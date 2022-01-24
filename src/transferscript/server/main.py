@@ -67,5 +67,5 @@ async def get_microscope():
         microscope_from_hostname = hostname.split('.')[0]
     except OSError:
         microscope_from_hostname = 'Unknown'
-    microscope_name = os.getenv("MICROSCOPE", microscope_from_hostname)
+    microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
     return microscope_name
