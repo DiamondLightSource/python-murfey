@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import pathlib
 import queue
 import threading
 import time
 from typing import Dict, List, Optional
+
+logger = logging.getLogger("transferscript.utils.monitor")
 
 
 class Monitor:
@@ -31,12 +34,17 @@ class Monitor:
             self.thread = threading.Thread(
                 target=self._monitor, args=(sleep,), name=f"{self.dir} monitor thread"
             )
+            logger.info(
+                f"Starting to monitor {self.dir} in separate thread {self.thread}"
+            )
         else:
+            logger.info(f"Starting to monitor {self.dir}")
             self._monitor(sleep)
 
     def _monitor(self, sleep: int):
         while True:
             if new_files := self._check():
+                logger.info(f"{len(new_files)} new files found")
                 for f in new_files:
                     self._out_queue.put(f)
             time.sleep(sleep)
