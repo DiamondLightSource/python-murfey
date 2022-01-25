@@ -14,9 +14,9 @@ class Monitor:
     def __init__(self, directory: pathlib.Path):
         self.dir = directory
         self._timed_cache: Dict[pathlib.Path, float] = {}
-        self._in_queue: queue.Queue = queue.Queue()
-        self._out_queue: queue.Queue = queue.Queue()
+        self._file_queue: queue.Queue = queue.Queue()
         self.thread: Optional[threading.Thread] = None
+        self.free: bool = True
 
     def _check(self) -> List[pathlib.Path]:
         new_files: Dict[pathlib.Path, float] = {
@@ -37,14 +37,20 @@ class Monitor:
             logger.info(
                 f"Starting to monitor {self.dir} in separate thread {self.thread}"
             )
+            self.thread.start()
         else:
             logger.info(f"Starting to monitor {self.dir}")
             self._monitor(sleep)
 
     def _monitor(self, sleep: int):
-        while True:
+        while self.free:
             if new_files := self._check():
                 logger.info(f"{len(new_files)} new files found")
-                for f in new_files:
-                    self._out_queue.put(f)
+                self._file_queue.put(new_files)
             time.sleep(sleep)
+
+    def stop(self):
+        self.free = False
+
+    def wait(self):
+        self.thread.join()

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import queue
 import threading
 from pathlib import Path
 from typing import Callable, List, Optional, Union
 
 import procrunner
+
+from transferscript.utils.file_monitor import Monitor
 
 
 class RsyncInstance:
@@ -137,3 +140,17 @@ class RsyncInstance:
         print(f"{self.sent_bytes} bytes sent and {self.received_bytes} received")
         print("=================================\n")
         return len(self.transferred) == self.total_files
+
+
+class RsynchPipe:
+    def __init__(self, monitor: Monitor, finaldir: Path):
+        self.monitor = monitor
+        self._finaldir = finaldir
+        self._in_queue: queue.Queue = monitor._file_queue
+
+    def process(self):
+        while self.monitor.thread.is_alive():
+            files_for_transfer = self._in_queue.get()
+            rsyncher = RsyncInstance(files_for_transfer, self._finaldir)
+            rsyncher()
+            rsyncher.wait()
