@@ -22,7 +22,7 @@ class Monitor:
         new_files: Dict[pathlib.Path, float] = {
             f: f.stat().st_mtime
             for f in self.dir.glob("**/*")
-            if not self._timed_cache.get(f) or self._timed_cache[f] == f.stat().st_mtime
+            if not self._timed_cache.get(f) or self._timed_cache[f] != f.stat().st_mtime
         }
         if not new_files:
             return []
