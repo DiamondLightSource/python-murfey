@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Callable, List, Optional, Union
 import procrunner
 
 from transferscript.utils.file_monitor import Monitor
+
+logger = logging.getLogger("transferscript.utils.rsync")
 
 
 class RsyncInstance:
@@ -148,9 +151,16 @@ class RsynchPipe:
         self._finaldir = finaldir
         self._in_queue: queue.Queue = monitor._file_queue
 
-    def process(self):
-        while self.monitor.thread.is_alive():
-            files_for_transfer = self._in_queue.get()
-            rsyncher = RsyncInstance(files_for_transfer, self._finaldir)
-            rsyncher()
-            rsyncher.wait()
+    def process(self, retry: bool = True):
+        if self.monitor.thread:
+            while self.monitor.thread.is_alive():
+                files_for_transfer = self._in_queue.get()
+                rsyncher = RsyncInstance(files_for_transfer, self._finaldir)
+                rsyncher()
+                rsyncher.wait()
+                if rsyncher.failed:
+                    for f in rsyncher.failed:
+                        logger.error(f"Failed to transfer file {f}")
+                    if retry:
+                        # put the failed file transfers back into the queue
+                        self._in_queue.put(rsyncher.failed)
