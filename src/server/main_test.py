@@ -10,10 +10,15 @@ def test_read_main():
     assert response.status_code == 200
     assert response.json() == {"msg": "Transfer Server"}
 
-def test_get_visits():
+def test_get_all_visits():
     response = client.get("/visits/m12")
     assert response.status_code == 200
     #assert response.json()[0]["Start date"] == "2020-09-09T14:00:00"
+
+def test_get_visit_info():
+    response = client.get("/visits/m12/cm31095-1")
+    print(response.text)
+    assert response.status_code == 200
 
 def test_client_hostname():
     response = client.get("/")
@@ -32,5 +37,6 @@ def test_no_response():
     response = client.get("/hstnnsv")
     assert response.status_code != 200
 
-test_no_response()
-test_get_microscope()
+test_get_visit_info()
+#test_no_response()
+#test_get_microscope()
