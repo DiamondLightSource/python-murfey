@@ -54,3 +54,4 @@ class Monitor:
 
     def wait(self):
         self.thread.join()
+        self._file_queue.put([])
