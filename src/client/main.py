@@ -11,7 +11,7 @@ def run():
     print(get_visit_info(args.visit).text)
 
 def get_all_visits():
-    path = 'http://127.0.0.1:8000/visits/' + os.getenv("MICROSCOPE")
+    path = 'http://127.0.0.1:8000/visits/' + os.getenv("BEAMLINE")
     # uvicorn default host and port, specified in uvicorn.run in server/main.py
     r = requests.get(path)
     return r
