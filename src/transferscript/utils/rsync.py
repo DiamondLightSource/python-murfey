@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Callable, List, Optional
 
 import procrunner
@@ -28,7 +28,6 @@ class RsyncInstance:
         self,
         files: List[Path],
         destination: Path,
-        cygwin_base: Optional[Path] = None,
     ):
         self.destintation = destination
         self.files = files
@@ -50,7 +49,6 @@ class RsyncInstance:
             ),
         )
         self.runner_return: Optional[procrunner.ReturnObject] = None
-        self.cygwin_base = cygwin_base
 
     def __call__(self) -> threading.Thread:
         self._transferring = True
@@ -77,16 +75,9 @@ class RsyncInstance:
         :type callback_sterr: callable that takes a byte string as its only input
         """
         cmd: List[str] = ["rsync", "-v"]
-        if self.cygwin_base:
-            cmd.extend(
-                str(PurePosixPath("/", f.relative_to(self.cygwin_base))) for f in files
-            )
-            cmd.append(
-                str(PurePosixPath("/", destination.relative_to(self.cygwin_base)))
-            )
-        else:
-            cmd.extend(str(PurePosixPath(f)) for f in files)
-            cmd.append(str(PurePosixPath(destination)))
+
+        cmd.extend(str(f) for f in files)
+        cmd.append(str(destination))
         runner = procrunner.run(
             cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
         )
@@ -160,13 +151,10 @@ class RsyncInstance:
 
 
 class RsynchPipe:
-    def __init__(
-        self, monitor: Monitor, finaldir: Path, cygwin_base: Optional[Path] = None
-    ):
+    def __init__(self, monitor: Monitor, finaldir: Path):
         self.monitor = monitor
         self._finaldir = finaldir
         self._in_queue: queue.Queue = monitor._file_queue
-        self.cygwin_base = cygwin_base
 
     def process(self, retry: bool = True):
         if self.monitor.thread:
@@ -174,9 +162,7 @@ class RsynchPipe:
                 files_for_transfer = self._in_queue.get()
                 if not files_for_transfer:
                     continue
-                rsyncher = RsyncInstance(
-                    files_for_transfer, self._finaldir, self.cygwin_base
-                )
+                rsyncher = RsyncInstance(files_for_transfer, self._finaldir)
                 rsyncher()
                 rsyncher.wait()
                 if rsyncher.failed:
