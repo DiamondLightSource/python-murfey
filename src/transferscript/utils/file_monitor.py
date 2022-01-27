@@ -44,10 +44,14 @@ class Monitor:
 
     def _monitor(self, sleep: int):
         while self.free:
-            if new_files := self._check():
-                logger.info(f"{len(new_files)} new files found")
-                self._file_queue.put(new_files)
+            self._queue_new_files()
             time.sleep(sleep)
+        self._queue_new_files()
+
+    def _queue_new_files(self):
+        if new_files := self._check():
+            logger.info(f"{len(new_files)} new files found")
+            self._file_queue.put(new_files)
 
     def stop(self):
         self.free = False

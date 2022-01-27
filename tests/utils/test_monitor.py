@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time
-
 from transferscript.utils.file_monitor import Monitor
 
 
@@ -32,7 +30,6 @@ def test_directory_with_an_added_file(tmp_path):
     monitor = Monitor(tmp_path)
     monitor.monitor(in_thread=True, sleep=0.1)
     (tmp_path / "another_empty_file.txt").touch()
-    time.sleep(0.2)
     monitor.stop()
     monitor.wait()
     assert len(monitor._timed_cache.keys()) == 2
