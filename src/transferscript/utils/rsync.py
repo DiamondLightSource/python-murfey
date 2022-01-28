@@ -4,7 +4,7 @@ import logging
 import queue
 import threading
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import procrunner
 
@@ -26,14 +26,18 @@ class RsyncInstance:
 
     def __init__(
         self,
+        root: Path,
         files: List[Path],
         destination: Path,
     ):
         self.destintation = destination
+        self.root = root
         self.files = files
         self.total_files = len(files)
-        self.transferred: List[str] = []
-        self.failed: List[str] = []
+        self.transferred: List[Path] = []
+        self._transferred_tmp: List[str] = []
+        self.failed: List[Path] = []
+        self._failed_tmp: List[str] = []
         self._transferring = False
         self.sent_bytes = 0
         self.received_bytes = 0
@@ -48,7 +52,7 @@ class RsyncInstance:
                 self._parse_rsync_stderr,
             ),
         )
-        self.runner_return: Optional[procrunner.ReturnObject] = None
+        self.runner_return: List[procrunner.ReturnObject] = []
 
     def __call__(self, in_thread: bool = False) -> Optional[threading.Thread]:
         self._transferring = True
@@ -85,12 +89,28 @@ class RsyncInstance:
         """
         cmd: List[str] = ["rsync", "-v"]
 
-        cmd.extend(str(f) for f in files)
-        cmd.append(str(destination))
-        runner = procrunner.run(
-            cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
-        )
-        self.runner_return = runner
+        def _structure(p: Path) -> Path:
+            return (p.relative_to(self.root)).parent
+
+        divided_files: Dict[Path, List[Path]] = {}
+        for f in files:
+            s = _structure(f)
+            try:
+                divided_files[s].append(f)
+            except KeyError:
+                divided_files[s] = [f]
+        for s in divided_files.keys():
+            self._transferred_tmp = []
+            self._failed_tmp = []
+            cmd.extend(str(f) for f in divided_files[s])
+            cmd.append(str(destination / s) + "/")
+            print(f"rsync command {cmd}")
+            runner = procrunner.run(
+                cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
+            )
+            self.runner_return.append(runner)
+            self.transferred.extend(self.root / s / f for f in self._transferred_tmp)
+            self.failed.extend(self.root / s / f for f in self._failed_tmp)
 
     def _parse_rsync_stdout(self, stdout: bytes):
         """
@@ -101,6 +121,7 @@ class RsyncInstance:
         :type stdout: bytes
         """
         stringy_stdout = str(stdout)
+        print(f"output: {stringy_stdout}")
         if stringy_stdout:
             if self._transferring:
                 if stringy_stdout.startswith("sent"):
@@ -111,8 +132,8 @@ class RsyncInstance:
                         byte_info[byte_info.index("received") + 1]
                     )
                     self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
-                else:
-                    self.transferred.append(stringy_stdout)
+                elif len(stringy_stdout.split()) == 1:
+                    self._transferred_tmp.append(stringy_stdout)
             else:
                 if "total size" in stringy_stdout:
                     self.total_size = int(
@@ -133,7 +154,7 @@ class RsyncInstance:
                 and "failed" in stringy_stderr
             ):
                 failed_msg = stringy_stderr.split()
-                self.failed.append(
+                self._failed_tmp.append(
                     failed_msg[failed_msg.index("failed:") - 1].replace('"', "")
                 )
 
@@ -183,7 +204,9 @@ class RsyncPipe:
                 files_for_transfer = self._in_queue.get()
                 if not files_for_transfer:
                     continue
-                rsyncher = RsyncInstance(files_for_transfer, self._finaldir)
+                rsyncher = RsyncInstance(
+                    self.monitor.dir, files_for_transfer, self._finaldir
+                )
                 rsyncher()
                 rsyncher.wait()
                 if rsyncher.failed:
