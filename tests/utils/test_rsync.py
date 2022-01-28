@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from transferscript.utils.rsync import RsyncInstance
+from transferscript.utils.file_monitor import Monitor
+from transferscript.utils.rsync import RsyncInstance, RsyncPipe
 
 
 def test_a_simple_rsync_instance(tmp_path):
@@ -54,3 +55,20 @@ def test_rsync_instance_on_nested_directory_structure(tmp_path):
     assert ri.transferred == [f01]
     assert not len(ri.failed)
     assert (destination / "nest" / "file01.txt").exists()
+
+
+def test_rsync_pipe_from_monitor(tmp_path):
+    (tmp_path / "from").mkdir()
+    destination = tmp_path / "to"
+    destination.mkdir()
+    f01 = tmp_path / "from" / "file01.txt"
+    f01.touch()
+    monitor = Monitor(tmp_path / "from")
+    monitor.monitor(in_thread=True, sleep=0.1)
+    rp = RsyncPipe(monitor, destination)
+    rp.process(in_thread=True)
+    assert rp.thread
+    monitor.stop()
+    monitor.wait()
+    rp.wait()
+    assert (destination / "file01.txt").exists()

@@ -162,7 +162,8 @@ class RsyncInstance:
         """
         Wait for rsync process of this instance to finish.
         """
-        self.thread.join()
+        if self.thread.is_alive():
+            self.thread.join()
 
     def check(self) -> bool:
         """
@@ -215,3 +216,7 @@ class RsyncPipe:
                     if retry:
                         # put the failed file transfers back into the queue
                         self._in_queue.put(rsyncher.failed)
+
+    def wait(self):
+        if self.thread:
+            self.thread.join()
