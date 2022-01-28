@@ -50,10 +50,19 @@ class RsyncInstance:
         )
         self.runner_return: Optional[procrunner.ReturnObject] = None
 
-    def __call__(self) -> threading.Thread:
+    def __call__(self, in_thread: bool = False) -> Optional[threading.Thread]:
         self._transferring = True
-        self.thread.start()
-        return self.thread
+        if in_thread:
+            self.thread.start()
+            return self.thread
+        else:
+            self.run_rsync(
+                self.files,
+                self.destintation,
+                self._parse_rsync_stdout,
+                self._parse_rsync_stderr,
+            )
+            return None
 
     def run_rsync(
         self,
@@ -150,13 +159,25 @@ class RsyncInstance:
         return len(self.transferred) == self.total_files
 
 
-class RsynchPipe:
+class RsyncPipe:
     def __init__(self, monitor: Monitor, finaldir: Path):
         self.monitor = monitor
         self._finaldir = finaldir
         self._in_queue: queue.Queue = monitor._file_queue
+        self.thread: Optional[threading.Thread] = None
 
-    def process(self, retry: bool = True):
+    def process(self, retry: bool = True, in_thread: bool = False):
+        if in_thread:
+            self.thread = threading.Thread(
+                target=self._process,
+                args=(retry,),
+                name=f"rsync -> {self._finaldir} thread",
+            )
+            self.thread.start()
+        else:
+            self._process(retry)
+
+    def _process(self, retry: bool = True):
         if self.monitor.thread:
             while self.monitor.thread.is_alive():
                 files_for_transfer = self._in_queue.get()

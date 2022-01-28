@@ -3,18 +3,22 @@ from __future__ import annotations
 import datetime
 import os
 import socket
-from pprint import pprint
-from typing import List, Optional
 
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
+import uvicorn
 from fastapi import FastAPI, Request, Response
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
 app = FastAPI()
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app", host="127.0.0.1", port=8000, env_file="example_environment_file"
+    )
 
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
@@ -38,7 +42,7 @@ class Visits(BaseModel):
 
 
 @app.get("/visits/{bl_name}")
-async def visit_info(bl_name: str):
+async def all_visit_info(bl_name: str):
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -60,6 +64,7 @@ async def visit_info(bl_name: str):
         .all()
     )
     if query:
+        print("Query Found")
         return_query = [
             {
                 "Start date": id.startDate,
@@ -78,8 +83,50 @@ async def visit_info(bl_name: str):
         return None
 
 
+@app.get("/visits/{bl_name}/{visit_name}")
+async def visit_info(bl_name: str, visit_name: str):
+    print(visit_name)
+    query = (
+        db_session.query(BLSession)
+        .join(Proposal)
+        .filter(
+            BLSession.proposalId == Proposal.proposalId,
+            BLSession.beamLineName == bl_name,
+            BLSession.endDate > datetime.datetime.now(),
+            BLSession.startDate < datetime.datetime.now(),
+        )
+        .add_columns(
+            BLSession.startDate,
+            BLSession.endDate,
+            BLSession.beamLineName,
+            Proposal.proposalCode,
+            Proposal.proposalNumber,
+            BLSession.visit_number,
+            Proposal.title,
+        )
+        .all()
+    )
+    if query:
+        print("Query Found")
+        return_query = [
+            {
+                "Start date": id.startDate,
+                "End date": id.endDate,
+                "Beamline name": id.beamLineName,
+                "Visit name": visit_name,
+                "Time remaining": str(id.endDate - datetime.datetime.now()),
+            }
+            for id in query
+            if id.proposalCode + str(id.proposalNumber) + "-" + str(id.visit_number)
+            == visit_name
+        ]  # "Proposal title": id.title
+        return return_query
+    else:
+        return None
+
+
 @app.get("/pypi/{path}")
-async def pypi_request(path: str):
+async def pypi_request_path(path: str):
     full_path = "https://pypi.org/simple/" + path
     full_path_response = get(full_path)
     return Response(
