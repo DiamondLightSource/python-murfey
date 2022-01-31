@@ -30,7 +30,7 @@ class RsyncInstance:
         files: List[Path],
         destination: Path,
     ):
-        self.destintation = destination
+        self.destination = destination
         self.root = root
         self.files = files
         self.total_files = len(files)
@@ -43,26 +43,27 @@ class RsyncInstance:
         self.received_bytes = 0
         self.byte_rate: float = 0
         self.total_size = 0
-        self.thread = threading.Thread(
-            target=self.run_rsync,
-            args=(
-                files,
-                destination,
-                self._parse_rsync_stdout,
-                self._parse_rsync_stderr,
-            ),
-        )
+        self.thread: Optional[threading.Thread] = None
         self.runner_return: List[procrunner.ReturnObject] = []
 
     def __call__(self, in_thread: bool = False) -> Optional[threading.Thread]:
         self._transferring = True
         if in_thread:
+            self.thread = threading.Thread(
+                target=self.run_rsync,
+                args=(
+                    self.files,
+                    self.destination,
+                    self._parse_rsync_stdout,
+                    self._parse_rsync_stderr,
+                ),
+            )
             self.thread.start()
             return self.thread
         else:
             self.run_rsync(
                 self.files,
-                self.destintation,
+                self.destination,
                 self._parse_rsync_stdout,
                 self._parse_rsync_stderr,
             )
@@ -162,7 +163,7 @@ class RsyncInstance:
         """
         Wait for rsync process of this instance to finish.
         """
-        if self.thread.is_alive():
+        if self.thread:
             self.thread.join()
 
     def check(self) -> bool:
