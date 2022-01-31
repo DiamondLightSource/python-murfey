@@ -105,7 +105,6 @@ class RsyncInstance:
             self._failed_tmp = []
             cmd.extend(str(f) for f in divided_files[s])
             cmd.append(str(destination / s) + "/")
-            print(f"rsync command {cmd}")
             runner = procrunner.run(
                 cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
             )
@@ -122,7 +121,6 @@ class RsyncInstance:
         :type stdout: bytes
         """
         stringy_stdout = str(stdout)
-        print(f"output: {stringy_stdout}")
         if stringy_stdout:
             if self._transferring:
                 if stringy_stdout.startswith("sent"):
