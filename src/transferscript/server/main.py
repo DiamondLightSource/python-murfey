@@ -77,6 +77,15 @@ async def visit_info(bl_name: str):
     else:
         return None
 
+@app.get("/visits/{bl_name}/{visit_name}")
+async def visit_info(bl_name: str, visit_name: str):
+    query = db_session.query(BLSession).join(Proposal).filter(BLSession.proposalId == Proposal.proposalId, BLSession.beamLineName == bl_name, BLSession.endDate > datetime.datetime.now(), BLSession.startDate < datetime.datetime.now()).add_columns(BLSession.startDate, BLSession.endDate, BLSession.beamLineName, Proposal.proposalCode, Proposal.proposalNumber, BLSession.visit_number, Proposal.title).all()
+    if query:
+        return_query = [{"Start date": id.startDate, "End date": id.endDate, "Beamline name": id.beamLineName, "Visit name": visit_name, "Time remaining": str(id.endDate - datetime.datetime.now())} for id in query if id.proposalCode + str(id.proposalNumber) + '-' + str(id.visit_number) == visit_name] # "Proposal title": id.title
+        return return_query
+    else:
+        return None
+
 
 @app.get("/pypi/{path}")
 async def pypi_request(path: str):

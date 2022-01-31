@@ -1,2 +1,0 @@
-export ISPYB_CREDENTIALS=/dls_sw/dasc/mariadb/credentials/ispyb.cfg
-#export MICROSCOPE="m04"
