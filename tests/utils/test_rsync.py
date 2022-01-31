@@ -16,6 +16,19 @@ def test_a_simple_rsync_instance(tmp_path):
     assert ri.transferred == [f01]
 
 
+def test_a_simple_rsync_instance_in_thread(tmp_path):
+    (tmp_path / "from").mkdir()
+    destination = tmp_path / "to"
+    destination.mkdir()
+    f01 = tmp_path / "from" / "file01.txt"
+    f01.touch()
+    ri = RsyncInstance(tmp_path / "from", [f01], destination)
+    ri(in_thread=True)
+    ri.wait()
+    assert len(ri.transferred) == 1
+    assert ri.transferred == [f01]
+
+
 def test_rsync_multiple_files(tmp_path):
     (tmp_path / "from").mkdir()
     destination = tmp_path / "to"
