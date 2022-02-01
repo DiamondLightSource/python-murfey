@@ -2,20 +2,19 @@ from __future__ import annotations
 
 import logging
 import pathlib
-import queue
-import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+from transferscript.utils import Processor
 
 logger = logging.getLogger("transferscript.utils.monitor")
 
 
-class Monitor:
-    def __init__(self, directory: pathlib.Path):
+class Monitor(Processor):
+    def __init__(self, directory: pathlib.Path, name: str = "monitor"):
+        super().__init__(name=name)
         self.dir = directory
         self._timed_cache: Dict[pathlib.Path, float] = {}
-        self._file_queue: queue.Queue = queue.Queue()
-        self.thread: Optional[threading.Thread] = None
         self.free: bool = True
 
     def _check(self) -> List[pathlib.Path]:
@@ -29,20 +28,7 @@ class Monitor:
         self._timed_cache.update(new_files)
         return list(new_files.keys())
 
-    def monitor(self, sleep: int = 10, in_thread: bool = False):
-        if in_thread:
-            self.thread = threading.Thread(
-                target=self._monitor, args=(sleep,), name=f"{self.dir} monitor thread"
-            )
-            logger.info(
-                f"Starting to monitor {self.dir} in separate thread {self.thread}"
-            )
-            self.thread.start()
-        else:
-            logger.info(f"Starting to monitor {self.dir}")
-            self._monitor(sleep)
-
-    def _monitor(self, sleep: int):
+    def _process(self, sleep: int = 10, **kwargs):
         while self.free:
             self._queue_new_files()
             time.sleep(sleep)
@@ -51,11 +37,11 @@ class Monitor:
     def _queue_new_files(self):
         if new_files := self._check():
             logger.info(f"{len(new_files)} new files found")
-            self._file_queue.put(new_files)
+            self._out.put(new_files)
 
     def stop(self):
         self.free = False
 
     def wait(self):
-        self.thread.join()
-        self._file_queue.put([])
+        super().wait()
+        self._out.put([])
