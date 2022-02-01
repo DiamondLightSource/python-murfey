@@ -6,12 +6,12 @@ import pathlib
 
 import uvicorn
 
-# from ... import logconfig
+from . import logconfig
 
 
 def run():
     log = logging.getLogger(name="Transferscript server")
-    # logconfig.setup_logging()
+    logconfig.setup_logging()
     parser = argparse.ArgumentParser(description="Start the transferscript server")
     parser.add_argument(
         "--env_file",
@@ -19,5 +19,13 @@ def run():
         default=pathlib.Path(__file__).parent / "example_environment_file",
     )
     args = parser.parse_args()
-    log.info("Starting server (environment file: ", args.env_file, ")")
-    uvicorn.run("server.main:app", host="127.0.0.1", port=8000, env_file=args.env_file)
+    print(args.env_file)
+    log.info("Starting transferscript server.")
+    uvicorn.run(
+        "transferscript.server.main:app",
+        host="127.0.0.1",
+        port=8000,
+        env_file=args.env_file,
+        log_level="warning",
+    )  # set to warning to reduce log clogging
+    log.info("Server startup complete.")
