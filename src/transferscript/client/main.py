@@ -40,7 +40,7 @@ def get_visit_info(visit_name: str):
 
 def watch_directory(directory: pathlib.Path) -> Monitor:
     monitor = Monitor(directory)
-    monitor.monitor(in_thread=True)
+    monitor.process(in_thread=True)
     return monitor
 
 
@@ -50,7 +50,8 @@ def stop_watching(monitor: Monitor):
 
 
 def start_transfer(monitor: Monitor, destination: pathlib.Path) -> RsyncPipe:
-    rp = RsyncPipe(monitor, destination)
+    rp = RsyncPipe(destination)
+    monitor >> rp
     rp.process(in_thread=True)
     return rp
 

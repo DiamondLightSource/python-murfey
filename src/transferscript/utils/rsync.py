@@ -1,40 +1,21 @@
 from __future__ import annotations
 
 import logging
-import queue
-import threading
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 import procrunner
 
+from transferscript.utils import Processor
 from transferscript.utils.file_monitor import Monitor
 
 logger = logging.getLogger("transferscript.utils.rsync")
 
 
-class RsyncInstance:
-    """
-    Class for running an rsync process in a thread and collecting relevant information
-    from its outputs.
-
-    :param files: List of files to be transferred
-    :param type: list of strings or pathlib.Path objects
-    :param destination: Directory to copy files to
-    :param destination: string or pathlib.Path object
-    """
-
-    def __init__(
-        self,
-        root: Path,
-        files: List[Path],
-        destination: Path,
-    ):
-        self.destination = destination
-        self.root = root
-        self.files = files
-        self.total_files = len(files)
-        self.transferred: List[Path] = []
+class RsyncPipe(Processor):
+    def __init__(self, finaldir: Path, name: str = "rsync_pipe"):
+        super().__init__(name=name)
+        self._finaldir = finaldir
         self._transferred_tmp: List[str] = []
         self.failed: List[Path] = []
         self._failed_tmp: List[str] = []
@@ -43,55 +24,38 @@ class RsyncInstance:
         self.received_bytes = 0
         self.byte_rate: float = 0
         self.total_size = 0
-        self.thread: Optional[threading.Thread] = None
         self.runner_return: List[procrunner.ReturnObject] = []
 
-    def __call__(self, in_thread: bool = False) -> Optional[threading.Thread]:
-        self._transferring = True
-        if in_thread:
-            self.thread = threading.Thread(
-                target=self.run_rsync,
-                args=(
-                    self.files,
-                    self.destination,
-                    self._parse_rsync_stdout,
-                    self._parse_rsync_stderr,
-                ),
-            )
-            self.thread.start()
-            return self.thread
-        else:
-            self.run_rsync(
-                self.files,
-                self.destination,
-                self._parse_rsync_stdout,
-                self._parse_rsync_stderr,
-            )
-            return None
+    def _process(self, retry: bool = True, **kwargs):
+        if isinstance(self._previous, Monitor) and self._previous.thread:
+            while self._previous.thread.is_alive():
+                files_for_transfer = self._in.get()
+                if not files_for_transfer:
+                    continue
+                self._run_rsync(self._previous.dir, files_for_transfer, retry=retry)
 
-    def run_rsync(
+    def _run_rsync(
         self,
+        root: Path,
         files: List[Path],
-        destination: Path,
-        callback_stdout: Callable,
-        callback_stderr: Callable,
+        retry: bool = True,
     ):
         """
         Run rsync -v on a list of files using procrunner.
 
+        :param root: root path of files for transferring; structure below the root is preserved
+        :type root: pathlib.Path object
         :param files: List of files to be transferred
         :type files: list of strigs or pathlib.Path objects
         :param destination: Directory that files are to be copied to.
         :type destination: string or pathlib.Path object
-        :param callback_stdout: Method for parsing rsync's stdout
-        :type callback_stdout: callable that takes a byte string as its only input
-        :param callback_stderr: Method for parsing rsync's stderr
-        :type callback_sterr: callable that takes a byte string as its only input
+        :param retry: If True put failed files back into the queue to be consumed
+        :type retry: bool
         """
         cmd: List[str] = ["rsync", "-v"]
 
         def _structure(p: Path) -> Path:
-            return (p.relative_to(self.root)).parent
+            return (p.relative_to(root)).parent
 
         divided_files: Dict[Path, List[Path]] = {}
         for f in files:
@@ -104,13 +68,20 @@ class RsyncInstance:
             self._transferred_tmp = []
             self._failed_tmp = []
             cmd.extend(str(f) for f in divided_files[s])
-            cmd.append(str(destination / s) + "/")
+            cmd.append(str(self._finaldir / s) + "/")
+            print(f"rsync command: {cmd}")
+            self._transferring = True
             runner = procrunner.run(
-                cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
+                cmd,
+                callback_stdout=self._parse_rsync_stdout,
+                callback_stderr=self._parse_rsync_stderr,
             )
             self.runner_return.append(runner)
-            self.transferred.extend(self.root / s / f for f in self._transferred_tmp)
-            self.failed.extend(self.root / s / f for f in self._failed_tmp)
+            print(f"put on q {[root / s / f for f in self._transferred_tmp]}")
+            self._out.put([root / s / f for f in self._transferred_tmp])
+            self.failed.extend(root / s / f for f in self._failed_tmp)
+            if retry:
+                self._in.put(root / s / f for f in self._failed_tmp)
 
     def _parse_rsync_stdout(self, stdout: bytes):
         """
@@ -122,6 +93,7 @@ class RsyncInstance:
         """
         stringy_stdout = str(stdout)
         if stringy_stdout:
+            print(f"rsync output {stringy_stdout}: {self._transferring}")
             if self._transferring:
                 if stringy_stdout.startswith("sent"):
                     self._transferring = False
@@ -132,6 +104,7 @@ class RsyncInstance:
                     )
                     self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
                 elif len(stringy_stdout.split()) == 1:
+                    print(f"found {stringy_stdout.split()}")
                     self._transferred_tmp.append(stringy_stdout)
             else:
                 if "total size" in stringy_stdout:
@@ -156,66 +129,3 @@ class RsyncInstance:
                 self._failed_tmp.append(
                     failed_msg[failed_msg.index("failed:") - 1].replace('"', "")
                 )
-
-    def wait(self):
-        """
-        Wait for rsync process of this instance to finish.
-        """
-        if self.thread:
-            self.thread.join()
-
-    def check(self) -> bool:
-        """
-        Print summary of rsync process.
-
-        :return: True if the number of transferred files is equal to the number
-        of files that was to be transferred and False otherwise.
-        :rtype: bool
-        """
-        print("\n=====checking rsync instance=====")
-        print(f"{len(self.transferred)} files transferred of {self.total_files}")
-        print(f"total size {self.total_size} transferred")
-        print(f"{self.sent_bytes} bytes sent and {self.received_bytes} received")
-        print("=================================\n")
-        return len(self.transferred) == self.total_files
-
-
-class RsyncPipe:
-    def __init__(self, monitor: Monitor, finaldir: Path):
-        self.monitor = monitor
-        self._finaldir = finaldir
-        self._in_queue: queue.Queue = monitor._file_queue
-        self.thread: Optional[threading.Thread] = None
-
-    def process(self, retry: bool = True, in_thread: bool = False):
-        if in_thread:
-            self.thread = threading.Thread(
-                target=self._process,
-                args=(retry,),
-                name=f"rsync -> {self._finaldir} thread",
-            )
-            self.thread.start()
-        else:
-            self._process(retry)
-
-    def _process(self, retry: bool = True):
-        if self.monitor.thread:
-            while self.monitor.thread.is_alive():
-                files_for_transfer = self._in_queue.get()
-                if not files_for_transfer:
-                    continue
-                rsyncher = RsyncInstance(
-                    self.monitor.dir, files_for_transfer, self._finaldir
-                )
-                rsyncher()
-                rsyncher.wait()
-                if rsyncher.failed:
-                    for f in rsyncher.failed:
-                        logger.error(f"Failed to transfer file {f}")
-                    if retry:
-                        # put the failed file transfers back into the queue
-                        self._in_queue.put(rsyncher.failed)
-
-    def wait(self):
-        if self.thread:
-            self.thread.join()
