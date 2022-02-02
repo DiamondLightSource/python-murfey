@@ -7,18 +7,12 @@ import socket
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
-import uvicorn
 from fastapi import FastAPI, Request, Response
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
 app = FastAPI()
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:app", host="127.0.0.1", port=8000, env_file="example_environment_file"
-    )
 
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
@@ -64,7 +58,6 @@ async def all_visit_info(bl_name: str):
         .all()
     )
     if query:
-        print("Query Found")
         return_query = [
             {
                 "Start date": id.startDate,

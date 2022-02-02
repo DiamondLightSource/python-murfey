@@ -44,8 +44,3 @@ def test_get_microscope():
 def test_no_response():
     response = client.get("/hstnnsv")
     assert response.status_code != 200
-
-
-test_get_visit_info()
-# test_no_response()
-# test_get_microscope()
