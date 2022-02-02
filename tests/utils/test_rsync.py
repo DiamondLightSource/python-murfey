@@ -14,7 +14,7 @@ def test_a_simple_rsync_instance(tmp_path):
     rp._run_rsync(tmp_path / "from", [f01])
     assert rp._out.qsize() == 1
     transferred = rp._out.get()
-    assert transferred == [f01]
+    assert transferred == f01
 
 
 def test_rsync_multiple_files(tmp_path):
@@ -27,8 +27,9 @@ def test_rsync_multiple_files(tmp_path):
     f02.touch()
     rp = RsyncPipe(destination)
     rp._run_rsync(tmp_path / "from", [f01, f02])
-    assert rp._out.qsize() == 1
-    transferred = rp._out.get()
+    assert rp._out.qsize() == 2
+    transferred = [rp._out.get()]
+    transferred.append(rp._out.get())
     assert len(transferred) == 2
     assert set(transferred) == {f01, f02}
 
@@ -44,7 +45,7 @@ def test_rsync_a_nonexistant_file(tmp_path):
     rp._run_rsync(tmp_path / "from", [f01, f02], retry=False)
     assert rp._out.qsize() == 1
     transferred = rp._out.get()
-    assert transferred == [f01]
+    assert transferred == f01
     assert len(rp.failed) == 1
 
 
@@ -59,7 +60,7 @@ def test_rsync_instance_on_nested_directory_structure(tmp_path):
     rp._run_rsync(tmp_path / "from", [f01])
     assert rp._out.qsize() == 1
     transferred = rp._out.get()
-    assert transferred == [f01]
+    assert transferred == f01
     assert not len(rp.failed)
     assert (destination / "nest" / "file01.txt").exists()
 

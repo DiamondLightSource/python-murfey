@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import procrunner
 
@@ -13,10 +13,11 @@ logger = logging.getLogger("transferscript.utils.rsync")
 
 
 class RsyncPipe(Processor):
-    def __init__(self, finaldir: Path, name: str = "rsync_pipe"):
+    def __init__(
+        self, finaldir: Path, name: str = "rsync_pipe", root: Optional[Path] = None
+    ):
         super().__init__(name=name)
         self._finaldir = finaldir
-        self._transferred_tmp: List[str] = []
         self.failed: List[Path] = []
         self._failed_tmp: List[str] = []
         self._transferring = False
@@ -25,6 +26,8 @@ class RsyncPipe(Processor):
         self.byte_rate: float = 0
         self.total_size = 0
         self.runner_return: List[procrunner.ReturnObject] = []
+        self._root = root
+        self._sub_structure: Optional[Path] = None
 
     def _process(self, retry: bool = True, **kwargs):
         if isinstance(self._previous, Monitor) and self._previous.thread:
@@ -54,6 +57,8 @@ class RsyncPipe(Processor):
         """
         cmd: List[str] = ["rsync", "-v"]
 
+        self._root = root
+
         def _structure(p: Path) -> Path:
             return (p.relative_to(root)).parent
 
@@ -65,11 +70,10 @@ class RsyncPipe(Processor):
             except KeyError:
                 divided_files[s] = [f]
         for s in divided_files.keys():
-            self._transferred_tmp = []
+            self._sub_structure = s
             self._failed_tmp = []
             cmd.extend(str(f) for f in divided_files[s])
             cmd.append(str(self._finaldir / s) + "/")
-            print(f"rsync command: {cmd}")
             self._transferring = True
             runner = procrunner.run(
                 cmd,
@@ -77,8 +81,6 @@ class RsyncPipe(Processor):
                 callback_stderr=self._parse_rsync_stderr,
             )
             self.runner_return.append(runner)
-            print(f"put on q {[root / s / f for f in self._transferred_tmp]}")
-            self._out.put([root / s / f for f in self._transferred_tmp])
             self.failed.extend(root / s / f for f in self._failed_tmp)
             if retry:
                 self._in.put(root / s / f for f in self._failed_tmp)
@@ -93,7 +95,6 @@ class RsyncPipe(Processor):
         """
         stringy_stdout = str(stdout)
         if stringy_stdout:
-            print(f"rsync output {stringy_stdout}: {self._transferring}")
             if self._transferring:
                 if stringy_stdout.startswith("sent"):
                     self._transferring = False
@@ -104,8 +105,8 @@ class RsyncPipe(Processor):
                     )
                     self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
                 elif len(stringy_stdout.split()) == 1:
-                    print(f"found {stringy_stdout.split()}")
-                    self._transferred_tmp.append(stringy_stdout)
+                    if self._root and self._sub_structure:
+                        self._out.put(self._root / self._sub_structure / stringy_stdout)
             else:
                 if "total size" in stringy_stdout:
                     self.total_size = int(
