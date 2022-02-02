@@ -15,6 +15,9 @@ class Processor:
         self.name = name or str(uuid4())[:8]
 
     def __rshift__(self, other: Processor):
+        self.point_to(other)
+
+    def point_to(self, other: Processor):
         if isinstance(other, Processor):
             other._in = self._out
             other._previous = self
