@@ -35,6 +35,3 @@ def get_visit_info(visit_name: str):
     # uvicorn default host and port, specified in uvicorn.run in server/main.py
     r = requests.get(path)
     return r
-
-
-run()
