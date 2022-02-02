@@ -107,6 +107,10 @@ class RsyncPipe(Processor):
                 elif len(stringy_stdout.split()) == 1:
                     if self._root and self._sub_structure:
                         self._out.put(self._root / self._sub_structure / stringy_stdout)
+                    else:
+                        logger.warning(
+                            f"root or substructure not set for transfer of {stringy_stdout}"
+                        )
             else:
                 if "total size" in stringy_stdout:
                     self.total_size = int(
