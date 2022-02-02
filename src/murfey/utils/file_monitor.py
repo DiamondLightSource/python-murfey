@@ -5,9 +5,9 @@ import pathlib
 import time
 from typing import Dict, List
 
-from transferscript.utils import Processor
+from murfey.utils import Processor
 
-logger = logging.getLogger("transferscript.utils.monitor")
+logger = logging.getLogger("murfey.utils.monitor")
 
 
 class Monitor(Processor):
