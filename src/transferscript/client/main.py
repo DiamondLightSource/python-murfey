@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import argparse
 import os
-import pathlib
 
 import requests
-
-from transferscript.utils.file_monitor import Monitor
-from transferscript.utils.rsync import RsyncPipe
 
 
 def run():
@@ -20,40 +16,25 @@ def run():
 
 
 def get_all_visits():
-    path = "http://127.0.0.1:8000/visits/" + os.getenv("BEAMLINE")
+    bl = os.getenv("BEAMLINE")
+    if bl:
+        path = "http://127.0.0.1:8000/visits/" + bl
+    else:
+        raise RuntimeError("No BEAMLINE environment variable was specified")
     # uvicorn default host and port, specified in uvicorn.run in server/main.py
     r = requests.get(path)
     return r
 
 
 def get_visit_info(visit_name: str):
-    path = (
-        "http://127.0.0.1:8000/visits/"
-        + (os.getenv("BEAMLINE") or "")
-        + "/"
-        + visit_name
-    )
+    bl = os.getenv("BEAMLINE")
+    if bl:
+        path = "http://127.0.0.1:8000/visits/" + bl + "/" + visit_name
+    else:
+        raise RuntimeError("No BEAMLINE environment variable was specified")
     # uvicorn default host and port, specified in uvicorn.run in server/main.py
     r = requests.get(path)
     return r
-
-
-def watch_directory(directory: pathlib.Path) -> Monitor:
-    monitor = Monitor(directory)
-    monitor.process(in_thread=True)
-    return monitor
-
-
-def stop_watching(monitor: Monitor):
-    monitor.stop()
-    monitor.wait()
-
-
-def start_transfer(monitor: Monitor, destination: pathlib.Path) -> RsyncPipe:
-    rp = RsyncPipe(destination)
-    monitor >> rp
-    rp.process(in_thread=True)
-    return rp
 
 
 run()

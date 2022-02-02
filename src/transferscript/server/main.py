@@ -85,7 +85,6 @@ async def all_visit_info(bl_name: str):
 
 @app.get("/visits/{bl_name}/{visit_name}")
 async def visit_info(bl_name: str, visit_name: str):
-    print(visit_name)
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -107,7 +106,6 @@ async def visit_info(bl_name: str, visit_name: str):
         .all()
     )
     if query:
-        print("Query Found")
         return_query = [
             {
                 "Start date": id.startDate,
@@ -126,7 +124,7 @@ async def visit_info(bl_name: str, visit_name: str):
 
 
 @app.get("/pypi/{path}")
-async def pypi_request_path(path: str):
+async def pypi_path_request(path: str):
     full_path = "https://pypi.org/simple/" + path
     full_path_response = get(full_path)
     return Response(
