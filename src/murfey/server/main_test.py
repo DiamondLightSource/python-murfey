@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from transferscript.server.main import app
+from murfey.server.main import app
 
 client = TestClient(app)
 

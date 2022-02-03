@@ -9,15 +9,15 @@ import zocalo.configuration
 
 ZOCALO_CONFIG = "/dls_sw/apps/zocalo/live/configuration.yaml"
 
+logger = logging.getLogger("murfey.server")
 
 def run():
     # setup logging
-    log = logging.getLogger(name="Transferscript server")
     log.setLevel(logging.INFO)
     zc = zocalo.configuration.from_file(ZOCALO_CONFIG)
     zc.activate_environment("live")
 
-    parser = argparse.ArgumentParser(description="Start the transferscript server")
+    parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--env_file",
         help="Path to environment file",
@@ -25,9 +25,9 @@ def run():
     )
     args = parser.parse_args()
     print(args.env_file)
-    log.info("Starting transferscript server.")
+    log.info("Starting Murfey")
     uvicorn.run(
-        "transferscript.server.main:app",
+        "murfey.server.main:app",
         host="127.0.0.1",
         port=8000,
         env_file=args.env_file,
