@@ -5,13 +5,18 @@ import logging
 import pathlib
 
 import uvicorn
+import zocalo.configuration
 
-from . import logconfig
+ZOCALO_CONFIG = "/dls_sw/apps/zocalo/live/configuration.yaml"
 
 
 def run():
+    # setup logging
     log = logging.getLogger(name="Transferscript server")
-    logconfig.setup_logging()
+    log.setLevel(logging.INFO)
+    zc = zocalo.configuration.from_file(ZOCALO_CONFIG)
+    zc.activate_environment("live")
+
     parser = argparse.ArgumentParser(description="Start the transferscript server")
     parser.add_argument(
         "--env_file",
