@@ -11,9 +11,10 @@ ZOCALO_CONFIG = "/dls_sw/apps/zocalo/live/configuration.yaml"
 
 logger = logging.getLogger("murfey.server")
 
+
 def run():
     # setup logging
-    log.setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)
     zc = zocalo.configuration.from_file(ZOCALO_CONFIG)
     zc.activate_environment("live")
 
@@ -25,7 +26,7 @@ def run():
     )
     args = parser.parse_args()
     print(args.env_file)
-    log.info("Starting Murfey")
+    logger.info("Starting Murfey")
     uvicorn.run(
         "murfey.server.main:app",
         host="127.0.0.1",
@@ -33,4 +34,4 @@ def run():
         env_file=args.env_file,
         log_level="warning",
     )  # set to warning to reduce log clogging
-    log.info("Server startup complete.")
+    logger.info("Server startup complete.")
