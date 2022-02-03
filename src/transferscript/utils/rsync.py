@@ -1,76 +1,89 @@
 from __future__ import annotations
 
-import threading
+import logging
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Dict, List, Optional
 
 import procrunner
 
+from transferscript.utils import Processor
+from transferscript.utils.file_monitor import Monitor
 
-class RsyncInstance:
-    """
-    Class for running an rsync process in a thread and collecting relevant information
-    from its outputs.
+logger = logging.getLogger("transferscript.utils.rsync")
 
-    :param files: List of files to be transferred
-    :param type: list of strings or pathlib.Path objects
-    :param destination: Directory to copy files to
-    :param destination: string or pathlib.Path object
-    """
 
-    def __init__(self, files: List[Union[str, Path]], destination: Union[str, Path]):
-        self.destintation = destination
-        self.files = files
-        self.total_files = len(files)
-        self.transferred: List[str] = []
-        self.failed: List[str] = []
+class RsyncPipe(Processor):
+    def __init__(
+        self, finaldir: Path, name: str = "rsync_pipe", root: Optional[Path] = None
+    ):
+        super().__init__(name=name)
+        self._finaldir = finaldir
+        self.failed: List[Path] = []
+        self._failed_tmp: List[str] = []
         self._transferring = False
         self.sent_bytes = 0
         self.received_bytes = 0
         self.byte_rate: float = 0
         self.total_size = 0
-        self.thread = threading.Thread(
-            target=self.run_rsync,
-            args=(
-                files,
-                destination,
-                self._parse_rsync_stdout,
-                self._parse_rsync_stderr,
-            ),
-        )
-        self.runner_return: Optional[procrunner.ReturnObject] = None
+        self.runner_return: List[procrunner.ReturnObject] = []
+        self._root = root
+        self._sub_structure: Optional[Path] = None
 
-    def __call__(self) -> threading.Thread:
-        self._transferring = True
-        self.thread.start()
-        return self.thread
+    def _process(self, retry: bool = True, **kwargs):
+        if isinstance(self._previous, Monitor) and self._previous.thread:
+            while self._previous.thread.is_alive():
+                files_for_transfer = self._in.get()
+                if not files_for_transfer:
+                    continue
+                self._run_rsync(self._previous.dir, files_for_transfer, retry=retry)
 
-    def run_rsync(
+    def _run_rsync(
         self,
-        files: List[Union[str, Path]],
-        destination: Union[str, Path],
-        callback_stdout: Callable,
-        callback_stderr: Callable,
+        root: Path,
+        files: List[Path],
+        retry: bool = True,
     ):
         """
         Run rsync -v on a list of files using procrunner.
 
+        :param root: root path of files for transferring; structure below the root is preserved
+        :type root: pathlib.Path object
         :param files: List of files to be transferred
         :type files: list of strigs or pathlib.Path objects
         :param destination: Directory that files are to be copied to.
         :type destination: string or pathlib.Path object
-        :param callback_stdout: Method for parsing rsync's stdout
-        :type callback_stdout: callable that takes a byte string as its only input
-        :param callback_stderr: Method for parsing rsync's stderr
-        :type callback_sterr: callable that takes a byte string as its only input
+        :param retry: If True put failed files back into the queue to be consumed
+        :type retry: bool
         """
         cmd: List[str] = ["rsync", "-v"]
-        cmd.extend(str(f) for f in files)
-        cmd.append(str(destination))
-        runner = procrunner.run(
-            cmd, callback_stdout=callback_stdout, callback_stderr=callback_stderr
-        )
-        self.runner_return = runner
+
+        self._root = root
+
+        def _structure(p: Path) -> Path:
+            return (p.relative_to(root)).parent
+
+        divided_files: Dict[Path, List[Path]] = {}
+        for f in files:
+            s = _structure(f)
+            try:
+                divided_files[s].append(f)
+            except KeyError:
+                divided_files[s] = [f]
+        for s in divided_files.keys():
+            self._sub_structure = s
+            self._failed_tmp = []
+            cmd.extend(str(f) for f in divided_files[s])
+            cmd.append(str(self._finaldir / s) + "/")
+            self._transferring = True
+            runner = procrunner.run(
+                cmd,
+                callback_stdout=self._parse_rsync_stdout,
+                callback_stderr=self._parse_rsync_stderr,
+            )
+            self.runner_return.append(runner)
+            self.failed.extend(root / s / f for f in self._failed_tmp)
+            if retry:
+                self._in.put(root / s / f for f in self._failed_tmp)
 
     def _parse_rsync_stdout(self, stdout: bytes):
         """
@@ -91,8 +104,13 @@ class RsyncInstance:
                         byte_info[byte_info.index("received") + 1]
                     )
                     self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
-                else:
-                    self.transferred.append(stringy_stdout)
+                elif len(stringy_stdout.split()) == 1:
+                    if self._root and self._sub_structure:
+                        self._out.put(self._root / self._sub_structure / stringy_stdout)
+                    else:
+                        logger.warning(
+                            f"root or substructure not set for transfer of {stringy_stdout}"
+                        )
             else:
                 if "total size" in stringy_stdout:
                     self.total_size = int(
@@ -113,27 +131,6 @@ class RsyncInstance:
                 and "failed" in stringy_stderr
             ):
                 failed_msg = stringy_stderr.split()
-                self.failed.append(
+                self._failed_tmp.append(
                     failed_msg[failed_msg.index("failed:") - 1].replace('"', "")
                 )
-
-    def wait(self):
-        """
-        Wait for rsync process of this instance to finish.
-        """
-        self.thread.join()
-
-    def check(self) -> bool:
-        """
-        Print summary of rsync process.
-
-        :return: True if the number of transferred files is equal to the number
-        of files that was to be transferred and False otherwise.
-        :rtype: bool
-        """
-        print("\n=====checking rsync instance=====")
-        print(f"{len(self.transferred)} files transferred of {self.total_files}")
-        print(f"total size {self.total_size} transferred")
-        print(f"{self.sent_bytes} bytes sent and {self.received_bytes} received")
-        print("=================================\n")
-        return len(self.transferred) == self.total_files

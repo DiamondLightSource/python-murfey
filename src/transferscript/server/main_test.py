@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
-
 from fastapi.testclient import TestClient
-from main import app
+
+from transferscript.server.main import app
 
 client = TestClient(app)
 
@@ -39,7 +38,3 @@ def test_get_microscope():
 def test_no_response():
     response = client.get("/hstnnsv")
     assert response.status_code != 200
-
-
-test_no_response()
-test_get_microscope()

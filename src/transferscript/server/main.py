@@ -36,7 +36,7 @@ class Visits(BaseModel):
 
 
 @app.get("/visits/{bl_name}")
-async def all_visit_info(bl_name: str):
+def all_visit_info(bl_name: str):
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -77,7 +77,7 @@ async def all_visit_info(bl_name: str):
 
 
 @app.get("/visits/{bl_name}/{visit_name}")
-async def visit_info(bl_name: str, visit_name: str):
+def visit_info(bl_name: str, visit_name: str):
     query = (
         db_session.query(BLSession)
         .join(Proposal)
