@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.mark.xfail
 @pytest.fixture(scope="session")
 def client():
+    pytest.xfail("Will fail if server not running")
     from murfey.server.main import app
 
     return TestClient(app)
