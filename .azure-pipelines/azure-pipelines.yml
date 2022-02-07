@@ -77,8 +77,6 @@ stages:
       vmImage: ubuntu-20.04
     strategy:
       matrix:
-        python37:
-          PYTHON_VERSION: 3.7
         python38:
           PYTHON_VERSION: 3.8
         python39:
