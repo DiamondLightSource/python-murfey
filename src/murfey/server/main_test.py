@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from murfey.server.main import app
 
-
-@pytest.fixture
+@pytest.fixture(scope="session")
 def client():
+    from murfey.server.main import app
+
     return TestClient(app)
 
 
