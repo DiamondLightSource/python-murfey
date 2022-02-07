@@ -3,9 +3,17 @@ from __future__ import annotations
 import argparse
 import os
 import pathlib
-from typing import List, Union
+from typing import List, NamedTuple, Union
 
 import requests
+
+from murfey.utils.file_monitor import Monitor
+from murfey.utils.rsync import RsyncPipe
+
+
+class MonitoringPipeline(NamedTuple):
+    monitor: Monitor
+    rsync: RsyncPipe
 
 
 def run():
@@ -55,3 +63,12 @@ def notify_file(
     }
     r = requests.post(path, data=request_body)
     return r.json()
+
+
+def setup(directory: pathlib.Path, destination: pathlib.Path) -> MonitoringPipeline:
+    monitor = Monitor(directory)
+    monitor.process(in_thread=True)
+    rp = RsyncPipe(destination)
+    monitor >> rp
+    rp.process(in_thread=True)
+    return MonitoringPipeline(monitor, rp)
