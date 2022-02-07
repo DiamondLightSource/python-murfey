@@ -1,3 +1,6 @@
+variables:
+  DATABASE_SCHEMA: 1.28.0
+
 trigger:
   branches:
     include:
@@ -5,6 +8,16 @@ trigger:
   tags:
     include:
     - '*'
+
+resources:
+  containers:
+  - container: mariadb
+    image: mariadb:10.5
+    env:
+      MYSQL_DATABASE: ispybtest
+      MYSQL_ROOT_PASSWORD: mysql_root_pwd
+    ports:
+    - 3306:3306
 
 stages:
 - stage: static
@@ -57,6 +70,10 @@ stages:
           ls -laR dist
         displayName: Build python package
 
+      - bash: |
+          wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v$(DATABASE_SCHEMA)/ispyb-database-$(DATABASE_SCHEMA).tar.gz -O dist/ispyb-database.tar.gz
+        displayName: Download ISPyB DB schema v$(DATABASE_SCHEMA) for tests
+
       - task: PublishBuildArtifacts@1
         displayName: Store artifact
         inputs:
@@ -83,6 +100,8 @@ stages:
           PYTHON_VERSION: 3.9
         python310:
           PYTHON_VERSION: 3.10
+    services:
+      db: mariadb
     steps:
     - template: ci.yml
 
