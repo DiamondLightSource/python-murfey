@@ -135,10 +135,10 @@ stages:
           pip install --disable-pip-version-check twine
         displayName: Install twine
 
-#      - task: TwineAuthenticate@1
-#        displayName: Set up credentials
-#        inputs:
-#          pythonUploadServiceConnection: pypi-murfey
+      - task: TwineAuthenticate@1
+        displayName: Set up credentials
+        inputs:
+          pythonUploadServiceConnection: pypi-murfey
 
       - bash: |
           python -m twine upload -r pypi-murfey --config-file $(PYPIRC_PATH) $(System.ArtifactsDirectory)/package/pypi/*.tar.gz $(System.ArtifactsDirectory)/package/pypi/*.whl
