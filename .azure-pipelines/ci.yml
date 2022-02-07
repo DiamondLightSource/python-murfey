@@ -58,9 +58,6 @@ steps:
     database=ispybtest
     EOF
 
-    cp "$(Pipeline.Workspace)/src/conf/config.example.cfg" "$(Pipeline.Workspace)/src/conf/config.cfg"
-    cp "$(Pipeline.Workspace)/src/conf/ws_config.example.cfg" "$(Pipeline.Workspace)/src/conf/ws_config.cfg"
-
     mkdir schema
     cd schema
     tar xfz "$(System.ArtifactsDirectory)/package/ispyb-database.tar.gz"
