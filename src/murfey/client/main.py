@@ -47,9 +47,7 @@ def get_visit_info(visit_name: str) -> Union[dict, List[dict]]:
     return r.json()
 
 
-def notify_file(
-    visit_name: str, transferred_file: pathlib.Path
-) -> Union[dict, List[dict]]:
+def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
     bl = os.getenv("BEAMLINE")
     if bl:
         path = "http://127.0.0.1:8000/visits/" + bl + "/" + visit_name + "/files"
@@ -65,10 +63,17 @@ def notify_file(
     return r.json()
 
 
-def setup(directory: pathlib.Path, destination: pathlib.Path) -> MonitoringPipeline:
+def setup(
+    visit_name: str, directory: pathlib.Path, destination: pathlib.Path
+) -> MonitoringPipeline:
     monitor = Monitor(directory)
     monitor.process(in_thread=True)
-    rp = RsyncPipe(destination)
+
+    def _notify(transferred_file: pathlib.Path) -> dict:
+        request_json = notify_file(visit_name, transferred_file)
+        return request_json
+
+    rp = RsyncPipe(destination, notify=_notify)
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)
