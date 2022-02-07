@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.mark.xfail
 @pytest.fixture(scope="session")
 def client():
     from murfey.server.main import app
