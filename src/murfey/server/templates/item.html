@@ -1,8 +1,36 @@
 <html>
 <head>
-    <title>Item details</title>
+    <title>Murfey server</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
 </head>
 <body>
-    <h1>Host: {{ client_host }}</h1>
+
+<div class="topnav">
+    <a href="/">Home</a>
+    <div class="dropdown">
+        <button class="dropbtn">Microscopes
+        </button>
+        <div class="dropdown-content">
+            <a href="/visits/m01">m01</a>
+            <a href="/visits/m02">m02</a>
+            <a href="/visits/m03">m03</a>
+            <a href="/visits/m12">m12</a>
+        </div>
+    </div>
+    <a href="/pypi/fastapi">FastAPI PyPI</a>
+    <a href="/microscope">Which microscope am I on</a>
+</div>
+<div class="wrapper">
+    <div class="content">
+        <h2>Murfey server</h2>
+        <p>Microscope: {{ microscope }}</p>
+        <p>A transporter for data from Diamond eBIC microscope and detector machines onto the Diamond network.</p>
+    </div>
+</div>
+<div class="footer">
+    <p>For help please contact your LC or the EM Data Analysis team.</p>
+</div>
+
 </body>
+
 </html>

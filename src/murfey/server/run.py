@@ -25,8 +25,8 @@ def run():
         default=pathlib.Path(__file__).parent / "example_environment_file",
     )
     args = parser.parse_args()
-    print(args.env_file)
     logger.info("Starting Murfey")
+    print("Starting Murfey server")
     uvicorn.run(
         "murfey.server.main:app",
         host="127.0.0.1",

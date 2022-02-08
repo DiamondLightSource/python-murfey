@@ -10,21 +10,21 @@ import sqlalchemy.exc
 import sqlalchemy.orm
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
-app = FastAPI(debug=True)
+app = FastAPI(title="Murfey server", debug=True)
 
 basepath = Path(__file__).resolve().parent
-# print(basepath)
-templates = Jinja2Templates(
-    directory=str(basepath / "templates")
-)  #'/home/slg25752/python-murfey/src/murfey/server/templates')
-# print(templates)
-# print(templates.env.globals["url_for"])
-# print(templates.env.list_templates())
+
+templates = Jinja2Templates(directory=str(basepath / "templates"))
+app.mount(
+    "/static", StaticFiles(directory=str(basepath / "templates/static")), name="static"
+)
+
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
         ispyb.sqlalchemy.url(), connect_args={"use_pure": True}
@@ -35,11 +35,11 @@ db_session = sqlalchemy.orm.sessionmaker(
 @app.get("/")
 async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
+    microscope = get_microscope()
     return templates.TemplateResponse(
         "item.html",
-        {"request": request, "client_host": client_host, "message": "Transfer Server"},
+        {"request": request, "client_host": client_host, "microscope": microscope},
     )
-    # return {"client_host": client_host, "message": "Transfer Server"}
 
 
 class Visits(BaseModel):
@@ -165,7 +165,7 @@ async def add_file(file: File):
 
 
 @app.get("/microscope")
-async def get_microscope():
+def get_microscope():
     try:
         hostname = socket.gethostname()
         microscope_from_hostname = hostname.split(".")[0]
