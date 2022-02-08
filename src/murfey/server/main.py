@@ -90,13 +90,12 @@ def all_visit_info(request: Request, bl_name: str):
             "microscope.html",
             {"request": request, "info": return_query},
         )
-        # return return_query
     else:
         return None
 
 
 @app.get("/visits/{bl_name}/{visit_name}")
-def visit_info(bl_name: str, visit_name: str):
+def visit_info(request: Request, bl_name: str, visit_name: str):
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -130,7 +129,10 @@ def visit_info(bl_name: str, visit_name: str):
             if id.proposalCode + str(id.proposalNumber) + "-" + str(id.visit_number)
             == visit_name
         ]  # "Proposal title": id.title
-        return return_query
+        return templates.TemplateResponse(
+            "visit.html",
+            {"request": request, "visit": return_query},
+        )
     else:
         return None
 

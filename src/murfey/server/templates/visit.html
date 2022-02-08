@@ -1,13 +1,18 @@
 <html>
 <head>
-    <title>{{ visit['Visit name'] }}</title>
+    <title>{{ visit[0]['Visit name'] }}</title>
+    <link rel="icon" href="/favicon.ico" />
     <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
 </head>
 
 <body>
 
-<div class="visits">
 
+<div class="visits">
+    <h2>{{ visit[0]['Visit name'] }}</h2>
+    <p>Time remaining: {{ visit[0]['Time remaining'] }}</p>
+    <p>Start time: {{ visit[0]['Start date'] }}</p>
+    <p>End time: {{ visit[0]['End date'] }}</p>
 </div>
 
 <div class="footer">

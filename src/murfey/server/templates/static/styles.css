@@ -43,6 +43,10 @@ body {
   box-sizing: border-box;
 }
 
+.visits {
+  background-color: #ffcc99;
+  padding: 10px;
+}
 /* Style the footer */
 .footer {
   background-color: #f1f1f1;
