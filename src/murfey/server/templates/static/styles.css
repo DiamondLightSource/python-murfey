@@ -36,6 +36,13 @@ body {
   padding: 10px;
 }
 
+.box {
+  background-color: #da614e;
+  padding: 10px;
+  margin: 10px;
+  box-sizing: border-box;
+}
+
 /* Style the footer */
 .footer {
   background-color: #f1f1f1;

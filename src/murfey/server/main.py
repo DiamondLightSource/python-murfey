@@ -37,7 +37,7 @@ async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
     microscope = get_microscope()
     return templates.TemplateResponse(
-        "item.html",
+        "home.html",
         {"request": request, "client_host": client_host, "microscope": microscope},
     )
 
@@ -51,7 +51,7 @@ class Visits(BaseModel):
 
 
 @app.get("/visits/{bl_name}")
-def all_visit_info(bl_name: str):
+def all_visit_info(request: Request, bl_name: str):
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -86,7 +86,11 @@ def all_visit_info(bl_name: str):
             }
             for id in query
         ]  # "Proposal title": id.title
-        return return_query
+        return templates.TemplateResponse(
+            "microscope.html",
+            {"request": request, "info": return_query},
+        )
+        # return return_query
     else:
         return None
 
