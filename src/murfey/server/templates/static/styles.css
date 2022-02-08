@@ -36,16 +36,11 @@ body {
   padding: 10px;
 }
 
-.box {
-  background-color: #da614e;
-  padding: 10px;
-  margin: 10px;
-  box-sizing: border-box;
-}
-
 .visits {
   background-color: #ffcc99;
   padding: 10px;
+  box-sizing: border-box;
+  margin: 10px;
 }
 /* Style the footer */
 .footer {

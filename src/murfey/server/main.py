@@ -24,6 +24,9 @@ templates = Jinja2Templates(directory=str(basepath / "templates"))
 app.mount(
     "/static", StaticFiles(directory=str(basepath / "templates/static")), name="static"
 )
+app.mount(
+    "/images", StaticFiles(directory=str(basepath / "templates/images")), name="images"
+)
 
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
