@@ -3,17 +3,28 @@ from __future__ import annotations
 import datetime
 import os
 import socket
+from pathlib import Path
 
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
-app = FastAPI()
+app = FastAPI(debug=True)
 
+basepath = Path(__file__).resolve().parent
+# print(basepath)
+templates = Jinja2Templates(
+    directory=str(basepath / "templates")
+)  #'/home/slg25752/python-murfey/src/murfey/server/templates')
+# print(templates)
+# print(templates.env.globals["url_for"])
+# print(templates.env.list_templates())
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
         ispyb.sqlalchemy.url(), connect_args={"use_pure": True}
@@ -22,9 +33,13 @@ db_session = sqlalchemy.orm.sessionmaker(
 
 
 @app.get("/")
-async def root(request: Request):
+async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
-    return {"client_host": client_host, "message": "Transfer Server"}
+    return templates.TemplateResponse(
+        "item.html",
+        {"request": request, "client_host": client_host, "message": "Transfer Server"},
+    )
+    # return {"client_host": client_host, "message": "Transfer Server"}
 
 
 class Visits(BaseModel):
