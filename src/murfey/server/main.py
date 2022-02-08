@@ -142,10 +142,11 @@ class File(BaseModel):
     name: str
     description: str
     size: int
+    timestamp: float
 
 
-@app.post("/files", response_model=File)
-async def add_file(file: File):
+@app.post("/visits/{bl_name}/{visit_name}/files")
+async def add_file(bl_name: str, visit_name: str, file: File):
     return file
 
 
