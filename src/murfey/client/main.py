@@ -29,7 +29,7 @@ def get_all_visits():
 def get_visit_info(visit_name: str):
     bl = os.getenv("BEAMLINE")
     if bl:
-        path = "http://127.0.0.1:8000/visits/" + bl + "/" + visit_name
+        path = "http://127.0.0.1:8000/visits/" + visit_name
     else:
         raise RuntimeError("No BEAMLINE environment variable was specified")
     # uvicorn default host and port, specified in uvicorn.run in server/main.py
