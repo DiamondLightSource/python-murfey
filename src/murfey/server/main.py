@@ -34,7 +34,7 @@ db_session = sqlalchemy.orm.sessionmaker(
     )
 )()
 
-
+# This will be the homepage for a given microscope.
 @app.get("/")
 async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
@@ -53,8 +53,9 @@ class Visits(BaseModel):
     proposal_title: str
 
 
-@app.get("/visits/{bl_name}")
-def all_visit_info(request: Request, bl_name: str):
+@app.get("/visits/")
+def all_visit_info(request: Request):
+    bl_name = get_microscope()
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -97,8 +98,9 @@ def all_visit_info(request: Request, bl_name: str):
         return None
 
 
-@app.get("/visits/{bl_name}/{visit_name}")
-def visit_info(request: Request, bl_name: str, visit_name: str):
+@app.get("/visits/{visit_name}")
+def visit_info(request: Request, visit_name: str):
+    bl_name = get_microscope()
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -173,7 +175,7 @@ async def add_file(file: File):
     return file
 
 
-@app.get("/microscope")
+# @app.get("/microscope")
 def get_microscope():
     try:
         hostname = socket.gethostname()

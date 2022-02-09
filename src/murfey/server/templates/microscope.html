@@ -13,7 +13,7 @@
 
 {% for visit in info %}
 <div class="visits">
-    <a href="/visits/{{ visit['Beamline name'] }}/{{ visit['Visit name'] }}">{{ visit["Visit name"] }}</a>
+    <a href="/visits/{{ visit['Visit name'] }}">{{ visit["Visit name"] }}</a>
     <p>Time remaining: {{ visit["Time remaining"] }}</p>
 </div>
 {% endfor %}
