@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import procrunner
 
@@ -14,7 +14,11 @@ logger = logging.getLogger("murfey.utils.rsync")
 
 class RsyncPipe(Processor):
     def __init__(
-        self, finaldir: Path, name: str = "rsync_pipe", root: Optional[Path] = None
+        self,
+        finaldir: Path,
+        name: str = "rsync_pipe",
+        root: Optional[Path] = None,
+        notify: Optional[Callable[[Path], Optional[dict]]] = None,
     ):
         super().__init__(name=name)
         self._finaldir = finaldir
@@ -28,6 +32,7 @@ class RsyncPipe(Processor):
         self.runner_return: List[procrunner.ReturnObject] = []
         self._root = root
         self._sub_structure: Optional[Path] = None
+        self._notify = notify or (lambda f: None)
 
     def _process(self, retry: bool = True, **kwargs):
         if isinstance(self._previous, Monitor) and self._previous.thread:
@@ -106,6 +111,9 @@ class RsyncPipe(Processor):
                     self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
                 elif len(stringy_stdout.split()) == 1:
                     if self._root and self._sub_structure:
+                        self._notify(
+                            self._finaldir / self._sub_structure / stringy_stdout
+                        )
                         self._out.put(self._root / self._sub_structure / stringy_stdout)
                     else:
                         logger.warning(
