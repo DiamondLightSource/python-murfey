@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import procrunner
 
@@ -19,6 +19,7 @@ class RsyncPipe(Processor):
         name: str = "rsync_pipe",
         root: Optional[Path] = None,
         notify: Optional[Callable[[Path], Optional[dict]]] = None,
+        destination_structure: Optional[Callable[[Path], Tuple[Path, Path]]] = None,
     ):
         super().__init__(name=name)
         self._finaldir = finaldir
@@ -33,6 +34,7 @@ class RsyncPipe(Processor):
         self._root = root
         self._sub_structure: Optional[Path] = None
         self._notify = notify or (lambda f: None)
+        self._destination_structure = destination_structure
 
     def _process(self, retry: bool = True, **kwargs):
         if isinstance(self._previous, Monitor) and self._previous.thread:
@@ -60,8 +62,6 @@ class RsyncPipe(Processor):
         :param retry: If True put failed files back into the queue to be consumed
         :type retry: bool
         """
-        cmd: List[str] = ["rsync", "-v"]
-
         self._root = root
 
         def _structure(p: Path) -> Path:
@@ -75,20 +75,44 @@ class RsyncPipe(Processor):
             except KeyError:
                 divided_files[s] = [f]
         for s in divided_files.keys():
-            self._sub_structure = s
-            self._failed_tmp = []
-            cmd.extend(str(f) for f in divided_files[s])
-            cmd.append(str(self._finaldir / s) + "/")
-            self._transferring = True
-            runner = procrunner.run(
-                cmd,
-                callback_stdout=self._parse_rsync_stdout,
-                callback_stderr=self._parse_rsync_stderr,
-            )
-            self.runner_return.append(runner)
-            self.failed.extend(root / s / f for f in self._failed_tmp)
-            if retry:
-                self._in.put(root / s / f for f in self._failed_tmp)
+            if self._destination_structure:
+                for f in divided_files[s]:
+                    self._sub_structure, new_file_name = self._destination_structure(f)
+                    self._single_rsync(
+                        root,
+                        self._sub_structure,
+                        [f],
+                        file_name=new_file_name,
+                        retry=retry,
+                    )
+            else:
+                self._sub_structure = s
+                self._single_rsync(root, s, divided_files[s], retry=retry)
+
+    def _single_rsync(
+        self,
+        root: Path,
+        sub_struct: Union[str, Path],
+        sources: List[Path],
+        file_name: Optional[Path] = None,
+        retry: bool = True,
+    ):
+        cmd: List[str] = ["rsync", "-v"]
+        self._failed_tmp = []
+        cmd.extend(str(f) for f in sources)
+        if file_name:
+            cmd.append(str(self._finaldir / sub_struct / file_name))
+        else:
+            cmd.append(str(self._finaldir / sub_struct) + "/")
+        runner = procrunner.run(
+            cmd,
+            callback_stdout=self._parse_rsync_stdout,
+            callback_stderr=self._parse_rsync_stderr,
+        )
+        self.runner_return.append(runner)
+        self.failed.extend(root / sub_struct / f for f in self._failed_tmp)
+        if retry:
+            self._in.put(root / sub_struct / f for f in self._failed_tmp)
 
     def _parse_rsync_stdout(self, stdout: bytes):
         """
