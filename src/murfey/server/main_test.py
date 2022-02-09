@@ -18,7 +18,7 @@ def test_read_main(client):
     assert response.json() == {"msg": "Transfer Server"}
 
 
-def test_get_visits():
+def test_get_visits(client):
     response = client.get("/visits/")
     assert response.status_code == 200
     # assert response.json()[0]["Start date"] == "2020-09-09T14:00:00"
