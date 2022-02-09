@@ -91,7 +91,7 @@ def all_visit_info(request: Request):
             for id in query
         ]  # "Proposal title": id.title
         return templates.TemplateResponse(
-            "microscope.html",
+            "activevisits.html",
             {"request": request, "info": return_query},
         )
     else:
