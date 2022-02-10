@@ -8,11 +8,25 @@ import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
-app = FastAPI()
+try:
+    from importlib.resources import files
+except ModuleNotFoundError:
+    # Fallback for Python 3.8
+    from importlib_resources import files  # type: ignore
+
+app = FastAPI(title="Murfey server", debug=True)
+
+template_files = files("murfey") / "templates"
+templates = Jinja2Templates(directory=template_files)
+app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
+app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
@@ -20,11 +34,15 @@ db_session = sqlalchemy.orm.sessionmaker(
     )
 )()
 
-
+# This will be the homepage for a given microscope.
 @app.get("/")
-async def root(request: Request):
+async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
-    return {"client_host": client_host, "message": "Transfer Server"}
+    microscope = get_microscope()
+    return templates.TemplateResponse(
+        "home.html",
+        {"request": request, "client_host": client_host, "microscope": microscope},
+    )
 
 
 class Visits(BaseModel):
@@ -35,8 +53,9 @@ class Visits(BaseModel):
     proposal_title: str
 
 
-@app.get("/visits/{bl_name}")
-def all_visit_info(bl_name: str):
+@app.get("/visits/")
+def all_visit_info(request: Request):
+    bl_name = get_microscope()
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -71,13 +90,17 @@ def all_visit_info(bl_name: str):
             }
             for id in query
         ]  # "Proposal title": id.title
-        return return_query
+        return templates.TemplateResponse(
+            "activevisits.html",
+            {"request": request, "info": return_query},
+        )
     else:
         return None
 
 
-@app.get("/visits/{bl_name}/{visit_name}")
-def visit_info(bl_name: str, visit_name: str):
+@app.get("/visits/{visit_name}")
+def visit_info(request: Request, visit_name: str):
+    bl_name = get_microscope()
     query = (
         db_session.query(BLSession)
         .join(Proposal)
@@ -111,7 +134,10 @@ def visit_info(bl_name: str, visit_name: str):
             if id.proposalCode + str(id.proposalNumber) + "-" + str(id.visit_number)
             == visit_name
         ]  # "Proposal title": id.title
-        return return_query
+        return templates.TemplateResponse(
+            "visit.html",
+            {"request": request, "visit": return_query},
+        )
     else:
         return None
 
@@ -150,8 +176,8 @@ async def add_file(bl_name: str, visit_name: str, file: File):
     return file
 
 
-@app.get("/microscope")
-async def get_microscope():
+# @app.get("/microscope")
+def get_microscope():
     try:
         hostname = socket.gethostname()
         microscope_from_hostname = hostname.split(".")[0]

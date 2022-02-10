@@ -1,0 +1,27 @@
+<html>
+<head>
+    <title>MURFEY</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <link href="{{ url_for('images', path='/icon_268.png') }}" rel="icon" type="image/png" />
+</head>
+
+<body>
+<div class="topnav">
+    <a href="/">Home</a>
+    <a href="/visits">Active Visits</a>
+    <a href="/pypi/fastapi">FastAPI PyPI</a>
+</div>
+
+
+<div class="content">
+    <h1>{{ microscope }}</h1>
+    <p>A transporter for data from Diamond eBIC microscope and detector machines onto the Diamond network.</p>
+</div>
+
+<div class="footer">
+    <p>For help please contact your LC or the EM Data Analysis team.</p>
+</div>
+
+</body>
+
+</html>

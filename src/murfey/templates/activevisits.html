@@ -1,0 +1,31 @@
+<html>
+<head>
+    <title>{{ info[0]['Beamline name'] }}</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <link href="{{ url_for('images', path='/icon_268.png') }}" rel="icon" type="image/png" />
+</head>
+
+<body>
+
+<div class="topnav">
+    <a href="/">Home</a>
+</div>
+
+<div class="content">
+    <h1>Active Visits</h1>
+</div>
+
+{% for visit in info %}
+<div class="visits">
+    <a href="/visits/{{ visit['Visit name'] }}">{{ visit["Visit name"] }}</a>
+    <p>Time remaining: {{ visit["Time remaining"] }}</p>
+</div>
+{% endfor %}
+
+<div class="footer">
+    <p>For help please contact your LC or the EM Data Analysis team.</p>
+</div>
+
+</body>
+
+</html>
