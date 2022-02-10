@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import os
 import socket
-from pathlib import Path
 
 import ispyb
 import sqlalchemy.exc
@@ -16,17 +15,18 @@ from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
+try:
+    from importlib.resources import files
+except ModuleNotFoundError:
+    # Fallback for Python 3.8
+    from importlib_resources import files  # type: ignore
+
 app = FastAPI(title="Murfey server", debug=True)
 
-basepath = Path(__file__).resolve().parent
-
-templates = Jinja2Templates(directory=basepath / "templates")
-app.mount(
-    "/static", StaticFiles(directory=basepath / "templates" / "static"), name="static"
-)
-app.mount(
-    "/images", StaticFiles(directory=basepath / "templates" / "images"), name="images"
-)
+template_files = files("murfey") / "templates"
+templates = Jinja2Templates(directory=template_files)
+app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
+app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
 db_session = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
