@@ -11,7 +11,7 @@ body {
 /* Style the top navigation bar */
 .topnav {
   overflow: hidden;
-  background-color: #333;
+  background-color: #007a60;
 }
 
 /* Style the topnav links */
@@ -32,12 +32,12 @@ body {
 
 /* Style the content */
 .content {
-  background-color: #da614e;
+  background-color: #a9a9a9;
   padding: 10px;
 }
 
 .visits {
-  background-color: #ffcc99;
+  background-color: #a9a9a9;
   padding: 10px;
   box-sizing: border-box;
   margin: 10px;
