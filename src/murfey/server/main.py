@@ -20,12 +20,12 @@ app = FastAPI(title="Murfey server", debug=True)
 
 basepath = Path(__file__).resolve().parent
 
-templates = Jinja2Templates(directory=str(basepath / "templates"))
+templates = Jinja2Templates(directory=basepath / "templates")
 app.mount(
-    "/static", StaticFiles(directory=str(basepath / "templates/static")), name="static"
+    "/static", StaticFiles(directory=basepath / "templates" / "static"), name="static"
 )
 app.mount(
-    "/images", StaticFiles(directory=str(basepath / "templates/images")), name="images"
+    "/images", StaticFiles(directory=basepath / "templates" / "images"), name="images"
 )
 
 db_session = sqlalchemy.orm.sessionmaker(
