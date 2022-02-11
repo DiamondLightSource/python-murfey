@@ -3,11 +3,12 @@ from __future__ import annotations
 import datetime
 import os
 import socket
+import time
 
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -171,9 +172,19 @@ class File(BaseModel):
     timestamp: float
 
 
-@app.post("/visits/{bl_name}/{visit_name}/files")
-async def add_file(bl_name: str, visit_name: str, file: File):
+@app.post("/visits/{visit_name}/files")
+async def add_file(visit_name: str, file: File):
     return file
+
+
+@app.websocket("/ws/test")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        time.sleep(5)
+        data = await websocket.receive_text()
+        print("Received data: {}".format(data))
+        await websocket.send_text("Message: 5 sec wait")
 
 
 # @app.get("/microscope")

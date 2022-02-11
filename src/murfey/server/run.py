@@ -32,6 +32,6 @@ def run():
         host="127.0.0.1",
         port=8000,
         env_file=args.env_file,
-        log_level="warning",
+        log_level="info",
     )  # set to warning to reduce log clogging
     logger.info("Server startup complete.")

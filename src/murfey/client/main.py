@@ -6,6 +6,7 @@ import pathlib
 from typing import List, NamedTuple, Union
 
 import requests
+from websocket import create_connection
 
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
@@ -19,10 +20,13 @@ class MonitoringPipeline(NamedTuple):
 def run():
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument("--visit", help="Name of visit", required=True)
-    # args = parser.parse_args()
-    # print("Visit name: ", args.visit)
-    # print(get_all_visits().text)
-    # print(get_visit_info(args.visit).text)
+    print("IN RUN")
+    ws = create_connection("ws://127.0.0.1:8000/ws/test")
+    print("Sending message 1")
+    ws.send("Message 1")
+    result = ws.recv()
+    print("Received ", result)
+    ws.close()
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
