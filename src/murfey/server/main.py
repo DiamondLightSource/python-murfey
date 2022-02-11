@@ -8,7 +8,7 @@ import time
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
-from fastapi import FastAPI, Request, Response, WebSocket
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -180,11 +180,14 @@ async def add_file(visit_name: str, file: File):
 @app.websocket("/ws/test")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    while True:
-        time.sleep(5)
-        data = await websocket.receive_text()
-        print("Received data: {}".format(data))
-        await websocket.send_text("Message: 5 sec wait")
+    try:
+        while True:
+            time.sleep(5)
+            data = await websocket.receive_text()
+            print("Received data: {}".format(data))
+            await websocket.send_text("Message: 5 sec wait")
+    except WebSocketDisconnect:
+        print("Client disconnected")
 
 
 # @app.get("/microscope")
