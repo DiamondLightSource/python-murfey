@@ -20,7 +20,7 @@ class RsyncPipe(Processor):
         root: Optional[Path] = None,
         notify: Optional[Callable[[Path], Optional[dict]]] = None,
         destination_structure: Optional[
-            Callable[[Path, Optional[Path]], Tuple[Path, str]]
+            Callable[[Path, Path], Tuple[Path, str]]
         ] = None,
     ):
         super().__init__(name=name)
@@ -80,7 +80,7 @@ class RsyncPipe(Processor):
             if self._destination_structure:
                 for f in divided_files[s]:
                     self._sub_structure, new_file_name = self._destination_structure(
-                        f, s
+                        s, f
                     )
                     self._single_rsync(
                         root,

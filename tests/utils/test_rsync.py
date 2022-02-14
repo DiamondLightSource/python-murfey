@@ -87,7 +87,7 @@ def test_rsync_pipe_from_monitor(tmp_path):
 
 
 def test_rsync_with_additional_structure_without_changing_file_name(tmp_path):
-    def _new_structure(p: Path, s: Path) -> Tuple[Path, str]:
+    def _new_structure(s: Path, p: Path) -> Tuple[Path, str]:
         new_name = p.name
         new_dest = s / "extra"
         return new_dest, new_name
@@ -111,7 +111,7 @@ def test_rsync_with_additional_structure_without_changing_file_name(tmp_path):
 
 
 def test_rsync_with_changed_file_name(tmp_path):
-    def _new_structure(p: Path, s: Path) -> Tuple[Path, str]:
+    def _new_structure(s: Path, p: Path) -> Tuple[Path, str]:
         new_name = p.name.replace("01", "05")
         return s, new_name
 
