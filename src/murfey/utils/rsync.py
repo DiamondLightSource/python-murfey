@@ -19,7 +19,9 @@ class RsyncPipe(Processor):
         name: str = "rsync_pipe",
         root: Optional[Path] = None,
         notify: Optional[Callable[[Path], Optional[dict]]] = None,
-        destination_structure: Optional[Callable[[Path], Tuple[Path, Path]]] = None,
+        destination_structure: Optional[
+            Callable[[Path, Optional[Path]], Tuple[Path, str]]
+        ] = None,
     ):
         super().__init__(name=name)
         self._finaldir = finaldir
@@ -77,12 +79,14 @@ class RsyncPipe(Processor):
         for s in divided_files.keys():
             if self._destination_structure:
                 for f in divided_files[s]:
-                    self._sub_structure, new_file_name = self._destination_structure(f)
+                    self._sub_structure, new_file_name = self._destination_structure(
+                        f, s
+                    )
                     self._single_rsync(
                         root,
                         self._sub_structure,
                         [f],
-                        file_name=new_file_name,
+                        file_name=Path(new_file_name),
                         retry=retry,
                     )
             else:
