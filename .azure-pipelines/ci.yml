@@ -50,13 +50,7 @@ steps:
 
 - script: |
     set -eu
-    cat >~/.my.cnf <<EOF
-    [client]
-    user=root
-    host=127.0.0.1
-    password=mysql_root_pwd
-    database=ispybtest
-    EOF
+    cp "$(Pipeline.Workspace)/src/.azure-pipelines/my.cnf" ~/.my.cnf
 
     mkdir schema
     cd schema
@@ -87,6 +81,7 @@ steps:
   displayName: Check RabbitMQ is alive
 
 - script: |
+    export ISPYB_CREDENTIALS="$(Pipeline.Workspace)/src/.azure-pipelines/ispyb.cfg"
     PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
