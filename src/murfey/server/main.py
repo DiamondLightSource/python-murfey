@@ -7,7 +7,7 @@ import socket
 import ispyb
 import sqlalchemy.exc
 import sqlalchemy.orm
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -28,11 +28,20 @@ templates = Jinja2Templates(directory=template_files)
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
-db_session = sqlalchemy.orm.sessionmaker(
+SessionLocal = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
         ispyb.sqlalchemy.url(), connect_args={"use_pure": True}
     )
-)()
+)
+
+
+def get_db() -> sqlalchemy.orm.Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 # This will be the homepage for a given microscope.
 @app.get("/")
@@ -54,10 +63,10 @@ class Visits(BaseModel):
 
 
 @app.get("/visits/")
-def all_visit_info(request: Request):
+def all_visit_info(request: Request, db: sqlalchemy.orm.Session = Depends(get_db)):
     bl_name = get_microscope()
     query = (
-        db_session.query(BLSession)
+        db.query(BLSession)
         .join(Proposal)
         .filter(
             BLSession.proposalId == Proposal.proposalId,
@@ -99,10 +108,12 @@ def all_visit_info(request: Request):
 
 
 @app.get("/visits/{visit_name}")
-def visit_info(request: Request, visit_name: str):
+def visit_info(
+    request: Request, visit_name: str, db: sqlalchemy.orm.Session = Depends(get_db)
+):
     bl_name = get_microscope()
     query = (
-        db_session.query(BLSession)
+        db.query(BLSession)
         .join(Proposal)
         .filter(
             BLSession.proposalId == Proposal.proposalId,
