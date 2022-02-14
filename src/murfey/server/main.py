@@ -15,6 +15,8 @@ from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from requests import get
 
+import murfey
+
 try:
     from importlib.resources import files
 except ImportError:
@@ -196,3 +198,11 @@ def get_microscope():
         microscope_from_hostname = "Unknown"
     microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
     return microscope_name
+
+
+@app.get("/version")
+def get_version():
+    return {
+        "server": murfey.__version__,
+        "oldest-supported-client": murfey.__supported_client_version__,
+    }
