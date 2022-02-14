@@ -17,7 +17,7 @@ from requests import get
 
 try:
     from importlib.resources import files
-except ModuleNotFoundError:
+except ImportError:
     # Fallback for Python 3.8
     from importlib_resources import files  # type: ignore
 
