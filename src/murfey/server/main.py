@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import os
+import re
 import socket
 
 import ispyb
@@ -49,10 +51,29 @@ def get_db() -> sqlalchemy.orm.Session:
 @app.get("/")
 async def root(request: Request, response_class=HTMLResponse):
     client_host = request.client.host
-    microscope = get_microscope()
     return templates.TemplateResponse(
         "home.html",
-        {"request": request, "client_host": client_host, "microscope": microscope},
+        {
+            "request": request,
+            "client_host": client_host,
+            "hostname": get_hostname(),
+            "microscope": get_microscope(),
+            "version": murfey.__version__,
+        },
+    )
+
+
+@app.get("/bootstrap")
+def bootstrap(request: Request, response_class=HTMLResponse):
+    return templates.TemplateResponse(
+        "bootstrap.html",
+        {
+            "request": request,
+            "client_host": request.client.host,
+            "hostname": get_hostname(),
+            "microscope": get_microscope(),
+            "version": murfey.__version__,
+        },
     )
 
 
@@ -155,25 +176,70 @@ def visit_info(
         return None
 
 
-@app.get("/pypi/{path}")
-async def pypi_path_request(path: str):
-    full_path = "https://pypi.org/simple/" + path
-    full_path_response = get(full_path)
-    return Response(
-        content=full_path_response.content,
-        media_type=full_path_response.headers["Content-Type"],
-        status_code=full_path_response.status_code,
-    )
-
-
 @app.get("/pypi/")
-async def pypi_request():
+def pypi_request():
+    """Obtain list of all packagess from PyPI via the simple API (PEP 503).
+    (Should we really support this?)"""
     full_path = "https://pypi.org/simple/"
     full_path_response = get(full_path)
     return Response(
         content=full_path_response.content,
         media_type=full_path_response.headers["Content-Type"],
         status_code=200,
+    )
+
+
+@app.get("/pypi/{package}/")
+def pypi_package_request(package: str):
+    """Obtain list of all package downloads from PyPI via the simple API (PEP 503),
+    and rewrite all download URLs to point to this server,
+    underneath the current directory."""
+    full_path_response = get(f"https://pypi.org/simple/{package}")
+
+    def rewrite_pypi_url(match):
+        url = match.group(4)
+        return (
+            b"<a "
+            + match.group(1)
+            + b'href="'
+            + url
+            + b'"'
+            + match.group(3)
+            + b">"
+            + match.group(4)
+            + b"</a>"
+        )
+
+    content = re.sub(
+        b'<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',
+        rewrite_pypi_url,
+        full_path_response.content,
+    )
+    return Response(
+        content=content,
+        media_type=full_path_response.headers["Content-Type"],
+        status_code=full_path_response.status_code,
+    )
+
+
+@app.get("/pypi/{package}/{filename}")
+def pypi_download_request(package: str, filename: str):
+    """Obtain and pass through a specific download for a PyPI package."""
+    full_path_response = get(f"https://pypi.org/simple/{package}")
+    filename_bytes = filename.encode("latin1")
+
+    selected_package_link = re.search(
+        b'<a [^>]*href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
+        full_path_response.content,
+    )
+    if not selected_package_link:
+        return Response(content="File not found for package", status_code=404)
+    original_url = selected_package_link.group(1)
+    original_file = get(original_url)
+    return Response(
+        content=original_file.content,
+        media_type=original_file.headers["Content-Type"],
+        status_code=original_file.status_code,
     )
 
 
@@ -189,15 +255,20 @@ async def add_file(bl_name: str, visit_name: str, file: File):
     return file
 
 
-# @app.get("/microscope")
+@functools.lru_cache()
 def get_microscope():
     try:
-        hostname = socket.gethostname()
+        hostname = get_hostname()
         microscope_from_hostname = hostname.split(".")[0]
     except OSError:
         microscope_from_hostname = "Unknown"
     microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
     return microscope_name
+
+
+@functools.lru_cache()
+def get_hostname():
+    return socket.gethostname()
 
 
 @app.get("/version")

@@ -1,0 +1,20 @@
+<html><head>
+  <title>Murfey - {% block title %}{% endblock %}</title>
+  <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('images', path='/icon_268.png') }}" rel="icon" type="image/png" />
+</head><body>
+  <div class="topnav">
+    <a href="/">Home</a>
+    <a href="/visits">Active Visits</a>
+    <a href="/bootstrap">Installation instructions</a>
+    <a href="/pypi/fastapi">FastAPI PyPI</a>
+    <p style="text-align: right; margin: 8px 10px 0 auto;"><img src="{{ url_for('images', path='/diamond.png') }}" style="height: 25px;"></p>
+  </div>
+
+  <div class="content">{% block content %}{% endblock %}</div>
+
+  <div class="footer">
+    <p>For help please contact your local contact or the EM Data Analysis team.</p>
+    <p style="font-size:60%">Murfey v{{ version }} running on {{ hostname }} ({{ microscope }})</p>
+  </div>
+</body></html>

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Bootstrapping instructions{% endblock %}
+
+{% block content %}
+    <h1>Bootstrapping instructions</h1>
+    <p>How to bootstrap pip without pip being present on the system:</p>
+    <pre>
+      curl -sOL https://{{ hostname }}:{{ port }}/packages/py3/p/pip/pip-21.3.1-py3-none-any.whl
+      python pip-21.3.1-py3-none-any.whl/pip install pip
+    </pre>
+{% endblock %}
