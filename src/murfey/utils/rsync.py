@@ -104,6 +104,7 @@ class RsyncPipe(Processor):
             cmd.append(str(self._finaldir / sub_struct / file_name))
         else:
             cmd.append(str(self._finaldir / sub_struct) + "/")
+        self._transferring = True
         runner = procrunner.run(
             cmd,
             callback_stdout=self._parse_rsync_stdout,
