@@ -51,12 +51,10 @@ def get_db() -> sqlalchemy.orm.Session:
 # This will be the homepage for a given microscope.
 @app.get("/")
 async def root(request: Request, response_class=HTMLResponse):
-    client_host = request.client.host
     return templates.TemplateResponse(
         "home.html",
         {
             "request": request,
-            "client_host": client_host,
             "hostname": get_hostname(),
             "microscope": get_microscope(),
             "version": murfey.__version__,
@@ -70,7 +68,6 @@ def bootstrap(request: Request, response_class=HTMLResponse):
         "bootstrap.html",
         {
             "request": request,
-            "client_host": request.client.host,
             "hostname": get_hostname(),
             "microscope": get_microscope(),
             "version": murfey.__version__,
