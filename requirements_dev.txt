@@ -1,8 +1,10 @@
 fastapi==0.73.0
 graypy==2.1.0
 ispyb==6.10.0
+jinja2==3.0.3
 procrunner==2.3.2
 pytest-cov==3.0.0
+importlib_resources==5.4.0; python_version<'3.9'
 pytest==6.2.5
 textual==0.1.15
 uvicorn[standard]==0.17.4
