@@ -243,6 +243,11 @@ def pypi_download_request(package: str, filename: str):
     )
 
 
+@app.get("/bootstrap/pip.whl")
+def pypi_download_pip():
+    return pypi_download_request(package="pip", filename="pip-21.3.1-py3-none-any.whl")
+
+
 class File(BaseModel):
     name: str
     description: str

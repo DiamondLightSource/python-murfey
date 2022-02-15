@@ -4,9 +4,11 @@
 
 {% block content %}
     <h1>Bootstrapping instructions</h1>
-    <p>How to bootstrap pip without pip being present on the system:</p>
-    <pre>
-      curl -sOL https://{{ hostname }}:{{ port }}/packages/py3/p/pip/pip-21.3.1-py3-none-any.whl
-      python pip-21.3.1-py3-none-any.whl/pip install pip
+    <p>You can install Murfey on a network-isolated client by running the following commands:</p>
+    <pre style="font-family: monospace">
+      curl -O {{ request.url }}/pip.whl
+      python pip.whl/pip install -i {{ request.url.replace(path='/pypi') }} pip
+      rm pip.whl
+      python -mpip install -i {{ request.url.replace(path='/pypi') }} murfey
     </pre>
 {% endblock %}
