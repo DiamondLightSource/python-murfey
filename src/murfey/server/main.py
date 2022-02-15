@@ -7,9 +7,10 @@ import re
 import socket
 
 import ispyb
+import packaging.version
 import sqlalchemy.exc
 import sqlalchemy.orm
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -233,7 +234,7 @@ def pypi_download_request(package: str, filename: str):
         full_path_response.content,
     )
     if not selected_package_link:
-        return Response(content="File not found for package", status_code=404)
+        raise HTTPException(status_code=404, detail="File not found for package")
     original_url = selected_package_link.group(1)
     original_file = get(original_url)
     return Response(
@@ -245,7 +246,37 @@ def pypi_download_request(package: str, filename: str):
 
 @app.get("/bootstrap/pip.whl")
 def pypi_download_pip():
+    # Return a static version of pip. This does not need to be the newest or best,
+    # but has to be compatible with all supported Python versions.
+    # This is only used during bootstrapping by the client to identify and then
+    # download the actually newest appropriate version of pip.
     return pypi_download_request(package="pip", filename="pip-21.3.1-py3-none-any.whl")
+
+
+@app.get("/bootstrap/murfey.whl")
+def pypi_download_murfey():
+    # Return the latest version of murfey. We should not have to worry about the exact
+    # python compatibility here, as long as murfey.bootstrap is compatible with all
+    # relevant versions of Python. This also ignores yanked releases, which again should
+    # be fine.
+    full_path_response = get("https://pypi.org/simple/murfey")
+    wheels = {}
+    for wheel_file in re.findall(
+        b"<a [^>]*>([^<]*).whl</a>",
+        full_path_response.content,
+    ):
+        try:
+            filename = wheel_file.decode("latin-1") + ".whl"
+            version = packaging.version.parse(filename.split("-")[1])
+            wheels[version] = filename
+        except Exception:
+            pass
+    if not wheels:
+        raise HTTPException(
+            status_code=404, detail="Could not identify appropriate version of murfey"
+        )
+    newest_version = max(wheels)
+    return pypi_download_request(package="murfey", filename=wheels[newest_version])
 
 
 class File(BaseModel):
