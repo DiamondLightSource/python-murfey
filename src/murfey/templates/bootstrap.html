@@ -7,8 +7,8 @@
     <p>You can install Murfey on a network-isolated client by running the following commands:</p>
     <pre style="font-family: monospace">
       curl -O {{ request.url }}/pip.whl
-      python pip.whl/pip install -i {{ request.url.replace(path='/pypi') }} pip
+      python pip.whl/pip install --trusted-host {{ request.url.hostname }} -i {{ request.url.replace(path='/pypi') }} pip
       rm pip.whl
-      python -mpip install -i {{ request.url.replace(path='/pypi') }} murfey
+      python -mpip install --trusted-host {{ request.url.hostname }} -i {{ request.url.replace(path='/pypi') }} murfey
     </pre>
 {% endblock %}
