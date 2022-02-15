@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import contextlib
 import os
-import shelve
+import pathlib
 import subprocess
 import sys
 from urllib.parse import urlparse
@@ -113,5 +114,7 @@ if __name__ == "__main__":
 
     print()
     print("Installation completed.")
-    with shelve.open("~/.murfey") as db:
-        db["server"] = murfey_base
+    config = configparser.ConfigParser()
+    config["Murfey"] = {"Server": murfey_base}
+    with open(pathlib.Path.home() / ".murfey", "w") as configfile:
+        config.write(configfile)
