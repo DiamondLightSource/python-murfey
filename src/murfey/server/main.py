@@ -225,7 +225,7 @@ def pypi_download_request(package: str, filename: str):
     filename_bytes = re.escape(filename.encode("latin1"))
 
     selected_package_link = re.search(
-        b'<a [^>]*href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
+        b'<a [^>]*?href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
         full_path_response.content,
     )
     if not selected_package_link:
