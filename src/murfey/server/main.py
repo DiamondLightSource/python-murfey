@@ -222,7 +222,7 @@ def pypi_package_request(package: str):
 def pypi_download_request(package: str, filename: str):
     """Obtain and pass through a specific download for a PyPI package."""
     full_path_response = get(f"https://pypi.org/simple/{package}")
-    filename_bytes = filename.encode("latin1")
+    filename_bytes = re.escape(filename.encode("latin1"))
 
     selected_package_link = re.search(
         b'<a [^>]*href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
