@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Bootstrapping instructions{% endblock %}
+
+{% block content %}
+    <h1>Bootstrapping instructions</h1>
+    <p>You can install Murfey on a network-isolated client by running the following commands:</p>
+    <pre style="font-family: monospace">
+      curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
+      python murfey.whl/murfey/bootstrap {{ request.url.scheme }}://{{ request.url.netloc }}
+      rm murfey.whl
+    </pre>
+{% endblock %}
