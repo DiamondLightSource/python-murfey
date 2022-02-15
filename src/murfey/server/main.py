@@ -179,14 +179,12 @@ def visit_info(
 
 @app.get("/pypi/")
 def pypi_request():
-    """Obtain list of all packagess from PyPI via the simple API (PEP 503).
-    (Should we really support this?)"""
-    full_path = "https://pypi.org/simple/"
-    full_path_response = get(full_path)
+    """Obtain list of all PyPI packages via the simple API (PEP 503)."""
+    index = get("https://pypi.org/simple/")
     return Response(
-        content=full_path_response.content,
-        media_type=full_path_response.headers["Content-Type"],
-        status_code=200,
+        content=index.content,
+        media_type=index.headers["Content-Type"],
+        status_code=index.status_code,
     )
 
 
