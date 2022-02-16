@@ -6,10 +6,13 @@ import logging
 import os
 import pathlib
 import socket
+from typing import Any
 
 import uvicorn
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
+
+import murfey
 
 try:
     from importlib.resources import files
@@ -23,6 +26,17 @@ logger = logging.getLogger("murfey.server")
 
 template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
+
+
+def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
+    template_parameters = {
+        "hostname": get_hostname(),
+        "microscope": get_microscope(),
+        "version": murfey.__version__,
+    }
+    if parameters:
+        template_parameters.update(parameters)
+    return templates.TemplateResponse(filename, template_parameters)
 
 
 def run():

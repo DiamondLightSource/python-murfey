@@ -16,7 +16,9 @@ import murfey
 import murfey.server.bootstrap
 from murfey.server import get_hostname, get_microscope, template_files, templates
 
-app = FastAPI(title="Murfey server", debug=True)
+tags_metadata = [murfey.server.bootstrap.tag]
+
+app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")

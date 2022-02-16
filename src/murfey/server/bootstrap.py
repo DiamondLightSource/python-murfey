@@ -12,21 +12,21 @@ from __future__ import annotations
 import re
 
 import packaging.version
+import requests
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
-from requests import get
 
-import murfey
-from murfey.server import get_hostname, get_microscope, templates
+from murfey.server import respond_with_template
 
-bootstrap = APIRouter(prefix="/bootstrap")
-pypi = APIRouter(prefix="/pypi")
+tag = {"name": "bootstrap", "description": __doc__}
+bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
+pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 
 
 @pypi.get("/", response_class=Response)
 def get_pypi_index():
     """Obtain list of all PyPI packages via the simple API (PEP 503)."""
-    index = get("https://pypi.org/simple/")
+    index = requests.get("https://pypi.org/simple/")
     return Response(
         content=index.content,
         media_type=index.headers["Content-Type"],
@@ -39,7 +39,7 @@ def get_pypi_package_downloads_list(package: str):
     """Obtain list of all package downloads from PyPI via the simple API (PEP 503),
     and rewrite all download URLs to point to this server,
     underneath the current directory."""
-    full_path_response = get(f"https://pypi.org/simple/{package}")
+    full_path_response = requests.get(f"https://pypi.org/simple/{package}")
 
     def rewrite_pypi_url(match):
         url = match.group(4)
@@ -68,9 +68,9 @@ def get_pypi_package_downloads_list(package: str):
 
 
 @pypi.get("/{package}/{filename}", response_class=Response)
-def pypi_download_request(package: str, filename: str):
+def get_pypi_file(package: str, filename: str):
     """Obtain and pass through a specific download for a PyPI package."""
-    full_path_response = get(f"https://pypi.org/simple/{package}")
+    full_path_response = requests.get(f"https://pypi.org/simple/{package}")
     filename_bytes = re.escape(filename.encode("latin1"))
 
     selected_package_link = re.search(
@@ -80,7 +80,7 @@ def pypi_download_request(package: str, filename: str):
     if not selected_package_link:
         raise HTTPException(status_code=404, detail="File not found for package")
     original_url = selected_package_link.group(1)
-    original_file = get(original_url)
+    original_file = requests.get(original_url)
     return Response(
         content=original_file.content,
         media_type=original_file.headers["Content-Type"],
@@ -89,18 +89,15 @@ def pypi_download_request(package: str, filename: str):
 
 
 @bootstrap.get("/", response_class=HTMLResponse, include_in_schema=False)
-def bootstrap_instructions(request: Request):
+def get_bootstrap_instructions(request: Request):
     """
     Return a website containing instructions for installing the murfey client on a
     machine with no internet access.
     """
-    return templates.TemplateResponse(
+    return respond_with_template(
         "bootstrap.html",
         {
             "request": request,
-            "hostname": get_hostname(),
-            "microscope": get_microscope(),
-            "version": murfey.__version__,
         },
     )
 
@@ -113,7 +110,7 @@ def get_pip_wheel():
     This is only used during bootstrapping by the client to identify and then
     download the actually newest appropriate version of pip.
     """
-    return pypi_download_request(package="pip", filename="pip-21.3.1-py3-none-any.whl")
+    return get_pypi_file(package="pip", filename="pip-21.3.1-py3-none-any.whl")
 
 
 @bootstrap.get("/murfey.whl", response_class=Response)
@@ -124,7 +121,7 @@ def get_murfey_wheel():
     murfey.bootstrap is compatible with all relevant versions of Python.
     This also ignores yanked releases, which again should be fine.
     """
-    full_path_response = get("https://pypi.org/simple/murfey")
+    full_path_response = requests.get("https://pypi.org/simple/murfey")
     wheels = {}
     for wheel_file in re.findall(
         b"<a [^>]*>([^<]*).whl</a>",
@@ -141,4 +138,4 @@ def get_murfey_wheel():
             status_code=404, detail="Could not identify appropriate version of murfey"
         )
     newest_version = max(wheels)
-    return pypi_download_request(package="murfey", filename=wheels[newest_version])
+    return get_pypi_file(package="murfey", filename=wheels[newest_version])
