@@ -2,9 +2,11 @@
 API endpoints related to installing Murfey on a client.
 
 Client machines may not have a direct internet connection, so Murfey allows
-passing through requests to PyPI. A static HTML page gives instructions on
-how to install on a network-isolated system that already has Python installed.
-The system does not need to have pip available.
+passing through requests to PyPI using the PEP 503 simple API.
+
+A static HTML page gives instructions on how to install on a network-isolated
+system that has Python already installed. The system does not need to have
+pip installed in order to bootstrap Murfey.
 """
 
 from __future__ import annotations
@@ -18,7 +20,14 @@ from fastapi.responses import HTMLResponse
 
 from murfey.server import respond_with_template
 
-tag = {"name": "bootstrap", "description": __doc__}
+tag = {
+    "name": "bootstrap",
+    "description": __doc__,
+    "externalDocs": {
+        "description": "PEP 503",
+        "url": "https://www.python.org/dev/peps/pep-0503/",
+    },
+}
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 
@@ -88,10 +97,10 @@ def get_pypi_file(package: str, filename: str):
     )
 
 
-@bootstrap.get("/", response_class=HTMLResponse, include_in_schema=False)
+@bootstrap.get("/", response_class=HTMLResponse)
 def get_bootstrap_instructions(request: Request):
     """
-    Return a website containing instructions for installing the murfey client on a
+    Return a website containing instructions for installing the Murfey client on a
     machine with no internet access.
     """
     return respond_with_template(
@@ -116,8 +125,8 @@ def get_pip_wheel():
 @bootstrap.get("/murfey.whl", response_class=Response)
 def get_murfey_wheel():
     """
-    Return a wheel file containing the latest release version of murfey. We should
-    not have to worry about the exact python compatibility here, as long as
+    Return a wheel file containing the latest release version of Murfey. We should
+    not have to worry about the exact Python compatibility here, as long as
     murfey.bootstrap is compatible with all relevant versions of Python.
     This also ignores yanked releases, which again should be fine.
     """
@@ -135,7 +144,7 @@ def get_murfey_wheel():
             pass
     if not wheels:
         raise HTTPException(
-            status_code=404, detail="Could not identify appropriate version of murfey"
+            status_code=404, detail="Could not identify appropriate version of Murfey"
         )
     newest_version = max(wheels)
     return get_pypi_file(package="murfey", filename=wheels[newest_version])
