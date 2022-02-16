@@ -1,3 +1,5 @@
 from __future__ import annotations
 
-print("Hello world")
+from murfey.client import run
+
+__all__ = ["run"]
