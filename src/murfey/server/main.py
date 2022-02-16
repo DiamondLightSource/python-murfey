@@ -173,7 +173,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             print("Received data: {}".format(data))
-            await websocket.send_text("Message: 5 sec wait")
+            await websocket.send_text("Message from server")
     except WebSocketDisconnect:
         print("Client disconnected")
 
