@@ -49,8 +49,8 @@ def get_db() -> sqlalchemy.orm.Session:
 
 
 # This will be the homepage for a given microscope.
-@app.get("/")
-async def root(request: Request, response_class=HTMLResponse):
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
     return templates.TemplateResponse(
         "home.html",
         {
@@ -62,8 +62,8 @@ async def root(request: Request, response_class=HTMLResponse):
     )
 
 
-@app.get("/bootstrap")
-def bootstrap(request: Request, response_class=HTMLResponse):
+@app.get("/bootstrap", response_class=HTMLResponse)
+def bootstrap(request: Request):
     return templates.TemplateResponse(
         "bootstrap.html",
         {
