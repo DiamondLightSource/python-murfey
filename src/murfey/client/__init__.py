@@ -25,31 +25,23 @@ def run():
         exit("Murfey server not set. Please run with --server")
 
     if args.server != known_server:
+        # New server specified. Verify that it is real
         print(f"Attempting to connect to new server {args.server}")
-        # Verify the new given server is real
         try:
-            server_response = murfey.client.update.check(args.server)
+            murfey.client.update.check(args.server, install=False)
         except Exception as e:
-            exit(f"Could not reach {args.server} - {e}")
-        if not server_response:
-            exit(f"Could not get a valid response from {args.server}")
+            exit(f"Could not reach Murfey server at {args.server!r} - {e}")
 
         # If server is reachable then update the configuration
         config["Murfey"]["server"] = args.server
         write_config(config)
+
     if args.server:
-        if murfey.client.update.check(args.server) is murfey.client.update.UPDATE.NONE:
-            print(f"Murfey {murfey.__version__}")
-        elif (
+        # Now run an actual update check
+        try:
             murfey.client.update.check(args.server)
-            is murfey.client.update.UPDATE.OPTIONAL
-        ):
-            print(f"Murfey {murfey.__version__} - an update is available")
-        elif (
-            murfey.client.update.check(args.server)
-            is murfey.client.update.UPDATE.MANDATORY
-        ):
-            exit("This client is out of date and needs updating")
+        except Exception as e:
+            print(f"Murfey update check failed with {e}")
 
 
 def read_config() -> configparser.ConfigParser:
