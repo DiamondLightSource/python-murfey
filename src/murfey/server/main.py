@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import time
 
 import ispyb
 import packaging.version
@@ -172,7 +171,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            time.sleep(5)
             data = await websocket.receive_text()
             print("Received data: {}".format(data))
             await websocket.send_text("Message: 5 sec wait")

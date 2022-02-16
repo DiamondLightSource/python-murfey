@@ -8,5 +8,5 @@ importlib_resources==5.4.0; python_version<'3.9'
 pytest==6.2.5
 textual==0.1.15
 uvicorn[standard]==0.17.4
-zocalo==0.14.0
 websocket-client==1.2.3
+zocalo==0.14.0
