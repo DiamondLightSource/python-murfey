@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import os
 import pathlib
 from typing import List, NamedTuple, Union
@@ -15,14 +14,6 @@ from murfey.utils.rsync import RsyncPipe
 class MonitoringPipeline(NamedTuple):
     monitor: Monitor
     rsync: RsyncPipe
-
-
-def run():
-    parser = argparse.ArgumentParser(description="Start the Murfey client")
-    parser.add_argument("--visit", help="Name of visit", required=True)
-    visit_name = parser.parse_args().visit
-    example_websocket_connection(visit_name)
-    post_file(visit_name)
 
 
 def example_websocket_connection(visit_name):
