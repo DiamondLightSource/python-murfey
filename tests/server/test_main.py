@@ -29,3 +29,9 @@ def test_pypi_proxy():
 def test_file_not_found_response():
     response = client.get("/hstnnsv")
     assert response.status_code == 404
+
+
+def test_openapi_json_is_valid():
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    assert response.json()
