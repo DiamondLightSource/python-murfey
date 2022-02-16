@@ -1,6 +1,0 @@
-# Example file
-
-name: Anna
-description: 8361
-size: 25
-timestamp: 14:14

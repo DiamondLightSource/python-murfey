@@ -163,7 +163,7 @@ class File(BaseModel):
 
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
-    print("In post file")
+    print("File POST received")
     return file
 
 

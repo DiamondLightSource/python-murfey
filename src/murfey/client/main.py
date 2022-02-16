@@ -20,22 +20,28 @@ class MonitoringPipeline(NamedTuple):
 def run():
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument("--visit", help="Name of visit", required=True)
-    websocket_connection(parser.parse_args().visit)
+    visit_name = parser.parse_args().visit
+    example_websocket_connection(visit_name)
 
 
-def websocket_connection(visit_name):
+def example_websocket_connection(visit_name):
     ws = create_connection("ws://127.0.0.1:8000/ws/test")
-    url = "http://127.0.0.1:8000/visits/" + visit_name + "/files"
-    print(url)
-    data = {"name": "anna", "description": "8361", "size": 25, "timestamp": 24.0}
-    # file = {"file": "~/python-murfey/example_file.txt"}
-    requests.post(url, json=data)
+    post_file(visit_name)
+    send_message(ws)
 
+
+def send_message(ws):
     print("Sending message 1")
     ws.send("Message 1")
     result = ws.recv()
     print("Received ", result)
     ws.close()
+
+
+def post_file(visit):
+    url = "http://127.0.0.1:8000/visits/" + visit + "/files"
+    data = {"name": "file1", "description": "8361", "size": 25, "timestamp": 24.0}
+    requests.post(url, json=data)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
