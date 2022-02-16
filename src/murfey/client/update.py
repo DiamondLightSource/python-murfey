@@ -26,14 +26,21 @@ def check(api_base: str, install: bool = True, force: bool = False):
     print(
         f"Murfey {murfey.__version__} connected to Murfey server {versions['server']}"
     )
-    if versions["client-needs-update"]:
-        # install mandatory update
+    if versions["client-needs-update"] or versions["client-needs-downgrade"]:
+        # Proceed with mandatory installation
+        if versions["client-needs-update"]:
+            print("This version of Murfey must be updated before continuing.")
+        if versions["client-needs-downgrade"]:
+            print(
+                "This version of Murfey is too new for the server and must be downgraded before continuing."
+            )
         result = install_murfey(api_base, versions["server"])
         if result:
             print("\nMurfey has been updated. Please restart Murfey")
             exit()
         else:
             exit("Error occurred while updating Murfey")
+
     if versions["server"] != murfey.__version__:
         if force:
             result = install_murfey(api_base, versions["server"])
