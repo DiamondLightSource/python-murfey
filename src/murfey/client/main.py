@@ -22,11 +22,11 @@ def run():
     parser.add_argument("--visit", help="Name of visit", required=True)
     visit_name = parser.parse_args().visit
     example_websocket_connection(visit_name)
+    post_file(visit_name)
 
 
 def example_websocket_connection(visit_name):
     ws = create_connection("ws://127.0.0.1:8000/ws/test")
-    post_file(visit_name)
     send_message(ws)
 
 
