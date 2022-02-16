@@ -1,15 +1,28 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
+import os
 import pathlib
+import socket
 
 import uvicorn
 import zocalo.configuration
+from fastapi.templating import Jinja2Templates
+
+try:
+    from importlib.resources import files
+except ImportError:
+    # Fallback for Python 3.8
+    from importlib_resources import files  # type: ignore
 
 ZOCALO_CONFIG = "/dls_sw/apps/zocalo/live/configuration.yaml"
 
 logger = logging.getLogger("murfey.server")
+
+template_files = files("murfey") / "templates"
+templates = Jinja2Templates(directory=template_files)
 
 
 def run():
@@ -35,3 +48,19 @@ def run():
         log_level="warning",
     )  # set to warning to reduce log clogging
     logger.info("Server startup complete.")
+
+
+@functools.lru_cache()
+def get_microscope():
+    try:
+        hostname = get_hostname()
+        microscope_from_hostname = hostname.split(".")[0]
+    except OSError:
+        microscope_from_hostname = "Unknown"
+    microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
+    return microscope_name
+
+
+@functools.lru_cache()
+def get_hostname():
+    return socket.gethostname()
