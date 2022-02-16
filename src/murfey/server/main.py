@@ -4,9 +4,8 @@ import datetime
 
 import ispyb
 import packaging.version
-import sqlalchemy.exc
 import sqlalchemy.orm
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
@@ -161,9 +160,22 @@ class File(BaseModel):
     timestamp: float
 
 
-@app.post("/visits/{bl_name}/{visit_name}/files")
-async def add_file(bl_name: str, visit_name: str, file: File):
+@app.post("/visits/{visit_name}/files")
+async def add_file(file: File):
+    print("File POST received")
     return file
+
+
+@app.websocket("/ws/test")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            print("Received data: {}".format(data))
+            await websocket.send_text("Message from server")
+    except WebSocketDisconnect:
+        print("Client disconnected")
 
 
 @app.get("/version")

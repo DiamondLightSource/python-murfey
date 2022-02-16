@@ -5,6 +5,7 @@ import pathlib
 from typing import List, NamedTuple, Union
 
 import requests
+from websocket import create_connection
 
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
@@ -13,6 +14,25 @@ from murfey.utils.rsync import RsyncPipe
 class MonitoringPipeline(NamedTuple):
     monitor: Monitor
     rsync: RsyncPipe
+
+
+def example_websocket_connection(visit_name):
+    ws = create_connection("ws://127.0.0.1:8000/ws/test")
+    send_message(ws)
+
+
+def send_message(ws):
+    print("Sending message 1")
+    ws.send("Message 1")
+    result = ws.recv()
+    print("Received ", result)
+    ws.close()
+
+
+def post_file(visit):
+    url = "http://127.0.0.1:8000/visits/" + visit + "/files"
+    data = {"name": "file1", "description": "8361", "size": 25, "timestamp": 24.0}
+    requests.post(url, json=data)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
