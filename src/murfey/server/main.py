@@ -5,7 +5,7 @@ import datetime
 import ispyb
 import packaging.version
 import sqlalchemy.orm
-from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
@@ -24,6 +24,7 @@ app.mount("/images", StaticFiles(directory=template_files / "images"), name="ima
 
 app.include_router(murfey.server.bootstrap.bootstrap)
 app.include_router(murfey.server.bootstrap.pypi)
+app.include_router(murfey.server.websocket.ws)
 
 SessionLocal = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
@@ -163,19 +164,13 @@ class File(BaseModel):
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
+    # Want to tell if a file is the first to be transferred.
+    # Check if ISPyB has a Data Collection for that visit
+    # but there may be multiple Data Collections for a single visit.
+
+    # client_id = get_hostname()
+
     return file
-
-
-@app.websocket("/ws/test")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            print("Received data: {}".format(data))
-            await websocket.send_text("Message from server")
-    except WebSocketDisconnect:
-        print("Client disconnected")
 
 
 @app.get("/version")
