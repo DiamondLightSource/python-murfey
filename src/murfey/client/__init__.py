@@ -6,17 +6,22 @@ import pathlib
 
 import murfey.client.update
 
+from murfey.client.main import example_websocket_connection, post_file
+
 
 def run():
     config = read_config()
     known_server = config["Murfey"].get("server")
 
     parser = argparse.ArgumentParser(description="Start the Murfey client")
-    # parser.add_argument("--visit", help="Name of visit", required=True)
     parser.add_argument(
         "--server", type=str, help="Murfey server to connect to", default=known_server
     )
     args = parser.parse_args()
+    parser.add_argument("--visit", help="Name of visit", required=True)
+    visit_name = parser.parse_args().visit
+    example_websocket_connection(visit_name)
+    post_file(visit_name)
     # print("Visit name: ", args.visit)
     # print(get_all_visits().text)
     # print(get_visit_info(args.visit).text)

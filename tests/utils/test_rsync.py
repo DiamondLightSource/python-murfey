@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Tuple
+
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
 
@@ -81,3 +84,50 @@ def test_rsync_pipe_from_monitor(tmp_path):
     monitor.wait()
     rp.wait()
     assert (destination / "file01.txt").exists()
+
+
+def test_rsync_with_additional_structure_without_changing_file_name(tmp_path):
+    def _new_structure(s: Path, p: Path) -> Tuple[Path, str]:
+        new_name = p.name
+        new_dest = s / "extra"
+        return new_dest, new_name
+
+    (tmp_path / "from").mkdir()
+    destination = tmp_path / "to"
+    destination.mkdir()
+    (destination / "extra").mkdir()
+    f01 = tmp_path / "from" / "file01.txt"
+    f01.touch()
+    monitor = Monitor(tmp_path / "from")
+    monitor.process(in_thread=True, sleep=0.1)
+    rp = RsyncPipe(destination, destination_structure=_new_structure)
+    monitor >> rp
+    rp.process(in_thread=True)
+    assert rp.thread
+    monitor.stop()
+    monitor.wait()
+    rp.wait()
+    assert (destination / "extra" / "file01.txt").exists()
+
+
+def test_rsync_with_changed_file_name(tmp_path):
+    def _new_structure(s: Path, p: Path) -> Tuple[Path, str]:
+        new_name = p.name.replace("01", "05")
+        return s, new_name
+
+    (tmp_path / "from").mkdir()
+    destination = tmp_path / "to"
+    destination.mkdir()
+    f01 = tmp_path / "from" / "file01.txt"
+    f01.touch()
+    monitor = Monitor(tmp_path / "from")
+    monitor.process(in_thread=True, sleep=0.1)
+    rp = RsyncPipe(destination, destination_structure=_new_structure)
+    monitor >> rp
+    rp.process(in_thread=True)
+    assert rp.thread
+    monitor.stop()
+    monitor.wait()
+    rp.wait()
+    assert not (destination / "file01.txt").exists()
+    assert (destination / "file05.txt").exists()
