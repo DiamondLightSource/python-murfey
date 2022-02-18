@@ -182,7 +182,9 @@ def get_version(client_version: str = ""):
 
     if client_version:
         client = packaging.version.parse(client_version)
+        server = packaging.version.parse(murfey.__version__)
         minimum_version = packaging.version.parse(murfey.__supported_client_version__)
         result["client-needs-update"] = minimum_version > client
+        result["client-needs-downgrade"] = client > server
 
     return result
