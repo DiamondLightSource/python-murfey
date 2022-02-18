@@ -92,7 +92,7 @@ def run():
         env_file=args.env_file,
         log_level="warning",
     )  # set to warning to reduce log clogging
-    logger.info("Server startup complete.")
+    logger.info("Server shutting down")
 
 
 @functools.lru_cache()
