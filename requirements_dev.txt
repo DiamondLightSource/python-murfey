@@ -1,4 +1,4 @@
-fastapi==0.73.0
+fastapi==0.74.0
 graypy==2.1.0
 ispyb==6.10.0
 jinja2==3.0.3
@@ -7,6 +7,6 @@ pytest-cov==3.0.0
 importlib_resources==5.4.0; python_version<'3.9'
 pytest==6.2.5
 textual==0.1.15
-uvicorn[standard]==0.17.4
+uvicorn[standard]==0.17.5
 websocket-client==1.2.3
-zocalo==0.14.0
+zocalo==0.15.0
