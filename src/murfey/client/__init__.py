@@ -3,10 +3,14 @@ from __future__ import annotations
 import argparse
 import configparser
 import pathlib
+import threading
 
 import murfey.client.update
-
-from murfey.client.main import example_websocket_connection, post_file
+from murfey.client.main import (
+    close_websocket_connection,
+    open_websocket_connection,
+    receive_messages,
+)
 
 
 def run():
@@ -19,12 +23,13 @@ def run():
     )
     args = parser.parse_args()
     parser.add_argument("--visit", help="Name of visit", required=True)
-    visit_name = parser.parse_args().visit
-    example_websocket_connection(visit_name)
-    post_file(visit_name)
-    # print("Visit name: ", args.visit)
-    # print(get_all_visits().text)
-    # print(get_visit_info(args.visit).text)
+    # visit_name = parser.parse_args().visit
+
+    ws = open_websocket_connection()
+    receive = threading.Thread(receive_messages(ws))
+    receive.start()
+    # if file gets transferred, post request with message and ws object
+    close_websocket_connection(ws)
 
     if not args.server:
         exit("Murfey server not set. Please run with --server")

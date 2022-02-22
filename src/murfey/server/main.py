@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 import murfey
 import murfey.server.bootstrap
+import murfey.server.websocket as ws
 from murfey.server import get_hostname, get_microscope, template_files, templates
 
 tags_metadata = [murfey.server.bootstrap.tag]
@@ -164,12 +165,7 @@ class File(BaseModel):
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
-    # Want to tell if a file is the first to be transferred.
-    # Check if ISPyB has a Data Collection for that visit
-    # but there may be multiple Data Collections for a single visit.
-
-    # client_id = get_hostname()
-
+    ws.update_clients(file)
     return file
 
 

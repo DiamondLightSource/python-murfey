@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import random
 from typing import List, NamedTuple, Union
 
 import requests
@@ -16,23 +17,23 @@ class MonitoringPipeline(NamedTuple):
     rsync: RsyncPipe
 
 
-def example_websocket_connection(visit_name):
-    ws = create_connection("ws://127.0.0.1:8000/ws/test")
-    send_message(ws)
+def open_websocket_connection():
+    id = str(random.randint(0, 100))
+    url = "ws://127.0.0.1:8000/ws/" + id
+    ws = create_connection(url)
+    print(f"Websocket connection opened for Client {id}")
+    return ws
 
 
-def send_message(ws):
-    print("Sending message 1")
-    ws.send("Message 1")
+def receive_messages(ws):
     result = ws.recv()
     print("Received ", result)
+    # Do other stuff with the received message
+
+
+def close_websocket_connection(ws):
+    print("Closing websocket connection")
     ws.close()
-
-
-def post_file(visit):
-    url = "http://127.0.0.1:8000/visits/" + visit + "/files"
-    data = {"name": "file1", "description": "8361", "size": 25, "timestamp": 24.0}
-    requests.post(url, json=data)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:

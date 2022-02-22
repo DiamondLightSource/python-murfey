@@ -29,16 +29,19 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@ws.websocket("/ws/test")
-async def update_clients(websocket: WebSocket, client_id):
-    await manager.connect(websocket)
+@ws.websocket("/ws/{client_id}")
+async def manage_connection(websocket: WebSocket, client_id: str):
     try:
-        while True:
-            data = await websocket.receive_text()
-            print("Received data: {}".format(data))
-            await manager.send_individual_message(f"Received {data}", websocket)
-            await manager.broadcast(f"Client {client_id} sent {data}")
+        await manager.connect(websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         await manager.broadcast(f"Client {client_id} disconnected")
+        print("Client disconnected")
+
+
+def update_clients(file_name):
+    try:
+        await manager.broadcast(f"File transferred {file_name}")
+    except WebSocketDisconnect:
+        await manager.broadcast("Client disconnected")
         print("Client disconnected")
