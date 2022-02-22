@@ -6,8 +6,7 @@ import pathlib
 import threading
 
 import murfey.client.update
-from murfey.client.main import (
-    close_websocket_connection,
+from murfey.client.main import (  # close_websocket_connection,
     open_websocket_connection,
     receive_messages,
 )
@@ -29,7 +28,7 @@ def run():
     receive = threading.Thread(receive_messages(ws))
     receive.start()
     # if file gets transferred, post request with message and ws object
-    close_websocket_connection(ws)
+    # close_websocket_connection(ws)
 
     if not args.server:
         exit("Murfey server not set. Please run with --server")
@@ -52,6 +51,12 @@ def run():
             murfey.client.update.check(args.server)
         except Exception as e:
             print(f"Murfey update check failed with {e}")
+
+    try:
+        while True:
+            pass
+    except Exception:
+        return 0
 
 
 def read_config() -> configparser.ConfigParser:

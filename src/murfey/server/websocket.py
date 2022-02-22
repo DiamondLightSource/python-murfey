@@ -39,7 +39,8 @@ async def manage_connection(websocket: WebSocket, client_id: str):
         print("Client disconnected")
 
 
-def update_clients(file_name):
+async def update_clients(file_name):
+    print("CONNECTIONS", manager.active_connections)
     try:
         await manager.broadcast(f"File transferred {file_name}")
     except WebSocketDisconnect:
