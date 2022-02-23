@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import os
 import pathlib
 import random
@@ -48,7 +49,10 @@ def on_error(ws, error):
     ws.close()
 
 
-def on_close():
+def on_close(ws, url):
+    print("Closing connection")
+    ws.close()
+    # requests.delete(url)
     print("### closed ###")
 
 
@@ -60,8 +64,9 @@ def websocket_app():
     websocket.enableTrace(True)
     id = str(random.randint(0, 100))
     url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = websocket.WebSocketApp(url, on_error=on_error)
+    ws = websocket.WebSocketApp(url)
     ws.run_forever()
+    atexit.register(on_close, ws, url)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
