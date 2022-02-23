@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import atexit
 import os
 import pathlib
+import random
 from typing import List, NamedTuple, Union
 
 import requests
+import websocket
 from websocket import create_connection
 
 from murfey.utils.file_monitor import Monitor
@@ -16,23 +19,54 @@ class MonitoringPipeline(NamedTuple):
     rsync: RsyncPipe
 
 
-def example_websocket_connection(visit_name):
-    ws = create_connection("ws://127.0.0.1:8000/ws/test")
-    send_message(ws)
+def open_websocket_connection():
+    id = str(random.randint(0, 100))
+    url = "ws://127.0.0.1:8000/ws/test/" + id
+    ws = create_connection(url)
+    print(ws.connected)
+    print(f"Websocket connection opened for Client {id}")
+    return ws
 
 
-def send_message(ws):
-    print("Sending message 1")
-    ws.send("Message 1")
-    result = ws.recv()
-    print("Received ", result)
+def receive_messages(ws):
+    while True:
+        result = ws.recv()
+        print("Received ", result)
+    # Do other stuff with the received message
+
+
+def close_websocket_connection(ws):
+    print("Closing websocket connection")
     ws.close()
 
 
-def post_file(visit):
-    url = "http://127.0.0.1:8000/visits/" + visit + "/files"
-    data = {"name": "file1", "description": "8361", "size": 25, "timestamp": 24.0}
-    requests.post(url, json=data)
+def on_message(message):
+    print(message)
+
+
+def on_error(ws, error):
+    # print(error.text)
+    ws.close()
+
+
+def on_close(ws, url):
+    print("Closing connection")
+    ws.close()
+    # requests.delete(url)
+    print("### closed ###")
+
+
+def on_open():
+    print("Opened connection")
+
+
+def websocket_app():
+    websocket.enableTrace(True)
+    id = str(random.randint(0, 100))
+    url = "ws://127.0.0.1:8000/ws/test/" + id
+    ws = websocket.WebSocketApp(url)
+    ws.run_forever()
+    atexit.register(on_close, ws, url)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:

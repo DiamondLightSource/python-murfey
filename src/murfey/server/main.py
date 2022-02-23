@@ -5,7 +5,7 @@ import datetime
 import ispyb
 import packaging.version
 import sqlalchemy.orm
-from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 import murfey
 import murfey.server.bootstrap
+import murfey.server.websocket as ws
 from murfey.server import get_hostname, get_microscope, template_files, templates
 
 tags_metadata = [murfey.server.bootstrap.tag]
@@ -24,6 +25,7 @@ app.mount("/images", StaticFiles(directory=template_files / "images"), name="ima
 
 app.include_router(murfey.server.bootstrap.bootstrap)
 app.include_router(murfey.server.bootstrap.pypi)
+app.include_router(murfey.server.websocket.ws)
 
 SessionLocal = sqlalchemy.orm.sessionmaker(
     bind=sqlalchemy.create_engine(
@@ -163,19 +165,10 @@ class File(BaseModel):
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
+    await ws.manager.broadcast(f"File {file} transferred")
+    # await ws.update_clients(file)
+    print("after await")
     return file
-
-
-@app.websocket("/ws/test")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            print("Received data: {}".format(data))
-            await websocket.send_text("Message from server")
-    except WebSocketDisconnect:
-        print("Client disconnected")
 
 
 @app.get("/version")
