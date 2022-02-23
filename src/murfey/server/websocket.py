@@ -46,9 +46,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
     await manager.broadcast(f"Client {client_id} joined")
     try:
         while True:
-            await asyncio.sleep(5)
-            file = await manager.queue.get()
-            await manager.broadcast(f"Client #{client_id} uploaded file {file}")
+            # await asyncio.sleep(5)
+            # file = await manager.queue.get()
+            data = await websocket.receive_text()
+            await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
         print("Disconnecting", websocket, client_id)
         manager.disconnect(websocket, client_id)
