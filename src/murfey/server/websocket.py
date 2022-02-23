@@ -26,9 +26,9 @@ class ConnectionManager:
         await websocket.send_text(message)
 
     async def broadcast(self, message: str):
-        print("Connections", self.active_connections)
+        # print("Connections", self.active_connections)
         for connection in self.active_connections:
-            print(connection, message)
+            # print(connection, message)
             await self.active_connections[connection].send_text(message)
 
 

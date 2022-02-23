@@ -165,7 +165,7 @@ class File(BaseModel):
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
-    await ws.manager.queue.put(file)
+    await ws.manager.broadcast(f"File {file} transferred")
     # await ws.update_clients(file)
     print("after await")
     return file
