@@ -16,19 +16,16 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, client_id):
         await websocket.accept()
         self.active_connections[client_id] = websocket
-        # self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket, client_id):
         self.active_connections.pop(client_id)
-        # self.active_connections.remove(websocket)
 
     async def send_individual_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
 
     async def broadcast(self, message: str):
-        # print("Connections", self.active_connections)
         for connection in self.active_connections:
-            # print(connection, message)
+            print(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
 
@@ -38,16 +35,10 @@ manager = ConnectionManager()
 @ws.websocket("/ws/test/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
     await manager.connect(websocket, client_id)
-    # await check_connections(manager.active_connections)
-    # print(
-    #    f"active connection statuses: {[ac.client_state for ac in manager.active_connections]}"
-    # )
 
     await manager.broadcast(f"Client {client_id} joined")
     try:
         while True:
-            # await asyncio.sleep(5)
-            # file = await manager.queue.get()
             data = await websocket.receive_text()
             await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:

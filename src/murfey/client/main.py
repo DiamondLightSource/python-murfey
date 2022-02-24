@@ -62,7 +62,7 @@ def on_open():
 
 def websocket_app():
     websocket.enableTrace(True)
-    id = str(random.randint(0, 100))
+    id = str(random.randint(0, 1000))
     url = "ws://127.0.0.1:8000/ws/test/" + id
     ws = websocket.WebSocketApp(url)
     ws.run_forever()
