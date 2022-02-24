@@ -24,13 +24,6 @@ def run():
     args = parser.parse_args()
     visit_name = args.visit
 
-    ws = threading.Thread(target=websocket_app)
-    ws.start()
-    if args.source and args.destination:
-        source_directory = pathlib.Path(args.source)
-        destination_directory = pathlib.Path(args.destination)
-        setup_rsync(visit_name, source_directory, destination_directory)
-
     if not args.server:
         exit("Murfey server not set. Please run with --server")
 
@@ -52,6 +45,13 @@ def run():
             murfey.client.update.check(args.server)
         except Exception as e:
             print(f"Murfey update check failed with {e}")
+
+    ws = threading.Thread(target=websocket_app)
+    ws.start()
+    if args.source and args.destination:
+        source_directory = pathlib.Path(args.source)
+        destination_directory = pathlib.Path(args.destination)
+        setup_rsync(visit_name, source_directory, destination_directory)
 
 
 def read_config() -> configparser.ConfigParser:
