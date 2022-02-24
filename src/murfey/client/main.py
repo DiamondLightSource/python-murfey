@@ -117,3 +117,9 @@ def setup_rsync(
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)
+
+
+def stop_rsync(mpipeline: MonitoringPipeline):
+    mpipeline.monitor.stop()
+    mpipeline.monitor.wait()
+    mpipeline.rsync.wait()
