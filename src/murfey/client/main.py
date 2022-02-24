@@ -110,6 +110,7 @@ def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
 def setup_rsync(
     visit_name: str, directory: pathlib.Path, destination: pathlib.Path
 ) -> MonitoringPipeline:
+    print("Called setup rsync")
     monitor = Monitor(directory)
     monitor.process(in_thread=True)
 

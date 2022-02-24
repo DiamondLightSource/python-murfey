@@ -42,7 +42,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
             data = await websocket.receive_text()
             await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
-        print("Disconnecting", websocket, client_id)
+        print(f"Disconnecting Client {client_id}")
         manager.disconnect(websocket, client_id)
         await manager.broadcast(f"Client #{client_id} disconnected")
 
@@ -54,7 +54,7 @@ async def check_connections(active_connections):
         try:
             await asyncio.wait_for(connection.receive(), timeout=6)
         except asyncio.TimeoutError:
-            print(f"Disconnecting client {connection}")
+            print(f"Disconnecting Client {connection[0]}")
             manager.disconnect(connection[0], connection[1])
 
 
