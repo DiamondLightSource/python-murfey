@@ -133,11 +133,15 @@ class RsyncPipe(Processor):
                 if stringy_stdout.startswith("sent"):
                     self._transferring = False
                     byte_info = stringy_stdout.split()
-                    self.sent_bytes = int(byte_info[byte_info.index("sent") + 1])
-                    self.received_bytes = int(
-                        byte_info[byte_info.index("received") + 1]
+                    self.sent_bytes = int(
+                        byte_info[byte_info.index("sent") + 1].replace(",", "")
                     )
-                    self.byte_rate = float(byte_info[byte_info.index("bytes/sec") - 1])
+                    self.received_bytes = int(
+                        byte_info[byte_info.index("received") + 1].replace(",", "")
+                    )
+                    self.byte_rate = float(
+                        byte_info[byte_info.index("bytes/sec") - 1].replace(",", "")
+                    )
                 elif len(stringy_stdout.split()) == 1:
                     if self._root and self._sub_structure:
                         self._notify(

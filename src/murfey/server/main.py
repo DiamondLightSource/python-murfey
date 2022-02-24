@@ -166,8 +166,6 @@ class File(BaseModel):
 async def add_file(file: File):
     print("File POST received")
     await ws.manager.broadcast(f"File {file} transferred")
-    # await ws.update_clients(file)
-    print("after await")
     return file
 
 
