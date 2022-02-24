@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import configparser
 import pathlib
+import threading
 
 import murfey.client.update
-from murfey.client.main import websocket_app
+from murfey.client.main import setup_rsync, websocket_app
 
 
 def run():
@@ -16,11 +17,12 @@ def run():
     parser.add_argument(
         "--server", type=str, help="Murfey server to connect to", default=known_server
     )
-    args = parser.parse_args()
-    parser.add_argument("--visit", help="Name of visit", required=True)
-    # visit_name = parser.parse_args().visit
 
-    websocket_app()
+    parser.add_argument("--visit", help="Name of visit", required=True)
+    parser.add_argument("--source", help="Directory to transfer files from")
+    parser.add_argument("--destination", help="Directory to transfer files to")
+    args = parser.parse_args()
+    visit_name = args.visit
 
     if not args.server:
         exit("Murfey server not set. Please run with --server")
@@ -43,6 +45,13 @@ def run():
             murfey.client.update.check(args.server)
         except Exception as e:
             print(f"Murfey update check failed with {e}")
+
+    ws = threading.Thread(target=websocket_app)
+    ws.start()
+    if args.source and args.destination:
+        source_directory = pathlib.Path(args.source)
+        destination_directory = pathlib.Path(args.destination)
+        setup_rsync(visit_name, source_directory, destination_directory)
 
 
 def read_config() -> configparser.ConfigParser:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import atexit
 import os
 import pathlib
 import random
@@ -45,14 +44,12 @@ def on_message(message):
 
 
 def on_error(ws, error):
-    # print(error.text)
-    ws.close()
+    print(error.text)
 
 
-def on_close(ws, url):
+def on_close(ws):
     print("Closing connection")
     ws.close()
-    # requests.delete(url)
     print("### closed ###")
 
 
@@ -64,9 +61,8 @@ def websocket_app():
     websocket.enableTrace(True)
     id = str(random.randint(0, 1000))
     url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = websocket.WebSocketApp(url)
+    ws = websocket.WebSocketApp(url, on_close=on_close)
     ws.run_forever()
-    atexit.register(on_close, ws, url)
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
@@ -94,7 +90,7 @@ def get_visit_info(visit_name: str) -> Union[dict, List[dict]]:
 def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
     bl = os.getenv("BEAMLINE")
     if bl:
-        path = "http://127.0.0.1:8000/visits/" + bl + "/" + visit_name + "/files"
+        path = "http://127.0.0.1:8000/visits/" + visit_name + "/files"
     else:
         raise RuntimeError("No BEAMLINE environment variable was specified")
     request_body = {
@@ -103,7 +99,7 @@ def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
         "size": transferred_file.stat().st_size,
         "timestamp": transferred_file.stat().st_mtime,
     }
-    r = requests.post(path, data=request_body)
+    r = requests.post(path, json=request_body)
     return r.json()
 
 
@@ -121,3 +117,9 @@ def setup_rsync(
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)
+
+
+def stop_rsync(mpipeline: MonitoringPipeline):
+    mpipeline.monitor.stop()
+    mpipeline.monitor.wait()
+    mpipeline.rsync.wait()
