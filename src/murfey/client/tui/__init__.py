@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Union
 
 from rich.align import Align
+from rich.box import SQUARE
 from rich.panel import Panel
 from rich.progress import (
-    BarColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
@@ -23,12 +23,14 @@ from textual.keys import Keys
 from textual.reactive import Reactive
 from textual.widget import Widget
 
+from murfey.client.tui.progress import BlockBarColumn
+
 
 class StatusBar(Widget):
     @functools.lru_cache()
     def get_progress(self):
         text_column = TextColumn("{task.description}", table_column=Column(ratio=1))
-        bar_column = BarColumn(bar_width=None, table_column=Column(ratio=3))
+        bar_column = BlockBarColumn(bar_width=None, table_column=Column(ratio=3))
         progress = Progress(
             text_column,
             bar_column,
@@ -50,11 +52,11 @@ class StatusBar(Widget):
         progress.update(task1, completed=max(0, min(1000, elapsed)))
         progress.update(task2, completed=max(0, min(1000, elapsed - 1000)))
         progress.update(task3, completed=max(0, min(1000, elapsed - 2000)))
-        return Panel(progress.make_tasks_table(progress.tasks), height=5)
+        return Panel(progress.make_tasks_table(progress.tasks), height=5, box=SQUARE)
 
         timestamp = datetime.now().strftime("%c")
         return Align.center(timestamp, vertical="middle")
-        return Panel("Hello [b]World[/b]", style="", height=3)
+        return Panel("Hello [b]World[/b]", style="", height=3, box=SQUARE)
 
     def on_mount(self):
         self.start = time.time()
@@ -65,11 +67,14 @@ class StatusBar(Widget):
 
 
 class Hover(Widget):
-
     mouse_over = Reactive(False)
 
     def render(self) -> Panel:
-        return Panel("Hello [b]World[/b]", style=("on red" if self.mouse_over else ""))
+        return Panel(
+            "Hello [b]World[/b]",
+            style=("on red" if self.mouse_over else ""),
+            box=SQUARE,
+        )
 
     def on_enter(self) -> None:
         self.mouse_over = True
@@ -91,6 +96,7 @@ class InputBox(Widget):
         return Panel(
             f"[blue]❯[/blue] {self.input_text}",
             style=("on red" if self.mouse_over else ""),
+            box=SQUARE,
         )
 
     def set_input_text(self, input_text: str) -> None:
@@ -107,10 +113,16 @@ class InputBox(Widget):
     async def on_key(self, key: events.Key) -> None:
         if key.key == Keys.ControlH:
             self.input_text = self.input_text[:-1]
+            key.stop()
         elif key.key == Keys.Delete:
             self.input_text = ""
+            key.stop()
         elif key.key in string.printable:
             self.input_text += key.key
+            key.stop()
+        elif key.key == Keys.Enter:
+            self.input_text = ""
+            key.stop()
 
 
 class MurfeyTUI(App):
@@ -124,6 +136,3 @@ class MurfeyTUI(App):
         self._statusbar = StatusBar()
         hovers = (Hover() for _ in range(3))
         await self.view.dock(self._statusbar, self.input_box, *hovers, edge="top")
-
-
-MurfeyTUI.run(log="textual.log", log_verbosity=2)
