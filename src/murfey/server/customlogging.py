@@ -5,8 +5,12 @@ import logging
 
 class CustomHandler(logging.Handler):
     def prepare(self, record):
-        self.format(record)
-        record.msg = record.message
+        self.format(
+            record
+        )  # when format() isn't called, the message "Hello" is preserved
+        record.msg = (
+            record.message
+        )  # when record.msg = "Hello" the entire message is "Hello"
         # record.args = None
         # record.exc_info = None
         return record
