@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 
 import ispyb
 import packaging.version
@@ -15,11 +16,15 @@ import murfey
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
 from murfey.server import get_hostname, get_microscope, template_files, templates
+from murfey.server.customlogging import CustomHandler
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
+logger = logging.getLogger("murfey.server")
+handler = CustomHandler()
+logger.addHandler(handler)
 
+app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
@@ -160,11 +165,19 @@ class File(BaseModel):
     description: str
     size: int
     timestamp: float
+    message: str
 
 
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
+    dictionary = file.dict()
+    dictionary["level"] = 0
+    record = logging.makeLogRecord(dictionary)
+    log_record = handler.prepare(record)
+    # print(log_record)
+    # logger.handle(record)
+    logger.info(log_record)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
 
