@@ -4,9 +4,11 @@ import argparse
 import configparser
 import pathlib
 import threading
+import time
 
 import murfey.client.update
-from murfey.client.main import setup_rsync, websocket_app
+from murfey.client.main import just_watch_files, setup_rsync, websocket_app
+from murfey.utils.file_monitor import Monitor
 
 
 def run():
@@ -52,6 +54,17 @@ def run():
         source_directory = pathlib.Path(args.source)
         destination_directory = pathlib.Path(args.destination)
         setup_rsync(visit_name, source_directory, destination_directory)
+
+    if args.destination and not args.source:
+        destination_directory = pathlib.Path(args.destination)
+        monitor = Monitor(destination_directory)
+        monitor.process(in_thread=True)
+        watch = threading.Thread(target=just_watch_files, args=(visit_name, monitor))
+        watch.start()
+        time.sleep(300)
+        print(f"Stopping watching {destination_directory}")
+        monitor.stop()
+        watch.join()
 
 
 def read_config() -> configparser.ConfigParser:

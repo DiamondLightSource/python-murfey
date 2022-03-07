@@ -165,19 +165,16 @@ class File(BaseModel):
     description: str
     size: int
     timestamp: float
-    message: str
 
 
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     print("File POST received")
-    dictionary = file.dict()
-    dictionary["level"] = 0
-    record = logging.makeLogRecord(dictionary)
-    log_record = handler.prepare(record)
-    # print(log_record)
-    # logger.handle(record)
-    logger.info(log_record)
+    # dictionary = file.dict()
+    # dictionary["level"] = 0
+    # record = logging.makeLogRecord(dictionary)
+    message = 'File "' + str(file.name) + '" transferred'
+    logger.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
 
