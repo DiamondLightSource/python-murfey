@@ -24,6 +24,7 @@ app.mount("/static", StaticFiles(directory=template_files / "static"), name="sta
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
 app.include_router(murfey.server.bootstrap.bootstrap)
+app.include_router(murfey.server.bootstrap.cygwin)
 app.include_router(murfey.server.bootstrap.pypi)
 app.include_router(murfey.server.websocket.ws)
 

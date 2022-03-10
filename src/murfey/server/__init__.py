@@ -103,7 +103,15 @@ def run():
         default=8000,
     )
 
-    parser.add_argument(
+    verbosity = parser.add_mutually_exclusive_group()
+    verbosity.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Decrease logging output verbosity",
+    )
+    verbosity.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -115,11 +123,21 @@ def run():
     # Set up logging now that the desired verbosity is known
     logger.setLevel(logging.DEBUG)
     rich_handler = RichHandler(enable_link_path=False)
-    if args.verbose == 0:
+    if args.quiet:
+        rich_handler.setLevel(logging.INFO)
+        log_levels = {
+            "murfey": logging.INFO,
+            "uvicorn": logging.WARNING,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.WARNING,
+        }
+    elif args.verbose == 0:
         rich_handler.setLevel(logging.INFO)
         log_levels = {
             "murfey": logging.DEBUG,
             "uvicorn": logging.INFO,
+            "uvicorn.access": logging.WARNING,
             "fastapi": logging.INFO,
             "starlette": logging.INFO,
             "sqlalchemy": logging.WARNING,
@@ -164,8 +182,8 @@ def run():
         host=args.host,
         port=args.port,
         env_file=args.env_file,
-        log_level="warning",
-    )  # set to warning to reduce log clogging
+        log_config=None,
+    )
     logger.info("Server shutting down")
 
 
