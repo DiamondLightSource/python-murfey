@@ -1,11 +1,12 @@
 fastapi==0.74.1
 graypy==2.1.0
+importlib_resources==5.4.0; python_version<'3.9'
 ispyb==6.10.0
 jinja2==3.0.3
 procrunner==2.3.2
 pytest-cov==3.0.0
-importlib_resources==5.4.0; python_version<'3.9'
 pytest==7.0.1
+rich==11.2.0
 textual==0.1.15
 uvicorn[standard]==0.17.5
 websocket-client==1.3.1
