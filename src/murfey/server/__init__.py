@@ -176,7 +176,9 @@ def run():
     for logger_name, log_level in log_levels.items():
         logging.getLogger(logger_name).setLevel(log_level)
 
-    logger.info(f"Starting Murfey server, listening on {args.host}:{args.port}")
+    logger.info(
+        f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
+    )
     uvicorn.run(
         "murfey.server.main:app",
         host=args.host,
