@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 from typing import List, NamedTuple, Union
@@ -8,6 +9,8 @@ import requests
 
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
+
+log = logging.getLogger("murfey.client.transfer")
 
 
 class MonitoringPipeline(NamedTuple):
@@ -38,6 +41,8 @@ def get_visit_info(visit_name: str) -> Union[dict, List[dict]]:
 
 
 def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
+    log.info("Notifying for {visit_name=} {transferred_file=}")
+    return {}
     bl = os.getenv("BEAMLINE")
     if bl:
         path = "http://127.0.0.1:8000/visits/" + visit_name + "/files"
@@ -53,6 +58,18 @@ def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
     return r.json()
 
 
+class _NotRSyncingPipeline(RsyncPipe):
+    def _run_rsync(
+        self,
+        root: pathlib.Path,
+        files: List[pathlib.Path],
+        retry: bool = True,
+    ):
+        log.info(f"Would sync {len(files)} elements")
+        for file in files:
+            log.debug(f"- {file} ({file.stat().st_size} bytes)")
+
+
 def setup_rsync(
     visit_name: str, directory: pathlib.Path, destination: pathlib.Path
 ) -> MonitoringPipeline:
@@ -63,7 +80,8 @@ def setup_rsync(
         request_json = notify_file(visit_name, transferred_file)
         return request_json
 
-    rp = RsyncPipe(destination, notify=_notify)
+    # rp = RsyncPipe(destination, notify=_notify)
+    rp = _NotRSyncingPipeline(destination, notify=_notify)
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)

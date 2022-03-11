@@ -2,16 +2,24 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import logging
 import pathlib
 import platform
 import shutil
-import threading
+
+# import threading
+import time
 import webbrowser
 from typing import Literal
 
+from rich.logging import RichHandler
+
 import murfey.client.update
 from murfey.client.transfer import setup_rsync
-from murfey.client.websockets import websocket_app
+
+# from murfey.client.websockets import websocket_app
+
+log = logging.getLogger("murfey.client")
 
 
 def _enable_webbrowser_in_cygwin():
@@ -54,7 +62,7 @@ def run():
         "--server", type=str, help="Murfey server to connect to", default=known_server
     )
 
-    parser.add_argument("--visit", help="Name of visit", required=True)
+    parser.add_argument("--visit", help="Name of visit")
     parser.add_argument("--source", help="Directory to transfer files from")
     parser.add_argument("--destination", help="Directory to transfer files to")
     parser.add_argument(
@@ -65,7 +73,6 @@ def run():
         help="Update Murfey to the newest or to a specific version",
     )
     args = parser.parse_args()
-    visit_name = args.visit
 
     if not args.server:
         exit("Murfey server not set. Please run with --server")
@@ -89,12 +96,27 @@ def run():
 
     _enable_webbrowser_in_cygwin()
 
-    ws = threading.Thread(target=websocket_app)
-    ws.start()
-    if args.source and args.destination:
+    # For now show all logs on stdout
+    rich_handler = RichHandler(enable_link_path=False)
+    logging.getLogger().addHandler(rich_handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
+
+    # ws = threading.Thread(target=websocket_app)
+    # ws.start()
+    if args.visit and args.source and args.destination:
+        log.info("Starting Monitor/RSync processes")
         source_directory = pathlib.Path(args.source)
         destination_directory = pathlib.Path(args.destination)
-        setup_rsync(visit_name, source_directory, destination_directory)
+        setup_rsync(args.visit, source_directory, destination_directory)
+
+    # Leave threads running
+    try:
+        while True:
+            time.sleep(3)
+    except KeyboardInterrupt:
+        pass
+
+    log.info("Encountered CTRL+C")
 
 
 def read_config() -> configparser.ConfigParser:
