@@ -7,7 +7,7 @@
     <h3>Installing Cygwin</h3>
     <p>Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>, and then run
     <pre style="font-family: monospace">
-    setup-x86_64.exe -BO -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P python3,rsync -q
+    setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
     </pre>
 
     <h3>Installing Murfey</h3>
