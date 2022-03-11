@@ -3,10 +3,46 @@ from __future__ import annotations
 import argparse
 import configparser
 import pathlib
+import platform
+import shutil
 import threading
+import webbrowser
+from typing import Literal
 
 import murfey.client.update
-from murfey.client.main import setup_rsync, websocket_app
+from murfey.client.transfer import setup_rsync
+from murfey.client.websockets import websocket_app
+
+
+def _enable_webbrowser_in_cygwin():
+    """Helper function to make webbrowser.open() work in CygWin"""
+    if "cygwin" in platform.system().lower() and shutil.which("cygstart"):
+        webbrowser.register("cygstart", None, webbrowser.GenericBrowser("cygstart"))
+
+
+def _check_for_updates(server: str, install_version: None | Literal[True] | str):
+    if install_version is True:
+        # User requested installation of the newest version
+        try:
+            murfey.client.update.check(server, force=True)
+            print("\nYou are already running the newest version of Murfey")
+            exit()
+        except Exception as e:
+            exit(f"Murfey update check failed with {e}")
+
+    if install_version:
+        # User requested installation of a specific version
+        if murfey.client.update.install_murfey(server, install_version):
+            print(f"\nMurfey has been updated to version {install_version}")
+            exit()
+        else:
+            exit("Error occurred while updating Murfey")
+
+    # Otherwise run a routine update check to ensure client and server are compatible
+    try:
+        murfey.client.update.check(server)
+    except Exception as e:
+        print(f"Murfey update check failed with {e}")
 
 
 def run():
@@ -46,27 +82,12 @@ def run():
         config["Murfey"]["server"] = args.server
         write_config(config)
 
-    if args.server:
-        if args.update:
-            # User requested installation of a specific or a newer version
-            if args.update is True:
-                try:
-                    murfey.client.update.check(args.server, force=True)
-                    print("\nYou are already running the newest version of Murfey")
-                    exit()
-                except Exception as e:
-                    exit(f"Murfey update check failed with {e}")
-            if murfey.client.update.install_murfey(args.server, args.update):
-                print(f"\nMurfey has been updated to version {args.update}")
-                exit()
-            else:
-                exit("Error occurred while updating Murfey")
+    # If user requested installation of a specific or a newer version then
+    # make that happen, otherwise ensure client and server are compatible and
+    # update if necessary.
+    _check_for_updates(server=args.server, install_version=args.update)
 
-        # Otherwise run a routine update check to ensure client and server are compatible
-        try:
-            murfey.client.update.check(args.server)
-        except Exception as e:
-            print(f"Murfey update check failed with {e}")
+    _enable_webbrowser_in_cygwin()
 
     ws = threading.Thread(target=websocket_app)
     ws.start()
