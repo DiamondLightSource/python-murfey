@@ -21,6 +21,13 @@ def run():
     parser.add_argument("--visit", help="Name of visit", required=True)
     parser.add_argument("--source", help="Directory to transfer files from")
     parser.add_argument("--destination", help="Directory to transfer files to")
+    parser.add_argument(
+        "--update",
+        nargs="?",
+        default=None,
+        const=True,
+        help="Update Murfey to the newest or to a specific version",
+    )
     args = parser.parse_args()
     visit_name = args.visit
 
@@ -40,7 +47,22 @@ def run():
         write_config(config)
 
     if args.server:
-        # Now run an actual update check
+        if args.update:
+            # User requested installation of a specific or a newer version
+            if args.update is True:
+                try:
+                    murfey.client.update.check(args.server, force=True)
+                    print("\nYou are already running the newest version of Murfey")
+                    exit()
+                except Exception as e:
+                    exit(f"Murfey update check failed with {e}")
+            if murfey.client.update.install_murfey(args.server, args.update):
+                print(f"\nMurfey has been updated to version {args.update}")
+                exit()
+            else:
+                exit("Error occurred while updating Murfey")
+
+        # Otherwise run a routine update check to ensure client and server are compatible
         try:
             murfey.client.update.check(args.server)
         except Exception as e:
