@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 
 import ispyb
 import packaging.version
@@ -11,10 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 
-import murfey
+import murfey.server
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
 from murfey.server import get_hostname, get_microscope, template_files, templates
+
+log = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
@@ -185,3 +188,13 @@ def get_version(client_version: str = ""):
         result["client-needs-downgrade"] = client > server
 
     return result
+
+
+@app.get("/shutdown", include_in_schema=False)
+def shutdown():
+    """A method to stop the server. This should be removed before Murfey is
+    deployed in production. To remove it we need to figure out how to control
+    to process (eg. systemd) and who to run it as."""
+    log.info("Server shutdown request received")
+    murfey.server.shutdown()
+    return {"success": True}

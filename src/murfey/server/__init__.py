@@ -28,6 +28,8 @@ logger = logging.getLogger("murfey.server")
 template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
 
+_running_server: uvicorn.Server | None = None
+
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
     template_parameters = {
@@ -179,14 +181,24 @@ def run():
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
     )
-    uvicorn.run(
+    global _running_server
+    config = uvicorn.Config(
         "murfey.server.main:app",
         host=args.host,
         port=args.port,
         env_file=args.env_file,
         log_config=None,
     )
+    _running_server = uvicorn.Server(config=config)
+    _running_server.run()
     logger.info("Server shutting down")
+
+
+def shutdown():
+    global _running_server
+    if _running_server:
+        _running_server.should_exit = True
+        _running_server.force_exit = True
 
 
 @functools.lru_cache()
