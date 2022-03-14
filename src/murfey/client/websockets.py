@@ -1,53 +1,93 @@
 from __future__ import annotations
 
+import logging
+import queue
 import random
+import threading
+import time
 
 import websocket
-from websocket import create_connection
+
+log = logging.getLogger("murfey.client.websockets")
 
 
-def open_websocket_connection():
-    id = str(random.randint(0, 100))
-    url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = create_connection(url)
-    print(ws.connected)
-    print(f"Websocket connection opened for Client {id}")
-    return ws
+class WSApp:
+    def __init__(self):
+        id = str(random.randint(0, 100))
+        log.info(f"Opening websocket connection for Client {id}")
+        websocket.enableTrace(True)
+        url = "ws://127.0.0.1:8000/ws/test/" + id
+        self._alive = True
+        self._ready = False
+        self._send_queue = queue.Queue()
+        self._ws = websocket.WebSocketApp(
+            url,
+            on_close=self.on_close,
+            on_message=self.on_message,
+            on_open=self.on_open,
+        )
+        self._ws_thread = threading.Thread(
+            target=self._run_websocket_event_loop,
+            daemon=True,
+            name="websocket-connection",
+        )
+        self._ws_thread.start()
+        self._feeder_thread = threading.Thread(
+            target=self._send_queue_feeder, daemon=True, name="websocket-send-queue"
+        )
+        self._feeder_thread.start()
 
+    def __repr__(self):
+        if self.alive:
+            if self._ready:
+                status = "connected"
+            else:
+                status = "connecting"
+        else:
+            status = "closed"
+        return f"<WSApp {status=} sendqueue={self._send_queue.qsize()}>"
 
-def receive_messages(ws):
-    while True:
-        result = ws.recv()
-        print("Received ", result)
-    # Do other stuff with the received message
+    @property
+    def alive(self):
+        return self._alive and self._ws_thread.is_alive()
 
+    def _run_websocket_event_loop(self):
+        teardown = self._ws.run_forever()
+        if teardown:
+            log.error("Exception raised in websocket event loop")
+        else:
+            log.info("Websocket connection closed")
+        self._alive = False
 
-def close_websocket_connection(ws):
-    print("Closing websocket connection")
-    ws.close()
+    def _send_queue_feeder(self):
+        log.info("Websocket send-queue-feeder thread starting")
+        while self.alive:
+            element = self._send_queue.get()
+            while not self._ready:
+                time.sleep(0.3)
+            self._ws.send(element)
+            self._send_queue.task_done()
+        log.info("Websocket send-queue-feeder thread stopped")
 
+    def close(self):
+        log.info("Closing websocket connection")
+        self._ws.close()
 
-def on_message(message):
-    print(message)
+    def on_message(self, ws: websocket.WebSocketApp, message: str):
+        log.info(f"Received message: {message}")
 
+    def on_error(self, ws: websocket.WebSocketApp, error):
+        log.error(error.text)
+        print(repr(error))
 
-def on_error(ws, error):
-    print(error.text)
+    def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
+        log.info(f"Connection closed due to {close_status_code}, {close_msg}")
+        self._ws.close()
 
+    def on_open(self, ws: websocket.WebSocketApp):
+        log.info("Opened connection")
+        self._ready = True
 
-def on_close(ws):
-    print("Closing connection")
-    ws.close()
-    print("### closed ###")
-
-
-def on_open():
-    print("Opened connection")
-
-
-def websocket_app():
-    websocket.enableTrace(True)
-    id = str(random.randint(0, 1000))
-    url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = websocket.WebSocketApp(url, on_close=on_close)
-    ws.run_forever()
+    def send(self, thing):
+        if self.alive:
+            self._send_queue.put_nowait(thing)

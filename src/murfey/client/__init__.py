@@ -15,9 +15,8 @@ from typing import Literal
 from rich.logging import RichHandler
 
 import murfey.client.update
+import murfey.client.websockets
 from murfey.client.transfer import setup_rsync
-
-# from murfey.client.websockets import websocket_app
 
 log = logging.getLogger("murfey.client")
 
@@ -101,8 +100,9 @@ def run():
     logging.getLogger().addHandler(rich_handler)
     logging.getLogger("").setLevel(logging.DEBUG)
 
-    # ws = threading.Thread(target=websocket_app)
-    # ws.start()
+    log.info("Starting Websockets")
+    ws = murfey.client.websockets.WSApp()
+
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")
         source_directory = pathlib.Path(args.source)
@@ -113,6 +113,8 @@ def run():
     try:
         while True:
             time.sleep(3)
+            ws.send("ohai")
+            log.debug(f"Client is running {ws}")
     except KeyboardInterrupt:
         pass
 
