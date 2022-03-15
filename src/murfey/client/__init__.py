@@ -58,14 +58,18 @@ def run():
 
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument(
-        "--server", type=str, help="Murfey server to connect to", default=known_server
+        "--server",
+        metavar="HOST:PORT",
+        type=str,
+        help=f"Murfey server to connect to ({known_server})",
+        default=known_server,
     )
-
     parser.add_argument("--visit", help="Name of visit")
     parser.add_argument("--source", help="Directory to transfer files from")
     parser.add_argument("--destination", help="Directory to transfer files to")
     parser.add_argument(
         "--update",
+        metavar="VERSION",
         nargs="?",
         default=None,
         const=True,
@@ -74,7 +78,11 @@ def run():
     args = parser.parse_args()
 
     if not args.server:
-        exit("Murfey server not set. Please run with --server")
+        exit("Murfey server not set. Please run with --server host:port")
+    if not args.server.startswith(("http://", "https://")):
+        if "://" in args.server:
+            exit("Unknown server protocol. Only http:// and https:// are allowed")
+        args.server = f"http://{args.server}"
 
     if args.server != known_server:
         # New server specified. Verify that it is real
