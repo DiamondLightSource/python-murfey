@@ -15,7 +15,7 @@ from typing import Literal
 from rich.logging import RichHandler
 
 import murfey.client.update
-import murfey.client.websockets
+import murfey.client.websocket
 from murfey.client.transfer import setup_rsync
 
 log = logging.getLogger("murfey.client")
@@ -100,8 +100,8 @@ def run():
     logging.getLogger().addHandler(rich_handler)
     logging.getLogger("").setLevel(logging.DEBUG)
 
-    log.info("Starting Websockets")
-    ws = murfey.client.websockets.WSApp()
+    log.info("Starting Websocket connection")
+    ws = murfey.client.websocket.WSApp()
 
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")

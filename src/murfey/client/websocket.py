@@ -8,7 +8,7 @@ import time
 
 import websocket
 
-log = logging.getLogger("murfey.client.websockets")
+log = logging.getLogger("murfey.client.websocket")
 
 
 class WSApp:
