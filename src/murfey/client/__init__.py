@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import logging
 import pathlib
 import threading
 import time
@@ -9,6 +10,8 @@ import time
 import murfey.client.update
 from murfey.client.main import just_watch_files, setup_rsync, websocket_app
 from murfey.utils.file_monitor import Monitor
+
+logger = logging.getLogger("murfey.client")
 
 
 def run():

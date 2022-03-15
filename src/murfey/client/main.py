@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import random
@@ -12,6 +13,8 @@ from websocket import create_connection
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
 
+logger = logging.getLogger("murfey.client")
+
 
 class MonitoringPipeline(NamedTuple):
     monitor: Monitor
@@ -22,39 +25,46 @@ def open_websocket_connection():
     id = str(random.randint(0, 100))
     url = "ws://127.0.0.1:8000/ws/test/" + id
     ws = create_connection(url)
-    print(ws.connected)
-    print(f"Websocket connection opened for Client {id}")
+    # print(ws.connected)
+    # print(f"Websocket connection opened for Client {id}")
+    logger.info(f"Websocket connection opened for Client {id}")
     return ws
 
 
 def receive_messages(ws):
     while True:
         result = ws.recv()
-        print("Received ", result)
+        # print("Received ", result)
+        logger.info("Received ", result)
     # Do other stuff with the received message
 
 
 def close_websocket_connection(ws):
-    print("Closing websocket connection")
+    # print("Closing websocket connection")
+    logger.info("Closing websocket connection")
     ws.close()
 
 
 def on_message(message):
-    print(message)
+    logger.info(message)
+    # print(message)
 
 
 def on_error(ws, error):
-    print(error.text)
+    # print(error.text)
+    logger.info(error.text)
 
 
 def on_close(ws):
-    print("Closing connection")
+    # print("Closing connection")
+    logger.info("Closing connection")
     ws.close()
-    print("### closed ###")
+    # print("### closed ###")
 
 
 def on_open():
-    print("Opened connection")
+    # print("Opened connection")
+    logger.info("Opened connection")
 
 
 def websocket_app():
