@@ -109,7 +109,7 @@ def run():
     logging.getLogger("").setLevel(logging.DEBUG)
 
     log.info("Starting Websocket connection")
-    ws = murfey.client.websocket.WSApp()
+    ws = murfey.client.websocket.WSApp(server=args.server)
 
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")

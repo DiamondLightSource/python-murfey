@@ -5,6 +5,7 @@ import queue
 import random
 import threading
 import time
+import urllib.parse
 
 import websocket
 
@@ -12,16 +13,17 @@ log = logging.getLogger("murfey.client.websocket")
 
 
 class WSApp:
-    def __init__(self):
-        id = str(random.randint(0, 100))
+    def __init__(self, *, server: str):
+        id = random.randint(0, 100)
         log.info(f"Opening websocket connection for Client {id}")
         websocket.enableTrace(True)
-        url = "ws://127.0.0.1:8000/ws/test/" + id
+        url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
+        self._address = url.geturl()
         self._alive = True
         self._ready = False
-        self._send_queue = queue.Queue()
+        self._send_queue: queue.Queue[str] = queue.Queue()
         self._ws = websocket.WebSocketApp(
-            url,
+            url._replace(path=f"/ws/test/{id}").geturl(),
             on_close=self.on_close,
             on_message=self.on_message,
             on_open=self.on_open,
@@ -45,7 +47,7 @@ class WSApp:
                 status = "connecting"
         else:
             status = "closed"
-        return f"<WSApp {status=} sendqueue={self._send_queue.qsize()}>"
+        return f"<WSApp host={self._address!r} {status=} sendqueue={self._send_queue.qsize()}>"
 
     @property
     def alive(self):
@@ -88,6 +90,6 @@ class WSApp:
         log.info("Opened connection")
         self._ready = True
 
-    def send(self, thing):
+    def send(self, thing: str):
         if self.alive:
             self._send_queue.put_nowait(thing)
