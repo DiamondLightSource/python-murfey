@@ -4,14 +4,52 @@ import argparse
 import configparser
 import logging
 import pathlib
+import platform
+import shutil
 import threading
 import time
+import webbrowser
+from typing import Literal
+
+from rich.logging import RichHandler
 
 import murfey.client.update
-from murfey.client.main import just_watch_files, setup_rsync, websocket_app
+import murfey.client.websocket
+from murfey.client.transfer import just_watch_files, setup_rsync
 from murfey.utils.file_monitor import Monitor
 
-logger = logging.getLogger("murfey.client")
+log = logging.getLogger("murfey.client")
+
+
+def _enable_webbrowser_in_cygwin():
+    """Helper function to make webbrowser.open() work in CygWin"""
+    if "cygwin" in platform.system().lower() and shutil.which("cygstart"):
+        webbrowser.register("cygstart", None, webbrowser.GenericBrowser("cygstart"))
+
+
+def _check_for_updates(server: str, install_version: None | Literal[True] | str):
+    if install_version is True:
+        # User requested installation of the newest version
+        try:
+            murfey.client.update.check(server, force=True)
+            print("\nYou are already running the newest version of Murfey")
+            exit()
+        except Exception as e:
+            exit(f"Murfey update check failed with {e}")
+
+    if install_version:
+        # User requested installation of a specific version
+        if murfey.client.update.install_murfey(server, install_version):
+            print(f"\nMurfey has been updated to version {install_version}")
+            exit()
+        else:
+            exit("Error occurred while updating Murfey")
+
+    # Otherwise run a routine update check to ensure client and server are compatible
+    try:
+        murfey.client.update.check(server)
+    except Exception as e:
+        print(f"Murfey update check failed with {e}")
 
 
 def run():
@@ -20,17 +58,31 @@ def run():
 
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument(
-        "--server", type=str, help="Murfey server to connect to", default=known_server
+        "--server",
+        metavar="HOST:PORT",
+        type=str,
+        help=f"Murfey server to connect to ({known_server})",
+        default=known_server,
     )
-
-    parser.add_argument("--visit", help="Name of visit", required=True)
+    parser.add_argument("--visit", help="Name of visit")
     parser.add_argument("--source", help="Directory to transfer files from")
     parser.add_argument("--destination", help="Directory to transfer files to")
+    parser.add_argument(
+        "--update",
+        metavar="VERSION",
+        nargs="?",
+        default=None,
+        const=True,
+        help="Update Murfey to the newest or to a specific version",
+    )
     args = parser.parse_args()
-    visit_name = args.visit
 
     if not args.server:
-        exit("Murfey server not set. Please run with --server")
+        exit("Murfey server not set. Please run with --server host:port")
+    if not args.server.startswith(("http://", "https://")):
+        if "://" in args.server:
+            exit("Unknown server protocol. Only http:// and https:// are allowed")
+        args.server = f"http://{args.server}"
 
     if args.server != known_server:
         # New server specified. Verify that it is real
@@ -44,25 +96,43 @@ def run():
         config["Murfey"]["server"] = args.server
         write_config(config)
 
-    if args.server:
-        # Now run an actual update check
-        try:
-            murfey.client.update.check(args.server)
-        except Exception as e:
-            print(f"Murfey update check failed with {e}")
+    # If user requested installation of a specific or a newer version then
+    # make that happen, otherwise ensure client and server are compatible and
+    # update if necessary.
+    _check_for_updates(server=args.server, install_version=args.update)
 
-    ws = threading.Thread(target=websocket_app)
-    ws.start()
-    if args.source and args.destination:
+    _enable_webbrowser_in_cygwin()
+
+    # For now show all logs on stdout
+    rich_handler = RichHandler(enable_link_path=False)
+    logging.getLogger().addHandler(rich_handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
+
+    log.info("Starting Websocket connection")
+    ws = murfey.client.websocket.WSApp(server=args.server)
+
+    if args.visit and args.source and args.destination:
+        log.info("Starting Monitor/RSync processes")
         source_directory = pathlib.Path(args.source)
         destination_directory = pathlib.Path(args.destination)
-        setup_rsync(visit_name, source_directory, destination_directory)
+        setup_rsync(args.visit, source_directory, destination_directory)
+
+    # Leave threads running
+    try:
+        while True:
+            time.sleep(3)
+            ws.send("ohai")
+            log.debug(f"Client is running {ws}")
+    except KeyboardInterrupt:
+        pass
+
+    log.info("Encountered CTRL+C")
 
     if args.destination and not args.source:
         destination_directory = pathlib.Path(args.destination)
         monitor = Monitor(destination_directory)
         monitor.process(in_thread=True)
-        watch = threading.Thread(target=just_watch_files, args=(visit_name, monitor))
+        watch = threading.Thread(target=just_watch_files, args=(args.visit, monitor))
         watch.start()
         time.sleep(300)
         print(f"Stopping watching {destination_directory}")

@@ -3,76 +3,19 @@ from __future__ import annotations
 import logging
 import os
 import pathlib
-import random
 from typing import List, NamedTuple, Union
 
 import requests
-import websocket
-from websocket import create_connection
 
 from murfey.utils.file_monitor import Monitor
 from murfey.utils.rsync import RsyncPipe
 
-logger = logging.getLogger("murfey.client")
+log = logging.getLogger("murfey.client.transfer")
 
 
 class MonitoringPipeline(NamedTuple):
     monitor: Monitor
     rsync: RsyncPipe
-
-
-def open_websocket_connection():
-    id = str(random.randint(0, 100))
-    url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = create_connection(url)
-    # print(ws.connected)
-    # print(f"Websocket connection opened for Client {id}")
-    logger.info(f"Websocket connection opened for Client {id}")
-    return ws
-
-
-def receive_messages(ws):
-    while True:
-        result = ws.recv()
-        # print("Received ", result)
-        logger.info("Received ", result)
-    # Do other stuff with the received message
-
-
-def close_websocket_connection(ws):
-    # print("Closing websocket connection")
-    logger.info("Closing websocket connection")
-    ws.close()
-
-
-def on_message(message):
-    logger.info(message)
-    # print(message)
-
-
-def on_error(ws, error):
-    # print(error.text)
-    logger.info(error.text)
-
-
-def on_close(ws):
-    # print("Closing connection")
-    logger.info("Closing connection")
-    ws.close()
-    # print("### closed ###")
-
-
-def on_open():
-    # print("Opened connection")
-    logger.info("Opened connection")
-
-
-def websocket_app():
-    websocket.enableTrace(True)
-    id = str(random.randint(0, 1000))
-    url = "ws://127.0.0.1:8000/ws/test/" + id
-    ws = websocket.WebSocketApp(url, on_close=on_close)
-    ws.run_forever()
 
 
 def get_all_visits() -> Union[dict, List[dict]]:
@@ -98,6 +41,8 @@ def get_visit_info(visit_name: str) -> Union[dict, List[dict]]:
 
 
 def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
+    log.info("Notifying for {visit_name=} {transferred_file=}")
+    return {}
     bl = os.getenv("BEAMLINE")
     if bl:
         path = "http://127.0.0.1:8000/visits/" + visit_name + "/files"
@@ -113,6 +58,18 @@ def notify_file(visit_name: str, transferred_file: pathlib.Path) -> dict:
     return r.json()
 
 
+class _NotRSyncingPipeline(RsyncPipe):
+    def _run_rsync(
+        self,
+        root: pathlib.Path,
+        files: List[pathlib.Path],
+        retry: bool = True,
+    ):
+        log.info(f"Would sync {len(files)} elements")
+        for file in files:
+            log.debug(f"- {file} ({file.stat().st_size} bytes)")
+
+
 def setup_rsync(
     visit_name: str, directory: pathlib.Path, destination: pathlib.Path
 ) -> MonitoringPipeline:
@@ -123,8 +80,9 @@ def setup_rsync(
         request_json = notify_file(visit_name, transferred_file)
         return request_json
 
-    rp = RsyncPipe(destination, notify=_notify)
-    print(monitor._out.get())
+    # rp = RsyncPipe(destination, notify=_notify)
+    rp = _NotRSyncingPipeline(destination, notify=_notify)
+
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)

@@ -73,11 +73,11 @@ if __name__ == "__main__":
         )
 
     print()
-    print(f"1/3 -- Connecting to murfey server on {murfey_base}...")
+    print(f"1/4 -- Connecting to murfey server on {murfey_base}...")
     _download_to_file(f"{murfey_base}/bootstrap/pip.whl", "pip.whl")
 
     print()
-    print("2/3 -- Bootstrapping pip")
+    print("2/4 -- Bootstrapping pip")
     python = sys.executable
     result = subprocess.run(
         [
@@ -96,7 +96,26 @@ if __name__ == "__main__":
     os.remove("pip.whl")
 
     print()
-    print("3/3 -- Installing murfey client")
+    print("3/4 -- Updating pip")
+    python = sys.executable
+    result = subprocess.run(
+        [
+            python,
+            "-mpip",
+            "install",
+            "--trusted-host",
+            murfey_hostname,
+            "-i",
+            f"{murfey_base}/pypi",
+            "--upgrade",
+            "pip",
+        ]
+    )
+    if result.returncode:
+        exit("Could not update pip")
+
+    print()
+    print("4/4 -- Installing murfey client")
     result = subprocess.run(
         [
             python,

@@ -4,6 +4,13 @@
 
 {% block content %}
     <h1>Bootstrapping instructions</h1>
+    <h3>Installing Cygwin</h3>
+    <p>Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>, and then run
+    <pre style="font-family: monospace">
+    setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
+    </pre>
+
+    <h3>Installing Murfey</h3>
     <p>You can install Murfey on a network-isolated client by running the following commands:</p>
     <pre style="font-family: monospace">
       curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
