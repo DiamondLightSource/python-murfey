@@ -12,11 +12,8 @@ class CustomHandler(logging.Handler):
 
     def prepare(self, record):
         self.format(record)
-        # print("DICT", record.__dict__)
         record_dict = record.__dict__
         record_dict["type"] = "log"
-        # record_dict["record"] = record
-        # print(json.dumps(record_dict))
         return json.dumps(record_dict)
 
     def emit(self, record):
