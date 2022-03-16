@@ -225,10 +225,3 @@ def read_config() -> configparser.ConfigParser:
 def write_config(config: configparser.ConfigParser):
     with open(pathlib.Path.home() / ".murfey", "w") as configfile:
         config.write(configfile)
-
-
-# def _log_send(logrecord):
-#    """Forward log records to the frontend."""
-#    for field, value in self.__log_extensions:
-#        setattr(logrecord, field, value)
-#    self.__send_to_frontend({"band": "log", "payload": logrecord})

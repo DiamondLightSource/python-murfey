@@ -45,11 +45,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
             data = await websocket.receive_text()
             try:
                 json_data = json.loads(data)
-                if isinstance(json_data, dict) and json_data["type"] == "log":
+                if json_data["type"] == "log":  # and isinstance(json_data, dict)
                     json_data.pop("type")
                     await forward_log(json_data)
-                else:
-                    pass
             except Exception:
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
