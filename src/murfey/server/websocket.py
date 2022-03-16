@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Dict
 
@@ -42,7 +43,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.broadcast(f"Client #{client_id} sent message {data}")
+            try:
+                json_data = json.loads(data)
+                if isinstance(json_data, dict) and json_data["type"] == "log":
+                    json_data.pop("type")
+                    await forward_log(json_data)
+                else:
+                    pass
+            except Exception:
+                await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
         log.info(f"Disconnecting Client {client_id}")
         manager.disconnect(websocket, client_id)
@@ -58,6 +67,10 @@ async def check_connections(active_connections):
         except asyncio.TimeoutError:
             log.info(f"Disconnecting Client {connection[0]}")
             manager.disconnect(connection[0], connection[1])
+
+
+async def forward_log(logrecord):
+    log.handle(logging.makeLogRecord(logrecord))
 
 
 @ws.delete("/ws/test/{client_id}")

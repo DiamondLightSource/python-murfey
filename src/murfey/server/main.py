@@ -16,15 +16,11 @@ import murfey.server
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
 from murfey.server import get_hostname, get_microscope, template_files, templates
-from murfey.server.customlogging import CustomHandler
 
 log = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-logger = logging.getLogger("murfey.server")
-handler = CustomHandler()
-logger.addHandler(handler)
 
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
@@ -177,7 +173,7 @@ async def add_file(file: File):
     # dictionary["level"] = 0
     # record = logging.makeLogRecord(dictionary)
     message = 'File "' + str(file.name) + '" transferred'
-    logger.info(message)
+    log.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
 
