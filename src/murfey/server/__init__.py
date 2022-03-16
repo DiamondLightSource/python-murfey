@@ -123,60 +123,7 @@ def run():
     args = parser.parse_args()
 
     # Set up logging now that the desired verbosity is known
-    logger.setLevel(logging.DEBUG)
-    rich_handler = RichHandler(enable_link_path=False)
-    if args.quiet:
-        rich_handler.setLevel(logging.INFO)
-        log_levels = {
-            "murfey": logging.INFO,
-            "uvicorn": logging.WARNING,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 0:
-        rich_handler.setLevel(logging.INFO)
-        log_levels = {
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "uvicorn.access": logging.WARNING,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 1:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.INFO,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 2:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.INFO,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.DEBUG,
-            "fastapi": logging.DEBUG,
-            "starlette": logging.DEBUG,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose >= 3:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.DEBUG,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.DEBUG,
-            "fastapi": logging.DEBUG,
-            "starlette": logging.DEBUG,
-            "sqlalchemy": logging.DEBUG,
-        }
-    logging.getLogger().addHandler(rich_handler)
-    for logger_name, log_level in log_levels.items():
-        logging.getLogger(logger_name).setLevel(log_level)
+    _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
@@ -215,3 +162,60 @@ def get_microscope():
 @functools.lru_cache()
 def get_hostname():
     return socket.gethostname()
+
+
+def _set_up_logging(quiet: bool, verbosity: int):
+    rich_handler = RichHandler(enable_link_path=False)
+    if quiet:
+        rich_handler.setLevel(logging.INFO)
+        log_levels = {
+            "murfey": logging.INFO,
+            "uvicorn": logging.WARNING,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.WARNING,
+        }
+    elif verbosity <= 0:
+        rich_handler.setLevel(logging.INFO)
+        log_levels = {
+            "murfey": logging.DEBUG,
+            "uvicorn": logging.INFO,
+            "uvicorn.access": logging.WARNING,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.WARNING,
+        }
+    elif verbosity <= 1:
+        rich_handler.setLevel(logging.DEBUG)
+        log_levels = {
+            "": logging.INFO,
+            "murfey": logging.DEBUG,
+            "uvicorn": logging.INFO,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.WARNING,
+        }
+    elif verbosity <= 2:
+        rich_handler.setLevel(logging.DEBUG)
+        log_levels = {
+            "": logging.INFO,
+            "murfey": logging.DEBUG,
+            "uvicorn": logging.DEBUG,
+            "fastapi": logging.DEBUG,
+            "starlette": logging.DEBUG,
+            "sqlalchemy": logging.WARNING,
+        }
+    else:
+        rich_handler.setLevel(logging.DEBUG)
+        log_levels = {
+            "": logging.DEBUG,
+            "murfey": logging.DEBUG,
+            "uvicorn": logging.DEBUG,
+            "fastapi": logging.DEBUG,
+            "starlette": logging.DEBUG,
+            "sqlalchemy": logging.DEBUG,
+        }
+
+    logging.getLogger().addHandler(rich_handler)
+    for logger_name, log_level in log_levels.items():
+        logging.getLogger(logger_name).setLevel(log_level)
