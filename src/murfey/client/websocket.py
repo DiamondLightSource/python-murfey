@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import queue
 import random
@@ -76,7 +77,12 @@ class WSApp:
         self._ws.close()
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
-        log.info(f"Received message: {message}")
+        log.info(f"Received message: {message!r}")
+        try:
+            data = json.loads(message)
+            log.info(f"Interpreted data as {data!r}")
+        except Exception:
+            pass
 
     def on_error(self, ws: websocket.WebSocketApp, error):
         log.error(error.text)
