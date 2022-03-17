@@ -3,36 +3,49 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Dict
+from typing import Dict, Generic, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from murfey.utils.state import State, global_state
+
+T = TypeVar("T")
 
 ws = APIRouter(prefix="/ws", tags=["websocket"])
 log = logging.getLogger("murfey.server.websocket")
 
 
-class ConnectionManager:
-    def __init__(self):
+class ConnectionManager(Generic[T]):
+    def __init__(self, state: State[T]):
         self.active_connections: Dict[str, WebSocket] = {}
-        self.queue = asyncio.Queue()
+        self._state = state
+        self._state.subscribe(self._broadcast_state_update)
 
     async def connect(self, websocket: WebSocket, client_id):
         await websocket.accept()
         self.active_connections[client_id] = websocket
+        await websocket.send_json({"message": "state-full", "state": self._state.data})
 
     def disconnect(self, websocket: WebSocket, client_id):
         self.active_connections.pop(client_id)
-
-    async def send_individual_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
 
     async def broadcast(self, message: str):
         for connection in self.active_connections:
             log.info(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
+    async def _broadcast_state_update(self, attribute: str, value: T | None):
+        for connection in self.active_connections:
+            await self.active_connections[connection].send_json(
+                {"message": "state-update", "attribute": attribute, "value": value}
+            )
 
-manager = ConnectionManager()
+    async def set_state(self, attribute: str, value: T):
+        log.info(f"State attribute {attribute!r} set to {value!r}")
+        await self._state.update(attribute, value)
+
+
+manager = ConnectionManager(global_state)
 
 
 @ws.websocket("/ws/test/{client_id}")
@@ -40,6 +53,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
     await manager.connect(websocket, client_id)
 
     await manager.broadcast(f"Client {client_id} joined")
+    await manager.set_state(f"Client {client_id}", "joined")
     try:
         while True:
             data = await websocket.receive_text()
@@ -54,6 +68,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
         log.info(f"Disconnecting Client {client_id}")
         manager.disconnect(websocket, client_id)
         await manager.broadcast(f"Client #{client_id} disconnected")
+        await manager.set_state(f"Client {client_id}", "left")
 
 
 async def check_connections(active_connections):

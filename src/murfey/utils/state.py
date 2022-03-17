@@ -1,36 +1,86 @@
 from __future__ import annotations
 
+import asyncio
 import collections
-from typing import Callable, TypeVar, Union
+import inspect
+from typing import Awaitable, Callable, TypeVar, Union
 
 T = TypeVar("T")
 GlobalStateValues = Union[str, int, None]
 
 
-class State(collections.UserDict[str, T]):
+class State(collections.Mapping[str, T]):
     """A helper class to coordinate shared state across server instances.
     This is a dictionary implementing the Observer pattern and is mostly used
     as a singleton."""
 
     def __init__(self):
-        self._listeners: list[Callable[[str, T | None], None]] = []
+        self.data: dict[str, T] = {}
+        self._listeners: list[Callable[[str, T | None], Awaitable | None]] = []
         super().__init__()
-
-    def __delitem__(self, key: str):
-        super().__delitem__(key)
-        for notify_function in self._listeners:
-            notify_function(key, None)
-
-    def __setitem__(self, key: str, value: T):
-        super().__setitem__(key, value)
-        for notify_function in self._listeners:
-            notify_function(key, value)
 
     def __repr__(self):
         return f"{type(self).__name__}({self.data}; {len(self._listeners)} subscribers)"
 
-    def subscribe(self, fn: Callable[[str, T | None], None]):
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __contains__(self, key) -> bool:
+        return key in self.data
+
+    def __getitem__(self, key: str) -> T:
+        if key in self.data:
+            return self.data[key]
+        raise KeyError(key)
+
+    async def delete(self, key: str):
+        del self.data[key]
+        await self._async_notify(key, None)
+
+    async def update(self, key: str, value: T):
+        self.data[key] = value
+        await self._async_notify(key, value)
+
+    def subscribe(self, fn: Callable[[str, T | None], Awaitable | None]):
         self._listeners.append(fn)
+
+    async def _async_notify(self, key: str, value: T | None):
+        awaitables: list[Awaitable] = []
+        for notify_function in self._listeners:
+            result = notify_function(key, value)
+            if result is not None and inspect.isawaitable(result):
+                awaitables.append(result)
+        await asyncio.wait(awaitables)
+
+    def _sync_notify(self, key: str, value: T | None):
+        asyncio.run(self._async_notify(key, value))
+
+    def __setitem__(self, key: str, item: T):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # This is synchronous code, we're not running in an event loop
+            self.data[key] = item
+            self._sync_notify(key, item)
+            return
+        raise RuntimeError(
+            "__setitem__() called from async code. Use async .update() instead"
+        )
+
+    def __delitem__(self, key: str):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # This is synchronous code, we're not running in an event loop
+            del self.data[key]
+            self._sync_notify(key, None)
+            return
+        raise RuntimeError(
+            "__delitem__() called from async code. Use async .delete() instead"
+        )
 
 
 global_state: State[GlobalStateValues] = State()
