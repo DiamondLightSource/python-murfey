@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import inspect
-from typing import Awaitable, Callable, TypeVar, Union
+from typing import Awaitable, Callable, Mapping, TypeVar, Union
 
 T = TypeVar("T")
 GlobalStateValues = Union[str, int, None]
 
 
-class State(collections.abc.Mapping[str, T]):
+class State(Mapping[str, T]):
     """A helper class to coordinate shared state across server instances.
     This is a Mapping with added (synchronous) set and delete functionality,
     as well as asynchronous .update/.delete calls. It implements the Observer
