@@ -168,7 +168,7 @@ class File(BaseModel):
 
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
-    message = 'File "' + str(file.name) + '" transferred'
+    message = f"File {file} transferred"
     log.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file

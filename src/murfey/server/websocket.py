@@ -68,7 +68,8 @@ async def check_connections(active_connections):
 
 
 async def forward_log(logrecord):
-    log.handle(logging.makeLogRecord(logrecord))
+    record_name = logrecord["name"]
+    logging.getLogger(record_name).handle(logging.makeLogRecord(logrecord))
 
 
 @ws.delete("/ws/test/{client_id}")

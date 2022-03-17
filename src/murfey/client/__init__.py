@@ -76,21 +76,6 @@ def run():
         const=True,
         help="Update Murfey to the newest or to a specific version",
     )
-    verbosity = parser.add_mutually_exclusive_group()
-    verbosity.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        default=False,
-        help="Decrease logging output verbosity",
-    )
-    verbosity.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        help="Increase logging output verbosity",
-        default=0,
-    )
 
     args = parser.parse_args()
 
@@ -120,64 +105,13 @@ def run():
 
     _enable_webbrowser_in_cygwin()
 
-    # Set up logging now that the desired verbosity is known
     log.setLevel(logging.DEBUG)
     rich_handler = RichHandler(enable_link_path=False)
-    if args.quiet:
-        rich_handler.setLevel(logging.INFO)
-        log_levels = {
-            "murfey": logging.INFO,
-            "uvicorn": logging.WARNING,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 0:
-        rich_handler.setLevel(logging.INFO)
-        log_levels = {
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "uvicorn.access": logging.WARNING,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 1:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.INFO,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose == 2:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.INFO,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.DEBUG,
-            "fastapi": logging.DEBUG,
-            "starlette": logging.DEBUG,
-            "sqlalchemy": logging.WARNING,
-        }
-    elif args.verbose >= 3:
-        rich_handler.setLevel(logging.DEBUG)
-        log_levels = {
-            "": logging.DEBUG,
-            "murfey": logging.DEBUG,
-            "uvicorn": logging.DEBUG,
-            "fastapi": logging.DEBUG,
-            "starlette": logging.DEBUG,
-            "sqlalchemy": logging.DEBUG,
-        }
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
-    log.addHandler(handler)
-    for logger_name, log_level in log_levels.items():
-        logging.getLogger(logger_name).setLevel(log_level)
+    logging.getLogger().addHandler(handler)
+    logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
 
