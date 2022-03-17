@@ -28,6 +28,7 @@ class WSApp:
             on_close=self.on_close,
             on_message=self.on_message,
             on_open=self.on_open,
+            on_error=self.on_error,
         )
         self._ws_thread = threading.Thread(
             target=self._run_websocket_event_loop,
@@ -84,9 +85,8 @@ class WSApp:
         except Exception:
             pass
 
-    def on_error(self, ws: websocket.WebSocketApp, error):
-        log.error(error.text)
-        print(repr(error))
+    def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
+        log.error(error)
 
     def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
         log.info(f"Connection closed due to {close_status_code}, {close_msg}")
