@@ -17,7 +17,7 @@ class State(Mapping[str, T]):
 
     def __init__(self):
         self.data: dict[str, T] = {}
-        self._listeners: list[Callable[[str, T | None], Awaitable | None]] = []
+        self._listeners: list[Callable[[str, T | None], Awaitable[None] | None]] = []
         super().__init__()
 
     def __repr__(self):
@@ -45,7 +45,7 @@ class State(Mapping[str, T]):
         self.data[key] = value
         await self._async_notify(key, value)
 
-    def subscribe(self, fn: Callable[[str, T | None], Awaitable | None]):
+    def subscribe(self, fn: Callable[[str, T | None], Awaitable[None] | None]):
         self._listeners.append(fn)
 
     async def _async_notify(self, key: str, value: T | None):
