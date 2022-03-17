@@ -70,20 +70,19 @@ class Visits(BaseModel):
 
 @app.get("/visits/")
 def all_visit_info(request: Request, db: sqlalchemy.orm.Session = Depends(get_db)):
-    bl_name = get_microscope()
+    microscope = get_microscope()
     query = (
         db.query(BLSession)
         .join(Proposal)
         .filter(
             BLSession.proposalId == Proposal.proposalId,
-            BLSession.beamLineName == bl_name,
+            BLSession.beamLineName == microscope,
             BLSession.endDate > datetime.datetime.now(),
             BLSession.startDate < datetime.datetime.now(),
         )
         .add_columns(
             BLSession.startDate,
             BLSession.endDate,
-            BLSession.beamLineName,
             Proposal.proposalCode,
             Proposal.proposalNumber,
             BLSession.visit_number,
@@ -96,7 +95,6 @@ def all_visit_info(request: Request, db: sqlalchemy.orm.Session = Depends(get_db
             {
                 "Start date": id.startDate,
                 "End date": id.endDate,
-                "Beamline name": id.beamLineName,
                 "Visit name": id.proposalCode
                 + str(id.proposalNumber)
                 + "-"
@@ -105,25 +103,32 @@ def all_visit_info(request: Request, db: sqlalchemy.orm.Session = Depends(get_db
             }
             for id in query
         ]  # "Proposal title": id.title
+        log.debug(
+            f"{len(return_query)} visits active for {microscope=}: {', '.join(r['Visit name'] for r in return_query)}"
+        )
         return templates.TemplateResponse(
             "activevisits.html",
-            {"request": request, "info": return_query},
+            {"request": request, "info": return_query, "microscope": microscope},
         )
     else:
-        return None
+        log.debug(f"No visits identified for {microscope=}")
+        return templates.TemplateResponse(
+            "activevisits.html",
+            {"request": request, "info": [], "microscope": microscope},
+        )
 
 
 @app.get("/visits/{visit_name}")
 def visit_info(
     request: Request, visit_name: str, db: sqlalchemy.orm.Session = Depends(get_db)
 ):
-    bl_name = get_microscope()
+    microscope = get_microscope()
     query = (
         db.query(BLSession)
         .join(Proposal)
         .filter(
             BLSession.proposalId == Proposal.proposalId,
-            BLSession.beamLineName == bl_name,
+            BLSession.beamLineName == microscope,
             BLSession.endDate > datetime.datetime.now(),
             BLSession.startDate < datetime.datetime.now(),
         )

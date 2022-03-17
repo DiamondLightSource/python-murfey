@@ -4,7 +4,6 @@ import argparse
 import functools
 import logging
 import os
-import pathlib
 import socket
 from typing import Any
 
@@ -20,8 +19,6 @@ try:
 except ImportError:
     # Fallback for Python 3.8
     from importlib_resources import files  # type: ignore
-
-ZOCALO_CONFIG = "/dls_sw/apps/zocalo/live/configuration.yaml"
 
 logger = logging.getLogger("murfey.server")
 
@@ -79,7 +76,7 @@ class LogFilter(logging.Filter):
 
 def run():
     # setup logging
-    zc = zocalo.configuration.from_file(ZOCALO_CONFIG)
+    zc = zocalo.configuration.from_file()
     zc.activate_environment("live")
 
     # Install a log filter to all existing handlers.
@@ -88,11 +85,6 @@ def run():
     LogFilter.install()
 
     parser = argparse.ArgumentParser(description="Start the Murfey server")
-    parser.add_argument(
-        "--env_file",
-        help="Path to environment file",
-        default=pathlib.Path(__file__).parent / "example_environment_file",
-    )
     parser.add_argument(
         "--host",
         help="Listen for incoming connections on a specific interface (IP address or hostname; default: all)",
@@ -126,14 +118,13 @@ def run():
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
     logger.info(
-        f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
+        f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
     )
     global _running_server
     config = uvicorn.Config(
         "murfey.server.main:app",
         host=args.host,
         port=args.port,
-        env_file=args.env_file,
         log_config=None,
     )
     _running_server = uvicorn.Server(config=config)
