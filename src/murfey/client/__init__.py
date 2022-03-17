@@ -6,8 +6,7 @@ import logging
 import pathlib
 import platform
 import shutil
-
-# import threading
+import threading
 import time
 import webbrowser
 from typing import Literal
@@ -16,7 +15,9 @@ from rich.logging import RichHandler
 
 import murfey.client.update
 import murfey.client.websocket
-from murfey.client.transfer import setup_rsync
+from murfey.client.customlogging import CustomHandler
+from murfey.client.transfer import just_watch_files, setup_rsync
+from murfey.utils.file_monitor import Monitor
 
 log = logging.getLogger("murfey.client")
 
@@ -75,6 +76,7 @@ def run():
         const=True,
         help="Update Murfey to the newest or to a specific version",
     )
+
     args = parser.parse_args()
 
     if not args.server:
@@ -103,13 +105,15 @@ def run():
 
     _enable_webbrowser_in_cygwin()
 
-    # For now show all logs on stdout
+    log.setLevel(logging.DEBUG)
     rich_handler = RichHandler(enable_link_path=False)
+    ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
-    logging.getLogger("").setLevel(logging.DEBUG)
+    handler = CustomHandler(ws.send)
+    logging.getLogger().addHandler(handler)
+    logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
-    ws = murfey.client.websocket.WSApp(server=args.server)
 
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")
@@ -127,6 +131,17 @@ def run():
         pass
 
     log.info("Encountered CTRL+C")
+
+    if args.destination and not args.source:
+        destination_directory = pathlib.Path(args.destination)
+        monitor = Monitor(destination_directory)
+        monitor.process(in_thread=True)
+        watch = threading.Thread(target=just_watch_files, args=(args.visit, monitor))
+        watch.start()
+        time.sleep(300)
+        print(f"Stopping watching {destination_directory}")
+        monitor.stop()
+        watch.join()
 
 
 def read_config() -> configparser.ConfigParser:

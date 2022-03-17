@@ -21,8 +21,8 @@ log = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 
+app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
@@ -168,7 +168,8 @@ class File(BaseModel):
 
 @app.post("/visits/{visit_name}/files")
 async def add_file(file: File):
-    print("File POST received")
+    message = f"File {file} transferred"
+    log.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
 

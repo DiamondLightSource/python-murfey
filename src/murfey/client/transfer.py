@@ -82,6 +82,7 @@ def setup_rsync(
 
     # rp = RsyncPipe(destination, notify=_notify)
     rp = _NotRSyncingPipeline(destination, notify=_notify)
+
     monitor >> rp
     rp.process(in_thread=True)
     return MonitoringPipeline(monitor, rp)
@@ -91,3 +92,15 @@ def stop_rsync(mpipeline: MonitoringPipeline):
     mpipeline.monitor.stop()
     mpipeline.monitor.wait()
     mpipeline.rsync.wait()
+
+
+def just_watch_files(visit_name: str, monitor: Monitor):
+    def _notify(transferred_file: pathlib.Path) -> dict:
+        request_json = notify_file(visit_name, transferred_file)
+        return request_json
+
+    if monitor.thread:
+        while monitor.thread.is_alive():
+            files_transferred = monitor._out.get()
+            for file in files_transferred:
+                _notify(file)
