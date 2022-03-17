@@ -9,10 +9,12 @@ T = TypeVar("T")
 GlobalStateValues = Union[str, int, None]
 
 
-class State(collections.Mapping[str, T]):
+class State(collections.abc.Mapping[str, T]):
     """A helper class to coordinate shared state across server instances.
-    This is a dictionary implementing the Observer pattern and is mostly used
-    as a singleton."""
+    This is a Mapping with added (synchronous) set and delete functionality,
+    as well as asynchronous .update/.delete calls. It implements the Observer
+    pattern notifying synchronous and asynchronous callback functions.
+    """
 
     def __init__(self):
         self.data: dict[str, T] = {}
@@ -53,10 +55,22 @@ class State(collections.Mapping[str, T]):
             result = notify_function(key, value)
             if result is not None and inspect.isawaitable(result):
                 awaitables.append(result)
-        await asyncio.wait(awaitables)
+        if awaitables:
+            await self._await_all(awaitables)
+
+    @staticmethod
+    async def _await_all(awaitables: list[Awaitable]):
+        for awaitable in asyncio.as_completed(awaitables):
+            await awaitable
 
     def _sync_notify(self, key: str, value: T | None):
-        asyncio.run(self._async_notify(key, value))
+        awaitables: list[Awaitable] = []
+        for notify_function in self._listeners:
+            result = notify_function(key, value)
+            if result is not None and inspect.isawaitable(result):
+                awaitables.append(result)
+        if awaitables:
+            asyncio.run(self._await_all(awaitables))
 
     def __setitem__(self, key: str, item: T):
         try:
