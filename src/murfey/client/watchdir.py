@@ -16,31 +16,31 @@ class FileInfo(NamedTuple):
 class WatchedLocation:
     def __init__(self, path: str):
         self._basepath = path
-        self._lastscan = None
+        self._lastscan: dict[str, FileInfo] | None = None
         self._file_candidates: dict[str, FileInfo] = {}
 
     def scan(self):
         t = time.time()
-        treescan = self.scan_directory()
+        filelist = self.scan_directory()
         t1 = time.time() - t
         print(f"Scan completed in {t1} seconds")
         scan_completion = time.time()
         if self._lastscan:
             for entry, entry_info in self.difference_of_scans(
-                self._lastscan, treescan
+                self._lastscan, filelist
             ).items():
                 self._file_candidates[entry] = entry_info._replace(
                     settling_time=scan_completion
                 )
-        self._lastscan = treescan
+        self._lastscan = filelist
 
         for x in sorted(self._file_candidates):
-            if x not in treescan:
+            if x not in filelist:
                 print(f"{x} has disappeared!")
                 del self._file_candidates[x]
                 continue
 
-            if self._file_candidates[x].settling_time + 4 < time.time():
+            if self._file_candidates[x].settling_time + 60 < time.time():
                 file_stat = os.stat(x)
                 if (
                     file_stat.st_size == self._file_candidates[x].size
