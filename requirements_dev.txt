@@ -1,5 +1,4 @@
 fastapi==0.75.0
-graypy==2.1.0
 importlib_resources==5.4.0; python_version<'3.9'
 ispyb==6.10.0
 jinja2==3.0.3
