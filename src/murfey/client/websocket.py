@@ -73,6 +73,7 @@ class WSApp:
 
     def close(self):
         log.info("Closing websocket connection")
+        self._send_queue.join()
         self._ws.close()
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
