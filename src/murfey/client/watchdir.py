@@ -5,6 +5,8 @@ import os
 import time
 from typing import NamedTuple, Optional
 
+import murfey.util
+
 log = logging.getLogger("murfey.client.watchdir")
 
 
@@ -14,8 +16,9 @@ class _FileInfo(NamedTuple):
     settling_time: Optional[float] = None
 
 
-class DirWatcher:
+class DirWatcher(murfey.util.Observer):
     def __init__(self, path: str | os.PathLike):
+        super().__init__()
         self._basepath = os.fspath(path)
         self._lastscan: dict[str, _FileInfo] | None = None
         self._file_candidates: dict[str, _FileInfo] = {}
@@ -52,6 +55,7 @@ class DirWatcher:
                     and file_stat.st_ctime <= self._file_candidates[x].modification_time
                 ):
                     log.debug(f"File {x} is ready to be transferred")
+                    self.notify(x)
                     del self._file_candidates[x]
                     continue
 
@@ -66,7 +70,7 @@ class DirWatcher:
             # If it is a sub directory then we can just ignore this case, but if it is our main directory
             # we should raise it to the caller.
             if path:
-                return {}
+                return result
             raise
         for entry in directory_contents:
             entry_name = os.path.join(path, entry.name)
