@@ -5,13 +5,15 @@
 {% block content %}
     <h1>Bootstrapping instructions</h1>
     <h3>Installing Cygwin</h3>
-    <p>Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>, and then run
+    <p>If you already have a Cygwin install, rename it so that it doesn't get overwritten (something like "[install name]-old").</p>
+    <p>Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>, and then run the following from a terminal
     <pre style="font-family: monospace">
     setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
     </pre>
+    <p>The Cygwin install sometimes hangs even when it is finished, hit Enter to return to a command prompt.</p>
 
     <h3>Installing Murfey</h3>
-    <p>You can install Murfey on a network-isolated client by running the following commands:</p>
+    <p>You can install Murfey on a network-isolated client by running the following commands from a Cygwin terminal:</p>
     <pre style="font-family: monospace">
       curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
       python murfey.whl/murfey/bootstrap {{ request.url.scheme }}://{{ request.url.netloc }}
