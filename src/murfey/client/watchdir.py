@@ -1,42 +1,46 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from typing import NamedTuple, Optional
 
-basepath = "/dls/m08/data/2022/cm31098-1/trash"
+log = logging.getLogger("murfey.client.watchdir")
 
 
-class FileInfo(NamedTuple):
+class _FileInfo(NamedTuple):
     size: int
     modification_time: float
     settling_time: Optional[float] = None
 
 
-class WatchedLocation:
-    def __init__(self, path: str):
-        self._basepath = path
-        self._lastscan: dict[str, FileInfo] | None = None
-        self._file_candidates: dict[str, FileInfo] = {}
+class DirWatcher:
+    def __init__(self, path: str | os.PathLike):
+        self._basepath = os.fspath(path)
+        self._lastscan: dict[str, _FileInfo] | None = None
+        self._file_candidates: dict[str, _FileInfo] = {}
+
+    def __repr__(self) -> str:
+        return f"<DirWatcher ({self._basepath})>"
 
     def scan(self):
-        t = time.time()
-        filelist = self.scan_directory()
-        t1 = time.time() - t
-        print(f"Scan completed in {t1} seconds")
+        t_start = time.perf_counter()
+        filelist = self._scan_directory()
+        t_scan = time.perf_counter() - t_start
+        log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
         scan_completion = time.time()
         if self._lastscan:
-            for entry, entry_info in self.difference_of_scans(
-                self._lastscan, filelist
-            ).items():
-                self._file_candidates[entry] = entry_info._replace(
-                    settling_time=scan_completion
-                )
+            # TODO: Decide what to do with initial scan
+            for entry, entry_info in filelist.items():
+                if entry_info != self._lastscan.get(entry):
+                    self._file_candidates[entry] = entry_info._replace(
+                        settling_time=scan_completion
+                    )
         self._lastscan = filelist
 
         for x in sorted(self._file_candidates):
             if x not in filelist:
-                print(f"{x} has disappeared!")
+                log.debug(f"Previously seen file {x} has disappeared")
                 del self._file_candidates[x]
                 continue
 
@@ -47,14 +51,14 @@ class WatchedLocation:
                     and file_stat.st_mtime <= self._file_candidates[x].modification_time
                     and file_stat.st_ctime <= self._file_candidates[x].modification_time
                 ):
-                    print(f"{x} is ready to be transferred")
+                    log.debug(f"File {x} is ready to be transferred")
                     del self._file_candidates[x]
                     continue
 
-            print(f"{x} must wait")
+            log.debug(f"File {x} is not yet ready for transfer")
 
-    def scan_directory(self, path: str = "") -> dict[str, FileInfo]:
-        result = {}
+    def _scan_directory(self, path: str = "") -> dict[str, _FileInfo]:
+        result: dict[str, _FileInfo] = {}
         try:
             directory_contents = os.scandir(os.path.join(self._basepath, path))
         except FileNotFoundError:
@@ -67,7 +71,7 @@ class WatchedLocation:
         for entry in directory_contents:
             entry_name = os.path.join(path, entry.name)
             if entry.is_dir():
-                result.update(self.scan_directory(entry_name))
+                result.update(self._scan_directory(entry_name))
             else:
                 try:
                     file_stat = entry.stat()
@@ -75,18 +79,8 @@ class WatchedLocation:
                     # Possible race condition here if the file disappears between the scandir and the stat call.
                     # In this case we can just ignore the file.
                     continue
-                result[entry_name] = FileInfo(
+                result[entry_name] = _FileInfo(
                     size=file_stat.st_size,
                     modification_time=max(file_stat.st_mtime, file_stat.st_ctime),
                 )
         return result
-
-    def difference_of_scans(self, old, new) -> dict[str, FileInfo]:
-        return {entry: value for entry, value in new.items() if value != old.get(entry)}
-
-
-w = WatchedLocation(basepath)
-
-while True:
-    w.scan()
-    time.sleep(3)
