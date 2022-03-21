@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from murfey.utils.state import State
+from murfey.util.state import State
 
 
 def test_default_state_behaves_like_empty_dictionary():

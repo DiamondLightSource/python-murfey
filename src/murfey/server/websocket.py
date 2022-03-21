@@ -7,7 +7,7 @@ from typing import Dict, Generic, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from murfey.utils.state import State, global_state
+from murfey.util.state import State, global_state
 
 T = TypeVar("T")
 

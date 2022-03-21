@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
-from murfey.utils.file_monitor import Monitor
-from murfey.utils.rsync import RsyncPipe
+from murfey.util.file_monitor import Monitor
+from murfey.util.rsync import RsyncPipe
 
 
 def test_a_simple_rsync_instance(tmp_path):

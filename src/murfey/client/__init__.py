@@ -17,7 +17,7 @@ import murfey.client.update
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
 from murfey.client.transfer import just_watch_files, setup_rsync
-from murfey.utils.file_monitor import Monitor
+from murfey.util.file_monitor import Monitor
 
 log = logging.getLogger("murfey.client")
 

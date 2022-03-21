@@ -7,8 +7,8 @@ from typing import List, NamedTuple, Union
 
 import requests
 
-from murfey.utils.file_monitor import Monitor
-from murfey.utils.rsync import RsyncPipe
+from murfey.util.file_monitor import Monitor
+from murfey.util.rsync import RsyncPipe
 
 log = logging.getLogger("murfey.client.transfer")
 

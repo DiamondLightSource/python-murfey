@@ -6,10 +6,10 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import procrunner
 
-from murfey.utils import Processor
-from murfey.utils.file_monitor import Monitor
+from murfey.util import Processor
+from murfey.util.file_monitor import Monitor
 
-logger = logging.getLogger("murfey.utils.rsync")
+logger = logging.getLogger("murfey.util.rsync")
 
 
 class RsyncPipe(Processor):

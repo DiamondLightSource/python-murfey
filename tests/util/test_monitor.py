@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from murfey.utils.file_monitor import Monitor
+from murfey.util.file_monitor import Monitor
 
 
 def test_empty_directory_does_nothing(tmp_path):
