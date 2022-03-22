@@ -130,7 +130,6 @@ def run():
     except KeyboardInterrupt:
         log.info("Encountered CTRL+C")
         ws.close()
-        pass
 
     if args.destination and not args.source:
         destination_directory = pathlib.Path(args.destination)
