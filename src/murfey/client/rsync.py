@@ -5,13 +5,13 @@ import os
 import queue
 import threading
 import time
+from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import NamedTuple, Optional
 
 import procrunner
 
-from murfey.util import Observer, Processor
-from murfey.util.file_monitor import Monitor
+from murfey.util import Observer
 
 logger = logging.getLogger("murfey.util.rsync")
 
@@ -27,17 +27,13 @@ logger = logging.getLogger("murfey.util.rsync")
 # total size is 314,923,092  speedup is 76,068.38 (DRY RUN)
 
 
-from enum import Enum
-from typing import NamedTuple
-
-
 class TransferResult(Enum):
     SUCCESS = 1
     FAILURE = 2
 
 
 class RSyncerUpdate(NamedTuple):
-    file_name: str
+    file_path: Path
     file_size: int
     outcome: TransferResult
     transfer_total: int
@@ -53,12 +49,12 @@ class RSyncer(Observer):
         host: str,
     ):
         super().__init__()
-        self._basepath = basepath_local
+        self._basepath = basepath_local.absolute()
         self._remote = f"{host}:{basepath_remote}"
         self._files_transferred = 0
         self._bytes_transferred = 0
 
-        self.queue = queue.Queue[Optional[str]]()
+        self.queue = queue.Queue[Optional[Path]]()
         self.thread = threading.Thread(
             name=f"RSync {self._basepath}:{self._remote}", target=self._process
         )
@@ -98,7 +94,7 @@ class RSyncer(Observer):
 
     def _process(self):
         print("Process start")
-        files_to_transfer: List[str]
+        files_to_transfer: list[Path]
         while not self._stop:
             print("wait")
             first = self.queue.get()
@@ -125,7 +121,7 @@ class RSyncer(Observer):
                 self.queue.task_done()
         print("Process stop")
 
-    def _transfer(self, files: List[str]):
+    def _transfer(self, files: list[Path]):
         """
         Actually transfer files in an rsync subprocess
         """
@@ -133,7 +129,7 @@ class RSyncer(Observer):
 
         next_file: RSyncerUpdate | None = None
         errors: list[str] = []
-        transfer_success: set[str] = set()
+        transfer_success: set[Path] = set()
 
         def parse_stdout(line: str):
             nonlocal next_file
@@ -153,7 +149,10 @@ class RSyncer(Observer):
                     raise RuntimeError(
                         f"Unexpected line {xfer_line} {line.split(chr(13))}"
                     )
-                transfer_success.add(next_file.file_name)
+                assert (
+                    next_file is not None
+                ), f"Invalid state {xfer_line=}, {next_file=}"
+                transfer_success.add(next_file.file_path)
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
                 next_file = None
@@ -179,7 +178,7 @@ class RSyncer(Observer):
                     self._files_transferred - previously_transferred
                 )
                 update = RSyncerUpdate(
-                    file_name=line[12:],
+                    file_path=Path(line[12:]),
                     file_size=0,
                     outcome=TransferResult.SUCCESS,
                     transfer_total=self._files_transferred - previously_transferred,
@@ -188,7 +187,7 @@ class RSyncer(Observer):
                 )
                 if line[0] == ".":
                     # No transfer happening
-                    transfer_success.add(update.file_name)
+                    transfer_success.add(update.file_path)
                     self.notify(update)
                 else:
                     # This marks the start of a transfer, wait for the progress line
@@ -205,6 +204,14 @@ class RSyncer(Observer):
             logger.error(line)
             errors.append(line)
 
+        relative_filenames = []
+        for f in files:
+            try:
+                relative_filenames.append(f.relative_to(self._basepath))
+            except ValueError:
+                raise ValueError("File {f} is outside of {self._basepath}") from None
+        rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
+
         result = procrunner.run(
             [
                 "rsync",
@@ -215,12 +222,12 @@ class RSyncer(Observer):
                 "--files-from=-",
                 ".",
                 "wra62962@ws133:/dls/tmp/wra62962/junk",
-                #               "--dry-run",
+                "--dry-run",
             ],
             callback_stdout=parse_stdout,
             callback_stderr=parse_stderr,
             working_directory=self._basepath,
-            stdin=b"\n".join(os.fsencode(f) for f in files),
+            stdin=rsync_stdin,
             print_stdout=False,
             print_stderr=False,
         )
@@ -246,34 +253,21 @@ class RSyncer(Observer):
         """
         stringy_stdout = str(stdout)
         if stringy_stdout:
-            if self._transferring:
-                if stringy_stdout.startswith("sent"):
-                    self._transferring = False
-                    byte_info = stringy_stdout.split()
-                    self.sent_bytes = int(
-                        byte_info[byte_info.index("sent") + 1].replace(",", "")
-                    )
-                    self.received_bytes = int(
-                        byte_info[byte_info.index("received") + 1].replace(",", "")
-                    )
-                    self.byte_rate = float(
-                        byte_info[byte_info.index("bytes/sec") - 1].replace(",", "")
-                    )
-                elif len(stringy_stdout.split()) == 1:
-                    if self._root and self._sub_structure:
-                        self._notify(
-                            self._finaldir / self._sub_structure / stringy_stdout
-                        )
-                        self._out.put(self._root / self._sub_structure / stringy_stdout)
-                    else:
-                        logger.warning(
-                            f"root or substructure not set for transfer of {stringy_stdout}"
-                        )
-            else:
-                if "total size" in stringy_stdout:
-                    self.total_size = int(
-                        stringy_stdout.replace("total size", "").split()[1]
-                    )
+            if stringy_stdout.startswith("sent"):
+                byte_info = stringy_stdout.split()
+                self.sent_bytes = int(
+                    byte_info[byte_info.index("sent") + 1].replace(",", "")
+                )
+                self.received_bytes = int(
+                    byte_info[byte_info.index("received") + 1].replace(",", "")
+                )
+                self.byte_rate = float(
+                    byte_info[byte_info.index("bytes/sec") - 1].replace(",", "")
+                )
+            if "total size" in stringy_stdout:
+                self.total_size = int(
+                    stringy_stdout.replace("total size", "").split()[1]
+                )
 
     def _parse_rsync_stderr(self, stderr: bytes):
         """
@@ -289,15 +283,13 @@ class RSyncer(Observer):
                 and "failed" in stringy_stderr
             ):
                 failed_msg = stringy_stderr.split()
-                self._failed_tmp.append(
-                    failed_msg[failed_msg.index("failed:") - 1].replace('"', "")
-                )
+                failed_msg[failed_msg.index("failed:") - 1].replace('"', "")
 
 
 if __name__ == "__main__":
     x = RSyncer(
-        "/dls/tmp/wra62962/directories/z2MvX0sf",
-        basepath_remote="/remote",
+        Path("/dls/tmp/wra62962/directories/z2MvX0sf"),
+        basepath_remote=Path("/remote"),
         host="ws312",
     )
     print(x)
@@ -306,7 +298,7 @@ if __name__ == "__main__":
     with open("/dls/tmp/wra62962/directories/z2MvX0sf/filelist", "r") as fh:
         filelist = fh.read().split("\n")
     for f in filelist:
-        x.queue.put(f)
+        x.queue.put(Path(f))
     time.sleep(15)
     x.stop()
     print(x)
