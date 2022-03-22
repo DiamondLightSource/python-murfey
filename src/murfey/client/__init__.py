@@ -128,9 +128,8 @@ def run():
             ws.send("ohai")
             log.debug(f"Client is running {ws}")
     except KeyboardInterrupt:
-        pass
-
-    log.info("Encountered CTRL+C")
+        log.info("Encountered CTRL+C")
+        ws.close()
 
     if args.destination and not args.source:
         destination_directory = pathlib.Path(args.destination)
