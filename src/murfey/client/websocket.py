@@ -7,6 +7,7 @@ import random
 import threading
 import time
 import urllib.parse
+from typing import Optional
 
 import websocket
 
@@ -22,7 +23,7 @@ class WSApp:
         self._address = url.geturl()
         self._alive = True
         self._ready = False
-        self._send_queue: queue.Queue[str] = queue.Queue()
+        self._send_queue: queue.Queue[Optional[str]] = queue.Queue()
         self._ws = websocket.WebSocketApp(
             url._replace(path=f"/ws/test/{id}").geturl(),
             on_close=self.on_close,
@@ -67,6 +68,9 @@ class WSApp:
         log.info("Websocket send-queue-feeder thread starting")
         while self.alive:
             element = self._send_queue.get()
+            if element is None:
+                self._send_queue.task_done()
+                continue
             while not self._ready:
                 time.sleep(0.3)
             self._ws.send(element)
@@ -75,7 +79,12 @@ class WSApp:
 
     def close(self):
         log.info("Closing websocket connection")
-        self._send_queue.join()
+        if self._feeder_thread.is_alive():
+            self._send_queue.join()
+        self._alive = False
+        if self._feeder_thread.is_alive():
+            self._send_queue.put(None)
+            self._feeder_thread.join()
         self._ws.close()
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
