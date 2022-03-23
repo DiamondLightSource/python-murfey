@@ -14,6 +14,7 @@ from urllib.parse import ParseResult, urlparse
 
 from rich.logging import RichHandler
 
+import murfey.client.rsync
 import murfey.client.update
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
@@ -69,7 +70,9 @@ def run():
         default=known_server,
     )
     parser.add_argument("--visit", help="Name of visit")
-    parser.add_argument("--source", help="Directory to transfer files from")
+    parser.add_argument(
+        "--source", help="Directory to transfer files from", type=Path, default="."
+    )
     parser.add_argument("--destination", help="Directory to transfer files to")
     parser.add_argument(
         "--update",
@@ -115,15 +118,29 @@ def run():
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
     logging.getLogger().addHandler(handler)
+    logging.getLogger("murfey").setLevel(logging.DEBUG)
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
 
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")
-        source_directory = Path(args.source)
+        source_directory = args.source
         destination_directory = Path(args.destination)
         setup_rsync(args.visit, source_directory, destination_directory)
+
+    rsync_process = murfey.client.rsync.RSyncer(
+        args.source,
+        basepath_remote=Path("args.destination"),
+        server_url=murfey_url,
+    )
+    rsync_process.start()
+
+    #  with open("/dls/tmp/wra62962/directories/z2MvX0sf/filelist", "r") as fh:
+    #    filelist = fh.read().split("\n")
+    # for f in filelist:
+    #     if f:
+    #         rsync_process.queue.put(Path(f).absolute())
 
     # Leave threads running
     try:
@@ -133,7 +150,9 @@ def run():
             log.debug(f"Client is running {ws}")
     except KeyboardInterrupt:
         log.info("Encountered CTRL+C")
-        ws.close()
+
+    rsync_process.stop()
+    ws.close()
 
     if args.destination and not args.source:
         destination_directory = Path(args.destination)
