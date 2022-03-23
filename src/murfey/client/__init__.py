@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import configparser
 import logging
-import pathlib
 import platform
 import shutil
 import threading
 import time
 import webbrowser
+from pathlib import Path
 from typing import Literal
+from urllib.parse import ParseResult, urlparse
 
 from rich.logging import RichHandler
 
@@ -28,7 +29,9 @@ def _enable_webbrowser_in_cygwin():
         webbrowser.register("cygstart", None, webbrowser.GenericBrowser("cygstart"))
 
 
-def _check_for_updates(server: str, install_version: None | Literal[True] | str):
+def _check_for_updates(
+    server: ParseResult, install_version: None | Literal[True] | str
+):
     if install_version is True:
         # User requested installation of the newest version
         try:
@@ -86,11 +89,12 @@ def run():
             exit("Unknown server protocol. Only http:// and https:// are allowed")
         args.server = f"http://{args.server}"
 
+    murfey_url = urlparse(args.server, allow_fragments=False)
     if args.server != known_server:
         # New server specified. Verify that it is real
         print(f"Attempting to connect to new server {args.server}")
         try:
-            murfey.client.update.check(args.server, install=False)
+            murfey.client.update.check(murfey_url, install=False)
         except Exception as e:
             exit(f"Could not reach Murfey server at {args.server!r} - {e}")
 
@@ -101,7 +105,7 @@ def run():
     # If user requested installation of a specific or a newer version then
     # make that happen, otherwise ensure client and server are compatible and
     # update if necessary.
-    _check_for_updates(server=args.server, install_version=args.update)
+    _check_for_updates(server=murfey_url, install_version=args.update)
 
     _enable_webbrowser_in_cygwin()
 
@@ -117,8 +121,8 @@ def run():
 
     if args.visit and args.source and args.destination:
         log.info("Starting Monitor/RSync processes")
-        source_directory = pathlib.Path(args.source)
-        destination_directory = pathlib.Path(args.destination)
+        source_directory = Path(args.source)
+        destination_directory = Path(args.destination)
         setup_rsync(args.visit, source_directory, destination_directory)
 
     # Leave threads running
@@ -132,7 +136,7 @@ def run():
         ws.close()
 
     if args.destination and not args.source:
-        destination_directory = pathlib.Path(args.destination)
+        destination_directory = Path(args.destination)
         monitor = Monitor(destination_directory)
         monitor.process(in_thread=True)
         watch = threading.Thread(target=just_watch_files, args=(args.visit, monitor))
@@ -146,7 +150,7 @@ def run():
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
-        with open(pathlib.Path.home() / ".murfey", "r") as configfile:
+        with open(Path.home() / ".murfey", "r") as configfile:
             config.read_file(configfile)
     except FileNotFoundError:
         pass
@@ -156,5 +160,5 @@ def read_config() -> configparser.ConfigParser:
 
 
 def write_config(config: configparser.ConfigParser):
-    with open(pathlib.Path.home() / ".murfey", "w") as configfile:
+    with open(Path.home() / ".murfey", "w") as configfile:
         config.write(configfile)

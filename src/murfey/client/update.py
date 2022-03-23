@@ -2,22 +2,23 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from urllib.parse import urlparse
+from urllib.parse import ParseResult
 
 import requests
 
 import murfey
 
 
-def check(api_base: str, install: bool = True, force: bool = False):
+def check(api_base: ParseResult, install: bool = True, force: bool = False):
     """
     Verify that the current client version can run against the selected server.
     If the version number is outside the allowed range then this can trigger
     an update on the client, and in that case will terminate the process.
     """
-    server_reply = requests.get(
-        f"{api_base}/version?client_version={murfey.__version__}"
+    version_check_url = api_base._replace(
+        path="/version", query=f"client_version={murfey.__version__}"
     )
+    server_reply = requests.get(version_check_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError("Server unreachable")
     versions = server_reply.json()
@@ -53,22 +54,20 @@ def check(api_base: str, install: bool = True, force: bool = False):
             print("An update is available, install with 'murfey update'.")
 
 
-def install_murfey(api_base: str, version: str) -> bool:
+def install_murfey(api_base: ParseResult, version: str) -> bool:
     """Install a specific version of the Murfey client.
     Return 'true' on success and 'false' on error."""
 
-    murfey_url = urlparse(api_base)
-    murfey_base = f"{murfey_url.scheme}://{murfey_url.netloc}"
-    murfey_hostname = murfey_url.netloc.split(":")[0]
+    assert api_base.hostname is not None
     result = subprocess.run(
         [
             sys.executable,
             "-mpip",
             "install",
             "--trusted-host",
-            murfey_hostname,
+            api_base.hostname,
             "-i",
-            f"{murfey_base}/pypi",
+            api_base._replace(path="/pypi", query="").geturl(),
             f"murfey[client]=={version}",
         ]
     )
