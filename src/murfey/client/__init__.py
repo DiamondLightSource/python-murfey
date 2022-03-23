@@ -5,7 +5,6 @@ import configparser
 import logging
 import platform
 import shutil
-import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -16,10 +15,9 @@ from rich.logging import RichHandler
 
 import murfey.client.rsync
 import murfey.client.update
+import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
-from murfey.client.transfer import just_watch_files, setup_rsync
-from murfey.util.file_monitor import Monitor
 
 log = logging.getLogger("murfey.client")
 
@@ -123,20 +121,26 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    if args.visit and args.source and args.destination:
-        log.info("Starting Monitor/RSync processes")
-        source_directory = args.source
-        destination_directory = Path(args.destination)
-        setup_rsync(args.visit, source_directory, destination_directory)
+    def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
+        if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
+            log.info(
+                f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
+            )
+        else:
+            log.warning(f"Failed to transfer file {str(update.file_path)!r}")
 
     rsync_process = murfey.client.rsync.RSyncer(
         args.source,
-        basepath_remote=Path("args.destination"),
+        basepath_remote=Path(args.destination or "data/2022/cm31093-2/tmp/murfey"),
         server_url=murfey_url,
     )
+    rsync_process.subscribe(rsync_result)
     rsync_process.start()
 
-    #  with open("/dls/tmp/wra62962/directories/z2MvX0sf/filelist", "r") as fh:
+    source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=5)
+    source_watcher.subscribe(rsync_process.enqueue)
+
+    # with open("/dls/tmp/wra62962/directories/z2MvX0sf/filelist", "r") as fh:
     #    filelist = fh.read().split("\n")
     # for f in filelist:
     #     if f:
@@ -145,6 +149,7 @@ def run():
     # Leave threads running
     try:
         while True:
+            source_watcher.scan()
             time.sleep(3)
             ws.send("ohai")
             log.debug(f"Client is running {ws}")
@@ -153,17 +158,6 @@ def run():
 
     rsync_process.stop()
     ws.close()
-
-    if args.destination and not args.source:
-        destination_directory = Path(args.destination)
-        monitor = Monitor(destination_directory)
-        monitor.process(in_thread=True)
-        watch = threading.Thread(target=just_watch_files, args=(args.visit, monitor))
-        watch.start()
-        time.sleep(300)
-        print(f"Stopping watching {destination_directory}")
-        monitor.stop()
-        watch.join()
 
 
 def read_config() -> configparser.ConfigParser:

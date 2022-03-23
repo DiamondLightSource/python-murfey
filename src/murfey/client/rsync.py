@@ -50,7 +50,7 @@ class RSyncer(Observer):
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
-        self._remote = f"{server_url.hostname}:{basepath_remote}"
+        self._remote = f"{server_url.hostname}::{basepath_remote}"
         self._files_transferred = 0
         self._bytes_transferred = 0
 
@@ -82,6 +82,7 @@ class RSyncer(Observer):
             raise RuntimeError("RSyncer already running")
         if self._stopping:
             raise RuntimeError("RSyncer has already stopped")
+        logger.info(f"RSync thread starting for {self}")
         self.thread.start()
 
     def stop(self):
@@ -99,7 +100,8 @@ class RSyncer(Observer):
 
     def enqueue(self, filepath: Path):
         if not self._stopping:
-            self.queue.put(filepath)
+            absolute_path = (self._basepath / filepath).resolve()
+            self.queue.put(absolute_path)
 
     def _process(self):
         logger.info("RSync thread starting")
@@ -159,7 +161,7 @@ class RSyncer(Observer):
                 #           3,136 100%    1.50MB/s    0:00:00
                 #           3,136 100%    1.50MB/s    0:00:00 (xfr#5, to-chk=109/115)
                 xfer_line = line.split(chr(13))[-1]
-                if xfer_line.endswith(" files to consider"):
+                if xfer_line.endswith((" file to consider", " files to consider")):
                     return
                 if "(xfr" not in xfer_line:
                     raise RuntimeError(
@@ -235,7 +237,7 @@ class RSyncer(Observer):
                 "--outbuf=line",
                 "--files-from=-",
                 ".",
-                "wra62962@ws133:/dls/tmp/wra62962/junk",
+                self._remote,
                 "--dry-run",
             ],
             callback_stdout=parse_stdout,

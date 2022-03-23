@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 from typing import NamedTuple, Optional
 
 import murfey.util
@@ -17,11 +18,12 @@ class _FileInfo(NamedTuple):
 
 
 class DirWatcher(murfey.util.Observer):
-    def __init__(self, path: str | os.PathLike):
+    def __init__(self, path: str | os.PathLike, settling_time: float = 60):
         super().__init__()
         self._basepath = os.fspath(path)
         self._lastscan: dict[str, _FileInfo] | None = None
         self._file_candidates: dict[str, _FileInfo] = {}
+        self.settling_time = settling_time
 
     def __repr__(self) -> str:
         return f"<DirWatcher ({self._basepath})>"
@@ -47,7 +49,10 @@ class DirWatcher(murfey.util.Observer):
                 del self._file_candidates[x]
                 continue
 
-            if self._file_candidates[x].settling_time + 60 < time.time():
+            if (
+                self._file_candidates[x].settling_time + self.settling_time
+                < time.time()
+            ):
                 file_stat = os.stat(x)
                 if (
                     file_stat.st_size == self._file_candidates[x].size
@@ -55,7 +60,7 @@ class DirWatcher(murfey.util.Observer):
                     and file_stat.st_ctime <= self._file_candidates[x].modification_time
                 ):
                     log.debug(f"File {x} is ready to be transferred")
-                    self.notify(x)
+                    self.notify(Path(x))
                     del self._file_candidates[x]
                     continue
 
