@@ -6,7 +6,8 @@ import logging
 import ispyb.sqlalchemy
 import sqlalchemy.orm
 from fastapi import Depends
-from pydantic import BaseModel
+
+from murfey.util.models import Visit
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -31,25 +32,6 @@ def _get_session() -> sqlalchemy.orm.Session:
 
 DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
-
-
-class Visit(BaseModel):
-    start: datetime.datetime
-    end: datetime.datetime
-    name: str
-    beamline: str
-    proposal_title: str
-
-    def __repr__(self) -> str:
-        return (
-            "Visit("
-            f"start='{self.start:%Y-%m-%d %H:%M}', "
-            f"end='{self.end:%Y-%m-%d %H:%M}', "
-            f"name={self.name!r}, "
-            f"beamline={self.beamline!r}, "
-            f"proposal_title={self.proposal_title!r}"
-            ")"
-        )
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
