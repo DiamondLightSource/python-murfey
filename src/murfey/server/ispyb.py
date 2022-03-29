@@ -10,7 +10,8 @@ from fastapi import Depends
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
-
+_DataCollection = ispyb.sqlalchemy.DataCollection
+_ProcessingJob = ispyb.sqlalchemy.ProcessingJob
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -83,3 +84,12 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         )
         for row in query
     ]
+
+def start_data_collection(db: sqlalchemy.orm.Session):
+    comment = "Test Murfey DC insert"
+    insert = _DataCollection(comments=comment)
+    #insert = _ProcessingJob(comments=comment)
+    db.add(insert)
+    db.commit()
+
+#start_data_collection(Session())

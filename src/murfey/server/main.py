@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
+import workflows.transport
 
 import murfey.server
 import murfey.server.bootstrap

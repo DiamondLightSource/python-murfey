@@ -11,7 +11,7 @@ import uvicorn
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
 from rich.logging import RichHandler
-
+import workflows.transport
 import murfey
 
 try:
@@ -77,7 +77,7 @@ class LogFilter(logging.Filter):
 def run():
     # setup logging
     zc = zocalo.configuration.from_file()
-    zc.activate_environment("live")
+    zc.activate_environment("devrmq")
 
     # Install a log filter to all existing handlers.
     # At this stage this will exclude console loggers, but will cover
@@ -112,6 +112,7 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    workflows.transport.add_command_line_options(parser, transport_argument=True)
     args = parser.parse_args()
 
     # Set up logging now that the desired verbosity is known
@@ -127,9 +128,14 @@ def run():
         port=args.port,
         log_config=None,
     )
+
+    transport = workflows.transport.lookup(args.transport)()
+    transport.connect()
+    transport.send("ispyb_connector", "ispyb_command_list")
     _running_server = uvicorn.Server(config=config)
     _running_server.run()
     logger.info("Server shutting down")
+    transport.disconnect()
 
 
 def shutdown():
