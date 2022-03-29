@@ -45,14 +45,6 @@ async def root(request: Request):
     )
 
 
-class Visits(BaseModel):
-    start: str
-    end: str
-    beamline_name: str
-    visit_name: str
-    proposal_title: str
-
-
 @app.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
     microscope = get_microscope()
@@ -81,6 +73,12 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
             "activevisits.html",
             {"request": request, "info": [], "microscope": microscope},
         )
+
+
+@app.get("/visits_raw", response_model=list[murfey.server.ispyb.Visit])
+def get_current_visits(db=murfey.server.ispyb.DB):
+    microscope = get_microscope()
+    return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
 @app.get("/visits/{visit_name}")

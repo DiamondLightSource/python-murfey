@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import datetime
 import logging
-from dataclasses import dataclass
 
 import ispyb.sqlalchemy
 import sqlalchemy.orm
 from fastapi import Depends
+from pydantic import BaseModel
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -33,8 +33,7 @@ DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
 
 
-@dataclass(frozen=True)
-class Visit:
+class Visit(BaseModel):
     start: datetime.datetime
     end: datetime.datetime
     name: str

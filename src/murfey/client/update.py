@@ -20,7 +20,7 @@ def check(api_base: ParseResult, install: bool = True, force: bool = False):
     )
     server_reply = requests.get(version_check_url.geturl())
     if server_reply.status_code != 200:
-        raise ValueError("Server unreachable")
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
     versions = server_reply.json()
     if not install:
         return
