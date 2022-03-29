@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from typing import List
 
 import packaging.version
 from fastapi import FastAPI, Request
@@ -76,7 +77,7 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
         )
 
 
-@app.get("/visits_raw", response_model=list[murfey.util.models.Visit])
+@app.get("/visits_raw", response_model=List[murfey.util.models.Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
