@@ -14,6 +14,7 @@ import murfey.server
 import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
+import murfey.util.models
 from murfey.server import get_hostname, get_microscope, template_files, templates
 
 log = logging.getLogger("murfey.server.main")
@@ -75,7 +76,7 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
         )
 
 
-@app.get("/visits_raw", response_model=list[murfey.server.ispyb.Visit])
+@app.get("/visits_raw", response_model=list[murfey.util.models.Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
