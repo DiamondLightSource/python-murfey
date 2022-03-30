@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 import ispyb.sqlalchemy
 import sqlalchemy.orm
-from fastapi import Depends
 import workflows.transport
+from fastapi import Depends
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -22,11 +22,15 @@ Session = sqlalchemy.orm.sessionmaker(
     )
 )
 
-class TransportManager():
+
+class TransportManager:
     def __init__(self, transport_type):
-        transport = workflows.transport.lookup(transport_type)()
-        transport.connect()
-        transport.send("ispyb_connector", "ispyb_command_list")
+        self.transport = workflows.transport.lookup(transport_type)()
+        self.transport.connect()
+
+    def start_dc(self, message):
+        self.transport.send("ispyb_connector", message)
+
 
 def _get_session() -> sqlalchemy.orm.Session:
     db = Session()
@@ -91,11 +95,13 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         for row in query
     ]
 
+
 def start_data_collection(db: sqlalchemy.orm.Session):
     comment = "Test Murfey DC insert"
     insert = _DataCollection(comments=comment)
-    #insert = _ProcessingJob(comments=comment)
+    # insert = _ProcessingJob(comments=comment)
     db.add(insert)
     db.commit()
 
-#start_data_collection(Session())
+
+# start_data_collection(Session())

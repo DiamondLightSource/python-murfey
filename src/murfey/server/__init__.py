@@ -11,7 +11,7 @@ import uvicorn
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
 from rich.logging import RichHandler
-import workflows.transport
+
 import murfey
 import murfey.server.ispyb
 
@@ -27,6 +27,8 @@ template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
+_transport_object = None
+
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
     template_parameters = {
@@ -96,7 +98,11 @@ def run():
         type=int,
         default=8000,
     )
-    parser.add_argument("--transport", help="Transport type for Zocalo connection (default: Pika Transport)", default="PikaTransport")
+    parser.add_argument(
+        "--transport",
+        help="Transport type for Zocalo connection (default: Pika Transport)",
+        default="PikaTransport",
+    )
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -216,5 +222,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
     for logger_name, log_level in log_levels.items():
         logging.getLogger(logger_name).setLevel(log_level)
 
+
 def _set_up_transport(transport_type):
-    murfey.server.ispyb.TransportManager(transport_type)
+    global _transport_object
+    _transport_object = murfey.server.ispyb.TransportManager(transport_type)

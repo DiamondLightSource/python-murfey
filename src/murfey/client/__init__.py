@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import datetime
+import json
 import logging
 import platform
 import shutil
@@ -120,6 +122,23 @@ def run():
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
+
+    start_dc = input(
+        "Press 'D' to start a new Data Collection or press any other key to continue:"
+    )
+    if start_dc == "D":
+        start_time = str(datetime.datetime.now())
+        image_directory = str(args.destination)
+        image_suffix = input("Enter the image suffix: ")
+        dc_params = {
+            "type": "start_dc",
+            "params": {
+                "start_time": start_time,
+                "image_directory": image_directory,
+                "image_suffix": image_suffix,
+            },
+        }
+        ws.send(json.dumps(dc_params))
 
     def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
         if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
