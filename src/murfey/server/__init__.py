@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from rich.logging import RichHandler
 import workflows.transport
 import murfey
+import murfey.server.ispyb
 
 try:
     from importlib.resources import files
@@ -26,7 +27,6 @@ template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
-
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
     template_parameters = {
@@ -96,6 +96,7 @@ def run():
         type=int,
         default=8000,
     )
+    parser.add_argument("--transport", help="Transport type for Zocalo connection (default: Pika Transport)", default="PikaTransport")
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -112,8 +113,10 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
-    workflows.transport.add_command_line_options(parser, transport_argument=True)
     args = parser.parse_args()
+
+    # Set up Zocalo connection
+    _set_up_transport(args.transport)
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -129,13 +132,9 @@ def run():
         log_config=None,
     )
 
-    transport = workflows.transport.lookup(args.transport)()
-    transport.connect()
-    transport.send("ispyb_connector", "ispyb_command_list")
     _running_server = uvicorn.Server(config=config)
     _running_server.run()
     logger.info("Server shutting down")
-    transport.disconnect()
 
 
 def shutdown():
@@ -216,3 +215,6 @@ def _set_up_logging(quiet: bool, verbosity: int):
     logging.getLogger().addHandler(rich_handler)
     for logger_name, log_level in log_levels.items():
         logging.getLogger(logger_name).setLevel(log_level)
+
+def _set_up_transport(transport_type):
+    murfey.server.ispyb.TransportManager(transport_type)

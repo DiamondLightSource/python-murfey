@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import ispyb.sqlalchemy
 import sqlalchemy.orm
 from fastapi import Depends
+import workflows.transport
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -21,6 +22,11 @@ Session = sqlalchemy.orm.sessionmaker(
     )
 )
 
+class TransportManager():
+    def __init__(self, transport_type):
+        transport = workflows.transport.lookup(transport_type)()
+        transport.connect()
+        transport.send("ispyb_connector", "ispyb_command_list")
 
 def _get_session() -> sqlalchemy.orm.Session:
     db = Session()
