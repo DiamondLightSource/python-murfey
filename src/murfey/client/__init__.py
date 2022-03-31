@@ -130,12 +130,14 @@ def run():
         start_time = str(datetime.datetime.now())
         image_directory = str(args.destination)
         image_suffix = input("Enter the image suffix: ")
+        visit = str(args.visit)
         dc_params = {
             "type": "start_dc",
             "params": {
                 "start_time": start_time,
                 "image_directory": image_directory,
                 "image_suffix": image_suffix,
+                "visit": visit,
             },
         }
         ws.send(json.dumps(dc_params))
