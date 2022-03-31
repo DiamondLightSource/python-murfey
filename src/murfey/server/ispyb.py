@@ -29,7 +29,9 @@ class TransportManager:
         self.transport.connect()
 
     def start_dc(self, message):
-        self.transport.send("ispyb_connector", message)
+        message["ispyb_command"] = "insert_data_collection"
+        ispyb_message = {"content": "Murfey DC insert", "parameters": message}
+        self.transport.send("ispyb_connector", ispyb_message)
 
 
 def _get_session() -> sqlalchemy.orm.Session:

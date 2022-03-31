@@ -64,6 +64,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                     json_data.pop("type")
                     await forward_log(json_data)
                 elif json_data["type"] == "start_dc":
+                    json_data.pop("type")
                     await start_dc(json_data)
             except Exception:
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
