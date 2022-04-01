@@ -133,12 +133,10 @@ def run():
         visit = str(args.visit)
         dc_params = {
             "type": "start_dc",
-            "params": {
-                "start_time": start_time,
-                "image_directory": image_directory,
-                "image_suffix": image_suffix,
-                "visit": visit,
-            },
+            "start_time": start_time,
+            "image_directory": image_directory,
+            "image_suffix": image_suffix,
+            "visit": visit,
         }
         ws.send(json.dumps(dc_params))
 
