@@ -8,6 +8,7 @@ import ispyb.sqlalchemy
 import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
+from sqlalchemy.orm import Load
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -30,6 +31,28 @@ class TransportManager:
 
     def start_dc(self, message):
         message["ispyb_command"] = "insert_data_collection"
+        visit = message["visit"]
+        session = (
+            Session()
+            .query(_BLSession, _Proposal)
+            .join(_Proposal, _Proposal.proposalId == _BLSession.proposalId)
+            .options(
+                Load(_BLSession).load_only("sessionId", "visit_number", "proposalId"),
+                Load(_Proposal).load_only(
+                    "proposalId", "proposalCode", "proposalNumber"
+                ),
+            )
+            .filter(
+                sqlalchemy.func.concat(
+                    _Proposal.proposalCode,
+                    _Proposal.proposalNumber,
+                    "-",
+                    _BLSession.visit_number,
+                )
+                == visit
+            )
+        )
+        message["session_id"] = session.first()[0].sessionId
         ispyb_message = {"content": "Murfey DC insert", "parameters": message}
         self.transport.send("ispyb_connector", ispyb_message)
 
