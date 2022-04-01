@@ -178,7 +178,7 @@ def run():
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
-        with open(Path.home() / ".murfey", "r") as configfile:
+        with open(Path.home() / ".murfey") as configfile:
             config.read_file(configfile)
     except FileNotFoundError:
         pass
