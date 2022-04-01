@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from typing import List
 
 import packaging.version
 from fastapi import FastAPI, Request
@@ -14,6 +15,7 @@ import murfey.server
 import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
+import murfey.util.models
 from murfey.server import get_hostname, get_microscope, template_files, templates
 
 log = logging.getLogger("murfey.server.main")
@@ -45,14 +47,6 @@ async def root(request: Request):
     )
 
 
-class Visits(BaseModel):
-    start: str
-    end: str
-    beamline_name: str
-    visit_name: str
-    proposal_title: str
-
-
 @app.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
     microscope = get_microscope()
@@ -81,6 +75,12 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
             "activevisits.html",
             {"request": request, "info": [], "microscope": microscope},
         )
+
+
+@app.get("/visits_raw", response_model=List[murfey.util.models.Visit])
+def get_current_visits(db=murfey.server.ispyb.DB):
+    microscope = get_microscope()
+    return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
 @app.get("/visits/{visit_name}")
