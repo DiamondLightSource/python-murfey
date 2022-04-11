@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
+import requests
 from rich.logging import RichHandler
 
 import murfey.client.rsync
@@ -20,6 +21,7 @@ import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
+from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
 
@@ -55,6 +57,14 @@ def _check_for_updates(
         murfey.client.update.check(server)
     except Exception as e:
         print(f"Murfey update check failed with {e}")
+
+
+def _get_visit_list(api_base: ParseResult):
+    get_visits_url = api_base._replace(path="/visits_raw")
+    server_reply = requests.get(get_visits_url.geturl())
+    if server_reply.status_code != 200:
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
+    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def run():
@@ -109,6 +119,11 @@ def run():
     # make that happen, otherwise ensure client and server are compatible and
     # update if necessary.
     _check_for_updates(server=murfey_url, install_version=args.update)
+
+    from pprint import pprint
+
+    print("Ongoing visits:")
+    pprint(_get_visit_list(murfey_url))
 
     _enable_webbrowser_in_cygwin()
 
@@ -182,7 +197,7 @@ def run():
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
-        with open(Path.home() / ".murfey", "r") as configfile:
+        with open(Path.home() / ".murfey") as configfile:
             config.read_file(configfile)
     except FileNotFoundError:
         pass

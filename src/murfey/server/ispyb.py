@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import datetime
 import logging
-from dataclasses import dataclass
 
 import ispyb.sqlalchemy
 import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 from sqlalchemy.orm import Load
+
+from murfey.util.models import Visit
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
@@ -67,26 +68,6 @@ def _get_session() -> sqlalchemy.orm.Session:
 
 DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
-
-
-@dataclass(frozen=True)
-class Visit:
-    start: datetime.datetime
-    end: datetime.datetime
-    name: str
-    beamline: str
-    proposal_title: str
-
-    def __repr__(self) -> str:
-        return (
-            "Visit("
-            f"start='{self.start:%Y-%m-%d %H:%M}', "
-            f"end='{self.end:%Y-%m-%d %H:%M}', "
-            f"name={self.name!r}, "
-            f"beamline={self.beamline!r}, "
-            f"proposal_title={self.proposal_title!r}"
-            ")"
-        )
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
