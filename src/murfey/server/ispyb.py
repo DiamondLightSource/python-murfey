@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import datetime
 import logging
+import time
 
 import ispyb.sqlalchemy
 import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
-from sqlalchemy.orm import Load
 
 from murfey.util.models import Visit
+
+# from sqlalchemy.orm import Load
+
 
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
 _DataCollection = ispyb.sqlalchemy.DataCollection
 _ProcessingJob = ispyb.sqlalchemy.ProcessingJob
+_DataCollectionGroup = ispyb.sqlalchemy.DataCollectionGroup
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -31,31 +35,22 @@ class TransportManager:
         self.transport.connect()
 
     def start_dc(self, message):
+        first_dcgid_list = get_data_collection_group_ids(message["session_id"])
+        self.insert_data_collection_group(message)
+        time.sleep(1)
+        second_dcgid_list = get_data_collection_group_ids(message["session_id"])
+        dcgid = list(set(second_dcgid_list) - set(first_dcgid_list))
+
         message["ispyb_command"] = "insert_data_collection"
-        visit = message["visit"]
-        session = (
-            Session()
-            .query(_BLSession, _Proposal)
-            .join(_Proposal, _Proposal.proposalId == _BLSession.proposalId)
-            .options(
-                Load(_BLSession).load_only("sessionId", "visit_number", "proposalId"),
-                Load(_Proposal).load_only(
-                    "proposalId", "proposalCode", "proposalNumber"
-                ),
-            )
-            .filter(
-                sqlalchemy.func.concat(
-                    _Proposal.proposalCode,
-                    _Proposal.proposalNumber,
-                    "-",
-                    _BLSession.visit_number,
-                )
-                == visit
-            )
-        )
-        message["session_id"] = session.first()[0].sessionId
+        message["dcgid"] = dcgid[0]
         ispyb_message = {"content": "Murfey DC insert", "parameters": message}
         self.transport.send("ispyb_connector", ispyb_message)
+
+    def insert_data_collection_group(self, message):
+        message["ispyb_command"] = "insert_data_collection_group"
+        ispyb_message = {"content": "Murfey DCG insert", "parameters": message}
+        self.transport.send("ispyb_connector", ispyb_message)
+        return
 
 
 def _get_session() -> sqlalchemy.orm.Session:
@@ -83,6 +78,7 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         .add_columns(
             _BLSession.startDate,
             _BLSession.endDate,
+            _BLSession.sessionId,
             _Proposal.proposalCode,
             _Proposal.proposalNumber,
             _BLSession.visit_number,
@@ -94,6 +90,7 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         Visit(
             start=row.startDate,
             end=row.endDate,
+            session_id=row.sessionId,
             name=f"{row.proposalCode}{row.proposalNumber}-{row.visit_number}",
             proposal_title=row.title,
             beamline=microscope,
@@ -105,9 +102,18 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
 def start_data_collection(db: sqlalchemy.orm.Session):
     comment = "Test Murfey DC insert"
     insert = _DataCollection(comments=comment)
-    # insert = _ProcessingJob(comments=comment)
     db.add(insert)
     db.commit()
 
 
-# start_data_collection(Session())
+def get_data_collection_group_ids(session_id):
+    query = (
+        Session()
+        .query(_DataCollectionGroup)
+        .filter(
+            _DataCollectionGroup.sessionId == session_id,
+        )
+        .all()
+    )
+    dcgids = [row.dataCollectionGroupId for row in query]
+    return dcgids

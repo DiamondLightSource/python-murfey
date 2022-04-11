@@ -123,7 +123,11 @@ def run():
     from pprint import pprint
 
     print("Ongoing visits:")
-    pprint(_get_visit_list(murfey_url))
+    ongoing_visits = _get_visit_list(murfey_url)
+    pprint(ongoing_visits)
+
+    current_visit = [visit for visit in ongoing_visits if visit.name == args.visit]
+    session_id = current_visit[0].session_id
 
     _enable_webbrowser_in_cygwin()
 
@@ -149,6 +153,7 @@ def run():
         dc_params = {
             "type": "start_dc",
             "start_time": start_time,
+            "session_id": session_id,
             "image_directory": image_directory,
             "image_suffix": image_suffix,
             "visit": visit,
