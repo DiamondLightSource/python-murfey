@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Dict, Generic, TypeVar
+from datetime import datetime
+from typing import Any, Dict, Generic, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -82,8 +83,13 @@ async def check_connections(active_connections):
             manager.disconnect(connection[0], connection[1])
 
 
-async def forward_log(logrecord):
+async def forward_log(logrecord: dict[str, Any]):
     record_name = logrecord["name"]
+    logrecord.pop("msecs", None)
+    logrecord.pop("relativeCreated", None)
+    client_timestamp = logrecord.pop("created", 0)
+    if client_timestamp:
+        logrecord["client_time"] = datetime.fromtimestamp(client_timestamp).isoformat()
     logging.getLogger(record_name).handle(logging.makeLogRecord(logrecord))
 
 
