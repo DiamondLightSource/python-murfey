@@ -38,12 +38,6 @@ class TransportManager:
             "processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": message}
         )
 
-    def insert_data_collection_group(self, message):
-        message["ispyb_command"] = "insert_data_collection_group"
-        ispyb_message = {"content": "Murfey DCG insert", "parameters": message}
-        self.transport.send("ispyb_connector", ispyb_message)
-        return
-
 
 def _get_session() -> sqlalchemy.orm.Session:
     db = Session()
