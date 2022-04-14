@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import time
 
 import ispyb.sqlalchemy
 import sqlalchemy.orm
@@ -35,16 +34,9 @@ class TransportManager:
         self.transport.connect()
 
     def start_dc(self, message):
-        first_dcgid_list = get_data_collection_group_ids(message["session_id"])
-        self.insert_data_collection_group(message)
-        time.sleep(1)
-        second_dcgid_list = get_data_collection_group_ids(message["session_id"])
-        dcgid = list(set(second_dcgid_list) - set(first_dcgid_list))
-
-        message["ispyb_command"] = "insert_data_collection"
-        message["dcgid"] = dcgid[0]
-        ispyb_message = {"content": "Murfey DC insert", "parameters": message}
-        self.transport.send("ispyb_connector", ispyb_message)
+        self.transport.send(
+            "processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": message}
+        )
 
     def insert_data_collection_group(self, message):
         message["ispyb_command"] = "insert_data_collection_group"
