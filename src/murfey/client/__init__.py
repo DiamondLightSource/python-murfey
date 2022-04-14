@@ -165,14 +165,15 @@ def run():
     try:
         while True:
             source_watcher.scan()
-            time.sleep(3)
-            ws.send("ohai")
+            time.sleep(15)
+            # ws.send("ohai")
             log.debug(f"Client is running {ws}")
     except KeyboardInterrupt:
         log.info("Encountered CTRL+C")
 
     rsync_process.stop()
     ws.close()
+    log.info("Client stopped")
 
 
 def read_config() -> configparser.ConfigParser:
