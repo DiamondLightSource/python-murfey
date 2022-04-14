@@ -5,6 +5,7 @@ import configparser
 import logging
 import platform
 import shutil
+import sys
 import time
 import webbrowser
 from pathlib import Path
@@ -159,7 +160,9 @@ def run():
     else:
         log.error("No destination set, no files will be transferred")
 
-    # Main loop
+    log.info(
+        f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
+    )
     try:
         while True:
             source_watcher.scan()
@@ -169,7 +172,8 @@ def run():
     except KeyboardInterrupt:
         log.info("Encountered CTRL+C")
 
-    rsync_process.stop()
+    if args.destination:
+        rsync_process.stop()
     ws.close()
     log.info("Client stopped")
 
