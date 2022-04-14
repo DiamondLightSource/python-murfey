@@ -81,7 +81,10 @@ def run():
     parser.add_argument(
         "--source", help="Directory to transfer files from", type=Path, default="."
     )
-    parser.add_argument("--destination", help="Directory to transfer files to")
+    parser.add_argument(
+        "--destination",
+        help="Directory to transfer files to (syntax: 'data/2022/cm31093-2/tmp/murfey')",
+    )
     parser.add_argument(
         "--update",
         metavar="VERSION",
@@ -144,24 +147,19 @@ def run():
         else:
             log.warning(f"Failed to transfer file {str(update.file_path)!r}")
 
-    rsync_process = murfey.client.rsync.RSyncer(
-        args.source,
-        basepath_remote=Path(args.destination or "data/2022/cm31093-2/tmp/murfey"),
-        server_url=murfey_url,
-    )
-    rsync_process.subscribe(rsync_result)
-    rsync_process.start()
+    source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=60)
 
-    source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=5)
-    source_watcher.subscribe(rsync_process.enqueue)
+    if args.destination:
+        rsync_process = murfey.client.rsync.RSyncer(
+            args.source, basepath_remote=Path(args.destination), server_url=murfey_url
+        )
+        rsync_process.subscribe(rsync_result)
+        rsync_process.start()
+        source_watcher.subscribe(rsync_process.enqueue)
+    else:
+        log.error("No destination set, no files will be transferred")
 
-    # with open("/dls/tmp/wra62962/directories/z2MvX0sf/filelist", "r") as fh:
-    #    filelist = fh.read().split("\n")
-    # for f in filelist:
-    #     if f:
-    #         rsync_process.queue.put(Path(f).absolute())
-
-    # Leave threads running
+    # Main loop
     try:
         while True:
             source_watcher.scan()

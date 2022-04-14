@@ -238,7 +238,6 @@ class RSyncer(Observer):
                 "--files-from=-",
                 ".",
                 self._remote,
-                "--dry-run",
             ],
             callback_stdout=parse_stdout,
             callback_stderr=parse_stderr,
