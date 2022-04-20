@@ -46,6 +46,10 @@ class ConnectionManager(Generic[T]):
         log.info(f"State attribute {attribute!r} set to {value!r}")
         await self._state.update(attribute, value)
 
+    async def delete_state(self, attribute: str):
+        log.info(f"State attribute {attribute!r} removed")
+        await self._state.delete(attribute)
+
 
 manager = ConnectionManager(global_state)
 
@@ -74,7 +78,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
         log.info(f"Disconnecting Client {client_id}")
         manager.disconnect(websocket, client_id)
         await manager.broadcast(f"Client #{client_id} disconnected")
-        await manager.set_state(f"Client {client_id}", "left")
+        await manager.delete_state(f"Client {client_id}")
 
 
 async def check_connections(active_connections):
