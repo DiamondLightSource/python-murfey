@@ -51,6 +51,9 @@ class RSyncer(Observer):
         super().__init__()
         self._basepath = basepath_local.absolute()
         self._remote = f"{server_url.hostname}::{basepath_remote}"
+        # For local tests you can use something along the lines of
+        # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
+        # to avoid having to set up an rsync daemon
         self._files_transferred = 0
         self._bytes_transferred = 0
 
