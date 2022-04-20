@@ -157,20 +157,22 @@ def run():
         }
         ws.send(json.dumps(dc_params))
 
-    def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
-        if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
-            log.info(
-                f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
-            )
-        else:
-            log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-
     source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=60)
 
     if args.destination:
         rsync_process = murfey.client.rsync.RSyncer(
             args.source, basepath_remote=Path(args.destination), server_url=murfey_url
         )
+
+        def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
+            if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
+                log.info(
+                    f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
+                )
+            else:
+                log.warning(f"Failed to transfer file {str(update.file_path)!r}")
+                rsync_process.enqueue(update.file_path)
+
         rsync_process.subscribe(rsync_result)
         rsync_process.start()
         source_watcher.subscribe(rsync_process.enqueue)

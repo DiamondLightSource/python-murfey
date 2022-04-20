@@ -4,6 +4,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from enum import Enum
 from pathlib import Path
 from typing import NamedTuple, Optional
@@ -37,7 +38,6 @@ class RSyncerUpdate(NamedTuple):
     file_size: int
     outcome: TransferResult
     transfer_total: int
-    transfer_speed: float
     queue_size: int
 
 
@@ -106,6 +106,7 @@ class RSyncer(Observer):
     def _process(self):
         logger.info("RSync thread starting")
         files_to_transfer: list[Path]
+        backoff = 0
         while not self._halt_thread:
             first = self.queue.get()
             if not first:
@@ -127,20 +128,28 @@ class RSyncer(Observer):
 
             logger.info(f"Preparing to transfer {len(files_to_transfer)} files")
             try:
-                self._transfer(files_to_transfer)
+                success = self._transfer(files_to_transfer)
             except Exception as e:
                 logger.error(f"Unhandled exception {e} in RSync thread", exc_info=True)
+                success = False
 
             logger.info(f"Completed transfer of {len(files_to_transfer)} files")
             for _ in files_to_transfer:
                 self.queue.task_done()
             logger.debug(
-                f"Queue status: {self.queue.qsize()} {self.queue.unfinished_tasks}"
+                f"{self.queue.unfinished_tasks} files remain in queue for processing"
             )
+
+            if success:
+                backoff = 0
+            else:
+                backoff = min(backoff * 2 + 1, 120)
+                logger.info(f"Waiting {backoff} seconds before next rsync attempt")
+                time.sleep(backoff)
 
         logger.info("RSync thread finishing")
 
-    def _transfer(self, files: list[Path]):
+    def _transfer(self, files: list[Path]) -> bool:
         """
         Actually transfer files in an rsync subprocess
         """
@@ -200,7 +209,6 @@ class RSyncer(Observer):
                     file_size=0,
                     outcome=TransferResult.SUCCESS,
                     transfer_total=self._files_transferred - previously_transferred,
-                    transfer_speed=0.0,
                     queue_size=current_outstanding,
                 )
                 if line[0] == ".":
@@ -246,6 +254,7 @@ class RSyncer(Observer):
             print_stdout=False,
             print_stderr=False,
         )
+        success = result.returncode == 0
 
         for f in set(relative_filenames) - transfer_success:
             self._files_transferred += 1
@@ -257,15 +266,16 @@ class RSyncer(Observer):
                 file_size=0,
                 outcome=TransferResult.FAILURE,
                 transfer_total=self._files_transferred,
-                transfer_speed=0.0,
                 queue_size=current_outstanding,
             )
             self.notify(update)
+            success = False
 
         logger.log(
-            logging.WARNING if result.returncode else logging.INFO,
+            logging.WARNING if result.returncode else logging.DEBUG,
             f"rsync process finished with return code {result.returncode}",
         )
+        return success
 
     def _parse_rsync_stdout(self, stdout: bytes):
         """
