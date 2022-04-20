@@ -86,17 +86,17 @@ class RSyncer(Observer):
         self.thread.start()
 
     def stop(self):
-        logger.info("RSync thread stop requested")
+        logger.debug("RSync thread stop requested")
         self._stopping = True
         if self.thread.is_alive():
-            # Wait for all ongoing transfers to complete
+            logger.info("Waiting for ongoing transfers to complete...")
             self.queue.join()
 
         self._halt_thread = True
         if self.thread.is_alive():
             self.queue.put(None)
             self.thread.join()
-        logger.info("RSync thread stop completed")
+        logger.debug("RSync thread stop completed")
 
     def enqueue(self, filepath: Path):
         if not self._stopping:
@@ -147,7 +147,7 @@ class RSyncer(Observer):
                 logger.info(f"Waiting {backoff} seconds before next rsync attempt")
                 time.sleep(backoff)
 
-        logger.info("RSync thread finishing")
+        logger.info("RSync thread finished")
 
     def _transfer(self, files: list[Path]) -> bool:
         """

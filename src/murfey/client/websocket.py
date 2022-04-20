@@ -65,7 +65,7 @@ class WSApp:
         self._alive = False
 
     def _send_queue_feeder(self):
-        log.info("Websocket send-queue-feeder thread starting")
+        log.debug("Websocket send-queue-feeder thread starting")
         while self.alive:
             element = self._send_queue.get()
             if element is None:
@@ -75,7 +75,7 @@ class WSApp:
                 time.sleep(0.3)
             self._ws.send(element)
             self._send_queue.task_done()
-        log.info("Websocket send-queue-feeder thread stopped")
+        log.debug("Websocket send-queue-feeder thread stopped")
 
     def close(self):
         log.info("Closing websocket connection")
@@ -99,7 +99,8 @@ class WSApp:
         log.error(error)
 
     def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
-        log.info(f"Connection closed due to {close_status_code}, {close_msg}")
+        if self._alive:
+            log.info(f"Connection closed due to code {close_status_code}: {close_msg}")
         self._ws.close()
 
     def on_open(self, ws: websocket.WebSocketApp):
