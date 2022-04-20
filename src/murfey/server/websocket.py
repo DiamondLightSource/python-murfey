@@ -54,7 +54,7 @@ class ConnectionManager(Generic[T]):
 manager = ConnectionManager(global_state)
 
 
-@ws.websocket("/ws/test/{client_id}")
+@ws.websocket("/test/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
     await manager.connect(websocket, client_id)
 
@@ -103,7 +103,7 @@ async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
     logging.getLogger(record_name).handle(logging.makeLogRecord(logrecord))
 
 
-@ws.delete("/ws/test/{client_id}")
+@ws.delete("/test/{client_id}")
 async def close_ws_connection(client_id):
     log.info("Disconnecting", client_id)
     manager.disconnect(manager.active_connections[client_id], client_id)
