@@ -223,8 +223,6 @@ class RSyncer(Observer):
             if line.startswith(("cd", ".d")):
                 return
 
-            print(line)
-
         def parse_stderr(line: str):
             logger.error(line)
 
@@ -276,26 +274,3 @@ class RSyncer(Observer):
             f"rsync process finished with return code {result.returncode}",
         )
         return success
-
-    def _parse_rsync_stdout(self, stdout: bytes):
-        """
-        Parse rsync stdout to collect information such as the paths of transferred
-        files and the amount of data transferred.
-        """
-        stringy_stdout = str(stdout)
-        if stringy_stdout:
-            if stringy_stdout.startswith("sent"):
-                byte_info = stringy_stdout.split()
-                self.sent_bytes = int(
-                    byte_info[byte_info.index("sent") + 1].replace(",", "")
-                )
-                self.received_bytes = int(
-                    byte_info[byte_info.index("received") + 1].replace(",", "")
-                )
-                self.byte_rate = float(
-                    byte_info[byte_info.index("bytes/sec") - 1].replace(",", "")
-                )
-            if "total size" in stringy_stdout:
-                self.total_size = int(
-                    stringy_stdout.replace("total size", "").split()[1]
-                )
