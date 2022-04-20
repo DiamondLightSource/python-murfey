@@ -8,6 +8,7 @@ import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 
+import murfey.server
 from murfey.util.models import Visit
 
 # from sqlalchemy.orm import Load
@@ -34,6 +35,13 @@ class TransportManager:
         self.transport.connect()
 
     def start_dc(self, message):
+        message["start_time"] = str(datetime.datetime.now())
+        visits = get_all_ongoing_visits(murfey.server.get_microscope(), Session())
+        current_visit_object = [
+            visit for visit in visits if visit.name == message["visit"]
+        ]
+        if current_visit_object:
+            message["session_id"] = current_visit_object[0].session_id
         self.transport.send(
             "processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": message}
         )

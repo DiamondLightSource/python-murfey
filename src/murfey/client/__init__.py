@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import configparser
-import datetime
 import json
 import logging
 import platform
@@ -126,8 +125,8 @@ def run():
     ongoing_visits = _get_visit_list(murfey_url)
     pprint(ongoing_visits)
 
-    current_visit = [visit for visit in ongoing_visits if visit.name == args.visit]
-    session_id = current_visit[0].session_id
+    # current_visit = [visit for visit in ongoing_visits if visit.name == args.visit]
+    # session_id = current_visit[0].session_id
 
     _enable_webbrowser_in_cygwin()
 
@@ -146,14 +145,11 @@ def run():
         "Press 'D' to start a new Data Collection or press any other key to continue:"
     )
     if start_dc == "D":
-        start_time = str(datetime.datetime.now())
         image_directory = str(args.destination)
         image_suffix = input("Enter the image suffix: ")
         visit = str(args.visit)
         dc_params = {
             "type": "start_dc",
-            "start_time": start_time,
-            "session_id": session_id,
             "image_directory": image_directory,
             "image_suffix": image_suffix,
             "visit": visit,
