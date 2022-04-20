@@ -125,9 +125,6 @@ def run():
     ongoing_visits = _get_visit_list(murfey_url)
     pprint(ongoing_visits)
 
-    # current_visit = [visit for visit in ongoing_visits if visit.name == args.visit]
-    # session_id = current_visit[0].session_id
-
     _enable_webbrowser_in_cygwin()
 
     log.setLevel(logging.DEBUG)

@@ -80,7 +80,6 @@ class LogFilter(logging.Filter):
 def run():
     # setup logging
     zc = zocalo.configuration.from_file()
-    # zc.activate_environment("devrmq")
     zc.activate()
 
     # Install a log filter to all existing handlers.
@@ -100,11 +99,6 @@ def run():
         type=int,
         default=8000,
     )
-    # parser.add_argument(
-    #    "--transport",
-    #    help="Transport type for Zocalo connection (default: Pika Transport)",
-    #    default="PikaTransport",
-    # )
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(

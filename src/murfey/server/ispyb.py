@@ -11,9 +11,6 @@ from fastapi import Depends
 import murfey.server
 from murfey.util.models import Visit
 
-# from sqlalchemy.orm import Load
-
-
 _BLSession = ispyb.sqlalchemy.BLSession
 _Proposal = ispyb.sqlalchemy.Proposal
 _DataCollection = ispyb.sqlalchemy.DataCollection
