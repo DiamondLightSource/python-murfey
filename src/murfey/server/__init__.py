@@ -8,11 +8,13 @@ import socket
 from typing import Any
 
 import uvicorn
+import workflows
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
 from rich.logging import RichHandler
 
 import murfey
+import murfey.server.ispyb
 
 try:
     from importlib.resources import files
@@ -26,6 +28,7 @@ template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
+_transport_object = None
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -77,7 +80,7 @@ class LogFilter(logging.Filter):
 def run():
     # setup logging
     zc = zocalo.configuration.from_file()
-    zc.activate_environment("live")
+    zc.activate()
 
     # Install a log filter to all existing handlers.
     # At this stage this will exclude console loggers, but will cover
@@ -112,7 +115,13 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    zc.add_command_line_options(parser)
+    workflows.transport.add_command_line_options(parser, transport_argument=True)
+
     args = parser.parse_args()
+
+    # Set up Zocalo connection
+    _set_up_transport(args.transport)
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -127,6 +136,7 @@ def run():
         port=args.port,
         log_config=None,
     )
+
     _running_server = uvicorn.Server(config=config)
     _running_server.run()
     logger.info("Server shutting down")
@@ -210,3 +220,8 @@ def _set_up_logging(quiet: bool, verbosity: int):
     logging.getLogger().addHandler(rich_handler)
     for logger_name, log_level in log_levels.items():
         logging.getLogger(logger_name).setLevel(log_level)
+
+
+def _set_up_transport(transport_type):
+    global _transport_object
+    _transport_object = murfey.server.ispyb.TransportManager(transport_type)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import json
 import logging
 import platform
 import shutil
@@ -125,7 +126,8 @@ def run():
     from pprint import pprint
 
     print("Ongoing visits:")
-    pprint(_get_visit_list(murfey_url))
+    ongoing_visits = _get_visit_list(murfey_url)
+    pprint(ongoing_visits)
 
     _enable_webbrowser_in_cygwin()
 
@@ -139,6 +141,21 @@ def run():
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
+
+    start_dc = input(
+        "Press 'D' to start a new Data Collection or press any other key to continue:"
+    )
+    if start_dc == "D":
+        image_directory = str(args.destination)
+        image_suffix = input("Enter the image suffix: ")
+        visit = str(args.visit)
+        dc_params = {
+            "type": "start_dc",
+            "image_directory": image_directory,
+            "image_suffix": image_suffix,
+            "visit": visit,
+        }
+        ws.send(json.dumps(dc_params))
 
     def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
         if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
