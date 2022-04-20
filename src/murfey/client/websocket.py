@@ -57,11 +57,19 @@ class WSApp:
         return self._alive and self._ws_thread.is_alive()
 
     def _run_websocket_event_loop(self):
-        teardown = self._ws.run_forever()
-        if teardown:
-            log.error("Exception raised in websocket event loop")
-        else:
-            log.info("Websocket connection closed")
+        backoff = 0
+        while True:
+            attempt_start = time.perf_counter()
+            connection_failure = self._ws.run_forever()
+            if not connection_failure:
+                break
+            if (time.perf_counter() - attempt_start) < 5:
+                # rapid connection cycling
+                backoff = min(120, backoff * 2 + 1)
+            else:
+                backoff = 0
+            time.sleep(backoff)
+        log.info("Websocket connection closed")
         self._alive = False
 
     def _send_queue_feeder(self):
@@ -99,14 +107,16 @@ class WSApp:
         log.error(str(error))
 
     def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
-        if self._alive:
-            log.info(f"Connection closed due to code {close_status_code}: {close_msg}")
-        self._ws.close()
+        self._ready = False
+        if close_status_code or close_msg:
+            log.debug(f"Websocket closed (code={close_status_code}, msg={close_msg})")
+        else:
+            log.debug("Websocket closed")
 
     def on_open(self, ws: websocket.WebSocketApp):
         log.info("Opened connection")
         self._ready = True
 
-    def send(self, thing: str):
+    def send(self, message: str):
         if self.alive:
-            self._send_queue.put_nowait(thing)
+            self._send_queue.put_nowait(message)
