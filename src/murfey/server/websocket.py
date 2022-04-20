@@ -67,7 +67,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                 json_data = json.loads(data)
                 if json_data["type"] == "log":  # and isinstance(json_data, dict)
                     json_data.pop("type")
-                    await forward_log(json_data)
+                    await forward_log(json_data, websocket)
                 elif json_data["type"] == "start_dc":
                     json_data.pop("type")
                     assert _transport_object is not None
@@ -92,13 +92,14 @@ async def check_connections(active_connections):
             manager.disconnect(connection[0], connection[1])
 
 
-async def forward_log(logrecord: dict[str, Any]):
+async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
     record_name = logrecord["name"]
     logrecord.pop("msecs", None)
     logrecord.pop("relativeCreated", None)
     client_timestamp = logrecord.pop("created", 0)
     if client_timestamp:
         logrecord["client_time"] = datetime.fromtimestamp(client_timestamp).isoformat()
+    logrecord["client_host"] = websocket.client.host
     logging.getLogger(record_name).handle(logging.makeLogRecord(logrecord))
 
 
