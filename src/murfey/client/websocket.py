@@ -96,7 +96,7 @@ class WSApp:
             pass
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
-        log.error(error)
+        log.error(str(error))
 
     def on_close(self, ws: websocket.WebSocketApp, close_status_code, close_msg):
         if self._alive:
