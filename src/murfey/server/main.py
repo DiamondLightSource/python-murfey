@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from functools import lru_cache
 from typing import List
 
 import packaging.version
@@ -9,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from ispyb.sqlalchemy import BLSession, Proposal
-from pydantic import BaseModel
+from pydantic import BaseModel, BaseSettings
 
 import murfey.server
 import murfey.server.bootstrap
@@ -17,11 +18,18 @@ import murfey.server.ispyb
 import murfey.server.websocket as ws
 import murfey.util.models
 from murfey.server import get_hostname, get_microscope, template_files, templates
+from murfey.server.config import from_file
 
 log = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
+
+class Settings(BaseSettings):
+    murfey_machine_configuration: str
+
+
+settings = Settings()
 
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
@@ -45,6 +53,12 @@ async def root(request: Request):
             "version": murfey.__version__,
         },
     )
+
+
+@lru_cache(maxsize=1)
+@app.get("/machine/")
+def machine_info():
+    return from_file(settings.murfey_machine_configuration)
 
 
 @app.get("/visits/")
