@@ -26,7 +26,7 @@ tags_metadata = [murfey.server.bootstrap.tag]
 
 
 class Settings(BaseSettings):
-    murfey_machine_configuration: str
+    murfey_machine_configuration: str = ""
 
 
 settings = Settings()
@@ -58,7 +58,9 @@ async def root(request: Request):
 @lru_cache(maxsize=1)
 @app.get("/machine/")
 def machine_info():
-    return from_file(settings.murfey_machine_configuration)
+    if settings.murfey_machine_configuration:
+        return from_file(settings.murfey_machine_configuration)
+    return {}
 
 
 @app.get("/visits/")
