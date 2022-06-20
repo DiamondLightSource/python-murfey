@@ -54,13 +54,16 @@ class TomographyContext(Context):
             last_tilt_angle = self._last_transferred_file.name.split("[")[1].split("]")[
                 0
             ]
+            self._last_transferred_file = file_path
             if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
                 newly_completed_series = []
-                tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
+                if self._tilt_series:
+                    tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
+                else:
+                    tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
                 if this_tilt_series_size >= tilt_series_size:
                     self._completed_tilt_series.append(tilt_series)
-                    self._last_transferred_file = file_path
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
                     if (
