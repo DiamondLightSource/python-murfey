@@ -17,7 +17,7 @@ import murfey
 import murfey.server.ispyb
 
 try:
-    from importlib.resources import files
+    from importlib.resources import files  # type: ignore
 except ImportError:
     # Fallback for Python 3.8
     from importlib_resources import files  # type: ignore
