@@ -12,10 +12,17 @@ class Context:
         self._acquisition_software = acquisition_software
 
     def post_transfer(self, transferred_file: Path):
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"post_transfer hook must be declared in derived class to be used: {self}"
+        )
+
+    def post_first_transfer(self, transferred_file: Path):
+        self.post_transfer(transferred_file)
 
     def gather_metadata(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"gather_metadata must be declared in derived class to be used: {self}"
+        )
 
 
 class SPAContext(Context):

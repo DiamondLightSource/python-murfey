@@ -46,6 +46,8 @@ class Analyser(Observer):
                         f"Context not understood for {transferred_file}, stopping analysis"
                     )
                     self.stop()
+                else:
+                    self._context.post_first_transfer(transferred_file)
             else:
                 self._context.post_transfer(transferred_file)
 
