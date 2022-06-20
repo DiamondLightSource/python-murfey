@@ -17,7 +17,13 @@ import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
 import murfey.util.models
-from murfey.server import get_hostname, get_microscope, template_files, templates
+from murfey.server import (
+    _transport_object,
+    get_hostname,
+    get_microscope,
+    template_files,
+    templates,
+)
 from murfey.server.config import from_file
 
 log = logging.getLogger("murfey.server.main")
@@ -156,6 +162,35 @@ async def add_file(file: File):
     log.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
+
+
+class ProcessFile(BaseModel):
+    name: str
+    description: str
+    size: int
+    timestamp: float
+    processing_job: int
+
+
+@app.post("/visits/{visit_name}/common_preprocess")
+async def request_common_preprocessing(proc_file: ProcessFile):
+    zocalo_message = {
+        "recipes": ["relion"],
+        "parameters": {
+            "ispyb_process": proc_file.processing_job,
+            "movie": proc_file.name,
+        },
+    }
+    log.info(f"Sending Zocalo message {zocalo_message}")
+    if _transport_object:
+        _transport_object.transport.send("processing_recipe", zocalo_message)
+    else:
+        log.error(
+            f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
+        )
+        return proc_file
+    await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
+    return proc_file
 
 
 @app.get("/version")
