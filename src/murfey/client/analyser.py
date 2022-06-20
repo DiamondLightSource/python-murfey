@@ -4,7 +4,6 @@ import logging
 import queue
 import threading
 from pathlib import Path
-from typing import Optional
 
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.util import Observer
@@ -20,7 +19,7 @@ class Analyser(Observer):
         self._context: Context | None = None
         self._batch_store = {}
 
-        self.queue = queue.Queue[Optional[Path]]()
+        self.queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
         self._stopping = False
         self._halt_thread = False
@@ -39,6 +38,8 @@ class Analyser(Observer):
     def _analyse(self):
         while not self._halt_thread:
             transferred_file = self.queue.get()
+            if not transferred_file:
+                return
             if not self._experiment_type or not self._acquisition_software:
                 found = self._find_context(transferred_file)
                 if not found:
@@ -50,6 +51,14 @@ class Analyser(Observer):
                     self._context.post_first_transfer(transferred_file)
             else:
                 self._context.post_transfer(transferred_file)
+
+    def start(self):
+        if self.thread.is_alive():
+            raise RuntimeError("Analyser already running")
+        if self._stopping:
+            raise RuntimeError("Analyser has already stopped")
+        logger.info(f"Analyser thread starting for {self}")
+        self.thread.start()
 
     def stop(self):
         logger.debug("Analyser thread stop requested")
