@@ -55,16 +55,20 @@ class TomographyContext(Context):
                 0
             ]
             if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
-                self._completed_tilt_series.append(tilt_series)
-                self._last_transferred_file = file_path
-                tilt_series_size = len(self._tilt_series[tilt_series])
-                newly_completed_series = [tilt_series]
+                newly_completed_series = []
+                tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
+                this_tilt_series_size = len(self._tilt_series[tilt_series])
+                if this_tilt_series_size >= tilt_series_size:
+                    self._completed_tilt_series.append(tilt_series)
+                    self._last_transferred_file = file_path
+                    newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
                     if (
                         len(ta) >= tilt_series_size
                         and ts not in self._completed_tilt_series
                     ):
                         newly_completed_series.append(ts)
+                        self._completed_tilt_series.append(ts)
                 logger.info(
                     f"The following tilt series are considered complete: {newly_completed_series}"
                 )
