@@ -4,7 +4,7 @@ import functools
 import string
 import time
 from datetime import datetime
-from typing import Union
+from typing import List, Union
 
 from rich.align import Align
 from rich.box import SQUARE
@@ -69,9 +69,13 @@ class StatusBar(Widget):
 class Hover(Widget):
     mouse_over = Reactive(False)
 
+    def __init__(self, text: str, **kwargs):
+        super().__init__(**kwargs)
+        self._text = text
+
     def render(self) -> Panel:
         return Panel(
-            "Hello [b]World[/b]",
+            self._text,
             style=("on red" if self.mouse_over else ""),
             box=SQUARE,
         )
@@ -82,11 +86,52 @@ class Hover(Widget):
     def on_leave(self) -> None:
         self.mouse_over = False
 
+    async def on_click(self) -> None:
+        await self.app.shutdown()
+
+
+class HoverVisit(Widget):
+    mouse_over = Reactive(False)
+    lock: bool | None = None
+
+    def __init__(self, text: str, **kwargs):
+        super().__init__(**kwargs)
+        self._text = text
+
+    def render(self) -> Panel:
+        if self.lock is None:
+            return Panel(
+                self._text,
+                style=("on red" if self.mouse_over else ""),
+                box=SQUARE,
+            )
+        return Panel(
+            self._text,
+            style=("on red" if self.lock else ""),
+            box=SQUARE,
+        )
+
+    def on_enter(self) -> None:
+        self.mouse_over = True
+
+    def on_leave(self) -> None:
+        self.mouse_over = False
+
+    def on_click(self) -> None:
+        if self.lock is None:
+            self.lock = True
+            if isinstance(self.app, MurfeyTUI):
+                for h in self.app.hovers:
+                    if isinstance(h, HoverVisit) and h != self:
+                        h.lock = False
+                self.app.input_box.lock = False
+
 
 class InputBox(Widget):
     input_text: Union[Reactive[str], str] = Reactive("")
     mouse_over = Reactive(False)
     can_focus = True
+    lock: bool = True
 
     def __init__(self, app):
         self._app_reference = app
@@ -94,8 +139,8 @@ class InputBox(Widget):
 
     def render(self) -> Panel:
         return Panel(
-            f"[blue]❯[/blue] {self.input_text}",
-            style=("on red" if self.mouse_over else ""),
+            f"[white]❯[/white] {self.input_text}",
+            style=("on blue" if self.mouse_over else ""),
             box=SQUARE,
         )
 
@@ -103,12 +148,14 @@ class InputBox(Widget):
         self.input_text = input_text
 
     async def on_enter(self) -> None:
-        self.mouse_over = True
-        await self.focus()
+        if not self.lock:
+            self.mouse_over = True
+            await self.focus()
 
     async def on_leave(self) -> None:
-        self.mouse_over = False
-        await self._app_reference.set_focus(None)
+        if not self.lock:
+            self.mouse_over = False
+            await self._app_reference.set_focus(None)
 
     async def on_key(self, key: events.Key) -> None:
         if key.key == Keys.ControlH:
@@ -127,12 +174,22 @@ class InputBox(Widget):
 
 class MurfeyTUI(App):
     input_box: InputBox
+    hover: List[str]
+    visits: List[str]
+
+    def __init__(self, visits: List[str] | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.visits = visits or []
 
     async def on_load(self, event):
-        await self.bind("q", "quit")
+        await self.bind("q", "quit", show=True)
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self)
         self._statusbar = StatusBar()
-        hovers = (Hover() for _ in range(3))
-        await self.view.dock(self._statusbar, self.input_box, *hovers, edge="top")
+        self.hovers = (
+            [HoverVisit(v) for v in self.visits]
+            if len(self.visits)
+            else [Hover("No ongoing visits found")]
+        )
+        await self.view.dock(*self.hovers, self._statusbar, self.input_box, edge="top")

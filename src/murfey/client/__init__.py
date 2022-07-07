@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import configparser
-import json
+
+# import json
 import logging
 import platform
 import shutil
@@ -21,7 +22,11 @@ import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
+from murfey.client.tui import MurfeyTUI
 from murfey.util.models import Visit
+
+# from rich.prompt import Prompt
+
 
 log = logging.getLogger("murfey.client")
 
@@ -142,20 +147,21 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    start_dc = input(
-        "Press 'D' to start a new Data Collection or press any other key to continue:"
-    )
-    if start_dc == "D":
-        image_directory = str(args.destination)
-        image_suffix = input("Enter the image suffix: ")
-        visit = str(args.visit)
-        dc_params = {
-            "type": "start_dc",
-            "image_directory": image_directory,
-            "image_suffix": image_suffix,
-            "visit": visit,
-        }
-        ws.send(json.dumps(dc_params))
+    MurfeyTUI.run(log="textual.log", log_verbosity=2, visits=ongoing_visits)
+
+    # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
+
+    # if start_dc == "y":
+    #     image_directory = str(args.destination)
+    #     image_suffix = Prompt.ask("Enter the image suffix", choices=[".tiff", ".tif", ".mrc", ".eer"])
+    #     visit = str(args.visit)
+    #     dc_params = {
+    #         "type": "start_dc",
+    #         "image_directory": image_directory,
+    #         "image_suffix": image_suffix,
+    #         "visit": visit,
+    #     }
+    #     ws.send(json.dumps(dc_params))
 
     source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=60)
 
