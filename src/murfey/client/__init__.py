@@ -10,7 +10,13 @@ import shutil
 import sys
 import time
 import webbrowser
+from asyncio import Queue
+
+# from queue import Queue
 from pathlib import Path
+
+# from multiprocessing import Process, Queue
+from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
@@ -21,7 +27,7 @@ import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
-from murfey.client.customlogging import CustomHandler
+from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.tui import MurfeyTUI
 from murfey.util.models import Visit
 
@@ -137,7 +143,8 @@ def run():
     _enable_webbrowser_in_cygwin()
 
     log.setLevel(logging.DEBUG)
-    rich_handler = RichHandler(enable_link_path=False)
+    log_queue = Queue()
+    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
@@ -147,7 +154,16 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    MurfeyTUI.run(log="textual.log", log_verbosity=2, visits=ongoing_visits)
+    input_queue = Queue()
+
+    ongoing_visits = ["cm31111-2"]
+    # input_queue.put_nowait("Would you like to register a new data collection?")
+    # tui_thread = Process(target=MurfeyTUI.run, kwargs={"log_verbosity": 2, "visits": ongoing_visits, "queues": {"input": input_queue}})
+    # tui_thread.start()
+    # MurfeyTUI.run(log="textual.log", log_verbosity=2, visits=ongoing_visits, queues={"input": input_queue})
+    input_queue.put_nowait(
+        ("Would you like to register a new data collection?", ["y", "n"])
+    )
 
     # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
 
@@ -185,22 +201,51 @@ def run():
     else:
         log.error("No destination set, no files will be transferred")
 
+    main_loop_thread = Thread(target=main_loop, args=[source_watcher], daemon=True)
+    main_loop_thread.start()
+
+    rich_handler.redirect = True
+    MurfeyTUI.run(
+        log="textual.log",
+        log_verbosity=2,
+        visits=ongoing_visits,
+        queues={"input": input_queue, "logs": log_queue},
+    )
+
+    try:
+        main_loop_thread.join()
+    except KeyboardInterrupt:
+        log.info("Encountered CTRL+C")
+        if args.destination:
+            rsync_process.stop()
+        ws.close()
+        log.info("Client stopped")
+
+    # log.info(
+    #     f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
+    # )
+    # try:
+    #     while True:
+    #         source_watcher.scan()
+    #         time.sleep(15)
+    #         # ws.send("ohai")
+    #         log.debug(f"Client is running {ws}")
+    # except KeyboardInterrupt:
+    #     log.info("Encountered CTRL+C")
+
+    # if args.destination:
+    #     rsync_process.stop()
+    # ws.close()
+    # log.info("Client stopped")
+
+
+def main_loop(source_watcher: murfey.client.watchdir.DirWatcher):
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
     )
-    try:
-        while True:
-            source_watcher.scan()
-            time.sleep(15)
-            # ws.send("ohai")
-            log.debug(f"Client is running {ws}")
-    except KeyboardInterrupt:
-        log.info("Encountered CTRL+C")
-
-    if args.destination:
-        rsync_process.stop()
-    ws.close()
-    log.info("Client stopped")
+    while True:
+        source_watcher.scan()
+        time.sleep(15)
 
 
 def read_config() -> configparser.ConfigParser:

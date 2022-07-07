@@ -4,10 +4,12 @@ import functools
 import string
 import time
 from datetime import datetime
+from queue import Queue
 from typing import List, Union
 
 from rich.align import Align
 from rich.box import SQUARE
+from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.progress import (
     Progress,
@@ -16,12 +18,14 @@ from rich.progress import (
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
+from rich.prompt import Prompt
 from rich.table import Column
 from textual import events
 from textual.app import App
 from textual.keys import Keys
 from textual.reactive import Reactive
 from textual.widget import Widget
+from textual.widgets import ScrollView
 
 from murfey.client.tui.progress import BlockBarColumn
 
@@ -127,19 +131,52 @@ class HoverVisit(Widget):
                 self.app.input_box.lock = False
 
 
+class QuickPrompt:
+    def __init__(self, text: str, options: List[str]):
+        self._text = text
+        self._options = options
+        self.warn = False
+
+    def __repr__(self):
+        return repr(self._text)
+
+    def __str__(self):
+        return self._text
+
+    def __iter__(self):
+        return iter(self._options)
+
+    def __bool__(self):
+        return bool(self._text)
+
+
 class InputBox(Widget):
     input_text: Union[Reactive[str], str] = Reactive("")
+    prompt: str = ""
     mouse_over = Reactive(False)
     can_focus = True
     lock: bool = True
 
-    def __init__(self, app):
+    def __init__(self, app, queue: Queue | None = None):
         self._app_reference = app
+        self._queue: Queue = queue or Queue()
         super().__init__()
 
     def render(self) -> Panel:
+        if not self._queue.empty():
+            msg = self._queue.get_nowait()
+            self.input_text = ""
+            self.prompt = QuickPrompt(msg[0], msg[1])
+        if self.prompt:
+            panel_msg = (
+                f"{self.prompt}: [[red]{'/'.join(self.prompt)}[/red]] {self.input_text}"
+                if self.prompt.warn
+                else f"{self.prompt}: [[white]{'/'.join(self.prompt)}[/white]] {self.input_text}"
+            )
+        else:
+            panel_msg = f"[white]❯[/white] {self.input_text}"
         return Panel(
-            f"[white]❯[/white] {self.input_text}",
+            panel_msg,
             style=("on blue" if self.mouse_over else ""),
             box=SQUARE,
         )
@@ -167,25 +204,51 @@ class InputBox(Widget):
         elif key.key in string.printable:
             self.input_text += key.key
             key.stop()
+        elif key.key == Keys.Enter and self.prompt:
+            if self.input_text not in self.prompt:
+                self.prompt.warn = True
+            else:
+                self.prompt = None
+                self.input_text = ""
+            key.stop()
         elif key.key == Keys.Enter:
             self.input_text = ""
             key.stop()
 
 
+# class LogBook(ScrollView):
+#     def __init__(self, queue: Queue, *args, **kwargs):
+#         self._queue = queue
+#         self._handler = Reactive(RichHandler(enable_link_path=False))
+#         super().__init__(*args, **kwargs)
+
+#     async def on_mount(self) -> None:
+
+
 class MurfeyTUI(App):
     input_box: InputBox
+    log_book: ScrollView
     hover: List[str]
     visits: List[str]
+    _handler = Reactive(RichHandler(enable_link_path=False))
 
-    def __init__(self, visits: List[str] | None = None, **kwargs):
+    def __init__(
+        self,
+        visits: List[str] | None = None,
+        queues: Dict[str, Queue] | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.visits = visits or []
+        self._queues = queues
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
     async def on_mount(self) -> None:
-        self.input_box = InputBox(self)
+        self.input_box = InputBox(self, queue=self._queues.get("input"))
+        self.log_book = ScrollView()
+        await self.log_book.update(self._handler)
         self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]
@@ -193,3 +256,12 @@ class MurfeyTUI(App):
             else [Hover("No ongoing visits found")]
         )
         await self.view.dock(*self.hovers, self._statusbar, self.input_box, edge="top")
+        await self.view.dock(self.log_book, edge="right")
+
+        # async def add_log():
+        #     if self._queues.get("logs") and not self._queues["logs"].empty():
+        #         record = self._queues["logs"].get_nowait()
+        #         self._handler.emit(record)
+        #     await self.log_book.update(self._handler.console)
+
+        # await self.call_later(add_log)
