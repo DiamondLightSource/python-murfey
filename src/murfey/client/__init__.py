@@ -17,7 +17,7 @@ from pathlib import Path
 from queue import Queue
 
 # from multiprocessing import Process, Queue
-from threading import Thread
+from threading import RLock, Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
