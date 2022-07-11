@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+# import asyncio
+# import contextlib
 import functools
 import string
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from queue import Queue
-from typing import List, Union
+from threading import RLock
+from typing import Dict, List, TypeVar, Union
 
 from rich.align import Align
 from rich.box import SQUARE
@@ -18,16 +22,29 @@ from rich.progress import (
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
-from rich.prompt import Prompt
 from rich.table import Column
 from textual import events
 from textual.app import App
 from textual.keys import Keys
 from textual.reactive import Reactive
+from textual.views import DockView
 from textual.widget import Widget
 from textual.widgets import ScrollView
 
 from murfey.client.tui.progress import BlockBarColumn
+
+ReactiveType = TypeVar("ReactiveType")
+
+_pool = ThreadPoolExecutor()
+
+# @contextlib.asynccontextmanager
+# async def async_lock(lock):
+#     loop = asyncio.get_event_loop()
+#     await loop.run_in_executor(_pool, lock.acquire)
+#     try:
+#         yield
+#     finally:
+#         lock.release()
 
 
 class StatusBar(Widget):
@@ -152,7 +169,7 @@ class QuickPrompt:
 
 class InputBox(Widget):
     input_text: Union[Reactive[str], str] = Reactive("")
-    prompt: str = ""
+    prompt: str | QuickPrompt | None = ""
     mouse_over = Reactive(False)
     can_focus = True
     lock: bool = True
@@ -163,11 +180,14 @@ class InputBox(Widget):
         super().__init__()
 
     def render(self) -> Panel:
+        self.app.log("rendering input box")
+        if self.app.log_book.next_log:
+            self.app.log(self.app.log_book.next_log._default)
         if not self._queue.empty():
             msg = self._queue.get_nowait()
             self.input_text = ""
             self.prompt = QuickPrompt(msg[0], msg[1])
-        if self.prompt:
+        if self.prompt and isinstance(self.prompt, QuickPrompt):
             panel_msg = (
                 f"{self.prompt}: [[red]{'/'.join(self.prompt)}[/red]] {self.input_text}"
                 if self.prompt.warn
@@ -205,7 +225,9 @@ class InputBox(Widget):
             self.input_text += key.key
             key.stop()
         elif key.key == Keys.Enter and self.prompt:
-            if self.input_text not in self.prompt:
+            if self.input_text not in self.prompt and isinstance(
+                self.prompt, QuickPrompt
+            ):
                 self.prompt.warn = True
             else:
                 self.prompt = None
@@ -216,13 +238,20 @@ class InputBox(Widget):
             key.stop()
 
 
-# class LogBook(ScrollView):
-#     def __init__(self, queue: Queue, *args, **kwargs):
-#         self._queue = queue
-#         self._handler = Reactive(RichHandler(enable_link_path=False))
-#         super().__init__(*args, **kwargs)
+class LogBook(ScrollView):
+    def __init__(self, lock, renderable, *args, **kwargs):
+        self.next_log = renderable
+        with lock:
+            renderable.redirect_to(self)
+        self._lock = lock
+        self._handler = RichHandler(enable_link_path=False)
+        super().__init__(*args, **kwargs)
 
-#     async def on_mount(self) -> None:
+    async def watch_next_log(self, new_value) -> None:
+        # async with async_lock(self._lock):
+        # this blocks all coroutines at the moment
+        with self._lock:
+            await self.update(new_value, home=False)
 
 
 class MurfeyTUI(App):
@@ -230,38 +259,60 @@ class MurfeyTUI(App):
     log_book: ScrollView
     hover: List[str]
     visits: List[str]
-    _handler = Reactive(RichHandler(enable_link_path=False))
 
     def __init__(
         self,
+        log_renderable=None,
+        lock=None,
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
+        self._log_renderable = log_renderable
         self.visits = visits or []
-        self._queues = queues
+        self._queues = queues or {}
+        self._lock = lock or RLock()
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
-        self.log_book = ScrollView()
-        await self.log_book.update(self._handler)
+        if self._log_renderable is None:
+            raise ValueError("log renderable should not be None")
+        self.log_book = LogBook(self._lock, self._log_renderable)
+        await self.log_book.update(
+            self._log_renderable._default or "[blue]Log book[/blue]"
+        )
         self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]
             if len(self.visits)
             else [Hover("No ongoing visits found")]
         )
-        await self.view.dock(*self.hovers, self._statusbar, self.input_box, edge="top")
-        await self.view.dock(self.log_book, edge="right")
 
-        # async def add_log():
-        #     if self._queues.get("logs") and not self._queues["logs"].empty():
-        #         record = self._queues["logs"].get_nowait()
-        #         self._handler.emit(record)
-        #     await self.log_book.update(self._handler.console)
+        grid = await self.view.dock_grid(edge="left")
 
-        # await self.call_later(add_log)
+        grid.add_column(fraction=2, name="left")
+        grid.add_column(fraction=1, name="right")
+        grid.add_row(fraction=1, name="top")
+        grid.add_row(fraction=1, name="middle")
+        grid.add_row(fraction=1, name="bottom")
+
+        grid.add_areas(
+            area1="left,top",
+            area2="right,top-start|bottom-end",
+            area3="left,middle",
+            area4="left,bottom",
+        )
+
+        sub_view = DockView()
+        await sub_view.dock(*self.hovers, edge="top")
+
+        grid.place(
+            area1=sub_view,
+            area2=self.log_book,
+            area3=self._statusbar,
+            area4=self.input_box,
+        )

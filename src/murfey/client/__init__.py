@@ -16,12 +16,11 @@ from asyncio import Queue
 from pathlib import Path
 
 # from multiprocessing import Process, Queue
-from threading import Thread
+from threading import RLock, Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
-from rich.logging import RichHandler
 
 import murfey.client.rsync
 import murfey.client.update
@@ -144,7 +143,14 @@ def run():
 
     log.setLevel(logging.DEBUG)
     log_queue = Queue()
-    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    lock = RLock()
+    input_queue = Queue()
+
+    ongoing_visits = ["cm31111-2"]
+    # tui = MurfeyTUI(lock=lock, visits=ongoing_visits, queues={"input": input_queue, "logs": log_queue})
+    # log_book = tui.log_book
+    rich_handler = DirectableRichHandler(log_queue, lock, enable_link_path=False)
+    print("rich handler renderable log", rich_handler.next_log)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
@@ -154,9 +160,6 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    input_queue = Queue()
-
-    ongoing_visits = ["cm31111-2"]
     # input_queue.put_nowait("Would you like to register a new data collection?")
     # tui_thread = Process(target=MurfeyTUI.run, kwargs={"log_verbosity": 2, "visits": ongoing_visits, "queues": {"input": input_queue}})
     # tui_thread.start()
@@ -208,9 +211,11 @@ def run():
     MurfeyTUI.run(
         log="textual.log",
         log_verbosity=2,
+        log_renderable=rich_handler.next_log,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
     )
+    rich_handler.redirect = False
 
     try:
         main_loop_thread.join()
