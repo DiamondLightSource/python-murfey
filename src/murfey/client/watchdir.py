@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple, Optional
 
 import murfey.util
+from murfey.client.tui import StatusBar
 
 log = logging.getLogger("murfey.client.watchdir")
 
@@ -18,11 +19,17 @@ class _FileInfo(NamedTuple):
 
 
 class DirWatcher(murfey.util.Observer):
-    def __init__(self, path: str | os.PathLike, settling_time: float = 60):
+    def __init__(
+        self,
+        path: str | os.PathLike,
+        settling_time: float = 60,
+        status_bar: StatusBar | None = None,
+    ):
         super().__init__()
         self._basepath = os.fspath(path)
         self._lastscan: dict[str, _FileInfo] | None = {}
         self._file_candidates: dict[str, _FileInfo] = {}
+        self._statusbar = status_bar
         self.settling_time = settling_time
 
     def __repr__(self) -> str:
@@ -58,6 +65,8 @@ class DirWatcher(murfey.util.Observer):
                     and file_stat.st_ctime <= self._file_candidates[x].modification_time
                 ):
                     log.debug(f"File {x!r} is ready to be transferred")
+                    if self._statusbar:
+                        self._statusbar.transferred[1] += 1
                     self.notify(Path(x))
                     del self._file_candidates[x]
                     continue

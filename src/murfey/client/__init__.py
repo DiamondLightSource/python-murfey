@@ -25,7 +25,7 @@ import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
-from murfey.client.tui import MurfeyTUI
+from murfey.client.tui import MurfeyTUI, StatusBar
 from murfey.util.models import Visit
 
 # from asyncio import Queue
@@ -146,8 +146,6 @@ def run():
     log_queue = Queue()
     input_queue = Queue()
 
-    ongoing_visits = ["cm31111-2"]
-
     rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
@@ -176,7 +174,10 @@ def run():
     #     }
     #     ws.send(json.dumps(dc_params))
 
-    source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=60)
+    status_bar = StatusBar()
+    source_watcher = murfey.client.watchdir.DirWatcher(
+        args.source, settling_time=60, status_bar=status_bar
+    )
 
     if args.destination:
         rsync_process = murfey.client.rsync.RSyncer(
@@ -207,6 +208,7 @@ def run():
         log_verbosity=2,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
+        status_bar=status_bar,
     )
     rich_handler.redirect = False
 

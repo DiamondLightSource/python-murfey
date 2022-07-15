@@ -47,6 +47,8 @@ _pool = ThreadPoolExecutor()
 
 
 class StatusBar(Widget):
+    transferred = Reactive((0, 0))
+
     @functools.lru_cache()
     def get_progress(self):
         text_column = TextColumn("{task.description}", table_column=Column(ratio=1))
@@ -60,7 +62,7 @@ class StatusBar(Widget):
             expand=True,
         )
 
-        task1 = progress.add_task("[red]Downloading...", total=1000)
+        task1 = progress.add_task("[red]Downloading...", total=self.transferred[1])
         task2 = progress.add_task("[green]Processing...", total=1000)
         task3 = progress.add_task("[cyan]Cooking...", total=1000)
         return (progress, task1, task2, task3)
@@ -69,7 +71,7 @@ class StatusBar(Widget):
         progress, task1, task2, task3 = self.get_progress()
         elapsed = (time.time() - self.start) * 100
 
-        progress.update(task1, completed=max(0, min(1000, elapsed)))
+        progress.update(task1, completed=self.transferred[0], total=self.transferred[1])
         progress.update(task2, completed=max(0, min(1000, elapsed - 1000)))
         progress.update(task3, completed=max(0, min(1000, elapsed - 2000)))
         return Panel(progress.make_tasks_table(progress.tasks), height=5, box=SQUARE)
@@ -285,11 +287,13 @@ class MurfeyTUI(App):
         self,
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
+        status_bar: StatusBar | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.visits = visits or []
         self._queues = queues or {}
+        self._statusbar = status_bar or StatusBar()
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
@@ -297,7 +301,7 @@ class MurfeyTUI(App):
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
         self.log_book = LogBook(self._queues["logs"])
-        self._statusbar = StatusBar()
+        # self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]
             if len(self.visits)
