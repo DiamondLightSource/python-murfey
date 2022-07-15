@@ -10,13 +10,11 @@ import shutil
 import sys
 import time
 import webbrowser
-from asyncio import Queue
-
-# from queue import Queue
 from pathlib import Path
+from queue import Queue
 
 # from multiprocessing import Process, Queue
-from threading import RLock, Thread
+from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
@@ -29,6 +27,9 @@ import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.tui import MurfeyTUI
 from murfey.util.models import Visit
+
+# from asyncio import Queue
+
 
 # from rich.prompt import Prompt
 
@@ -143,12 +144,11 @@ def run():
 
     log.setLevel(logging.DEBUG)
     log_queue = Queue()
-    lock = RLock()
     input_queue = Queue()
 
     ongoing_visits = ["cm31111-2"]
 
-    rich_handler = DirectableRichHandler(log_queue, lock, enable_link_path=False)
+    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
@@ -205,7 +205,6 @@ def run():
     MurfeyTUI.run(
         log="textual.log",
         log_verbosity=2,
-        log_renderable=rich_handler.next_log,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
     )

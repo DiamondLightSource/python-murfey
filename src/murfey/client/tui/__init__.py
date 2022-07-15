@@ -180,9 +180,6 @@ class InputBox(Widget):
         super().__init__()
 
     def render(self) -> Panel:
-        self.app.log("rendering input box")
-        if self.app.log_book.next_log:
-            self.app.log(self.app.log_book.next_log._default)
         if not self._queue.empty() and not self.prompt:
             msg = self._queue.get_nowait()
             self.input_text = ""
@@ -245,19 +242,32 @@ class InputBox(Widget):
 
 
 class LogBook(ScrollView):
-    def __init__(self, lock, renderable, *args, **kwargs):
-        self.next_log = renderable
-        with lock:
-            renderable.redirect_to(self)
+    def __init__(self, lock, queue, *args, **kwargs):
         self._lock = lock
+        self._queue = queue
+        self._next_log = None
+        self._logs = None
         self._handler = RichHandler(enable_link_path=False)
         super().__init__(*args, **kwargs)
 
-    async def watch_next_log(self, new_value) -> None:
-        # async with async_lock(self._lock):
-        # this blocks all coroutines at the moment
-        with self._lock:
-            await self.update(new_value, home=False)
+    def on_mount(self):
+        self.set_interval(0.5, self.tick)
+
+    def _load_from_queue(self) -> bool:
+        if not self._queue.empty():
+            msg = self._queue.get_nowait()
+            self._next_log = msg
+            return True
+        return False
+
+    async def tick(self):
+        loaded = self._load_from_queue()
+        if self._next_log and loaded:
+            if self._logs is None:
+                self._logs = self._next_log[1]
+            else:
+                self._logs.add_row(*self._next_log[0])
+            await self.update(self._logs, home=False)
 
 
 class MurfeyTUI(App):
@@ -268,14 +278,12 @@ class MurfeyTUI(App):
 
     def __init__(
         self,
-        log_renderable=None,
         lock=None,
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._log_renderable = log_renderable
         self.visits = visits or []
         self._queues = queues or {}
         self._lock = lock or RLock()
@@ -285,12 +293,7 @@ class MurfeyTUI(App):
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
-        if self._log_renderable is None:
-            raise ValueError("log renderable should not be None")
-        self.log_book = LogBook(self._lock, self._log_renderable)
-        await self.log_book.update(
-            self._log_renderable._default or "[blue]Log book[/blue]"
-        )
+        self.log_book = LogBook(self._lock, self._queues["logs"])
         self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]

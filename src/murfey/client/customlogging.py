@@ -5,47 +5,12 @@ import logging
 from asyncio import Queue
 from datetime import datetime
 from pathlib import Path
-from typing import List, TypeVar
+from typing import List
 
 from rich.console import Console, RenderableType
 from rich.containers import Renderables
 from rich.logging import RichHandler
-from rich.table import Table
 from rich.text import Text
-from textual.reactive import Reactive
-
-ReactiveType = TypeVar("ReactiveType")
-
-
-class RedirectedReactive(Reactive):
-    def __init__(
-        self,
-        default: ReactiveType,
-        *,
-        layout: bool = False,
-        repaint: bool = True,
-    ) -> None:
-        self.redirection = None
-        super().__init__(default, layout=layout, repaint=repaint)
-
-    def redirect_to(self, obj):
-        self.redirection = obj
-        self.repaint = True
-
-    def __get__(self, obj, obj_type):
-        return self
-
-    def __set__(self, obj, value):
-        if self.redirection:
-            setattr(obj, self.internal_name, value)
-            super().__set__(self.redirection, value)
-        else:
-            super().__set__(obj, value)
-
-
-class LogHolder:
-    def __init__(self, rendered_log):
-        self.rendered_log = rendered_log
 
 
 class CustomHandler(logging.Handler):
@@ -68,12 +33,9 @@ class CustomHandler(logging.Handler):
 
 
 class DirectableRichHandler(RichHandler):
-    next_log = RedirectedReactive(Text("log book"), repaint=False)
-
-    def __init__(self, queue: Queue, lock, **kwargs):
+    def __init__(self, queue: Queue, **kwargs):
         super().__init__(**kwargs)
         self._queue = queue
-        self._lock = lock
         self.redirect = False
         self._console = Console()
         self._last_time = None
@@ -118,31 +80,17 @@ class DirectableRichHandler(RichHandler):
     def emit(self, record):
         try:
             if self.redirect:
-                with self._lock:
-                    message = self.format(record)
-                    message_renderable = self.render_message(record, message)
-                    rendered_log = self.render(
-                        record=record,
-                        traceback=None,
-                        message_renderable=message_renderable,
-                    )
-                    rendered_log_row = self.get_log_row(
-                        record=record, message_renderable=message_renderable
-                    )
-                    if self.next_log.redirection is not None:
-                        if not isinstance(
-                            getattr(self, self.next_log.internal_name), Table
-                        ):
-                            self.next_log = rendered_log
-                        else:
-                            if rendered_log_row:
-                                self.next_log._first = True
-                                getattr(self, self.next_log.internal_name).add_row(
-                                    *rendered_log_row
-                                )
-                                self.next_log = getattr(
-                                    self, self.next_log.internal_name
-                                )
+                message = self.format(record)
+                message_renderable = self.render_message(record, message)
+                rendered_log = self.render(
+                    record=record,
+                    traceback=None,
+                    message_renderable=message_renderable,
+                )
+                rendered_log_row = self.get_log_row(
+                    record=record, message_renderable=message_renderable
+                )
+                self._queue.put((rendered_log_row, rendered_log))
             else:
                 super().emit(record)
         except Exception:
