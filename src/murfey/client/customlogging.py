@@ -33,12 +33,9 @@ class CustomHandler(logging.Handler):
 
 
 class DirectableRichHandler(RichHandler):
-    next_log = RedirectedReactive(Text("log book"), repaint=False)
-
-    def __init__(self, queue: Queue, lock, **kwargs):
+    def __init__(self, queue: Queue, **kwargs):
         super().__init__(**kwargs)
         self._queue = queue
-        self._lock = lock
         self.redirect = False
         self._console = Console()
         self._last_time = None

@@ -10,14 +10,11 @@ import shutil
 import sys
 import time
 import webbrowser
-from asyncio import Queue
-
-# from queue import Queue
 from pathlib import Path
 from queue import Queue
 
 # from multiprocessing import Process, Queue
-from threading import RLock, Thread
+from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
