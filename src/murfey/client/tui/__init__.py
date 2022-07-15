@@ -183,7 +183,7 @@ class InputBox(Widget):
         self.app.log("rendering input box")
         if self.app.log_book.next_log:
             self.app.log(self.app.log_book.next_log._default)
-        if not self._queue.empty():
+        if not self._queue.empty() and not self.prompt:
             msg = self._queue.get_nowait()
             self.input_text = ""
             self.prompt = QuickPrompt(msg[0], msg[1])
@@ -200,6 +200,12 @@ class InputBox(Widget):
             style=("on blue" if self.mouse_over else ""),
             box=SQUARE,
         )
+
+    def on_mount(self):
+        self.set_interval(2, self.tick)
+
+    def tick(self):
+        self.refresh()
 
     def set_input_text(self, input_text: str) -> None:
         self.input_text = input_text

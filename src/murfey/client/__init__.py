@@ -147,10 +147,8 @@ def run():
     input_queue = Queue()
 
     ongoing_visits = ["cm31111-2"]
-    # tui = MurfeyTUI(lock=lock, visits=ongoing_visits, queues={"input": input_queue, "logs": log_queue})
-    # log_book = tui.log_book
+
     rich_handler = DirectableRichHandler(log_queue, lock, enable_link_path=False)
-    print("rich handler renderable log", rich_handler.next_log)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
@@ -160,10 +158,6 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    # input_queue.put_nowait("Would you like to register a new data collection?")
-    # tui_thread = Process(target=MurfeyTUI.run, kwargs={"log_verbosity": 2, "visits": ongoing_visits, "queues": {"input": input_queue}})
-    # tui_thread.start()
-    # MurfeyTUI.run(log="textual.log", log_verbosity=2, visits=ongoing_visits, queues={"input": input_queue})
     input_queue.put_nowait(
         ("Would you like to register a new data collection?", ["y", "n"])
     )
@@ -225,23 +219,6 @@ def run():
             rsync_process.stop()
         ws.close()
         log.info("Client stopped")
-
-    # log.info(
-    #     f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
-    # )
-    # try:
-    #     while True:
-    #         source_watcher.scan()
-    #         time.sleep(15)
-    #         # ws.send("ohai")
-    #         log.debug(f"Client is running {ws}")
-    # except KeyboardInterrupt:
-    #     log.info("Encountered CTRL+C")
-
-    # if args.destination:
-    #     rsync_process.stop()
-    # ws.close()
-    # log.info("Client stopped")
 
 
 def main_loop(source_watcher: murfey.client.watchdir.DirWatcher):
