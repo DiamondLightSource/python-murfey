@@ -255,18 +255,25 @@ class LogBook(ScrollView):
 
     def _load_from_queue(self) -> bool:
         if not self._queue.empty():
-            msg = self._queue.get_nowait()
-            self._next_log = msg
+            num_logs = 0
+            self._next_log = []
+            while not self._queue.empty() and num_logs < 10:
+                msg = self._queue.get_nowait()
+                self._next_log.append(msg)
+                num_logs += 1
             return True
         return False
 
     async def tick(self):
         loaded = self._load_from_queue()
-        if self._next_log and loaded:
+        if loaded:
             if self._logs is None:
-                self._logs = self._next_log[1]
+                self._logs = self._next_log[0][1]
+                for nl in self._next_log[1:]:
+                    self._logs.add_row(*nl[0])
             else:
-                self._logs.add_row(*self._next_log[0])
+                for nl in self._next_log:
+                    self._logs.add_row(*nl[0])
             await self.update(self._logs, home=False)
 
 
