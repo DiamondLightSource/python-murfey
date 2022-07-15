@@ -8,7 +8,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from queue import Queue
-from threading import RLock
 from typing import Dict, List, TypeVar, Union
 
 from rich.align import Align
@@ -242,8 +241,7 @@ class InputBox(Widget):
 
 
 class LogBook(ScrollView):
-    def __init__(self, lock, queue, *args, **kwargs):
-        self._lock = lock
+    def __init__(self, queue, *args, **kwargs):
         self._queue = queue
         self._next_log = None
         self._logs = None
@@ -285,7 +283,6 @@ class MurfeyTUI(App):
 
     def __init__(
         self,
-        lock=None,
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
         **kwargs,
@@ -293,14 +290,13 @@ class MurfeyTUI(App):
         super().__init__(**kwargs)
         self.visits = visits or []
         self._queues = queues or {}
-        self._lock = lock or RLock()
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
-        self.log_book = LogBook(self._lock, self._queues["logs"])
+        self.log_book = LogBook(self._queues["logs"])
         self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]
