@@ -149,6 +149,8 @@ def run():
     pprint(ongoing_visits)
     ongoing_visits = [v.name for v in ongoing_visits]
 
+    ongoing_visits = ["cm31111-1"]
+
     _enable_webbrowser_in_cygwin()
 
     log.setLevel(logging.DEBUG)
