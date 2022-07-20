@@ -7,7 +7,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 from urllib.parse import ParseResult
 
 import procrunner
@@ -47,17 +47,22 @@ class RSyncer(Observer):
         basepath_local: Path,
         basepath_remote: Path,
         server_url: ParseResult,
+        local: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
-        self._remote = f"{server_url.hostname}::{basepath_remote}"
+        if local:
+            self._remote = str(basepath_remote)
+        else:
+            self._remote = f"{server_url.hostname}::{basepath_remote}"
         # For local tests you can use something along the lines of
         # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
         # to avoid having to set up an rsync daemon
         self._files_transferred = 0
         self._bytes_transferred = 0
 
-        self.queue = queue.Queue[Optional[Path]]()
+        # self.queue = queue.Queue[Optional[Path]]()
+        self.queue: queue.Queue[Path | None] = queue.Queue()
         self.thread = threading.Thread(
             name=f"RSync {self._basepath}:{self._remote}", target=self._process
         )
@@ -196,7 +201,7 @@ class RSyncer(Observer):
                 # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
                 return
 
-            if line.startswith((".f", "<f")):
+            if line.startswith((".f", ">f")):
                 # .d          ./
                 # .f          README.md
                 # .f          tests/util/__pycache__/test_state.cpython-39-pytest-6.2.5.pyc

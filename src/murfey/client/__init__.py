@@ -25,7 +25,9 @@ import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
-from murfey.client.tui import MurfeyTUI, StatusBar
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.tui.app import MurfeyTUI
+from murfey.client.tui.status_bar import StatusBar
 from murfey.util.models import Visit
 
 # from asyncio import Queue
@@ -106,6 +108,10 @@ def run():
         const=True,
         help="Update Murfey to the newest or to a specific version",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -140,6 +146,8 @@ def run():
     ongoing_visits = _get_visit_list(murfey_url)
     pprint(ongoing_visits)
 
+    ongoing_visits = ["cm31111-1"]
+
     _enable_webbrowser_in_cygwin()
 
     log.setLevel(logging.DEBUG)
@@ -155,10 +163,6 @@ def run():
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
-
-    input_queue.put_nowait(
-        ("Would you like to register a new data collection?", ["y", "n"])
-    )
 
     # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
 
@@ -176,36 +180,25 @@ def run():
 
     status_bar = StatusBar()
     source_watcher = murfey.client.watchdir.DirWatcher(
-        args.source, settling_time=60, status_bar=status_bar
+        args.source, settling_time=10, status_bar=status_bar
     )
-
-    if args.destination:
-        rsync_process = murfey.client.rsync.RSyncer(
-            args.source, basepath_remote=Path(args.destination), server_url=murfey_url
-        )
-
-        def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
-            if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
-                log.info(
-                    f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
-                )
-            else:
-                log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-                rsync_process.enqueue(update.file_path)
-
-        rsync_process.subscribe(rsync_result)
-        rsync_process.start()
-        source_watcher.subscribe(rsync_process.enqueue)
-    else:
-        log.error("No destination set, no files will be transferred")
 
     main_loop_thread = Thread(target=main_loop, args=[source_watcher], daemon=True)
     main_loop_thread.start()
+
+    instance_environment = MurfeyInstanceEnvironment(
+        source=Path(args.source),
+        watcher=source_watcher,
+        default_destination=args.destination,
+        murfey_url=murfey_url,
+        demo=args.demo,
+    )
 
     rich_handler.redirect = True
     MurfeyTUI.run(
         log="textual.log",
         log_verbosity=2,
+        environment=instance_environment,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
@@ -216,8 +209,8 @@ def run():
         main_loop_thread.join()
     except KeyboardInterrupt:
         log.info("Encountered CTRL+C")
-        if args.destination:
-            rsync_process.stop()
+        # if args.destination:
+        #     rsync_process.stop()
         ws.close()
         log.info("Client stopped")
 
