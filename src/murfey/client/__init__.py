@@ -72,8 +72,10 @@ def _check_for_updates(
         print(f"Murfey update check failed with {e}")
 
 
-def _get_visit_list(api_base: ParseResult):
-    get_visits_url = api_base._replace(path="/visits_raw")
+def _get_visit_list(api_base: ParseResult, demo: bool = False):
+    get_visits_url = api_base._replace(
+        path="/demo/visits_raw" if demo else "/visits_raw"
+    )
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
@@ -143,10 +145,9 @@ def run():
     from pprint import pprint
 
     print("Ongoing visits:")
-    ongoing_visits = _get_visit_list(murfey_url)
+    ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
     pprint(ongoing_visits)
-
-    ongoing_visits = ["cm31111-1"]
+    ongoing_visits = [v.name for v in ongoing_visits]
 
     _enable_webbrowser_in_cygwin()
 

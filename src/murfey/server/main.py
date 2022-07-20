@@ -93,6 +93,12 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
         )
 
 
+@app.get("/demo/visits_raw", response_model=List[murfey.util.models.Visit])
+def get_current_visits_demo(db=murfey.server.ispyb.DB):
+    microscope = "m12"
+    return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
+
+
 @app.get("/visits_raw", response_model=List[murfey.util.models.Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
