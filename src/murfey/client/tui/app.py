@@ -48,6 +48,7 @@ class InputResponse(NamedTuple):
     default: str = ""
     callback: Callable | None = None
     kwargs: dict | None = None
+    form: dict | None = None
 
 
 class Hover(Widget):
@@ -142,12 +143,15 @@ class InputBox(Widget):
     def __init__(self, app, queue: Queue | None = None):
         self._app_reference = app
         self._queue: Queue = queue or Queue()
+        self._form: dict = {}
         super().__init__()
 
     def render(self) -> Panel:
         if not self._queue.empty() and not self.prompt and not self.input_text:
             msg = self._queue.get_nowait()
             self.input_text = ""
+            if msg.form:
+                self._form = msg.form
             if msg.allowed_responses:
                 self.prompt = QuickPrompt(msg.question, msg.allowed_responses)
             else:
@@ -160,6 +164,10 @@ class InputBox(Widget):
                 f"{self.prompt}: [[red]{'/'.join(self.prompt)}[/red]] {self.input_text}"
                 if self.prompt.warn
                 else f"{self.prompt}: [[white]{'/'.join(self.prompt)}[/white]] {self.input_text}"
+            )
+        elif self._form:
+            panel_msg = f"{self.input_text}\n" + "\n".join(
+                f"{key}: {value}" for key, value in self._form.items()
             )
         else:
             panel_msg = f"[white]❯[/white] {self.input_text}"
@@ -319,6 +327,12 @@ class MurfeyTUI(App):
             InputResponse(
                 question="Would you like to register a new data collection?",
                 allowed_responses=["y", "n"],
+            )
+        )
+        self._queues["input"].put_nowait(
+            InputResponse(
+                question="Processing parameters: ",
+                form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
             )
         )
         self.log_book = LogBook(self._queues["logs"])
