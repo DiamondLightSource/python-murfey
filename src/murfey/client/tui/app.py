@@ -139,12 +139,19 @@ class InputBox(Widget):
     lock: bool = True
     current_callback: Callable | None = None
     _question: str = ""
+    _form: Reactive[dict] = Reactive({})
 
     def __init__(self, app, queue: Queue | None = None):
         self._app_reference = app
         self._queue: Queue = queue or Queue()
-        self._form: dict = {}
+        # self._form: dict = {}
+        self._line = 0
+        self._form_keys: List[str] = []
         super().__init__()
+
+    @property
+    def _num_lines(self):
+        return len(self._form.keys())
 
     def render(self) -> Panel:
         if not self._queue.empty() and not self.prompt and not self.input_text:
@@ -168,8 +175,9 @@ class InputBox(Widget):
                 else f"{self.prompt}: [[white]{'/'.join(self.prompt)}[/white]] {self.input_text}"
             )
         elif self._form:
+            self._form_keys = list(self._form.keys())
             panel_msg = f"{self.input_text}\n" + "\n".join(
-                f"[cyan]{key}[/cyan]: {value}" for key, value in self._form.items()
+                f"[cyan]{key}[/cyan]: {self._form[key]}" for key in self._form_keys
             )
         else:
             panel_msg = f"[white]❯[/white] {self.input_text}"
@@ -199,14 +207,43 @@ class InputBox(Widget):
             await self._app_reference.set_focus(None)
 
     async def on_key(self, key: events.Key) -> None:
-        if key.key == Keys.ControlH and self.input_text != self._question:
-            self.input_text = self.input_text[:-1]
+        if key.key == Keys.ControlH and (
+            self.input_text != self._question or self._line
+        ):
+            if self._line == 0:
+                self.input_text = self.input_text[:-1]
+            else:
+                k = self._form_keys[self._line - 1]
+                # set self._form rather than accessing by key in order to make use of reactivity
+                self._form = {
+                    _k: str(self._form[_k])[:-1] if _k == k else self._form[_k]
+                    for _k in self._form_keys
+                }
             key.stop()
         elif key.key == Keys.Delete:
+            self._form = {}
             self.input_text = ""
             key.stop()
+        elif key.key == Keys.Down:
+            new_line = self._line + 1
+            if new_line <= self._num_lines:
+                self._line = new_line
+            key.stop()
+        elif key.key == Keys.Up:
+            new_line = self._line - 1
+            if new_line >= 0:
+                self._line = new_line
+            key.stop()
         elif key.key in string.printable:
-            self.input_text += key.key
+            if self._line == 0:
+                self.input_text += key.key
+            else:
+                k = self._form_keys[self._line - 1]
+                # set self._form rather than accessing by key in order to make use of reactivity
+                self._form = {
+                    _k: str(self._form[_k]) + key.key if _k == k else self._form[_k]
+                    for _k in self._form_keys
+                }
             key.stop()
         elif key.key == Keys.Enter and self.prompt:
             if self.input_text not in self.prompt and isinstance(
@@ -231,6 +268,7 @@ class InputBox(Widget):
             self.input_text = ""
             if self._form:
                 self._form = {}
+                self._form_keys = []
             key.stop()
 
 
