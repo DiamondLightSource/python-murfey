@@ -426,6 +426,15 @@ class MurfeyTUI(App):
         )
         requests.post(url, json=json)
 
+    def _data_collection_form(self, response: str):
+        if response == "y":
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Data collection parameters: ",
+                    form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+                )
+            )
+
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
@@ -438,12 +447,12 @@ class MurfeyTUI(App):
                 callback=self._set_request_destination,
             )
         )
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question="Processing parameters: ",
-                form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
-            )
-        )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Processing parameters: ",
+        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+        #     )
+        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (
