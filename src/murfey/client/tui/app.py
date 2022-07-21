@@ -154,6 +154,8 @@ class InputBox(Widget):
                 self._form = msg.form
             if msg.allowed_responses:
                 self.prompt = QuickPrompt(msg.question, msg.allowed_responses)
+                if msg.callback:
+                    self.current_callback = msg.callback
             else:
                 self._question = msg.question
                 self.input_text = msg.question + msg.default
@@ -167,7 +169,7 @@ class InputBox(Widget):
             )
         elif self._form:
             panel_msg = f"{self.input_text}\n" + "\n".join(
-                f"{key}: {value}" for key, value in self._form.items()
+                f"[cyan]{key}[/cyan]: {value}" for key, value in self._form.items()
             )
         else:
             panel_msg = f"[white]❯[/white] {self.input_text}"
@@ -213,14 +215,22 @@ class InputBox(Widget):
                 self.prompt.warn = True
             else:
                 self.prompt = None
+                if self.current_callback:
+                    self.current_callback(
+                        self.input_text.replace(self._question, "", 1)
+                    )
+                    self.current_callback = None
                 self.input_text = ""
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
             self.current_callback(self.input_text.replace(self._question, "", 1))
+            self.current_callback = None
             self.input_text = ""
             key.stop()
         elif key.key == Keys.Enter:
             self.input_text = ""
+            if self._form:
+                self._form = {}
             key.stop()
 
 
@@ -311,6 +321,15 @@ class MurfeyTUI(App):
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
 
+    def _data_collection_form(self, response: str):
+        if response == "y":
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Data collection parameters: ",
+                    form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+                )
+            )
+
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
@@ -327,14 +346,15 @@ class MurfeyTUI(App):
             InputResponse(
                 question="Would you like to register a new data collection?",
                 allowed_responses=["y", "n"],
+                callback=self._data_collection_form,
             )
         )
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question="Processing parameters: ",
-                form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
-            )
-        )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Processing parameters: ",
+        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+        #     )
+        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (
