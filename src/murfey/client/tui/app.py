@@ -438,6 +438,12 @@ class MurfeyTUI(App):
                 callback=self._set_request_destination,
             )
         )
+        self._queues["input"].put_nowait(
+            InputResponse(
+                question="Processing parameters: ",
+                form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+            )
+        )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (
