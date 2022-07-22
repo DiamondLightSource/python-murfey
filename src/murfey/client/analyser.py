@@ -6,6 +6,7 @@ import threading
 from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
+from murfey.client.rsync import RSyncerUpdate
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
