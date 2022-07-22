@@ -155,6 +155,23 @@ def visit_info(request: Request, visit_name: str, db=murfey.server.ispyb.DB):
         return None
 
 
+class ContextInfo(BaseModel):
+    experiment_type: str
+    acquisition_software: str
+
+
+@app.post("/visits/{visit_name}/context")
+async def register_context(context_info: ContextInfo):
+    log.info(
+        f"Context {context_info.experiment_type}:{context_info.acquisition_software} registered"
+    )
+    await ws.manager.broadcast(f"Context registered: {context_info}")
+    await ws.manager.set_state("experiment_type", context_info.experiment_type)
+    await ws.manager.set_state(
+        "acquisition_software", context_info.acquisition_software
+    )
+
+
 class File(BaseModel):
     name: str
     description: str

@@ -22,6 +22,7 @@ from textual.widget import Widget
 from textual.widgets import ScrollView
 
 import murfey.client.rsync as rsync
+from murfey.client.analyser import Analyser
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.status_bar import StatusBar
@@ -313,6 +314,7 @@ class MurfeyTUI(App):
     hover: List[str]
     visits: List[str]
     rsync_process: RSyncer | None = None
+    analyser: Analyser | None = None
 
     def __init__(
         self,
@@ -358,6 +360,9 @@ class MurfeyTUI(App):
             self.rsync_process.start()
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
+            self.analyser = Analyser()
+            self.rsync_process.subscribe(self.analyser.enqueue)
+            self.analyser.start()
 
     def _data_collection_form(self, response: str):
         if response == "y":

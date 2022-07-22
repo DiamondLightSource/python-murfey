@@ -7,17 +7,27 @@ from typing import Dict, List
 logger = logging.getLogger("murfey.client.context")
 
 
+def detect_acquisition_software(dir_for_transfer: Path) -> str:
+    glob = dir_for_transfer.glob("*")
+    for f in glob:
+        if f.name.startswith("EPU") or f.name.startswith("GridSquare"):
+            return "epu"
+        if f.name.startswith("Position") or f.suffix == ".mdoc":
+            return "tomo"
+    return ""
+
+
 class Context:
     def __init__(self, acquisition_software: str):
         self._acquisition_software = acquisition_software
 
-    def post_transfer(self, transferred_file: Path):
+    def post_transfer(self, transferred_file: Path, role: str = ""):
         raise NotImplementedError(
             f"post_transfer hook must be declared in derived class to be used: {self}"
         )
 
-    def post_first_transfer(self, transferred_file: Path):
-        self.post_transfer(transferred_file)
+    def post_first_transfer(self, transferred_file: Path, role: str = ""):
+        self.post_transfer(transferred_file, role=role)
 
     def gather_metadata(self):
         raise NotImplementedError(
@@ -26,7 +36,7 @@ class Context:
 
 
 class SPAContext(Context):
-    def post_transfer(self, transferred_file: Path):
+    def post_transfer(self, transferred_file: Path, role: str = ""):
         pass
 
 
@@ -79,8 +89,8 @@ class TomographyContext(Context):
         self._last_transferred_file = file_path
         return []
 
-    def post_transfer(self, transferred_file: Path) -> List[str]:
+    def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
         completed_tilts = []
-        if self._acquisition_software == "tomo":
+        if self._acquisition_software == "tomo" and role == "detector":
             completed_tilts = self._add_tomo_tilt(transferred_file)
         return completed_tilts
