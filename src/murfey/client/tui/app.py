@@ -120,13 +120,13 @@ class HoverVisit(Widget):
                         callback=self.app._start_rsyncer,
                     )
                 )
-                self.app._queues["input"].put_nowait(
-                    InputResponse(
-                        question="Would you like to register a new data collection?",
-                        allowed_responses=["y", "n"],
-                        callback=self.app._set_register_dc,
-                    )
-                )
+                # self.app._queues["input"].put_nowait(
+                #     InputResponse(
+                #         question="Would you like to register a new data collection?",
+                #         allowed_responses=["y", "n"],
+                #         callback=self.app._set_register_dc,
+                #     )
+                # )
 
 
 class QuickPrompt:
@@ -355,6 +355,12 @@ class MurfeyTUI(App):
         self._register_dc: bool | None = None
         self._tmp_responses: List[dict] = []
 
+    @property
+    def role(self) -> str:
+        if self.analyser:
+            return self.analyser._role
+        return ""
+
     def _start_rsyncer(self, destination: str):
         self.rsync_process = rsync.RSyncer(
             self._source,
@@ -401,16 +407,28 @@ class MurfeyTUI(App):
             self._register_dc = True
             for r in self._tmp_responses:
                 self._queues["input"].put_nowait(
-                    InputResponse(question="Data collection parameters:", form=r)
+                    InputResponse(
+                        question="Data collection parameters:", form=r.get("form", {})
+                    )
                 )
         elif response == "n":
             self._register_dc = False
         self._tmp_responses = []
 
     def _data_collection_form(self, response: dict):
-        if self._register_dc:
+        if self._register_dc and response.get("form"):
             self._queues["input"].put_nowait(
-                InputResponse(question="Data collection parameters:", form=response)
+                InputResponse(
+                    question="Data collection parameters:", form=response["form"]
+                )
+            )
+        elif self._register_dc and response.get("allowed_responses"):
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Would you like to start a data collection?",
+                    allowed_responses=response["allowed_responses"],
+                    callback=self.app._set_register_dc,
+                )
             )
         elif self._register_dc is None:
             self._tmp_responses.append(response)

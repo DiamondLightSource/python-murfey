@@ -62,18 +62,23 @@ class Analyser(Observer):
                     # self.queue.put(None)
                 else:
                     self._context.post_first_transfer(transferred_file, role=self._role)
-                    dc_metadata = self._context.gather_metadata(
-                        transferred_file.with_suffix(".xml")
-                    )
-                    self.notify(dc_metadata)
+                    if self._role == "detector":
+                        self.notify({"allowed_responses": ["y", "n"]})
+                        dc_metadata = self._context.gather_metadata(
+                            transferred_file.with_suffix(".xml")
+                        )
+                        self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(transferred_file, role=self._role)
-                if len(self._context._tilt_series.keys()) > len(_tilt_series):
+                if (
+                    len(self._context._tilt_series.keys()) > len(_tilt_series)
+                    and self._role == "detector"
+                ):
                     dc_metadata = self._context.gather_metadata(
                         transferred_file.with_suffix(".xml")
                     )
-                    self.notify(dc_metadata)
+                    self.notify({"form": dc_metadata})
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
