@@ -435,6 +435,10 @@ class MurfeyTUI(App):
                 )
             )
 
+    def _set_request_destination(self, response: str):
+        if response == "y":
+            self._request_destinations = True
+
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
