@@ -353,6 +353,12 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
+    @property
+    def role(self) -> str:
+        if self.analyser:
+            return self.analyser._role
+        return ""
+
     def _start_rsyncer(self, destination: str):
         self.rsync_process = RSyncer(
             self._source,
@@ -438,9 +444,19 @@ class MurfeyTUI(App):
         self._tmp_responses = []
 
     def _data_collection_form(self, response: dict):
-        if self._register_dc:
+        if self._register_dc and response.get("form"):
             self._queues["input"].put_nowait(
-                InputResponse(question="Data collection parameters:", form=response)
+                InputResponse(
+                    question="Data collection parameters:", form=response["form"]
+                )
+            )
+        elif self._register_dc and response.get("allowed_responses"):
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Would you like to start a data collection?",
+                    allowed_responses=response["allowed_responses"],
+                    callback=self.app._set_register_dc,
+                )
             )
         elif self._register_dc is None:
             self._tmp_responses.append(response)
