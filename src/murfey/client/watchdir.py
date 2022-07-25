@@ -72,7 +72,12 @@ class DirWatcher(murfey.util.Observer):
                                 f"File {Path(x).name!r} is ready to be transferred"
                             )
                             if self._statusbar:
-                                self._statusbar.transferred[1] += 1
+                                log.info("Increasing number to be transferred")
+                                with self._statusbar.lock:
+                                    self._statusbar.transferred = [
+                                        self._statusbar.transferred[0],
+                                        self._statusbar.transferred[1] + 1,
+                                    ]
                             self.notify(Path(x))
                             del self._file_candidates[x]
                             continue

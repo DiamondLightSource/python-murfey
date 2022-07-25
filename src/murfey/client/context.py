@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List
 
+import xmltodict
+
 logger = logging.getLogger("murfey.client.context")
 
 
@@ -29,7 +31,7 @@ class Context:
     def post_first_transfer(self, transferred_file: Path, role: str = ""):
         self.post_transfer(transferred_file, role=role)
 
-    def gather_metadata(self):
+    def gather_metadata(self, metadata_file: Path):
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
@@ -91,6 +93,28 @@ class TomographyContext(Context):
 
     def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
         completed_tilts = []
-        if self._acquisition_software == "tomo" and role == "detector":
-            completed_tilts = self._add_tomo_tilt(transferred_file)
+        if self._acquisition_software == "tomo":
+            if role == "detector":
+                completed_tilts = self._add_tomo_tilt(transferred_file)
         return completed_tilts
+
+    def gather_metadata(self, metadata_file: Path) -> dict:
+        if metadata_file.suffix != ".xml":
+            raise ValueError(
+                f"Tomography gather_metadata method expected xml file not {metadata_file.name}"
+            )
+        if not metadata_file.is_file():
+            logger.warning(f"Metadata file {metadata_file} not found")
+            return {}
+        with open(metadata_file, "r") as xml:
+            for_parsing = xml.read()
+            data = xmltodict.parse(for_parsing)
+        metadata: dict = {}
+        metadata["experiment_type"] = "tomography"
+        metadata["voltage"] = 300
+        metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
+        metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"]["Height"]
+        metadata["pixel_size_on_image"] = (
+            float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]) / 10
+        )
+        return metadata

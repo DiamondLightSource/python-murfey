@@ -124,7 +124,7 @@ class HoverVisit(Widget):
                     InputResponse(
                         question="Would you like to register a new data collection?",
                         allowed_responses=["y", "n"],
-                        callback=self.app._data_collection_form,
+                        callback=self.app._set_register_dc,
                     )
                 )
 
@@ -352,6 +352,8 @@ class MurfeyTUI(App):
         self._queues = queues or {}
         self._statusbar = status_bar or StatusBar()
         self._request_destinations = False
+        self._register_dc: bool | None = None
+        self._tmp_responses: List[dict] = []
 
     def _start_rsyncer(self, destination: str):
         self.rsync_process = rsync.RSyncer(
@@ -359,6 +361,7 @@ class MurfeyTUI(App):
             basepath_remote=Path(destination),
             server_url=self._url,
             local=self._environment.demo,
+            status_bar=self._statusbar,
         )
 
         def rsync_result(update: rsync.RSyncerUpdate):
@@ -375,20 +378,42 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
+            self.analyser = Analyser()
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
-            self.analyser = Analyser()
-            self.rsync_process.subscribe(self.analyser.enqueue)
+                self._watcher.subscribe(self.analyser.enqueue)
+            # self.analyser = Analyser()
+            # self.rsync_process.subscribe(self.analyser.enqueue)
+            self.analyser.subscribe(self._data_collection_form)
             self.analyser.start()
 
-    def _data_collection_form(self, response: str):
+    # def _data_collection_form(self, response: str):
+    #     if response == "y":
+    #         self._queues["input"].put_nowait(
+    #             InputResponse(
+    #                 question="Data collection parameters: ",
+    #                 form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+    #             )
+    #         )
+
+    def _set_register_dc(self, response: str):
         if response == "y":
-            self._queues["input"].put_nowait(
-                InputResponse(
-                    question="Data collection parameters: ",
-                    form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+            self._register_dc = True
+            for r in self._tmp_responses:
+                self._queues["input"].put_nowait(
+                    InputResponse(question="Data collection parameters:", form=r)
                 )
+        elif response == "n":
+            self._register_dc = False
+        self._tmp_responses = []
+
+    def _data_collection_form(self, response: dict):
+        if self._register_dc:
+            self._queues["input"].put_nowait(
+                InputResponse(question="Data collection parameters:", form=response)
             )
+        elif self._register_dc is None:
+            self._tmp_responses.append(response)
 
     def _set_request_destination(self, response: str):
         if response == "y":
@@ -455,11 +480,13 @@ class MurfeyTUI(App):
         grid.place(
             area1=sub_view,
             area2=self.log_book,
-            area3=self._statusbar,
+            # area3=self._statusbar,
             area4=self.input_box,
         )
 
     async def action_quit(self) -> None:
         if self.rsync_process:
             self.rsync_process.stop()
+        if self.analyser:
+            self.analyser.stop()
         await self.shutdown()

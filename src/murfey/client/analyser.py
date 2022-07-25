@@ -6,7 +6,6 @@ import threading
 from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
-from murfey.client.rsync import RSyncerUpdate
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -31,7 +30,13 @@ class Analyser(Observer):
         if split_file_name:
             if split_file_name[0] == "Position":
                 self._context = TomographyContext("tomo")
-                self._role = "detector"
+                if split_file_name[-1].startswith("Fractions"):
+                    self._role = "detector"
+                elif (
+                    file_path.suffix == ".mdoc"
+                    or file_path.with_suffix(".mdoc").is_file()
+                ):
+                    self._role = "microscope"
                 return True
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
@@ -45,22 +50,33 @@ class Analyser(Observer):
             transferred_file = self.queue.get()
             logger.info(f"Analysing transferred file {transferred_file}")
             if not transferred_file:
-                return
+                self._halt_thread = True
+                continue
             if not self._experiment_type or not self._acquisition_software:
                 found = self._find_context(transferred_file)
                 if not found:
                     logger.warning(
                         f"Context not understood for {transferred_file}, stopping analysis"
                     )
-                    self.stop()
+                    continue
+                    # self.queue.put(None)
                 else:
                     self._context.post_first_transfer(transferred_file, role=self._role)
+                    dc_metadata = self._context.gather_metadata(
+                        transferred_file.with_suffix(".xml")
+                    )
+                    self.notify(dc_metadata)
             else:
+                _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(transferred_file, role=self._role)
+                if len(self._context._tilt_series.keys()) > len(_tilt_series):
+                    dc_metadata = self._context.gather_metadata(
+                        transferred_file.with_suffix(".xml")
+                    )
+                    self.notify(dc_metadata)
 
-    def enqueue(self, update: RSyncerUpdate):
+    def enqueue(self, file_path: Path):
         if not self._stopping:
-            file_path = Path(update.file_path)
             self.queue.put(file_path)
 
     def start(self):
@@ -75,7 +91,10 @@ class Analyser(Observer):
         logger.debug("Analyser thread stop requested")
         self._stopping = True
         self._halt_thread = True
-        if self.thread.is_alive():
-            self.queue.put(None)
-            self.thread.join()
+        try:
+            if self.thread.is_alive():
+                # self.queue.put(None)
+                self.thread.join()
+        except Exception as e:
+            logger.debug(f"Exception encountered while stopping analyser: {e}")
         logger.debug("Analyser thread stop completed")
