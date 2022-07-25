@@ -351,6 +351,7 @@ class MurfeyTUI(App):
         self.visits = visits or []
         self._queues = queues or {}
         self._statusbar = status_bar or StatusBar()
+        self._request_destinations = False
 
     def _start_rsyncer(self, destination: str):
         self.rsync_process = rsync.RSyncer(
@@ -389,11 +390,22 @@ class MurfeyTUI(App):
                 )
             )
 
+    def _set_request_destination(self, response: str):
+        if response == "y":
+            self._request_destinations = True
+
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
+        self._queues["input"].put_nowait(
+            InputResponse(
+                question="Would you like to be asked for a destination for every new directory?",
+                allowed_responses=["y", "n"],
+                callback=self._set_request_destination,
+            )
+        )
         # self._queues["input"].put_nowait(
         #     InputResponse(
         #         question="Transfer to: ",
