@@ -111,6 +111,22 @@ class HoverVisit(Widget):
                     if isinstance(h, HoverVisit) and h != self:
                         h.lock = False
                 self.app.input_box.lock = False
+                self.app._queues["input"].put_nowait(
+                    InputResponse(
+                        question="Transfer to: ",
+                        default=self.app._default_destination + f"/{self._text}"
+                        if self.app._default_destination
+                        else "unknown",
+                        callback=self.app._start_rsyncer,
+                    )
+                )
+                self.app._queues["input"].put_nowait(
+                    InputResponse(
+                        question="Would you like to register a new data collection?",
+                        allowed_responses=["y", "n"],
+                        callback=self.app._data_collection_form,
+                    )
+                )
 
 
 class QuickPrompt:
@@ -378,20 +394,20 @@ class MurfeyTUI(App):
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question="Transfer to: ",
-                default=self._default_destination or "unknown",
-                callback=self._start_rsyncer,
-            )
-        )
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question="Would you like to register a new data collection?",
-                allowed_responses=["y", "n"],
-                callback=self._data_collection_form,
-            )
-        )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Transfer to: ",
+        #         default=self._default_destination or "unknown",
+        #         callback=self._start_rsyncer,
+        #     )
+        # )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Would you like to register a new data collection?",
+        #         allowed_responses=["y", "n"],
+        #         callback=self._data_collection_form,
+        #     )
+        # )
         # self._queues["input"].put_nowait(
         #     InputResponse(
         #         question="Processing parameters: ",
