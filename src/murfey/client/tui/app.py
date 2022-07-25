@@ -428,12 +428,22 @@ class MurfeyTUI(App):
 
     def _data_collection_form(self, response: str):
         if response == "y":
-            self._queues["input"].put_nowait(
-                InputResponse(
-                    question="Data collection parameters: ",
-                    form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+            self._register_dc = True
+            for r in self._tmp_responses:
+                self._queues["input"].put_nowait(
+                    InputResponse(question="Data collection parameters:", form=r)
                 )
+        elif response == "n":
+            self._register_dc = False
+        self._tmp_responses = []
+
+    def _data_collection_form(self, response: dict):
+        if self._register_dc:
+            self._queues["input"].put_nowait(
+                InputResponse(question="Data collection parameters:", form=response)
             )
+        elif self._register_dc is None:
+            self._tmp_responses.append(response)
 
     def _set_request_destination(self, response: str):
         if response == "y":
