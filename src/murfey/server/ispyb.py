@@ -73,31 +73,17 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         .filter(
             _BLSession.proposalId == _Proposal.proposalId,
             _BLSession.beamLineName == microscope,
-            _BLSession.endDate > datetime.datetime.now(),
-            _BLSession.startDate < datetime.datetime.now(),
+            _Proposal.proposalCode == proposal_code,
+            _Proposal.proposalNumber == proposal_number,
+            _BLSession.visit_number == visit_number
         )
         .add_columns(
-            _BLSession.startDate,
-            _BLSession.endDate,
-            _BLSession.sessionId,
-            _Proposal.proposalCode,
-            _Proposal.proposalNumber,
-            _BLSession.visit_number,
-            _Proposal.title,
+            _BLSession.sessionId
         )
         .all()
     )
-    return [
-        Visit(
-            start=row.startDate,
-            end=row.endDate,
-            session_id=row.sessionId,
-            name=f"{row.proposalCode}{row.proposalNumber}-{row.visit_number}",
-            proposal_title=row.title,
-            beamline=microscope,
-        )
-        for row in query
-    ]
+    return query[0][1]
+
 
 
 def get_data_collection_group_ids(session_id):
