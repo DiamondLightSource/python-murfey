@@ -9,6 +9,7 @@ from pathlib import Path
 from queue import Queue
 from typing import Callable, Dict, List, NamedTuple, TypeVar, Union
 from urllib.parse import urlparse
+import requests
 
 import requests
 from rich.box import SQUARE
