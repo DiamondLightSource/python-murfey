@@ -9,6 +9,7 @@ from pathlib import Path
 from queue import Queue
 from typing import Callable, Dict, List, NamedTuple, TypeVar, Union
 from urllib.parse import urlparse
+import requests
 
 from rich.box import SQUARE
 from rich.logging import RichHandler
@@ -124,7 +125,7 @@ class HoverVisit(Widget):
                 #     InputResponse(
                 #         question="Would you like to register a new data collection?",
                 #         allowed_responses=["y", "n"],
-                #         callback=self.app._set_register_dc,
+                #         callback=self.app._set_register_dc(self._text),
                 #     )
                 # )
 
@@ -402,13 +403,14 @@ class MurfeyTUI(App):
     #             )
     #         )
 
-    def _set_register_dc(self, response: str):
+    def _set_register_dc(self, visit, response: str):
         if response == "y":
             self._register_dc = True
             for r in self._tmp_responses:
                 self._queues["input"].put_nowait(
                     InputResponse(
-                        question="Data collection parameters:", form=r.get("form", {})
+                        question="Data collection parameters:", form=r.get("form", {}),
+                        callback=self.app._start_dc(visit, r.get("form", {})),
                     )
                 )
         elif response == "n":
@@ -436,6 +438,9 @@ class MurfeyTUI(App):
     def _set_request_destination(self, response: str):
         if response == "y":
             self._request_destinations = True
+
+    def _start_dc(self, visit, json):
+        requests.post(f"/visits/{visit}/start_data_collection", json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
