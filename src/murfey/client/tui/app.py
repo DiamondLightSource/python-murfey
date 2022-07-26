@@ -440,7 +440,8 @@ class MurfeyTUI(App):
             self._request_destinations = True
 
     def _start_dc(self, visit, json):
-        requests.post(f"/visits/{visit}/start_data_collection", json=json)
+        print(f"Would start DC at /visits/{visit}/start_data_collection, json={json}")
+        #requests.post(f"/visits/{visit}/start_data_collection", json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
