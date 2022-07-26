@@ -270,3 +270,31 @@ def shutdown():
     log.info("Server shutdown request received")
     murfey.server.shutdown()
     return {"success": True}
+
+
+@app.get("/visits/{visit_name}/start_data_collection")
+def start_dc(visit_name, image_directory):
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split('-')[0][2:]
+    ispyb_visit_number = visit_name.split('-')[-1]
+    parameters = {
+        "image_directory": image_directory,
+        "visit": visit_name,
+        "session_id": murfey.server.ispyb.get_session_id(microscope=get_microscope(), #"m12",
+                                                    proposal_code=ispyb_proposal_code,
+                                                    proposal_number=ispyb_proposal_number,
+                                                    visit_number=ispyb_visit_number,
+                                                    db=murfey.server.ispyb.DB),
+        "start_time": str(datetime.datetime.now())
+    }
+    log.info(f"Sending Zocalo message {parameters}")
+    print(parameters)
+    #if _transport_object:
+    #    _transport_object.transport.send("processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": parameters})
+    #else:
+    #    log.error(
+    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
+    #    )
+    #    return parameters
+
+start_dc("cm31111-1", "")
