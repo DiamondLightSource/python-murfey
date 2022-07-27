@@ -53,30 +53,6 @@ class InputResponse(NamedTuple):
     form: dict | None = None
 
 
-class Hover(Widget):
-    mouse_over = Reactive(False)
-
-    def __init__(self, text: str, **kwargs):
-        super().__init__(**kwargs)
-        self._text = text
-
-    def render(self) -> Panel:
-        return Panel(
-            self._text,
-            style=("on red" if self.mouse_over else ""),
-            box=SQUARE,
-        )
-
-    def on_enter(self) -> None:
-        self.mouse_over = True
-
-    def on_leave(self) -> None:
-        self.mouse_over = False
-
-    async def on_click(self) -> None:
-        await self.app.shutdown()
-
-
 class HoverVisit(Widget):
     mouse_over = Reactive(False)
     lock: bool | None = None
@@ -89,12 +65,12 @@ class HoverVisit(Widget):
         if self.lock is None:
             return Panel(
                 self._text,
-                style=("on red" if self.mouse_over else ""),
+                style=("on blue" if self.mouse_over else ""),
                 box=SQUARE,
             )
         return Panel(
             self._text,
-            style=("on red" if self.lock else ""),
+            style=("on blue" if self.lock else ""),
             box=SQUARE,
         )
 
@@ -122,13 +98,6 @@ class HoverVisit(Widget):
                         callback=self.app._start_rsyncer,
                     )
                 )
-                # self.app._queues["input"].put_nowait(
-                #     InputResponse(
-                #         question="Would you like to register a new data collection?",
-                #         allowed_responses=["y", "n"],
-                #         callback=self.app._set_register_dc(self._text),
-                #     )
-                # )
 
 
 class QuickPrompt:
@@ -166,6 +135,7 @@ class InputBox(Widget):
         # self._form: dict = {}
         self._line = 0
         self._form_keys: List[str] = []
+        self._unanswered_message = False
         super().__init__()
 
     @property
@@ -175,6 +145,8 @@ class InputBox(Widget):
     def render(self) -> Panel:
         if not self._queue.empty() and not self.prompt and not self.input_text:
             msg = self._queue.get_nowait()
+            if msg is not None:
+                self._unanswered_message = True
             self.input_text = ""
             if msg.form:
                 self._form = msg.form
@@ -196,13 +168,24 @@ class InputBox(Widget):
         elif self._form:
             self._form_keys = list(self._form.keys())
             panel_msg = f"{self.input_text}\n" + "\n".join(
-                f"[cyan]{key}[/cyan]: {self._form[key]}" for key in self._form_keys
+                f"[cyan]{key}[/cyan]: {self._form[key]}[blink]\u275a[/blink]"
+                if i == self._line - 1
+                else f"[cyan]{key}[/cyan]: {self._form[key]}"
+                for i, key in enumerate(self._form_keys)
             )
         else:
             panel_msg = f"[white]❯[/white] {self.input_text}"
         return Panel(
             panel_msg,
-            style=("on blue" if self.mouse_over else ""),
+            style=(
+                "on blue"
+                if self.mouse_over and not self._unanswered_message
+                else "on deep_pink4"
+                if self.mouse_over and self._unanswered_message
+                else "on red"
+                if self._unanswered_message
+                else ""
+            ),
             box=SQUARE,
         )
 
@@ -277,6 +260,7 @@ class InputBox(Widget):
                     )
                     self.current_callback = None
                 self.input_text = ""
+                self._unanswered_message = False
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
             if self._form:
@@ -285,9 +269,11 @@ class InputBox(Widget):
                 self.current_callback(self.input_text.replace(self._question, "", 1))
             self.current_callback = None
             self.input_text = ""
+            self._unanswered_message = False
             key.stop()
         elif key.key == Keys.Enter:
             self.input_text = ""
+            self._unanswered_message = False
             if self._form:
                 self._form = {}
                 self._form_keys = []
@@ -327,6 +313,7 @@ class LogBook(ScrollView):
                 for nl in self._next_log:
                     self._logs.add_row(*nl[0])
             await self.update(self._logs, home=False)
+            self.page_down()
 
 
 class MurfeyTUI(App):
@@ -394,19 +381,8 @@ class MurfeyTUI(App):
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
                 self._watcher.subscribe(self.analyser.enqueue)
-            # self.analyser = Analyser()
-            # self.rsync_process.subscribe(self.analyser.enqueue)
             self.analyser.subscribe(self._data_collection_form)
             self.analyser.start()
-
-    # def _data_collection_form(self, response: str):
-    #     if response == "y":
-    #         self._queues["input"].put_nowait(
-    #             InputResponse(
-    #                 question="Data collection parameters: ",
-    #                 form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
-    #             )
-    #         )
 
     def _set_register_dc(self, response: str):
         if response == "y":
@@ -455,42 +431,22 @@ class MurfeyTUI(App):
         self.input_box = InputBox(self, queue=self._queues.get("input"))
         self._queues["input"].put_nowait(
             InputResponse(
-                question="Would you like to be asked for a destination for every new directory?",
+                question="Are you using multi-grid?",
                 allowed_responses=["y", "n"],
                 callback=self._set_request_destination,
             )
         )
-        # self._queues["input"].put_nowait(
-        #     InputResponse(
-        #         question="Transfer to: ",
-        #         default=self._default_destination or "unknown",
-        #         callback=self._start_rsyncer,
-        #     )
-        # )
-        # self._queues["input"].put_nowait(
-        #     InputResponse(
-        #         question="Would you like to register a new data collection?",
-        #         allowed_responses=["y", "n"],
-        #         callback=self._data_collection_form,
-        #     )
-        # )
-        # self._queues["input"].put_nowait(
-        #     InputResponse(
-        #         question="Processing parameters: ",
-        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
-        #     )
-        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (
             [HoverVisit(v) for v in self.visits]
             if len(self.visits)
-            else [Hover("No ongoing visits found")]
+            else [HoverVisit("No ongoing visits found")]
         )
 
         grid = await self.view.dock_grid(edge="left")
 
-        grid.add_column(fraction=2, name="left")
+        grid.add_column(fraction=1, name="left")
         grid.add_column(fraction=1, name="right")
         grid.add_row(fraction=1, name="top")
         grid.add_row(fraction=1, name="middle")

@@ -104,7 +104,7 @@ class TomographyContext(Context):
                 f"Tomography gather_metadata method expected xml file not {metadata_file.name}"
             )
         if not metadata_file.is_file():
-            logger.warning(f"Metadata file {metadata_file} not found")
+            logger.debug(f"Metadata file {metadata_file} not found")
             return {}
         with open(metadata_file, "r") as xml:
             for_parsing = xml.read()
@@ -114,7 +114,7 @@ class TomographyContext(Context):
         metadata["voltage"] = 300
         metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
         metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"]["Height"]
-        metadata["pixel_size_on_image"] = (
-            float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]) / 10
+        metadata["pixel_size_on_image"] = float(
+            data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
         )
         return metadata

@@ -28,8 +28,10 @@ class Analyser(Observer):
         self._halt_thread = False
 
     def _find_extension(self, file_path: Path):
-        logger.info(f"File extension attempt: {file_path}")
-        if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer") and not self._extension:
+        if (
+            file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
+            and not self._extension
+        ):
             logger.info(f"File extension determined: {file_path.suffix}")
             self._extension = file_path.suffix
 
@@ -60,7 +62,9 @@ class Analyser(Observer):
             if not transferred_file:
                 self._halt_thread = True
                 continue
-            if not self._context: # self._experiment_type or not self._acquisition_software:
+            if (
+                not self._context
+            ):  # self._experiment_type or not self._acquisition_software:
                 if not self._extension:
                     self._find_extension(transferred_file)
                 found = self._find_context(transferred_file)
@@ -69,11 +73,13 @@ class Analyser(Observer):
                     #     f"Context not understood for {transferred_file}, stopping analysis"
                     # )
                     continue
-                    # self.queue.put(None)
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
                     self._context.post_first_transfer(transferred_file, role=self._role)
                     if self._role == "detector":
+                        logger.debug(
+                            f"Role as detector submitting question: {transferred_file}"
+                        )
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml")
                         )
@@ -82,43 +88,35 @@ class Analyser(Observer):
                             # continue
                         else:
                             self._unseen_xml = []
-                            logger.debug(f"Role as detector submitting question: {transferred_file}")
                             self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = transferred_file.name.split("_")[1]
                             dc_metadata["file_extension"] = self._extension
-                            dc_metadata["acquisition_software"] = self._context._acquisition_software
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
                             self.notify({"form": dc_metadata})
-                # else:
-                #     logger.info(f"Context found successfully: {self._role}")
-                #     self._context.post_first_transfer(transferred_file, role=self._role)
-                #     if self._role == "detector":
-                #         logger.debug("Role as detector submitting question")
-                #         self.notify({"allowed_responses": ["y", "n"]})
-                #         dc_metadata = self._context.gather_metadata(
-                #             transferred_file.with_suffix(".xml")
-                #         )
-                #         dc_metadata["tilt"] = transferred_file.name.split("_")[1]
-                #         self.notify({"form": dc_metadata})
             elif not self._extension or self._unseen_xml:
                 self._find_extension(transferred_file)
                 if self._extension:
-                    logger.info(f"Context found successfully: {self._role}, {transferred_file}")
+                    logger.info(
+                        f"Context found successfully: {self._role}, {transferred_file}"
+                    )
                     self._context.post_first_transfer(transferred_file, role=self._role)
                     if self._role == "detector":
-                        #logger.debug("Role as detector submitting question")
+                        logger.debug("Role as detector submitting question")
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml")
                         )
                         if not dc_metadata:
                             self._unseen_xml.append(transferred_file)
-                            # continue
                         else:
                             self._unseen_xml = []
-                            logger.debug(f"Role as detector submitting question: {transferred_file}")
                             self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = transferred_file.name.split("_")[1]
                             dc_metadata["file_extension"] = self._extension
-                            dc_metadata["acquisition_software"] = self._context._acquisition_software
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
                             self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
