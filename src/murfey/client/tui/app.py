@@ -337,7 +337,7 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._source = self._environment.source or Path(".")
-        self._url = self._environment.murfey_url
+        self._url = self._environment.murfey_url.geturl()
         self._default_destination = self._environment.default_destination
         self._watcher = self._environment.watcher
         self.visits = visits or []
