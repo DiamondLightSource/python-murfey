@@ -65,7 +65,6 @@ def get_session_id(
     )
     return query[0][1]
 
-
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
     query = (
         db.query(_BLSession)
@@ -73,29 +72,10 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         .filter(
             _BLSession.proposalId == _Proposal.proposalId,
             _BLSession.beamLineName == microscope,
-            _Proposal.proposalCode == proposal_code,
-            _Proposal.proposalNumber == proposal_number,
-            _BLSession.visit_number == visit_number
-        )
-        .add_columns(
-            _BLSession.sessionId
-        )
-        .all()
-    )
-    return query[0][1]
-
-
-def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
-    query = (
-        db.query(_BLSession)
-            .join(_Proposal)
-            .filter(
-            _BLSession.proposalId == _Proposal.proposalId,
-            _BLSession.beamLineName == microscope,
             _BLSession.endDate > datetime.datetime.now(),
             _BLSession.startDate < datetime.datetime.now(),
-            )
-            .add_columns(
+        )
+        .add_columns(
             _BLSession.startDate,
             _BLSession.endDate,
             _BLSession.sessionId,
@@ -104,7 +84,7 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
             _BLSession.visit_number,
             _Proposal.title,
         )
-            .all()
+        .all()
     )
     return [
         Visit(
