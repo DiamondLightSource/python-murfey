@@ -112,6 +112,7 @@ class HoverVisit(Widget):
                     if isinstance(h, HoverVisit) and h != self:
                         h.lock = False
                 self.app.input_box.lock = False
+                self.app._visit = self._text
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
@@ -278,7 +279,10 @@ class InputBox(Widget):
                 self.input_text = ""
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
-            self.current_callback(self.input_text.replace(self._question, "", 1))
+            if self._form:
+                self.current_callback(self._form)
+            else:
+                self.current_callback(self.input_text.replace(self._question, "", 1))
             self.current_callback = None
             self.input_text = ""
             key.stop()
@@ -346,7 +350,7 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._source = self._environment.source or Path(".")
-        self._url = self._environment.murfey_url
+        self._url = self._environment.murfey_url.geturl()
         self._default_destination = self._environment.default_destination
         self._watcher = self._environment.watcher
         self.visits = visits or []
@@ -355,6 +359,7 @@ class MurfeyTUI(App):
         self._request_destinations = False
         self._register_dc: bool | None = None
         self._tmp_responses: List[dict] = []
+        self._visit = ""
 
     @property
     def role(self) -> str:
@@ -403,14 +408,14 @@ class MurfeyTUI(App):
     #             )
     #         )
 
-    def _set_register_dc(self, visit, response: str):
+    def _set_register_dc(self, response: str):
         if response == "y":
             self._register_dc = True
             for r in self._tmp_responses:
                 self._queues["input"].put_nowait(
                     InputResponse(
                         question="Data collection parameters:", form=r.get("form", {}),
-                        callback=self.app._start_dc(visit, r.get("form", {})),
+                        callback=self.app._start_dc(r.get("form", {})),
                     )
                 )
         elif response == "n":
@@ -424,12 +429,12 @@ class MurfeyTUI(App):
                     question="Data collection parameters:", form=response["form"]
                 )
             )
-        elif self._register_dc and response.get("allowed_responses"):
+        elif response.get("allowed_responses"):
             self._queues["input"].put_nowait(
                 InputResponse(
                     question="Would you like to start a data collection?",
                     allowed_responses=response["allowed_responses"],
-                    callback=self.app._set_register_dc,
+                    callback=self._set_register_dc,
                 )
             )
         elif self._register_dc is None:
@@ -439,9 +444,9 @@ class MurfeyTUI(App):
         if response == "y":
             self._request_destinations = True
 
-    def _start_dc(self, visit, json):
-        print(f"Would start DC at /visits/{visit}/start_data_collection, json={json}")
-        #requests.post(f"/visits/{visit}/start_data_collection", json=json)
+    def _start_dc(self, json):
+        url = f"{str(self._url)}/visits/{str(self._visit)}/start_data_collection"
+        requests.post(url, json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)

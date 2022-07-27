@@ -272,23 +272,42 @@ def shutdown():
     return {"success": True}
 
 
-@app.get("/visits/{visit_name}/start_data_collection")
-def start_dc(visit_name, image_directory):
+class DCParameters(BaseModel):
+    voltage: float
+    pixel_size_on_image: str
+    experiment_type: str
+    image_size_x: float
+    image_size_y: float
+    tilt: int
+    file_extension: str
+    acquisition_software: str
+
+
+@app.post("/visits/{visit_name}/start_data_collection")
+def start_dc(visit_name, dc_params: DCParameters):
+    log.warning(f"Starting DC {visit_name}")
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split('-')[0][2:]
     ispyb_visit_number = visit_name.split('-')[-1]
     parameters = {
-        "image_directory": image_directory,
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(microscope=get_microscope(), #"m12",
                                                     proposal_code=ispyb_proposal_code,
                                                     proposal_number=ispyb_proposal_number,
                                                     visit_number=ispyb_visit_number,
-                                                    db=murfey.server.ispyb.DB),
-        "start_time": str(datetime.datetime.now())
+                                                    db=murfey.server.ispyb.Session()),
+        "start_time": str(datetime.datetime.now()),
+        "voltage": dc_params.voltage,
+        "pixel_size": dc_params.pixel_size_on_image,
+        "image_suffix": dc_params.file_extension,
+        "experiment_type": dc_params.experiment_type,
+        "n_images": dc_params.tilt,
+        "image_size_x": dc_params.image_size_x,
+        "image_size_y": dc_params.image_size_y,
+        "acquisition_software": dc_params.acquisition_software
+
     }
     log.info(f"Sending Zocalo message {parameters}")
-    print(parameters)
     #if _transport_object:
     #    _transport_object.transport.send("processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": parameters})
     #else:
@@ -296,5 +315,6 @@ def start_dc(visit_name, image_directory):
     #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
     #    )
     #    return parameters
+    return dc_params
 
-start_dc("cm31111-1", "")
+

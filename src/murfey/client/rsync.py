@@ -266,7 +266,7 @@ class RSyncer(Observer):
             ],
             callback_stdout=parse_stdout,
             callback_stderr=parse_stderr,
-            working_directory=self._basepath,
+            working_directory=str(self._basepath),
             stdin=rsync_stdin,
             print_stdout=False,
             print_stderr=False,
