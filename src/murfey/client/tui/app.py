@@ -455,7 +455,7 @@ class MurfeyTUI(App):
                 InputResponse(
                     question="Would you like to start a data collection?",
                     allowed_responses=response["allowed_responses"],
-                    callback=self.app._set_register_dc,
+                    callback=self._set_register_dc,
                 )
             )
         elif self._register_dc is None:

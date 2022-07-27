@@ -131,7 +131,7 @@ class Analyser(Observer):
                     dc_metadata = self._context.gather_metadata(
                         transferred_file.with_suffix(".xml")
                     )
-                    self.notify({"form": dc_metadata})
+                    # self.notify({"form": dc_metadata})
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
