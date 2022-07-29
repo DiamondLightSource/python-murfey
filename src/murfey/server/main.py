@@ -329,4 +329,4 @@ def start_dc(visit_name, dc_params: DCParameters):
     #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
     #    )
     #    return dc_parameters
-    return dc_params
+    return dc_parameters
