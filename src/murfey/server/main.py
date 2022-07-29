@@ -287,15 +287,17 @@ class DCParameters(BaseModel):
 def start_dc(visit_name, dc_params: DCParameters):
     log.warning(f"Starting DC {visit_name}")
     ispyb_proposal_code = visit_name[:2]
-    ispyb_proposal_number = visit_name.split('-')[0][2:]
-    ispyb_visit_number = visit_name.split('-')[-1]
-    parameters = {
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    dc_parameters = {
         "visit": visit_name,
-        "session_id": murfey.server.ispyb.get_session_id(microscope=get_microscope(), #"m12",
-                                                    proposal_code=ispyb_proposal_code,
-                                                    proposal_number=ispyb_proposal_number,
-                                                    visit_number=ispyb_visit_number,
-                                                    db=murfey.server.ispyb.Session()),
+        "session_id": murfey.server.ispyb.get_session_id(
+            microscope=get_microscope(),  # "m12",
+            proposal_code=ispyb_proposal_code,
+            proposal_number=ispyb_proposal_number,
+            visit_number=ispyb_visit_number,
+            db=murfey.server.ispyb.Session(),
+        ),
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": dc_params.pixel_size_on_image,
@@ -304,17 +306,26 @@ def start_dc(visit_name, dc_params: DCParameters):
         "n_images": dc_params.tilt,
         "image_size_x": dc_params.image_size_x,
         "image_size_y": dc_params.image_size_y,
-        "acquisition_software": dc_params.acquisition_software
-
+        "acquisition_software": dc_params.acquisition_software,
     }
-    log.info(f"Sending Zocalo message {parameters}")
-    #if _transport_object:
-    #    _transport_object.transport.send("processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": parameters})
-    #else:
-    #    log.error(
-    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
-    #    )
-    #    return parameters
+
+    # tomo_parameters = {}
+    log.info(f"Sending Zocalo message {dc_parameters}")
+    if _transport_object:
+        _transport_object.transport.send(
+            "processing_recipe",
+            {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
+        )
+        _transport_object.transport.send(
+            destination="ispyb_connector",
+            message={
+                "parameters": {"ispyb_command": "insert_tomogram"},
+                "content": {"dummy": "dummy"},
+            },
+        )
+    else:
+        log.error(
+            f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
+        )
+        return dc_parameters
     return dc_params
-
-
