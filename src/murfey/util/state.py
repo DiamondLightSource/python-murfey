@@ -4,7 +4,7 @@ import asyncio
 from typing import Awaitable, Callable, Mapping, TypeVar, Union
 
 T = TypeVar("T")
-GlobalStateValues = Union[str, int, None]
+GlobalStateValues = Union[str, int, list, None]
 
 from murfey.util import Observer
 
