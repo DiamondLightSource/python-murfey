@@ -43,8 +43,8 @@ class Analyser(Observer):
                 if split_file_name[-1].startswith("Fractions"):
                     self._role = "detector"
                 elif (
-                        file_path.suffix == ".mdoc"
-                        or file_path.with_suffix(".mdoc").is_file()
+                    file_path.suffix == ".mdoc"
+                    or file_path.with_suffix(".mdoc").is_file()
                 ):
                     self._role = "microscope"
                 return True
@@ -125,8 +125,8 @@ class Analyser(Observer):
                 _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(transferred_file, role=self._role)
                 if (
-                        len(self._context._tilt_series.keys()) > len(_tilt_series)
-                        and self._role == "detector"
+                    len(self._context._tilt_series.keys()) > len(_tilt_series)
+                    and self._role == "detector"
                 ):
                     dc_metadata = self._context.gather_metadata(
                         transferred_file.with_suffix(".xml")
