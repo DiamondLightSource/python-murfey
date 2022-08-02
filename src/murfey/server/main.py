@@ -309,23 +309,22 @@ def start_dc(visit_name, dc_params: DCParameters):
         "acquisition_software": dc_params.acquisition_software,
     }
 
-    # tomo_parameters = {}
-    log.info(f"Sending Zocalo message {dc_parameters}")
-    if _transport_object:
-        _transport_object.transport.send(
-            "processing_recipe",
-            {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
-        )
-        _transport_object.transport.send(
-            destination="ispyb_connector",
-            message={
-                "parameters": {"ispyb_command": "insert_tomogram"},
-                "content": {"dummy": "dummy"},
-            },
-        )
-    else:
-        log.error(
-            f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
-        )
-        return dc_parameters
+    log.info(f"Would send Zocalo message {dc_parameters}")
+    # if _transport_object:
+    #    _transport_object.transport.send(
+    #        "processing_recipe",
+    #        {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
+    #    )
+    #    _transport_object.transport.send(
+    #        destination="ispyb_connector",
+    #        message={
+    #            "parameters": {"ispyb_command": "insert_tomogram"},
+    #            "content": {"dummy": "dummy"},
+    #        },
+    #    )
+    # else:
+    #    log.error(
+    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
+    #    )
+    #    return dc_parameters
     return dc_params
