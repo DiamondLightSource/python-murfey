@@ -80,9 +80,12 @@ class Analyser(Observer):
                         logger.debug(
                             f"Role as detector submitting question: {transferred_file}"
                         )
-                        dc_metadata = self._context.gather_metadata(
-                            transferred_file.with_suffix(".xml")
-                        )
+                        try:
+                            dc_metadata = self._context.gather_metadata(
+                                transferred_file.with_suffix(".xml")
+                            )
+                        except NotImplementedError:
+                            dc_metadata = {}
                         if not dc_metadata:
                             self._unseen_xml.append(transferred_file)
                             # continue
