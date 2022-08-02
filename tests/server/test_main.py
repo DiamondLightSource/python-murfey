@@ -14,7 +14,7 @@ def test_read_main():
 
 
 def test_get_visits():
-    response = client.get("/visits/")
+    response = client.get("/visits")
     assert response.status_code == 200
     # assert response.json()[0]["Start date"] == "2020-09-09T14:00:00"
 
