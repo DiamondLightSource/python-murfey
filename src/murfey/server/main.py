@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import lru_cache
-from typing import List
+from typing import Any, Dict, List
 
 import packaging.version
 from fastapi import FastAPI, Request
@@ -185,6 +185,19 @@ async def add_file(file: File):
     log.info(message)
     await ws.manager.broadcast(f"File {file} transferred")
     return file
+
+
+class RegistrationMessage(BaseModel):
+    registration: str
+    params: Dict[str, Any] | None = None
+
+
+@app.post("/feedback")
+async def send_murfey_message(msg: RegistrationMessage):
+    if _transport_object:
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": msg.registration}
+        )
 
 
 class ProcessFile(BaseModel):
