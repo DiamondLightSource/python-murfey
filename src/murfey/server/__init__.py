@@ -257,15 +257,22 @@ def feedback_callback(header: dict, message: dict):
             global_state["motion_corrected"] = [message["movie"]]
     elif message["register"] == "data_collection":
         record = DataCollection(imageDirectory=message["image_directory"])
+        dcid = _register(record, header)
+        global_state["data_collection_id"] = dcid
+        return
     elif message["register"] == "processing_job":
         record = ProcessingJob(
             dataCollectionId=message["data_collection_id"], recipe=message["recipe"]
         )
+        pid = _register(record, header)
+        global_state["processing_job_id"] = pid
+        return
     elif message["register"] == "auto_proc_program":
         record = AutoProcProgram(processingJobId=message["processing_job_id"])
-    if record:
-        _register(record, header)
-    elif _transport_object:
+        appid = _register(record, header)
+        global_state["autoproc_program_id"] = appid
+        return
+    if _transport_object:
         _transport_object.transport.nack(header, requeue=False)
 
 
