@@ -281,6 +281,7 @@ class DCParameters(BaseModel):
     tilt: int
     file_extension: str
     acquisition_software: str
+    image_directory: str
 
 
 @app.post("/visits/{visit_name}/start_data_collection")
@@ -298,6 +299,7 @@ def start_dc(visit_name, dc_params: DCParameters):
             visit_number=ispyb_visit_number,
             db=murfey.server.ispyb.Session(),
         ),
+        "image_directory": None,
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": dc_params.pixel_size_on_image,
@@ -310,11 +312,11 @@ def start_dc(visit_name, dc_params: DCParameters):
     }
 
     log.info(f"Would send Zocalo message {dc_parameters}")
-    # if _transport_object:
-    #    _transport_object.transport.send(
-    #        "processing_recipe",
-    #        {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
-    #    )
+    if _transport_object:
+        _transport_object.transport.send(
+            "processing_recipe",
+            {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
+        )
     #    _transport_object.transport.send(
     #        destination="ispyb_connector",
     #        message={
