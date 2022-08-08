@@ -432,7 +432,7 @@ class MurfeyTUI(App):
         )
         requests.post(url, json=json)
 
-    def _data_collection_form(self, response: str):
+    def _set_register_dc(self, response: str):
         if response == "y":
             self._register_dc = True
             for r in self._tmp_responses:
