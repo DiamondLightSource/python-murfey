@@ -8,7 +8,6 @@ import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 
-import murfey.server
 from murfey.util.models import Visit
 
 _BLSession = ispyb.sqlalchemy.BLSession
@@ -31,18 +30,6 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
 
-    def start_dc(self, message):
-        message["start_time"] = str(datetime.datetime.now())
-        visits = get_all_ongoing_visits(murfey.server.get_microscope(), Session())
-        current_visit_object = [
-            visit for visit in visits if visit.name == message["visit"]
-        ]
-        if current_visit_object:
-            message["session_id"] = current_visit_object[0].session_id
-        self.transport.send(
-            "processing_recipe", {"recipes": ["ispyb-murfey"], "parameters": message}
-        )
-
 
 def _get_session() -> sqlalchemy.orm.Session:
     db = Session()
@@ -54,6 +41,29 @@ def _get_session() -> sqlalchemy.orm.Session:
 
 DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
+
+
+def get_session_id(
+    microscope: str,
+    proposal_code: str,
+    proposal_number: str,
+    visit_number: str,
+    db: sqlalchemy.orm.Session,
+) -> list[Visit]:
+    query = (
+        db.query(_BLSession)
+        .join(_Proposal)
+        .filter(
+            _BLSession.proposalId == _Proposal.proposalId,
+            _BLSession.beamLineName == microscope,
+            _Proposal.proposalCode == proposal_code,
+            _Proposal.proposalNumber == proposal_number,
+            _BLSession.visit_number == visit_number,
+        )
+        .add_columns(_BLSession.sessionId)
+        .all()
+    )
+    return query[0][1]
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
@@ -88,13 +98,6 @@ def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[
         )
         for row in query
     ]
-
-
-def start_data_collection(db: sqlalchemy.orm.Session):
-    comment = "Test Murfey DC insert"
-    insert = _DataCollection(comments=comment)
-    db.add(insert)
-    db.commit()
 
 
 def get_data_collection_group_ids(session_id):

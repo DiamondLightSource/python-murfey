@@ -10,6 +10,7 @@ from queue import Queue
 from typing import Callable, Dict, List, NamedTuple, TypeVar, Union
 from urllib.parse import urlparse
 
+import requests
 from rich.box import SQUARE
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -87,6 +88,7 @@ class HoverVisit(Widget):
                     if isinstance(h, HoverVisit) and h != self:
                         h.lock = False
                 self.app.input_box.lock = False
+                self.app._visit = self._text
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
@@ -261,7 +263,10 @@ class InputBox(Widget):
                 self._unanswered_message = False
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
-            self.current_callback(self.input_text.replace(self._question, "", 1))
+            if self._form:
+                self.current_callback(self._form)
+            else:
+                self.current_callback(self.input_text.replace(self._question, "", 1))
             self.current_callback = None
             self.input_text = ""
             self._unanswered_message = False
@@ -341,6 +346,7 @@ class MurfeyTUI(App):
         self._request_destinations = False
         self._register_dc: bool | None = None
         self._tmp_responses: List[dict] = []
+        self._visit = ""
 
     @property
     def role(self) -> str:
@@ -384,7 +390,9 @@ class MurfeyTUI(App):
             for r in self._tmp_responses:
                 self._queues["input"].put_nowait(
                     InputResponse(
-                        question="Data collection parameters:", form=r.get("form", {})
+                        question="Data collection parameters:",
+                        form=r.get("form", {}),
+                        callback=self.app._start_dc(r.get("form", {})),
                     )
                 )
         elif response == "n":
@@ -412,6 +420,12 @@ class MurfeyTUI(App):
     def _set_request_destination(self, response: str):
         if response == "y":
             self._request_destinations = True
+
+    def _start_dc(self, json):
+        url = (
+            f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+        )
+        requests.post(url, json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
