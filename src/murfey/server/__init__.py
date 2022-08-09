@@ -246,7 +246,7 @@ def _set_up_transport(transport_type):
     _transport_object = murfey.server.ispyb.TransportManager(transport_type)
 
 
-def feedback_callback(header: dict, message: dict):
+def feedback_callback(header: dict, message: dict) -> None:
     record = None
     if message["register"] == "motion_corrected":
         if global_state.get("motion_corrected") and isinstance(
@@ -256,24 +256,31 @@ def feedback_callback(header: dict, message: dict):
         else:
             global_state["motion_corrected"] = [message["movie"]]
     elif message["register"] == "data_collection":
-        record = DataCollection(imageDirectory=message["image_directory"])
+        record = DataCollection(SESSIONID=message["session_id"])
         dcid = _register(record, header)
         global_state["data_collection_id"] = dcid
-        return
+        message["data_collection_id"] = dcid
+        message.pop("register")
+        if _transport_object:
+            _transport_object.transport.send(
+                "murfey_feedback", {"register": "processing_job", **message}
+            )
+        return None
     elif message["register"] == "processing_job":
         record = ProcessingJob(
             dataCollectionId=message["data_collection_id"], recipe=message["recipe"]
         )
         pid = _register(record, header)
         global_state["processing_job_id"] = pid
-        return
+        return None
     elif message["register"] == "auto_proc_program":
         record = AutoProcProgram(processingJobId=message["processing_job_id"])
         appid = _register(record, header)
         global_state["autoproc_program_id"] = appid
-        return
+        return None
     if _transport_object:
         _transport_object.transport.nack(header, requeue=False)
+    return None
 
 
 @singledispatch
