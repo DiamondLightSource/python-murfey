@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import packaging.version
 from fastapi import FastAPI, Request
@@ -189,7 +189,7 @@ async def add_file(file: File):
 
 class RegistrationMessage(BaseModel):
     registration: str
-    params: Dict[str, Any] | None = None
+    params: Optional[Dict[str, Any]] = None
 
 
 @app.post("/feedback")
@@ -299,14 +299,14 @@ class DCParameters(BaseModel):
 
 @app.post("/visits/{visit_name}/start_data_collection")
 def start_dc(visit_name, dc_params: DCParameters):
-    log.warning(f"Starting DC {visit_name}")
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
+    log.info(f"Starting data collection on microscope {get_microscope()}")
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),  # "m12",
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
@@ -324,22 +324,8 @@ def start_dc(visit_name, dc_params: DCParameters):
         "acquisition_software": dc_params.acquisition_software,
     }
 
-    log.info(f"Would send Zocalo message {dc_parameters}")
-    # if _transport_object:
-    #    _transport_object.transport.send(
-    #        "processing_recipe",
-    #        {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
-    #    )
-    #    _transport_object.transport.send(
-    #        destination="ispyb_connector",
-    #        message={
-    #            "parameters": {"ispyb_command": "insert_tomogram"},
-    #            "content": {"dummy": "dummy"},
-    #        },
-    #    )
-    # else:
-    #    log.error(
-    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
-    #    )
-    #    return dc_parameters
+    if _transport_object:
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "data_collection", **dc_parameters}
+        )
     return dc_parameters
