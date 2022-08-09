@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 import xmltodict
 
@@ -49,9 +49,14 @@ class TomographyContext(Context):
         self._completed_tilt_series: List[str] = []
         self._last_transferred_file: Path | None = None
 
-    def _add_tomo_tilt(self, file_path: Path) -> List[str]:
-        tilt_series = file_path.name.split("_")[1]
-        tilt_angle = file_path.name.split("[")[1].split("]")[0]
+    def _add_tilt(
+        self,
+        file_path: Path,
+        extract_tilt_series: Callable[[Path], str],
+        extract_tilt_angle: Callable[[Path], str],
+    ) -> List[str]:
+        tilt_series = extract_tilt_series(file_path)
+        tilt_angle = extract_tilt_angle(file_path)
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
@@ -62,10 +67,8 @@ class TomographyContext(Context):
         else:
             self._tilt_series[tilt_series].append(file_path)
         if self._last_transferred_file:
-            last_tilt_series = self._last_transferred_file.name.split("_")[1]
-            last_tilt_angle = self._last_transferred_file.name.split("[")[1].split("]")[
-                0
-            ]
+            last_tilt_series = extract_tilt_series(self._last_transferred_file)
+            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
                 newly_completed_series = []
@@ -90,6 +93,15 @@ class TomographyContext(Context):
                 return newly_completed_series
         self._last_transferred_file = file_path
         return []
+
+    def _add_tomo_tilt(self, file_path: Path) -> List[str]:
+        return self._add_tilt(
+            file_path,
+            lambda x: x.name.split("_")[1],
+            lambda x: x.name.split("[")[1].split("]")[0],
+        )
+
+    # def _add_serialem_tilt(self, file_path: Path) -> List[str]:
 
     def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
         completed_tilts = []
