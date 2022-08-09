@@ -38,7 +38,7 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         split_file_name = file_path.name.split("_")
         if split_file_name:
-            if split_file_name[0] == "Position":
+            if split_file_name[0] == "Position" or "[" in file_path.name:
                 self._context = TomographyContext("tomo")
                 if split_file_name[-1].startswith("Fractions"):
                     self._role = "detector"
@@ -51,6 +51,13 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
                 self._role = "detector"
+                return True
+            if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                self._context = TomographyContext("serialem")
+                if "Frames" in file_path.parts:
+                    self._role = "detector"
+                else:
+                    self._role = "microscope"
                 return True
         return False
 
