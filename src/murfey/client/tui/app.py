@@ -22,10 +22,9 @@ from textual.views import DockView
 from textual.widget import Widget
 from textual.widgets import ScrollView
 
-import murfey.client.rsync as rsync
 from murfey.client.analyser import Analyser
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.client.rsync import RSyncer
+from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.status_bar import StatusBar
 
 log = logging.getLogger("murfey.tui.app")
@@ -355,7 +354,7 @@ class MurfeyTUI(App):
         return ""
 
     def _start_rsyncer(self, destination: str):
-        self.rsync_process = rsync.RSyncer(
+        self.rsync_process = RSyncer(
             self._source,
             basepath_remote=Path(destination),
             server_url=self._url,
@@ -363,10 +362,10 @@ class MurfeyTUI(App):
             status_bar=self._statusbar,
         )
 
-        def rsync_result(update: rsync.RSyncerUpdate):
+        def rsync_result(update: RSyncerUpdate):
             if not self.rsync_process:
                 raise ValueError("TUI rsync process does not exist")
-            if update.outcome is rsync.TransferResult.SUCCESS:
+            if update.outcome is TransferResult.SUCCESS:
                 log.info(
                     f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
                 )

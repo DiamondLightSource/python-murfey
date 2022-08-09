@@ -7,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from rich.console import Console, RenderableType
-from rich.containers import Renderables
+from rich.console import Console
+from rich.containers import Renderables, RenderableType
 from rich.logging import RichHandler
 from rich.text import Text
 
@@ -41,7 +41,7 @@ class DirectableRichHandler(RichHandler):
         self._last_time = None
 
     def get_log_row(self, record, message_renderable) -> list:
-        row: List["RenderableType"] = []
+        row: List[RenderableType] = []
         renderables = [message_renderable]
         path = Path(record.pathname).name
         level = self.get_level_text(record)

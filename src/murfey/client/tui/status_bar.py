@@ -3,10 +3,8 @@ from __future__ import annotations
 import functools
 import logging
 import time
-from datetime import datetime
 from threading import RLock
 
-from rich.align import Align
 from rich.box import SQUARE
 from rich.panel import Panel
 from rich.progress import (
@@ -60,10 +58,6 @@ class StatusBar(Widget):
         # progress.update(task2, completed=max(0, min(1000, elapsed - 1000)))
         # progress.update(task3, completed=max(0, min(1000, elapsed - 2000)))
         return Panel(progress.make_tasks_table(progress.tasks), height=5, box=SQUARE)
-
-        timestamp = datetime.now().strftime("%c")
-        return Align.center(timestamp, vertical="middle")
-        return Panel("Hello [b]World[/b]", style="", height=3, box=SQUARE)
 
     def on_mount(self):
         self.start = time.time()
