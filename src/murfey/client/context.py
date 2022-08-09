@@ -133,6 +133,7 @@ class TomographyContext(Context):
             metadata["pixel_size_on_image"] = float(
                 data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
             )
+            metadata["dose_per_frame"] = None
             return metadata
         mdoc_data = mdocfile.read(metadata_file)
         mdoc_metadata: dict = {}
@@ -141,4 +142,5 @@ class TomographyContext(Context):
         mdoc_metadata["image_size_x"] = mdoc_data.iloc[0].image_size[0]
         mdoc_metadata["image_size_y"] = mdoc_data.iloc[0].image_size[1]
         mdoc_metadata["pixel_size_on_image"] = float(mdoc_data.iloc[0].pixel_spacing)
+        mdoc_metadata["dose_per_frame"] = None
         return mdoc_metadata
