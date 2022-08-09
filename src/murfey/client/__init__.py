@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import configparser
-import json
+
+# import json
 import logging
 import platform
 import shutil
@@ -10,18 +11,30 @@ import sys
 import time
 import webbrowser
 from pathlib import Path
+from queue import Queue
+
+# from multiprocessing import Process, Queue
+from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
-from rich.logging import RichHandler
 
 import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
-from murfey.client.customlogging import CustomHandler
+from murfey.client.customlogging import CustomHandler, DirectableRichHandler
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.tui.app import MurfeyTUI
+from murfey.client.tui.status_bar import StatusBar
 from murfey.util.models import Visit
+
+# from asyncio import Queue
+
+
+# from rich.prompt import Prompt
+
 
 log = logging.getLogger("murfey.client")
 
@@ -59,8 +72,10 @@ def _check_for_updates(
         print(f"Murfey update check failed with {e}")
 
 
-def _get_visit_list(api_base: ParseResult):
-    get_visits_url = api_base._replace(path="/visits_raw")
+def _get_visit_list(api_base: ParseResult, demo: bool = False):
+    get_visits_url = api_base._replace(
+        path="/demo/visits_raw" if demo else "/visits_raw"
+    )
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
@@ -95,6 +110,10 @@ def run():
         const=True,
         help="Update Murfey to the newest or to a specific version",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -126,13 +145,17 @@ def run():
     from pprint import pprint
 
     print("Ongoing visits:")
-    ongoing_visits = _get_visit_list(murfey_url)
+    ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
     pprint(ongoing_visits)
+    ongoing_visits = [v.name for v in ongoing_visits]
 
     _enable_webbrowser_in_cygwin()
 
     log.setLevel(logging.DEBUG)
-    rich_handler = RichHandler(enable_link_path=False)
+    log_queue = Queue()
+    input_queue = Queue()
+
+    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
@@ -142,59 +165,64 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    start_dc = input(
-        "Press 'D' to start a new Data Collection or press any other key to continue:"
+    # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
+
+    # if start_dc == "y":
+    #     image_directory = str(args.destination)
+    #     image_suffix = Prompt.ask("Enter the image suffix", choices=[".tiff", ".tif", ".mrc", ".eer"])
+    #     visit = str(args.visit)
+    #     dc_params = {
+    #         "type": "start_dc",
+    #         "image_directory": image_directory,
+    #         "image_suffix": image_suffix,
+    #         "visit": visit,
+    #     }
+    #     ws.send(json.dumps(dc_params))
+
+    status_bar = StatusBar()
+    source_watcher = murfey.client.watchdir.DirWatcher(
+        args.source, settling_time=10, status_bar=status_bar
     )
-    if start_dc == "D":
-        image_directory = str(args.destination)
-        image_suffix = input("Enter the image suffix: ")
-        visit = str(args.visit)
-        dc_params = {
-            "type": "start_dc",
-            "image_directory": image_directory,
-            "image_suffix": image_suffix,
-            "visit": visit,
-        }
-        ws.send(json.dumps(dc_params))
 
-    source_watcher = murfey.client.watchdir.DirWatcher(args.source, settling_time=60)
+    main_loop_thread = Thread(target=main_loop, args=[source_watcher], daemon=True)
+    main_loop_thread.start()
 
-    if args.destination:
-        rsync_process = murfey.client.rsync.RSyncer(
-            args.source, basepath_remote=Path(args.destination), server_url=murfey_url
-        )
+    instance_environment = MurfeyInstanceEnvironment(
+        source=Path(args.source),
+        watcher=source_watcher,
+        default_destination=args.destination,
+        murfey_url=murfey_url,
+        demo=args.demo,
+    )
 
-        def rsync_result(update: murfey.client.rsync.RSyncerUpdate):
-            if update.outcome is murfey.client.rsync.TransferResult.SUCCESS:
-                log.info(
-                    f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
-                )
-            else:
-                log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-                rsync_process.enqueue(update.file_path)
+    rich_handler.redirect = True
+    MurfeyTUI.run(
+        log="textual.log",
+        log_verbosity=2,
+        environment=instance_environment,
+        visits=ongoing_visits,
+        queues={"input": input_queue, "logs": log_queue},
+        status_bar=status_bar,
+    )
+    rich_handler.redirect = False
 
-        rsync_process.subscribe(rsync_result)
-        rsync_process.start()
-        source_watcher.subscribe(rsync_process.enqueue)
-    else:
-        log.error("No destination set, no files will be transferred")
+    try:
+        main_loop_thread.join()
+    except KeyboardInterrupt:
+        log.info("Encountered CTRL+C")
+        # if args.destination:
+        #     rsync_process.stop()
+        ws.close()
+        log.info("Client stopped")
 
+
+def main_loop(source_watcher: murfey.client.watchdir.DirWatcher):
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
     )
-    try:
-        while True:
-            source_watcher.scan()
-            time.sleep(15)
-            # ws.send("ohai")
-            log.debug(f"Client is running {ws}")
-    except KeyboardInterrupt:
-        log.info("Encountered CTRL+C")
-
-    if args.destination:
-        rsync_process.stop()
-    ws.close()
-    log.info("Client stopped")
+    while True:
+        source_watcher.scan()
+        time.sleep(15)
 
 
 def read_config() -> configparser.ConfigParser:

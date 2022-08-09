@@ -99,6 +99,12 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
         )
 
 
+@app.get("/demo/visits_raw", response_model=List[murfey.util.models.Visit])
+def get_current_visits_demo(db=murfey.server.ispyb.DB):
+    microscope = "m12"
+    return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
+
+
 @app.get("/visits_raw", response_model=List[murfey.util.models.Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
@@ -147,6 +153,23 @@ def visit_info(request: Request, visit_name: str, db=murfey.server.ispyb.DB):
         )
     else:
         return None
+
+
+class ContextInfo(BaseModel):
+    experiment_type: str
+    acquisition_software: str
+
+
+@app.post("/visits/{visit_name}/context")
+async def register_context(context_info: ContextInfo):
+    log.info(
+        f"Context {context_info.experiment_type}:{context_info.acquisition_software} registered"
+    )
+    await ws.manager.broadcast(f"Context registered: {context_info}")
+    await ws.manager.set_state("experiment_type", context_info.experiment_type)
+    await ws.manager.set_state(
+        "acquisition_software", context_info.acquisition_software
+    )
 
 
 class File(BaseModel):
@@ -247,3 +270,63 @@ def shutdown():
     log.info("Server shutdown request received")
     murfey.server.shutdown()
     return {"success": True}
+
+
+class DCParameters(BaseModel):
+    voltage: float
+    pixel_size_on_image: str
+    experiment_type: str
+    image_size_x: float
+    image_size_y: float
+    tilt: int
+    file_extension: str
+    acquisition_software: str
+    image_directory: str
+
+
+@app.post("/visits/{visit_name}/start_data_collection")
+def start_dc(visit_name, dc_params: DCParameters):
+    log.warning(f"Starting DC {visit_name}")
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    dc_parameters = {
+        "visit": visit_name,
+        "session_id": murfey.server.ispyb.get_session_id(
+            microscope=get_microscope(),  # "m12",
+            proposal_code=ispyb_proposal_code,
+            proposal_number=ispyb_proposal_number,
+            visit_number=ispyb_visit_number,
+            db=murfey.server.ispyb.Session(),
+        ),
+        "image_directory": None,
+        "start_time": str(datetime.datetime.now()),
+        "voltage": dc_params.voltage,
+        "pixel_size": dc_params.pixel_size_on_image,
+        "image_suffix": dc_params.file_extension,
+        "experiment_type": dc_params.experiment_type,
+        "n_images": dc_params.tilt,
+        "image_size_x": dc_params.image_size_x,
+        "image_size_y": dc_params.image_size_y,
+        "acquisition_software": dc_params.acquisition_software,
+    }
+
+    log.info(f"Would send Zocalo message {dc_parameters}")
+    # if _transport_object:
+    #    _transport_object.transport.send(
+    #        "processing_recipe",
+    #        {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
+    #    )
+    #    _transport_object.transport.send(
+    #        destination="ispyb_connector",
+    #        message={
+    #            "parameters": {"ispyb_command": "insert_tomogram"},
+    #            "content": {"dummy": "dummy"},
+    #        },
+    #    )
+    # else:
+    #    log.error(
+    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
+    #    )
+    #    return dc_parameters
+    return dc_params

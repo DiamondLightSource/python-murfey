@@ -4,29 +4,41 @@ import logging
 from pathlib import Path
 from typing import Dict, List
 
+import xmltodict
+
 logger = logging.getLogger("murfey.client.context")
+
+
+def detect_acquisition_software(dir_for_transfer: Path) -> str:
+    glob = dir_for_transfer.glob("*")
+    for f in glob:
+        if f.name.startswith("EPU") or f.name.startswith("GridSquare"):
+            return "epu"
+        if f.name.startswith("Position") or f.suffix == ".mdoc":
+            return "tomo"
+    return ""
 
 
 class Context:
     def __init__(self, acquisition_software: str):
         self._acquisition_software = acquisition_software
 
-    def post_transfer(self, transferred_file: Path):
+    def post_transfer(self, transferred_file: Path, role: str = ""):
         raise NotImplementedError(
             f"post_transfer hook must be declared in derived class to be used: {self}"
         )
 
-    def post_first_transfer(self, transferred_file: Path):
-        self.post_transfer(transferred_file)
+    def post_first_transfer(self, transferred_file: Path, role: str = ""):
+        self.post_transfer(transferred_file, role=role)
 
-    def gather_metadata(self):
+    def gather_metadata(self, metadata_file: Path):
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
 
 
 class SPAContext(Context):
-    def post_transfer(self, transferred_file: Path):
+    def post_transfer(self, transferred_file: Path, role: str = ""):
         pass
 
 
@@ -79,8 +91,30 @@ class TomographyContext(Context):
         self._last_transferred_file = file_path
         return []
 
-    def post_transfer(self, transferred_file: Path) -> List[str]:
+    def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
         completed_tilts = []
         if self._acquisition_software == "tomo":
-            completed_tilts = self._add_tomo_tilt(transferred_file)
+            if role == "detector":
+                completed_tilts = self._add_tomo_tilt(transferred_file)
         return completed_tilts
+
+    def gather_metadata(self, metadata_file: Path) -> dict:
+        if metadata_file.suffix != ".xml":
+            raise ValueError(
+                f"Tomography gather_metadata method expected xml file not {metadata_file.name}"
+            )
+        if not metadata_file.is_file():
+            logger.debug(f"Metadata file {metadata_file} not found")
+            return {}
+        with open(metadata_file, "r") as xml:
+            for_parsing = xml.read()
+            data = xmltodict.parse(for_parsing)
+        metadata: dict = {}
+        metadata["experiment_type"] = "tomography"
+        metadata["voltage"] = 300
+        metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
+        metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"]["Height"]
+        metadata["pixel_size_on_image"] = float(
+            data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+        )
+        return metadata

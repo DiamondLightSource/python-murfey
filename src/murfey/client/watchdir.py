@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple, Optional
 
 import murfey.util
+from murfey.client.tui.status_bar import StatusBar
 
 log = logging.getLogger("murfey.client.watchdir")
 
@@ -18,54 +19,78 @@ class _FileInfo(NamedTuple):
 
 
 class DirWatcher(murfey.util.Observer):
-    def __init__(self, path: str | os.PathLike, settling_time: float = 60):
+    def __init__(
+        self,
+        path: str | os.PathLike,
+        settling_time: float = 60,
+        status_bar: StatusBar | None = None,
+    ):
         super().__init__()
         self._basepath = os.fspath(path)
         self._lastscan: dict[str, _FileInfo] | None = {}
         self._file_candidates: dict[str, _FileInfo] = {}
+        self._statusbar = status_bar
         self.settling_time = settling_time
 
     def __repr__(self) -> str:
         return f"<DirWatcher ({self._basepath})>"
 
     def scan(self):
-        t_start = time.perf_counter()
-        filelist = self._scan_directory()
-        t_scan = time.perf_counter() - t_start
-        log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
-        scan_completion = time.time()
+        try:
+            t_start = time.perf_counter()
+            filelist = self._scan_directory()
+            t_scan = time.perf_counter() - t_start
+            log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
+            scan_completion = time.time()
 
-        for entry, entry_info in filelist.items():
-            if entry_info != self._lastscan.get(entry):
-                self._file_candidates[entry] = entry_info._replace(
-                    settling_time=scan_completion
-                )
+            for entry, entry_info in filelist.items():
+                if entry_info != self._lastscan.get(entry):
+                    self._file_candidates[entry] = entry_info._replace(
+                        settling_time=scan_completion
+                    )
 
-        for x in sorted(self._file_candidates):
-            if x not in filelist:
-                log.info(f"Previously seen file {x!r} has disappeared")
-                del self._file_candidates[x]
-                continue
-
-            if (
-                self._file_candidates[x].settling_time + self.settling_time
-                < time.time()
-            ):
-                file_stat = os.stat(x)
-                if (
-                    file_stat.st_size == self._file_candidates[x].size
-                    and file_stat.st_mtime <= self._file_candidates[x].modification_time
-                    and file_stat.st_ctime <= self._file_candidates[x].modification_time
-                ):
-                    log.debug(f"File {x!r} is ready to be transferred")
-                    self.notify(Path(x))
+            for x in sorted(self._file_candidates):
+                if x not in filelist:
+                    log.info(f"Previously seen file {x!r} has disappeared")
                     del self._file_candidates[x]
                     continue
 
-            if x not in self._lastscan:
-                log.debug(f"Found file {x!r} for future transfer")
+                if (
+                    self._file_candidates[x].settling_time + self.settling_time
+                    < time.time()
+                ):
+                    try:
+                        file_stat = os.stat(x)
+                        if (
+                            file_stat.st_size == self._file_candidates[x].size
+                            and file_stat.st_mtime
+                            <= self._file_candidates[x].modification_time
+                            and file_stat.st_ctime
+                            <= self._file_candidates[x].modification_time
+                        ):
+                            log.debug(
+                                f"File {Path(x).name!r} is ready to be transferred"
+                            )
+                            if self._statusbar:
+                                log.info("Increasing number to be transferred")
+                                with self._statusbar.lock:
+                                    self._statusbar.transferred = [
+                                        self._statusbar.transferred[0],
+                                        self._statusbar.transferred[1] + 1,
+                                    ]
+                            self.notify(Path(x))
+                            del self._file_candidates[x]
+                            continue
+                    except Exception as e:
+                        log.error(f"Exception encountered: {e}", exc_info=True)
+                        return
 
-        self._lastscan = filelist
+                if x not in self._lastscan:
+                    log.debug(f"Found file {Path(x).name!r} for future transfer")
+
+            self._lastscan = filelist
+        except Exception as e:
+            log.error(f"Exception encountered: {e}")
 
     def _scan_directory(self, path: str = "") -> dict[str, _FileInfo]:
         result: dict[str, _FileInfo] = {}
@@ -91,7 +116,7 @@ class DirWatcher(murfey.util.Observer):
                     # between the scandir and the stat call.
                     # In this case we can just ignore the file.
                     continue
-                result[entry_name] = _FileInfo(
+                result[str(Path(self._basepath) / path / entry_name)] = _FileInfo(
                     size=file_stat.st_size,
                     modification_time=max(file_stat.st_mtime, file_stat.st_ctime),
                 )

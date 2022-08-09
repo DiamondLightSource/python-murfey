@@ -8,7 +8,6 @@ from typing import Any, Dict, Generic, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from murfey.server import _transport_object
 from murfey.util.state import State, global_state
 
 T = TypeVar("T")
@@ -68,10 +67,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                 if json_data["type"] == "log":  # and isinstance(json_data, dict)
                     json_data.pop("type")
                     await forward_log(json_data, websocket)
-                elif json_data["type"] == "start_dc":
-                    json_data.pop("type")
-                    assert _transport_object is not None
-                    await _transport_object.start_dc(json_data)
+            #                elif json_data["type"] == "start_dc":
+            #                    json_data.pop("type")
+            #                    assert _transport_object is not None
+            #                    await _transport_object.start_dc(json_data)
             except Exception:
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:

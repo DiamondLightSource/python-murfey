@@ -7,11 +7,12 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 from urllib.parse import ParseResult
 
 import procrunner
 
+from murfey.client.tui.status_bar import StatusBar
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.rsync")
@@ -39,6 +40,7 @@ class RSyncerUpdate(NamedTuple):
     outcome: TransferResult
     transfer_total: int
     queue_size: int
+    base_path: Path | None = None
 
 
 class RSyncer(Observer):
@@ -47,22 +49,29 @@ class RSyncer(Observer):
         basepath_local: Path,
         basepath_remote: Path,
         server_url: ParseResult,
+        local: bool = False,
+        status_bar: StatusBar | None = None,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
-        self._remote = f"{server_url.hostname}::{basepath_remote}"
+        if local:
+            self._remote = str(basepath_remote)
+        else:
+            self._remote = f"{server_url.hostname}::{basepath_remote}"
         # For local tests you can use something along the lines of
         # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
         # to avoid having to set up an rsync daemon
         self._files_transferred = 0
         self._bytes_transferred = 0
 
-        self.queue = queue.Queue[Optional[Path]]()
+        # self.queue = queue.Queue[Optional[Path]]()
+        self.queue: queue.Queue[Path | None] = queue.Queue()
         self.thread = threading.Thread(
             name=f"RSync {self._basepath}:{self._remote}", target=self._process
         )
         self._stopping = False
         self._halt_thread = False
+        self._statusbar = status_bar
 
     def __repr__(self) -> str:
         return f"<RSyncer {self._basepath} → {self._remote} ({self.status})"
@@ -196,7 +205,7 @@ class RSyncer(Observer):
                 # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
                 return
 
-            if line.startswith((".f", "<f")):
+            if line.startswith((".f", ">f")):
                 # .d          ./
                 # .f          README.md
                 # .f          tests/util/__pycache__/test_state.cpython-39-pytest-6.2.5.pyc
@@ -204,6 +213,13 @@ class RSyncer(Observer):
                 assert next_file is None, f"Invalid state {line=}, {next_file=}"
 
                 self._files_transferred += 1
+                if self._statusbar:
+                    logger.debug("Incrementing number of transferred files")
+                    with self._statusbar.lock:
+                        self._statusbar.transferred = [
+                            self._statusbar.transferred[0] + 1,
+                            self._statusbar.transferred[1],
+                        ]
                 current_outstanding = self.queue.unfinished_tasks - (
                     self._files_transferred - previously_transferred
                 )
@@ -250,7 +266,7 @@ class RSyncer(Observer):
             ],
             callback_stdout=parse_stdout,
             callback_stderr=parse_stderr,
-            working_directory=self._basepath,
+            working_directory=str(self._basepath),
             stdin=rsync_stdin,
             print_stdout=False,
             print_stderr=False,
@@ -268,6 +284,7 @@ class RSyncer(Observer):
                 outcome=TransferResult.FAILURE,
                 transfer_total=self._files_transferred,
                 queue_size=current_outstanding,
+                base_path=self._basepath,
             )
             self.notify(update)
             success = False
