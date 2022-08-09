@@ -18,6 +18,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     Base,
     DataCollection,
     ProcessingJob,
+    ProcessingJobParameter,
 )
 from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
@@ -272,6 +273,11 @@ def feedback_callback(header: dict, message: dict) -> None:
         )
         pid = _register(record, header)
         global_state["processing_job_id"] = pid
+        for k, v in message["processing_job_parameters"].items():
+            params_record = ProcessingJobParameter(
+                processingJobId=pid, parameterKey=k, parameterValue=v
+            )
+            _register(params_record, header)
         return None
     elif message["register"] == "auto_proc_program":
         record = AutoProcProgram(processingJobId=message["processing_job_id"])
