@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Callable, Dict, List
 
+import mdocfile
 import xmltodict
 
 logger = logging.getLogger("murfey.client.context")
@@ -111,22 +112,33 @@ class TomographyContext(Context):
         return completed_tilts
 
     def gather_metadata(self, metadata_file: Path) -> dict:
-        if metadata_file.suffix != ".xml":
+        if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
-                f"Tomography gather_metadata method expected xml file not {metadata_file.name}"
+                f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
         if not metadata_file.is_file():
             logger.debug(f"Metadata file {metadata_file} not found")
             return {}
-        with open(metadata_file, "r") as xml:
-            for_parsing = xml.read()
-            data = xmltodict.parse(for_parsing)
-        metadata: dict = {}
-        metadata["experiment_type"] = "tomography"
-        metadata["voltage"] = 300
-        metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
-        metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"]["Height"]
-        metadata["pixel_size_on_image"] = float(
-            data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
-        )
-        return metadata
+        if metadata_file.suffix == ".xml":
+            with open(metadata_file, "r") as xml:
+                for_parsing = xml.read()
+                data = xmltodict.parse(for_parsing)
+            metadata: dict = {}
+            metadata["experiment_type"] = "tomography"
+            metadata["voltage"] = 300
+            metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
+            metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
+                "Height"
+            ]
+            metadata["pixel_size_on_image"] = float(
+                data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+            )
+            return metadata
+        mdoc_data = mdocfile.read(metadata_file)
+        mdoc_metadata: dict = {}
+        mdoc_metadata["experiment_type"] = "tomography"
+        mdoc_metadata["voltage"] = mdoc_data.iloc[0].voltage
+        mdoc_metadata["image_size_x"] = mdoc_data.iloc[0].image_size[0]
+        mdoc_metadata["image_size_y"] = mdoc_data.iloc[0].image_size[1]
+        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data.iloc[0].pixel_spacing)
+        return mdoc_metadata
