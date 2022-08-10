@@ -263,14 +263,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             experimentType=message["experiment_type"],
         )
         dcgid = _register(record, header)
-        if global_state.get("data_collection_group_id") and isinstance(
-            global_state["data_collection_group_id"], dict
-        ):
-            global_state["data_collection_group_id"][
-                message["data_collection_group_tag"]
-            ] = dcgid
-        else:
-            global_state["data_collection_group_id"] = {message["tag"]: dcgid}
+        global_state["data_collection_group_id"] = dcgid
     elif message["register"] == "data_collection":
         record = DataCollection(
             SESSIONID=message["session_id"],
@@ -278,12 +271,15 @@ def feedback_callback(header: dict, message: dict) -> None:
             imageDirectory=message["image_dirctory"],
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
-            dataCollectionGroupId=message["data_collection_group_id"][
-                message["data_collection_group_tag"]
-            ],
+            dataCollectionGroupId=global_state.get("data_collection_group_id"),
         )
         dcid = _register(record, header)
-        global_state["data_collection_id"] = dcid
+        if global_state.get("data_collection_id") and isinstance(
+            global_state["data_collection_id"], dict
+        ):
+            global_state["data_collection_id"][message["tag"]] = dcid
+        else:
+            global_state["data_collection_id"] = {message["tag"]: dcid}
         message["data_collection_id"] = dcid
         message.pop("register")
         if _transport_object:

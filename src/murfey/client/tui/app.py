@@ -23,6 +23,7 @@ from textual.widget import Widget
 from textual.widgets import ScrollView
 
 from murfey.client.analyser import Analyser
+from murfey.client.context import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.status_bar import StatusBar
@@ -421,10 +422,12 @@ class MurfeyTUI(App):
             self._request_destinations = True
 
     def _start_dc(self, json):
-        url = (
-            f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-        )
-        requests.post(url, json=json)
+        if isinstance(self.analyser._context, TomographyContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            dcg_data = {"experiment_type": "tomo"}
+            requests.post(url, json=dcg_data)
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            requests.post(url, json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
