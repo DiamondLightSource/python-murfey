@@ -102,13 +102,37 @@ class TomographyContext(Context):
             lambda x: x.name.split("[")[1].split("]")[0],
         )
 
-    # def _add_serialem_tilt(self, file_path: Path) -> List[str]:
+    def _add_serialem_tilt(self, file_path: Path) -> List[str]:
+        delimiters = ("_", "-")
+        for d in delimiters:
+            if file_path.name.count(d) > 1:
+                delimiter = d
+                break
+        else:
+            delimiter = delimiters[0]
+
+        def _extract_tilt_series(p: Path) -> str:
+            split = p.name.split(delimiter)
+            for s in split:
+                if s.isdigit():
+                    return s
+            raise ValueError(
+                f"No digits found in {p.name} after splitting on {delimiter}"
+            )
+
+        return self._add_tilt(
+            file_path,
+            _extract_tilt_series,
+            lambda x: x.name.split(delimiter)[-1].split(".")[0],
+        )
 
     def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
         completed_tilts = []
-        if self._acquisition_software == "tomo":
-            if role == "detector":
+        if role == "detector":
+            if self._acquisition_software == "tomo":
                 completed_tilts = self._add_tomo_tilt(transferred_file)
+            elif self._acquisition_software == "serialem":
+                completed_tilts = self._add_serialem_tilt(transferred_file)
         return completed_tilts
 
     def gather_metadata(self, metadata_file: Path) -> dict:
