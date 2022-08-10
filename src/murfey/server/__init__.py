@@ -26,7 +26,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.ispyb
-from murfey.server.ispyb import DB
+
+# from murfey.server.ispyb import DB
 from murfey.util.state import global_state
 
 try:
@@ -268,7 +269,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
-            imageDirectory=message["image_dirctory"],
+            imageDirectory=message["image_directory"],
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
@@ -322,9 +323,10 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        DB.add(record)
-        DB.commit()
-        _transport_object.transport.ack(header)
+        # DB.add(record)
+        # DB.commit()
+        _transport_object.transport.ack(header, requeue=False)
+        return 1
         return getattr(record, record.__table__.primary_key.columns[0].name)
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)

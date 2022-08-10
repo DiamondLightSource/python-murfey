@@ -188,12 +188,14 @@ def run():
     main_loop_thread.start()
 
     instance_environment = MurfeyInstanceEnvironment(
+        murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
         default_destination=args.destination,
-        murfey_url=murfey_url,
         demo=args.demo,
     )
+
+    ws.environment = instance_environment
 
     rich_handler.redirect = True
     MurfeyTUI.run(
