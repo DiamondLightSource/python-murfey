@@ -285,6 +285,11 @@ def shutdown():
     return {"success": True}
 
 
+class DCGroupParameters(BaseModel):
+    experiment_type: str
+    tag: str
+
+
 class DCParameters(BaseModel):
     voltage: float
     pixel_size_on_image: str
@@ -295,6 +300,33 @@ class DCParameters(BaseModel):
     file_extension: str
     acquisition_software: str
     image_directory: str
+    data_collection_group_tag: str
+
+
+@app.post("/visits/{visit_name}/register_data_collection_group")
+def register_dc_group(visit_name, dcg_params: DCGroupParameters):
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    log.info(f"Registering data collection group on microscope {get_microscope()}")
+    dcg_parameters = {
+        "session_id": murfey.server.ispyb.get_session_id(
+            microscope=get_microscope(),
+            proposal_code=ispyb_proposal_code,
+            proposal_number=ispyb_proposal_number,
+            visit_number=ispyb_visit_number,
+            db=murfey.server.ispyb.Session(),
+        ),
+        "start_time": str(datetime.datetime.now()),
+        "experiment_type": dcg_params.experiment_type,
+        "tag": dcg_params.tag,
+    }
+
+    if _transport_object:
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+        )
+    return dcg_params
 
 
 @app.post("/visits/{visit_name}/start_data_collection")
@@ -312,7 +344,7 @@ def start_dc(visit_name, dc_params: DCParameters):
             visit_number=ispyb_visit_number,
             db=murfey.server.ispyb.Session(),
         ),
-        "image_directory": None,
+        "image_directory": dc_params.image_directory,
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": dc_params.pixel_size_on_image,
@@ -328,4 +360,4 @@ def start_dc(visit_name, dc_params: DCParameters):
         _transport_object.transport.send(
             "murfey_feedback", {"register": "data_collection", **dc_parameters}
         )
-    return dc_parameters
+    return dc_params

@@ -270,9 +270,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 message["data_collection_group_tag"]
             ] = dcgid
         else:
-            global_state["data_collection_group_id"] = {
-                message["data_collection_group_tag"]: dcgid
-            }
+            global_state["data_collection_group_id"] = {message["tag"]: dcgid}
     elif message["register"] == "data_collection":
         record = DataCollection(
             SESSIONID=message["session_id"],
