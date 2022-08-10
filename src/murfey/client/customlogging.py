@@ -7,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from rich.console import Console
-from rich.containers import Renderables, RenderableType
+from rich.console import Console, RenderableType
+from rich.containers import Renderables
 from rich.logging import RichHandler
 from rich.text import Text
 

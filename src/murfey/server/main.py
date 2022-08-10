@@ -206,15 +206,21 @@ class ProcessFile(BaseModel):
     size: int
     timestamp: float
     processing_job: int
+    data_collection_id: int
+    image_number: int
+    mc_uuid: int
+    autoproc_program_id: int
+    pixel_size: float
 
 
-@app.post("/visits/{visit_name}/common_preprocess")
-async def request_common_preprocessing(proc_file: ProcessFile):
+@app.post("/visits/{visit_name}/tomography_preprocess")
+async def request_tomography_preprocessing(proc_file: ProcessFile):
     zocalo_message = {
-        "recipes": ["em_common_preprocess"],
+        "recipes": ["em_tomo_preprocess"],
         "parameters": {
             "ispyb_process": proc_file.processing_job,
             "movie": proc_file.name,
+            # "mrc_out":
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
@@ -310,7 +316,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
     dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),
+            microscope="m12",  # get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
@@ -318,7 +324,6 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
         ),
         "start_time": str(datetime.datetime.now()),
         "experiment_type": dcg_params.experiment_type,
-        "tag": dcg_params.tag,
     }
 
     if _transport_object:
@@ -337,7 +342,7 @@ def start_dc(visit_name, dc_params: DCParameters):
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),
+            microscope="m12",  # get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,

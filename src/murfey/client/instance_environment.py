@@ -1,15 +1,46 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import Callable, Dict, List
 from urllib.parse import ParseResult
 
 from murfey.client.watchdir import DirWatcher
 
 
-class MurfeyInstanceEnvironment(NamedTuple):
-    murfey_url: ParseResult
-    source: Path | None = None
-    default_destination: str = ""
-    watcher: DirWatcher | None = None
-    demo: bool = False
+class MurfeyInstanceEnvironment:
+    # murfey_url: ParseResult
+    # source: Path | None = None
+    # default_destination: str = ""
+    # watcher: DirWatcher | None = None
+    # demo: bool = False
+    # data_collection_group_id: int | None = None
+    # visit: str = ""
+    # processing_jobs: dict[str, int] = {}
+
+    def __init__(
+        self,
+        murfey_url: ParseResult,
+        source: Path | None = None,
+        default_destination: str = "",
+        watcher: DirWatcher | None = None,
+        demo: bool = False,
+        data_collection_group_id: int | None = None,
+        visit: str = "",
+    ):
+        self.murfey_url = murfey_url
+        self.source = source
+        self.default_destination = default_destination
+        self.watcher = watcher
+        self.demo = demo
+        self.data_collection_group_id = data_collection_group_id
+        self.visit = visit
+        self._listeners: List[Callable] = []
+        self._processing_jobs: Dict[str, int] = {}
+
+    def subscribe(self, callback: Callable):
+        self._listeners.append(callback)
+
+    def new_processing_id(self, pid: int, tag: str):
+        self._processing_jobs[tag] = pid
+        for l in self._listeners:
+            l(tag)

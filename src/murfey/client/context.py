@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 import mdocfile
+import requests
 import xmltodict
+
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -50,11 +53,15 @@ class TomographyContext(Context):
         self._completed_tilt_series: List[str] = []
         self._last_transferred_file: Path | None = None
 
+    def _check_tilt(self, tilt_series: int):
+        logger.debug(f"Check for tilt series {tilt_series} for peocessing request")
+
     def _add_tilt(
         self,
         file_path: Path,
         extract_tilt_series: Callable[[Path], str],
         extract_tilt_angle: Callable[[Path], str],
+        environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         tilt_series = extract_tilt_series(file_path)
         tilt_angle = extract_tilt_angle(file_path)
@@ -65,6 +72,25 @@ class TomographyContext(Context):
             self._completed_tilt_series.remove(tilt_series)
         if not self._tilt_series.get(tilt_series):
             self._tilt_series[tilt_series] = [file_path]
+            logger.debug(f"Environment is ok: {environment}")
+            try:
+                if environment:
+                    url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    data = {
+                        "voltage": 300.0,
+                        "pixel_size_on_image": 1,
+                        "experiment_type": "tomography",
+                        "image_size_x": 4026,
+                        "image_size_y": 4026,
+                        "tilt": tilt_series,
+                        "file_extension": file_path.suffix,
+                        "acquisition_software": self._acquisition_software,
+                        "image_directory": str(file_path.parent),
+                        "tag": tilt_series,
+                    }
+                    requests.post(url, json=data)
+            except Exception as e:
+                logger.error(e)
         else:
             self._tilt_series[tilt_series].append(file_path)
         if self._last_transferred_file:
@@ -95,14 +121,19 @@ class TomographyContext(Context):
         self._last_transferred_file = file_path
         return []
 
-    def _add_tomo_tilt(self, file_path: Path) -> List[str]:
+    def _add_tomo_tilt(
+        self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
+    ) -> List[str]:
         return self._add_tilt(
             file_path,
             lambda x: x.name.split("_")[1],
             lambda x: x.name.split("[")[1].split("]")[0],
+            environment=environment,
         )
 
-    def _add_serialem_tilt(self, file_path: Path) -> List[str]:
+    def _add_serialem_tilt(
+        self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
+    ) -> List[str]:
         delimiters = ("_", "-")
         for d in delimiters:
             if file_path.name.count(d) > 1:
@@ -124,16 +155,36 @@ class TomographyContext(Context):
             file_path,
             _extract_tilt_series,
             lambda x: x.name.split(delimiter)[-1].split(".")[0],
+            environment=environment,
         )
 
-    def post_transfer(self, transferred_file: Path, role: str = "") -> List[str]:
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+    ) -> List[str]:
+        data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if role == "detector":
+        if role == "detector" and transferred_file.suffix in data_suffixes:
+            logger.debug(f"Perform post transfer with environment {environment}")
             if self._acquisition_software == "tomo":
-                completed_tilts = self._add_tomo_tilt(transferred_file)
+                completed_tilts = self._add_tomo_tilt(
+                    transferred_file, environment=environment
+                )
             elif self._acquisition_software == "serialem":
-                completed_tilts = self._add_serialem_tilt(transferred_file)
+                completed_tilts = self._add_serialem_tilt(
+                    transferred_file, environment=environment
+                )
         return completed_tilts
+
+    def post_first_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+    ):
+        self.post_transfer(transferred_file, role=role, environment=environment)
 
     def gather_metadata(self, metadata_file: Path) -> dict:
         if metadata_file.suffix not in (".mdoc", ".xml"):

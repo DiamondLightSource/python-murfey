@@ -6,23 +6,25 @@ import threading
 from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
 
 
 class Analyser(Observer):
-    def __init__(self):
+    def __init__(self, environment: MurfeyInstanceEnvironment | None = None):
         super().__init__()
         self._experiment_type = ""
         self._acquisition_software = ""
         self._role = ""
         self._extension: str = ""
-        self._unseen_xml = []
+        self._unseen_xml: list = []
         self._context: Context | None = None
-        self._batch_store = {}
+        self._batch_store: dict = {}
+        self._environment = environment
 
-        self.queue = queue.Queue()
+        self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
         self._stopping = False
         self._halt_thread = False
@@ -82,7 +84,9 @@ class Analyser(Observer):
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
-                    self._context.post_first_transfer(transferred_file, role=self._role)
+                    self._context.post_first_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
                     if self._role == "detector":
                         logger.debug(
                             f"Role as detector submitting question: {transferred_file}"
@@ -113,7 +117,9 @@ class Analyser(Observer):
                     logger.info(
                         f"Context found successfully: {self._role}, {transferred_file}"
                     )
-                    self._context.post_first_transfer(transferred_file, role=self._role)
+                    self._context.post_first_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
                     if self._role == "detector":
                         logger.debug("Role as detector submitting question")
                         dc_metadata = self._context.gather_metadata(
@@ -132,7 +138,12 @@ class Analyser(Observer):
                             self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
-                self._context.post_transfer(transferred_file, role=self._role)
+                logger.debug(
+                    f"Requsting post transfer action with enviornment {self._environment}"
+                )
+                self._context.post_transfer(
+                    transferred_file, role=self._role, environment=self._environment
+                )
                 if (
                     len(self._context._tilt_series.keys()) > len(_tilt_series)
                     and self._role == "detector"

@@ -23,7 +23,7 @@ from textual.widget import Widget
 from textual.widgets import ScrollView
 
 from murfey.client.analyser import Analyser
-from murfey.client.context import TomographyContext
+from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.status_bar import StatusBar
@@ -89,6 +89,7 @@ class HoverVisit(Widget):
                         h.lock = False
                 self.app.input_box.lock = False
                 self.app._visit = self._text
+                self.app._environment.visit = self._text
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
@@ -347,6 +348,7 @@ class MurfeyTUI(App):
         self._register_dc: bool | None = None
         self._tmp_responses: List[dict] = []
         self._visit = ""
+        self._dc_metadata: dict = {}
 
     @property
     def role(self) -> str:
@@ -377,7 +379,7 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
-            self.analyser = Analyser()
+            self.analyser = Analyser(environment=self._environment)
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
                 self._watcher.subscribe(self.analyser.enqueue)
@@ -395,6 +397,7 @@ class MurfeyTUI(App):
                         callback=self.app._start_dc(r.get("form", {})),
                     )
                 )
+                self._dc_metadata = r.get("form", {})
         elif response == "n":
             self._register_dc = False
         self._tmp_responses = []
@@ -425,6 +428,10 @@ class MurfeyTUI(App):
         if isinstance(self.analyser._context, TomographyContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo"}
+            requests.post(url, json=dcg_data)
+        elif isinstance(self.analyser._context, SPAContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            dcg_data = {"experiment_type": "single particle"}
             requests.post(url, json=dcg_data)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             requests.post(url, json=json)
