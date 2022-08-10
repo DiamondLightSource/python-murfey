@@ -17,6 +17,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
     Base,
     DataCollection,
+    DataCollectionGroup,
     ProcessingJob,
     ProcessingJobParameter,
 )
@@ -256,8 +257,33 @@ def feedback_callback(header: dict, message: dict) -> None:
             global_state["motion_corrected"].append(message["movie"])
         else:
             global_state["motion_corrected"] = [message["movie"]]
+    elif message["register"] == "data_collection_group":
+        record = DataCollectionGroup(
+            sessionId=message["session_id"],
+            experimentType=message["experiment_type"],
+        )
+        dcgid = _register(record, header)
+        if global_state.get("data_collection_group_id") and isinstance(
+            global_state["data_collection_group_id"], dict
+        ):
+            global_state["data_collection_group_id"][
+                message["data_collection_group_tag"]
+            ] = dcgid
+        else:
+            global_state["data_collection_group_id"] = {
+                message["data_collection_group_tag"]: dcgid
+            }
     elif message["register"] == "data_collection":
-        record = DataCollection(SESSIONID=message["session_id"])
+        record = DataCollection(
+            SESSIONID=message["session_id"],
+            experimenttype=message["experiment_type"],
+            imageDirectory=message["image_dirctory"],
+            imageSuffix=message["image_suffix"],
+            voltage=message["voltage"],
+            dataCollectionGroupId=message["data_collection_group_id"][
+                message["data_collection_group_tag"]
+            ],
+        )
         dcid = _register(record, header)
         global_state["data_collection_id"] = dcid
         message["data_collection_id"] = dcid
