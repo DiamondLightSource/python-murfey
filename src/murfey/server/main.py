@@ -287,7 +287,6 @@ def shutdown():
 
 class DCGroupParameters(BaseModel):
     experiment_type: str
-    tag: str
 
 
 class DCParameters(BaseModel):
@@ -300,7 +299,7 @@ class DCParameters(BaseModel):
     file_extension: str
     acquisition_software: str
     image_directory: str
-    data_collection_group_tag: str
+    tag: str
 
 
 @app.post("/visits/{visit_name}/register_data_collection_group")
