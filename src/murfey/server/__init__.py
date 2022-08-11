@@ -258,14 +258,22 @@ def feedback_callback(header: dict, message: dict) -> None:
             global_state["motion_corrected"].append(message["movie"])
         else:
             global_state["motion_corrected"] = [message["movie"]]
+        return None
     elif message["register"] == "data_collection_group":
         record = DataCollectionGroup(
             sessionId=message["session_id"],
             experimentType=message["experiment_type"],
         )
         dcgid = _register(record, header)
+        if dcgid is None:
+            _transport_object.transport.nack(header)
+            return None
         global_state["data_collection_group_id"] = dcgid
+        _transport_object.transport.ack(header)
+        return None
     elif message["register"] == "data_collection":
+        # txn = _transport_object.transport.transaction_begin(subscription_id=header["subscription"])
+        logger.debug(f"Registering data collection proper: {message.get('tag')}")
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
@@ -275,35 +283,44 @@ def feedback_callback(header: dict, message: dict) -> None:
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
         )
         dcid = _register(record, header)
+        if dcid is None:
+            _transport_object.transport.nack(header)
+            return None
+        logger.debug(f"registered: {message.get('tag')}")
         if global_state.get("data_collection_id") and isinstance(
             global_state["data_collection_id"], dict
         ):
-            global_state["data_collection_id"][message["tag"]] = dcid
+            global_state["data_collection_id"] = {
+                **global_state["data_collection_id"],
+                message.get("tag"): dcid,
+            }
         else:
-            global_state["data_collection_id"] = {message["tag"]: dcid}
-        message["data_collection_id"] = dcid
-        message.pop("register")
+            global_state["data_collection_id"] = {message.get("tag"): dcid}
         if _transport_object:
-            _transport_object.transport.send(
-                "murfey_feedback", {"register": "processing_job", **message}
-            )
+            _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
-        record = ProcessingJob(
-            dataCollectionId=message["data_collection_id"], recipe=message["recipe"]
-        )
+        _dcid = global_state["data_collection_id"][message["tag"]]
+        record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
         pid = _register(record, header)
-        global_state["processing_job_id"] = pid
-        for k, v in message["processing_job_parameters"].items():
-            params_record = ProcessingJobParameter(
-                processingJobId=pid, parameterKey=k, parameterValue=v
-            )
-            _register(params_record, header)
-        return None
-    elif message["register"] == "auto_proc_program":
-        record = AutoProcProgram(processingJobId=message["processing_job_id"])
+        if pid is None:
+            _transport_object.transport.nack(header)
+            return None
+        if global_state.get("processing_job_id"):
+            global_state["processing_job_id"][message["tag"]] = pid
+        else:
+            global_state["processing_job_id"] = {message["tag"]: pid}
+        record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
-        global_state["autoproc_program_id"] = appid
+        if appid is None:
+            _transport_object.transport.nack(header)
+            return None
+        if global_state.get("autoproc_program_id"):
+            global_state["autoproc_program_id"][message["tag"]] = appid
+        else:
+            global_state["autoproc_program_id"] = {message["tag"]: appid}
+        if _transport_object:
+            _transport_object.transport.ack(header)
         return None
     if _transport_object:
         _transport_object.transport.nack(header, requeue=False)
@@ -325,12 +342,12 @@ def _(record: Base, header: dict):
     try:
         # DB.add(record)
         # DB.commit()
-        _transport_object.transport.ack(header, requeue=False)
+        # _transport_object.transport.ack(header, requeue=False)
         return 1
         return getattr(record, record.__table__.primary_key.columns[0].name)
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
-        _transport_object.transport.nack(header)
+        # _transport_object.transport.nack(header)
         return None
     except AttributeError as e:
         logger.error(
@@ -338,7 +355,7 @@ def _(record: Base, header: dict):
             e,
             exc_info=True,
         )
-        _transport_object.transport.nack(header)
+        # _transport_object.transport.nack(header)
         return None
 
 

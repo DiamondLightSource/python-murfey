@@ -52,9 +52,26 @@ class TomographyContext(Context):
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
         self._last_transferred_file: Path | None = None
+        self._data_collection_stash: list = []
+        self._processing_job_stash: dict = {}
 
     def _check_tilt(self, tilt_series: int):
         logger.debug(f"Check for tilt series {tilt_series} for peocessing request")
+
+    def _flush_data_collections(self):
+        for dc_data in self._data_collection_stash:
+            logger.debug(f"Sending data: {dc_data[1]}")
+            requests.post(dc_data[0], json=dc_data[1])
+        self._data_collection_stash = []
+
+    def _flush_processing_job(self, tag: str):
+        logger.debug(
+            f"Flushing processing job {tag}: {self._processing_job_stash.get(tag)}"
+        )
+        if proc_data := self._processing_job_stash.get(tag):
+            for pd in proc_data:
+                requests.post(pd[0], json=pd[1])
+            self._processing_job_stash.pop(tag)
 
     def _add_tilt(
         self,
@@ -71,10 +88,11 @@ class TomographyContext(Context):
             )
             self._completed_tilt_series.remove(tilt_series)
         if not self._tilt_series.get(tilt_series):
+            logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
             logger.debug(f"Environment is ok: {environment}")
             try:
-                if environment:
+                if environment:  # and environment._processing_jobs.get(tilt_series):
                     url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "voltage": 300.0,
@@ -88,7 +106,18 @@ class TomographyContext(Context):
                         "image_directory": str(file_path.parent),
                         "tag": tilt_series,
                     }
-                    requests.post(url, json=data)
+                    if environment.data_collection_group_id is None:
+                        self._data_collection_stash.append((url, data))
+                    else:
+                        logger.debug(f"Sending data: {data}")
+                        requests.post(url, json=data)
+                    proc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    self._processing_job_stash[tilt_series] = [
+                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-preprocess"})
+                    ]
+                    self._processing_job_stash[tilt_series].append(
+                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
+                    )
             except Exception as e:
                 logger.error(e)
         else:

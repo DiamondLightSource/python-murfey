@@ -105,7 +105,10 @@ class WSApp:
             log.info(f"Interpreted data as {data!r}")
             if data.get("message") == "state-update":
                 if data["attribute"] == "data_collection_group_id" and self.environment:
-                    self.environment.data_collection_group_id = data["value"]
+                    self.environment.register_dcg(data["value"])
+                elif data["attribute"] == "data_collection_id" and self.environment:
+                    for k, v in data["value"].items():
+                        self.environment.register_dc(v, k)
         except Exception:
             pass
 

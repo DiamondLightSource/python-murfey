@@ -308,6 +308,11 @@ class DCParameters(BaseModel):
     tag: str
 
 
+class ProcessingJobParameters(BaseModel):
+    tag: str
+    recipe: str
+
+
 @app.post("/visits/{visit_name}/register_data_collection_group")
 def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     ispyb_proposal_code = visit_name[:2]
@@ -358,10 +363,29 @@ def start_dc(visit_name, dc_params: DCParameters):
         "image_size_x": dc_params.image_size_x,
         "image_size_y": dc_params.image_size_y,
         "acquisition_software": dc_params.acquisition_software,
+        "tag": dc_params.tag,
     }
 
     if _transport_object:
+        log.debug(f"Send registration message to murfey_feedback: {dc_parameters}")
         _transport_object.transport.send(
             "murfey_feedback", {"register": "data_collection", **dc_parameters}
         )
     return dc_params
+
+
+@app.post("/visits/{visit_name}/register_processing_job")
+def register_proc(visit_name, proc_params: ProcessingJobParameters):
+    proc_parameters = {
+        "recipe": proc_params.recipe,
+        "tag": proc_params.tag,
+    }
+
+    if _transport_object:
+        log.debug(
+            f"Send processing registration message to murfey_feedback: {proc_parameters}"
+        )
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "processing_job", **proc_parameters}
+        )
+    return proc_params
