@@ -102,13 +102,19 @@ class WSApp:
         log.info(f"Received message: {message!r}")
         try:
             data = json.loads(message)
-            log.info(f"Interpreted data as {data!r}")
+            # log.info(f"Interpreted data as {data!r}: {bool(self.environment)}: {data.get('message') == 'state-update'}: {data['attribute'] == 'autoproc_program_id'}")
             if data.get("message") == "state-update":
                 if data["attribute"] == "data_collection_group_id" and self.environment:
                     self.environment.register_dcg(data["value"])
                 elif data["attribute"] == "data_collection_id" and self.environment:
                     for k, v in data["value"].items():
                         self.environment.register_dc(v, k)
+                elif data["attribute"] == "processing_job_id" and self.environment:
+                    for k, v in data["value"].items():
+                        self.environment.new_processing_id(v, k)
+                elif data["attribute"] == "autoproc_program_id" and self.environment:
+                    for k, v in data["value"].items():
+                        self.environment.register_app(v, k)
         except Exception:
             pass
 

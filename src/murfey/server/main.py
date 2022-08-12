@@ -209,6 +209,7 @@ class ProcessFile(BaseModel):
     data_collection_id: int
     image_number: int
     mc_uuid: int
+    movie_uuid: int
     autoproc_program_id: int
     pixel_size: float
 
@@ -224,14 +225,14 @@ async def request_tomography_preprocessing(proc_file: ProcessFile):
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
-    if _transport_object:
-        _transport_object.transport.send("processing_recipe", zocalo_message)
-    else:
-        log.error(
-            f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
-        )
-        return proc_file
-    await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
+    # if _transport_object:
+    #     _transport_object.transport.send("processing_recipe", zocalo_message)
+    # else:
+    #     log.error(
+    #         f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
+    #     )
+    #     return proc_file
+    # await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
     return proc_file
 
 

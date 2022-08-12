@@ -7,8 +7,13 @@ from typing import Callable, Dict, List
 import mdocfile
 import requests
 import xmltodict
+from pydantic import BaseModel
 
-from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.instance_environment import (
+    MovieID,
+    MurfeyID,
+    MurfeyInstanceEnvironment,
+)
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -46,6 +51,15 @@ class SPAContext(Context):
         pass
 
 
+class ProcessFileIncomplete(BaseModel):
+    path: Path
+    image_number: int
+    movie_uuid: int
+    mc_uuid: int
+    tag: str
+    description: str = ""
+
+
 class TomographyContext(Context):
     def __init__(self, acquisition_software: str):
         super().__init__(acquisition_software)
@@ -54,6 +68,7 @@ class TomographyContext(Context):
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
+        self._preprocessing_triggers: dict = {}
 
     def _check_tilt(self, tilt_series: int):
         logger.debug(f"Check for tilt series {tilt_series} for peocessing request")
@@ -74,6 +89,41 @@ class TomographyContext(Context):
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
+    def _flush_preprocess(self, tag: str):
+        logger.debug(
+            f"Flushing preprocessing job {tag}: {self._preprocessing_triggers.get(tag)}"
+        )
+        if tr := self._preprocessing_triggers.get(tag):
+            process_file = self._complete_process_file(tr[1], tr[2])
+            if process_file:
+                requests.post(tr[0], json=process_file)
+                self._preprocessing_triggers.pop(tag)
+
+    def _complete_process_file(
+        self,
+        incomplete_process_file: ProcessFileIncomplete,
+        environment: MurfeyInstanceEnvironment,
+    ) -> dict:
+        try:
+            tag = incomplete_process_file.tag
+            return {
+                "name": str(incomplete_process_file.path),
+                "description": incomplete_process_file.description,
+                "size": incomplete_process_file.path.stat().st_size,
+                "timestamp": incomplete_process_file.path.stat().st_ctime,
+                "processing_job": environment._processing_jobs[tag],
+                "data_collection_id": environment._data_collections[tag],
+                "image_number": incomplete_process_file.image_number,
+                "pixel_size": environment._data_collection_parameters[
+                    "pixel_size_on_image"
+                ],
+                "autoproc_program_id": environment._autoproc_programs[tag],
+                "mc_uuid": incomplete_process_file.mc_uuid,
+                "movie_uuid": incomplete_process_file.movie_uuid,
+            }
+        except KeyError:
+            return {}
+
     def _add_tilt(
         self,
         file_path: Path,
@@ -81,6 +131,10 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
+        if environment:
+            environment.movie_ids[file_path] = next(MurfeyID)
+            environment.motion_correction_ids[file_path] = next(MurfeyID)
+            environment.movie_numbers[file_path] = next(MovieID)
         tilt_series = extract_tilt_series(file_path)
         tilt_angle = extract_tilt_angle(file_path)
         if tilt_series in self._completed_tilt_series:
@@ -91,7 +145,6 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
-            logger.debug(f"Environment is ok: {environment}")
             try:
                 if environment:  # and environment._processing_jobs.get(tilt_series):
                     url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
@@ -115,6 +168,26 @@ class TomographyContext(Context):
                     self._processing_job_stash[tilt_series].append(
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
                     )
+                    preproc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+                    pfi = ProcessFileIncomplete(
+                        path=file_path,
+                        image_number=environment.movie_numbers[file_path],
+                        movie_uuid=environment.movie_ids[file_path],
+                        mc_uuid=environment.motion_correction_ids[file_path],
+                        tag=tilt_series,
+                    )
+                    if (
+                        environment._autoproc_programs.get(tilt_series) is None
+                        or environment._processing_jobs.get(tilt_series) is None
+                    ):
+                        self._preprocessing_triggers[tilt_series] = (
+                            preproc_url,
+                            pfi,
+                            environment,
+                        )
+                    else:
+                        process_file = self._complete_process_file(pfi, environment)
+                        requests.post(preproc_url, json=process_file)
             except Exception as e:
                 logger.error(e)
         else:

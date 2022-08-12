@@ -272,7 +272,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
-        # txn = _transport_object.transport.transaction_begin(subscription_id=header["subscription"])
         logger.debug(f"Registering data collection proper: {message.get('tag')}")
         record = DataCollection(
             SESSIONID=message["session_id"],
@@ -300,6 +299,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
+        logger.debug(f"Registering processing job: {message.get('tag')}")
         assert isinstance(global_state["data_collection_id"], dict)
         _dcid = global_state["data_collection_id"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
@@ -309,7 +309,10 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         if global_state.get("processing_job_id"):
             assert isinstance(global_state["processing_job_id"], dict)
-            global_state["processing_job_id"][message["tag"]] = pid
+            global_state["processing_job_id"] = {
+                **global_state["processing_job_id"],
+                message.get("tag"): pid,
+            }
         else:
             global_state["processing_job_id"] = {message["tag"]: pid}
         record = AutoProcProgram(processingJobId=pid)
@@ -319,7 +322,10 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         if global_state.get("autoproc_program_id"):
             assert isinstance(global_state["autoproc_program_id"], dict)
-            global_state["autoproc_program_id"][message["tag"]] = appid
+            global_state["autoproc_program_id"] = {
+                **global_state["autoproc_program_id"],
+                message.get("tag"): appid,
+            }
         else:
             global_state["autoproc_program_id"] = {message["tag"]: appid}
         if _transport_object:

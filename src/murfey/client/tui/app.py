@@ -465,6 +465,7 @@ class MurfeyTUI(App):
                 self.analyser._context._flush_data_collections
             )
             self._environment.subscribe_dc(self.analyser._context._flush_processing_job)
+            self._environment.subscribe(self.analyser._context._flush_preprocess)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo"}
             requests.post(url, json=dcg_data)
