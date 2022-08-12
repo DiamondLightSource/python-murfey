@@ -60,8 +60,9 @@ class TomographyContext(Context):
 
     def _flush_data_collections(self):
         for dc_data in self._data_collection_stash:
-            logger.debug(f"Sending data: {dc_data[1]}")
-            requests.post(dc_data[0], json=dc_data[1])
+            data = {**dc_data[2], **dc_data[1]._data_collection_parameters}
+            logger.debug(f"Sending data: {data}")
+            requests.post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
@@ -95,11 +96,7 @@ class TomographyContext(Context):
                 if environment:  # and environment._processing_jobs.get(tilt_series):
                     url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
-                        "voltage": 300.0,
-                        "pixel_size_on_image": 1,
                         "experiment_type": "tomography",
-                        "image_size_x": 4026,
-                        "image_size_y": 4026,
                         "tilt": tilt_series,
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
@@ -107,7 +104,7 @@ class TomographyContext(Context):
                         "tag": tilt_series,
                     }
                     if environment.data_collection_group_id is None:
-                        self._data_collection_stash.append((url, data))
+                        self._data_collection_stash.append((url, environment, data))
                     else:
                         logger.debug(f"Sending data: {data}")
                         requests.post(url, json=data)

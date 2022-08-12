@@ -299,8 +299,8 @@ class DCParameters(BaseModel):
     voltage: float
     pixel_size_on_image: str
     experiment_type: str
-    image_size_x: float
-    image_size_y: float
+    image_size_x: int
+    image_size_y: int
     tilt: int
     file_extension: str
     acquisition_software: str

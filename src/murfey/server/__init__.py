@@ -19,7 +19,6 @@ from ispyb.sqlalchemy._auto_db_schema import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
-    ProcessingJobParameter,
 )
 from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
@@ -265,11 +264,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             experimentType=message["experiment_type"],
         )
         dcgid = _register(record, header)
-        if dcgid is None:
-            _transport_object.transport.nack(header)
-            return None
-        global_state["data_collection_group_id"] = dcgid
-        _transport_object.transport.ack(header)
+        if _transport_object:
+            if dcgid is None:
+                _transport_object.transport.nack(header)
+                return None
+            global_state["data_collection_group_id"] = dcgid
+            _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
         # txn = _transport_object.transport.transaction_begin(subscription_id=header["subscription"])
@@ -283,7 +283,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
         )
         dcid = _register(record, header)
-        if dcid is None:
+        if dcid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
         logger.debug(f"registered: {message.get('tag')}")
@@ -300,22 +300,25 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
+        assert isinstance(global_state["data_collection_id"], dict)
         _dcid = global_state["data_collection_id"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
         pid = _register(record, header)
-        if pid is None:
+        if pid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
         if global_state.get("processing_job_id"):
+            assert isinstance(global_state["processing_job_id"], dict)
             global_state["processing_job_id"][message["tag"]] = pid
         else:
             global_state["processing_job_id"] = {message["tag"]: pid}
         record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
-        if appid is None:
+        if appid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
         if global_state.get("autoproc_program_id"):
+            assert isinstance(global_state["autoproc_program_id"], dict)
             global_state["autoproc_program_id"][message["tag"]] = appid
         else:
             global_state["autoproc_program_id"] = {message["tag"]: appid}

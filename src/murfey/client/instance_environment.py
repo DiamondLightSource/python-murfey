@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 from urllib.parse import ParseResult
 
 from murfey.client.watchdir import DirWatcher
@@ -39,6 +39,7 @@ class MurfeyInstanceEnvironment:
         self._dc_listeners: List[Callable] = []
         self._processing_jobs: Dict[str, int] = {}
         self._data_collections: Dict[str, int] = {}
+        self._data_collection_parameters: Dict[str, Any] = {}
 
     def subscribe(self, callback: Callable):
         self._listeners.append(callback)
