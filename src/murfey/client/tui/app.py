@@ -461,11 +461,20 @@ class MurfeyTUI(App):
     def _start_dc(self, json):
         self._environment._data_collection_parameters = json
         if isinstance(self.analyser._context, TomographyContext):
-            self._environment.subscribe_dcg(
+            self._environment.listeners["data_collection_group_id"] = {
                 self.analyser._context._flush_data_collections
-            )
-            self._environment.subscribe_dc(self.analyser._context._flush_processing_job)
-            self._environment.subscribe(self.analyser._context._flush_preprocess)
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                self.analyser._context._flush_processing_job
+            }
+            self._environment.listeners["autoproc_program_ids"] = {
+                self.analyser._context._flush_preprocess
+            }
+            # self._environment.subscribe_dcg(
+            #     self.analyser._context._flush_data_collections
+            # )
+            # self._environment.subscribe_dc(self.analyser._context._flush_processing_job)
+            # self._environment.subscribe(self.analyser._context._flush_preprocess)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo"}
             requests.post(url, json=dcg_data)
