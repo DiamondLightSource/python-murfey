@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from murfey.client.instance_environment import (
     MovieID,
+    MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
@@ -132,9 +133,11 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         if environment:
-            environment.movie_ids[file_path] = next(MurfeyID)
-            environment.motion_correction_ids[file_path] = next(MurfeyID)
-            environment.movie_numbers[file_path] = next(MovieID)
+            environment.movies[file_path] = MovieTracker(
+                movie_number=next(MovieID),
+                movie_uuid=next(MurfeyID),
+                motion_correction_uuid=next(MurfeyID),
+            )
         tilt_series = extract_tilt_series(file_path)
         tilt_angle = extract_tilt_angle(file_path)
         if tilt_series in self._completed_tilt_series:
@@ -171,9 +174,9 @@ class TomographyContext(Context):
                     preproc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/tomography_preprocess"
                     pfi = ProcessFileIncomplete(
                         path=file_path,
-                        image_number=environment.movie_numbers[file_path],
-                        movie_uuid=environment.movie_ids[file_path],
-                        mc_uuid=environment.motion_correction_ids[file_path],
+                        image_number=environment.movies[file_path].movie_number,
+                        movie_uuid=environment.movies[file_path].movie_uuid,
+                        mc_uuid=environment.movies[file_path].motion_correction_uuid,
                         tag=tilt_series,
                     )
                     if (

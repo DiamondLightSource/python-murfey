@@ -64,17 +64,3 @@ class MurfeyInstanceEnvironment(BaseModel):
             else:
                 for k in v.keys():
                     l(k)
-
-    # def subscribe(self, callback: Callable):
-    #     self._listeners.append(callback)
-
-    # def subscribe_dcg(self, callback: Callable):
-    #     self._dcg_listeners.append(callback)
-
-    # def subscribe_dc(self, callback: Callable):
-    #     self._dc_listeners.append(callback)
-
-    # def new_processing_id(self, pid: int, tag: str):
-    #     self._processing_jobs[tag] = pid
-    #     for l in self._listeners:
-    #         l(tag)
