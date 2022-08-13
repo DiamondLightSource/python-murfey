@@ -286,48 +286,48 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.nack(header)
             return None
         logger.debug(f"registered: {message.get('tag')}")
-        if global_state.get("data_collection_id") and isinstance(
-            global_state["data_collection_id"], dict
+        if global_state.get("data_collection_ids") and isinstance(
+            global_state["data_collection_ids"], dict
         ):
-            global_state["data_collection_id"] = {
-                **global_state["data_collection_id"],
+            global_state["data_collection_ids"] = {
+                **global_state["data_collection_ids"],
                 message.get("tag"): dcid,
             }
         else:
-            global_state["data_collection_id"] = {message.get("tag"): dcid}
+            global_state["data_collection_ids"] = {message.get("tag"): dcid}
         if _transport_object:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
         logger.debug(f"Registering processing job: {message.get('tag')}")
-        assert isinstance(global_state["data_collection_id"], dict)
-        _dcid = global_state["data_collection_id"][message["tag"]]
+        assert isinstance(global_state["data_collection_ids"], dict)
+        _dcid = global_state["data_collection_ids"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
         pid = _register(record, header)
         if pid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
-        if global_state.get("processing_job_id"):
-            assert isinstance(global_state["processing_job_id"], dict)
-            global_state["processing_job_id"] = {
-                **global_state["processing_job_id"],
+        if global_state.get("processing_job_ids"):
+            assert isinstance(global_state["processing_job_ids"], dict)
+            global_state["processing_job_ids"] = {
+                **global_state["processing_job_ids"],
                 message.get("tag"): pid,
             }
         else:
-            global_state["processing_job_id"] = {message["tag"]: pid}
+            global_state["processing_job_ids"] = {message["tag"]: pid}
         record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
         if appid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
-        if global_state.get("autoproc_program_id"):
-            assert isinstance(global_state["autoproc_program_id"], dict)
-            global_state["autoproc_program_id"] = {
-                **global_state["autoproc_program_id"],
+        if global_state.get("autoproc_program_ids"):
+            assert isinstance(global_state["autoproc_program_ids"], dict)
+            global_state["autoproc_program_ids"] = {
+                **global_state["autoproc_program_ids"],
                 message.get("tag"): appid,
             }
         else:
-            global_state["autoproc_program_id"] = {message["tag"]: appid}
+            global_state["autoproc_program_ids"] = {message["tag"]: appid}
         if _transport_object:
             _transport_object.transport.ack(header)
         return None
