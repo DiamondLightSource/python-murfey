@@ -253,7 +253,7 @@ class TomographyContext(Context):
         return self._add_tilt(
             file_path,
             _extract_tilt_series,
-            lambda x: x.name.split(delimiter)[-1].split(".")[0],
+            lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
             environment=environment,
         )
 
