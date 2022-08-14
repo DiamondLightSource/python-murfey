@@ -33,6 +33,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     processing_job_ids: Dict[str, int] = {}
     autoproc_program_ids: Dict[str, int] = {}
     movies: Dict[Path, MovieTracker] = {}
+    motion_corrected_movies: Dict[Path, Path] = {}
     listeners: Dict[str, Set[Callable]] = {}
     visit: str = ""
 
@@ -64,3 +65,14 @@ class MurfeyInstanceEnvironment(BaseModel):
             else:
                 for k in v.keys():
                     l(k)
+
+    @validator("motion_corrected_movies")
+    def motion_corrected_callback(cls, v, values):
+        _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/request_tilt_series_alignment"
+        for l in values.get("listeners", {}).get("motion_corrected_movies", []):
+            if values.get("motion_corrected_movies"):
+                for k in set(values["motion_corrected_movies"].keys()) ^ set(v.keys()):
+                    l(k, v[k], _url)
+            else:
+                for k, val in v.items():
+                    l(k, val, _url)

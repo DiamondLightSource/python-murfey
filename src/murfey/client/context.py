@@ -66,6 +66,7 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
+        self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
@@ -99,6 +100,47 @@ class TomographyContext(Context):
             if process_file:
                 requests.post(tr[0], json=process_file)
                 self._preprocessing_triggers.pop(tag)
+
+    def _check_for_alignment(
+        self, movie_path: Path, motion_corrected_path: Path, url: str
+    ):
+        if self._acquisition_software == "serialem":
+            delimiters = ("_", "-")
+            for d in delimiters:
+                if movie_path.name.count(d) > 1:
+                    delimiter = d
+                    break
+            else:
+                delimiter = delimiters[0]
+
+            def _extract_tilt_series(p: Path) -> str:
+                split = p.name.split(delimiter)
+                for s in split:
+                    if s.isdigit():
+                        return s
+                raise ValueError(
+                    f"No digits found in {p.name} after splitting on {delimiter}"
+                )
+
+            tilt_series = _extract_tilt_series(movie_path)
+            # tilt_angle = ".".join(movie_path.name.split(delimiter)[-1].split(".")[:-1])
+        elif self._acquisition_software == "tomo":
+            tilt_series = movie_path.name.split("_")[1]
+            # tilt_angle = movie_path.name.split("[")[1].split("]")[0]
+        else:
+            return
+        if self._motion_corrected_tilt_series.get(tilt_series):
+            self._motion_corrected_tilt_series[tilt_series].append(
+                motion_corrected_path
+            )
+        else:
+            self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
+        if tilt_series in self._completed_tilt_series:
+            if len(self._motion_corrected_tilt_series[tilt_series]) == len(
+                self._tilt_series[tilt_series]
+            ):
+                series_data: dict = {}
+                requests.post(url, json=series_data)
 
     def _complete_process_file(
         self,
@@ -150,7 +192,7 @@ class TomographyContext(Context):
             self._tilt_series[tilt_series] = [file_path]
             try:
                 if environment:  # and environment._processing_jobs.get(tilt_series):
-                    url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "tilt": tilt_series,
@@ -164,14 +206,14 @@ class TomographyContext(Context):
                     else:
                         logger.debug(f"Sending data: {data}")
                         requests.post(url, json=data)
-                    proc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     self._processing_job_stash[tilt_series] = [
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-preprocess"})
                     ]
                     self._processing_job_stash[tilt_series].append(
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
                     )
-                    preproc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+                    preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
                     pfi = ProcessFileIncomplete(
                         path=file_path,
                         image_number=environment.movies[file_path].movie_number,
