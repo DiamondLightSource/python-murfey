@@ -49,7 +49,7 @@ def get_session_id(
     proposal_number: str,
     visit_number: str,
     db: sqlalchemy.orm.Session,
-) -> list[Visit]:
+) -> int:
     query = (
         db.query(_BLSession)
         .join(_Proposal)

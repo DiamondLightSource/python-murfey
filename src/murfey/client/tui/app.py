@@ -11,6 +11,7 @@ from typing import Callable, Dict, List, NamedTuple, TypeVar, Union
 from urllib.parse import urlparse
 
 import requests
+from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -23,6 +24,7 @@ from textual.widget import Widget
 from textual.widgets import ScrollView
 
 from murfey.client.analyser import Analyser
+from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.status_bar import StatusBar
@@ -50,6 +52,7 @@ class InputResponse(NamedTuple):
     callback: Callable | None = None
     kwargs: dict | None = None
     form: dict | None = None
+    model: BaseModel | None = None
 
 
 class HoverVisit(Widget):
@@ -88,6 +91,7 @@ class HoverVisit(Widget):
                         h.lock = False
                 self.app.input_box.lock = False
                 self.app._visit = self._text
+                self.app._environment.visit = self._text
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
@@ -118,6 +122,16 @@ class QuickPrompt:
         return bool(self._text)
 
 
+def validate_form(form: dict, model: BaseModel) -> dict:
+    log.debug("validating", form)
+    try:
+        validated = model(**form)
+        return validated.dict()
+    except (AttributeError, ValidationError) as e:
+        log.debug(e)
+        return {}
+
+
 class InputBox(Widget):
     input_text: Union[Reactive[str], str] = Reactive("")
     prompt: str | QuickPrompt | None = ""
@@ -135,6 +149,7 @@ class InputBox(Widget):
         self._line = 0
         self._form_keys: List[str] = []
         self._unanswered_message = False
+        self._model: BaseModel | None = None
         super().__init__()
 
     @property
@@ -149,6 +164,7 @@ class InputBox(Widget):
             self.input_text = ""
             if msg.form:
                 self._form = msg.form
+                self._model = msg.model
             if msg.allowed_responses:
                 self.prompt = QuickPrompt(msg.question, msg.allowed_responses)
                 if msg.callback:
@@ -263,7 +279,12 @@ class InputBox(Widget):
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
             if self._form:
-                self.current_callback(self._form)
+                if validated_form := validate_form(self._form, self._model):
+                    self.current_callback(validated_form)
+                    self._form = {}
+                    self._form_keys = []
+                else:
+                    return
             else:
                 self.current_callback(self.input_text.replace(self._question, "", 1))
             self.current_callback = None
@@ -315,6 +336,17 @@ class LogBook(ScrollView):
             self.page_down()
 
 
+class DCParametersTomo(BaseModel):
+    voltage: float
+    pixel_size_on_image: str
+    experiment_type: str
+    image_size_x: int
+    image_size_y: int
+    tilt: int
+    acquisition_software: str
+    dose_per_frame: float
+
+
 class MurfeyTUI(App):
     input_box: InputBox
     log_book: ScrollView
@@ -336,7 +368,7 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._source = self._environment.source or Path(".")
-        self._url = self._environment.murfey_url
+        self._url = self._environment.url
         self._default_destination = self._environment.default_destination
         self._watcher = self._environment.watcher
         self.visits = visits or []
@@ -346,6 +378,7 @@ class MurfeyTUI(App):
         self._register_dc: bool | None = None
         self._tmp_responses: List[dict] = []
         self._visit = ""
+        self._dc_metadata: dict = {}
 
     @property
     def role(self) -> str:
@@ -376,7 +409,7 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
-            self.analyser = Analyser()
+            self.analyser = Analyser(environment=self._environment)
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
                 self._watcher.subscribe(self.analyser.enqueue)
@@ -391,9 +424,14 @@ class MurfeyTUI(App):
                     InputResponse(
                         question="Data collection parameters:",
                         form=r.get("form", {}),
-                        callback=self.app._start_dc(r.get("form", {})),
+                        model=DCParametersTomo
+                        if self.analyser
+                        and isinstance(self.analyser._context, TomographyContext)
+                        else None,
+                        callback=self.app._start_dc,
                     )
                 )
+                self._dc_metadata = r.get("form", {})
         elif response == "n":
             self._register_dc = False
         self._tmp_responses = []
@@ -416,15 +454,31 @@ class MurfeyTUI(App):
         elif self._register_dc is None:
             self._tmp_responses.append(response)
 
+    def _start_dc(self, json):
+        self._environment.data_collection_parameters = json
+        if isinstance(self.analyser._context, TomographyContext):
+            self._environment.listeners["data_collection_group_id"] = {
+                self.analyser._context._flush_data_collections
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                self.analyser._context._flush_processing_job
+            }
+            self._environment.listeners["autoproc_program_ids"] = {
+                self.analyser._context._flush_preprocess
+            }
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            dcg_data = {"experiment_type": "tomo"}
+            requests.post(url, json=dcg_data)
+        elif isinstance(self.analyser._context, SPAContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            dcg_data = {"experiment_type": "single particle"}
+            requests.post(url, json=dcg_data)
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            requests.post(url, json=json)
+
     def _set_request_destination(self, response: str):
         if response == "y":
             self._request_destinations = True
-
-    def _start_dc(self, json):
-        url = (
-            f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-        )
-        requests.post(url, json=json)
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
@@ -438,6 +492,12 @@ class MurfeyTUI(App):
                 callback=self._set_request_destination,
             )
         )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Processing parameters: ",
+        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+        #     )
+        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (

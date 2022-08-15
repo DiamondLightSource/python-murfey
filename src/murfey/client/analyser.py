@@ -6,23 +6,25 @@ import threading
 from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
 
 
 class Analyser(Observer):
-    def __init__(self):
+    def __init__(self, environment: MurfeyInstanceEnvironment | None = None):
         super().__init__()
         self._experiment_type = ""
         self._acquisition_software = ""
         self._role = ""
         self._extension: str = ""
-        self._unseen_xml = []
+        self._unseen_xml: list = []
         self._context: Context | None = None
-        self._batch_store = {}
+        self._batch_store: dict = {}
+        self._environment = environment
 
-        self.queue = queue.Queue()
+        self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
         self._stopping = False
         self._halt_thread = False
@@ -38,7 +40,7 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         split_file_name = file_path.name.split("_")
         if split_file_name:
-            if split_file_name[0] == "Position":
+            if split_file_name[0] == "Position" or "[" in file_path.name:
                 self._context = TomographyContext("tomo")
                 if split_file_name[-1].startswith("Fractions"):
                     self._role = "detector"
@@ -51,6 +53,13 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
                 self._role = "detector"
+                return True
+            if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                self._context = TomographyContext("serialem")
+                if "Frames" in file_path.parts:
+                    self._role = "detector"
+                else:
+                    self._role = "microscope"
                 return True
         return False
 
@@ -75,14 +84,15 @@ class Analyser(Observer):
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
-                    self._context.post_first_transfer(transferred_file, role=self._role)
+                    self._context.post_first_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
                     if self._role == "detector":
-                        logger.debug(
-                            f"Role as detector submitting question: {transferred_file}"
-                        )
                         try:
                             dc_metadata = self._context.gather_metadata(
-                                transferred_file.with_suffix(".xml")
+                                transferred_file.with_suffix(".mdoc")
+                                if self._context._acquisition_software == "serialem"
+                                else transferred_file.with_suffix(".xml")
                             )
                         except NotImplementedError:
                             dc_metadata = {}
@@ -104,9 +114,10 @@ class Analyser(Observer):
                     logger.info(
                         f"Context found successfully: {self._role}, {transferred_file}"
                     )
-                    self._context.post_first_transfer(transferred_file, role=self._role)
+                    self._context.post_first_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
                     if self._role == "detector":
-                        logger.debug("Role as detector submitting question")
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml")
                         )
@@ -123,7 +134,9 @@ class Analyser(Observer):
                             self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
-                self._context.post_transfer(transferred_file, role=self._role)
+                self._context.post_transfer(
+                    transferred_file, role=self._role, environment=self._environment
+                )
                 if (
                     len(self._context._tilt_series.keys()) > len(_tilt_series)
                     and self._role == "detector"

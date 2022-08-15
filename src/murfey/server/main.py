@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import lru_cache
-from typing import List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import packaging.version
 from fastapi import FastAPI, Request
@@ -187,21 +188,48 @@ async def add_file(file: File):
     return file
 
 
+class RegistrationMessage(BaseModel):
+    registration: str
+    params: Optional[Dict[str, Any]] = None
+
+
+@app.post("/feedback")
+async def send_murfey_message(msg: RegistrationMessage):
+    if _transport_object:
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": msg.registration}
+        )
+
+
 class ProcessFile(BaseModel):
-    name: str
+    path: str
     description: str
     size: int
     timestamp: float
     processing_job: int
+    data_collection_id: int
+    image_number: int
+    mc_uuid: int
+    movie_uuid: int
+    autoproc_program_id: int
+    pixel_size: float
 
 
-@app.post("/visits/{visit_name}/common_preprocess")
-async def request_common_preprocessing(proc_file: ProcessFile):
+@app.post("/visits/{visit_name}/tomography_preprocess")
+async def request_tomography_preprocessing(proc_file: ProcessFile):
     zocalo_message = {
-        "recipes": ["em_common_preprocess"],
+        "recipes": ["em_tomo_preprocess"],
         "parameters": {
-            "ispyb_process": proc_file.processing_job,
-            "movie": proc_file.name,
+            "dcid": proc_file.data_collection_id,
+            "autoproc_program_id": proc_file.autoproc_program_id,
+            "movie": proc_file.path,
+            "mrc_out": str(Path(proc_file.path).with_suffix("_motion_corrected.mrc")),
+            "pix_size": proc_file.pixel_size,
+            "output_image": str(Path(proc_file.path).with_suffix("_ctf.mrc")),
+            "image_number": proc_file.image_number,
+            "microscope": get_microscope(),
+            "mc_uuid": proc_file.mc_uuid,
+            "movie_uuid": proc_file.movie_uuid,
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
@@ -272,34 +300,69 @@ def shutdown():
     return {"success": True}
 
 
+class DCGroupParameters(BaseModel):
+    experiment_type: str
+
+
 class DCParameters(BaseModel):
     voltage: float
     pixel_size_on_image: str
     experiment_type: str
-    image_size_x: float
-    image_size_y: float
+    image_size_x: int
+    image_size_y: int
     tilt: int
     file_extension: str
     acquisition_software: str
     image_directory: str
+    tag: str
 
 
-@app.post("/visits/{visit_name}/start_data_collection")
-def start_dc(visit_name, dc_params: DCParameters):
-    log.warning(f"Starting DC {visit_name}")
+class ProcessingJobParameters(BaseModel):
+    tag: str
+    recipe: str
+
+
+@app.post("/visits/{visit_name}/register_data_collection_group")
+def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
-    dc_parameters = {
-        "visit": visit_name,
+    log.info(f"Registering data collection group on microscope {get_microscope()}")
+    dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),  # "m12",
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
             db=murfey.server.ispyb.Session(),
         ),
-        "image_directory": None,
+        "start_time": str(datetime.datetime.now()),
+        "experiment_type": dcg_params.experiment_type,
+    }
+
+    if _transport_object:
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+        )
+    return dcg_params
+
+
+@app.post("/visits/{visit_name}/start_data_collection")
+def start_dc(visit_name, dc_params: DCParameters):
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    log.info(f"Starting data collection on microscope {get_microscope()}")
+    dc_parameters = {
+        "visit": visit_name,
+        "session_id": murfey.server.ispyb.get_session_id(
+            microscope=get_microscope(),
+            proposal_code=ispyb_proposal_code,
+            proposal_number=ispyb_proposal_number,
+            visit_number=ispyb_visit_number,
+            db=murfey.server.ispyb.Session(),
+        ),
+        "image_directory": dc_params.image_directory,
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": dc_params.pixel_size_on_image,
@@ -309,24 +372,29 @@ def start_dc(visit_name, dc_params: DCParameters):
         "image_size_x": dc_params.image_size_x,
         "image_size_y": dc_params.image_size_y,
         "acquisition_software": dc_params.acquisition_software,
+        "tag": dc_params.tag,
     }
 
-    log.info(f"Would send Zocalo message {dc_parameters}")
-    # if _transport_object:
-    #    _transport_object.transport.send(
-    #        "processing_recipe",
-    #        {"recipes": ["ispyb-murfey"], "parameters": dc_parameters},
-    #    )
-    #    _transport_object.transport.send(
-    #        destination="ispyb_connector",
-    #        message={
-    #            "parameters": {"ispyb_command": "insert_tomogram"},
-    #            "content": {"dummy": "dummy"},
-    #        },
-    #    )
-    # else:
-    #    log.error(
-    #        f"New Data Collection was requested for visit {visit_name} but no Zocalo transport object was found"
-    #    )
-    #    return dc_parameters
+    if _transport_object:
+        log.debug(f"Send registration message to murfey_feedback: {dc_parameters}")
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "data_collection", **dc_parameters}
+        )
     return dc_params
+
+
+@app.post("/visits/{visit_name}/register_processing_job")
+def register_proc(visit_name, proc_params: ProcessingJobParameters):
+    proc_parameters = {
+        "recipe": proc_params.recipe,
+        "tag": proc_params.tag,
+    }
+
+    if _transport_object:
+        log.debug(
+            f"Send processing registration message to murfey_feedback: {proc_parameters}"
+        )
+        _transport_object.transport.send(
+            "murfey_feedback", {"register": "processing_job", **proc_parameters}
+        )
+    return proc_params

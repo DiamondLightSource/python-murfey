@@ -11,6 +11,8 @@ from typing import Optional
 
 import websocket
 
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
+
 log = logging.getLogger("murfey.client.websocket")
 
 
@@ -41,6 +43,7 @@ class WSApp:
             target=self._send_queue_feeder, daemon=True, name="websocket-send-queue"
         )
         self._feeder_thread.start()
+        self.environment: MurfeyInstanceEnvironment | None = None
 
     def __repr__(self):
         if self.alive:
@@ -99,9 +102,14 @@ class WSApp:
         log.info(f"Received message: {message!r}")
         try:
             data = json.loads(message)
-            log.info(f"Interpreted data as {data!r}")
+            if data.get("message") == "state-update":
+                self._register_id(data["attribute"], data["value"])
         except Exception:
             pass
+
+    def _register_id(self, attribute: str, value):
+        if self.environment and hasattr(self.environment, attribute):
+            setattr(self.environment, attribute, value)
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
         log.error(str(error))

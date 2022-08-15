@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 import argparse
-import functools
 import logging
 import os
 import socket
+from functools import lru_cache, singledispatch
+from threading import Thread
 from typing import Any
 
 import uvicorn
 import workflows
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
+from ispyb.sqlalchemy._auto_db_schema import (
+    AutoProcProgram,
+    Base,
+    DataCollection,
+    DataCollectionGroup,
+    ProcessingJob,
+)
 from rich.logging import RichHandler
+from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.ispyb
+from murfey.util.state import global_state
 
 try:
     from importlib.resources import files  # type: ignore
@@ -99,6 +109,10 @@ def run():
         type=int,
         default=8000,
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+    )
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -126,6 +140,10 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
+    rabbit_thread = Thread(target=feedback_listen, daemon=True)
+    logger.info("Starting Murfey RabbitMQ thread")
+    rabbit_thread.start()
+
     logger.info(
         f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
     )
@@ -149,7 +167,7 @@ def shutdown():
         _running_server.force_exit = True
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_microscope():
     try:
         hostname = get_hostname()
@@ -160,7 +178,7 @@ def get_microscope():
     return microscope_name
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_hostname():
     return socket.gethostname()
 
@@ -225,3 +243,124 @@ def _set_up_logging(quiet: bool, verbosity: int):
 def _set_up_transport(transport_type):
     global _transport_object
     _transport_object = murfey.server.ispyb.TransportManager(transport_type)
+
+
+def feedback_callback(header: dict, message: dict) -> None:
+    record = None
+    if message["register"] == "motion_corrected":
+        if global_state.get("motion_corrected") and isinstance(
+            global_state["motion_corrected"], list
+        ):
+            global_state["motion_corrected"].append(message["movie"])
+        else:
+            global_state["motion_corrected"] = [message["movie"]]
+        return None
+    elif message["register"] == "data_collection_group":
+        record = DataCollectionGroup(
+            sessionId=message["session_id"],
+            experimentType=message["experiment_type"],
+        )
+        dcgid = _register(record, header)
+        if _transport_object:
+            if dcgid is None:
+                _transport_object.transport.nack(header)
+                return None
+            global_state["data_collection_group_id"] = dcgid
+            _transport_object.transport.ack(header)
+        return None
+    elif message["register"] == "data_collection":
+        record = DataCollection(
+            SESSIONID=message["session_id"],
+            experimenttype=message["experiment_type"],
+            imageDirectory=message["image_directory"],
+            imageSuffix=message["image_suffix"],
+            voltage=message["voltage"],
+            dataCollectionGroupId=global_state.get("data_collection_group_id"),
+        )
+        dcid = _register(record, header)
+        if dcid is None and _transport_object:
+            _transport_object.transport.nack(header)
+            return None
+        logger.debug(f"registered: {message.get('tag')}")
+        if global_state.get("data_collection_ids") and isinstance(
+            global_state["data_collection_ids"], dict
+        ):
+            global_state["data_collection_ids"] = {
+                **global_state["data_collection_ids"],
+                message.get("tag"): dcid,
+            }
+        else:
+            global_state["data_collection_ids"] = {message.get("tag"): dcid}
+        if _transport_object:
+            _transport_object.transport.ack(header)
+        return None
+    elif message["register"] == "processing_job":
+        assert isinstance(global_state["data_collection_ids"], dict)
+        _dcid = global_state["data_collection_ids"][message["tag"]]
+        record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
+        pid = _register(record, header)
+        if pid is None and _transport_object:
+            _transport_object.transport.nack(header)
+            return None
+        if global_state.get("processing_job_ids"):
+            assert isinstance(global_state["processing_job_ids"], dict)
+            global_state["processing_job_ids"] = {
+                **global_state["processing_job_ids"],
+                message.get("tag"): pid,
+            }
+        else:
+            global_state["processing_job_ids"] = {message["tag"]: pid}
+        record = AutoProcProgram(processingJobId=pid)
+        appid = _register(record, header)
+        if appid is None and _transport_object:
+            _transport_object.transport.nack(header)
+            return None
+        if global_state.get("autoproc_program_ids"):
+            assert isinstance(global_state["autoproc_program_ids"], dict)
+            global_state["autoproc_program_ids"] = {
+                **global_state["autoproc_program_ids"],
+                message.get("tag"): appid,
+            }
+        else:
+            global_state["autoproc_program_ids"] = {message["tag"]: appid}
+        if _transport_object:
+            _transport_object.transport.ack(header)
+        return None
+    if _transport_object:
+        _transport_object.transport.nack(header, requeue=False)
+    return None
+
+
+@singledispatch
+def _register(record, header: dict):
+    raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
+
+
+@_register.register
+def _(record: Base, header: dict):
+    if not _transport_object:
+        logger.error(
+            f"No transport object found when processing record {record}. Message header: {header}"
+        )
+        return None
+    try:
+        murfey.server.ispyb.DB.add(record)
+        murfey.server.ispyb.DB.commit()
+        return getattr(record, record.__table__.primary_key.columns[0].name)
+    except SQLAlchemyError as e:
+        logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
+        return None
+    except AttributeError as e:
+        logger.error(
+            f"Murfey could not find primary key when inserting record {record}",
+            e,
+            exc_info=True,
+        )
+        return None
+
+
+def feedback_listen():
+    if _transport_object:
+        _transport_object.transport.subscribe(
+            "murfey_feedback", feedback_callback, acknowledgement=True
+        )
