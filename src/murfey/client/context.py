@@ -71,29 +71,22 @@ class TomographyContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
-    def _check_tilt(self, tilt_series: int):
-        logger.debug(f"Check for tilt series {tilt_series} for peocessing request")
-
     def _flush_data_collections(self):
+        logger.debug("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
-            logger.debug(f"Sending data: {data}")
             requests.post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        logger.debug(
-            f"Flushing processing job {tag}: {self._processing_job_stash.get(tag)}"
-        )
+        logger.debug(f"Flushing processing job {tag}")
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str):
-        logger.debug(
-            f"Flushing preprocessing job {tag}: {self._preprocessing_triggers.get(tag)}"
-        )
+        logger.debug(f"Flushing preprocessing job {tag}")
         if tr := self._preprocessing_triggers.get(tag):
             process_file = self._complete_process_file(tr[1], tr[2])
             if process_file:
@@ -162,7 +155,6 @@ class TomographyContext(Context):
                     if environment.data_collection_group_id is None:
                         self._data_collection_stash.append((url, environment, data))
                     else:
-                        logger.debug(f"Sending data: {data}")
                         requests.post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     self._processing_job_stash[tilt_series] = [
@@ -270,7 +262,6 @@ class TomographyContext(Context):
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
         if role == "detector" and transferred_file.suffix in data_suffixes:
-            logger.debug(f"Perform post transfer with environment {environment}")
             if self._acquisition_software == "tomo":
                 completed_tilts = self._add_tomo_tilt(
                     transferred_file, environment=environment
