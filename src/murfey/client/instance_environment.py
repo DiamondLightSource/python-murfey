@@ -34,6 +34,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     autoproc_program_ids: Dict[str, int] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
+    motion_corrected_movies: Dict[Path, Path] = {}
     listeners: Dict[str, Set[Callable]] = {}
     visit: str = ""
 
