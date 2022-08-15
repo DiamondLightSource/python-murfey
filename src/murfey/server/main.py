@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import packaging.version
@@ -201,7 +202,7 @@ async def send_murfey_message(msg: RegistrationMessage):
 
 
 class ProcessFile(BaseModel):
-    name: str
+    path: str
     description: str
     size: int
     timestamp: float
@@ -219,9 +220,16 @@ async def request_tomography_preprocessing(proc_file: ProcessFile):
     zocalo_message = {
         "recipes": ["em_tomo_preprocess"],
         "parameters": {
-            "ispyb_process": proc_file.processing_job,
-            "movie": proc_file.name,
-            # "mrc_out":
+            "dcid": proc_file.data_collection_id,
+            "autoproc_program_id": proc_file.autoproc_program_id,
+            "movie": proc_file.path,
+            "mrc_out": str(Path(proc_file.path).with_suffix("_motion_corrected.mrc")),
+            "pix_size": proc_file.pixel_size,
+            "output_image": str(Path(proc_file.path).with_suffix("_ctf.mrc")),
+            "image_number": proc_file.image_number,
+            "microscope": get_microscope(),
+            "mc_uuid": proc_file.mc_uuid,
+            "movie_uuid": proc_file.movie_uuid,
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")

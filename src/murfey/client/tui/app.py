@@ -368,7 +368,7 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._source = self._environment.source or Path(".")
-        self._url = self._environment.murfey_url
+        self._url = self._environment.url
         self._default_destination = self._environment.default_destination
         self._watcher = self._environment.watcher
         self.visits = visits or []
@@ -454,12 +454,8 @@ class MurfeyTUI(App):
         elif self._register_dc is None:
             self._tmp_responses.append(response)
 
-    def _set_request_destination(self, response: str):
-        if response == "y":
-            self._request_destinations = True
-
     def _start_dc(self, json):
-        self._environment._data_collection_parameters = json
+        self._environment.data_collection_parameters = json
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {
                 self.analyser._context._flush_data_collections
@@ -470,11 +466,6 @@ class MurfeyTUI(App):
             self._environment.listeners["autoproc_program_ids"] = {
                 self.analyser._context._flush_preprocess
             }
-            # self._environment.subscribe_dcg(
-            #     self.analyser._context._flush_data_collections
-            # )
-            # self._environment.subscribe_dc(self.analyser._context._flush_processing_job)
-            # self._environment.subscribe(self.analyser._context._flush_preprocess)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo"}
             requests.post(url, json=dcg_data)
@@ -484,6 +475,10 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             requests.post(url, json=json)
+
+    def _set_request_destination(self, response: str):
+        if response == "y":
+            self._request_destinations = True
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
@@ -497,6 +492,12 @@ class MurfeyTUI(App):
                 callback=self._set_request_destination,
             )
         )
+        # self._queues["input"].put_nowait(
+        #     InputResponse(
+        #         question="Processing parameters: ",
+        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
+        #     )
+        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (

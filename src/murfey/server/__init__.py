@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import functools
 import logging
 import os
 import socket
-from functools import singledispatch
+from functools import lru_cache, singledispatch
 from threading import Thread
 from typing import Any
 
@@ -170,7 +169,7 @@ def shutdown():
         _running_server.force_exit = True
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_microscope():
     try:
         hostname = get_hostname()
@@ -181,7 +180,7 @@ def get_microscope():
     return microscope_name
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_hostname():
     return socket.gethostname()
 
@@ -272,7 +271,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
-        logger.debug(f"Registering data collection proper: {message.get('tag')}")
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
@@ -299,7 +297,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
-        logger.debug(f"Registering processing job: {message.get('tag')}")
         assert isinstance(global_state["data_collection_ids"], dict)
         _dcid = global_state["data_collection_ids"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
@@ -364,7 +361,6 @@ def _(record: Base, header: dict):
             e,
             exc_info=True,
         )
-        # _transport_object.transport.nack(header)
         return None
 
 

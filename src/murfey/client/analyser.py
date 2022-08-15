@@ -88,13 +88,10 @@ class Analyser(Observer):
                         transferred_file, role=self._role, environment=self._environment
                     )
                     if self._role == "detector":
-                        logger.debug(
-                            f"Role as detector submitting question: {transferred_file}"
-                        )
                         try:
                             dc_metadata = self._context.gather_metadata(
                                 transferred_file.with_suffix(".mdoc")
-                                if self._context.acquisition_software == "serialem"
+                                if self._context._acquisition_software == "serialem"
                                 else transferred_file.with_suffix(".xml")
                             )
                         except NotImplementedError:
@@ -121,7 +118,6 @@ class Analyser(Observer):
                         transferred_file, role=self._role, environment=self._environment
                     )
                     if self._role == "detector":
-                        logger.debug("Role as detector submitting question")
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml")
                         )
@@ -138,9 +134,6 @@ class Analyser(Observer):
                             self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
-                logger.debug(
-                    f"Requsting post transfer action with enviornment {self._environment}"
-                )
                 self._context.post_transfer(
                     transferred_file, role=self._role, environment=self._environment
                 )
