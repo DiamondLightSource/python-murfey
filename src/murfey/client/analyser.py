@@ -94,7 +94,7 @@ class Analyser(Observer):
                         try:
                             dc_metadata = self._context.gather_metadata(
                                 transferred_file.with_suffix(".mdoc")
-                                if self._context.acquisition_software == "serialem"
+                                if self._context._acquisition_software == "serialem"
                                 else transferred_file.with_suffix(".xml")
                             )
                         except NotImplementedError:

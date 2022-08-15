@@ -33,13 +33,13 @@ class Context:
     def __init__(self, acquisition_software: str):
         self._acquisition_software = acquisition_software
 
-    def post_transfer(self, transferred_file: Path, role: str = ""):
+    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
         raise NotImplementedError(
             f"post_transfer hook must be declared in derived class to be used: {self}"
         )
 
-    def post_first_transfer(self, transferred_file: Path, role: str = ""):
-        self.post_transfer(transferred_file, role=role)
+    def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
+        self.post_transfer(transferred_file, role=role, **kwargs)
 
     def gather_metadata(self, metadata_file: Path):
         raise NotImplementedError(
@@ -48,7 +48,7 @@ class Context:
 
 
 class SPAContext(Context):
-    def post_transfer(self, transferred_file: Path, role: str = ""):
+    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
         pass
 
 
@@ -76,7 +76,7 @@ class TomographyContext(Context):
 
     def _flush_data_collections(self):
         for dc_data in self._data_collection_stash:
-            data = {**dc_data[2], **dc_data[1]._data_collection_parameters}
+            data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             logger.debug(f"Sending data: {data}")
             requests.post(dc_data[0], json=data)
         self._data_collection_stash = []
@@ -115,10 +115,10 @@ class TomographyContext(Context):
                 "processing_job": environment._processing_jobs[tag],
                 "data_collection_id": environment._data_collections[tag],
                 "image_number": incomplete_process_file.image_number,
-                "pixel_size": environment._data_collection_parameters[
+                "pixel_size": environment.data_collection_parameters[
                     "pixel_size_on_image"
                 ],
-                "autoproc_program_id": environment._autoproc_programs[tag],
+                "autoproc_program_id": environment.autoproc_program_ids[tag],
                 "mc_uuid": incomplete_process_file.mc_uuid,
                 "movie_uuid": incomplete_process_file.movie_uuid,
             }
@@ -150,7 +150,7 @@ class TomographyContext(Context):
             self._tilt_series[tilt_series] = [file_path]
             try:
                 if environment:  # and environment._processing_jobs.get(tilt_series):
-                    url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "tilt": tilt_series,
@@ -164,14 +164,14 @@ class TomographyContext(Context):
                     else:
                         logger.debug(f"Sending data: {data}")
                         requests.post(url, json=data)
-                    proc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     self._processing_job_stash[tilt_series] = [
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-preprocess"})
                     ]
                     self._processing_job_stash[tilt_series].append(
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
                     )
-                    preproc_url = f"{str(environment.murfey_url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+                    preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
                     pfi = ProcessFileIncomplete(
                         path=file_path,
                         image_number=environment.movies[file_path].movie_number,
@@ -180,8 +180,8 @@ class TomographyContext(Context):
                         tag=tilt_series,
                     )
                     if (
-                        environment._autoproc_programs.get(tilt_series) is None
-                        or environment._processing_jobs.get(tilt_series) is None
+                        environment.autoproc_program_ids.get(tilt_series) is None
+                        or environment.processing_job_ids.get(tilt_series) is None
                     ):
                         self._preprocessing_triggers[tilt_series] = (
                             preproc_url,
@@ -265,6 +265,7 @@ class TomographyContext(Context):
         transferred_file: Path,
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
@@ -285,6 +286,7 @@ class TomographyContext(Context):
         transferred_file: Path,
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 

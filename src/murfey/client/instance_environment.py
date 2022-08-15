@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from itertools import count
 from pathlib import Path
-from typing import Callable, Dict, NamedTuple, Set
+from typing import Callable, Dict, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
 from pydantic import BaseModel, validator
@@ -24,14 +24,15 @@ class MovieTracker(NamedTuple):
 
 class MurfeyInstanceEnvironment(BaseModel):
     url: ParseResult
-    source: Path | None = None
+    source: Optional[Path] = None
     default_destination: str = ""
-    watcher: DirWatcher | None = None
+    watcher: Optional[DirWatcher] = None
     demo: bool = False
-    data_collection_group_id: int | None = None
+    data_collection_group_id: Optional[int] = None
     data_collection_ids: Dict[str, int] = {}
     processing_job_ids: Dict[str, int] = {}
     autoproc_program_ids: Dict[str, int] = {}
+    data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     listeners: Dict[str, Set[Callable]] = {}
     visit: str = ""

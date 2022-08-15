@@ -368,7 +368,7 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._source = self._environment.source or Path(".")
-        self._url = self._environment.murfey_url
+        self._url = self._environment.url
         self._default_destination = self._environment.default_destination
         self._watcher = self._environment.watcher
         self.visits = visits or []
@@ -459,7 +459,7 @@ class MurfeyTUI(App):
             self._request_destinations = True
 
     def _start_dc(self, json):
-        self._environment._data_collection_parameters = json
+        self._environment.data_collection_parameters = json
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {
                 self.analyser._context._flush_data_collections
