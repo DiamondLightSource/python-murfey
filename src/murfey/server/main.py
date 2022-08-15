@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import packaging.version
@@ -201,7 +202,7 @@ async def send_murfey_message(msg: RegistrationMessage):
 
 
 class ProcessFile(BaseModel):
-    name: str
+    path: str
     description: str
     size: int
     timestamp: float
@@ -219,20 +220,27 @@ async def request_tomography_preprocessing(proc_file: ProcessFile):
     zocalo_message = {
         "recipes": ["em_tomo_preprocess"],
         "parameters": {
-            "ispyb_process": proc_file.processing_job,
-            "movie": proc_file.name,
-            # "mrc_out":
+            "dcid": proc_file.data_collection_id,
+            "autoproc_program_id": proc_file.autoproc_program_id,
+            "movie": proc_file.path,
+            "mrc_out": str(Path(proc_file.path).with_suffix("_motion_corrected.mrc")),
+            "pix_size": proc_file.pixel_size,
+            "output_image": str(Path(proc_file.path).with_suffix("_ctf.mrc")),
+            "image_number": proc_file.image_number,
+            "microscope": get_microscope(),
+            "mc_uuid": proc_file.mc_uuid,
+            "movie_uuid": proc_file.movie_uuid,
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
-    # if _transport_object:
-    #     _transport_object.transport.send("processing_recipe", zocalo_message)
-    # else:
-    #     log.error(
-    #         f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
-    #     )
-    #     return proc_file
-    # await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
+    if _transport_object:
+        _transport_object.transport.send("processing_recipe", zocalo_message)
+    else:
+        log.error(
+            f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
+        )
+        return proc_file
+    await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
     return proc_file
 
 
@@ -322,7 +330,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
     dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope="m12",  # get_microscope(),
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
@@ -348,7 +356,7 @@ def start_dc(visit_name, dc_params: DCParameters):
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope="m12",  # get_microscope(),
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,

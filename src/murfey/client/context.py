@@ -101,7 +101,7 @@ class TomographyContext(Context):
         try:
             tag = incomplete_process_file.tag
             return {
-                "name": str(incomplete_process_file.path),
+                "path": str(incomplete_process_file.path),
                 "description": incomplete_process_file.description,
                 "size": incomplete_process_file.path.stat().st_size,
                 "timestamp": incomplete_process_file.path.stat().st_ctime,
