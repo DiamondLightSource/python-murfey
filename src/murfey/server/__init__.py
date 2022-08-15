@@ -271,7 +271,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
-        logger.debug(f"Registering data collection proper: {message.get('tag')}")
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
@@ -298,7 +297,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "processing_job":
-        logger.debug(f"Registering processing job: {message.get('tag')}")
         assert isinstance(global_state["data_collection_ids"], dict)
         _dcid = global_state["data_collection_ids"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
