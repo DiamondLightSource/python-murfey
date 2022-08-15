@@ -102,12 +102,14 @@ class WSApp:
         log.info(f"Received message: {message!r}")
         try:
             data = json.loads(message)
-            log.info(f"Interpreted data as {data!r}")
             if data.get("message") == "state-update":
-                if data["attribute"] == "data_collection_group_id" and self.environment:
-                    self.environment.data_collection_group_id = data["value"]
+                self._register_id(data["attribute"], data["value"])
         except Exception:
             pass
+
+    def _register_id(self, attribute: str, value):
+        if self.environment and hasattr(self.environment, attribute):
+            setattr(self.environment, attribute, value)
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
         log.error(str(error))

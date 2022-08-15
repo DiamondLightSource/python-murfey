@@ -188,7 +188,7 @@ def run():
     main_loop_thread.start()
 
     instance_environment = MurfeyInstanceEnvironment(
-        murfey_url,
+        url=murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
         default_destination=args.destination,

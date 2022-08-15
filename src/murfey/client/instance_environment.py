@@ -1,46 +1,67 @@
 from __future__ import annotations
 
+import logging
+from itertools import count
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
+
+from pydantic import BaseModel, validator
 
 from murfey.client.watchdir import DirWatcher
 
+logger = logging.getLogger("murfey.client.instance_environment")
 
-class MurfeyInstanceEnvironment:
-    # murfey_url: ParseResult
-    # source: Path | None = None
-    # default_destination: str = ""
-    # watcher: DirWatcher | None = None
-    # demo: bool = False
-    # data_collection_group_id: int | None = None
-    # visit: str = ""
-    # processing_jobs: dict[str, int] = {}
+MurfeyID = count(1)
+MovieID = count(1)
 
-    def __init__(
-        self,
-        murfey_url: ParseResult,
-        source: Path | None = None,
-        default_destination: str = "",
-        watcher: DirWatcher | None = None,
-        demo: bool = False,
-        data_collection_group_id: int | None = None,
-        visit: str = "",
-    ):
-        self.murfey_url = murfey_url
-        self.source = source
-        self.default_destination = default_destination
-        self.watcher = watcher
-        self.demo = demo
-        self.data_collection_group_id = data_collection_group_id
-        self.visit = visit
-        self._listeners: List[Callable] = []
-        self._processing_jobs: Dict[str, int] = {}
 
-    def subscribe(self, callback: Callable):
-        self._listeners.append(callback)
+class MovieTracker(NamedTuple):
+    movie_number: int
+    movie_uuid: int
+    motion_correction_uuid: int
 
-    def new_processing_id(self, pid: int, tag: str):
-        self._processing_jobs[tag] = pid
-        for l in self._listeners:
-            l(tag)
+
+class MurfeyInstanceEnvironment(BaseModel):
+    url: ParseResult
+    source: Optional[Path] = None
+    default_destination: str = ""
+    watcher: Optional[DirWatcher] = None
+    demo: bool = False
+    data_collection_group_id: Optional[int] = None
+    data_collection_ids: Dict[str, int] = {}
+    processing_job_ids: Dict[str, int] = {}
+    autoproc_program_ids: Dict[str, int] = {}
+    data_collection_parameters: dict = {}
+    movies: Dict[Path, MovieTracker] = {}
+    listeners: Dict[str, Set[Callable]] = {}
+    visit: str = ""
+
+    class Config:
+        validate_assignment: bool = True
+        arbitrary_types_allowed: bool = True
+
+    @validator("data_collection_group_id")
+    def dcg_callback(cls, v, values):
+        for l in values.get("listeners", {}).get("data_collection_group_id", []):
+            l()
+
+    @validator("data_collection_ids")
+    def dc_callback(cls, v, values):
+        for l in values.get("listeners", {}).get("data_collection_ids", []):
+            if values.get("data_collection_ids"):
+                for k in set(values["data_collection_ids"].keys()) ^ set(v.keys()):
+                    l(k)
+            else:
+                for k in v.keys():
+                    l(k)
+
+    @validator("autoproc_program_ids")
+    def app_callback(cls, v, values):
+        for l in values.get("listeners", {}).get("autoproc_program_ids", []):
+            if values.get("autoproc_program_ids"):
+                for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
+                    l(k)
+            else:
+                for k in v.keys():
+                    l(k)
