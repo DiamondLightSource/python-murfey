@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import functools
 import logging
 import os
 import socket
-from functools import singledispatch
+from functools import lru_cache, singledispatch
 from threading import Thread
 from typing import Any
 
@@ -25,7 +24,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.ispyb
-from murfey.server.ispyb import DB
 from murfey.util.state import global_state
 
 try:
@@ -169,7 +167,7 @@ def shutdown():
         _running_server.force_exit = True
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_microscope():
     try:
         hostname = get_hostname()
@@ -180,7 +178,7 @@ def get_microscope():
     return microscope_name
 
 
-@functools.lru_cache()
+@lru_cache()
 def get_hostname():
     return socket.gethostname()
 
@@ -346,8 +344,8 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        DB.add(record)
-        DB.commit()
+        murfey.server.ispyb.DB.add(record)
+        murfey.server.ispyb.DB.commit()
         return getattr(record, record.__table__.primary_key.columns[0].name)
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
