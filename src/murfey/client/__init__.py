@@ -120,6 +120,12 @@ def run():
         default=-1,
         help="Only consider top level directories that have appeared more recently than this many hours ago",
     )
+    parser.add_argument(
+        "--real_dc",
+        action="store_true",
+        default=False,
+        help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
+    )
 
     args = parser.parse_args()
 
@@ -213,6 +219,7 @@ def run():
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
+        dummy_dc=not args.real_dc,
     )
     rich_handler.redirect = False
 
