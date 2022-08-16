@@ -35,16 +35,18 @@ class DirWatcher(murfey.util.Observer):
     def __repr__(self) -> str:
         return f"<DirWatcher ({self._basepath})>"
 
-    def scan(self):
+    def scan(self, modification_time: float | None = None):
         try:
             t_start = time.perf_counter()
-            filelist = self._scan_directory()
+            filelist = self._scan_directory(modification_time=modification_time)
             t_scan = time.perf_counter() - t_start
             log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
             scan_completion = time.time()
 
             for entry, entry_info in filelist.items():
-                if entry_info != self._lastscan.get(entry):
+                if self._lastscan is not None and entry_info != self._lastscan.get(
+                    entry
+                ):
                     self._file_candidates[entry] = entry_info._replace(
                         settling_time=scan_completion
                     )
@@ -56,7 +58,7 @@ class DirWatcher(murfey.util.Observer):
                     continue
 
                 if (
-                    self._file_candidates[x].settling_time + self.settling_time
+                    self._file_candidates[x].settling_time + self.settling_time  # type: ignore
                     < time.time()
                 ):
                     try:
@@ -85,14 +87,16 @@ class DirWatcher(murfey.util.Observer):
                         log.error(f"Exception encountered: {e}", exc_info=True)
                         return
 
-                if x not in self._lastscan:
+                if self._lastscan is not None and x not in self._lastscan:
                     log.debug(f"Found file {Path(x).name!r} for future transfer")
 
             self._lastscan = filelist
         except Exception as e:
             log.error(f"Exception encountered: {e}")
 
-    def _scan_directory(self, path: str = "") -> dict[str, _FileInfo]:
+    def _scan_directory(
+        self, path: str = "", modification_time: float | None = None
+    ) -> dict[str, _FileInfo]:
         result: dict[str, _FileInfo] = {}
         try:
             directory_contents = os.scandir(os.path.join(self._basepath, path))
@@ -106,7 +110,9 @@ class DirWatcher(murfey.util.Observer):
             raise
         for entry in directory_contents:
             entry_name = os.path.join(path, entry.name)
-            if entry.is_dir():
+            if entry.is_dir() and (
+                modification_time is None or entry.stat().st_ctime < modification_time
+            ):
                 result.update(self._scan_directory(entry_name))
             else:
                 try:
@@ -116,8 +122,19 @@ class DirWatcher(murfey.util.Observer):
                     # between the scandir and the stat call.
                     # In this case we can just ignore the file.
                     continue
-                result[str(Path(self._basepath) / path / entry_name)] = _FileInfo(
-                    size=file_stat.st_size,
-                    modification_time=max(file_stat.st_mtime, file_stat.st_ctime),
-                )
+                if modification_time:
+                    if max(file_stat.st_mtime, file_stat.st_ctime) > modification_time:
+                        result[
+                            str(Path(self._basepath) / path / entry_name)
+                        ] = _FileInfo(
+                            size=file_stat.st_size,
+                            modification_time=max(
+                                file_stat.st_mtime, file_stat.st_ctime
+                            ),
+                        )
+                else:
+                    result[str(Path(self._basepath) / path / entry_name)] = _FileInfo(
+                        size=file_stat.st_size,
+                        modification_time=max(file_stat.st_mtime, file_stat.st_ctime),
+                    )
         return result
