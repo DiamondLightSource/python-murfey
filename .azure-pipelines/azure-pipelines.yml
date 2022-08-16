@@ -74,7 +74,7 @@ stages:
           wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v$(DATABASE_SCHEMA)/ispyb-database-$(DATABASE_SCHEMA).tar.gz -O dist/ispyb-database.tar.gz
         displayName: Download ISPyB DB schema v$(DATABASE_SCHEMA) for tests
 
-      - task: PublishBuildArtifacts@1
+      - task: PublishBuildArtifacts@1.200.0
         displayName: Store artifact
         inputs:
           pathToPublish: dist/
