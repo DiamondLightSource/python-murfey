@@ -361,6 +361,7 @@ class MurfeyTUI(App):
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
         status_bar: StatusBar | None = None,
+        dummy_dc: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -379,6 +380,7 @@ class MurfeyTUI(App):
         self._tmp_responses: List[dict] = []
         self._visit = ""
         self._dc_metadata: dict = {}
+        self._dummy_dc = dummy_dc
 
     @property
     def role(self) -> str:
@@ -409,7 +411,9 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
-            self.analyser = Analyser(environment=self._environment)
+            self.analyser = Analyser(
+                environment=self._environment if not self._dummy_dc else None
+            )
             if self._watcher:
                 self._watcher.subscribe(self.rsync_process.enqueue)
                 self._watcher.subscribe(self.analyser.enqueue)
@@ -455,6 +459,8 @@ class MurfeyTUI(App):
             self._tmp_responses.append(response)
 
     def _start_dc(self, json):
+        if self._dummy_dc:
+            return
         self._environment.data_collection_parameters = json
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {

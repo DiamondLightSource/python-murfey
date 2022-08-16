@@ -114,6 +114,18 @@ def run():
         "--demo",
         action="store_true",
     )
+    parser.add_argument(
+        "--appearance_time",
+        type=float,
+        default=-1,
+        help="Only consider top level directories that have appeared more recently than this many hours ago",
+    )
+    parser.add_argument(
+        "--real_dc",
+        action="store_true",
+        default=False,
+        help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
+    )
 
     args = parser.parse_args()
 
@@ -184,7 +196,9 @@ def run():
         args.source, settling_time=10, status_bar=status_bar
     )
 
-    main_loop_thread = Thread(target=main_loop, args=[source_watcher], daemon=True)
+    main_loop_thread = Thread(
+        target=main_loop, args=[source_watcher, args.appearance_time], daemon=True
+    )
     main_loop_thread.start()
 
     instance_environment = MurfeyInstanceEnvironment(
@@ -205,6 +219,7 @@ def run():
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
+        dummy_dc=not args.real_dc,
     )
     rich_handler.redirect = False
 
@@ -218,12 +233,18 @@ def run():
         log.info("Client stopped")
 
 
-def main_loop(source_watcher: murfey.client.watchdir.DirWatcher):
+def main_loop(
+    source_watcher: murfey.client.watchdir.DirWatcher, appearance_time: float
+):
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
     )
+    if appearance_time > 0:
+        modification_time: float | None = time.time() - appearance_time * 3600
+    else:
+        modification_time = None
     while True:
-        source_watcher.scan()
+        source_watcher.scan(modification_time=modification_time)
         time.sleep(15)
 
 
