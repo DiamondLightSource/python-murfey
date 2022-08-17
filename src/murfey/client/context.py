@@ -4,7 +4,10 @@ import logging
 from pathlib import Path
 from typing import Callable, Dict, List
 
-import mdocfile
+try:
+    import mdocfile
+except ImportError:
+    mdocfile = None  # type: ignore
 import requests
 import xmltodict
 from pydantic import BaseModel
@@ -311,6 +314,8 @@ class TomographyContext(Context):
             )
             metadata["dose_per_frame"] = None
             return metadata
+        if mdocfile is None:
+            logger.debug("mdocfile not installed so mdoc file not parsed")
         mdoc_data = mdocfile.read(metadata_file)
         mdoc_metadata: dict = {}
         mdoc_metadata["experiment_type"] = "tomography"
