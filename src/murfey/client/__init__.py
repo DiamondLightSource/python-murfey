@@ -10,6 +10,7 @@ import shutil
 import sys
 import time
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from queue import Queue
 
@@ -204,11 +205,15 @@ def run():
     )
     main_loop_thread.start()
 
+    microscope = requests.get(murfey_url._replace(path="/microscope").geturl())[
+        "microscope"
+    ]
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
-        default_destination=args.destination,
+        default_destination=args.destination
+        or f"/dls/{microscope}/{datetime.now().year}",
         demo=args.demo,
     )
 
