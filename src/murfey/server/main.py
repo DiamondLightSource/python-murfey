@@ -70,6 +70,12 @@ def machine_info():
     return {}
 
 
+@app.get("/microscope/")
+def get_mic():
+    microscope = get_microscope()
+    return {"microscope": microscope}
+
+
 @app.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
     microscope = get_microscope()
