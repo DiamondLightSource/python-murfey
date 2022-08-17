@@ -205,9 +205,10 @@ def run():
     )
     main_loop_thread.start()
 
-    microscope = requests.get(murfey_url._replace(path="/microscope").geturl())[
-        "microscope"
-    ]
+    microscope_data = requests.get(
+        murfey_url._replace(path="/microscope").geturl()
+    ).json()
+    microscope = microscope_data.get("microscope")
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         source=Path(args.source),
