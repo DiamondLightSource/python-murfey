@@ -37,7 +37,7 @@ class DirWatcher(murfey.util.Observer):
     def __repr__(self) -> str:
         return f"<DirWatcher ({self._basepath})>"
 
-    def scan(self, modification_time: float | None = None):
+    def scan(self, modification_time: float | None = None, transfer_all: bool = False):
         try:
             t_start = time.perf_counter()
             filelist = self._scan_directory(
@@ -77,6 +77,7 @@ class DirWatcher(murfey.util.Observer):
                             if (
                                 not modification_time
                                 and not self._modification_overwrite
+                                and not transfer_all
                             ):
                                 if file_stat.st_mtime >= self._init_time:
                                     top_level_dir = (

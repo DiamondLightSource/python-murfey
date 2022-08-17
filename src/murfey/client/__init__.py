@@ -127,6 +127,11 @@ def run():
         default=False,
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
     )
+    parser.add_argument(
+        "--transfer_all",
+        action="store_true",
+        help="Transfer all files in current directory regardless of age",
+    )
 
     args = parser.parse_args()
 
@@ -201,7 +206,9 @@ def run():
     )
 
     main_loop_thread = Thread(
-        target=main_loop, args=[source_watcher, args.appearance_time], daemon=True
+        target=main_loop,
+        args=[source_watcher, args.appearance_time, args.transfer_all],
+        daemon=True,
     )
     main_loop_thread.start()
 
@@ -243,7 +250,9 @@ def run():
 
 
 def main_loop(
-    source_watcher: murfey.client.watchdir.DirWatcher, appearance_time: float
+    source_watcher: murfey.client.watchdir.DirWatcher,
+    appearance_time: float,
+    transfer_all: bool,
 ):
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
@@ -253,7 +262,9 @@ def main_loop(
     else:
         modification_time = None
     while True:
-        source_watcher.scan(modification_time=modification_time)
+        source_watcher.scan(
+            modification_time=modification_time, transfer_all=transfer_all
+        )
         time.sleep(15)
 
 
