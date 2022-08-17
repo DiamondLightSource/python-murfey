@@ -117,7 +117,7 @@ class DirWatcher(murfey.util.Observer):
     def _notify_for_transfer(self, file_candidate: str):
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
         if self._statusbar:
-            log.info("Increasing number to be transferred")
+            # log.info("Increasing number to be transferred")
             with self._statusbar.lock:
                 self._statusbar.transferred = [
                     self._statusbar.transferred[0],
