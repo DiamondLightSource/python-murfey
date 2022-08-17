@@ -156,10 +156,13 @@ def run():
 
     from pprint import pprint
 
-    print("Ongoing visits:")
-    ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
-    pprint(ongoing_visits)
-    ongoing_visits = [v.name for v in ongoing_visits]
+    if args.visit:
+        ongoing_visits = [args.visit]
+    else:
+        print("Ongoing visits:")
+        ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
+        pprint(ongoing_visits)
+        ongoing_visits = [v.name for v in ongoing_visits]
 
     _enable_webbrowser_in_cygwin()
 
