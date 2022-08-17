@@ -221,7 +221,7 @@ def run():
         source=Path(args.source),
         watcher=source_watcher,
         default_destination=args.destination
-        or f"/dls/{microscope}/{datetime.now().year}",
+        or f"/dls/{microscope}/data/{datetime.now().year}",
         demo=args.demo,
     )
 
