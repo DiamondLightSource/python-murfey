@@ -131,8 +131,14 @@ class TomographyContext(Context):
                 movie_uuid=next(MurfeyID),
                 motion_correction_uuid=next(MurfeyID),
             )
-        tilt_series = extract_tilt_series(file_path)
-        tilt_angle = extract_tilt_angle(file_path)
+        try:
+            tilt_series = extract_tilt_series(file_path)
+            tilt_angle = extract_tilt_angle(file_path)
+        except Exception:
+            logger.debug(
+                f"Tilt series and angle could not be determined for {file_path}"
+            )
+            return []
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
