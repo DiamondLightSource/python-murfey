@@ -212,7 +212,7 @@ class RSyncer(Observer):
                 # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
                 return
 
-            if line.startswith((".f", ">f")):
+            if line.startswith((".f", ">f", "<f")):
                 # .d          ./
                 # .f          README.md
                 # .f          tests/util/__pycache__/test_state.cpython-39-pytest-6.2.5.pyc
