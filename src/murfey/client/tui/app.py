@@ -4,6 +4,7 @@ from __future__ import annotations
 # import contextlib
 import logging
 import string
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
@@ -363,6 +364,8 @@ class MurfeyTUI(App):
         status_bar: StatusBar | None = None,
         dummy_dc: bool = True,
         do_transfer: bool = True,
+        rsync_process: RSyncer | None = None,
+        analyser: Analyser | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -383,6 +386,8 @@ class MurfeyTUI(App):
         self._dc_metadata: dict = {}
         self._dummy_dc = dummy_dc
         self._do_transfer = do_transfer
+        self.rsync_process = rsync_process
+        self.analyser = analyser
 
     @property
     def role(self) -> str:
@@ -391,14 +396,27 @@ class MurfeyTUI(App):
         return ""
 
     def _start_rsyncer(self, destination: str):
-        self.rsync_process = RSyncer(
-            self._source,
-            basepath_remote=Path(destination),
-            server_url=self._url,
-            local=self._environment.demo,
-            status_bar=self._statusbar,
-            do_transfer=self._do_transfer,
-        )
+        new_rsyncer = False
+        if not self.rsync_process:
+            self.rsync_process = RSyncer(
+                self._source,
+                basepath_remote=Path(destination),
+                server_url=self._url,
+                local=self._environment.demo,
+                status_bar=self._statusbar,
+                do_transfer=self._do_transfer,
+            )
+            new_rsyncer = True
+        else:
+            if self._environment.demo:
+                _remote = destination
+            else:
+                _remote = f"{self._url.hostname}::{destination}"
+            self.rsync_process._remote = _remote
+            self.thread = threading.Thread(
+                name=f"RSync {self._source.absolute()}:{_remote}",
+                target=self.rsync_process._process,
+            )
 
         def rsync_result(update: RSyncerUpdate):
             if not self.rsync_process:
@@ -414,12 +432,17 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
-            self.analyser = Analyser(
-                environment=self._environment if not self._dummy_dc else None
-            )
+            new_analyser = False
+            if not self.analyser:
+                self.analyser = Analyser(
+                    environment=self._environment if not self._dummy_dc else None
+                )
+                new_analyser = True
             if self._watcher:
-                self._watcher.subscribe(self.rsync_process.enqueue)
-                self._watcher.subscribe(self.analyser.enqueue)
+                if new_rsyncer:
+                    self._watcher.subscribe(self.rsync_process.enqueue)
+                if new_analyser:
+                    self._watcher.subscribe(self.analyser.enqueue)
             self.analyser.subscribe(self._data_collection_form)
             self.analyser.start()
 

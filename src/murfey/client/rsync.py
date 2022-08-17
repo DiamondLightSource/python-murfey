@@ -149,6 +149,8 @@ class RSyncer(Observer):
                         f"Unhandled exception {e} in RSync thread", exc_info=True
                     )
                     success = False
+            else:
+                success = True
 
             logger.info(f"Completed transfer of {len(files_to_transfer)} files")
             for _ in files_to_transfer:

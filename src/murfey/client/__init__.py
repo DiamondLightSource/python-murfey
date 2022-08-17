@@ -25,8 +25,10 @@ import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
+from murfey.client.analyser import Analyser
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.rsync import RSyncer
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
 from murfey.util.models import Visit
@@ -235,6 +237,20 @@ def run():
 
     ws.environment = instance_environment
 
+    rsync_process = RSyncer(
+        instance_environment.source,
+        basepath_remote=Path(
+            args.destination or f"/dls/{microscope}/data/{datetime.now().year}"
+        ),
+        server_url=murfey_url,
+        local=instance_environment.demo,
+        do_transfer=not args.no_transfer,
+    )
+    source_watcher.subscribe(rsync_process.enqueue)
+
+    analyser = Analyser(environment=instance_environment if args.real_dc else None)
+    source_watcher.subscribe(analyser.enqueue)
+
     rich_handler.redirect = True
     MurfeyTUI.run(
         log="textual.log",
@@ -245,6 +261,8 @@ def run():
         status_bar=status_bar,
         dummy_dc=not args.real_dc,
         do_transfer=not args.no_transfer,
+        rsync_process=rsync_process,
+        analyser=analyser,
     )
     rich_handler.redirect = False
 
