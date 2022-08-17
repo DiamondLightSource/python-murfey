@@ -195,9 +195,9 @@ class RSyncer(Observer):
                     raise RuntimeError(
                         f"Unexpected line {xfer_line} {line.split(chr(13))}"
                     )
-                assert (
-                    next_file is not None
-                ), f"Invalid state {xfer_line=}, {next_file=}"
+                if next_file is None:
+                    logger.warning(f"Invalid state {xfer_line=}, {next_file=}")
+                    return
                 transfer_success.add(next_file.file_path)
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
@@ -217,7 +217,9 @@ class RSyncer(Observer):
                 # .f          README.md
                 # .f          tests/util/__pycache__/test_state.cpython-39-pytest-6.2.5.pyc
                 # No transfer happening
-                assert next_file is None, f"Invalid state {line=}, {next_file=}"
+                if next_file is not None:
+                    logger.warning(f"Invalid state {line=}, {next_file=}")
+                    return
 
                 self._files_transferred += 1
                 if self._statusbar:
