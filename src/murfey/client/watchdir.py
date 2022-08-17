@@ -147,6 +147,9 @@ class DirWatcher(murfey.util.Observer):
             ):
                 result.update(self._scan_directory(entry_name))
             else:
+                # avoid textual log
+                if "textual" in str(entry):
+                    continue
                 try:
                     file_stat = entry.stat()
                 except FileNotFoundError:
