@@ -362,6 +362,7 @@ class MurfeyTUI(App):
         queues: Dict[str, Queue] | None = None,
         status_bar: StatusBar | None = None,
         dummy_dc: bool = True,
+        do_transfer: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -381,6 +382,7 @@ class MurfeyTUI(App):
         self._visit = ""
         self._dc_metadata: dict = {}
         self._dummy_dc = dummy_dc
+        self._do_transfer = do_transfer
 
     @property
     def role(self) -> str:
@@ -395,6 +397,7 @@ class MurfeyTUI(App):
             server_url=self._url,
             local=self._environment.demo,
             status_bar=self._statusbar,
+            do_transfer=self._do_transfer,
         )
 
         def rsync_result(update: RSyncerUpdate):

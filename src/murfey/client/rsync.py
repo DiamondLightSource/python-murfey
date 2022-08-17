@@ -51,9 +51,11 @@ class RSyncer(Observer):
         server_url: ParseResult,
         local: bool = False,
         status_bar: StatusBar | None = None,
+        do_transfer: bool = True,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
+        self._do_transfer = do_transfer
         if local:
             self._remote = str(basepath_remote)
         else:
@@ -139,11 +141,14 @@ class RSyncer(Observer):
                 pass
 
             logger.info(f"Preparing to transfer {len(files_to_transfer)} files")
-            try:
-                success = self._transfer(files_to_transfer)
-            except Exception as e:
-                logger.error(f"Unhandled exception {e} in RSync thread", exc_info=True)
-                success = False
+            if self._do_transfer:
+                try:
+                    success = self._transfer(files_to_transfer)
+                except Exception as e:
+                    logger.error(
+                        f"Unhandled exception {e} in RSync thread", exc_info=True
+                    )
+                    success = False
 
             logger.info(f"Completed transfer of {len(files_to_transfer)} files")
             for _ in files_to_transfer:

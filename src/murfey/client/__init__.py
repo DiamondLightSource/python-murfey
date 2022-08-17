@@ -132,6 +132,11 @@ def run():
         action="store_true",
         help="Transfer all files in current directory regardless of age",
     )
+    parser.add_argument(
+        "--no_transfer",
+        action="store_true",
+        help="Avoid actually transferring files",
+    )
 
     args = parser.parse_args()
 
@@ -159,6 +164,9 @@ def run():
     # make that happen, otherwise ensure client and server are compatible and
     # update if necessary.
     _check_for_updates(server=murfey_url, install_version=args.update)
+
+    if args.no_transfer:
+        log.info("No files will be transferred as --no_transfer flag was specified")
 
     from pprint import pprint
 
@@ -236,6 +244,7 @@ def run():
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
         dummy_dc=not args.real_dc,
+        do_transfer=not args.no_transfer,
     )
     rich_handler.redirect = False
 
