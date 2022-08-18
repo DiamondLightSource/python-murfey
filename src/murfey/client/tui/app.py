@@ -112,12 +112,31 @@ class HoverVisit(Widget):
                 self.app.input_box.lock = False
                 self.app._visit = self._text
                 self.app._environment.visit = self._text
+                machine_data = requests.get(
+                    f"{self.app._environment.url.geturl()}/machine"
+                ).json()
+                if self.app._default_destination:
+                    if machine_data.get(
+                        "data_directory"
+                    ) and self.app._environment.source == Path(
+                        machine_data["data_directory"]
+                    ):
+                        _default = self.app._default_destination + f"/{self._text}"
+                    elif self.app._environment.source:
+                        mid_path = self.app._environment.source.relative_to(
+                            self.app._default_destination
+                        )
+                        _default = (
+                            f"{self.app._default_destination}/{mid_path}/{self._text}"
+                        )
+                    else:
+                        _default = ""
+                else:
+                    _default = "unknown"
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
-                        default=self.app._default_destination + f"/{self._text}"
-                        if self.app._default_destination
-                        else "unknown",
+                        default=_default,
                         callback=self.app._start_rsyncer,
                     )
                 )
@@ -577,8 +596,8 @@ class MurfeyTUI(App):
         grid.add_areas(
             area1="left,top",
             area2="right,top-start|bottom-end",
-            area3="left,middle",
-            area4="left,bottom",
+            # area3="left,middle",
+            area3="left,bottom",
         )
 
         sub_view = DockView()
@@ -592,7 +611,7 @@ class MurfeyTUI(App):
             area2=self.log_book,
             # area3=self._statusbar,
             # area4=self.input_box,
-            area4=info_sub_view,
+            area3=info_sub_view,
         )
 
     async def action_quit(self) -> None:
