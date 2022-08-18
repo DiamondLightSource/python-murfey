@@ -56,6 +56,17 @@ class InputResponse(NamedTuple):
     model: BaseModel | None = None
 
 
+class InfoWidget(Widget):
+    text: Reactive[str] = Reactive("")
+
+    def __init__(self, text: str, **kwargs):
+        super().__init__(**kwargs)
+        self.text = text
+
+    def render(self) -> Panel:
+        return Panel(self.text, style=("on dark_magenta"), box=SQUARE)
+
+
 class HoverVisit(Widget):
     mouse_over = Reactive(False)
     lock: bool | None = None
@@ -68,12 +79,12 @@ class HoverVisit(Widget):
         if self.lock is None:
             return Panel(
                 self._text,
-                style=("on blue" if self.mouse_over else ""),
+                style=("on purple4" if self.mouse_over else ""),
                 box=SQUARE,
             )
         return Panel(
             self._text,
-            style=("on blue" if self.lock else ""),
+            style=("on purple4" if self.lock else ""),
             box=SQUARE,
         )
 
@@ -388,6 +399,7 @@ class MurfeyTUI(App):
         self._do_transfer = do_transfer
         self.rsync_process = rsync_process
         self.analyser = analyser
+        self._info_widget = InfoWidget("Welcome to Murfey :microscope:")
 
     @property
     def role(self) -> str:
@@ -508,6 +520,9 @@ class MurfeyTUI(App):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             requests.post(url, json=json)
 
+    def _update_info(self, new_text: str):
+        self._info_widget.text = new_text
+
     def _set_request_destination(self, response: str):
         if response == "y":
             self._request_destinations = True
@@ -556,11 +571,15 @@ class MurfeyTUI(App):
         sub_view = DockView()
         await sub_view.dock(*self.hovers, edge="top")
 
+        info_sub_view = DockView()
+        await info_sub_view.dock(self.input_box, self._info_widget, edge="top")
+
         grid.place(
             area1=sub_view,
             area2=self.log_book,
             # area3=self._statusbar,
-            area4=self.input_box,
+            # area4=self.input_box,
+            area4=info_sub_view,
         )
 
     async def action_quit(self) -> None:
