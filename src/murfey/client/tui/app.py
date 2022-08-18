@@ -51,6 +51,7 @@ class InputResponse(NamedTuple):
     allowed_responses: List[str] | None = None
     default: str = ""
     callback: Callable | None = None
+    key_change_callback: Callable | None = None
     kwargs: dict | None = None
     form: dict | None = None
     model: BaseModel | None = None
@@ -65,6 +66,12 @@ class InfoWidget(Widget):
 
     def render(self) -> Panel:
         return Panel(self.text, style=("on dark_magenta"), box=SQUARE)
+
+    def _key_change(self, input_char: str | None):
+        if input_char is None:
+            self.text = self.text[:-1]
+            return
+        self.text += input_char
 
 
 class HoverVisit(Widget):
@@ -152,6 +159,7 @@ class InputBox(Widget):
     can_focus = True
     lock: bool = True
     current_callback: Callable | None = None
+    key_change_callback: Callable | None = None
     _question: str = ""
     _form: Reactive[dict] = Reactive({})
 
@@ -242,6 +250,8 @@ class InputBox(Widget):
         ):
             if self._line == 0:
                 self.input_text = self.input_text[:-1]
+                if self.key_change_callback:
+                    self.key_change_callback(None)
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
@@ -267,6 +277,8 @@ class InputBox(Widget):
         elif key.key in string.printable:
             if self._line == 0:
                 self.input_text += key.key
+                if self.key_change_callback:
+                    self.key_change_callback(key.key)
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
