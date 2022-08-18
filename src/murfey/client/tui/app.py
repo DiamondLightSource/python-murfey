@@ -79,12 +79,12 @@ class HoverVisit(Widget):
         if self.lock is None:
             return Panel(
                 self._text,
-                style=("on purple4" if self.mouse_over else ""),
+                style=("on purple4" if self.mouse_over else "on medium_purple3"),
                 box=SQUARE,
             )
         return Panel(
             self._text,
-            style=("on purple4" if self.lock else ""),
+            style=("on purple4" if self.lock else "on bright_black"),
             box=SQUARE,
         )
 
@@ -101,6 +101,7 @@ class HoverVisit(Widget):
                 for h in self.app.hovers:
                     if isinstance(h, HoverVisit) and h != self:
                         h.lock = False
+                        h.refresh()
                 self.app.input_box.lock = False
                 self.app._visit = self._text
                 self.app._environment.visit = self._text
