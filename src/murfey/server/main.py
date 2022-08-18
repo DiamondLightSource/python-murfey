@@ -208,7 +208,6 @@ async def send_murfey_message(msg: RegistrationMessage):
 
 
 class ProcessFile(BaseModel):
-    base_path: str
     path: str
     description: str
     size: int
@@ -223,19 +222,22 @@ class ProcessFile(BaseModel):
 
 
 @app.post("/visits/{visit_name}/tomography_preprocess")
-async def request_tomography_preprocessing(proc_file: ProcessFile):
+async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+    path_parts = Path(proc_file.path).parts
+    visit_idx = path_parts.index(visit_name)
+    base_path = "/".join(path_parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
     mrc_out = (
         Path(proc_file.base_path)
         / "processed"
-        / ppath.relative_to(proc_file.base_path).parts[0]
+        / ppath.relative_to(base_path).parts[0]
         / "MotionCorr"
         / ppath.with_suffix("_motion_corrected.mrc").name
     )
     ctf_out = (
         Path(proc_file.base_path)
         / "processed"
-        / ppath.relative_to(proc_file.base_path).parts[0]
+        / ppath.relative_to(base_path).parts[0]
         / "CTF"
         / ppath.with_suffix("_ctf.mrc").name
     )
