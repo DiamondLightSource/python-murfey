@@ -187,11 +187,12 @@ def run():
     input_queue = Queue()
 
     rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    rich_handler.setLevel(logging.INFO)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
     logging.getLogger().addHandler(handler)
-    logging.getLogger("murfey").setLevel(logging.DEBUG)
+    logging.getLogger("murfey").setLevel(logging.INFO)
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
