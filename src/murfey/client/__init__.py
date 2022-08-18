@@ -139,6 +139,11 @@ def run():
         action="store_true",
         help="Avoid actually transferring files",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Turn on debugging logs",
+    )
 
     args = parser.parse_args()
 
@@ -187,7 +192,7 @@ def run():
     input_queue = Queue()
 
     rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
-    rich_handler.setLevel(logging.INFO)
+    rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
