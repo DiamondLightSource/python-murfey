@@ -598,7 +598,7 @@ class MurfeyTUI(App):
             area1="left,top",
             area2="right,top-start|bottom-end",
             # area3="left,middle",
-            area3="left,bottom",
+            area3="left,middle-start|bottom-end",
         )
 
         sub_view = DockView()
