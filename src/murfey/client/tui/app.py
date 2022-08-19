@@ -116,25 +116,28 @@ class HoverVisit(Widget):
                     f"{self.app._environment.url.geturl()}/machine"
                 ).json()
                 if self.app._default_destination:
-                    if (
-                        machine_data.get("data_directory")
-                        and self.app._environment.source
-                        and self.app._environment.source.resolve()
-                        == Path(machine_data["data_directory"])
-                    ):
-                        _default = self.app._default_destination + f"/{self._text}"
-                    elif self.app._environment.source:
-                        try:
-                            mid_path = (
-                                self.app._environment.source.resolve().relative_to(
-                                    machine_data["data_directory"]
+                    if machine_data.get("data_directories"):
+                        for data_dir in machine_data["data_directories"]:
+                            if (
+                                self.app._environment.source
+                                and self.app._environment.source.resolve()
+                                == Path(data_dir)
+                            ):
+                                _default = (
+                                    self.app._default_destination + f"/{self._text}"
                                 )
-                            )
-                            _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
-                        except (ValueError, KeyError):
-                            _default = f"{self.app._default_destination}/{self._text}"
-                    else:
-                        _default = ""
+                                break
+                            elif self.app._environment.source:
+                                try:
+                                    mid_path = self.app._environment.source.resolve().relative_to(
+                                        data_dir
+                                    )
+                                    _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    break
+                                except (ValueError, KeyError):
+                                    pass
+                        else:
+                            _default = ""
                 else:
                     _default = "unknown"
                 self.app._queues["input"].put_nowait(
