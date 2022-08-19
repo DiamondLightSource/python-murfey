@@ -113,7 +113,7 @@ class HoverVisit(Widget):
                 self.app._visit = self._text
                 self.app._environment.visit = self._text
                 machine_data = requests.get(
-                    f"{self.app._environment.url.geturl()}/machine"
+                    f"{self.app._environment.url.geturl()}/machine/"
                 ).json()
                 if self.app._default_destination:
                     if machine_data.get("data_directories"):
