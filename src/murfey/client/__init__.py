@@ -19,6 +19,7 @@ from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
+import procrunner
 import requests
 
 import murfey.client.rsync
@@ -293,6 +294,12 @@ def main_loop(
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
     )
+    if gain_ref:
+        gain_rsync = procrunner.run(["rsync", str(gain_ref)])
+        if gain_rsync.returncode:
+            log.warning(
+                f"Gain reference file {gain_ref} was not successfully transferred"
+            )
     if appearance_time > 0:
         modification_time: float | None = time.time() - appearance_time * 3600
     else:
