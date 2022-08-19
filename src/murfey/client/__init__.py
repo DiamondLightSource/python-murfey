@@ -252,7 +252,6 @@ def run():
 
     rich_handler.redirect = True
     MurfeyTUI.run(
-        log="textual.log",
         log_verbosity=2,
         environment=instance_environment,
         visits=ongoing_visits,
