@@ -123,12 +123,13 @@ class HoverVisit(Widget):
                     ):
                         _default = self.app._default_destination + f"/{self._text}"
                     elif self.app._environment.source:
-                        mid_path = self.app._environment.source.relative_to(
-                            self.app._default_destination
-                        )
-                        _default = (
-                            f"{self.app._default_destination}/{mid_path}/{self._text}"
-                        )
+                        try:
+                            mid_path = self.app._environment.source.relative_to(
+                                self.app._default_destination
+                            )
+                            _default = f"{self.app._default_destination}/{mid_path}/{self._text}"
+                        except ValueError:
+                            _default = f"{self.app._default_destination}/{self._text}"
                     else:
                         _default = ""
                 else:
