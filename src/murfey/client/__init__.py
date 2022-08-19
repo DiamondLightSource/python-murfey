@@ -228,16 +228,11 @@ def run():
     )
     main_loop_thread.start()
 
-    microscope_data = requests.get(
-        murfey_url._replace(path="/microscope").geturl()
-    ).json()
-    microscope = microscope_data.get("microscope")
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
-        default_destination=args.destination
-        or f"/dls/{microscope}/data/{datetime.now().year}",
+        default_destination=args.destination or f"data/{datetime.now().year}",
         demo=args.demo,
     )
 
@@ -245,9 +240,7 @@ def run():
 
     rsync_process = RSyncer(
         instance_environment.source,
-        basepath_remote=Path(
-            args.destination or f"/dls/{microscope}/data/{datetime.now().year}"
-        ),
+        basepath_remote=Path(args.destination or f"data/{datetime.now().year}"),
         server_url=murfey_url,
         local=instance_environment.demo,
         do_transfer=not args.no_transfer,
