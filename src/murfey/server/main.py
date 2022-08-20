@@ -66,7 +66,8 @@ async def root(request: Request):
 @app.get("/machine/")
 def machine_info():
     if settings.murfey_machine_configuration:
-        return from_file(settings.murfey_machine_configuration)
+        microscope = get_microscope()
+        return from_file(settings.murfey_machine_configuration, microscope)
     return {}
 
 
