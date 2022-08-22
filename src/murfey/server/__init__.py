@@ -24,8 +24,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.ispyb
-
-# from murfey.server.ispyb import DB
+from murfey.server.ispyb import DB
 from murfey.util.state import global_state
 
 try:
@@ -250,6 +249,7 @@ def _set_up_transport(transport_type):
 def feedback_callback(header: dict, message: dict) -> None:
     record = None
     if message["register"] == "motion_corrected":
+        # murfey client check_for_alignment
         if global_state.get("motion_corrected") and isinstance(
             global_state["motion_corrected"], list
         ):
@@ -346,8 +346,8 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        # DB.add(record)
-        # DB.commit()
+        DB.add(record)
+        DB.commit()
         # _transport_object.transport.ack(header, requeue=False)
         return 1
         return getattr(record, record.__table__.primary_key.columns[0].name)

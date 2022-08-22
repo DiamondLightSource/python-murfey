@@ -218,7 +218,7 @@ class ProcessFile(BaseModel):
 @app.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(proc_file: ProcessFile):
     zocalo_message = {
-        "recipes": ["em_tomo_preprocess"],
+        "recipes": ["em-tomo-preprocess"],
         "parameters": {
             "dcid": proc_file.data_collection_id,
             "autoproc_program_id": proc_file.autoproc_program_id,
@@ -248,28 +248,34 @@ class TiltSeries(BaseModel):
     name: str
     tilts: List[str]
     processing_job: int
+    autoproc_program_id: int
+    stack_file: str
+    movie_id: int
 
 
 @app.post("/visits/{visit_name}/align")
 async def request_tilt_series_alignment(tilt_series: TiltSeries):
     zocalo_message = {
-        "recipes": ["em_align"],
+        "recipes": ["em-align"],
         "parameters": {
             "ispyb_process": tilt_series.processing_job,
             "tilts": tilt_series.tilts,
+            "appid": tilt_series.autoproc_program_id,
+            "stack_file": tilt_series.stack_file,
+            "movie_id": tilt_series.movie_id,
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
-    if _transport_object:
-        _transport_object.transport.send("processing_recipe", zocalo_message)
-    else:
-        log.error(
-            f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
-        )
-        return tilt_series
-    await ws.manager.broadcast(
-        f"Processing requested for tilt series {tilt_series.name}"
-    )
+    # if _transport_object:
+    #    _transport_object.transport.send("processing_recipe", zocalo_message)
+    # else:
+    #    log.error(
+    #        f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
+    #    )
+    #    return tilt_series
+    # await ws.manager.broadcast(
+    #    f"Processing requested for tilt series {tilt_series.name}"
+    # )
     return tilt_series
 
 
