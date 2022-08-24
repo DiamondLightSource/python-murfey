@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 import socket
@@ -24,7 +25,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.ispyb
-from murfey.server.ispyb import DB
+import murfey.server.websocket
+from murfey.server.ispyb import Session
 from murfey.util.state import global_state
 
 try:
@@ -249,13 +251,24 @@ def _set_up_transport(transport_type):
 def feedback_callback(header: dict, message: dict) -> None:
     record = None
     if message["register"] == "motion_corrected":
-        # murfey client check_for_alignment
+        if murfey.server.websocket.manager:
+            asyncio.run(
+                murfey.server.websocket.manager.broadcast_json(
+                    {
+                        "message": "mc-message",
+                        "movie": message["movie"],
+                        "mc-path": message["mrc_out"],
+                    }
+                )
+            )
         if global_state.get("motion_corrected") and isinstance(
             global_state["motion_corrected"], list
         ):
             global_state["motion_corrected"].append(message["movie"])
         else:
             global_state["motion_corrected"] = [message["movie"]]
+        if _transport_object:
+            _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection_group":
         record = DataCollectionGroup(
@@ -268,7 +281,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.nack(header)
                 return None
             global_state["data_collection_group_id"] = dcgid
-            _transport_object.transport.ack(header)
+        _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
         record = DataCollection(
@@ -346,8 +359,8 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        DB.add(record)
-        DB.commit()
+        Session().add(record)
+        Session().commit()
         # _transport_object.transport.ack(header, requeue=False)
         return 1
         return getattr(record, record.__table__.primary_key.columns[0].name)
