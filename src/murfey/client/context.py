@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 from typing import Callable, Dict, List
 
-import mdocfile
 import requests
 import xmltodict
 from pydantic import BaseModel
@@ -15,6 +14,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
+from murfey.util.mdoc import get_global_data
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -177,8 +177,14 @@ class TomographyContext(Context):
                 movie_uuid=next(MurfeyID),
                 motion_correction_uuid=next(MurfeyID),
             )
-        tilt_series = extract_tilt_series(file_path)
-        tilt_angle = extract_tilt_angle(file_path)
+        try:
+            tilt_series = extract_tilt_series(file_path)
+            tilt_angle = extract_tilt_angle(file_path)
+        except Exception:
+            logger.debug(
+                f"Tilt series and angle could not be determined for {file_path}"
+            )
+            return []
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
@@ -351,12 +357,15 @@ class TomographyContext(Context):
             )
             metadata["dose_per_frame"] = None
             return metadata
-        mdoc_data = mdocfile.read(metadata_file)
+        with open(metadata_file, "r") as md:
+            mdoc_data = get_global_data(md)
+        if not mdoc_data:
+            return {}
         mdoc_metadata: dict = {}
         mdoc_metadata["experiment_type"] = "tomography"
-        mdoc_metadata["voltage"] = mdoc_data.iloc[0].voltage
-        mdoc_metadata["image_size_x"] = mdoc_data.iloc[0].image_size[0]
-        mdoc_metadata["image_size_y"] = mdoc_data.iloc[0].image_size[1]
-        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data.iloc[0].pixel_spacing)
+        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
+        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
+        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data["PixelSpacing"])
         mdoc_metadata["dose_per_frame"] = None
         return mdoc_metadata

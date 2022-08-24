@@ -4,6 +4,7 @@ from __future__ import annotations
 # import contextlib
 import logging
 import string
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
@@ -50,9 +51,27 @@ class InputResponse(NamedTuple):
     allowed_responses: List[str] | None = None
     default: str = ""
     callback: Callable | None = None
+    key_change_callback: Callable | None = None
     kwargs: dict | None = None
     form: dict | None = None
     model: BaseModel | None = None
+
+
+class InfoWidget(Widget):
+    text: Reactive[str] = Reactive("")
+
+    def __init__(self, text: str, **kwargs):
+        super().__init__(**kwargs)
+        self.text = text
+
+    def render(self) -> Panel:
+        return Panel(self.text, style=("on dark_magenta"), box=SQUARE)
+
+    def _key_change(self, input_char: str | None):
+        if input_char is None:
+            self.text = self.text[:-1]
+            return
+        self.text += input_char
 
 
 class HoverVisit(Widget):
@@ -67,12 +86,12 @@ class HoverVisit(Widget):
         if self.lock is None:
             return Panel(
                 self._text,
-                style=("on blue" if self.mouse_over else ""),
+                style=("on purple4" if self.mouse_over else "on medium_purple3"),
                 box=SQUARE,
             )
         return Panel(
             self._text,
-            style=("on blue" if self.lock else ""),
+            style=("on purple4" if self.lock else "on bright_black"),
             box=SQUARE,
         )
 
@@ -89,15 +108,42 @@ class HoverVisit(Widget):
                 for h in self.app.hovers:
                     if isinstance(h, HoverVisit) and h != self:
                         h.lock = False
+                        h.refresh()
                 self.app.input_box.lock = False
                 self.app._visit = self._text
                 self.app._environment.visit = self._text
+                machine_data = requests.get(
+                    f"{self.app._environment.url.geturl()}/machine/"
+                ).json()
+                if self.app._default_destination:
+                    if machine_data.get("data_directories"):
+                        for data_dir in machine_data["data_directories"]:
+                            if (
+                                self.app._environment.source
+                                and self.app._environment.source.resolve()
+                                == Path(data_dir)
+                            ):
+                                _default = (
+                                    self.app._default_destination + f"/{self._text}"
+                                )
+                                break
+                            elif self.app._environment.source:
+                                try:
+                                    mid_path = self.app._environment.source.resolve().relative_to(
+                                        data_dir
+                                    )
+                                    _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    break
+                                except (ValueError, KeyError):
+                                    pass
+                        else:
+                            _default = ""
+                else:
+                    _default = "unknown"
                 self.app._queues["input"].put_nowait(
                     InputResponse(
                         question="Transfer to: ",
-                        default=self.app._default_destination + f"/{self._text}"
-                        if self.app._default_destination
-                        else "unknown",
+                        default=_default,
                         callback=self.app._start_rsyncer,
                     )
                 )
@@ -139,6 +185,7 @@ class InputBox(Widget):
     can_focus = True
     lock: bool = True
     current_callback: Callable | None = None
+    key_change_callback: Callable | None = None
     _question: str = ""
     _form: Reactive[dict] = Reactive({})
 
@@ -229,6 +276,8 @@ class InputBox(Widget):
         ):
             if self._line == 0:
                 self.input_text = self.input_text[:-1]
+                if self.key_change_callback:
+                    self.key_change_callback(None)
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
@@ -254,6 +303,8 @@ class InputBox(Widget):
         elif key.key in string.printable:
             if self._line == 0:
                 self.input_text += key.key
+                if self.key_change_callback:
+                    self.key_change_callback(key.key)
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
@@ -361,6 +412,10 @@ class MurfeyTUI(App):
         visits: List[str] | None = None,
         queues: Dict[str, Queue] | None = None,
         status_bar: StatusBar | None = None,
+        dummy_dc: bool = True,
+        do_transfer: bool = True,
+        rsync_process: RSyncer | None = None,
+        analyser: Analyser | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -379,6 +434,11 @@ class MurfeyTUI(App):
         self._tmp_responses: List[dict] = []
         self._visit = ""
         self._dc_metadata: dict = {}
+        self._dummy_dc = dummy_dc
+        self._do_transfer = do_transfer
+        self.rsync_process = rsync_process
+        self.analyser = analyser
+        self._info_widget = InfoWidget("Welcome to Murfey :microscope:")
 
     @property
     def role(self) -> str:
@@ -387,13 +447,27 @@ class MurfeyTUI(App):
         return ""
 
     def _start_rsyncer(self, destination: str):
-        self.rsync_process = RSyncer(
-            self._source,
-            basepath_remote=Path(destination),
-            server_url=self._url,
-            local=self._environment.demo,
-            status_bar=self._statusbar,
-        )
+        new_rsyncer = False
+        if not self.rsync_process:
+            self.rsync_process = RSyncer(
+                self._source,
+                basepath_remote=Path(destination),
+                server_url=self._url,
+                local=self._environment.demo,
+                status_bar=self._statusbar,
+                do_transfer=self._do_transfer,
+            )
+            new_rsyncer = True
+        else:
+            if self._environment.demo:
+                _remote = destination
+            else:
+                _remote = f"{self._url.hostname}::{destination}"
+            self.rsync_process._remote = _remote
+            self.thread = threading.Thread(
+                name=f"RSync {self._source.absolute()}:{_remote}",
+                target=self.rsync_process._process,
+            )
 
         def rsync_result(update: RSyncerUpdate):
             if not self.rsync_process:
@@ -409,10 +483,17 @@ class MurfeyTUI(App):
         if self.rsync_process:
             self.rsync_process.subscribe(rsync_result)
             self.rsync_process.start()
-            self.analyser = Analyser(environment=self._environment)
+            new_analyser = False
+            if not self.analyser:
+                self.analyser = Analyser(
+                    environment=self._environment if not self._dummy_dc else None
+                )
+                new_analyser = True
             if self._watcher:
-                self._watcher.subscribe(self.rsync_process.enqueue)
-                self._watcher.subscribe(self.analyser.enqueue)
+                if new_rsyncer:
+                    self._watcher.subscribe(self.rsync_process.enqueue)
+                if new_analyser:
+                    self._watcher.subscribe(self.analyser.enqueue)
             self.analyser.subscribe(self._data_collection_form)
             self.analyser.start()
 
@@ -455,6 +536,8 @@ class MurfeyTUI(App):
             self._tmp_responses.append(response)
 
     def _start_dc(self, json):
+        if self._dummy_dc:
+            return
         self._environment.data_collection_parameters = json
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {
@@ -475,6 +558,9 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             requests.post(url, json=json)
+
+    def _update_info(self, new_text: str):
+        self._info_widget.text = new_text
 
     def _set_request_destination(self, response: str):
         if response == "y":
@@ -517,18 +603,22 @@ class MurfeyTUI(App):
         grid.add_areas(
             area1="left,top",
             area2="right,top-start|bottom-end",
-            area3="left,middle",
-            area4="left,bottom",
+            # area3="left,middle",
+            area3="left,middle-start|bottom-end",
         )
 
         sub_view = DockView()
         await sub_view.dock(*self.hovers, edge="top")
 
+        info_sub_view = DockView()
+        await info_sub_view.dock(self.input_box, self._info_widget, edge="top")
+
         grid.place(
             area1=sub_view,
             area2=self.log_book,
             # area3=self._statusbar,
-            area4=self.input_box,
+            # area4=self.input_box,
+            area3=info_sub_view,
         )
 
     async def action_quit(self) -> None:

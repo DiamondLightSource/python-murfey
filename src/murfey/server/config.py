@@ -11,6 +11,8 @@ class MachineConfig(BaseModel):
     name: str
     acquisition_software: List[str]
     calibrations: Dict[str, Union[dict, float]]
+    data_directories: List[Path]
+    gain_reference_directory: Path
 
 
 def from_file(config_file_path: Path) -> MachineConfig:

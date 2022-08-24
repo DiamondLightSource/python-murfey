@@ -51,9 +51,11 @@ class RSyncer(Observer):
         server_url: ParseResult,
         local: bool = False,
         status_bar: StatusBar | None = None,
+        do_transfer: bool = True,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
+        self._do_transfer = do_transfer
         if local:
             self._remote = str(basepath_remote)
         else:
@@ -139,11 +141,16 @@ class RSyncer(Observer):
                 pass
 
             logger.info(f"Preparing to transfer {len(files_to_transfer)} files")
-            try:
-                success = self._transfer(files_to_transfer)
-            except Exception as e:
-                logger.error(f"Unhandled exception {e} in RSync thread", exc_info=True)
-                success = False
+            if self._do_transfer:
+                try:
+                    success = self._transfer(files_to_transfer)
+                except Exception as e:
+                    logger.error(
+                        f"Unhandled exception {e} in RSync thread", exc_info=True
+                    )
+                    success = False
+            else:
+                success = True
 
             logger.info(f"Completed transfer of {len(files_to_transfer)} files")
             for _ in files_to_transfer:
@@ -188,9 +195,9 @@ class RSyncer(Observer):
                     raise RuntimeError(
                         f"Unexpected line {xfer_line} {line.split(chr(13))}"
                     )
-                assert (
-                    next_file is not None
-                ), f"Invalid state {xfer_line=}, {next_file=}"
+                if next_file is None:
+                    logger.warning(f"Invalid state {xfer_line=}, {next_file=}")
+                    return
                 transfer_success.add(next_file.file_path)
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
@@ -205,12 +212,14 @@ class RSyncer(Observer):
                 # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
                 return
 
-            if line.startswith((".f", ">f")):
+            if line.startswith((".f", ">f", "<f")):
                 # .d          ./
                 # .f          README.md
                 # .f          tests/util/__pycache__/test_state.cpython-39-pytest-6.2.5.pyc
                 # No transfer happening
-                assert next_file is None, f"Invalid state {line=}, {next_file=}"
+                if next_file is not None:
+                    logger.warning(f"Invalid state {line=}, {next_file=}")
+                    return
 
                 self._files_transferred += 1
                 if self._statusbar:

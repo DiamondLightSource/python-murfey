@@ -116,6 +116,10 @@ def run():
         "--demo",
         action="store_true",
     )
+    parser.add_argument(
+        "--feedback",
+        action="store_true",
+    )
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -145,7 +149,8 @@ def run():
 
     rabbit_thread = Thread(target=feedback_listen, daemon=True)
     logger.info("Starting Murfey RabbitMQ thread")
-    rabbit_thread.start()
+    if args.feedback:
+        rabbit_thread.start()
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"

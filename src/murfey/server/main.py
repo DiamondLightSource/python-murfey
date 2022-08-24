@@ -70,6 +70,12 @@ def machine_info():
     return {}
 
 
+@app.get("/microscope/")
+def get_mic():
+    microscope = get_microscope()
+    return {"microscope": microscope}
+
+
 @app.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
     microscope = get_microscope()
@@ -216,16 +222,38 @@ class ProcessFile(BaseModel):
 
 
 @app.post("/visits/{visit_name}/tomography_preprocess")
-async def request_tomography_preprocessing(proc_file: ProcessFile):
+async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+    path_parts = Path(proc_file.path).parts
+    visit_idx = path_parts.index(visit_name)
+    base_path = "/".join(path_parts[: visit_idx + 1])
+    ppath = Path(proc_file.path)
+    mrc_out = (
+        Path(proc_file.base_path)
+        / "processed"
+        / ppath.relative_to(base_path).parts[0]
+        / "MotionCorr"
+        / ppath.with_suffix("_motion_corrected.mrc").name
+    )
+    ctf_out = (
+        Path(proc_file.base_path)
+        / "processed"
+        / ppath.relative_to(base_path).parts[0]
+        / "CTF"
+        / ppath.with_suffix("_ctf.mrc").name
+    )
+    if not mrc_out.parent.exists():
+        mrc_out.parent.mkdir(parents=True)
+    if not ctf_out.parent.exists():
+        ctf_out.parent.mkdir(parents=True)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
             "dcid": proc_file.data_collection_id,
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
-            "mrc_out": str(Path(proc_file.path).with_suffix("_motion_corrected.mrc")),
+            "mrc_out": mrc_out,
             "pix_size": proc_file.pixel_size,
-            "output_image": str(Path(proc_file.path).with_suffix("_ctf.mrc")),
+            "output_image": ctf_out,
             "image_number": proc_file.image_number,
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,

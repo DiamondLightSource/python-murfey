@@ -28,7 +28,7 @@ steps:
     versionSpec: '$(PYTHON_VERSION)'
   displayName: 'Use Python $(PYTHON_VERSION)'
 
-- task: DownloadBuildArtifacts@0
+- task: DownloadBuildArtifacts@0.206.0
   displayName: Get pre-built package
   inputs:
     buildType: 'current'
@@ -36,7 +36,7 @@ steps:
     artifactName: 'package'
     downloadPath: '$(System.ArtifactsDirectory)'
 
-- task: ExtractFiles@1
+- task: ExtractFiles@1.200.0
   displayName: Checkout sources
   inputs:
     archiveFilePatterns: "$(System.ArtifactsDirectory)/package/repo-source.tar.gz"
