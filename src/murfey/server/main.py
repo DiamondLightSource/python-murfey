@@ -329,6 +329,21 @@ def shutdown():
     return {"success": True}
 
 
+class SuggestedPathParameters(BaseModel):
+    base_path: Path
+
+
+@app.post("/visits/{visit_name}/suggested_path")
+def suggest_path(visit_name, params: SuggestedPathParameters):
+    count: int | None = None
+    check_path = Path(f"/dls/{get_microscope()}") / params.base_path
+    check_path_name = check_path.name
+    while check_path.exists():
+        count = count + 1 if count else 2
+        check_path = check_path.parent / f"{check_path_name}{count}"
+    return {"suggested_path": check_path}
+
+
 class DCGroupParameters(BaseModel):
     experiment_type: str
 
