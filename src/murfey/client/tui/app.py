@@ -133,7 +133,23 @@ class HoverVisit(Widget):
                                     mid_path = self.app._environment.source.resolve().relative_to(
                                         data_dir
                                     )
-                                    _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    if self.app.analyser:
+                                        if self.app.analyser._role == "detector":
+                                            suggested_path_response = requests.post(
+                                                url=f"{str(self.app._url.geturl())}/visits/{self._text}/suggested_path",
+                                                json={
+                                                    "base_path": f"{self.app._default_destination}/{self._text}/{mid_path.parent}/raw"
+                                                },
+                                            )
+                                            _default = (
+                                                suggested_path_response.json().get(
+                                                    "suggested_path"
+                                                )
+                                            )
+                                        else:
+                                            _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    else:
+                                        _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
                                     break
                                 except (ValueError, KeyError):
                                     pass

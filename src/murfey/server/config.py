@@ -8,14 +8,13 @@ from pydantic import BaseModel
 
 
 class MachineConfig(BaseModel):
-    name: str
     acquisition_software: List[str]
     calibrations: Dict[str, Union[dict, float]]
     data_directories: List[Path]
     gain_reference_directory: Path
 
 
-def from_file(config_file_path: Path) -> MachineConfig:
+def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
-    return MachineConfig(**config)
+    return MachineConfig(**config.get(microscope, {}))
