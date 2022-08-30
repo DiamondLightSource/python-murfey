@@ -234,7 +234,7 @@ def run():
     main_loop_thread = Thread(
         target=main_loop,
         args=[source_watcher, args.appearance_time, args.transfer_all],
-        kwargs={"gain_ref", gain_ref},
+        kwargs={"gain_ref": gain_ref},
         daemon=True,
     )
     main_loop_thread.start()

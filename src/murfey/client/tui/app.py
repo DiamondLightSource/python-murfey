@@ -116,6 +116,7 @@ class HoverVisit(Widget):
                 machine_data = requests.get(
                     f"{self.app._environment.url.geturl()}/machine/"
                 ).json()
+                _default = ""
                 if self.app._default_destination:
                     if machine_data.get("data_directories"):
                         for data_dir in machine_data["data_directories"]:
@@ -152,6 +153,7 @@ class HoverVisit(Widget):
                                         _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
                                     break
                                 except (ValueError, KeyError):
+                                    _default = ""
                                     pass
                         else:
                             _default = ""

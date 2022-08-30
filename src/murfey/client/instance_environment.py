@@ -88,6 +88,6 @@ class MurfeyInstanceEnvironment(BaseModel):
                 for k in set(values["motion_corrected_movies"].keys()) ^ set(v.keys()):
                     l(k, v[k], _url)
             else:
-                for k, val in v.items():
-                    l(k, val, _url)
+                for k in v.keys():
+                    l(k)
         return v
