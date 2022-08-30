@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from itertools import count
 from pathlib import Path
+from threading import RLock
 from typing import Callable, Dict, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
@@ -20,6 +21,9 @@ class MovieTracker(NamedTuple):
     movie_number: int
     movie_uuid: int
     motion_correction_uuid: int
+
+
+global_env_lock = RLock()
 
 
 class MurfeyInstanceEnvironment(BaseModel):
@@ -44,28 +48,31 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     @validator("data_collection_group_id")
     def dcg_callback(cls, v, values):
-        for l in values.get("listeners", {}).get("data_collection_group_id", []):
-            l()
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("data_collection_group_id", []):
+                l()
 
     @validator("data_collection_ids")
     def dc_callback(cls, v, values):
-        for l in values.get("listeners", {}).get("data_collection_ids", []):
-            if values.get("data_collection_ids"):
-                for k in set(values["data_collection_ids"].keys()) ^ set(v.keys()):
-                    l(k)
-            else:
-                for k in v.keys():
-                    l(k)
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("data_collection_ids", []):
+                if values.get("data_collection_ids"):
+                    for k in set(values["data_collection_ids"].keys()) ^ set(v.keys()):
+                        l(k)
+                else:
+                    for k in v.keys():
+                        l(k)
 
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
-        for l in values.get("listeners", {}).get("autoproc_program_ids", []):
-            if values.get("autoproc_program_ids"):
-                for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
-                    l(k)
-            else:
-                for k in v.keys():
-                    l(k)
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("autoproc_program_ids", []):
+                if values.get("autoproc_program_ids"):
+                    for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
+                        l(k)
+                else:
+                    for k in v.keys():
+                        l(k)
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):

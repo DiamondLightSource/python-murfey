@@ -223,6 +223,7 @@ class ProcessFile(BaseModel):
 
 @app.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+    print("RECEIVED PRE REQUEST")
     path_parts = Path(proc_file.path).parts
     visit_idx = path_parts.index(visit_name)
     base_path = "/".join(path_parts[: visit_idx + 1])
@@ -425,7 +426,7 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     }
 
     if _transport_object:
-        log.debug(
+        log.info(
             f"Send processing registration message to murfey_feedback: {proc_parameters}"
         )
         _transport_object.transport.send(

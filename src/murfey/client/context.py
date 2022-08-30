@@ -13,6 +13,7 @@ from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
+    global_env_lock,
 )
 from murfey.util.mdoc import get_global_data
 
@@ -90,8 +91,11 @@ class TomographyContext(Context):
         logger.debug(
             f"Flushing preprocessing job {tag}: {self._preprocessing_triggers.get(tag)}"
         )
+        logger.error(f"here preprocess {tag}")
         if tr := self._preprocessing_triggers.get(tag):
+            logger.error(f"TR {tr}")
             process_file = self._complete_process_file(tr[1], tr[2])
+            logger.error(f"PROCESS {process_file}")
             if process_file:
                 requests.post(tr[0], json=process_file)
                 self._preprocessing_triggers.pop(tag)
@@ -145,23 +149,46 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment,
     ) -> dict:
         try:
-            tag = incomplete_process_file.tag
-            return {
-                "path": str(incomplete_process_file.path),
-                "description": incomplete_process_file.description,
-                "size": incomplete_process_file.path.stat().st_size,
-                "timestamp": incomplete_process_file.path.stat().st_ctime,
-                "processing_job": environment._processing_jobs[tag],
-                "data_collection_id": environment._data_collections[tag],
-                "image_number": incomplete_process_file.image_number,
-                "pixel_size": environment.data_collection_parameters[
-                    "pixel_size_on_image"
-                ],
-                "autoproc_program_id": environment.autoproc_program_ids[tag],
-                "mc_uuid": incomplete_process_file.mc_uuid,
-                "movie_uuid": incomplete_process_file.movie_uuid,
-            }
-        except KeyError:
+            with global_env_lock:
+                tag = incomplete_process_file.tag
+                logger.error(f"TAG {tag}")
+                logger.error(f"path {str(incomplete_process_file.path)}")
+                logger.error(f"description {incomplete_process_file.description}")
+                logger.error(f"size {incomplete_process_file.path.stat().st_size}")
+                logger.error(
+                    f"timestamp {incomplete_process_file.path.stat().st_ctime}"
+                )
+                logger.error(f"PJIDs {environment.processing_job_ids}")
+                logger.error(f"processing_job {environment.processing_job_ids[tag]}")
+                logger.error(f"DCs {environment.data_collection_ids}")
+                # logger.error(f"data_collection_id {environment.data_collection_ids[tag]}")
+                logger.error(f"Im number {incomplete_process_file.image_number}")
+                logger.error(
+                    f"pixel_size {environment.data_collection_parameters['pixel_size_on_image']}"
+                )
+                logger.error(f"APPIDs {environment.autoproc_program_ids}")
+                # logger.error(f"autoproc_program_id {environment.autoproc_program_ids[tag]}")
+                logger.error(f"mc_uuid {incomplete_process_file.mc_uuid}")
+                logger.error(f"movie_uuid {incomplete_process_file.movie_uuid}")
+
+                new_dict = {
+                    "path": str(incomplete_process_file.path),
+                    "description": incomplete_process_file.description,
+                    "size": incomplete_process_file.path.stat().st_size,
+                    "timestamp": incomplete_process_file.path.stat().st_ctime,
+                    "processing_job": environment.processing_job_ids[tag],
+                    "image_number": incomplete_process_file.image_number,
+                    "pixel_size": environment.data_collection_parameters[
+                        "pixel_size_on_image"
+                    ],
+                    "autoproc_program_id": environment.autoproc_program_ids[tag],
+                    "mc_uuid": incomplete_process_file.mc_uuid,
+                    "movie_uuid": incomplete_process_file.movie_uuid,
+                }
+                logger.error(f"DICT {new_dict}")
+                return new_dict
+        except KeyError as e:
+            logger.error(f"ERROR, {e}")
             return {}
 
     def _add_tilt(
@@ -223,7 +250,13 @@ class TomographyContext(Context):
                         mc_uuid=environment.movies[file_path].motion_correction_uuid,
                         tag=tilt_series,
                     )
+                    logger.warning(
+                        f"ADD TILT APPID {environment.autoproc_program_ids}, PJID {environment.processing_job_ids}"
+                    )
                     if (
+                        environment.autoproc_program_ids is None
+                        or environment.processing_job_ids is None
+                    ) or (
                         environment.autoproc_program_ids.get(tilt_series) is None
                         or environment.processing_job_ids.get(tilt_series) is None
                     ):
@@ -232,11 +265,15 @@ class TomographyContext(Context):
                             pfi,
                             environment,
                         )
+                        logger.error(
+                            f"Triggers {len(self._preprocessing_triggers)}, tilt {tilt_series}"
+                        )
                     else:
                         process_file = self._complete_process_file(pfi, environment)
                         requests.post(preproc_url, json=process_file)
+                        logger.error(f"POSTED {preproc_url} {process_file}")
             except Exception as e:
-                logger.error(e)
+                logger.error(f"ERROR {e}")
         else:
             self._tilt_series[tilt_series].append(file_path)
         if self._last_transferred_file:

@@ -130,6 +130,11 @@ class WSApp:
     def _register_id(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
             setattr(self.environment, attribute, value)
+            log.warning(f"Succeded for attribute {attribute}, {value}")
+        else:
+            log.warning(
+                f"Failed for attribute {attribute}: {hasattr(self.environment, attribute)}"
+            )
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
         log.error(str(error))
