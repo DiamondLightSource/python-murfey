@@ -127,29 +127,35 @@ class HoverVisit(Widget):
                                 _default = (
                                     self.app._default_destination + f"/{self._text}"
                                 )
+                                if self.app.analyser:
+                                    self.app.analyser._role = machine_data[
+                                        "data_directories"
+                                    ][data_dir]
                                 break
                             elif self.app._environment.source:
                                 try:
                                     mid_path = self.app._environment.source.resolve().relative_to(
                                         data_dir
                                     )
-                                    if self.app.analyser:
-                                        if self.app.analyser._role == "detector":
-                                            suggested_path_response = requests.post(
-                                                url=f"{str(self.app._url.geturl())}/visits/{self._text}/suggested_path",
-                                                json={
-                                                    "base_path": f"{self.app._default_destination}/{self._text}/{mid_path.parent}/raw"
-                                                },
-                                            )
-                                            _default = (
-                                                suggested_path_response.json().get(
-                                                    "suggested_path"
-                                                )
-                                            )
-                                        else:
-                                            _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    if (
+                                        machine_data["data_directories"][data_dir]
+                                        == "detector"
+                                    ):
+                                        suggested_path_response = requests.post(
+                                            url=f"{str(self.app._url.geturl())}/visits/{self._text}/suggested_path",
+                                            json={
+                                                "base_path": f"{self.app._default_destination}/{self._text}/{mid_path.parent}/raw"
+                                            },
+                                        )
+                                        _default = suggested_path_response.json().get(
+                                            "suggested_path"
+                                        )
                                     else:
                                         _default = f"{self.app._default_destination}/{self._text}/{mid_path}"
+                                    if self.app.analyser:
+                                        self.app.analyser._role = machine_data[
+                                            "data_directories"
+                                        ][data_dir]
                                     break
                                 except (ValueError, KeyError):
                                     _default = ""
