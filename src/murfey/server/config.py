@@ -10,7 +10,7 @@ from pydantic import BaseModel
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Union[dict, float]]
-    data_directories: List[Path]
+    data_directories: Dict[str, List[Path]]
     gain_reference_directory: Optional[Path] = None
 
 
