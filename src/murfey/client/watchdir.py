@@ -39,12 +39,12 @@ class DirWatcher(murfey.util.Observer):
 
     def scan(self, modification_time: float | None = None, transfer_all: bool = False):
         try:
-            t_start = time.perf_counter()
+            # t_start = time.perf_counter()
             filelist = self._scan_directory(
                 modification_time=self._modification_overwrite or modification_time
             )
-            t_scan = time.perf_counter() - t_start
-            log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
+            # t_scan = time.perf_counter() - t_start
+            # log.info(f"Scan of {self._basepath} completed in {t_scan:.1f} seconds")
             scan_completion = time.time()
 
             for entry, entry_info in filelist.items():
