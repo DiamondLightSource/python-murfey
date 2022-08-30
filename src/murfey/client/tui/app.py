@@ -156,6 +156,8 @@ class HoverVisit(Widget):
                                     pass
                         else:
                             _default = ""
+                    else:
+                        _default = self.app._default_destination + f"/{self._text}"
                 else:
                     _default = "unknown"
                 self.app._queues["input"].put_nowait(
