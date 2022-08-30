@@ -45,6 +45,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     def dcg_callback(cls, v, values):
         for l in values.get("listeners", {}).get("data_collection_group_id", []):
             l()
+        return v
 
     @validator("data_collection_ids")
     def dc_callback(cls, v, values):
@@ -55,6 +56,7 @@ class MurfeyInstanceEnvironment(BaseModel):
             else:
                 for k in v.keys():
                     l(k)
+        return v
 
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
@@ -65,3 +67,4 @@ class MurfeyInstanceEnvironment(BaseModel):
             else:
                 for k in v.keys():
                     l(k)
+        return v
