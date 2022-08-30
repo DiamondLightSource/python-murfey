@@ -118,11 +118,7 @@ class HoverVisit(Widget):
                 _default = ""
                 if self.app._default_destination:
                     if machine_data.get("data_directories"):
-                        for data_dir in [
-                            dd
-                            for dl in machine_data["data_directories"].values()
-                            for dd in dl
-                        ]:
+                        for data_dir in machine_data["data_directories"].keys():
                             if (
                                 self.app._environment.source
                                 and self.app._environment.source.resolve()
