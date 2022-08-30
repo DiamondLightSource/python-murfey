@@ -51,6 +51,7 @@ class MurfeyInstanceEnvironment(BaseModel):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_group_id", []):
                 l()
+        return v
 
     @validator("data_collection_ids")
     def dc_callback(cls, v, values):
@@ -62,17 +63,22 @@ class MurfeyInstanceEnvironment(BaseModel):
                 else:
                     for k in v.keys():
                         l(k)
+        return v
 
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
+        logger.warning(f"APP setting to {v}")
         with global_env_lock:
             for l in values.get("listeners", {}).get("autoproc_program_ids", []):
                 if values.get("autoproc_program_ids"):
                     for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
+                        logger.warning(f"listener {l}, {k} setting to {v}")
                         l(k)
                 else:
                     for k in v.keys():
+                        logger.warning(f"listener {l}, {k} setting to {v}")
                         l(k)
+        return v
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
@@ -84,3 +90,4 @@ class MurfeyInstanceEnvironment(BaseModel):
             else:
                 for k, val in v.items():
                     l(k, val, _url)
+        return v
