@@ -11,7 +11,7 @@ class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Union[dict, float]]
     data_directories: List[Path]
-    gain_reference_directory: Path
+    gain_reference_directory: Path | None = None
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
