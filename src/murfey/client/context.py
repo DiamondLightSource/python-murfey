@@ -93,7 +93,6 @@ class TomographyContext(Context):
         )
         if tr := self._preprocessing_triggers.get(tag):
             process_file = self._complete_process_file(tr[1], tr[2])
-            logger.error(f"PROCESS {process_file}")
             if process_file:
                 requests.post(tr[0], json=process_file)
                 self._preprocessing_triggers.pop(tag)
@@ -166,8 +165,7 @@ class TomographyContext(Context):
                     "movie_uuid": incomplete_process_file.movie_uuid,
                 }
                 return new_dict
-        except KeyError as e:
-            logger.error(f"ERROR, {e}")
+        except KeyError:
             return {}
 
     def _add_tilt(
@@ -222,8 +220,11 @@ class TomographyContext(Context):
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
                     )
                     preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+                    file_transferred_to = (
+                        Path(environment.default_destination) / file_path.name
+                    )
                     pfi = ProcessFileIncomplete(
-                        path=file_path,
+                        path=file_transferred_to,
                         image_number=environment.movies[file_path].movie_number,
                         movie_uuid=environment.movies[file_path].movie_uuid,
                         mc_uuid=environment.movies[file_path].motion_correction_uuid,

@@ -224,25 +224,22 @@ class ProcessFile(BaseModel):
 
 @app.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
-    print("RECEIVED PRE REQUEST")
-    path_parts = Path(proc_file.path).parts
-    visit_idx = path_parts.index(visit_name)
-    base_path = "/".join(path_parts[: visit_idx + 1])
+    visit_idx = Path(proc_file.path).parts.index(visit_name)
+    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
+    sub_dataset = (
+        ppath.relative_to(core).parts[0]
+        if len(ppath.relative_to(core).parts) > 1
+        else ""
+    )
     mrc_out = (
-        Path(base_path)
+        core
         / "processed"
-        / ppath.relative_to(base_path).parts[0]
+        / sub_dataset
         / "MotionCorr"
-        / ppath.with_suffix("_motion_corrected.mrc").name
+        / str(ppath.stem + "_motion_corrected.mrc")
     )
-    ctf_out = (
-        Path(proc_file.base_path)
-        / "processed"
-        / ppath.relative_to(base_path).parts[0]
-        / "CTF"
-        / ppath.with_suffix("_ctf.mrc").name
-    )
+    ctf_out = core / "processed" / sub_dataset / "CTF" / str(ppath.stem + "_ctf.mrc")
     if not mrc_out.parent.exists():
         mrc_out.parent.mkdir(parents=True)
     if not ctf_out.parent.exists():
@@ -253,9 +250,9 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "dcid": proc_file.data_collection_id,
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
-            "mrc_out": mrc_out,
+            "mrc_out": str(mrc_out),
             "pix_size": proc_file.pixel_size,
-            "output_image": ctf_out,
+            "output_image": str(ctf_out),
             "image_number": proc_file.image_number,
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,
