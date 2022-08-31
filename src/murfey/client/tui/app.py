@@ -262,7 +262,7 @@ class InputBox(Widget):
                 for i, key in enumerate(self._form_keys)
             )
         else:
-            panel_msg = f"[white]❯[/white] {self.input_text}"
+            panel_msg = f"[white]❯[/white] {self.input_text}[blink]\u275a[/blink]"
         return Panel(
             panel_msg,
             style=(
