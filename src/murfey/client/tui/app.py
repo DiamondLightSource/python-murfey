@@ -102,7 +102,6 @@ class HoverVisit(Widget):
         self.mouse_over = False
 
     def on_click(self) -> None:
-        _default = "unknown"
         if self.lock is None:
             self.lock = True
             if isinstance(self.app, MurfeyTUI):
@@ -160,7 +159,6 @@ class HoverVisit(Widget):
                                     break
                                 except (ValueError, KeyError):
                                     _default = ""
-                                    pass
                         else:
                             _default = ""
                     else:

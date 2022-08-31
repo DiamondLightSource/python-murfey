@@ -24,9 +24,8 @@ from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
-import murfey.server.ispyb
 import murfey.server.websocket
-from murfey.server.ispyb import Session
+from murfey.server.ispyb import Session, TransportManager
 from murfey.util.state import global_state
 
 try:
@@ -250,7 +249,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
 
 def _set_up_transport(transport_type):
     global _transport_object
-    _transport_object = murfey.server.ispyb.TransportManager(transport_type)
+    _transport_object = TransportManager(transport_type)
 
 
 def feedback_callback(header: dict, message: dict) -> None:
@@ -368,7 +367,8 @@ def _(record: Base, header: dict):
         Session().commit()
         # _transport_object.transport.ack(header, requeue=False)
         return 1
-        return getattr(record, record.__table__.primary_key.columns[0].name)
+        # return getattr(record, record.__table__.primary_key.columns[0].name)
+
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
         # _transport_object.transport.nack(header)
