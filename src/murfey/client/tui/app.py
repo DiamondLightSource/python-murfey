@@ -505,7 +505,8 @@ class MurfeyTUI(App):
             new_analyser = False
             if not self.analyser:
                 self.analyser = Analyser(
-                    environment=self._environment if not self._dummy_dc else None
+                    self._source,
+                    environment=self._environment if not self._dummy_dc else None,
                 )
                 new_analyser = True
             if self._watcher:

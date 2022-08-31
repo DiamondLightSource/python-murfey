@@ -13,8 +13,11 @@ logger = logging.getLogger("murfey.client.analyser")
 
 
 class Analyser(Observer):
-    def __init__(self, environment: MurfeyInstanceEnvironment | None = None):
+    def __init__(
+        self, basepath_local: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         super().__init__()
+        self._basepath = basepath_local.absolute()
         self._experiment_type = ""
         self._acquisition_software = ""
         self._role = ""
@@ -147,7 +150,9 @@ class Analyser(Observer):
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
-            self.queue.put(file_path)
+            absolute_path = (self._basepath / file_path).resolve()
+            self.queue.put(absolute_path)
+            # self.queue.put(file_path)
 
     def start(self):
         if self.thread.is_alive():

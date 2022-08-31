@@ -91,9 +91,7 @@ class TomographyContext(Context):
         logger.debug(
             f"Flushing preprocessing job {tag}: {self._preprocessing_triggers.get(tag)}"
         )
-        logger.error(f"here preprocess {tag}")
         if tr := self._preprocessing_triggers.get(tag):
-            logger.error(f"TR {tr}")
             process_file = self._complete_process_file(tr[1], tr[2])
             logger.error(f"PROCESS {process_file}")
             if process_file:
@@ -151,25 +149,6 @@ class TomographyContext(Context):
         try:
             with global_env_lock:
                 tag = incomplete_process_file.tag
-                logger.error(f"TAG {tag}")
-                logger.error(f"path {str(incomplete_process_file.path)}")
-                logger.error(f"description {incomplete_process_file.description}")
-                logger.error(f"size {incomplete_process_file.path.stat().st_size}")
-                logger.error(
-                    f"timestamp {incomplete_process_file.path.stat().st_ctime}"
-                )
-                logger.error(f"PJIDs {environment.processing_job_ids}")
-                logger.error(f"processing_job {environment.processing_job_ids[tag]}")
-                logger.error(f"DCs {environment.data_collection_ids}")
-                # logger.error(f"data_collection_id {environment.data_collection_ids[tag]}")
-                logger.error(f"Im number {incomplete_process_file.image_number}")
-                logger.error(
-                    f"pixel_size {environment.data_collection_parameters['pixel_size_on_image']}"
-                )
-                logger.error(f"APPIDs {environment.autoproc_program_ids}")
-                # logger.error(f"autoproc_program_id {environment.autoproc_program_ids[tag]}")
-                logger.error(f"mc_uuid {incomplete_process_file.mc_uuid}")
-                logger.error(f"movie_uuid {incomplete_process_file.movie_uuid}")
 
                 new_dict = {
                     "path": str(incomplete_process_file.path),
@@ -177,6 +156,7 @@ class TomographyContext(Context):
                     "size": incomplete_process_file.path.stat().st_size,
                     "timestamp": incomplete_process_file.path.stat().st_ctime,
                     "processing_job": environment.processing_job_ids[tag],
+                    "data_collection_id": environment.data_collection_ids[tag],
                     "image_number": incomplete_process_file.image_number,
                     "pixel_size": environment.data_collection_parameters[
                         "pixel_size_on_image"
@@ -185,7 +165,6 @@ class TomographyContext(Context):
                     "mc_uuid": incomplete_process_file.mc_uuid,
                     "movie_uuid": incomplete_process_file.movie_uuid,
                 }
-                logger.error(f"DICT {new_dict}")
                 return new_dict
         except KeyError as e:
             logger.error(f"ERROR, {e}")
@@ -250,9 +229,6 @@ class TomographyContext(Context):
                         mc_uuid=environment.movies[file_path].motion_correction_uuid,
                         tag=tilt_series,
                     )
-                    logger.warning(
-                        f"ADD TILT APPID {environment.autoproc_program_ids}, PJID {environment.processing_job_ids}"
-                    )
                     if (
                         environment.autoproc_program_ids is None
                         or environment.processing_job_ids is None
@@ -265,13 +241,9 @@ class TomographyContext(Context):
                             pfi,
                             environment,
                         )
-                        logger.error(
-                            f"Triggers {len(self._preprocessing_triggers)}, tilt {tilt_series}"
-                        )
                     else:
                         process_file = self._complete_process_file(pfi, environment)
                         requests.post(preproc_url, json=process_file)
-                        logger.error(f"POSTED {preproc_url} {process_file}")
             except Exception as e:
                 logger.error(f"ERROR {e}")
         else:

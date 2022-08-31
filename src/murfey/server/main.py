@@ -230,7 +230,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     base_path = "/".join(path_parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
     mrc_out = (
-        Path(proc_file.base_path)
+        Path(base_path)
         / "processed"
         / ppath.relative_to(base_path).parts[0]
         / "MotionCorr"

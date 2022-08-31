@@ -258,7 +258,10 @@ def run():
     )
     source_watcher.subscribe(rsync_process.enqueue)
 
-    analyser = Analyser(environment=instance_environment if args.real_dc else None)
+    analyser = Analyser(
+        instance_environment.source,
+        environment=instance_environment if args.real_dc else None,
+    )
     source_watcher.subscribe(analyser.enqueue)
 
     rich_handler.redirect = True

@@ -112,9 +112,9 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def enqueue(self, filepath: Path):
+    def enqueue(self, file_path: Path):
         if not self._stopping:
-            absolute_path = (self._basepath / filepath).resolve()
+            absolute_path = (self._basepath / file_path).resolve()
             self.queue.put(absolute_path)
 
     def _process(self):
