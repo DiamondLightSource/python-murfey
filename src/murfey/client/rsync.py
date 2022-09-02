@@ -270,6 +270,8 @@ class RSyncer(Observer):
                 "--progress",
                 "--outbuf=line",
                 "--files-from=-",
+                "-o",  # preserve ownership
+                "-p",  # preserve permissions
                 ".",
                 self._remote,
             ],

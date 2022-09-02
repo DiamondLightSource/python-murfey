@@ -241,9 +241,9 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     ctf_out = core / "processed" / sub_dataset / "CTF" / str(ppath.stem + "_ctf.mrc")
     if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True)
+        mrc_out.parent.mkdir(parents=True, mode=1411)
     if not ctf_out.parent.exists():
-        ctf_out.parent.mkdir(parents=True)
+        ctf_out.parent.mkdir(parents=True, mode=1411)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -251,7 +251,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
             "mrc_out": str(mrc_out),
-            "pix_size": proc_file.pixel_size,
+            "pix_size": (proc_file.pixel_size) * 10**10,
             "output_image": str(ctf_out),
             "image_number": proc_file.image_number,
             "microscope": get_microscope(),
@@ -260,14 +260,14 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
-    # if _transport_object:
-    #     _transport_object.transport.send("processing_recipe", zocalo_message)
-    # else:
-    #     log.error(
-    #         f"Processing was requested for {proc_file.name} but no Zocalo transport object was found"
-    #     )
-    #     return proc_file
-    # await ws.manager.broadcast(f"Processing requested for {proc_file.name}")
+    if _transport_object:
+        _transport_object.transport.send("processing_recipe", zocalo_message)
+    else:
+        log.error(
+            f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+        )
+        return proc_file
+    await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
 
 
@@ -293,16 +293,16 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
-    # if _transport_object:
-    #    _transport_object.transport.send("processing_recipe", zocalo_message)
-    # else:
-    #    log.error(
-    #        f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
-    #    )
-    #    return tilt_series
-    # await ws.manager.broadcast(
-    #    f"Processing requested for tilt series {tilt_series.name}"
-    # )
+    if _transport_object:
+        _transport_object.transport.send("processing_recipe", zocalo_message)
+    else:
+        log.error(
+            f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
+        )
+        return tilt_series
+    await ws.manager.broadcast(
+        f"Processing requested for tilt series {tilt_series.name}"
+    )
     return tilt_series
 
 
@@ -392,7 +392,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
         _transport_object.transport.send(
             "murfey_feedback", {"register": "data_collection_group", **dcg_parameters}  # type: ignore
         )
-    return dcg_params
+    return dcg_parameters
 
 
 @app.post("/visits/{visit_name}/start_data_collection")

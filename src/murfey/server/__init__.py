@@ -25,7 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.websocket
-from murfey.server.ispyb import Session, TransportManager
+from murfey.server.ispyb import TransportManager  # Session
 from murfey.util.state import global_state
 
 try:
@@ -363,11 +363,21 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        Session().add(record)
-        Session().commit()
+        if isinstance(record, DataCollection):
+            return _transport_object.do_insert_data_collection(record)["return_value"]
+        if isinstance(record, DataCollectionGroup):
+            return _transport_object.do_insert_data_collection_group(record)[
+                "return_value"
+            ]
+        if isinstance(record, ProcessingJob):
+            return _transport_object.do_create_ispyb_job(record)["return_value"]
+        if isinstance(record, AutoProcProgram):
+            return _transport_object.do_update_processing_status(record)["return_value"]
+        # session = Session()
+        # session.add(record)
+        # session.commit()
         # _transport_object.transport.ack(header, requeue=False)
-        return 1
-        # return getattr(record, record.__table__.primary_key.columns[0].name)
+        return getattr(record, record.__table__.primary_key.columns[0].name)
 
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
