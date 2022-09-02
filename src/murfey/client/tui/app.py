@@ -261,7 +261,7 @@ class InputBox(Widget):
                 for i, key in enumerate(self._form_keys)
             )
         else:
-            panel_msg = f"[white]❯[/white] {self.input_text}"
+            panel_msg = f"[white]❯[/white] {self.input_text}[blink]\u275a[/blink]"
         return Panel(
             panel_msg,
             style=(
@@ -381,6 +381,7 @@ class LogBook(ScrollView):
         self._queue = queue
         self._next_log = None
         self._logs = None
+        self._log_cache = []
         self._handler = RichHandler(enable_link_path=False)
         super().__init__(*args, **kwargs)
 
@@ -404,11 +405,18 @@ class LogBook(ScrollView):
             if self._logs is None:
                 self._logs = self._next_log[0][1]
                 for nl in self._next_log[1:]:
+                    self._log_cache.append(nl)
                     self._logs.add_row(*nl[0])
             else:
                 for nl in self._next_log:
+                    self._log_cache.append(nl)
                     self._logs.add_row(*nl[0])
             await self.update(self._logs, home=False)
+            if len(self._logs.rows) > 50:
+                self._logs = self._log_cache[-50][1]
+                for r in self._log_cache[-49:]:
+                    self._logs.add_row(*r[0])
+                self._log_cache = self._log_cache[-50:]
             self.page_down()
 
 
