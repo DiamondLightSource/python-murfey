@@ -251,10 +251,15 @@ class TomographyContext(Context):
                 lambda x: x.name.split("[")[1].split("]")[0],
                 environment=environment,
             )
+
+        def _extract_tilt_series(p: Path) -> str:
+            _split = p.name.split("_")[-1].split(".")
+            return ".".join(_split[:-1])
+
         return self._add_tilt(
             file_path,
             lambda x: x.name.split("_")[1],
-            lambda x: x.name.split("_")[-1].split(".")[0],
+            _extract_tilt_series,
             environment=environment,
         )
 
