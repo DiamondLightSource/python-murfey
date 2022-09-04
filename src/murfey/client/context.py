@@ -193,6 +193,26 @@ class TomographyContext(Context):
                 logger.error(e)
         else:
             self._tilt_series[tilt_series].append(file_path)
+            if environment:
+                preproc_data = {
+                    "path": str(file_path),
+                    "description": "",
+                    "size": file_path.stat().st_size,
+                    "timestamp": file_path.stat().st_ctime,
+                    "processing_job": environment._processing_jobs[tilt_series],
+                    "data_collection_id": environment._data_collections[tilt_series],
+                    "image_number": environment.movies[file_path].movie_number,
+                    "pixel_size": environment.data_collection_parameters[
+                        "pixel_size_on_image"
+                    ],
+                    "autoproc_program_id": environment.autoproc_program_ids[
+                        tilt_series
+                    ],
+                    "mc_uuid": environment.movies[file_path].motion_correction_uuid,
+                    "movie_uuid": environment.movies[file_path].movie_uuid,
+                }
+                preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+                requests.post(preproc_url, json=preproc_data)
         if self._last_transferred_file:
             last_tilt_series = extract_tilt_series(self._last_transferred_file)
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
