@@ -244,10 +244,17 @@ class TomographyContext(Context):
     def _add_tomo_tilt(
         self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> List[str]:
+        if "[" in file_path.name:
+            return self._add_tilt(
+                file_path,
+                lambda x: x.name.split("_")[1],
+                lambda x: x.name.split("[")[1].split("]")[0],
+                environment=environment,
+            )
         return self._add_tilt(
             file_path,
             lambda x: x.name.split("_")[1],
-            lambda x: x.name.split("[")[1].split("]")[0],
+            lambda x: x.name.split("_")[-1].split(".")[0],
             environment=environment,
         )
 
