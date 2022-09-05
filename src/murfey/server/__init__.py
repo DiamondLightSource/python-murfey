@@ -254,6 +254,8 @@ def _set_up_transport(transport_type):
 
 def feedback_callback(header: dict, message: dict) -> None:
     record = None
+    if message["environment"]:
+        message = message["payload"]
     if message["register"] == "motion_corrected":
         if murfey.server.websocket.manager:
             asyncio.run(
