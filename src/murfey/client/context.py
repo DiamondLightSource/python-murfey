@@ -184,6 +184,15 @@ class TomographyContext(Context):
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
+            try:
+                float(tilt_series)
+                float(tilt_angle)
+            except ValueError:
+                logger.warn("RETURNING")
+                return []
+
+            if not tilt_series.isnumeric() or not tilt_angle.isnumeric():
+                return []
         except Exception:
             logger.debug(
                 f"Tilt series and angle could not be determined for {file_path}"
