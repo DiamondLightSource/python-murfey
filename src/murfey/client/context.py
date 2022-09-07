@@ -134,6 +134,7 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
+            # logger.warn(len(self._motion_corrected_tilt_series[tilt_series]), len(self._tilt_series[tilt_series]))
             if len(self._motion_corrected_tilt_series[tilt_series]) == len(
                 self._tilt_series[tilt_series]
             ):
@@ -235,7 +236,6 @@ class TomographyContext(Context):
                     if environment.data_collection_group_id is None:
                         self._data_collection_stash.append((url, environment, data))
                     else:
-                        logger.warn(f"POSTING START DC {data}")
                         requests.post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     self._processing_job_stash[tilt_series] = [
@@ -249,10 +249,17 @@ class TomographyContext(Context):
 
         if environment and environment.data_collection_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            file_transferred_to = Path(environment.default_destination) / file_path.name
+            if environment.visit in environment.default_destination:
+                file_transferred_to = (
+                    Path(environment.default_destination) / file_path.name
+                )
+            else:
+                file_transferred_to = (
+                    Path(environment.default_destination)
+                    / environment.visit
+                    / file_path.name
+                )
             self._tilt_series[tilt_series].append(file_path)
-            # if environment:
-            logger.warn(f"Collecting preproc data for environment {environment}")
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",

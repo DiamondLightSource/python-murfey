@@ -283,7 +283,7 @@ class TiltSeries(BaseModel):
 @app.post("/visits/{visit_name}/align")
 async def request_tilt_series_alignment(tilt_series: TiltSeries):
     zocalo_message = {
-        "recipes": ["em-align"],
+        "recipes": ["em-tomo-align"],
         "parameters": {
             "ispyb_process": tilt_series.processing_job,
             "tilts": tilt_series.tilts,
