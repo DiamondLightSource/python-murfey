@@ -32,7 +32,7 @@ def tomo_file_name() -> str:
 
 
 def write_mrc(base_path: Path, session_dir: str, mrc_name: str):
-    rand_data = np.random.rand(2048, 2048, 50)
+    rand_data = np.random.randint(0, high=128, size=(2048, 2048, 50), dtype=np.uint8)
     with mrcfile.new(base_path / "Data" / session_dir / mrc_name) as mrc:
         mrc.set_data(rand_data)
 
