@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import requests
 from pydantic import BaseModel, ValidationError
-from rich.box import SQUARE
+from rich.box import MINIMAL, SQUARE
 from rich.logging import RichHandler
 from rich.panel import Panel
 from textual import events
@@ -408,7 +408,7 @@ class LogBook(Widget):
         panel_msg = self._logs or ""
         return Panel(
             panel_msg,
-            box=SQUARE,
+            box=MINIMAL,
         )
 
     async def tick(self):
