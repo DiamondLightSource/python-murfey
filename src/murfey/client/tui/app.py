@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # import asyncio
 # import contextlib
+import copy
 import logging
 import string
 import threading
@@ -377,7 +378,7 @@ class InputBox(Widget):
             key.stop()
 
 
-class LogBook(ScrollView):
+class LogBook(Widget):
     def __init__(self, queue, *args, **kwargs):
         self._queue = queue
         self._next_log = None
@@ -392,6 +393,9 @@ class LogBook(ScrollView):
     def _load_from_queue(self) -> bool:
         if not self._queue.empty():
             num_logs = 0
+            if self._next_log:
+                for nl in self._next_log:
+                    del nl
             self._next_log = []
             while not self._queue.empty() and num_logs < 10:
                 msg = self._queue.get_nowait()
@@ -399,6 +403,13 @@ class LogBook(ScrollView):
                 num_logs += 1
             return True
         return False
+
+    def render(self) -> Panel:
+        panel_msg = self._logs or ""
+        return Panel(
+            panel_msg,
+            box=SQUARE,
+        )
 
     async def tick(self):
         loaded = self._load_from_queue()
@@ -412,13 +423,14 @@ class LogBook(ScrollView):
                 for nl in self._next_log:
                     self._log_cache.append(nl)
                     self._logs.add_row(*nl[0])
-            await self.update(self._logs, home=False)
-            if len(self._logs.rows) > 50:
+            if len(self._log_cache) > 50:
                 self._logs = self._log_cache[-50][1]
-                for r in self._log_cache[-49:]:
+                curr_log_cache = copy.deepcopy(self._log_cache)
+                for r in curr_log_cache[-49:]:
                     self._logs.add_row(*r[0])
-                self._log_cache = self._log_cache[-50:]
-            self.page_down()
+                self._log_cache = curr_log_cache[-50:]
+                del curr_log_cache
+            self.refresh()
 
 
 class DCParametersTomo(BaseModel):
