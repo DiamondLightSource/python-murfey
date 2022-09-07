@@ -54,7 +54,8 @@ class SPAContext(Context):
 
 
 class ProcessFileIncomplete(BaseModel):
-    path: Path
+    dest: Path
+    source: Path
     image_number: int
     movie_uuid: int
     mc_uuid: int
@@ -150,10 +151,10 @@ class TomographyContext(Context):
                 tag = incomplete_process_file.tag
 
                 new_dict = {
-                    "path": str(incomplete_process_file.path),
+                    "path": str(incomplete_process_file.dest),
                     "description": incomplete_process_file.description,
-                    "size": incomplete_process_file.path.stat().st_size,
-                    "timestamp": incomplete_process_file.path.stat().st_ctime,
+                    "size": incomplete_process_file.source.stat().st_size,
+                    "timestamp": incomplete_process_file.source.stat().st_ctime,
                     "processing_job": environment.processing_job_ids[tag],
                     "data_collection_id": environment.data_collection_ids[tag],
                     "image_number": incomplete_process_file.image_number,
@@ -188,11 +189,8 @@ class TomographyContext(Context):
                 float(tilt_series)
                 float(tilt_angle)
             except ValueError:
-                logger.warn("RETURNING")
                 return []
 
-            if not tilt_series.isnumeric() or not tilt_angle.isnumeric():
-                return []
         except Exception:
             logger.debug(
                 f"Tilt series and angle could not be determined for {file_path}"
@@ -217,9 +215,27 @@ class TomographyContext(Context):
                         "image_directory": str(file_path.parent),
                         "tag": tilt_series,
                     }
+                    if environment.data_collection_parameters:
+                        data.update(
+                            {
+                                "voltage": environment.data_collection_parameters[
+                                    "voltage"
+                                ],
+                                "pixel_size_on_image": environment.data_collection_parameters[
+                                    "pixel_size_on_image"
+                                ],
+                                "image_size_x": environment.data_collection_parameters[
+                                    "image_size_x"
+                                ],
+                                "image_size_y": environment.data_collection_parameters[
+                                    "image_size_y"
+                                ],
+                            }
+                        )
                     if environment.data_collection_group_id is None:
                         self._data_collection_stash.append((url, environment, data))
                     else:
+                        logger.warn(f"POSTING START DC {data}")
                         requests.post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     self._processing_job_stash[tilt_series] = [
@@ -228,56 +244,67 @@ class TomographyContext(Context):
                     self._processing_job_stash[tilt_series].append(
                         (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
                     )
-                    preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-                    file_transferred_to = (
-                        Path(environment.default_destination) / file_path.name
-                    )
-                    pfi = ProcessFileIncomplete(
-                        path=file_transferred_to,
-                        image_number=environment.movies[file_path].movie_number,
-                        movie_uuid=environment.movies[file_path].movie_uuid,
-                        mc_uuid=environment.movies[file_path].motion_correction_uuid,
-                        tag=tilt_series,
-                    )
-                    if (
-                        environment.autoproc_program_ids is None
-                        or environment.processing_job_ids is None
-                    ) or (
-                        environment.autoproc_program_ids.get(tilt_series) is None
-                        or environment.processing_job_ids.get(tilt_series) is None
-                    ):
-                        self._preprocessing_triggers[tilt_series] = (
-                            preproc_url,
-                            pfi,
-                            environment,
-                        )
-                    else:
-                        process_file = self._complete_process_file(pfi, environment)
-                        requests.post(preproc_url, json=process_file)
             except Exception as e:
                 logger.error(f"ERROR {e}")
-        else:
+
+        if environment and environment.data_collection_ids.get(tilt_series):
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            file_transferred_to = Path(environment.default_destination) / file_path.name
             self._tilt_series[tilt_series].append(file_path)
-            if environment:
-                preproc_data = {
-                    "path": str(file_path),
-                    "description": "",
-                    "size": file_path.stat().st_size,
-                    "timestamp": file_path.stat().st_ctime,
-                    "processing_job": environment._processing_jobs[tilt_series],
-                    "data_collection_id": environment._data_collections[tilt_series],
-                    "image_number": environment.movies[file_path].movie_number,
-                    "pixel_size": environment.data_collection_parameters[
-                        "pixel_size_on_image"
-                    ],
-                    "autoproc_program_id": environment.autoproc_program_ids[
-                        tilt_series
-                    ],
-                    "mc_uuid": environment.movies[file_path].motion_correction_uuid,
-                    "movie_uuid": environment.movies[file_path].movie_uuid,
-                }
-                preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-                requests.post(preproc_url, json=preproc_data)
+            # if environment:
+            logger.warn(f"Collecting preproc data for environment {environment}")
+            preproc_data = {
+                "path": str(file_transferred_to),
+                "description": "",
+                "size": file_path.stat().st_size,
+                "timestamp": file_path.stat().st_ctime,
+                "processing_job": environment.processing_job_ids[tilt_series],
+                "data_collection_id": environment.data_collection_ids[tilt_series],
+                "image_number": environment.movies[file_path].movie_number,
+                "pixel_size": environment.data_collection_parameters[
+                    "pixel_size_on_image"
+                ],
+                "autoproc_program_id": environment.autoproc_program_ids[tilt_series],
+                "mc_uuid": environment.movies[file_path].motion_correction_uuid,
+                "movie_uuid": environment.movies[file_path].movie_uuid,
+            }
+            requests.post(preproc_url, json=preproc_data)
+        elif environment:
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            if environment.visit in environment.default_destination:
+                file_transferred_to = (
+                    Path(environment.default_destination) / file_path.name
+                )
+            else:
+                file_transferred_to = (
+                    Path(environment.default_destination)
+                    / environment.visit
+                    / file_path.name
+                )
+            pfi = ProcessFileIncomplete(
+                dest=file_transferred_to,
+                source=environment.source,
+                image_number=environment.movies[file_path].movie_number,
+                movie_uuid=environment.movies[file_path].movie_uuid,
+                mc_uuid=environment.movies[file_path].motion_correction_uuid,
+                tag=tilt_series,
+            )
+            if (
+                environment.autoproc_program_ids is None
+                or environment.processing_job_ids is None
+            ) or (
+                environment.autoproc_program_ids.get(tilt_series) is None
+                or environment.processing_job_ids.get(tilt_series) is None
+            ):
+                self._preprocessing_triggers[tilt_series] = (
+                    preproc_url,
+                    pfi,
+                    environment,
+                )
+            else:
+                process_file = self._complete_process_file(pfi, environment)
+                requests.post(preproc_url, json=process_file)
+
         if self._last_transferred_file:
             last_tilt_series = extract_tilt_series(self._last_transferred_file)
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
