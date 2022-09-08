@@ -393,9 +393,6 @@ class LogBook(Widget):
     def _load_from_queue(self) -> bool:
         if not self._queue.empty():
             num_logs = 0
-            if self._next_log:
-                for nl in self._next_log:
-                    del nl
             self._next_log = []
             while not self._queue.empty() and num_logs < 10:
                 msg = self._queue.get_nowait()
