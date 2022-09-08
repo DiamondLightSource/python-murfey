@@ -35,11 +35,6 @@ class ConnectionManager(Generic[T]):
             log.info(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
-    async def broadcast_json(self, message: dict):
-        for connection in self.active_connections:
-            log.info(f"Sending '{message}'")
-            await self.active_connections[connection].send_json(message)
-
     async def _broadcast_state_update(self, attribute: str, value: T | None):
         for connection in self.active_connections:
             await self.active_connections[connection].send_json(

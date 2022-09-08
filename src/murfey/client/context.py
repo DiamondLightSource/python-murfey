@@ -101,7 +101,7 @@ class TomographyContext(Context):
     def _check_for_alignment(
         self, movie_path: Path, motion_corrected_path: Path, url: str
     ):
-        print("Checking alignment")
+        logger.warn("Context checking alignment")
         if self._acquisition_software == "serialem":
             delimiters = ("_", "-")
             for d in delimiters:
@@ -140,7 +140,6 @@ class TomographyContext(Context):
             ):
                 series_data: dict = {}
                 requests.post(url, json=series_data)
-        print("Checked alignment")
 
     def _complete_process_file(
         self,

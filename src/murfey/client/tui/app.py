@@ -583,6 +583,9 @@ class MurfeyTUI(App):
             self._environment.listeners["autoproc_program_ids"] = {
                 self.analyser._context._flush_preprocess
             }
+            self._environment.listeners["motion_corrected_movies"] = {
+                self.analyser._context._check_for_alignment
+            }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo"}
             requests.post(url, json=dcg_data)

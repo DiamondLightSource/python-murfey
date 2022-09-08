@@ -11,8 +11,6 @@ from typing import Optional
 
 import websocket
 
-from murfey.client.analyser import Analyser
-from murfey.client.context import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 log = logging.getLogger("murfey.client.websocket")
@@ -46,7 +44,6 @@ class WSApp:
         )
         self._feeder_thread.start()
         self.environment: MurfeyInstanceEnvironment | None = None
-        self.analyser: Analyser | None = None
 
     def __repr__(self):
         if self.alive:
@@ -107,23 +104,6 @@ class WSApp:
             data = json.loads(message)
             if data.get("message") == "state-update":
                 self._register_id(data["attribute"], data["value"])
-            if data.get("message") == "mc-message":
-                print("Checking alignment", data["movie"], data["mc-path"])
-                if (
-                    self.analyser
-                    and self.environment
-                    and isinstance(self.analyser._context, TomographyContext)
-                ):
-                    _url = (
-                        str(self.environment.url)
-                        + "/visits/"
-                        + str(self.environment.visit)
-                        + "/align"
-                    )
-                    self.analyser._context._check_for_alignment(
-                        data["movie"], data["mc-path"], _url
-                    )
-                print("Checked alignment", data["movie"])
         except Exception:
             pass
 

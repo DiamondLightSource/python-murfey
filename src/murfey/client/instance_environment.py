@@ -86,5 +86,5 @@ class MurfeyInstanceEnvironment(BaseModel):
                     l(k, v[k], _url)
             else:
                 for k in v.keys():
-                    l(k)
+                    l(k, v[k], _url)
         return v
