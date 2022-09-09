@@ -220,7 +220,7 @@ def run():
 
     status_bar = StatusBar()
     source_watcher = murfey.client.watchdir.DirWatcher(
-        args.source, settling_time=10, status_bar=status_bar
+        args.source, settling_time=1, status_bar=status_bar
     )
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()

@@ -99,7 +99,13 @@ class TomographyContext(Context):
                 self._preprocessing_triggers.pop(tag)
 
     def _check_for_alignment(
-        self, movie_path: Path, motion_corrected_path: Path, url: str
+        self,
+        movie_path: Path,
+        motion_corrected_path: Path,
+        url: str,
+        pjid: int,
+        appid: int,
+        mvid: int,
     ):
         logger.warn("Context checking alignment")
         if self._acquisition_software == "serialem":
@@ -134,12 +140,25 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
-            # logger.warn(len(self._motion_corrected_tilt_series[tilt_series]), len(self._tilt_series[tilt_series]))
+            logger.warn(
+                f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
+            )
             if len(self._motion_corrected_tilt_series[tilt_series]) == len(
                 self._tilt_series[tilt_series]
             ):
-                series_data: dict = {}
-                requests.post(url, json=series_data)
+                try:
+                    series_data: dict = {
+                        "name": tilt_series,
+                        "tilts": self._completed_tilt_series,
+                        "processing_job": pjid,
+                        "autoproc_program_id": appid,
+                        "stack_file": str(motion_corrected_path),
+                        "movie_id": mvid,
+                    }
+                    logger.warn(f"sending data {series_data}")
+                    requests.post(url, json=series_data)
+                except Exception as e:
+                    logger.warn(f"Data error {e}")
 
     def _complete_process_file(
         self,
@@ -177,7 +196,17 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         if environment:
-            environment.movies[file_path] = MovieTracker(
+            if environment.visit in environment.default_destination:
+                file_transferred_to = (
+                    Path(environment.default_destination) / file_path.name
+                )
+            else:
+                file_transferred_to = (
+                    Path(environment.default_destination)
+                    / environment.visit
+                    / file_path.name
+                )
+            environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
                 movie_uuid=next(MurfeyID),
                 motion_correction_uuid=next(MurfeyID),
@@ -196,6 +225,9 @@ class TomographyContext(Context):
                 f"Tilt series and angle could not be determined for {file_path}"
             )
             return []
+        if environment:
+            environment.movie_tilt_pair[file_transferred_to] = tilt_series
+            logger.warn(f"Setting {environment.movie_tilt_pair}")
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
@@ -248,16 +280,16 @@ class TomographyContext(Context):
 
         if environment and environment.data_collection_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            if environment.visit in environment.default_destination:
-                file_transferred_to = (
-                    Path(environment.default_destination) / file_path.name
-                )
-            else:
-                file_transferred_to = (
-                    Path(environment.default_destination)
-                    / environment.visit
-                    / file_path.name
-                )
+            # if environment.visit in environment.default_destination:
+            #    file_transferred_to = (
+            #        Path(environment.default_destination) / file_path.name
+            #    )
+            # else:
+            #    file_transferred_to = (
+            #        Path(environment.default_destination)
+            #        / environment.visit
+            #        / file_path.name
+            #    )
             self._tilt_series[tilt_series].append(file_path)
             preproc_data = {
                 "path": str(file_transferred_to),
@@ -266,33 +298,35 @@ class TomographyContext(Context):
                 "timestamp": file_path.stat().st_ctime,
                 "processing_job": environment.processing_job_ids[tilt_series],
                 "data_collection_id": environment.data_collection_ids[tilt_series],
-                "image_number": environment.movies[file_path].movie_number,
+                "image_number": environment.movies[file_transferred_to].movie_number,
                 "pixel_size": environment.data_collection_parameters[
                     "pixel_size_on_image"
                 ],
                 "autoproc_program_id": environment.autoproc_program_ids[tilt_series],
-                "mc_uuid": environment.movies[file_path].motion_correction_uuid,
-                "movie_uuid": environment.movies[file_path].movie_uuid,
+                "mc_uuid": environment.movies[
+                    file_transferred_to
+                ].motion_correction_uuid,
+                "movie_uuid": environment.movies[file_transferred_to].movie_uuid,
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            if environment.visit in environment.default_destination:
-                file_transferred_to = (
-                    Path(environment.default_destination) / file_path.name
-                )
-            else:
-                file_transferred_to = (
-                    Path(environment.default_destination)
-                    / environment.visit
-                    / file_path.name
-                )
+            # if environment.visit in environment.default_destination:
+            #    file_transferred_to = (
+            #        Path(environment.default_destination) / file_path.name
+            #    )
+            # else:
+            #    file_transferred_to = (
+            #        Path(environment.default_destination)
+            #        / environment.visit
+            #        / file_path.name
+            #    )
             pfi = ProcessFileIncomplete(
                 dest=file_transferred_to,
                 source=environment.source,
-                image_number=environment.movies[file_path].movie_number,
-                movie_uuid=environment.movies[file_path].movie_uuid,
-                mc_uuid=environment.movies[file_path].motion_correction_uuid,
+                image_number=environment.movies[file_transferred_to].movie_number,
+                movie_uuid=environment.movies[file_transferred_to].movie_uuid,
+                mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
                 tag=tilt_series,
             )
             if (

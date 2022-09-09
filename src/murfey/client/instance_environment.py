@@ -40,6 +40,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, Path] = {}
     listeners: Dict[str, Set[Callable]] = {}
+    movie_tilt_pair: Dict[Path, str] = {}
     visit: str = ""
 
     class Config:
@@ -79,12 +80,45 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
-        _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/request_tilt_series_alignment"
+        _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
         for l in values.get("listeners", {}).get("motion_corrected_movies", []):
             if values.get("motion_corrected_movies"):
-                for k in set(values["motion_corrected_movies"].keys()) ^ set(v.keys()):
-                    l(k, v[k], _url)
+                for k in set(values["motion_corrected_movies"].keys()) ^ set(
+                    v.keys()
+                ):  # k is a path (key), v[k] is the value matching the key
+                    try:
+                        print(values.get("processing_job_ids")[k])
+                        print(set(values["autoproc_program_ids"].keys()))
+                        print(values["processing_job_ids"][k])
+                    except Exception as e:
+                        print(e)
+                    l(
+                        k,
+                        v[k],
+                        _url,
+                        values["processing_job_ids"][k],
+                        values["autoproc_program_ids"][k],
+                        values["movies"][k].movie_uuid,
+                    )
             else:
                 for k in v.keys():
-                    l(k, v[k], _url)
+                    try:
+                        # logger.warn(values.get("processing_job_ids")[k])
+                        # logger.warn(f"MTP: {values['movie_tilt_pair']}")
+                        tilt = values["movie_tilt_pair"][k]
+                        logger.warn(f"Tilt: {tilt}")
+                        logger.warn(f"Values, {values['autoproc_program_ids'][tilt]}")
+                        logger.warn(f"Values, {values['movies']}")
+                        logger.warn(f"Values, {values['processing_job_ids'][tilt]}")
+                        # logger.warn(values["processing_job_ids"][k]) # error because k (a file path) isn't a key in processing_job_ids
+                    except Exception as e:
+                        logger.warn(f"ERROR {e}")
+                    l(
+                        k,
+                        v[k],
+                        _url,
+                        values["processing_job_ids"][tilt],
+                        values["autoproc_program_ids"][tilt],
+                        values["movies"][k].movie_uuid,
+                    )
         return v
