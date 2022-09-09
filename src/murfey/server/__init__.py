@@ -258,11 +258,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         message = message["payload"]
     if message["register"] == "motion_corrected":
         if murfey.server.websocket.manager:
-            asyncio.run(
-                murfey.server.websocket.manager._broadcast_state_update(
-                    "motion_corrected_movies", {message["movie"]: message["mrc_out"]}
-                )
-            )
+            global_state["motion_corrected_movies"] = {**global_state.get("motion_corrected_movies", {}), message["movie"]: message["mrc_out"]}
         if _transport_object:
             _transport_object.transport.ack(header)
         return None

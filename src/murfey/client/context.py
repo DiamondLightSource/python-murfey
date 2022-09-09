@@ -378,35 +378,31 @@ class TomographyContext(Context):
                     ):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
-                        if environment:
-                            logger.warn(f"MOVIES {environment.motion_corrected_movies}")
                         if (
                             environment and environment.motion_corrected_movies
-                        ):  # .get(ts):
+                        ):
+                            logger.warn(f"MOVIES {environment.motion_corrected_movies}")
                             file_tilt_list = []
                             for movie, angle in environment.tilt_angles[ts]:
-                                # logger.warn(
-                                #    f"Appending {environment.motion_corrected_movies[ts]} {angle}"
-                                # )
-                                file_tilt_list.append(
-                                    [
-                                        # environment.motion_corrected_movies[ts],
-                                        angle,
-                                    ]
-                                )
-                            logger.warn(f"FILES {file_tilt_list}")
-                            # self._check_for_alignment(
-                            #    file_transferred_to,
-                            # environment.motion_corrected_movies[ts],
-                            # environment.url,
-                            # environment.data_collection_ids[ts],
-                            # environment.processing_job_ids[ts],
-                            #    environment.autoproc_program_ids[ts],
-                            # environment.movies[
-                            #    environment.motion_corrected_movies[ts]
-                            # ].movie_uuid,
-                            #    file_tilt_list,
-                            # )
+                                if environment.motion_corrected_movies.get(movie):
+                                    file_tilt_list.append(
+                                        [
+                                            environment.motion_corrected_movies[movie],
+                                            angle,
+                                        ]
+                                    )
+                            self._check_for_alignment(
+                                file_transferred_to,
+                                environment.motion_corrected_movies[file_transferred_to],
+                                environment.url,
+                                environment.data_collection_ids[ts],
+                                environment.processing_job_ids[ts],
+                                environment.autoproc_program_ids[ts],
+                                environment.movies[
+                                    file_transferred_to
+                                ].movie_uuid,
+                                file_tilt_list,
+                            )
                 logger.info(
                     f"The following tilt series are considered complete: {newly_completed_series}"
                 )

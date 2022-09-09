@@ -94,6 +94,7 @@ class MurfeyInstanceEnvironment(BaseModel):
                             file_tilt_list.append(
                                 [values["motion_corrected_movies"][movie], angle]
                             )
+                            #file_tilt_list.append([str(movie), angle, str(values["movies"][str(movie)].movie_uuid)])
                     l(
                         k,
                         v[k],
@@ -108,9 +109,11 @@ class MurfeyInstanceEnvironment(BaseModel):
                     try:
                         tilt = values["movie_tilt_pair"][k]
                         logger.warn(f"Tilt: {tilt}")
+                        logger.warn(f"movies {values['movies']}")
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
-                            file_tilt_list.append([str(k), angle])  # or v(k)
+                            file_tilt_list.append([str(k), angle])
+                            #file_tilt_list.append([str(movie), angle, values["movies"][str(movie)].movie_uuid])  # or v(k)
                         l(
                             k,
                             v[k],
@@ -122,5 +125,5 @@ class MurfeyInstanceEnvironment(BaseModel):
                             file_tilt_list,
                         )
                     except Exception as e:
-                        logger.warn(f"ERROR {e}")
+                        logger.warn(f"ERROR {e}", exc_info=True)
         return v
