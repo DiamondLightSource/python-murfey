@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import logging
 import os
 import socket
@@ -258,7 +257,14 @@ def feedback_callback(header: dict, message: dict) -> None:
         message = message["payload"]
     if message["register"] == "motion_corrected":
         if murfey.server.websocket.manager:
-            global_state["motion_corrected_movies"] = {**global_state.get("motion_corrected_movies", {}), message["movie"]: message["mrc_out"]}
+            if global_state.get("motion_corrected_movies") and isinstance(
+                global_state["motion_corrected_movies"], dict
+            ):
+                global_state["motion_corrected_movies"] = {
+                    **global_state["motion_corrected_movies"],
+                    message.get("movie"): message.get("mrc_out"),
+                }
+
         if _transport_object:
             _transport_object.transport.ack(header)
         return None

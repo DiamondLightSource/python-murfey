@@ -378,29 +378,31 @@ class TomographyContext(Context):
                     ):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
-                        if (
-                            environment and environment.motion_corrected_movies
-                        ):
+                        if environment and environment.motion_corrected_movies:
                             logger.warn(f"MOVIES {environment.motion_corrected_movies}")
                             file_tilt_list = []
+                            movie: str
+                            angle: str
                             for movie, angle in environment.tilt_angles[ts]:
-                                if environment.motion_corrected_movies.get(movie):
+                                if environment.motion_corrected_movies.get(Path(movie)):
                                     file_tilt_list.append(
                                         [
-                                            environment.motion_corrected_movies[movie],
+                                            environment.motion_corrected_movies[
+                                                Path(movie)
+                                            ],
                                             angle,
                                         ]
                                     )
                             self._check_for_alignment(
                                 file_transferred_to,
-                                environment.motion_corrected_movies[file_transferred_to],
-                                environment.url,
+                                environment.motion_corrected_movies[
+                                    file_transferred_to
+                                ],
+                                environment.url.geturl(),
                                 environment.data_collection_ids[ts],
                                 environment.processing_job_ids[ts],
                                 environment.autoproc_program_ids[ts],
-                                environment.movies[
-                                    file_transferred_to
-                                ].movie_uuid,
+                                environment.movies[file_transferred_to].movie_uuid,
                                 file_tilt_list,
                             )
                 logger.info(
