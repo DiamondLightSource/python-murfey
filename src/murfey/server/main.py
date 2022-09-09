@@ -273,22 +273,31 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
 
 class TiltSeries(BaseModel):
     name: str
-    tilts: List[str]
+    file_tilt_list: str
+    dcid: int
     processing_job: int
     autoproc_program_id: int
-    stack_file: str
+    motion_corrected_path: str
     movie_id: int
 
 
 @app.post("/visits/{visit_name}/align")
 async def request_tilt_series_alignment(tilt_series: TiltSeries):
+    stack_file = (
+        Path(tilt_series.motion_corrected_path).parents[1]
+        / "align_output"
+        / "aligned_file.mrc"
+    )
+    if not stack_file.parent.exists():
+        stack_file.parent.mkdir(parents=True, mode=1411)
     zocalo_message = {
         "recipes": ["em-tomo-align"],
         "parameters": {
-            "ispyb_process": tilt_series.processing_job,
-            "tilts": tilt_series.tilts,
+            # "ispyb_process": tilt_series.processing_job, #
+            "input_file_list": tilt_series.file_tilt_list,
+            "dcid": tilt_series.dcid,
             "appid": tilt_series.autoproc_program_id,
-            "stack_file": tilt_series.stack_file,
+            "stack_file": str(stack_file),
             "movie_id": tilt_series.movie_id,
         },
     }

@@ -4,7 +4,7 @@ import logging
 from itertools import count
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, NamedTuple, Optional, Set
+from typing import Callable, Dict, List, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
 from pydantic import BaseModel, validator
@@ -41,6 +41,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     motion_corrected_movies: Dict[Path, Path] = {}
     listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
+    tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
 
     class Config:
@@ -86,12 +87,13 @@ class MurfeyInstanceEnvironment(BaseModel):
                 for k in set(values["motion_corrected_movies"].keys()) ^ set(
                     v.keys()
                 ):  # k is a path (key), v[k] is the value matching the key
-                    try:
-                        print(values.get("processing_job_ids")[k])
-                        print(set(values["autoproc_program_ids"].keys()))
-                        print(values["processing_job_ids"][k])
-                    except Exception as e:
-                        print(e)
+                    tilt = values["movie_tilt_pair"][k]
+                    file_tilt_list = []
+                    for movie, angle in values["tilt_angles"][tilt]:
+                        if movie in values["motion_corrected_movies"]:
+                            file_tilt_list.append(
+                                [values["motion_corrected_movies"][movie], angle]
+                            )
                     l(
                         k,
                         v[k],
@@ -99,26 +101,26 @@ class MurfeyInstanceEnvironment(BaseModel):
                         values["processing_job_ids"][k],
                         values["autoproc_program_ids"][k],
                         values["movies"][k].movie_uuid,
+                        file_tilt_list,
                     )
             else:
                 for k in v.keys():
                     try:
-                        # logger.warn(values.get("processing_job_ids")[k])
-                        # logger.warn(f"MTP: {values['movie_tilt_pair']}")
                         tilt = values["movie_tilt_pair"][k]
                         logger.warn(f"Tilt: {tilt}")
-                        logger.warn(f"Values, {values['autoproc_program_ids'][tilt]}")
-                        logger.warn(f"Values, {values['movies']}")
-                        logger.warn(f"Values, {values['processing_job_ids'][tilt]}")
-                        # logger.warn(values["processing_job_ids"][k]) # error because k (a file path) isn't a key in processing_job_ids
+                        file_tilt_list = []
+                        for movie, angle in values["tilt_angles"][tilt]:
+                            file_tilt_list.append([str(k), angle])  # or v(k)
+                        l(
+                            k,
+                            v[k],
+                            _url,
+                            values["data_collection_ids"][tilt],
+                            values["processing_job_ids"][tilt],
+                            values["autoproc_program_ids"][tilt],
+                            values["movies"][k].movie_uuid,
+                            file_tilt_list,
+                        )
                     except Exception as e:
                         logger.warn(f"ERROR {e}")
-                    l(
-                        k,
-                        v[k],
-                        _url,
-                        values["processing_job_ids"][tilt],
-                        values["autoproc_program_ids"][tilt],
-                        values["movies"][k].movie_uuid,
-                    )
         return v

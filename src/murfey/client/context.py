@@ -103,11 +103,13 @@ class TomographyContext(Context):
         movie_path: Path,
         motion_corrected_path: Path,
         url: str,
+        dcid: int,
         pjid: int,
         appid: int,
         mvid: int,
+        tilt_angles: List,
     ):
-        logger.warn("Context checking alignment")
+        logger.warn("Context checking alignent")
         if self._acquisition_software == "serialem":
             delimiters = ("_", "-")
             for d in delimiters:
@@ -147,12 +149,14 @@ class TomographyContext(Context):
                 self._tilt_series[tilt_series]
             ):
                 try:
+
                     series_data: dict = {
                         "name": tilt_series,
-                        "tilts": self._completed_tilt_series,
+                        "file_tilt_list": str(tilt_angles),
+                        "dcid": dcid,
                         "processing_job": pjid,
                         "autoproc_program_id": appid,
-                        "stack_file": str(motion_corrected_path),
+                        "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
                     }
                     logger.warn(f"sending data {series_data}")
@@ -227,7 +231,15 @@ class TomographyContext(Context):
             return []
         if environment:
             environment.movie_tilt_pair[file_transferred_to] = tilt_series
-            logger.warn(f"Setting {environment.movie_tilt_pair}")
+            if environment.tilt_angles.get(tilt_series):
+                environment.tilt_angles[tilt_series].append(
+                    [str(file_transferred_to), tilt_angle]
+                )
+            else:
+                environment.tilt_angles[tilt_series] = [
+                    [str(file_transferred_to), tilt_angle]
+                ]
+            # logger.warn(f"Setting {environment.movie_tilt_pair} and {environment.tilt_angles}")
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
@@ -366,6 +378,35 @@ class TomographyContext(Context):
                     ):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
+                        if environment:
+                            logger.warn(f"MOVIES {environment.motion_corrected_movies}")
+                        if (
+                            environment and environment.motion_corrected_movies
+                        ):  # .get(ts):
+                            file_tilt_list = []
+                            for movie, angle in environment.tilt_angles[ts]:
+                                # logger.warn(
+                                #    f"Appending {environment.motion_corrected_movies[ts]} {angle}"
+                                # )
+                                file_tilt_list.append(
+                                    [
+                                        # environment.motion_corrected_movies[ts],
+                                        angle,
+                                    ]
+                                )
+                            logger.warn(f"FILES {file_tilt_list}")
+                            # self._check_for_alignment(
+                            #    file_transferred_to,
+                            # environment.motion_corrected_movies[ts],
+                            # environment.url,
+                            # environment.data_collection_ids[ts],
+                            # environment.processing_job_ids[ts],
+                            #    environment.autoproc_program_ids[ts],
+                            # environment.movies[
+                            #    environment.motion_corrected_movies[ts]
+                            # ].movie_uuid,
+                            #    file_tilt_list,
+                            # )
                 logger.info(
                     f"The following tilt series are considered complete: {newly_completed_series}"
                 )
