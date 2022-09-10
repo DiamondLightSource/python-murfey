@@ -290,6 +290,8 @@ class TomographyContext(Context):
             except Exception as e:
                 logger.error(f"ERROR {e}")
 
+        else:
+            self._tilt_series[tilt_series].append(file_path)
         if environment and environment.data_collection_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             # if environment.visit in environment.default_destination:
@@ -302,7 +304,6 @@ class TomographyContext(Context):
             #        / environment.visit
             #        / file_path.name
             #    )
-            self._tilt_series[tilt_series].append(file_path)
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
@@ -368,6 +369,7 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
+                print(tilt_series_size, this_tilt_series_size, self._tilt_series)
                 if this_tilt_series_size >= tilt_series_size:
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
