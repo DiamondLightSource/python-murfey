@@ -369,7 +369,6 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
-                print(tilt_series_size, this_tilt_series_size, self._tilt_series)
                 if this_tilt_series_size >= tilt_series_size:
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
