@@ -262,7 +262,8 @@ def run():
         instance_environment.source,
         environment=instance_environment if args.real_dc else None,
     )
-    source_watcher.subscribe(analyser.enqueue)
+    # source_watcher.subscribe(analyser.enqueue)
+    rsync_process.subscribe(analyser.enqueue)
 
     rich_handler.redirect = True
     MurfeyTUI.run(

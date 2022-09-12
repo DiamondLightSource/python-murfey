@@ -109,9 +109,12 @@ class MurfeyInstanceEnvironment(BaseModel):
                     try:
                         # possible race condition here where values accessing by [k] sometimes aren't ready when we
                         # try to access them - it throws a key error for a value which has just been set.
-                        # logger.warning(f"K {k}")
+                        logger.info(f"Processing {k}")
+                        logger.info("....")
+                        logger.warning(f"MTP {values['movie_tilt_pair']}")
+                        logger.warning(f"MV {values['movies']}")
                         tilt = values["movie_tilt_pair"][k]
-                        # logger.warn(f"Tilt: {tilt}")
+                        logger.info(f"Tilt: {tilt}")
                         # logger.warn(f"movies {values['movies'][k]}")
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
@@ -127,6 +130,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                             values["movies"][k].movie_uuid,
                             file_tilt_list,
                         )
+                    except KeyError:
+                        logger.warning("KEY error")
                     except Exception as e:
                         logger.warning(f"ERROR {e}")
         return v

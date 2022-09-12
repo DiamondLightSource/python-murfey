@@ -7,6 +7,7 @@ from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.rsync import RSyncerUpdate
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -148,9 +149,9 @@ class Analyser(Observer):
                     )
                     self.notify({"form": dc_metadata})
 
-    def enqueue(self, file_path: Path):
+    def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping:
-            absolute_path = (self._basepath / file_path).resolve()
+            absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
             # self.queue.put(file_path)
 
