@@ -264,6 +264,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                     **global_state["motion_corrected_movies"],
                     message.get("movie"): message.get("mrc_out"),
                 }
+            else:
+                global_state["motion_corrected_movies"] = {
+                    message.get("movie"): message.get("mrc_out")
+                }
 
         if _transport_object:
             _transport_object.transport.ack(header)

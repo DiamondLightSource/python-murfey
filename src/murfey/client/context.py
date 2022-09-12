@@ -135,18 +135,22 @@ class TomographyContext(Context):
             # tilt_angle = movie_path.name.split("[")[1].split("]")[0]
         else:
             return
-        if self._motion_corrected_tilt_series.get(tilt_series):
+        if self._motion_corrected_tilt_series.get(tilt_series) and motion_corrected_path not in self._motion_corrected_tilt_series.get(tilt_series):
             self._motion_corrected_tilt_series[tilt_series].append(
                 motion_corrected_path
             )
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
+            logger.warning(f"TS {self._tilt_series}")
+            logger.warning(f"MCTS {self._motion_corrected_tilt_series}")
             logger.warn(
                 f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
             )
-            if len(self._motion_corrected_tilt_series[tilt_series]) == len(
-                self._tilt_series[tilt_series]
+            if (
+                len(self._motion_corrected_tilt_series[tilt_series])
+                == len(self._tilt_series[tilt_series])
+                and len(self._motion_corrected_tilt_series[tilt_series]) > 1
             ):
                 try:
 
@@ -289,6 +293,8 @@ class TomographyContext(Context):
                     )
             except Exception as e:
                 logger.error(f"ERROR {e}")
+        else:
+            self._tilt_series[tilt_series].append(file_path)
 
         if environment and environment.data_collection_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
@@ -378,7 +384,9 @@ class TomographyContext(Context):
                     ):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
-                        if environment and environment.motion_corrected_movies:
+                        if environment and environment.motion_corrected_movies.get(
+                            file_transferred_to
+                        ):
                             logger.warn(f"MOVIES {environment.motion_corrected_movies}")
                             file_tilt_list = []
                             movie: str
@@ -393,18 +401,19 @@ class TomographyContext(Context):
                                             angle,
                                         ]
                                     )
-                            self._check_for_alignment(
-                                file_transferred_to,
-                                environment.motion_corrected_movies[
-                                    file_transferred_to
-                                ],
-                                environment.url.geturl(),
-                                environment.data_collection_ids[ts],
-                                environment.processing_job_ids[ts],
-                                environment.autoproc_program_ids[ts],
-                                environment.movies[file_transferred_to].movie_uuid,
-                                file_tilt_list,
-                            )
+                                self._check_for_alignment(
+                                    file_transferred_to,
+                                    environment.motion_corrected_movies.get(  # key error PosixPath
+                                        file_transferred_to
+                                    ),
+                                    environment.url.geturl(),
+                                    environment.data_collection_ids[ts],
+                                    environment.processing_job_ids[ts],
+                                    environment.autoproc_program_ids[ts],
+                                    environment.movies[file_transferred_to].movie_uuid,
+                                    file_tilt_list,
+                                )
+
                 logger.info(
                     f"The following tilt series are considered complete: {newly_completed_series}"
                 )
