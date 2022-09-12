@@ -138,7 +138,7 @@ class TomographyContext(Context):
         if self._motion_corrected_tilt_series.get(
             tilt_series
         ) and motion_corrected_path not in self._motion_corrected_tilt_series.get(
-            tilt_series
+            tilt_series, {}
         ):
             self._motion_corrected_tilt_series[tilt_series].append(
                 motion_corrected_path
@@ -222,10 +222,6 @@ class TomographyContext(Context):
             )
             return []
 
-        try:
-            logger.warning(f"context MTP {environment.movie_tilt_pair}")
-        except Exception:
-            pass
         if environment:
             if environment.visit in environment.default_destination:
                 file_transferred_to = (
@@ -303,11 +299,9 @@ class TomographyContext(Context):
             except Exception as e:
                 logger.error(f"ERROR {e}")
         else:
-            if file_path not in self._tilt_series.get(tilt_series):
+            if file_path not in self._tilt_series[tilt_series]:
                 self._tilt_series[tilt_series].append(file_path)
 
-        else:
-            self._tilt_series[tilt_series].append(file_path)
         if environment and environment.data_collection_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             # if environment.visit in environment.default_destination:
@@ -415,9 +409,9 @@ class TomographyContext(Context):
                                 ):
                                     self._check_for_alignment(
                                         file_transferred_to,
-                                        environment.motion_corrected_movies.get(  # key error PosixPath
+                                        environment.motion_corrected_movies[  # key error PosixPath
                                             file_transferred_to
-                                        ),
+                                        ],
                                         environment.url.geturl(),
                                         environment.data_collection_ids[ts],
                                         environment.processing_job_ids[ts],
