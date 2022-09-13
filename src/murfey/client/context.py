@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Callable, Dict, List
 
@@ -109,7 +110,7 @@ class TomographyContext(Context):
         mvid: int,
         tilt_angles: List,
     ):
-        logger.warn("Context checking alignent")
+        logger.warning("Context checking alignent")
         if self._acquisition_software == "serialem":
             delimiters = ("_", "-")
             for d in delimiters:
@@ -167,10 +168,10 @@ class TomographyContext(Context):
                         "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
                     }
-                    logger.warn(f"sending data {series_data}")
+                    logger.warning(f"sending data {series_data}")
                     requests.post(url, json=series_data)
                 except Exception as e:
-                    logger.warn(f"Data error {e}")
+                    logger.warning(f"Data error {e}")
 
     def _complete_process_file(
         self,
@@ -207,6 +208,8 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
+        logger.warning("Sleeping 5")
+        time.sleep(5)
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
@@ -222,9 +225,9 @@ class TomographyContext(Context):
             )
             return []
 
-        try:
-            logger.warning(f"context MTP {environment.movie_tilt_pair}")
-        except Exception:
+            # try:
+            #    logger.warning(f"context MTP {environment.movie_tilt_pair}")
+            # except Exception:
             pass
         if environment:
             if environment.visit in environment.default_destination:
@@ -306,7 +309,7 @@ class TomographyContext(Context):
             if file_path not in self._tilt_series.get(tilt_series):
                 self._tilt_series[tilt_series].append(file_path)
 
-        if environment and environment.data_collection_ids.get(tilt_series):
+        if environment and environment.autoproc_program_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             # if environment.visit in environment.default_destination:
             #    file_transferred_to = (
@@ -318,7 +321,7 @@ class TomographyContext(Context):
             #        / environment.visit
             #        / file_path.name
             #    )
-            self._tilt_series[tilt_series].append(file_path)
+            # self._tilt_series[tilt_series].append(file_path)
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
@@ -395,7 +398,7 @@ class TomographyContext(Context):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
                         if environment:
-                            logger.warn(f"MOVIES {environment.motion_corrected_movies}")
+                            # logger.warning(f"MOVIES {environment.motion_corrected_movies}")
                             file_tilt_list = []
                             movie: str
                             angle: str
@@ -403,10 +406,17 @@ class TomographyContext(Context):
                                 if environment.motion_corrected_movies.get(Path(movie)):
                                     file_tilt_list.append(
                                         [
-                                            environment.motion_corrected_movies[
-                                                Path(movie)
-                                            ],
+                                            str(
+                                                environment.motion_corrected_movies[
+                                                    Path(movie)
+                                                ]
+                                            ),
                                             angle,
+                                            str(
+                                                environment.movies[
+                                                    Path(movie)
+                                                ].movie_uuid
+                                            ),
                                         ]
                                     )
                                 if environment.motion_corrected_movies.get(
