@@ -471,6 +471,7 @@ class MurfeyTUI(App):
         self._do_transfer = do_transfer
         self.rsync_process = rsync_process
         self.analyser = analyser
+        self._data_collection_form_complete = False
         self._info_widget = InfoWidget("Welcome to Murfey :microscope:")
 
     @property
@@ -552,12 +553,15 @@ class MurfeyTUI(App):
         self._tmp_responses = []
 
     def _data_collection_form(self, response: dict):
+        if self._data_collection_form_complete:
+            return
         if self._register_dc and response.get("form"):
             self._queues["input"].put_nowait(
                 InputResponse(
                     question="Data collection parameters:", form=response["form"]
                 )
             )
+            self._data_collection_form_complete = True
         elif response.get("allowed_responses"):
             self._queues["input"].put_nowait(
                 InputResponse(
@@ -568,6 +572,7 @@ class MurfeyTUI(App):
             )
         elif self._register_dc is None:
             self._tmp_responses.append(response)
+            self._data_collection_form_complete = True
 
     def _start_dc(self, json):
         if self._dummy_dc:
