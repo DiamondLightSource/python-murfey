@@ -53,6 +53,8 @@ class Analyser(Observer):
                     or file_path.with_suffix(".mdoc").is_file()
                 ):
                     self._role = "microscope"
+                else:
+                    self._role = "detector"
                 return True
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
