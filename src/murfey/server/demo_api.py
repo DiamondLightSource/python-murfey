@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import datetime
 import logging
 from functools import lru_cache
@@ -15,7 +14,6 @@ from pydantic import BaseModel, BaseSettings
 
 import murfey.server
 import murfey.server.bootstrap
-import murfey.server.ispyb
 import murfey.server.websocket as ws
 import murfey.util.models
 from murfey.server import get_hostname, get_microscope, templates
@@ -26,7 +24,7 @@ log = logging.getLogger("murfey.server.demo_api")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-demo_router = APIRouter()
+router = APIRouter()
 
 
 class Settings(BaseSettings):
@@ -37,7 +35,7 @@ settings = Settings()
 
 
 # This will be the homepage for a given microscope.
-@demo_router.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse(
         "home.html",
@@ -51,7 +49,7 @@ async def root(request: Request):
 
 
 @lru_cache(maxsize=1)
-@demo_router.get("/machine/")
+@router.get("/machine/")
 def machine_info():
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
@@ -59,13 +57,13 @@ def machine_info():
     return {}
 
 
-@demo_router.get("/microscope/")
+@router.get("/microscope/")
 def get_mic():
     microscope = get_microscope()
     return {"microscope": microscope}
 
 
-@demo_router.get("/visits/")
+@router.get("/visits/")
 def all_visit_info(request: Request):
     microscope = get_microscope()
     return_query = [
@@ -83,12 +81,21 @@ def all_visit_info(request: Request):
     )
 
 
-@demo_router.get("/visits_raw", response_model=List[murfey.util.models.Visit])
+@router.get("/visits_raw", response_model=List[murfey.util.models.Visit])
 def get_current_visits():
-    return []
+    return [
+        murfey.util.models.Visit(
+            start=datetime.datetime.now(),
+            end=datetime.datetime.now() + datetime.timedelta(days=1),
+            session_id=1,
+            name="cm31111-2",
+            beamline="m12",
+            proposal_title="Nothing of importance",
+        )
+    ]
 
 
-@demo_router.get("/visits/{visit_name}")
+@router.get("/visits/{visit_name}")
 def visit_info(request: Request, visit_name: str):
     microscope = get_microscope()
     query = [
@@ -123,7 +130,7 @@ class ContextInfo(BaseModel):
     acquisition_software: str
 
 
-@demo_router.post("/visits/{visit_name}/context")
+@router.post("/visits/{visit_name}/context")
 async def register_context(context_info: ContextInfo):
     log.info(
         f"Context {context_info.experiment_type}:{context_info.acquisition_software} registered"
@@ -142,7 +149,7 @@ class File(BaseModel):
     timestamp: float
 
 
-@demo_router.post("/visits/{visit_name}/files")
+@router.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     message = f"File {file} transferred"
     log.info(message)
@@ -155,7 +162,7 @@ class RegistrationMessage(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
-@demo_router.post("/feedback")
+@router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     pass
 
@@ -174,8 +181,10 @@ class ProcessFile(BaseModel):
     pixel_size: float
 
 
-@demo_router.post("/visits/{visit_name}/tomography_preprocess")
+@router.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+    if not Path(proc_file.path).exists():
+        log.warning(f"{proc_file.path} has not been transferred before preprocessing")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
@@ -192,9 +201,8 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True, mode=1411)
-    asyncio.sleep(10)
-    murfey.server.feedback_callback(
+        mrc_out.parent.mkdir(parents=True)
+    await murfey.server.feedback_callback_async(
         {},
         {
             "register": "motion_corrected",
@@ -203,6 +211,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         },
     )
     await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
+    mrc_out.touch()
     return proc_file
 
 
@@ -216,22 +225,23 @@ class TiltSeries(BaseModel):
     movie_id: int
 
 
-@demo_router.post("/visits/{visit_name}/align")
+@router.post("/visits/{visit_name}/align")
 async def request_tilt_series_alignment(tilt_series: TiltSeries):
     stack_file = (
         Path(tilt_series.motion_corrected_path).parents[1]
         / "align_output"
-        / "aligned_file.mrc"
+        / f"aligned_file_{tilt_series.name}.mrc"
     )
     if not stack_file.parent.exists():
-        stack_file.parent.mkdir(parents=True, mode=1411)
+        stack_file.parent.mkdir(parents=True)
     await ws.manager.broadcast(
         f"Processing requested for tilt series {tilt_series.name}"
     )
+    stack_file.touch()
     return tilt_series
 
 
-@demo_router.get("/version")
+@router.get("/version")
 def get_version(client_version: str = ""):
     result = {
         "server": murfey.__version__,
@@ -248,7 +258,7 @@ def get_version(client_version: str = ""):
     return result
 
 
-@demo_router.get("/shutdown", include_in_schema=False)
+@router.get("/shutdown", include_in_schema=False)
 def shutdown():
     """A method to stop the server. This should be removed before Murfey is
     deployed in production. To remove it we need to figure out how to control
@@ -262,7 +272,7 @@ class SuggestedPathParameters(BaseModel):
     base_path: Path
 
 
-@demo_router.post("/visits/{visit_name}/suggested_path")
+@router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
     check_path = Path(f"/dls/{get_microscope()}") / params.base_path
@@ -295,14 +305,14 @@ class ProcessingJobParameters(BaseModel):
     recipe: str
 
 
-@demo_router.post("/visits/{visit_name}/register_data_collection_group")
+@router.post("/visits/{visit_name}/register_data_collection_group")
 def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
     global_state["data_collection_group_id"] = 1
     return dcg_params
 
 
-@demo_router.post("/visits/{visit_name}/start_data_collection")
+@router.post("/visits/{visit_name}/start_data_collection")
 def start_dc(visit_name, dc_params: DCParameters):
     log.info(f"Starting data collection on microscope {get_microscope()}")
     if global_state.get("data_collection_ids") and isinstance(
@@ -317,7 +327,7 @@ def start_dc(visit_name, dc_params: DCParameters):
     return dc_params
 
 
-@demo_router.post("/visits/{visit_name}/register_processing_job")
+@router.post("/visits/{visit_name}/register_processing_job")
 def register_proc(visit_name, proc_params: ProcessingJobParameters):
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)

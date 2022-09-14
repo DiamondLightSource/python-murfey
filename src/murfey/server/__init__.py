@@ -24,7 +24,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.websocket
-from murfey.server.ispyb import TransportManager  # Session
+
+try:
+    from murfey.server.ispyb import TransportManager  # Session
+except AttributeError:
+    pass
 from murfey.util.state import global_state
 
 try:
@@ -140,7 +144,10 @@ def run():
     args = parser.parse_args()
 
     # Set up Zocalo connection
-    _set_up_transport(args.transport)
+    if args.demo:
+        os.environ["MURFEY_DEMO"] = "1"
+    else:
+        _set_up_transport(args.transport)
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -249,6 +256,27 @@ def _set_up_logging(quiet: bool, verbosity: int):
 def _set_up_transport(transport_type):
     global _transport_object
     _transport_object = TransportManager(transport_type)
+
+
+async def feedback_callback_async(header: dict, message: dict) -> None:
+    logger.info(f"feedback_callback_async called with {header}, {message}")
+    if message["register"] == "motion_corrected":
+        if murfey.server.websocket.manager:
+            if global_state.get("motion_corrected_movies") and isinstance(
+                global_state["motion_corrected_movies"], dict
+            ):
+                await global_state.update(
+                    "motion_corrected_movies",
+                    {
+                        **global_state["motion_corrected_movies"],
+                        message.get("movie"): message.get("mrc_out"),
+                    },
+                )
+            else:
+                await global_state.update(
+                    "motion_corrected_movies",
+                    {message.get("movie"): message.get("mrc_out")},
+                )
 
 
 def feedback_callback(header: dict, message: dict) -> None:
