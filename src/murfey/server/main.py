@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -8,10 +9,14 @@ from pydantic import BaseSettings
 
 import murfey.server
 import murfey.server.bootstrap
-import murfey.server.ispyb
 import murfey.util.models
 from murfey.server import template_files
-from murfey.server.api import router
+
+if os.getenv("MURFEY_DEMO"):
+    from murfey.server.demo_api import router
+else:
+    from murfey.server.api import router
+
 
 log = logging.getLogger("murfey.server.main")
 
