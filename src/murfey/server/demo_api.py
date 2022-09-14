@@ -332,17 +332,29 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
         global_state["processing_job_ids"] = {
-            **global_state["processing_job_ids"],
-            proc_params.tag: 1,
+            **{
+                k: v
+                for k, v in global_state["processing_job_ids"].items()
+                if k != proc_params.tag
+            },
+            proc_params.tag: {
+                **global_state["processing_job_ids"].get(proc_params.tag, {}),
+                proc_params.recipe: 1,
+            },
         }
     else:
-        global_state["processing_job_ids"] = {proc_params.tag: 1}
+        global_state["processing_job_ids"] = {proc_params.tag: {proc_params.recipe: 1}}
     if global_state.get("autoproc_program_ids"):
         assert isinstance(global_state["autoproc_program_ids"], dict)
         global_state["autoproc_program_ids"] = {
             **global_state["autoproc_program_ids"],
-            proc_params.tag: 1,
+            proc_params.tag: {
+                **global_state["autoproc_program_ids"].get(proc_params.tag, {}),
+                proc_params.recipe: 1,
+            },
         }
     else:
-        global_state["autoproc_program_ids"] = {proc_params.tag: 1}
+        global_state["autoproc_program_ids"] = {
+            proc_params.tag: {proc_params.recipe: 1}
+        }
     return proc_params

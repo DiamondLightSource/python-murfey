@@ -91,7 +91,7 @@ class TomographyContext(Context):
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str, app_id: int):
-        logger.info(f"Flushing preprocessing job {tag}")
+        logger.info(f"Flushing preprocessing requests {tag}")
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
@@ -181,7 +181,9 @@ class TomographyContext(Context):
                     "description": incomplete_process_file.description,
                     "size": incomplete_process_file.source.stat().st_size,
                     "timestamp": incomplete_process_file.source.stat().st_ctime,
-                    "processing_job": environment.processing_job_ids[tag],
+                    "processing_job": environment.processing_job_ids[tag][
+                        "em-tomo-preprocess"
+                    ],
                     "data_collection_id": environment.data_collection_ids[tag],
                     "image_number": incomplete_process_file.image_number,
                     "pixel_size": environment.data_collection_parameters[
@@ -330,13 +332,17 @@ class TomographyContext(Context):
                 "description": "",
                 "size": file_path.stat().st_size,
                 "timestamp": file_path.stat().st_ctime,
-                "processing_job": environment.processing_job_ids[tilt_series],
+                "processing_job": environment.processing_job_ids[tilt_series][
+                    "em-tomo-preprocess"
+                ],
                 "data_collection_id": environment.data_collection_ids[tilt_series],
                 "image_number": environment.movies[file_transferred_to].movie_number,
                 "pixel_size": environment.data_collection_parameters[
                     "pixel_size_on_image"
                 ],
-                "autoproc_program_id": environment.autoproc_program_ids[tilt_series],
+                "autoproc_program_id": environment.autoproc_program_ids[tilt_series][
+                    "em-tomo-preprocess"
+                ],
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
@@ -439,8 +445,12 @@ class TomographyContext(Context):
                                         ],
                                         environment.url.geturl(),
                                         environment.data_collection_ids[ts],
-                                        environment.processing_job_ids[ts],
-                                        environment.autoproc_program_ids[ts],
+                                        environment.processing_job_ids[ts][
+                                            "em-tomo-align"
+                                        ],
+                                        environment.autoproc_program_ids[ts][
+                                            "em-tomo-align"
+                                        ],
                                         environment.movies[
                                             file_transferred_to
                                         ].movie_uuid,

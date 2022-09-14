@@ -348,13 +348,16 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.nack(header)
             return None
         if global_state.get("processing_job_ids"):
-            assert isinstance(global_state["processing_job_ids"], dict)
             global_state["processing_job_ids"] = {
-                **global_state["processing_job_ids"],
-                message.get("tag"): pid,
+                **global_state["processing_job_ids"],  # type: ignore
+                message.get("tag"): {
+                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                    ProcessingJob.recipe: pid,
+                },
             }
         else:
-            global_state["processing_job_ids"] = {message["tag"]: pid}
+            prids = {message["tag"]: {ProcessingJob.recipe: pid}}
+            global_state["processing_job_ids"] = prids
         record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
         if appid is None and _transport_object:
@@ -364,10 +367,15 @@ def feedback_callback(header: dict, message: dict) -> None:
             assert isinstance(global_state["autoproc_program_ids"], dict)
             global_state["autoproc_program_ids"] = {
                 **global_state["autoproc_program_ids"],
-                message.get("tag"): appid,
+                message.get("tag"): {
+                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                    ProcessingJob.recipe: appid,
+                },
             }
         else:
-            global_state["autoproc_program_ids"] = {message["tag"]: appid}
+            global_state["autoproc_program_ids"] = {
+                message["tag"]: {ProcessingJob.recipe: appid}
+            }
         if _transport_object:
             _transport_object.transport.ack(header)
         return None
