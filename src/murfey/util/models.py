@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -24,3 +26,70 @@ class Visit(BaseModel):
             f"proposal_title={self.proposal_title!r}"
             ")"
         )
+
+
+class ContextInfo(BaseModel):
+    experiment_type: str
+    acquisition_software: str
+
+
+class File(BaseModel):
+    name: str
+    description: str
+    size: int
+    timestamp: float
+
+
+class ProcessFile(BaseModel):
+    path: str
+    description: str
+    size: int
+    timestamp: float
+    processing_job: int
+    data_collection_id: int
+    image_number: int
+    mc_uuid: int
+    movie_uuid: int
+    autoproc_program_id: int
+    pixel_size: float
+
+
+class TiltSeries(BaseModel):
+    name: str
+    file_tilt_list: str
+    dcid: int
+    processing_job: int
+    autoproc_program_id: int
+    motion_corrected_path: str
+    movie_id: int
+
+
+class SuggestedPathParameters(BaseModel):
+    base_path: Path
+
+
+class DCGroupParameters(BaseModel):
+    experiment_type: str
+
+
+class DCParameters(BaseModel):
+    voltage: float
+    pixel_size_on_image: str
+    experiment_type: str
+    image_size_x: int
+    image_size_y: int
+    tilt: int
+    file_extension: str
+    acquisition_software: str
+    image_directory: str
+    tag: str
+
+
+class ProcessingJobParameters(BaseModel):
+    tag: str
+    recipe: str
+
+
+class RegistrationMessage(BaseModel):
+    registration: str
+    params: Optional[Dict[str, Any]] = None

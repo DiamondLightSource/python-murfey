@@ -4,20 +4,31 @@ import datetime
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseSettings
 
 import murfey.server
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
-import murfey.util.models
 from murfey.server import get_hostname, get_microscope, templates
 from murfey.server.config import from_file
+from murfey.util.models import (
+    ContextInfo,
+    DCGroupParameters,
+    DCParameters,
+    File,
+    ProcessFile,
+    ProcessingJobParameters,
+    RegistrationMessage,
+    SuggestedPathParameters,
+    TiltSeries,
+    Visit,
+)
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -81,10 +92,10 @@ def all_visit_info(request: Request):
     )
 
 
-@router.get("/visits_raw", response_model=List[murfey.util.models.Visit])
+@router.get("/visits_raw", response_model=List[Visit])
 def get_current_visits():
     return [
-        murfey.util.models.Visit(
+        Visit(
             start=datetime.datetime.now(),
             end=datetime.datetime.now() + datetime.timedelta(days=1),
             session_id=1,
@@ -125,11 +136,6 @@ def visit_info(request: Request, visit_name: str):
     )
 
 
-class ContextInfo(BaseModel):
-    experiment_type: str
-    acquisition_software: str
-
-
 @router.post("/visits/{visit_name}/context")
 async def register_context(context_info: ContextInfo):
     log.info(
@@ -142,13 +148,6 @@ async def register_context(context_info: ContextInfo):
     )
 
 
-class File(BaseModel):
-    name: str
-    description: str
-    size: int
-    timestamp: float
-
-
 @router.post("/visits/{visit_name}/files")
 async def add_file(file: File):
     message = f"File {file} transferred"
@@ -157,28 +156,9 @@ async def add_file(file: File):
     return file
 
 
-class RegistrationMessage(BaseModel):
-    registration: str
-    params: Optional[Dict[str, Any]] = None
-
-
 @router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     pass
-
-
-class ProcessFile(BaseModel):
-    path: str
-    description: str
-    size: int
-    timestamp: float
-    processing_job: int
-    data_collection_id: int
-    image_number: int
-    mc_uuid: int
-    movie_uuid: int
-    autoproc_program_id: int
-    pixel_size: float
 
 
 @router.post("/visits/{visit_name}/tomography_preprocess")
@@ -213,16 +193,6 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     mrc_out.touch()
     return proc_file
-
-
-class TiltSeries(BaseModel):
-    name: str
-    file_tilt_list: str
-    dcid: int
-    processing_job: int
-    autoproc_program_id: int
-    motion_corrected_path: str
-    movie_id: int
 
 
 @router.post("/visits/{visit_name}/align")
@@ -268,10 +238,6 @@ def shutdown():
     return {"success": True}
 
 
-class SuggestedPathParameters(BaseModel):
-    base_path: Path
-
-
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
@@ -281,28 +247,6 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     return {"suggested_path": check_path}
-
-
-class DCGroupParameters(BaseModel):
-    experiment_type: str
-
-
-class DCParameters(BaseModel):
-    voltage: float
-    pixel_size_on_image: str
-    experiment_type: str
-    image_size_x: int
-    image_size_y: int
-    tilt: int
-    file_extension: str
-    acquisition_software: str
-    image_directory: str
-    tag: str
-
-
-class ProcessingJobParameters(BaseModel):
-    tag: str
-    recipe: str
 
 
 @router.post("/visits/{visit_name}/register_data_collection_group")
