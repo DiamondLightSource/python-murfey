@@ -75,28 +75,29 @@ class TomographyContext(Context):
         self._preprocessing_triggers: dict = {}
 
     def _flush_data_collections(self):
-        logger.debug("Flushing data collection API calls")
+        logger.info("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             requests.post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        logger.debug(f"Flushing processing job {tag}")
+        logger.info(
+            f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
+        )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
-    def _flush_preprocess(self, tag: str):
-        logger.debug(
-            f"Flushing preprocessing job {tag}: {self._preprocessing_triggers.get(tag)}"
-        )
-        if tr := self._preprocessing_triggers.get(tag):
-            process_file = self._complete_process_file(tr[1], tr[2])
-            if process_file:
-                requests.post(tr[0], json=process_file)
-                self._preprocessing_triggers.pop(tag)
+    def _flush_preprocess(self, tag: str, app_id: int):
+        logger.info(f"Flushing preprocessing job {tag}")
+        if tag_tr := self._preprocessing_triggers.get(tag):
+            for tr in tag_tr:
+                process_file = self._complete_process_file(tr[1], tr[2], app_id)
+                if process_file:
+                    requests.post(tr[0], json=process_file)
+            self._preprocessing_triggers.pop(tag)
 
     def _check_for_alignment(
         self,
@@ -109,7 +110,6 @@ class TomographyContext(Context):
         mvid: int,
         tilt_angles: List,
     ):
-        logger.warn("Context checking alignent")
         if self._acquisition_software == "serialem":
             delimiters = ("_", "-")
             for d in delimiters:
@@ -146,11 +146,6 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
-            logger.warning(f"TS {self._tilt_series[tilt_series]}")
-            # logger.warning(f"MCTS {self._motion_corrected_tilt_series}")
-            logger.warning(
-                f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
-            )
             if (
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
@@ -167,7 +162,6 @@ class TomographyContext(Context):
                         "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
                     }
-                    logger.warn(f"sending data {series_data}")
                     requests.post(url, json=series_data)
                 except Exception as e:
                     logger.warn(f"Data error {e}")
@@ -176,6 +170,7 @@ class TomographyContext(Context):
         self,
         incomplete_process_file: ProcessFileIncomplete,
         environment: MurfeyInstanceEnvironment,
+        app_id: int,
     ) -> dict:
         try:
             with global_env_lock:
@@ -192,12 +187,13 @@ class TomographyContext(Context):
                     "pixel_size": environment.data_collection_parameters[
                         "pixel_size_on_image"
                     ],
-                    "autoproc_program_id": environment.autoproc_program_ids[tag],
+                    "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
                     "movie_uuid": incomplete_process_file.movie_uuid,
                 }
                 return new_dict
         except KeyError:
+            logger.warning("Key error encountered in _complete_process_file")
             return {}
 
     def _add_tilt(
@@ -290,19 +286,34 @@ class TomographyContext(Context):
                     else:
                         requests.post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-                    self._processing_job_stash[tilt_series] = [
-                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-preprocess"})
-                    ]
-                    self._processing_job_stash[tilt_series].append(
-                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
-                    )
+                    if environment.data_collection_ids.get(tilt_series) is None:
+                        self._processing_job_stash[tilt_series] = [
+                            (
+                                proc_url,
+                                {"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                            )
+                        ]
+                        self._processing_job_stash[tilt_series].append(
+                            (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
+                        )
+                    else:
+                        if self._processing_job_stash.get(tilt_series):
+                            self._flush_processing_job(tilt_series)
+                        requests.post(
+                            proc_url,
+                            json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                        )
+                        requests.post(
+                            proc_url,
+                            json={"tag": tilt_series, "recipe": "em-tomo-align"},
+                        )
             except Exception as e:
                 logger.error(f"ERROR {e}")
         else:
             if file_path not in self._tilt_series[tilt_series]:
                 self._tilt_series[tilt_series].append(file_path)
 
-        if environment and environment.data_collection_ids.get(tilt_series):
+        if environment and environment.autoproc_program_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             # if environment.visit in environment.default_destination:
             #    file_transferred_to = (
@@ -359,14 +370,22 @@ class TomographyContext(Context):
                 environment.autoproc_program_ids.get(tilt_series) is None
                 or environment.processing_job_ids.get(tilt_series) is None
             ):
-                self._preprocessing_triggers[tilt_series] = (
-                    preproc_url,
-                    pfi,
-                    environment,
-                )
-            else:
-                process_file = self._complete_process_file(pfi, environment)
-                requests.post(preproc_url, json=process_file)
+                if self._preprocessing_triggers.get(tilt_series):
+                    self._preprocessing_triggers[tilt_series].append(
+                        (
+                            preproc_url,
+                            pfi,
+                            environment,
+                        )
+                    )
+                else:
+                    self._preprocessing_triggers[tilt_series] = [
+                        (
+                            preproc_url,
+                            pfi,
+                            environment,
+                        )
+                    ]
 
         if self._last_transferred_file:
             last_tilt_series = extract_tilt_series(self._last_transferred_file)
@@ -390,7 +409,6 @@ class TomographyContext(Context):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
                         if environment:
-                            logger.warn(f"MOVIES {environment.motion_corrected_movies}")
                             file_tilt_list = []
                             movie: str
                             angle: str
