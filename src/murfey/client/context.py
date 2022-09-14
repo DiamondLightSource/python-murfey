@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Callable, Dict, List
 
@@ -164,7 +165,7 @@ class TomographyContext(Context):
                     }
                     requests.post(url, json=series_data)
                 except Exception as e:
-                    logger.warn(f"Data error {e}")
+                    logger.warning(f"Data error {e}")
 
     def _complete_process_file(
         self,
@@ -203,6 +204,8 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
+        logger.warning("Sleeping 5")
+        time.sleep(5)
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
@@ -416,10 +419,17 @@ class TomographyContext(Context):
                                 if environment.motion_corrected_movies.get(Path(movie)):
                                     file_tilt_list.append(
                                         [
-                                            environment.motion_corrected_movies[
-                                                Path(movie)
-                                            ],
+                                            str(
+                                                environment.motion_corrected_movies[
+                                                    Path(movie)
+                                                ]
+                                            ),
                                             angle,
+                                            str(
+                                                environment.movies[
+                                                    Path(movie)
+                                                ].movie_uuid
+                                            ),
                                         ]
                                     )
                                 if environment.motion_corrected_movies.get(

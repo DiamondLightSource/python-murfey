@@ -90,11 +90,17 @@ class MurfeyInstanceEnvironment(BaseModel):
                     tilt = values["movie_tilt_pair"][k]
                     file_tilt_list = []
                     for movie, angle in values["tilt_angles"][tilt]:
-                        if movie in values["motion_corrected_movies"]:
+                        if movie in v:  # values["motion_corrected_movies"]:
+                            # file_tilt_list.append(
+                            #    [values["motion_corrected_movies"][movie], angle]
+                            # )
                             file_tilt_list.append(
-                                [values["motion_corrected_movies"][movie], angle]
+                                [
+                                    str(v[Path(movie)]),
+                                    angle,
+                                    str(values["movies"][Path(movie)].movie_uuid),
+                                ]
                             )
-                            # file_tilt_list.append([str(movie), angle, str(values["movies"][str(movie)].movie_uuid)])
                     l(
                         k,
                         v[k],
@@ -112,8 +118,14 @@ class MurfeyInstanceEnvironment(BaseModel):
                         tilt = values["movie_tilt_pair"][k]
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
-                            file_tilt_list.append([str(movie), angle])
-                            # file_tilt_list.append([str(movie), angle, values["movies"][str(movie)].movie_uuid])  # or v(k)
+                            # file_tilt_list.append([str(movie), angle])
+                            file_tilt_list.append(
+                                [
+                                    str(v[Path(movie)]),
+                                    angle,
+                                    str(values["movies"][Path(movie)].movie_uuid),
+                                ]
+                            )  # or v(k)
                         l(
                             k,
                             v[k],
@@ -124,8 +136,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                             values["movies"][k].movie_uuid,
                             file_tilt_list,
                         )
-                    except KeyError:
-                        logger.warning("KEY error")
+                    except KeyError as k:
+                        logger.warning(f"KEY error {k}")
                     except Exception as e:
                         logger.warning(f"ERROR {e}")
         return v
