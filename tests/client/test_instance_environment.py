@@ -20,7 +20,7 @@ def test_murfey_instance_environment_subscribe(env):
     class DummyContext:
         elem = None
 
-        def set_elem(self, new_elem: str):
+        def set_elem(self, new_elem: str, values: dict):
             self.elem = new_elem
 
     dc = DummyContext()
