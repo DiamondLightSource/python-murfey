@@ -57,7 +57,6 @@ class ProcessFileIncomplete(BaseModel):
     dest: Path
     source: Path
     image_number: int
-    movie_uuid: int
     mc_uuid: int
     tag: str
     description: str = ""
@@ -146,6 +145,9 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
+            logger.info(
+                f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
+            )
             if (
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
@@ -191,7 +193,6 @@ class TomographyContext(Context):
                     ],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
-                    "movie_uuid": incomplete_process_file.movie_uuid,
                 }
                 return new_dict
         except KeyError:
@@ -233,7 +234,6 @@ class TomographyContext(Context):
                 )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
-                movie_uuid=next(MurfeyID),
                 motion_correction_uuid=next(MurfeyID),
             )
             environment.movie_tilt_pair[file_transferred_to] = tilt_series
@@ -245,7 +245,6 @@ class TomographyContext(Context):
                 environment.tilt_angles[tilt_series] = [
                     [str(file_transferred_to), tilt_angle]
                 ]
-            # logger.warn(f"Setting {environment.movie_tilt_pair} and {environment.tilt_angles}")
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
@@ -256,7 +255,7 @@ class TomographyContext(Context):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
             try:
-                if environment:  # and environment._processing_jobs.get(tilt_series):
+                if environment:
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
@@ -317,16 +316,6 @@ class TomographyContext(Context):
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            # if environment.visit in environment.default_destination:
-            #    file_transferred_to = (
-            #        Path(environment.default_destination) / file_path.name
-            #    )
-            # else:
-            #    file_transferred_to = (
-            #        Path(environment.default_destination)
-            #        / environment.visit
-            #        / file_path.name
-            #    )
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
@@ -346,26 +335,14 @@ class TomographyContext(Context):
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
-                "movie_uuid": environment.movies[file_transferred_to].movie_uuid,
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            # if environment.visit in environment.default_destination:
-            #    file_transferred_to = (
-            #        Path(environment.default_destination) / file_path.name
-            #    )
-            # else:
-            #    file_transferred_to = (
-            #        Path(environment.default_destination)
-            #        / environment.visit
-            #        / file_path.name
-            #    )
             pfi = ProcessFileIncomplete(
                 dest=file_transferred_to,
                 source=environment.source,
                 image_number=environment.movies[file_transferred_to].movie_number,
-                movie_uuid=environment.movies[file_transferred_to].movie_uuid,
                 mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
                 tag=tilt_series,
             )
@@ -425,13 +402,13 @@ class TomographyContext(Context):
                                             str(
                                                 environment.motion_corrected_movies[
                                                     Path(movie)
-                                                ]
+                                                ][0]
                                             ),
                                             angle,
                                             str(
-                                                environment.movies[
+                                                environment.motion_corrected_movies[
                                                     Path(movie)
-                                                ].movie_uuid
+                                                ][1]
                                             ),
                                         ]
                                     )
@@ -442,6 +419,8 @@ class TomographyContext(Context):
                                         file_transferred_to,
                                         environment.motion_corrected_movies[  # key error PosixPath
                                             file_transferred_to
+                                        ][
+                                            0
                                         ],
                                         environment.url.geturl(),
                                         environment.data_collection_ids[ts],
@@ -451,9 +430,9 @@ class TomographyContext(Context):
                                         environment.autoproc_program_ids[ts][
                                             "em-tomo-align"
                                         ],
-                                        environment.movies[
+                                        environment.motion_corrected_movies[
                                             file_transferred_to
-                                        ].movie_uuid,
+                                        ][1],
                                         file_tilt_list,
                                     )
 

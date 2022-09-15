@@ -284,18 +284,17 @@ def feedback_callback(header: dict, message: dict) -> None:
     if "environment" in message:
         message = message["payload"]
     if message["register"] == "motion_corrected":
-        if murfey.server.websocket.manager:
-            if global_state.get("motion_corrected_movies") and isinstance(
-                global_state["motion_corrected_movies"], dict
-            ):
-                global_state["motion_corrected_movies"] = {
-                    **global_state["motion_corrected_movies"],
-                    message.get("movie"): message.get("mrc_out"),
-                }
-            else:
-                global_state["motion_corrected_movies"] = {
-                    message.get("movie"): message.get("mrc_out")
-                }
+        if global_state.get("motion_corrected_movies") and isinstance(
+            global_state["motion_corrected_movies"], dict
+        ):
+            global_state["motion_corrected_movies"] = {
+                **global_state["motion_corrected_movies"],
+                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")],
+            }
+        else:
+            global_state["motion_corrected_movies"] = {
+                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")]
+            }
 
         if _transport_object:
             _transport_object.transport.ack(header)

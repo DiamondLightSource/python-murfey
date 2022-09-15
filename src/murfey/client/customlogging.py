@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from rich.console import Console, RenderableType
+from rich.console import RenderableType
 from rich.containers import Renderables
 from rich.logging import RichHandler
 from rich.text import Text
@@ -37,7 +37,6 @@ class DirectableRichHandler(RichHandler):
         super().__init__(**kwargs)
         self._queue = queue
         self.redirect = False
-        self._console = Console()
         self._last_time = None
 
     def get_log_row(self, record, message_renderable) -> list:
@@ -46,7 +45,7 @@ class DirectableRichHandler(RichHandler):
         path = Path(record.pathname).name
         level = self.get_level_text(record)
         time_format = None if self.formatter is None else self.formatter.datefmt
-        log_time = datetime.fromtimestamp(record.created) or self.console.get_datetime()
+        log_time = datetime.fromtimestamp(record.created) or datetime.now()
         time_format = time_format or self._log_render.time_format
         link_path = record.pathname if self.enable_link_path else None
         if callable(time_format):
