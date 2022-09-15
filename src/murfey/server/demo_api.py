@@ -12,10 +12,11 @@ from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
 
-import murfey.server
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
-from murfey.server import get_hostname, get_microscope, templates
+from murfey.server import feedback_callback_async, get_hostname, get_microscope
+from murfey.server import shutdown as _shutdown
+from murfey.server import templates
 from murfey.server.config import from_file
 from murfey.util.models import (
     ContextInfo,
@@ -182,7 +183,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     if not mrc_out.parent.exists():
         mrc_out.parent.mkdir(parents=True)
-    await murfey.server.feedback_callback_async(
+    await feedback_callback_async(
         {},
         {
             "register": "motion_corrected",
@@ -234,7 +235,7 @@ def shutdown():
     deployed in production. To remove it we need to figure out how to control
     to process (eg. systemd) and who to run it as."""
     log.info("Server shutdown request received")
-    murfey.server.shutdown()
+    _shutdown()
     return {"success": True}
 
 
