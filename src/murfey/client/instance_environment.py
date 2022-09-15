@@ -19,7 +19,6 @@ MovieID = count(1)
 
 class MovieTracker(NamedTuple):
     movie_number: int
-    movie_uuid: int
     motion_correction_uuid: int
 
 
@@ -38,7 +37,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     autoproc_program_ids: Dict[str, int] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
-    motion_corrected_movies: Dict[Path, Path] = {}
+    motion_corrected_movies: Dict[Path, List[str]] = {}
     listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
@@ -96,18 +95,18 @@ class MurfeyInstanceEnvironment(BaseModel):
                             # )
                             file_tilt_list.append(
                                 [
-                                    str(v[Path(movie)]),
+                                    str(v[Path(movie)][0]),
                                     angle,
-                                    str(values["movies"][Path(movie)].movie_uuid),
+                                    str(v[Path(movie)][1]),
                                 ]
                             )
                     l(
                         k,
-                        v[k],
+                        v[k][0],
                         _url,
                         values["processing_job_ids"][k],
                         values["autoproc_program_ids"][k],
-                        values["movies"][k].movie_uuid,
+                        v[k][1],
                         file_tilt_list,
                     )
             else:
@@ -127,19 +126,19 @@ class MurfeyInstanceEnvironment(BaseModel):
                             # file_tilt_list.append([str(movie), angle])
                             file_tilt_list.append(
                                 [
-                                    str(v[Path(movie)]),
+                                    str(v[Path(movie)][0]),
                                     angle,
-                                    str(values["movies"][Path(movie)].movie_uuid),
+                                    str(v[Path(movie)][1]),
                                 ]
                             )  # or v(k)
                         l(
                             k,
-                            v[k],
+                            v[k][0],
                             _url,
                             values["data_collection_ids"][tilt],
                             values["processing_job_ids"][tilt],
                             values["autoproc_program_ids"][tilt],
-                            values["movies"][k].movie_uuid,
+                            v[k][1],
                             file_tilt_list,
                         )
                     except KeyError as k:
