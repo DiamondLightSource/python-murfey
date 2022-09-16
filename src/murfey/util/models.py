@@ -49,7 +49,6 @@ class ProcessFile(BaseModel):
     data_collection_id: int
     image_number: int
     mc_uuid: int
-    movie_uuid: int
     autoproc_program_id: int
     pixel_size: float
 

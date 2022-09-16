@@ -17,6 +17,8 @@ from murfey.client.instance_environment import (
 )
 from murfey.util.mdoc import get_global_data
 
+# import time
+
 logger = logging.getLogger("murfey.client.context")
 
 
@@ -206,6 +208,7 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
+        # time.sleep(5)
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)

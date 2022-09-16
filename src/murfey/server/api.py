@@ -220,7 +220,6 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "image_number": proc_file.image_number,
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,
-            "movie_uuid": proc_file.movie_uuid,
         },
     }
     log.info(f"Sending Zocalo message {zocalo_message}")
