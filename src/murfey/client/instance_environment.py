@@ -33,8 +33,8 @@ class MurfeyInstanceEnvironment(BaseModel):
     demo: bool = False
     data_collection_group_id: Optional[int] = None
     data_collection_ids: Dict[str, int] = {}
-    processing_job_ids: Dict[str, int] = {}
-    autoproc_program_ids: Dict[str, int] = {}
+    processing_job_ids: Dict[str, Dict[str, int]] = {}
+    autoproc_program_ids: Dict[str, Dict[str, int]] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, List[str]] = {}
@@ -68,18 +68,22 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
+        logger.info(f"autoproc program ids validator: {v}")
         with global_env_lock:
             for l in values.get("listeners", {}).get("autoproc_program_ids", []):
                 if values.get("autoproc_program_ids"):
                     for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
-                        l(k)
+                        if v[k].get("em-tomo-preprocess"):
+                            l(k, v[k]["em-tomo-preprocess"])
                 else:
                     for k in v.keys():
-                        l(k)
+                        if v[k].get("em-tomo-preprocess"):
+                            l(k, v[k]["em-tomo-preprocess"])
         return v
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
+        logger.info("motion corrected callback")
         _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
         for l in values.get("listeners", {}).get("motion_corrected_movies", []):
             if values.get("motion_corrected_movies"):
@@ -104,8 +108,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                         k,
                         v[k][0],
                         _url,
-                        values["processing_job_ids"][k],
-                        values["autoproc_program_ids"][k],
+                        values["processing_job_ids"][k]["em-tomo-align"],
+                        values["autoproc_program_ids"][k]["em-tomo-align"],
                         v[k][1],
                         file_tilt_list,
                     )
@@ -114,13 +118,7 @@ class MurfeyInstanceEnvironment(BaseModel):
                     try:
                         # possible race condition here where values accessing by [k] sometimes aren't ready when we
                         # try to access them - it throws a key error for a value which has just been set.
-                        # logger.info(f"Processing {k}")
-                        # logger.info("....")
-                        # logger.warning(f"MTP {values['movie_tilt_pair']}")
-                        # logger.warning(f"MV {values['movies']}")
                         tilt = values["movie_tilt_pair"][k]
-                        logger.info(f"Tilt: {tilt}")
-                        # logger.warn(f"movies {values['movies'][k]}")
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
                             # file_tilt_list.append([str(movie), angle])
@@ -136,8 +134,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                             v[k][0],
                             _url,
                             values["data_collection_ids"][tilt],
-                            values["processing_job_ids"][tilt],
-                            values["autoproc_program_ids"][tilt],
+                            values["processing_job_ids"][tilt]["em-tomo-align"],
+                            values["autoproc_program_ids"][tilt]["em-tomo-align"],
                             v[k][1],
                             file_tilt_list,
                         )

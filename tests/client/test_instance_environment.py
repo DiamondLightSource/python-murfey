@@ -20,13 +20,16 @@ def test_murfey_instance_environment_subscribe(env):
     class DummyContext:
         elem = None
 
-        def set_elem(self, new_elem: str):
+        def set_elem(self, new_elem: str, values: dict):
             self.elem = new_elem
 
     dc = DummyContext()
     env.listeners["autoproc_program_ids"] = {dc.set_elem}
     assert len(env.listeners["autoproc_program_ids"]) == 1
-    env.autoproc_program_ids = {"a": 1}
+    env.autoproc_program_ids = {"a": {"em-tomo-preprocess": 1}}
     assert dc.elem == "a"
-    env.autoproc_program_ids = {"a": 1, "b": 2}
+    env.autoproc_program_ids = {
+        "a": {"em-tomo-preprocess": 1},
+        "b": {"em-tomo-preprocess": 2},
+    }
     assert dc.elem == "b"

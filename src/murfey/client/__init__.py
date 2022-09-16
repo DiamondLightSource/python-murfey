@@ -78,9 +78,7 @@ def _check_for_updates(
 
 
 def _get_visit_list(api_base: ParseResult, demo: bool = False):
-    get_visits_url = api_base._replace(
-        path="/demo/visits_raw" if demo else "/visits_raw"
-    )
+    get_visits_url = api_base._replace(path="/visits_raw")
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")

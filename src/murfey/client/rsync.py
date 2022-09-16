@@ -233,7 +233,7 @@ class RSyncer(Observer):
                     self._files_transferred - previously_transferred
                 )
                 update = RSyncerUpdate(
-                    file_path=Path(line[12:]),
+                    file_path=Path(line[12:].replace(" ", "")),
                     file_size=0,
                     outcome=TransferResult.SUCCESS,
                     transfer_total=self._files_transferred - previously_transferred,
