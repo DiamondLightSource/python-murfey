@@ -420,11 +420,13 @@ class TomographyContext(Context):
                                 ):
                                     self._check_for_alignment(
                                         file_transferred_to,
-                                        environment.motion_corrected_movies[  # key error PosixPath
-                                            file_transferred_to
-                                        ][
-                                            0
-                                        ],
+                                        Path(
+                                            environment.motion_corrected_movies[  # key error PosixPath
+                                                file_transferred_to
+                                            ][
+                                                0
+                                            ]
+                                        ),
                                         environment.url.geturl(),
                                         environment.data_collection_ids[ts],
                                         environment.processing_job_ids[ts][
@@ -433,9 +435,11 @@ class TomographyContext(Context):
                                         environment.autoproc_program_ids[ts][
                                             "em-tomo-align"
                                         ],
-                                        environment.motion_corrected_movies[
-                                            file_transferred_to
-                                        ][1],
+                                        int(
+                                            environment.motion_corrected_movies[
+                                                file_transferred_to
+                                            ][1]
+                                        ),
                                         file_tilt_list,
                                     )
 
