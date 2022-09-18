@@ -5,8 +5,6 @@ import queue
 import threading
 from pathlib import Path
 
-import requests
-
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
@@ -155,20 +153,7 @@ class Analyser(Observer):
 
     def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping:
-            if self._environment:
-                machine_config = (
-                    {}
-                    if self._environment.demo
-                    else requests.get(
-                        f"{str(self._environment.url.geturl())}/machine/"
-                    ).json()
-                )
-            else:
-                machine_config = {}
-            absolute_path = (
-                Path(machine_config.get("rsync_basepath", ""))
-                / (self._basepath / rsyncer.file_path).resolve()
-            )
+            absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
             # self.queue.put(file_path)
 

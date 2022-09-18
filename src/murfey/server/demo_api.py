@@ -193,6 +193,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "register": "motion_corrected",
             "movie": str(proc_file.path),
             "mrc_out": str(mrc_out),
+            "movie_id": proc_file.mc_uuid,
         },
     )
     await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")

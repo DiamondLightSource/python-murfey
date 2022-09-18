@@ -225,13 +225,21 @@ class TomographyContext(Context):
             return []
 
         if environment:
+            machine_config = (
+                {}
+                if environment.demo
+                else requests.get(f"{str(environment.url.geturl())}/machine/").json()
+            )
             if environment.visit in environment.default_destination:
                 file_transferred_to = (
-                    Path(environment.default_destination) / file_path.name
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
+                    / file_path.name
                 )
             else:
                 file_transferred_to = (
-                    Path(environment.default_destination)
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
                     / environment.visit
                     / file_path.name
                 )
