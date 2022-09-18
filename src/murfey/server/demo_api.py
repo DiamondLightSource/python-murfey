@@ -45,6 +45,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+machine_config: dict = {}
+if settings.murfey_machine_configuration:
+    microscope = get_microscope()
+    machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
 
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
@@ -242,7 +246,11 @@ def shutdown():
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
-    check_path = Path(f"/dls/{get_microscope()}") / params.base_path
+    check_path = (
+        machine_config["rsync_basepath"] / params.base_path
+        if machine_config
+        else Path(f"/dls/{get_microscope()}") / params.base_path
+    )
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2

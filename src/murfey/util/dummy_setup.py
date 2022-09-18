@@ -32,6 +32,7 @@ def initialise(dummy_location: Path) -> Path:
                         str(detector_dir): "detector",
                         str(microscope_dir): "microscope",
                     },
+                    "rsync_basepath": str(dummy_location),
                     "calibrations": {"dummy": 0},
                 }
             },
