@@ -491,6 +491,8 @@ class MurfeyTUI(App):
 
     def _start_rsyncer(self, destination: str):
         new_rsyncer = False
+        if self._environment:
+            self._environment.default_destination = destination
         if not self.rsync_process:
             self.rsync_process = RSyncer(
                 self._source,
