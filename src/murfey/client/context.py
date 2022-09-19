@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from threading import RLock
 from typing import Callable, Dict, List
 
 import requests
@@ -69,11 +70,13 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
+        self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
+        self._lock: RLock = RLock()
 
     def _flush_data_collections(self):
         logger.info("Flushing data collection API calls")
@@ -154,6 +157,7 @@ class TomographyContext(Context):
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
                 and len(self._motion_corrected_tilt_series[tilt_series]) > 1
+                and tilt_series not in self._aligned_tilt_series
             ):
                 try:
 
@@ -167,6 +171,8 @@ class TomographyContext(Context):
                         "movie_id": mvid,
                     }
                     requests.post(url, json=series_data)
+                    with self._lock:
+                        self._aligned_tilt_series.append(tilt_series)
                 except Exception as e:
                     logger.warning(f"Data error {e}")
 
@@ -261,6 +267,9 @@ class TomographyContext(Context):
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            if tilt_series in self._aligned_tilt_series:
+                with self._lock:
+                    self._aligned_tilt_series.remove(tilt_series)
 
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
