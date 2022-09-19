@@ -6,10 +6,9 @@ import copy
 import logging
 import string
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Dict, List, NamedTuple, TypeVar, Union
+from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar, Union
 from urllib.parse import urlparse
 
 import requests
@@ -29,13 +28,12 @@ from murfey.client.analyser import Analyser
 from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
+from murfey.client.tui.forms import TUIFormValue
 from murfey.client.tui.status_bar import StatusBar
 
 log = logging.getLogger("murfey.tui.app")
 
 ReactiveType = TypeVar("ReactiveType")
-
-_pool = ThreadPoolExecutor()
 
 # @contextlib.asynccontextmanager
 # async def async_lock(lock):
@@ -54,7 +52,7 @@ class InputResponse(NamedTuple):
     callback: Callable | None = None
     key_change_callback: Callable | None = None
     kwargs: dict | None = None
-    form: dict | None = None
+    form: OrderedDict[str, TUIFormValue] | None = None
     model: BaseModel | None = None
 
 
@@ -195,7 +193,6 @@ class QuickPrompt:
 
 
 def validate_form(form: dict, model: BaseModel) -> dict:
-    log.debug("validating", form)
     try:
         validated = model(**form)
         return validated.dict()
@@ -213,7 +210,7 @@ class InputBox(Widget):
     current_callback: Callable | None = None
     key_change_callback: Callable | None = None
     _question: str = ""
-    _form: Reactive[dict] = Reactive({})
+    _form: Reactive[OrderedDict] = Reactive(OrderedDict({}))
 
     def __init__(self, app, queue: Queue | None = None):
         self._app_reference = app
@@ -254,6 +251,7 @@ class InputBox(Widget):
                 else f"{self.prompt}: [[white]{'/'.join(self.prompt)}[/white]] {self.input_text}"
             )
         elif self._form:
+            self._line = 1
             self._form_keys = list(self._form.keys())
             panel_msg = f"{self.input_text}\n" + "\n".join(
                 f"[cyan]{key}[/cyan]: {self._form[key]}[blink]\u275a[/blink]"
@@ -307,13 +305,17 @@ class InputBox(Widget):
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
-                self._form = {
-                    _k: str(self._form[_k])[:-1] if _k == k else self._form[_k]
-                    for _k in self._form_keys
-                }
+                self._form = OrderedDict(
+                    {
+                        _k: TUIFormValue(self._form[_k].data[:-1])
+                        if _k == k
+                        else self._form[_k]
+                        for _k in self._form_keys
+                    }
+                )
             key.stop()
         elif key.key == Keys.Delete:
-            self._form = {}
+            self._form = OrderedDict({})
             self.input_text = ""
             key.stop()
         elif key.key == Keys.Down:
@@ -334,10 +336,14 @@ class InputBox(Widget):
             else:
                 k = self._form_keys[self._line - 1]
                 # set self._form rather than accessing by key in order to make use of reactivity
-                self._form = {
-                    _k: str(self._form[_k]) + key.key if _k == k else self._form[_k]
-                    for _k in self._form_keys
-                }
+                self._form = OrderedDict(
+                    {
+                        _k: TUIFormValue(self._form[_k].data + key.key)
+                        if _k == k
+                        else self._form[_k]
+                        for _k in self._form_keys
+                    }
+                )
             key.stop()
         elif key.key == Keys.Enter and self.prompt:
             if self.input_text not in self.prompt and isinstance(
@@ -356,9 +362,11 @@ class InputBox(Widget):
             key.stop()
         elif key.key == Keys.Enter and self.current_callback:
             if self._form:
-                if validated_form := validate_form(self._form, self._model):
+                if validated_form := validate_form(
+                    {k: v.data for k, v in self._form.items()}, self._model
+                ):
                     self.current_callback(validated_form)
-                    self._form = {}
+                    self._form = OrderedDict({})
                     self._form_keys = []
                 else:
                     return
@@ -372,7 +380,7 @@ class InputBox(Widget):
             self.input_text = ""
             self._unanswered_message = False
             if self._form:
-                self._form = {}
+                self._form = OrderedDict({})
                 self._form_keys = []
             key.stop()
 
@@ -550,7 +558,7 @@ class MurfeyTUI(App):
                 self._queues["input"].put_nowait(
                     InputResponse(
                         question="Data collection parameters:",
-                        form=r.get("form", {}),
+                        form=r.get("form", OrderedDict({})),
                         model=DCParametersTomo
                         if self.analyser
                         and isinstance(self.analyser._context, TomographyContext)
@@ -558,7 +566,7 @@ class MurfeyTUI(App):
                         callback=self.app._start_dc,
                     )
                 )
-                self._dc_metadata = r.get("form", {})
+                self._dc_metadata = r.get("form", OrderedDict({}))
         elif response == "n":
             self._register_dc = False
         self._tmp_responses = []
