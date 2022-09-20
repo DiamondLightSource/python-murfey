@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -16,6 +16,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
+from murfey.client.tui.forms import TUIFormValue
 from murfey.util.mdoc import get_global_data
 
 # import time
@@ -545,39 +546,49 @@ class TomographyContext(Context):
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 
-    def gather_metadata(self, metadata_file: Path) -> dict:
+    def gather_metadata(self, metadata_file: Path) -> OrderedDict:
         if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
         if not metadata_file.is_file():
             logger.debug(f"Metadata file {metadata_file} not found")
-            return {}
+            return OrderedDict({})
         if metadata_file.suffix == ".xml":
             with open(metadata_file, "r") as xml:
                 for_parsing = xml.read()
                 data = xmltodict.parse(for_parsing)
-            metadata: dict = {}
-            metadata["experiment_type"] = "tomography"
-            metadata["voltage"] = 300
-            metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                "Height"
-            ]
-            metadata["pixel_size_on_image"] = float(
-                data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+            metadata: OrderedDict = OrderedDict({})
+            metadata["experiment_type"] = TUIFormValue("tomography")
+            metadata["voltage"] = TUIFormValue(300)
+            metadata["image_size_x"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Width"]
             )
-            metadata["dose_per_frame"] = None
+            metadata["image_size_y"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Height"]
+            )
+            metadata["pixel_size_on_image"] = TUIFormValue(
+                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+            )
+            metadata["dose_per_frame"] = TUIFormValue(
+                None, top=True, colour="dark_orange"
+            )
+            metadata.move_to_end("dose_per_frame", last=False)
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
         if not mdoc_data:
-            return {}
-        mdoc_metadata: dict = {}
-        mdoc_metadata["experiment_type"] = "tomography"
-        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
-        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
-        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
-        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data["PixelSpacing"])
-        mdoc_metadata["dose_per_frame"] = None
+            return OrderedDict({})
+        mdoc_metadata: OrderedDict = OrderedDict({})
+        mdoc_metadata["experiment_type"] = TUIFormValue("tomography")
+        mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
+        mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
+        mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
+        mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+            float(mdoc_data["PixelSpacing"])
+        )
+        mdoc_metadata["dose_per_frame"] = TUIFormValue(
+            None, top=True, colour="dark_orange"
+        )
+        mdoc_metadata.move_to_end("dose_per_frame", last=False)
         return mdoc_metadata
