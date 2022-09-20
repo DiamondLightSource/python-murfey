@@ -14,3 +14,8 @@ class TUIFormValue(UserString):
         if self._colour:
             return f"[{self._colour}]{self.data}[/{self._colour}]"
         return self.data
+
+    def __eq__(self, other: object):
+        if isinstance(other, UserString):
+            return self.data == other.data
+        return self.data == other
