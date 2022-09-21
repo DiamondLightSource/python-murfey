@@ -615,7 +615,7 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
         elif isinstance(self.analyser._context, SPAContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
-            dcg_data = {"experiment_type": "single particle"}
+            dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
             requests.post(url, json=dcg_data)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             requests.post(url, json=json)
