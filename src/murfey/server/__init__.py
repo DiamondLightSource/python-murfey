@@ -303,6 +303,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         record = DataCollectionGroup(
             sessionId=message["session_id"],
             experimentType=message["experiment_type"],
+            experimentTypeId=message["experiment_type_id"],
         )
         dcgid = _register(record, header)
         if _transport_object:
