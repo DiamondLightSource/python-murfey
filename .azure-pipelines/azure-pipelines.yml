@@ -28,7 +28,7 @@ stages:
     pool:
       vmImage: ubuntu-20.04
     steps:
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.10
@@ -51,7 +51,7 @@ stages:
     pool:
       vmImage: ubuntu-20.04
     steps:
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.10
@@ -118,7 +118,7 @@ stages:
     steps:
       - checkout: none
 
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.10
