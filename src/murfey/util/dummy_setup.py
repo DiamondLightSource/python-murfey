@@ -27,11 +27,12 @@ def initialise(dummy_location: Path) -> Path:
         yaml.dump(
             {
                 "m12": {
-                    "aqcuisition_software": ["epu", "tomo", "serialem"],
+                    "acquisition_software": ["epu", "tomo", "serialem"],
                     "data_directories": {
                         str(detector_dir): "detector",
                         str(microscope_dir): "microscope",
                     },
+                    "rsync_basepath": str(dummy_location),
                     "calibrations": {"dummy": 0},
                 }
             },

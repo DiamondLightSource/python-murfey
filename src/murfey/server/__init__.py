@@ -269,13 +269,21 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                     "motion_corrected_movies",
                     {
                         **global_state["motion_corrected_movies"],
-                        message.get("movie"): message.get("mrc_out"),
+                        message.get("movie"): [
+                            message.get("mrc_out"),
+                            message.get("movie_id"),
+                        ],
                     },
                 )
             else:
                 await global_state.update(
                     "motion_corrected_movies",
-                    {message.get("movie"): message.get("mrc_out")},
+                    {
+                        message.get("movie"): [
+                            message.get("mrc_out"),
+                            message.get("movie_id"),
+                        ]
+                    },
                 )
 
 

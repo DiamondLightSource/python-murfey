@@ -241,7 +241,8 @@ def run():
         url=murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
-        default_destination=args.destination or f"data/{datetime.now().year}",
+        default_destination=args.destination
+        or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
     )
 

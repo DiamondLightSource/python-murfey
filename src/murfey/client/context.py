@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List
+from threading import RLock
+from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -15,6 +16,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
+from murfey.client.tui.forms import TUIFormValue
 from murfey.util.mdoc import get_global_data
 
 # import time
@@ -69,11 +71,13 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
+        self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
+        self._lock: RLock = RLock()
 
     def _flush_data_collections(self):
         logger.info("Flushing data collection API calls")
@@ -154,6 +158,7 @@ class TomographyContext(Context):
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
                 and len(self._motion_corrected_tilt_series[tilt_series]) > 1
+                and tilt_series not in self._aligned_tilt_series
             ):
                 try:
 
@@ -167,6 +172,8 @@ class TomographyContext(Context):
                         "movie_id": mvid,
                     }
                     requests.post(url, json=series_data)
+                    with self._lock:
+                        self._aligned_tilt_series.append(tilt_series)
                 except Exception as e:
                     logger.warning(f"Data error {e}")
 
@@ -225,13 +232,21 @@ class TomographyContext(Context):
             return []
 
         if environment:
+            machine_config = (
+                {}
+                if environment.demo
+                else requests.get(f"{str(environment.url.geturl())}/machine/").json()
+            )
             if environment.visit in environment.default_destination:
                 file_transferred_to = (
-                    Path(environment.default_destination) / file_path.name
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
+                    / file_path.name
                 )
             else:
                 file_transferred_to = (
-                    Path(environment.default_destination)
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
                     / environment.visit
                     / file_path.name
                 )
@@ -253,6 +268,9 @@ class TomographyContext(Context):
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            if tilt_series in self._aligned_tilt_series:
+                with self._lock:
+                    self._aligned_tilt_series.remove(tilt_series)
 
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
@@ -420,11 +438,13 @@ class TomographyContext(Context):
                                 ):
                                     self._check_for_alignment(
                                         file_transferred_to,
-                                        environment.motion_corrected_movies[  # key error PosixPath
-                                            file_transferred_to
-                                        ][
-                                            0
-                                        ],
+                                        Path(
+                                            environment.motion_corrected_movies[  # key error PosixPath
+                                                file_transferred_to
+                                            ][
+                                                0
+                                            ]
+                                        ),
                                         environment.url.geturl(),
                                         environment.data_collection_ids[ts],
                                         environment.processing_job_ids[ts][
@@ -433,9 +453,11 @@ class TomographyContext(Context):
                                         environment.autoproc_program_ids[ts][
                                             "em-tomo-align"
                                         ],
-                                        environment.motion_corrected_movies[
-                                            file_transferred_to
-                                        ][1],
+                                        int(
+                                            environment.motion_corrected_movies[
+                                                file_transferred_to
+                                            ][1]
+                                        ),
                                         file_tilt_list,
                                     )
 
@@ -524,39 +546,49 @@ class TomographyContext(Context):
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 
-    def gather_metadata(self, metadata_file: Path) -> dict:
+    def gather_metadata(self, metadata_file: Path) -> OrderedDict:
         if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
         if not metadata_file.is_file():
             logger.debug(f"Metadata file {metadata_file} not found")
-            return {}
+            return OrderedDict({})
         if metadata_file.suffix == ".xml":
             with open(metadata_file, "r") as xml:
                 for_parsing = xml.read()
                 data = xmltodict.parse(for_parsing)
-            metadata: dict = {}
-            metadata["experiment_type"] = "tomography"
-            metadata["voltage"] = 300
-            metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                "Height"
-            ]
-            metadata["pixel_size_on_image"] = float(
-                data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+            metadata: OrderedDict = OrderedDict({})
+            metadata["experiment_type"] = TUIFormValue("tomography")
+            metadata["voltage"] = TUIFormValue(300)
+            metadata["image_size_x"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Width"]
             )
-            metadata["dose_per_frame"] = None
+            metadata["image_size_y"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Height"]
+            )
+            metadata["pixel_size_on_image"] = TUIFormValue(
+                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+            )
+            metadata["dose_per_frame"] = TUIFormValue(
+                None, top=True, colour="dark_orange"
+            )
+            metadata.move_to_end("dose_per_frame", last=False)
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
         if not mdoc_data:
-            return {}
-        mdoc_metadata: dict = {}
-        mdoc_metadata["experiment_type"] = "tomography"
-        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
-        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
-        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
-        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data["PixelSpacing"])
-        mdoc_metadata["dose_per_frame"] = None
+            return OrderedDict({})
+        mdoc_metadata: OrderedDict = OrderedDict({})
+        mdoc_metadata["experiment_type"] = TUIFormValue("tomography")
+        mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
+        mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
+        mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
+        mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+            float(mdoc_data["PixelSpacing"])
+        )
+        mdoc_metadata["dose_per_frame"] = TUIFormValue(
+            None, top=True, colour="dark_orange"
+        )
+        mdoc_metadata.move_to_end("dose_per_frame", last=False)
         return mdoc_metadata

@@ -45,6 +45,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+machine_config: dict = {}
+if settings.murfey_machine_configuration:
+    microscope = get_microscope()
+    machine_config = dict(
+        from_file(Path(settings.murfey_machine_configuration), microscope)
+    )
 
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
@@ -189,6 +195,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "register": "motion_corrected",
             "movie": str(proc_file.path),
             "mrc_out": str(mrc_out),
+            "movie_id": proc_file.mc_uuid,
         },
     )
     await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
@@ -242,12 +249,16 @@ def shutdown():
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
-    check_path = Path(f"/dls/{get_microscope()}") / params.base_path
+    check_path = (
+        machine_config["rsync_basepath"] / params.base_path
+        if machine_config
+        else Path(f"/dls/{get_microscope()}") / params.base_path
+    )
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
-    return {"suggested_path": check_path}
+    return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
 @router.post("/visits/{visit_name}/register_data_collection_group")
