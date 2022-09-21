@@ -112,9 +112,9 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def enqueue(self, filepath: Path):
+    def enqueue(self, file_path: Path):
         if not self._stopping:
-            absolute_path = (self._basepath / filepath).resolve()
+            absolute_path = (self._basepath / file_path).resolve()
             self.queue.put(absolute_path)
 
     def _process(self):
@@ -233,7 +233,7 @@ class RSyncer(Observer):
                     self._files_transferred - previously_transferred
                 )
                 update = RSyncerUpdate(
-                    file_path=Path(line[12:]),
+                    file_path=Path(line[12:].replace(" ", "")),
                     file_size=0,
                     outcome=TransferResult.SUCCESS,
                     transfer_total=self._files_transferred - previously_transferred,
@@ -270,6 +270,8 @@ class RSyncer(Observer):
                 "--progress",
                 "--outbuf=line",
                 "--files-from=-",
+                "-o",  # preserve ownership
+                "-p",  # preserve permissions
                 ".",
                 self._remote,
             ],

@@ -23,7 +23,12 @@ from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
-import murfey.server.ispyb
+import murfey.server.websocket
+
+try:
+    from murfey.server.ispyb import TransportManager  # Session
+except AttributeError:
+    pass
 from murfey.util.state import global_state
 
 try:
@@ -139,7 +144,10 @@ def run():
     args = parser.parse_args()
 
     # Set up Zocalo connection
-    _set_up_transport(args.transport)
+    if args.demo:
+        os.environ["MURFEY_DEMO"] = "1"
+    else:
+        _set_up_transport(args.transport)
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -247,23 +255,63 @@ def _set_up_logging(quiet: bool, verbosity: int):
 
 def _set_up_transport(transport_type):
     global _transport_object
-    _transport_object = murfey.server.ispyb.TransportManager(transport_type)
+    _transport_object = TransportManager(transport_type)
+
+
+async def feedback_callback_async(header: dict, message: dict) -> None:
+    logger.info(f"feedback_callback_async called with {header}, {message}")
+    if message["register"] == "motion_corrected":
+        if murfey.server.websocket.manager:
+            if global_state.get("motion_corrected_movies") and isinstance(
+                global_state["motion_corrected_movies"], dict
+            ):
+                await global_state.update(
+                    "motion_corrected_movies",
+                    {
+                        **global_state["motion_corrected_movies"],
+                        message.get("movie"): [
+                            message.get("mrc_out"),
+                            message.get("movie_id"),
+                        ],
+                    },
+                )
+            else:
+                await global_state.update(
+                    "motion_corrected_movies",
+                    {
+                        message.get("movie"): [
+                            message.get("mrc_out"),
+                            message.get("movie_id"),
+                        ]
+                    },
+                )
 
 
 def feedback_callback(header: dict, message: dict) -> None:
     record = None
+    if "environment" in message:
+        message = message["payload"]
     if message["register"] == "motion_corrected":
-        if global_state.get("motion_corrected") and isinstance(
-            global_state["motion_corrected"], list
+        if global_state.get("motion_corrected_movies") and isinstance(
+            global_state["motion_corrected_movies"], dict
         ):
-            global_state["motion_corrected"].append(message["movie"])
+            global_state["motion_corrected_movies"] = {
+                **global_state["motion_corrected_movies"],
+                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")],
+            }
         else:
-            global_state["motion_corrected"] = [message["movie"]]
+            global_state["motion_corrected_movies"] = {
+                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")]
+            }
+
+        if _transport_object:
+            _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection_group":
         record = DataCollectionGroup(
             sessionId=message["session_id"],
             experimentType=message["experiment_type"],
+            experimentTypeId=message["experiment_type_id"],
         )
         dcgid = _register(record, header)
         if _transport_object:
@@ -271,7 +319,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.nack(header)
                 return None
             global_state["data_collection_group_id"] = dcgid
-            _transport_object.transport.ack(header)
+        _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
         record = DataCollection(
@@ -308,13 +356,16 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.nack(header)
             return None
         if global_state.get("processing_job_ids"):
-            assert isinstance(global_state["processing_job_ids"], dict)
             global_state["processing_job_ids"] = {
-                **global_state["processing_job_ids"],
-                message.get("tag"): pid,
+                **global_state["processing_job_ids"],  # type: ignore
+                message.get("tag"): {
+                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                    message["recipe"]: pid,
+                },
             }
         else:
-            global_state["processing_job_ids"] = {message["tag"]: pid}
+            prids = {message["tag"]: {message["recipe"]: pid}}
+            global_state["processing_job_ids"] = prids
         record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
         if appid is None and _transport_object:
@@ -324,10 +375,15 @@ def feedback_callback(header: dict, message: dict) -> None:
             assert isinstance(global_state["autoproc_program_ids"], dict)
             global_state["autoproc_program_ids"] = {
                 **global_state["autoproc_program_ids"],
-                message.get("tag"): appid,
+                message.get("tag"): {
+                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                    message["recipe"]: appid,
+                },
             }
         else:
-            global_state["autoproc_program_ids"] = {message["tag"]: appid}
+            global_state["autoproc_program_ids"] = {
+                message["tag"]: {message["recipe"]: appid}
+            }
         if _transport_object:
             _transport_object.transport.ack(header)
         return None
@@ -349,11 +405,25 @@ def _(record: Base, header: dict):
         )
         return None
     try:
-        murfey.server.ispyb.DB.add(record)
-        murfey.server.ispyb.DB.commit()
+        if isinstance(record, DataCollection):
+            return _transport_object.do_insert_data_collection(record)["return_value"]
+        if isinstance(record, DataCollectionGroup):
+            return _transport_object.do_insert_data_collection_group(record)[
+                "return_value"
+            ]
+        if isinstance(record, ProcessingJob):
+            return _transport_object.do_create_ispyb_job(record)["return_value"]
+        if isinstance(record, AutoProcProgram):
+            return _transport_object.do_update_processing_status(record)["return_value"]
+        # session = Session()
+        # session.add(record)
+        # session.commit()
+        # _transport_object.transport.ack(header, requeue=False)
         return getattr(record, record.__table__.primary_key.columns[0].name)
+
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
+        # _transport_object.transport.nack(header)
         return None
     except AttributeError as e:
         logger.error(

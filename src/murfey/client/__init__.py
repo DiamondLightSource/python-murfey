@@ -78,9 +78,7 @@ def _check_for_updates(
 
 
 def _get_visit_list(api_base: ParseResult, demo: bool = False):
-    get_visits_url = api_base._replace(
-        path="/demo/visits_raw" if demo else "/visits_raw"
-    )
+    get_visits_url = api_base._replace(path="/visits_raw")
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
@@ -220,7 +218,7 @@ def run():
 
     status_bar = StatusBar()
     source_watcher = murfey.client.watchdir.DirWatcher(
-        args.source, settling_time=10, status_bar=status_bar
+        args.source, settling_time=1, status_bar=status_bar
     )
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
@@ -243,7 +241,8 @@ def run():
         url=murfey_url,
         source=Path(args.source),
         watcher=source_watcher,
-        default_destination=args.destination or f"data/{datetime.now().year}",
+        default_destination=args.destination
+        or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
     )
 
@@ -258,8 +257,12 @@ def run():
     )
     source_watcher.subscribe(rsync_process.enqueue)
 
-    analyser = Analyser(environment=instance_environment if args.real_dc else None)
-    source_watcher.subscribe(analyser.enqueue)
+    analyser = Analyser(
+        instance_environment.source,
+        environment=instance_environment if args.real_dc else None,
+    )
+    # source_watcher.subscribe(analyser.enqueue)
+    rsync_process.subscribe(analyser.enqueue)
 
     rich_handler.redirect = True
     MurfeyTUI.run(

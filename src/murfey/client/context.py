@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List
+from threading import RLock
+from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -13,8 +14,12 @@ from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
+    global_env_lock,
 )
+from murfey.client.tui.forms import TUIFormValue
 from murfey.util.mdoc import get_global_data
+
+# import time
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -53,9 +58,9 @@ class SPAContext(Context):
 
 
 class ProcessFileIncomplete(BaseModel):
-    path: Path
+    dest: Path
+    source: Path
     image_number: int
-    movie_uuid: int
     mc_uuid: int
     tag: str
     description: str = ""
@@ -66,56 +71,141 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
+        self._aligned_tilt_series: List[str] = []
+        self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
+        self._lock: RLock = RLock()
 
     def _flush_data_collections(self):
-        logger.debug("Flushing data collection API calls")
+        logger.info("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             requests.post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        logger.debug(f"Flushing processing job {tag}")
+        logger.info(
+            f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
+        )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
-    def _flush_preprocess(self, tag: str):
-        logger.debug(f"Flushing preprocessing job {tag}")
-        if tr := self._preprocessing_triggers.get(tag):
-            process_file = self._complete_process_file(tr[1], tr[2])
-            if process_file:
-                requests.post(tr[0], json=process_file)
-                self._preprocessing_triggers.pop(tag)
+    def _flush_preprocess(self, tag: str, app_id: int):
+        logger.info(f"Flushing preprocessing requests {tag}")
+        if tag_tr := self._preprocessing_triggers.get(tag):
+            for tr in tag_tr:
+                process_file = self._complete_process_file(tr[1], tr[2], app_id)
+                if process_file:
+                    requests.post(tr[0], json=process_file)
+            self._preprocessing_triggers.pop(tag)
+
+    def _check_for_alignment(
+        self,
+        movie_path: Path,
+        motion_corrected_path: Path,
+        url: str,
+        dcid: int,
+        pjid: int,
+        appid: int,
+        mvid: int,
+        tilt_angles: List,
+    ):
+        if self._acquisition_software == "serialem":
+            delimiters = ("_", "-")
+            for d in delimiters:
+                if movie_path.name.count(d) > 1:
+                    delimiter = d
+                    break
+            else:
+                delimiter = delimiters[0]
+
+            def _extract_tilt_series(p: Path) -> str:
+                split = p.name.split(delimiter)
+                for s in split:
+                    if s.isdigit():
+                        return s
+                raise ValueError(
+                    f"No digits found in {p.name} after splitting on {delimiter}"
+                )
+
+            tilt_series = _extract_tilt_series(movie_path)
+            # tilt_angle = ".".join(movie_path.name.split(delimiter)[-1].split(".")[:-1])
+        elif self._acquisition_software == "tomo":
+            tilt_series = movie_path.name.split("_")[1]
+            # tilt_angle = movie_path.name.split("[")[1].split("]")[0]
+        else:
+            return
+        if self._motion_corrected_tilt_series.get(
+            tilt_series
+        ) and motion_corrected_path not in self._motion_corrected_tilt_series.get(
+            tilt_series, {}
+        ):
+            self._motion_corrected_tilt_series[tilt_series].append(
+                motion_corrected_path
+            )
+        else:
+            self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
+        if tilt_series in self._completed_tilt_series:
+            logger.info(
+                f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
+            )
+            if (
+                len(self._motion_corrected_tilt_series[tilt_series])
+                == len(self._tilt_series[tilt_series])
+                and len(self._motion_corrected_tilt_series[tilt_series]) > 1
+                and tilt_series not in self._aligned_tilt_series
+            ):
+                try:
+
+                    series_data: dict = {
+                        "name": tilt_series,
+                        "file_tilt_list": str(tilt_angles),
+                        "dcid": dcid,
+                        "processing_job": pjid,
+                        "autoproc_program_id": appid,
+                        "motion_corrected_path": str(motion_corrected_path),
+                        "movie_id": mvid,
+                    }
+                    requests.post(url, json=series_data)
+                    with self._lock:
+                        self._aligned_tilt_series.append(tilt_series)
+                except Exception as e:
+                    logger.warning(f"Data error {e}")
 
     def _complete_process_file(
         self,
         incomplete_process_file: ProcessFileIncomplete,
         environment: MurfeyInstanceEnvironment,
+        app_id: int,
     ) -> dict:
         try:
-            tag = incomplete_process_file.tag
-            return {
-                "path": str(incomplete_process_file.path),
-                "description": incomplete_process_file.description,
-                "size": incomplete_process_file.path.stat().st_size,
-                "timestamp": incomplete_process_file.path.stat().st_ctime,
-                "processing_job": environment._processing_jobs[tag],
-                "data_collection_id": environment._data_collections[tag],
-                "image_number": incomplete_process_file.image_number,
-                "pixel_size": environment.data_collection_parameters[
-                    "pixel_size_on_image"
-                ],
-                "autoproc_program_id": environment.autoproc_program_ids[tag],
-                "mc_uuid": incomplete_process_file.mc_uuid,
-                "movie_uuid": incomplete_process_file.movie_uuid,
-            }
+            with global_env_lock:
+                tag = incomplete_process_file.tag
+
+                new_dict = {
+                    "path": str(incomplete_process_file.dest),
+                    "description": incomplete_process_file.description,
+                    "size": incomplete_process_file.source.stat().st_size,
+                    "timestamp": incomplete_process_file.source.stat().st_ctime,
+                    "processing_job": environment.processing_job_ids[tag][
+                        "em-tomo-preprocess"
+                    ],
+                    "data_collection_id": environment.data_collection_ids[tag],
+                    "image_number": incomplete_process_file.image_number,
+                    "pixel_size": environment.data_collection_parameters[
+                        "pixel_size_on_image"
+                    ],
+                    "autoproc_program_id": app_id,
+                    "mc_uuid": incomplete_process_file.mc_uuid,
+                }
+                return new_dict
         except KeyError:
+            logger.warning("Key error encountered in _complete_process_file")
             return {}
 
     def _add_tilt(
@@ -125,30 +215,68 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
-        if environment:
-            environment.movies[file_path] = MovieTracker(
-                movie_number=next(MovieID),
-                movie_uuid=next(MurfeyID),
-                motion_correction_uuid=next(MurfeyID),
-            )
+        # time.sleep(5)
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
+            try:
+                float(tilt_series)
+                float(tilt_angle)
+            except ValueError:
+                return []
+
         except Exception:
             logger.debug(
                 f"Tilt series and angle could not be determined for {file_path}"
             )
             return []
+
+        if environment:
+            machine_config = (
+                {}
+                if environment.demo
+                else requests.get(f"{str(environment.url.geturl())}/machine/").json()
+            )
+            if environment.visit in environment.default_destination:
+                file_transferred_to = (
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
+                    / file_path.name
+                )
+            else:
+                file_transferred_to = (
+                    Path(machine_config.get("rsync_basepath", ""))
+                    / Path(environment.default_destination)
+                    / environment.visit
+                    / file_path.name
+                )
+            environment.movies[file_transferred_to] = MovieTracker(
+                movie_number=next(MovieID),
+                motion_correction_uuid=next(MurfeyID),
+            )
+            environment.movie_tilt_pair[file_transferred_to] = tilt_series
+            if environment.tilt_angles.get(tilt_series):
+                environment.tilt_angles[tilt_series].append(
+                    [str(file_transferred_to), tilt_angle]
+                )
+            else:
+                environment.tilt_angles[tilt_series] = [
+                    [str(file_transferred_to), tilt_angle]
+                ]
         if tilt_series in self._completed_tilt_series:
             logger.info(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            if tilt_series in self._aligned_tilt_series:
+                with self._lock:
+                    self._aligned_tilt_series.remove(tilt_series)
+
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
             try:
-                if environment:  # and environment._processing_jobs.get(tilt_series):
+                if environment:
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
@@ -158,41 +286,111 @@ class TomographyContext(Context):
                         "image_directory": str(file_path.parent),
                         "tag": tilt_series,
                     }
+                    if environment.data_collection_parameters:
+                        data.update(
+                            {
+                                "voltage": environment.data_collection_parameters[
+                                    "voltage"
+                                ],
+                                "pixel_size_on_image": environment.data_collection_parameters[
+                                    "pixel_size_on_image"
+                                ],
+                                "image_size_x": environment.data_collection_parameters[
+                                    "image_size_x"
+                                ],
+                                "image_size_y": environment.data_collection_parameters[
+                                    "image_size_y"
+                                ],
+                            }
+                        )
                     if environment.data_collection_group_id is None:
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         requests.post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-                    self._processing_job_stash[tilt_series] = [
-                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-preprocess"})
-                    ]
-                    self._processing_job_stash[tilt_series].append(
-                        (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
-                    )
-                    preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-                    pfi = ProcessFileIncomplete(
-                        path=file_path,
-                        image_number=environment.movies[file_path].movie_number,
-                        movie_uuid=environment.movies[file_path].movie_uuid,
-                        mc_uuid=environment.movies[file_path].motion_correction_uuid,
-                        tag=tilt_series,
-                    )
-                    if (
-                        environment.autoproc_program_ids.get(tilt_series) is None
-                        or environment.processing_job_ids.get(tilt_series) is None
-                    ):
-                        self._preprocessing_triggers[tilt_series] = (
+                    if environment.data_collection_ids.get(tilt_series) is None:
+                        self._processing_job_stash[tilt_series] = [
+                            (
+                                proc_url,
+                                {"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                            )
+                        ]
+                        self._processing_job_stash[tilt_series].append(
+                            (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
+                        )
+                    else:
+                        if self._processing_job_stash.get(tilt_series):
+                            self._flush_processing_job(tilt_series)
+                        requests.post(
+                            proc_url,
+                            json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                        )
+                        requests.post(
+                            proc_url,
+                            json={"tag": tilt_series, "recipe": "em-tomo-align"},
+                        )
+            except Exception as e:
+                logger.error(f"ERROR {e}")
+        else:
+            if file_path not in self._tilt_series[tilt_series]:
+                self._tilt_series[tilt_series].append(file_path)
+
+        if environment and environment.autoproc_program_ids.get(tilt_series):
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            preproc_data = {
+                "path": str(file_transferred_to),
+                "description": "",
+                "size": file_path.stat().st_size,
+                "timestamp": file_path.stat().st_ctime,
+                "processing_job": environment.processing_job_ids[tilt_series][
+                    "em-tomo-preprocess"
+                ],
+                "data_collection_id": environment.data_collection_ids[tilt_series],
+                "image_number": environment.movies[file_transferred_to].movie_number,
+                "pixel_size": environment.data_collection_parameters[
+                    "pixel_size_on_image"
+                ],
+                "autoproc_program_id": environment.autoproc_program_ids[tilt_series][
+                    "em-tomo-preprocess"
+                ],
+                "mc_uuid": environment.movies[
+                    file_transferred_to
+                ].motion_correction_uuid,
+            }
+            requests.post(preproc_url, json=preproc_data)
+        elif environment:
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            pfi = ProcessFileIncomplete(
+                dest=file_transferred_to,
+                source=environment.source,
+                image_number=environment.movies[file_transferred_to].movie_number,
+                mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
+                tag=tilt_series,
+            )
+            if (
+                environment.autoproc_program_ids is None
+                or environment.processing_job_ids is None
+            ) or (
+                environment.autoproc_program_ids.get(tilt_series) is None
+                or environment.processing_job_ids.get(tilt_series) is None
+            ):
+                if self._preprocessing_triggers.get(tilt_series):
+                    self._preprocessing_triggers[tilt_series].append(
+                        (
                             preproc_url,
                             pfi,
                             environment,
                         )
-                    else:
-                        process_file = self._complete_process_file(pfi, environment)
-                        requests.post(preproc_url, json=process_file)
-            except Exception as e:
-                logger.error(e)
-        else:
-            self._tilt_series[tilt_series].append(file_path)
+                    )
+                else:
+                    self._preprocessing_triggers[tilt_series] = [
+                        (
+                            preproc_url,
+                            pfi,
+                            environment,
+                        )
+                    ]
+
         if self._last_transferred_file:
             last_tilt_series = extract_tilt_series(self._last_transferred_file)
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
@@ -214,6 +412,55 @@ class TomographyContext(Context):
                     ):
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
+                        if environment:
+                            file_tilt_list = []
+                            movie: str
+                            angle: str
+                            for movie, angle in environment.tilt_angles[ts]:
+                                if environment.motion_corrected_movies.get(Path(movie)):
+                                    file_tilt_list.append(
+                                        [
+                                            str(
+                                                environment.motion_corrected_movies[
+                                                    Path(movie)
+                                                ][0]
+                                            ),
+                                            angle,
+                                            str(
+                                                environment.motion_corrected_movies[
+                                                    Path(movie)
+                                                ][1]
+                                            ),
+                                        ]
+                                    )
+                                if environment.motion_corrected_movies.get(
+                                    file_transferred_to
+                                ):
+                                    self._check_for_alignment(
+                                        file_transferred_to,
+                                        Path(
+                                            environment.motion_corrected_movies[  # key error PosixPath
+                                                file_transferred_to
+                                            ][
+                                                0
+                                            ]
+                                        ),
+                                        environment.url.geturl(),
+                                        environment.data_collection_ids[ts],
+                                        environment.processing_job_ids[ts][
+                                            "em-tomo-align"
+                                        ],
+                                        environment.autoproc_program_ids[ts][
+                                            "em-tomo-align"
+                                        ],
+                                        int(
+                                            environment.motion_corrected_movies[
+                                                file_transferred_to
+                                            ][1]
+                                        ),
+                                        file_tilt_list,
+                                    )
+
                 logger.info(
                     f"The following tilt series are considered complete: {newly_completed_series}"
                 )
@@ -224,10 +471,22 @@ class TomographyContext(Context):
     def _add_tomo_tilt(
         self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> List[str]:
+        if "[" in file_path.name:
+            return self._add_tilt(
+                file_path,
+                lambda x: x.name.split("_")[1],
+                lambda x: x.name.split("[")[1].split("]")[0],
+                environment=environment,
+            )
+
+        def _extract_tilt_series(p: Path) -> str:
+            _split = p.name.split("_")[-1].split(".")
+            return ".".join(_split[:-1])
+
         return self._add_tilt(
             file_path,
             lambda x: x.name.split("_")[1],
-            lambda x: x.name.split("[")[1].split("]")[0],
+            _extract_tilt_series,
             environment=environment,
         )
 
@@ -287,39 +546,49 @@ class TomographyContext(Context):
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 
-    def gather_metadata(self, metadata_file: Path) -> dict:
+    def gather_metadata(self, metadata_file: Path) -> OrderedDict:
         if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
         if not metadata_file.is_file():
             logger.debug(f"Metadata file {metadata_file} not found")
-            return {}
+            return OrderedDict({})
         if metadata_file.suffix == ".xml":
             with open(metadata_file, "r") as xml:
                 for_parsing = xml.read()
                 data = xmltodict.parse(for_parsing)
-            metadata: dict = {}
-            metadata["experiment_type"] = "tomography"
-            metadata["voltage"] = 300
-            metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                "Height"
-            ]
-            metadata["pixel_size_on_image"] = float(
-                data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+            metadata: OrderedDict = OrderedDict({})
+            metadata["experiment_type"] = TUIFormValue("tomography")
+            metadata["voltage"] = TUIFormValue(300)
+            metadata["image_size_x"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Width"]
             )
-            metadata["dose_per_frame"] = None
+            metadata["image_size_y"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Height"]
+            )
+            metadata["pixel_size_on_image"] = TUIFormValue(
+                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+            )
+            metadata["dose_per_frame"] = TUIFormValue(
+                None, top=True, colour="dark_orange"
+            )
+            metadata.move_to_end("dose_per_frame", last=False)
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
         if not mdoc_data:
-            return {}
-        mdoc_metadata: dict = {}
-        mdoc_metadata["experiment_type"] = "tomography"
-        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
-        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
-        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
-        mdoc_metadata["pixel_size_on_image"] = float(mdoc_data["PixelSpacing"])
-        mdoc_metadata["dose_per_frame"] = None
+            return OrderedDict({})
+        mdoc_metadata: OrderedDict = OrderedDict({})
+        mdoc_metadata["experiment_type"] = TUIFormValue("tomography")
+        mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
+        mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
+        mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
+        mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+            float(mdoc_data["PixelSpacing"])
+        )
+        mdoc_metadata["dose_per_frame"] = TUIFormValue(
+            None, top=True, colour="dark_orange"
+        )
+        mdoc_metadata.move_to_end("dose_per_frame", last=False)
         return mdoc_metadata

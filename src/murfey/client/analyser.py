@@ -7,14 +7,19 @@ from pathlib import Path
 
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.rsync import RSyncerUpdate
+from murfey.client.tui.forms import TUIFormValue
 from murfey.util import Observer
 
 logger = logging.getLogger("murfey.client.analyser")
 
 
 class Analyser(Observer):
-    def __init__(self, environment: MurfeyInstanceEnvironment | None = None):
+    def __init__(
+        self, basepath_local: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         super().__init__()
+        self._basepath = basepath_local.absolute()
         self._experiment_type = ""
         self._acquisition_software = ""
         self._role = ""
@@ -49,6 +54,8 @@ class Analyser(Observer):
                     or file_path.with_suffix(".mdoc").is_file()
                 ):
                     self._role = "microscope"
+                else:
+                    self._role = "detector"
                 return True
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
@@ -101,11 +108,15 @@ class Analyser(Observer):
                         else:
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
-                            dc_metadata["tilt"] = transferred_file.name.split("_")[1]
-                            dc_metadata["file_extension"] = self._extension
-                            dc_metadata[
-                                "acquisition_software"
-                            ] = self._context._acquisition_software
+                            dc_metadata["tilt"] = TUIFormValue(
+                                transferred_file.name.split("_")[1]
+                            )
+                            dc_metadata["file_extension"] = TUIFormValue(
+                                self._extension
+                            )
+                            dc_metadata["acquisition_software"] = TUIFormValue(
+                                self._context._acquisition_software
+                            )
                             self.notify({"form": dc_metadata})
             elif not self._extension or self._unseen_xml:
                 self._find_extension(transferred_file)
@@ -125,11 +136,15 @@ class Analyser(Observer):
                         else:
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
-                            dc_metadata["tilt"] = transferred_file.name.split("_")[1]
-                            dc_metadata["file_extension"] = self._extension
-                            dc_metadata[
-                                "acquisition_software"
-                            ] = self._context._acquisition_software
+                            dc_metadata["tilt"] = TUIFormValue(
+                                transferred_file.name.split("_")[1]
+                            )
+                            dc_metadata["file_extension"] = TUIFormValue(
+                                self._extension
+                            )
+                            dc_metadata["acquisition_software"] = TUIFormValue(
+                                self._context._acquisition_software
+                            )
                             self.notify({"form": dc_metadata})
             else:
                 _tilt_series = set(self._context._tilt_series.keys())
@@ -145,9 +160,11 @@ class Analyser(Observer):
                     )
                     self.notify({"form": dc_metadata})
 
-    def enqueue(self, file_path: Path):
+    def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping:
-            self.queue.put(file_path)
+            absolute_path = (self._basepath / rsyncer.file_path).resolve()
+            self.queue.put(absolute_path)
+            # self.queue.put(file_path)
 
     def start(self):
         if self.thread.is_alive():

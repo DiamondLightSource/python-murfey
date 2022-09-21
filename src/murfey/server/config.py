@@ -11,6 +11,8 @@ class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Union[dict, float]]
     data_directories: Dict[Path, str]
+    rsync_basepath: Path
+    rsync_module: str = ""
     gain_reference_directory: Optional[Path] = None
 
 
