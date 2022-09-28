@@ -5,6 +5,7 @@ import configparser
 
 # import json
 import logging
+import os
 import platform
 import shutil
 import sys
@@ -317,7 +318,9 @@ def main_loop(
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
-        with open(Path.home() / ".murfey") as configfile:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        with open(murfey_client_config_home / ".murfey") as configfile:
             config.read_file(configfile)
     except FileNotFoundError:
         pass
@@ -327,5 +330,7 @@ def read_config() -> configparser.ConfigParser:
 
 
 def write_config(config: configparser.ConfigParser):
-    with open(Path.home() / ".murfey", "w") as configfile:
+    mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+    murfey_client_config_home = Path(mcch) if mcch else Path.home()
+    with open(murfey_client_config_home / ".murfey", "w") as configfile:
         config.write(configfile)
