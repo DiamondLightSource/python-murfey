@@ -93,15 +93,6 @@ class LogFilter(logging.Filter):
 
 
 def run():
-    # setup logging
-    zc = zocalo.configuration.from_file()
-    zc.activate()
-
-    # Install a log filter to all existing handlers.
-    # At this stage this will exclude console loggers, but will cover
-    # any Graylog logging set up by the environment activation
-    LogFilter.install()
-
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--host",
@@ -122,6 +113,10 @@ def run():
         "--feedback",
         action="store_true",
     )
+    parser.add_argument(
+        "--zocalo_config_file",
+        help="Override location of Zocalo configuration file",
+    )
 
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -138,6 +133,20 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    args = parser.parse_args()
+
+    # setup logging
+    if args.zocalo_config_file:
+        zc = zocalo.configuration.from_file(config_file=args.zocalo_config_file)
+    else:
+        zc = zocalo.configuration.from_file()
+    zc.activate()
+
+    # Install a log filter to all existing handlers.
+    # At this stage this will exclude console loggers, but will cover
+    # any Graylog logging set up by the environment activation
+    LogFilter.install()
+
     zc.add_command_line_options(parser)
     workflows.transport.add_command_line_options(parser, transport_argument=True)
 
