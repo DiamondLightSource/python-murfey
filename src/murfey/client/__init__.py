@@ -88,7 +88,16 @@ def _get_visit_list(api_base: ParseResult, demo: bool = False):
 
 def run():
     config = read_config()
-    known_server = config["Murfey"].get("server")
+    server_routing = config.get("ServerRouter", {})
+    if server_routing:
+        for path_prefix, server in server_routing.items():
+            if str(Path.cwd()).startswith(path_prefix):
+                known_server = server
+                break
+            else:
+                known_server = None
+    else:
+        known_server = config["Murfey"].get("server")
 
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument(
