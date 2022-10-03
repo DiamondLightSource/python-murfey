@@ -89,10 +89,12 @@ def _get_visit_list(api_base: ParseResult, demo: bool = False):
 def run():
     config = read_config()
     server_routing = config.get("ServerRouter", {})
+    server_routing_prefix_found = False
     if server_routing:
         for path_prefix, server in server_routing.items():
             if str(Path.cwd()).startswith(path_prefix):
                 known_server = server
+                server_routing_prefix_found = True
                 break
             else:
                 known_server = None
@@ -187,9 +189,15 @@ def run():
 
     from pprint import pprint
 
+    ongoing_visits = []
     if args.visit:
         ongoing_visits = [args.visit]
-    else:
+    elif server_routing_prefix_found:
+        for part in Path.cwd().parts:
+            if "-" in part:
+                ongoing_visits = [part]
+                break
+    if not ongoing_visits:
         print("Ongoing visits:")
         ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
         pprint(ongoing_visits)
