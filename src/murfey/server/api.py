@@ -203,12 +203,18 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     mrc_out = (
         core
-        / "processed"
+        / machine_config.get("processed_directory_name", "processed")
         / sub_dataset
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
-    ctf_out = core / "processed" / sub_dataset / "CTF" / str(ppath.stem + "_ctf.mrc")
+    ctf_out = (
+        core
+        / machine_config.get("processed_directory_name", "processed")
+        / sub_dataset
+        / "CTF"
+        / str(ppath.stem + "_ctf.mrc")
+    )
     if not mrc_out.parent.exists():
         mrc_out.parent.mkdir(parents=True, mode=1411)
     if not ctf_out.parent.exists():
