@@ -88,7 +88,10 @@ def _get_visit_list(api_base: ParseResult, demo: bool = False):
 
 def run():
     config = read_config()
-    server_routing = config.get("ServerRouter", {})
+    try:
+        server_routing = config["ServerRouter"]
+    except KeyError:
+        server_routing = {}
     server_routing_prefix_found = False
     if server_routing:
         for path_prefix, server in server_routing.items():
