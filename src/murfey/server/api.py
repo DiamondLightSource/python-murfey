@@ -216,9 +216,9 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / str(ppath.stem + "_ctf.mrc")
     )
     if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True, mode=1411)
+        mrc_out.parent.mkdir(parents=True)
     if not ctf_out.parent.exists():
-        ctf_out.parent.mkdir(parents=True, mode=1411)
+        ctf_out.parent.mkdir(parents=True)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -253,7 +253,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
         / "aligned_file.mrc"
     )
     if not stack_file.parent.exists():
-        stack_file.parent.mkdir(parents=True, mode=1411)
+        stack_file.parent.mkdir(parents=True)
     zocalo_message = {
         "recipes": ["em-tomo-align"],
         "parameters": {
