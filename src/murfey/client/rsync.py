@@ -150,7 +150,7 @@ class RSyncer(Observer):
                     )
                     success = False
             else:
-                success = True
+                success = self._fake_transfer(files_to_transfer)
 
             logger.info(f"Completed transfer of {len(files_to_transfer)} files")
             for _ in files_to_transfer:
@@ -167,6 +167,28 @@ class RSyncer(Observer):
                 time.sleep(backoff)
 
         logger.info("RSync thread finished")
+
+    def _fake_transfer(self, files: list[Path]) -> bool:
+        previously_transferred = self._files_transferred
+
+        relative_filenames = []
+        for f in files:
+            try:
+                relative_filenames.append(f.relative_to(self._basepath))
+            except ValueError:
+                raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
+
+        for f in set(relative_filenames):
+            self._files_transferred += 1
+            update = RSyncerUpdate(
+                file_path=f,
+                file_size=0,
+                outcome=TransferResult.SUCCESS,
+                transfer_total=self._files_transferred - previously_transferred,
+                queue_size=0,
+            )
+            self.notify(update)
+        return True
 
     def _transfer(self, files: list[Path]) -> bool:
         """
