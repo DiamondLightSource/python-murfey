@@ -337,6 +337,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
         ),
         "start_time": str(datetime.datetime.now()),
         "experiment_type": dcg_params.experiment_type,
+        "experiment_type_id": dcg_params.experiment_type_id,
     }
 
     if _transport_object:

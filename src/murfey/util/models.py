@@ -69,6 +69,7 @@ class SuggestedPathParameters(BaseModel):
 
 class DCGroupParameters(BaseModel):
     experiment_type: str
+    experiment_type_id: int
 
 
 class DCParameters(BaseModel):
