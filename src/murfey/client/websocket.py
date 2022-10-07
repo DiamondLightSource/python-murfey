@@ -99,7 +99,7 @@ class WSApp:
         self._ws.close()
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
-        log.info(f"Received message: {message!r}")
+        # log.info(f"Received message: {message!r}")
         try:
             data = json.loads(message)
             if data.get("message") == "state-update":

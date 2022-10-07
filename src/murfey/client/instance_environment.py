@@ -83,7 +83,7 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
-        logger.info("motion corrected callback")
+        # logger.info("motion corrected callback")
         _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
         for l in values.get("listeners", {}).get("motion_corrected_movies", []):
             if values.get("motion_corrected_movies"):
@@ -139,8 +139,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                             v[k][1],
                             file_tilt_list,
                         )
-                    except KeyError as k:
-                        logger.warning(f"KEY error {k}")
+                    except KeyError:
+                        pass
                     except Exception as e:
                         logger.warning(f"ERROR {e}")
         return v

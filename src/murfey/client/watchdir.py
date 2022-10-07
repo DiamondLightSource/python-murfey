@@ -52,7 +52,10 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
-            for x in sorted(self._file_candidates):
+            for x in sorted(
+                self._file_candidates,
+                key=lambda _x: self._file_candidates[_x].modification_time,
+            ):
                 if x not in filelist:
                     log.info(f"Previously seen file {x!r} has disappeared")
                     del self._file_candidates[x]
