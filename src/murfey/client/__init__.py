@@ -159,6 +159,12 @@ def run():
         action="store_true",
         help="Turn on debugging logs",
     )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        default=False,
+        help="Perform rsync transfers locally rather than remotely",
+    )
 
     args = parser.parse_args()
 
@@ -273,7 +279,7 @@ def run():
         instance_environment.source,
         basepath_remote=Path(args.destination or f"data/{datetime.now().year}"),
         server_url=murfey_url,
-        local=instance_environment.demo,
+        local=args.local or instance_environment.demo,
         do_transfer=not args.no_transfer,
     )
     source_watcher.subscribe(rsync_process.enqueue)
