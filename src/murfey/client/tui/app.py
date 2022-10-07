@@ -632,19 +632,6 @@ class MurfeyTUI(App):
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question="Are you using multi-grid?",
-                allowed_responses=["y", "n"],
-                callback=self._set_request_destination,
-            )
-        )
-        # self._queues["input"].put_nowait(
-        #     InputResponse(
-        #         question="Processing parameters: ",
-        #         form={"Voltage [keV]": 300, "Pixel size [U+212b]": 1},
-        #     )
-        # )
         self.log_book = LogBook(self._queues["logs"])
         # self._statusbar = StatusBar()
         self.hovers = (
