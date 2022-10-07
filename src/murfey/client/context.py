@@ -78,6 +78,8 @@ class TomographyContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
         self._lock: RLock = RLock()
+        self._extract_tilt_series: Callable[[Path], str] | None = None
+        self._extract_tilt_tag: Callable[[Path], str] | None = None
 
     def _flush_data_collections(self):
         logger.info("Flushing data collection API calls")
@@ -115,31 +117,13 @@ class TomographyContext(Context):
         mvid: int,
         tilt_angles: List,
     ):
-        if self._acquisition_software == "serialem":
-            delimiters = ("_", "-")
-            for d in delimiters:
-                if movie_path.name.count(d) > 1:
-                    delimiter = d
-                    break
-            else:
-                delimiter = delimiters[0]
-
-            def _extract_tilt_series(p: Path) -> str:
-                split = p.name.split(delimiter)
-                for s in split:
-                    if s.isdigit():
-                        return s
-                raise ValueError(
-                    f"No digits found in {p.name} after splitting on {delimiter}"
-                )
-
-            tilt_series = _extract_tilt_series(movie_path)
-            # tilt_angle = ".".join(movie_path.name.split(delimiter)[-1].split(".")[:-1])
-        elif self._acquisition_software == "tomo":
-            tilt_series = movie_path.name.split("_")[1]
-            # tilt_angle = movie_path.name.split("[")[1].split("]")[0]
+        if self._extract_tilt_series and self._extract_tilt_tag:
+            tilt_series = self._extract_tilt_tag(
+                movie_path
+            ) + self._extract_tilt_series(movie_path)
         else:
             return
+
         if self._motion_corrected_tilt_series.get(
             tilt_series
         ) and motion_corrected_path not in self._motion_corrected_tilt_series.get(
@@ -151,9 +135,6 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
-            # logger.info(
-            #     f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
-            # )
             if (
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
@@ -216,16 +197,21 @@ class TomographyContext(Context):
         extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
+        if not self._extract_tilt_series:
+            self._extract_tilt_series = extract_tilt_series
+        if not self._extract_tilt_tag:
+            self._extract_tilt_tag = extract_tilt_tag
         # time.sleep(5)
         try:
-            tilt_series = extract_tilt_series(file_path)
+            tilt_series_num = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
-            # tilt_tag = extract_tilt_tag(file_path)
+            tilt_tag = extract_tilt_tag(file_path)
             try:
-                float(tilt_series)
+                float(tilt_series_num)
                 float(tilt_angle)
             except ValueError:
                 return []
+            tilt_series = tilt_tag + tilt_series_num
 
         except Exception:
             logger.info(
@@ -282,7 +268,7 @@ class TomographyContext(Context):
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
-                        "tilt": tilt_series,
+                        "tilt": tilt_series_num,
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
                         "image_directory": str(file_path.parent),
@@ -462,10 +448,10 @@ class TomographyContext(Context):
                                         ),
                                         file_tilt_list,
                                     )
-
-                logger.info(
-                    f"The following tilt series are considered complete: {newly_completed_series}"
-                )
+                if newly_completed_series:
+                    logger.info(
+                        f"The following tilt series are considered complete: {newly_completed_series}"
+                    )
                 return newly_completed_series
         self._last_transferred_file = file_path
         return []

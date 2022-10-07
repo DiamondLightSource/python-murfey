@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 machine_config: MachineConfig = MachineConfig(
-    acquisition_software={},
+    acquisition_software=[],
     calibrations={},
     data_directories={},
     rsync_basepath=Path("dls/tmp"),
