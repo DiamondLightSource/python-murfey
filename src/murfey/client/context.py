@@ -87,16 +87,16 @@ class TomographyContext(Context):
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        logger.info(
-            f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
-        )
+        # logger.info(
+        #     f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
+        # )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str, app_id: int):
-        logger.info(f"Flushing preprocessing requests {tag}")
+        # logger.info(f"Flushing preprocessing requests {tag}")
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
@@ -151,9 +151,9 @@ class TomographyContext(Context):
         else:
             self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
         if tilt_series in self._completed_tilt_series:
-            logger.info(
-                f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
-            )
+            # logger.info(
+            #     f"LENGTHS {len(self._motion_corrected_tilt_series[tilt_series])}, {len(self._tilt_series[tilt_series])}"
+            # )
             if (
                 len(self._motion_corrected_tilt_series[tilt_series])
                 == len(self._tilt_series[tilt_series])
@@ -226,7 +226,7 @@ class TomographyContext(Context):
                 return []
 
         except Exception:
-            logger.debug(
+            logger.info(
                 f"Tilt series and angle could not be determined for {file_path}"
             )
             return []
@@ -480,13 +480,26 @@ class TomographyContext(Context):
             )
 
         def _extract_tilt_series(p: Path) -> str:
-            _split = p.name.split("_")[-1].split(".")
+            tag = p.name.split("_")[0]
+            slice_index = 0
+            for i, ch in enumerate(tag[::-1]):
+                if not ch.isnumeric():
+                    slice_index = -i
+                    break
+            if not slice_index:
+                raise ValueError(
+                    f"The file tag {tag} does not end in numeric characters or is entirely numeric: cannot parse"
+                )
+            return tag[slice_index:]
+
+        def _extract_tilt_angle(p: Path) -> str:
+            _split = p.name.split("_")[2].split(".")
             return ".".join(_split[:-1])
 
         return self._add_tilt(
             file_path,
-            lambda x: x.name.split("_")[1],
             _extract_tilt_series,
+            _extract_tilt_angle,
             environment=environment,
         )
 
