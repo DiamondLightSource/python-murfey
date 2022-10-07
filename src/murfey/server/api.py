@@ -18,7 +18,7 @@ import murfey.server.websocket as ws
 from murfey.server import _transport_object, get_hostname, get_microscope
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.config import from_file
+from murfey.server.config import MachineConfig, from_file
 from murfey.util.models import (
     ContextInfo,
     DCGroupParameters,
@@ -41,7 +41,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-machine_config: dict = {}
+machine_config: MachineConfig = MachineConfig(
+    acquisition_software={},
+    calibrations={},
+    data_directories={},
+    rsync_basepath=Path("dls/tmp"),
+)
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
     machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
@@ -203,14 +208,14 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     mrc_out = (
         core
-        / machine_config.get("processed_directory_name", "processed")
+        / machine_config.processed_directory_name
         / sub_dataset
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     ctf_out = (
         core
-        / machine_config.get("processed_directory_name", "processed")
+        / machine_config.processed_directory_name
         / sub_dataset
         / "CTF"
         / str(ppath.stem + "_ctf.mrc")
@@ -250,7 +255,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
     stack_file = (
         Path(tilt_series.motion_corrected_path).parents[1]
         / "align_output"
-        / "aligned_file.mrc"
+        / f"aligned_file_{tilt_series.name}.mrc"
     )
     if not stack_file.parent.exists():
         stack_file.parent.mkdir(parents=True)
@@ -329,7 +334,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
     dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope="m12",  # get_microscope(),
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
@@ -356,7 +361,7 @@ def start_dc(visit_name, dc_params: DCParameters):
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope="m12",  # get_microscope(),
+            microscope=get_microscope(),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
