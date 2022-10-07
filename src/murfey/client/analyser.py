@@ -45,9 +45,14 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         split_file_name = file_path.name.split("_")
         if split_file_name:
-            if split_file_name[0] == "Position" or "[" in file_path.name:
+            if (
+                split_file_name[0] == "Position"
+                or "[" in file_path.name
+                or "Fractions" in split_file_name[-1]
+            ):
+                logger.info("Acquisition software: tomo")
                 self._context = TomographyContext("tomo")
-                if split_file_name[-1].startswith("Fractions"):
+                if "Fractions" in split_file_name[-1]:
                     self._role = "detector"
                 elif (
                     file_path.suffix == ".mdoc"
