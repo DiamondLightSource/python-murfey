@@ -213,12 +213,14 @@ class TomographyContext(Context):
         file_path: Path,
         extract_tilt_series: Callable[[Path], str],
         extract_tilt_angle: Callable[[Path], str],
+        extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         # time.sleep(5)
         try:
             tilt_series = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
+            # tilt_tag = extract_tilt_tag(file_path)
             try:
                 float(tilt_series)
                 float(tilt_angle)
@@ -476,11 +478,11 @@ class TomographyContext(Context):
                 file_path,
                 lambda x: x.name.split("_")[1],
                 lambda x: x.name.split("[")[1].split("]")[0],
+                lambda x: x.name.split("_")[0],
                 environment=environment,
             )
 
-        def _extract_tilt_series(p: Path) -> str:
-            tag = p.name.split("_")[0]
+        def _get_slice_index(tag: str) -> int:
             slice_index = 0
             for i, ch in enumerate(tag[::-1]):
                 if not ch.isnumeric():
@@ -490,7 +492,17 @@ class TomographyContext(Context):
                 raise ValueError(
                     f"The file tag {tag} does not end in numeric characters or is entirely numeric: cannot parse"
                 )
+            return slice_index
+
+        def _extract_tilt_series(p: Path) -> str:
+            tag = p.name.split("_")[0]
+            slice_index = _get_slice_index(tag)
             return tag[slice_index:]
+
+        def _extract_tilt_tag(p: Path) -> str:
+            tag = p.name.split("_")[0]
+            slice_index = _get_slice_index(tag)
+            return tag[:slice_index]
 
         def _extract_tilt_angle(p: Path) -> str:
             _split = p.name.split("_")[2].split(".")
@@ -500,6 +512,7 @@ class TomographyContext(Context):
             file_path,
             _extract_tilt_series,
             _extract_tilt_angle,
+            _extract_tilt_tag,
             environment=environment,
         )
 
@@ -527,6 +540,7 @@ class TomographyContext(Context):
             file_path,
             _extract_tilt_series,
             lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
+            lambda x: "",
             environment=environment,
         )
 
