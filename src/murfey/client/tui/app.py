@@ -489,7 +489,7 @@ class MurfeyTUI(App):
         self.rsync_process = rsync_process
         self.analyser = analyser
         self._data_collection_form_complete = False
-        self._info_widget = InfoWidget("Welcome to Murfey :microscope:")
+        self._info_widget = InfoWidget("Welcome to Murfey :microscope: \n")
 
     @property
     def role(self) -> str:
@@ -521,6 +521,8 @@ class MurfeyTUI(App):
                 name=f"RSync {self._source.absolute()}:{_remote}",
                 target=self.rsync_process._process,
             )
+
+        self._info_widget.input_text += f"{self._source} -> {destination} \n"
 
         def rsync_result(update: RSyncerUpdate):
             if not self.rsync_process:
@@ -597,6 +599,9 @@ class MurfeyTUI(App):
         if self._dummy_dc:
             return
         self._environment.data_collection_parameters = json
+        self._info_widget.input_text += (
+            "\n".join(f"{k}:{v}" for k, v in json.items()) + "\n"
+        )
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {
                 self.analyser._context._flush_data_collections
