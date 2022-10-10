@@ -201,11 +201,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
-    sub_dataset = (
-        ppath.relative_to(core).parts[0]
-        if len(ppath.relative_to(core).parts) > 1
-        else ""
-    )
+    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
     mrc_out = (
         core
         / machine_config.processed_directory_name
