@@ -271,6 +271,7 @@ def run():
         default_destination=args.destination
         or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
+        processing_only_mode=server_routing_prefix_found,
     )
 
     ws.environment = instance_environment

@@ -42,6 +42,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
+    processing_only_mode: bool = False
 
     class Config:
         validate_assignment: bool = True

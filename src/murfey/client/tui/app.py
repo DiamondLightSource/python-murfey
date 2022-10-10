@@ -116,7 +116,14 @@ class HoverVisit(Widget):
                 ).json()
                 _default = ""
                 if self.app._default_destination:
-                    if machine_data.get("data_directories"):
+                    if (
+                        self.app._environment.processing_only_mode
+                        and self.app._environment.source
+                    ):
+                        _default = str(self.app._environment.source.resolve()) or str(
+                            Path.cwd()
+                        )
+                    elif machine_data.get("data_directories"):
                         for data_dir in machine_data["data_directories"].keys():
                             if (
                                 self.app._environment.source
@@ -164,13 +171,16 @@ class HoverVisit(Widget):
                         _default = self.app._default_destination + f"/{self._text}"
                 else:
                     _default = "unknown"
-                self.app._queues["input"].put_nowait(
-                    InputResponse(
-                        question="Transfer to: ",
-                        default=_default,
-                        callback=self.app._start_rsyncer,
+                if self.app._environment.processing_only_mode:
+                    self.app._start_rsyncer(_default)
+                else:
+                    self.app._queues["input"].put_nowait(
+                        InputResponse(
+                            question="Transfer to: ",
+                            default=_default,
+                            callback=self.app._start_rsyncer,
+                        )
                     )
-                )
 
 
 class QuickPrompt:
