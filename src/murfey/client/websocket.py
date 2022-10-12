@@ -116,10 +116,11 @@ class WSApp:
     def _register_id_partial(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
             if isinstance(value, dict):
+                new_value = {**getattr(self.environment, attribute), **value}
                 setattr(
                     self.environment,
                     attribute,
-                    {**self.environment[attribute], **value},
+                    new_value,
                 )
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
