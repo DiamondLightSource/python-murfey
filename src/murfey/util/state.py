@@ -42,7 +42,13 @@ class State(Mapping[str, T], Observer):
         del self.data[key]
         await self.anotify(key, None)
 
-    async def update(self, key: str, value: T):
+    async def update(self, key: str, value: dict):
+        if self.data.get(key):
+            if isinstance(self.data[key], dict):
+                self.data[key].update(value)  # type: ignore
+                await self.anotify(key, value, message="state-update-partial")
+
+    async def set(self, key: str, value: T):
         self.data[key] = value
         await self.anotify(key, value)
 

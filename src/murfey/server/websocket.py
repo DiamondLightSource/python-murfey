@@ -35,15 +35,17 @@ class ConnectionManager(Generic[T]):
             log.info(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
-    async def _broadcast_state_update(self, attribute: str, value: T | None):
+    async def _broadcast_state_update(
+        self, attribute: str, value: T | None, message: str = "state-update"
+    ):
         for connection in self.active_connections:
             await self.active_connections[connection].send_json(
-                {"message": "state-update", "attribute": attribute, "value": value}
+                {"message": message, "attribute": attribute, "value": value}
             )
 
     async def set_state(self, attribute: str, value: T):
         log.info(f"State attribute {attribute!r} set to {value!r}")
-        await self._state.update(attribute, value)
+        await self._state.set(attribute, value)
 
     async def delete_state(self, attribute: str):
         log.info(f"State attribute {attribute!r} removed")

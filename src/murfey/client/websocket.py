@@ -104,12 +104,23 @@ class WSApp:
             data = json.loads(message)
             if data.get("message") == "state-update":
                 self._register_id(data["attribute"], data["value"])
+            elif data.get("message") == "state-update-partial":
+                self._register_id_partial(data["attribute"], data["value"])
         except Exception:
             pass
 
     def _register_id(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
             setattr(self.environment, attribute, value)
+
+    def _register_id_partial(self, attribute: str, value):
+        if self.environment and hasattr(self.environment, attribute):
+            if isinstance(value, dict):
+                setattr(
+                    self.environment,
+                    attribute,
+                    {**self.environment[attribute], **value},
+                )
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
         log.error(str(error))
