@@ -266,10 +266,9 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
             if global_state.get("motion_corrected_movies") and isinstance(
                 global_state["motion_corrected_movies"], dict
             ):
-                await global_state.update(
+                await global_state.aupdate(
                     "motion_corrected_movies",
                     {
-                        **global_state["motion_corrected_movies"],
                         message.get("movie"): [
                             message.get("mrc_out"),
                             message.get("movie_id"),
@@ -277,7 +276,7 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                     },
                 )
             else:
-                await global_state.update(
+                await global_state.aupdate(
                     "motion_corrected_movies",
                     {
                         message.get("movie"): [
@@ -296,14 +295,25 @@ def feedback_callback(header: dict, message: dict) -> None:
         if global_state.get("motion_corrected_movies") and isinstance(
             global_state["motion_corrected_movies"], dict
         ):
-            global_state["motion_corrected_movies"] = {
-                **global_state["motion_corrected_movies"],
-                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")],
-            }
+            global_state.update(
+                "motion_corrected_movies",
+                {
+                    message.get("movie"): [
+                        message.get("mrc_out"),
+                        message.get("movie_id"),
+                    ]
+                },
+            )
         else:
-            global_state["motion_corrected_movies"] = {
-                message.get("movie"): [message.get("mrc_out"), message.get("movie_id")]
-            }
+            global_state.update(
+                "motion_corrected_movies",
+                {
+                    message.get("movie"): [
+                        message.get("mrc_out"),
+                        message.get("movie_id"),
+                    ]
+                },
+            )
 
         if _transport_object:
             _transport_object.transport.ack(header)
