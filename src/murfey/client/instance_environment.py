@@ -69,7 +69,7 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
-        logger.info(f"autoproc program ids validator: {v}")
+        # logger.info(f"autoproc program ids validator: {v}")
         with global_env_lock:
             for l in values.get("listeners", {}).get("autoproc_program_ids", []):
                 if values.get("autoproc_program_ids"):

@@ -538,9 +538,10 @@ class MurfeyTUI(App):
             if not self.rsync_process:
                 raise ValueError("TUI rsync process does not exist")
             if update.outcome is TransferResult.SUCCESS:
-                log.info(
-                    f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
-                )
+                # log.info(
+                #     f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
+                # )
+                pass
             else:
                 log.warning(f"Failed to transfer file {str(update.file_path)!r}")
                 self.rsync_process.enqueue(update.file_path)
