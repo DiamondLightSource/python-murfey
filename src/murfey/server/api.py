@@ -234,7 +234,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "mc_uuid": proc_file.mc_uuid,
         },
     }
-    log.info(f"Sending Zocalo message {zocalo_message}")
+    # log.info(f"Sending Zocalo message {zocalo_message}")
     if _transport_object:
         _transport_object.transport.send("processing_recipe", zocalo_message)
     else:
@@ -242,7 +242,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
         )
         return proc_file
-    await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
+    # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
 
 
@@ -277,6 +277,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
     await ws.manager.broadcast(
         f"Processing requested for tilt series {tilt_series.name}"
     )
+
     return tilt_series
 
 

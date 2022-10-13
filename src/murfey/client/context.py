@@ -380,7 +380,9 @@ class TomographyContext(Context):
                     ]
 
         if self._last_transferred_file:
-            last_tilt_series = extract_tilt_series(self._last_transferred_file)
+            last_tilt_series = extract_tilt_tag(
+                self._last_transferred_file
+            ) + extract_tilt_series(self._last_transferred_file)
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
@@ -569,7 +571,11 @@ class TomographyContext(Context):
             return OrderedDict({})
         if metadata_file.suffix == ".xml":
             with open(metadata_file, "r") as xml:
-                for_parsing = xml.read()
+                try:
+                    for_parsing = xml.read()
+                except Exception:
+                    logger.warning(f"Failed to parse file {metadata_file}")
+                    return OrderedDict({})
                 data = xmltodict.parse(for_parsing)
             metadata: OrderedDict = OrderedDict({})
             metadata["experiment_type"] = TUIFormValue("tomography")
@@ -587,6 +593,7 @@ class TomographyContext(Context):
                 None, top=True, colour="dark_orange"
             )
             metadata.move_to_end("dose_per_frame", last=False)
+            # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
@@ -598,10 +605,11 @@ class TomographyContext(Context):
         mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
         mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
         mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-            float(mdoc_data["PixelSpacing"])
+            float(mdoc_data["PixelSpacing"]) * 1e-10
         )
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
+        # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata

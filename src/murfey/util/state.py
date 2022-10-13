@@ -42,9 +42,28 @@ class State(Mapping[str, T], Observer):
         del self.data[key]
         await self.anotify(key, None)
 
-    async def update(self, key: str, value: T):
+    async def aupdate(self, key: str, value: T):
+        if self.data.get(key):
+            if isinstance(self.data[key], dict):
+                self.data[key].update(value)  # type: ignore
+                await self.anotify(key, value, message="state-update-partial")
+        else:
+            self.data[key] = value
+            await self.anotify(key, value, message="state-update")
+
+    async def set(self, key: str, value: T):
         self.data[key] = value
         await self.anotify(key, value)
+
+    def update(self, key: str, value: T, perform_state_update: bool = False):
+        if self.data.get(key):
+            if isinstance(self.data[key], dict):
+                if perform_state_update:
+                    self.data[key].update(value)  # type: ignore
+                self.notify(key, value, message="state-update-partial")
+        else:
+            self.data[key] = value
+            self.notify(key, value, message="state-update")
 
     def subscribe(self, fn: Callable[[str, T | None], Awaitable[None] | None]):
         self._listeners.append(fn)
