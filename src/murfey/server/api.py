@@ -251,7 +251,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
     stack_file = (
         Path(tilt_series.motion_corrected_path).parents[1]
         / "align_output"
-        / f"{tilt_series.name}.st"
+        / f"{tilt_series.name}_stack.mrc"
     )
     if not stack_file.parent.exists():
         stack_file.parent.mkdir(parents=True)
