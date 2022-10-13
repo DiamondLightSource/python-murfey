@@ -55,10 +55,11 @@ class State(Mapping[str, T], Observer):
         self.data[key] = value
         await self.anotify(key, value)
 
-    def update(self, key: str, value: T):
+    def update(self, key: str, value: T, perform_state_update: bool = False):
         if self.data.get(key):
             if isinstance(self.data[key], dict):
-                self.data[key].update(value)  # type: ignore
+                if perform_state_update:
+                    self.data[key].update(value)  # type: ignore
                 self.notify(key, value, message="state-update-partial")
         else:
             self.data[key] = value
