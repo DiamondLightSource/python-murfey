@@ -15,6 +15,7 @@ class MachineConfig(BaseModel):
     rsync_module: str = ""
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
+    feedback_queue: str = "murfey_feedback"
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

@@ -192,7 +192,7 @@ async def add_file(file: File):
 async def send_murfey_message(msg: RegistrationMessage):
     if _transport_object:
         _transport_object.transport.send(
-            "murfey_feedback", {"register": msg.registration}
+            machine_config.feedback_queue, {"register": msg.registration}
         )
 
 
@@ -344,7 +344,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
 
     if _transport_object:
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+            machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
         )
     return dcg_parameters
 
@@ -378,9 +378,12 @@ def start_dc(visit_name, dc_params: DCParameters):
     }
 
     if _transport_object:
-        log.debug(f"Send registration message to murfey_feedback: {dc_parameters}")
+        log.debug(
+            f"Send registration message to {machine_config.feedback_queue}: {dc_parameters}"
+        )
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "data_collection", **dc_parameters}
+            machine_config.feedback_queue,
+            {"register": "data_collection", **dc_parameters},
         )
     return dc_params
 
@@ -394,9 +397,10 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
 
     if _transport_object:
         log.info(
-            f"Send processing registration message to murfey_feedback: {proc_parameters}"
+            f"Send processing registration message to {machine_config.feedback_queue}: {proc_parameters}"
         )
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "processing_job", **proc_parameters}
+            machine_config.feedback_queue,
+            {"register": "processing_job", **proc_parameters},
         )
     return proc_params
