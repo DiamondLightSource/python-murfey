@@ -312,7 +312,7 @@ def shutdown():
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
     check_path = (
-        machine_config["rsync_basepath"] / params.base_path
+        machine_config.rsync_basepath / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
