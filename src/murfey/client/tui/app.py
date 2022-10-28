@@ -172,18 +172,12 @@ class HoverVisit(Widget):
                 else:
                     _default = "unknown"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(
-                        str(Path(_default).relative_to(machine_data["rsync_basepath"]))
-                    )
+                    self.app._start_rsyncer(_default)
                 else:
                     self.app._queues["input"].put_nowait(
                         InputResponse(
                             question="Transfer to: ",
-                            default=str(
-                                Path(_default).relative_to(
-                                    machine_data["rsync_basepath"]
-                                )
-                            ),
+                            default=_default,
                             callback=self.app._start_rsyncer,
                         )
                     )
