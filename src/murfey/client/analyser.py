@@ -19,7 +19,7 @@ class Analyser(Observer):
         self,
         basepath_local: Path,
         environment: MurfeyInstanceEnvironment | None = None,
-        force_metadata: bool = False,
+        force_mdoc_metadata: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -31,7 +31,7 @@ class Analyser(Observer):
         self._context: Context | None = None
         self._batch_store: dict = {}
         self._environment = environment
-        self._force_metadata = force_metadata
+        self._force_mdoc_metadata = force_mdoc_metadata
 
         self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
@@ -87,7 +87,7 @@ class Analyser(Observer):
                 self._halt_thread = True
                 continue
             dc_metadata = {}
-            if self._force_metadata and transferred_file.suffix == ".mdoc":
+            if self._force_mdoc_metadata and transferred_file.suffix == ".mdoc":
                 dc_metadata = self._context.gather_metadata(transferred_file)
             if (
                 not self._context

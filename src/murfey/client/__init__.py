@@ -166,7 +166,7 @@ def run():
         help="Perform rsync transfers locally rather than remotely",
     )
     parser.add_argument(
-        "--force_metadata",
+        "--force_mdoc_metadata",
         action="store_true",
         default=False,
         help="Force metadata to be read from mdoc files",
@@ -294,7 +294,7 @@ def run():
     analyser = Analyser(
         instance_environment.source,
         environment=instance_environment if args.real_dc else None,
-        force_metadata=args.force_metadata,
+        force_mdoc_metadata=args.force_mdoc_metadata,
     )
     # source_watcher.subscribe(analyser.enqueue)
     rsync_process.subscribe(analyser.enqueue)
