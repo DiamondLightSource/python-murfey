@@ -16,7 +16,10 @@ logger = logging.getLogger("murfey.client.analyser")
 
 class Analyser(Observer):
     def __init__(
-        self, basepath_local: Path, environment: MurfeyInstanceEnvironment | None = None
+        self,
+        basepath_local: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        force_mdoc_metadata: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -28,6 +31,7 @@ class Analyser(Observer):
         self._context: Context | None = None
         self._batch_store: dict = {}
         self._environment = environment
+        self._force_mdoc_metadata = force_mdoc_metadata
 
         self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
@@ -82,6 +86,9 @@ class Analyser(Observer):
             if not transferred_file:
                 self._halt_thread = True
                 continue
+            dc_metadata = {}
+            if self._force_mdoc_metadata and transferred_file.suffix == ".mdoc":
+                dc_metadata = self._context.gather_metadata(transferred_file)
             if (
                 not self._context
             ):  # self._experiment_type or not self._acquisition_software:
@@ -99,14 +106,15 @@ class Analyser(Observer):
                         transferred_file, role=self._role, environment=self._environment
                     )
                     if self._role == "detector":
-                        try:
-                            dc_metadata = self._context.gather_metadata(
-                                transferred_file.with_suffix(".mdoc")
-                                if self._context._acquisition_software == "serialem"
-                                else transferred_file.with_suffix(".xml")
-                            )
-                        except NotImplementedError:
-                            dc_metadata = {}
+                        if not dc_metadata:
+                            try:
+                                dc_metadata = self._context.gather_metadata(
+                                    transferred_file.with_suffix(".mdoc")
+                                    if self._context._acquisition_software == "serialem"
+                                    else transferred_file.with_suffix(".xml")
+                                )
+                            except NotImplementedError:
+                                dc_metadata = {}
                         if not dc_metadata:
                             self._unseen_xml.append(transferred_file)
                             # continue
@@ -114,7 +122,7 @@ class Analyser(Observer):
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = TUIFormValue(
-                                transferred_file.name.split("_")[1]
+                                transferred_file.stem.split("_")[1]
                             )
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
@@ -133,16 +141,17 @@ class Analyser(Observer):
                         transferred_file, role=self._role, environment=self._environment
                     )
                     if self._role == "detector":
-                        dc_metadata = self._context.gather_metadata(
-                            transferred_file.with_suffix(".xml")
-                        )
+                        if not dc_metadata:
+                            dc_metadata = self._context.gather_metadata(
+                                transferred_file.with_suffix(".xml")
+                            )
                         if not dc_metadata:
                             self._unseen_xml.append(transferred_file)
                         else:
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = TUIFormValue(
-                                transferred_file.name.split("_")[1]
+                                transferred_file.stem.split("_")[1]
                             )
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
@@ -160,9 +169,10 @@ class Analyser(Observer):
                     len(self._context._tilt_series.keys()) > len(_tilt_series)
                     and self._role == "detector"
                 ):
-                    dc_metadata = self._context.gather_metadata(
-                        transferred_file.with_suffix(".xml")
-                    )
+                    if not dc_metadata:
+                        dc_metadata = self._context.gather_metadata(
+                            transferred_file.with_suffix(".xml")
+                        )
                     self.notify({"form": dc_metadata})
 
     def enqueue(self, rsyncer: RSyncerUpdate):
