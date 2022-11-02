@@ -541,7 +541,11 @@ class TomographyContext(Context):
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if role == "detector" and transferred_file.suffix in data_suffixes:
+        if (
+            role == "detector"
+            and transferred_file.suffix in data_suffixes
+            and "gain" not in transferred_file.name
+        ):
             if self._acquisition_software == "tomo":
                 completed_tilts = self._add_tomo_tilt(
                     transferred_file, environment=environment
