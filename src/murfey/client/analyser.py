@@ -81,14 +81,25 @@ class Analyser(Observer):
 
     def _analyse(self):
         logger.info("Analyser thread started")
+        mdoc_for_reading = None
+        data_collection_question = False
         while not self._halt_thread:
             transferred_file = self.queue.get()
             if not transferred_file:
                 self._halt_thread = True
                 continue
             dc_metadata = {}
-            if self._force_mdoc_metadata and transferred_file.suffix == ".mdoc":
-                dc_metadata = self._context.gather_metadata(transferred_file)
+            if (
+                self._force_mdoc_metadata
+                and transferred_file.suffix == ".mdoc"
+                or mdoc_for_reading
+            ):
+                if self._context:
+                    dc_metadata = self._context.gather_metadata(
+                        mdoc_for_reading or transferred_file
+                    )
+                else:
+                    mdoc_for_reading = transferred_file
             if (
                 not self._context
             ):  # self._experiment_type or not self._acquisition_software:
@@ -120,7 +131,8 @@ class Analyser(Observer):
                             # continue
                         else:
                             self._unseen_xml = []
-                            self.notify({"allowed_responses": ["y", "n"]})
+                            if data_collection_question:
+                                self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = TUIFormValue(
                                 transferred_file.stem.split("_")[1]
                             )
