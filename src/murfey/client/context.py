@@ -345,6 +345,7 @@ class TomographyContext(Context):
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
+                "gain_ref": environment.data_collection_parameters.get("gain_ref"),
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
