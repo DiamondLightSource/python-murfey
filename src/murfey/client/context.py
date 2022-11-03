@@ -183,6 +183,7 @@ class TomographyContext(Context):
                     ],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
+                    "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 }
                 return new_dict
         except KeyError:
@@ -593,9 +594,11 @@ class TomographyContext(Context):
             metadata["pixel_size_on_image"] = TUIFormValue(
                 float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
             )
+            metadata["gain_ref"] = TUIFormValue(None, top=True)
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
             )
+            metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
             return metadata

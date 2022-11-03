@@ -51,6 +51,7 @@ class ProcessFile(BaseModel):
     mc_uuid: int
     autoproc_program_id: int
     pixel_size: float
+    gain_ref: Optional[str] = None
 
 
 class TiltSeries(BaseModel):
