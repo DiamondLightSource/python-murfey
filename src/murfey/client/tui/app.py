@@ -261,7 +261,8 @@ class InputBox(Widget):
                 else f"{self.prompt}: [[white]{'/'.join(self.prompt)}[/white]] {self.input_text}"
             )
         elif self._form:
-            self._line = 1
+            if not self._line:
+                self._line = 1
             self._form_keys = list(self._form.keys())
             panel_msg = f"{self.input_text}\n" + "\n".join(
                 f"[cyan]{key}[/cyan]: {self._form[key]}[blink]\u275a[/blink]"
