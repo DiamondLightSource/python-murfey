@@ -56,26 +56,29 @@ class Analyser(Observer):
             ):
                 logger.info("Acquisition software: tomo")
                 self._context = TomographyContext("tomo")
-                if "Fractions" in split_file_name[-1]:
-                    self._role = "detector"
-                elif (
-                    file_path.suffix == ".mdoc"
-                    or file_path.with_suffix(".mdoc").is_file()
-                ):
-                    self._role = "microscope"
-                else:
-                    self._role = "detector"
+                if not self._role:
+                    if "Fractions" in split_file_name[-1]:
+                        self._role = "detector"
+                    elif (
+                        file_path.suffix == ".mdoc"
+                        or file_path.with_suffix(".mdoc").is_file()
+                    ):
+                        self._role = "microscope"
+                    else:
+                        self._role = "detector"
                 return True
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
-                self._role = "detector"
+                if not self._role:
+                    self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
                 self._context = TomographyContext("serialem")
-                if "Frames" in file_path.parts:
-                    self._role = "detector"
-                else:
-                    self._role = "microscope"
+                if not self._role:
+                    if "Frames" in file_path.parts:
+                        self._role = "detector"
+                    else:
+                        self._role = "microscope"
                 return True
         return False
 
@@ -126,7 +129,7 @@ class Analyser(Observer):
                                 )
                             except NotImplementedError:
                                 dc_metadata = {}
-                        if not dc_metadata:
+                        if not dc_metadata and not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
                             # continue
                         else:
