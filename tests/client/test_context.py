@@ -38,7 +38,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(tmp_path):
     assert len(context._tilt_series.values()) == 3
     assert context._completed_tilt_series == ["Position1", "Position2"]
     context.post_transfer(tmp_path / "Position_3_[30.0].tiff", role="detector")
-    assert context._completed_tilt_series == ["Position1", "Position2"]
+    assert context._completed_tilt_series == ["Position1", "Position2", "Position3"]
 
 
 def test_tomography_context_add_tomo_tilt_delayed_tilt(tmp_path):
@@ -55,7 +55,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(tmp_path):
     new_series = context.post_transfer(
         tmp_path / "Position_1_[60.0].tiff", role="detector"
     )
-    assert context._completed_tilt_series == ["Position1"]
+    assert context._completed_tilt_series == ["Position2", "Position1"]
     assert new_series == ["Position1"]
 
 
