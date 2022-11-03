@@ -386,7 +386,9 @@ class TomographyContext(Context):
             ) + extract_tilt_series(self._last_transferred_file)
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
-            if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
+            if (
+                last_tilt_series != tilt_series and last_tilt_angle != tilt_angle
+            ) or self._completed_tilt_series:
                 newly_completed_series = []
                 if self._tilt_series:
                     tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
