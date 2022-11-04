@@ -11,6 +11,7 @@ from queue import Queue
 from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar, Union
 from urllib.parse import urlparse
 
+import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import MINIMAL, SQUARE
@@ -115,7 +116,9 @@ class HoverVisit(Widget):
                     f"{self.app._environment.url.geturl()}/machine/"
                 ).json()
                 _default = ""
+                visit_path = ""
                 if self.app._default_destination:
+                    visit_path = self.app._default_destination + f"/{self._text}"
                     if (
                         self.app._environment.processing_only_mode
                         and self.app._environment.source
@@ -172,7 +175,7 @@ class HoverVisit(Widget):
                 else:
                     _default = "unknown"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default)
+                    self.app._start_rsyncer(_default, visit_path)
                 else:
                     self.app._queues["input"].put_nowait(
                         InputResponse(
@@ -480,12 +483,14 @@ class MurfeyTUI(App):
         do_transfer: bool = True,
         rsync_process: RSyncer | None = None,
         analyser: Analyser | None = None,
+        gain_ref: Path | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._environment = environment or MurfeyInstanceEnvironment(
             urlparse("http://localhost:8000")
         )
+        self._environment.gain_ref = gain_ref
         self._source = self._environment.source or Path(".")
         self._url = self._environment.url
         self._default_destination = self._environment.default_destination
@@ -511,10 +516,22 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
-    def _start_rsyncer(self, destination: str):
+    def _start_rsyncer(self, destination: str, visit_path: str):
         new_rsyncer = False
         if self._environment:
             self._environment.default_destination = destination
+            if self._environment.gain_ref:
+                gain_rsync = procrunner.run(
+                    [
+                        "rsync",
+                        str(self._enviornment.gain_ref),
+                        f"{self._url.hostname}::{visit_path}/processing",
+                    ]
+                )
+                if gain_rsync.returncode:
+                    log.warning(
+                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
+                    )
         if not self.rsync_process:
             self.rsync_process = RSyncer(
                 self._source,
