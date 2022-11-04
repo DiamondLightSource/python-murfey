@@ -101,7 +101,7 @@ class Analyser(Observer):
                     dc_metadata = self._context.gather_metadata(
                         mdoc_for_reading or transferred_file
                     )
-                else:
+                elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if (
                 not self._context
@@ -129,7 +129,7 @@ class Analyser(Observer):
                                 )
                             except NotImplementedError:
                                 dc_metadata = {}
-                        if not dc_metadata and not self._force_mdoc_metadata:
+                        if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
                             # continue
                         else:
@@ -160,7 +160,7 @@ class Analyser(Observer):
                             dc_metadata = self._context.gather_metadata(
                                 transferred_file.with_suffix(".xml")
                             )
-                        if not dc_metadata and not self._force_mdoc_metadata:
+                        if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
                         else:
                             self._unseen_xml = []
