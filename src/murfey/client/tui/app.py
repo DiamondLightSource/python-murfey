@@ -523,7 +523,7 @@ class MurfeyTUI(App):
                     [
                         "rsync",
                         str(self._enviornment.gain_ref),
-                        f"{self._url.hostname}::{destination}",
+                        f"{self._url.hostname}::{destination}/processing",
                     ]
                 )
                 if gain_rsync.returncode:
