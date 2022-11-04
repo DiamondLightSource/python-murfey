@@ -379,16 +379,19 @@ class InputBox(Widget):
                     self.current_callback(validated_form)
                     self._form = OrderedDict({})
                     self._form_keys = []
+                    self._line = 0
                 else:
                     return
             else:
                 self.current_callback(self.input_text.replace(self._question, "", 1))
             self.current_callback = None
             self.input_text = ""
+            self._line = 0
             self._unanswered_message = False
             key.stop()
         elif key.key == Keys.Enter:
             self.input_text = ""
+            self._line = 0
             self._unanswered_message = False
             if self._form:
                 self._form = OrderedDict({})
