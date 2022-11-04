@@ -43,6 +43,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
     processing_only_mode: bool = False
+    gain_ref: Path | None = None
 
     class Config:
         validate_assignment: bool = True
