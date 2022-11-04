@@ -116,7 +116,9 @@ class HoverVisit(Widget):
                     f"{self.app._environment.url.geturl()}/machine/"
                 ).json()
                 _default = ""
+                visit_path = ""
                 if self.app._default_destination:
+                    visit_path = self.app._default_destination + f"/{self._text}"
                     if (
                         self.app._environment.processing_only_mode
                         and self.app._environment.source
@@ -173,7 +175,7 @@ class HoverVisit(Widget):
                 else:
                     _default = "unknown"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default)
+                    self.app._start_rsyncer(_default, visit_path)
                 else:
                     self.app._queues["input"].put_nowait(
                         InputResponse(
@@ -514,7 +516,7 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
-    def _start_rsyncer(self, destination: str):
+    def _start_rsyncer(self, destination: str, visit_path: str):
         new_rsyncer = False
         if self._environment:
             self._environment.default_destination = destination
@@ -523,12 +525,12 @@ class MurfeyTUI(App):
                     [
                         "rsync",
                         str(self._enviornment.gain_ref),
-                        f"{self._url.hostname}::{destination}/processing",
+                        f"{self._url.hostname}::{visit_path}/processing",
                     ]
                 )
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred"
+                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
                     )
         if not self.rsync_process:
             self.rsync_process = RSyncer(
