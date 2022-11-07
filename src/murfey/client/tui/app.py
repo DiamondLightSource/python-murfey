@@ -8,7 +8,16 @@ import string
 import threading
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar, Union
+from typing import (
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    OrderedDict,
+    TypeVar,
+    Union,
+)
 from urllib.parse import urlparse
 
 import procrunner
@@ -463,6 +472,8 @@ class DCParametersTomo(BaseModel):
     tilt: int
     acquisition_software: str
     dose_per_frame: float
+    gain_ref: Optional[str]
+    motion_corr_binning: int
 
 
 class MurfeyTUI(App):
