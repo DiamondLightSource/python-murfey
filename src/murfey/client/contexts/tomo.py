@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import Callable, List, NamedTuple
 
 
 class TiltInfoExtraction(NamedTuple):
@@ -52,11 +52,45 @@ def _get_tilt_tag_v5_11(p: Path) -> str:
     return ".".join(_split[:-1])
 
 
+def _find_angle_index(split_name: List[str]) -> int:
+    for i, part in enumerate(split_name):
+        if "." in part:
+            return i
+    return 0
+
+
+def _get_tilt_series_v5_12(p: Path) -> str:
+    split_name = p.name.split("_")
+    angle_idx = _find_angle_index(split_name)
+    if split_name[angle_idx - 2].isnumeric():
+        return split_name[angle_idx - 2]
+    return "0"
+
+
+def _get_tilt_angle_v5_12(p: Path) -> str:
+    split_name = p.name.split("_")
+    angle_idx = _find_angle_index(split_name)
+    return split_name[angle_idx]
+
+
+def _get_tilt_tag_v5_12(p: Path) -> str:
+    split_name = p.name.split("_")
+    angle_idx = _find_angle_index(split_name)
+    if split_name[angle_idx - 2].isnumeric():
+        return "_".join(split_name[: angle_idx - 2])
+    return "_".join(split_name[: angle_idx - 1])
+
+
 tomo_tilt_info = {
     "5.8": TiltInfoExtraction(
         _get_tilt_series_v5_8, _get_tilt_angle_v5_8, _get_tilt_tag_v5_8
     ),
     "5.11": TiltInfoExtraction(
         _get_tilt_series_v5_11, _get_tilt_angle_v5_11, _get_tilt_tag_v5_11
+    ),
+    "5.12": TiltInfoExtraction(
+        _get_tilt_series_v5_12,
+        _get_tilt_angle_v5_12,
+        _get_tilt_tag_v5_12,
     ),
 }
