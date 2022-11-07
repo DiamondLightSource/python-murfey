@@ -53,11 +53,15 @@ class Analyser(Observer):
                 split_file_name[0] == "Position"
                 or "[" in file_path.name
                 or "Fractions" in split_file_name[-1]
+                or "fractions" in split_file_name[-1]
             ):
                 logger.info("Acquisition software: tomo")
                 self._context = TomographyContext("tomo")
                 if not self._role:
-                    if "Fractions" in split_file_name[-1]:
+                    if (
+                        "Fractions" in split_file_name[-1]
+                        or "fractions" in split_file_name[-1]
+                    ):
                         self._role = "detector"
                     elif (
                         file_path.suffix == ".mdoc"
@@ -101,6 +105,7 @@ class Analyser(Observer):
                     dc_metadata = self._context.gather_metadata(
                         mdoc_for_reading or transferred_file
                     )
+                    mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if (
