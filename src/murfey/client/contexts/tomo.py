@@ -22,7 +22,7 @@ def _get_tilt_tag_v5_8(p: Path) -> str:
     return p.name.split("_")[0]
 
 
-def _get_slice_index_v5_10(tag: str) -> int:
+def _get_slice_index_v5_11(tag: str) -> int:
     slice_index = 0
     for i, ch in enumerate(tag[::-1]):
         if not ch.isnumeric():
@@ -35,19 +35,19 @@ def _get_slice_index_v5_10(tag: str) -> int:
     return slice_index
 
 
-def _get_tilt_series_v5_10(p: Path) -> str:
+def _get_tilt_series_v5_11(p: Path) -> str:
     tag = p.name.split("_")[0]
-    slice_index = _get_slice_index_v5_10(tag)
+    slice_index = _get_slice_index_v5_11(tag)
     return tag[slice_index:]
 
 
-def _get_tilt_angle_v5_10(p: Path) -> str:
+def _get_tilt_angle_v5_11(p: Path) -> str:
     tag = p.name.split("_")[0]
-    slice_index = _get_slice_index_v5_10(tag)
+    slice_index = _get_slice_index_v5_11(tag)
     return tag[:slice_index]
 
 
-def _get_tilt_tag_v5_10(p: Path) -> str:
+def _get_tilt_tag_v5_11(p: Path) -> str:
     _split = p.name.split("_")[2].split(".")
     return ".".join(_split[:-1])
 
@@ -56,7 +56,7 @@ tomo_tilt_info = {
     "5.8": TiltInfoExtraction(
         _get_tilt_series_v5_8, _get_tilt_angle_v5_8, _get_tilt_tag_v5_8
     ),
-    "5.10": TiltInfoExtraction(
-        _get_tilt_series_v5_10, _get_tilt_angle_v5_10, _get_tilt_tag_v5_10
+    "5.11": TiltInfoExtraction(
+        _get_tilt_series_v5_11, _get_tilt_angle_v5_11, _get_tilt_tag_v5_11
     ),
 }
