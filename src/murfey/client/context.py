@@ -119,9 +119,11 @@ class TomographyContext(Context):
         tilt_angles: List,
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
-            tilt_series = self._extract_tilt_tag(
-                movie_path
-            ) + self._extract_tilt_series(movie_path)
+            tilt_series = (
+                f"{self._extract_tilt_tag(movie_path)}_{self._extract_tilt_series(movie_path)}"
+                if self._extract_tilt_tag(movie_path)
+                else self._extract_tilt_series(movie_path)
+            )
         else:
             return
 
@@ -215,7 +217,9 @@ class TomographyContext(Context):
                 float(tilt_angle)
             except ValueError:
                 return []
-            tilt_series = f"{tilt_tag}_{tilt_series_num}"
+            tilt_series = (
+                f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+            )
 
         except Exception:
             logger.info(
@@ -392,9 +396,11 @@ class TomographyContext(Context):
                     ]
 
         if self._last_transferred_file:
-            last_tilt_series = extract_tilt_tag(
-                self._last_transferred_file
-            ) + extract_tilt_series(self._last_transferred_file)
+            last_tilt_series = (
+                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
+                if extract_tilt_tag(self._last_transferred_file)
+                else extract_tilt_series(self._last_transferred_file)
+            )
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
