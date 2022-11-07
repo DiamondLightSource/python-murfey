@@ -185,7 +185,7 @@ class TomographyContext(Context):
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
                     "mc_binning": environment.data_collection_parameters.get(
-                        "motion_correction_binning", 1
+                        "motion_corr_binning", 1
                     ),
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 }
@@ -215,7 +215,7 @@ class TomographyContext(Context):
                 float(tilt_angle)
             except ValueError:
                 return []
-            tilt_series = tilt_tag + tilt_series_num
+            tilt_series = f"{tilt_tag}_{tilt_series_num}"
 
         except Exception:
             logger.info(
@@ -325,7 +325,11 @@ class TomographyContext(Context):
                 logger.error(f"ERROR {e}")
         else:
             if file_path not in self._tilt_series[tilt_series]:
-                self._tilt_series[tilt_series].append(file_path)
+                for p in self._tilt_series[tilt_series]:
+                    if tilt_angle == extract_tilt_angle(p):
+                        break
+                else:
+                    self._tilt_series[tilt_series].append(file_path)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
@@ -348,6 +352,9 @@ class TomographyContext(Context):
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
+                "mc_binning": environment.data_collection_parameters.get(
+                    "motion_corr_binning", 1
+                ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
             }
             requests.post(preproc_url, json=preproc_data)
@@ -602,7 +609,7 @@ class TomographyContext(Context):
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
-        metadata.move_to_end("gain_ref", last=False)
+        mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata
