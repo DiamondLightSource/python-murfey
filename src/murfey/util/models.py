@@ -51,6 +51,7 @@ class ProcessFile(BaseModel):
     mc_uuid: int
     autoproc_program_id: int
     pixel_size: float
+    mc_binning: int = 1
     gain_ref: Optional[str] = None
 
 
