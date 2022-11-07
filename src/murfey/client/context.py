@@ -474,9 +474,9 @@ class TomographyContext(Context):
                         f"Extraction routines for TFS Tomo version {tomo_version} unknown"
                     )
             else:
-                tilt_info_extraction = tomo_tilt_info["5.11"]
+                tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
-            tilt_info_extraction = tomo_tilt_info["5.11"]
+            tilt_info_extraction = tomo_tilt_info["5.7"]
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,
