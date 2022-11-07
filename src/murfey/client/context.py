@@ -9,6 +9,7 @@ import requests
 import xmltodict
 from pydantic import BaseModel
 
+from murfey.client.contexts.tomo import tomo_tilt_info
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -468,46 +469,22 @@ class TomographyContext(Context):
     def _add_tomo_tilt(
         self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> List[str]:
-        if "[" in file_path.name:
-            return self._add_tilt(
-                file_path,
-                lambda x: x.name.split("_")[1],
-                lambda x: x.name.split("[")[1].split("]")[0],
-                lambda x: x.name.split("_")[0],
-                environment=environment,
-            )
-
-        def _get_slice_index(tag: str) -> int:
-            slice_index = 0
-            for i, ch in enumerate(tag[::-1]):
-                if not ch.isnumeric():
-                    slice_index = -i
-                    break
-            if not slice_index:
-                raise ValueError(
-                    f"The file tag {tag} does not end in numeric characters or is entirely numeric: cannot parse"
-                )
-            return slice_index
-
-        def _extract_tilt_series(p: Path) -> str:
-            tag = p.name.split("_")[0]
-            slice_index = _get_slice_index(tag)
-            return tag[slice_index:]
-
-        def _extract_tilt_tag(p: Path) -> str:
-            tag = p.name.split("_")[0]
-            slice_index = _get_slice_index(tag)
-            return tag[:slice_index]
-
-        def _extract_tilt_angle(p: Path) -> str:
-            _split = p.name.split("_")[2].split(".")
-            return ".".join(_split[:-1])
-
+        if environment:
+            if tomo_version := environment.software_verisons.get("tomo"):
+                tilt_info_extraction = tomo_tilt_info.get(tomo_version)
+                if not tilt_info_extraction:
+                    raise ValueError(
+                        f"Extraction routines for TFS Tomo version {tomo_version} unknown"
+                    )
+            else:
+                tilt_info_extraction = tomo_tilt_info["5.7"]
+        else:
+            tilt_info_extraction = tomo_tilt_info["5.7"]
         return self._add_tilt(
             file_path,
-            _extract_tilt_series,
-            _extract_tilt_angle,
-            _extract_tilt_tag,
+            tilt_info_extraction.series,
+            tilt_info_extraction.angle,
+            tilt_info_extraction.tag,
             environment=environment,
         )
 
