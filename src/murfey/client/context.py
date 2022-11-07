@@ -183,6 +183,9 @@ class TomographyContext(Context):
                     ],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
+                    "mc_binning": environment.data_collection_parameters.get(
+                        "motion_correction_binning", 1
+                    ),
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 }
                 return new_dict
@@ -597,6 +600,7 @@ class TomographyContext(Context):
             metadata["pixel_size_on_image"] = TUIFormValue(
                 float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
             )
+            metadata["motion_corr_binning"] = TUIFormValue(1)
             metadata["gain_ref"] = TUIFormValue(None, top=True)
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
@@ -617,6 +621,7 @@ class TomographyContext(Context):
         mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
             float(mdoc_data["PixelSpacing"]) * 1e-10
         )
+        mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
