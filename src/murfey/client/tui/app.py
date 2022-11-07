@@ -516,11 +516,11 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
-    def _start_rsyncer(self, destination: str, visit_path: str):
+    def _start_rsyncer(self, destination: str, visit_path: str = ""):
         new_rsyncer = False
         if self._environment:
             self._environment.default_destination = destination
-            if self._environment.gain_ref:
+            if self._environment.gain_ref and visit_path:
                 gain_rsync = procrunner.run(
                     [
                         "rsync",
