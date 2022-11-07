@@ -630,7 +630,9 @@ class MurfeyTUI(App):
     def _start_dc(self, json):
         if self._dummy_dc:
             return
-        self._environment.data_collection_parameters = json
+        self._environment.data_collection_parameters = {
+            k: None if v == "None" else v for k, v in json.items()
+        }
         self._info_widget.text += "\n".join(f"{k}: {v}" for k, v in json.items()) + "\n"
         if isinstance(self.analyser._context, TomographyContext):
             self._environment.listeners["data_collection_group_id"] = {
