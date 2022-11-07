@@ -617,9 +617,11 @@ class TomographyContext(Context):
         mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
             float(mdoc_data["PixelSpacing"]) * 1e-10
         )
+        mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
+        metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata
