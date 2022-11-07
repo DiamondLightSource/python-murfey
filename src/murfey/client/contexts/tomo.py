@@ -10,15 +10,15 @@ class TiltInfoExtraction(NamedTuple):
     tag: Callable[[Path], str]
 
 
-def _get_tilt_series_v5_8(p: Path) -> str:
+def _get_tilt_series_v5_7(p: Path) -> str:
     return p.name.split("_")[1]
 
 
-def _get_tilt_angle_v5_8(p: Path) -> str:
+def _get_tilt_angle_v5_7(p: Path) -> str:
     return p.name.split("[")[1].split("]")[0]
 
 
-def _get_tilt_tag_v5_8(p: Path) -> str:
+def _get_tilt_tag_v5_7(p: Path) -> str:
     return p.name.split("_")[0]
 
 
@@ -82,8 +82,8 @@ def _get_tilt_tag_v5_12(p: Path) -> str:
 
 
 tomo_tilt_info = {
-    "5.8": TiltInfoExtraction(
-        _get_tilt_series_v5_8, _get_tilt_angle_v5_8, _get_tilt_tag_v5_8
+    "5.7": TiltInfoExtraction(
+        _get_tilt_series_v5_7, _get_tilt_angle_v5_7, _get_tilt_tag_v5_7
     ),
     "5.11": TiltInfoExtraction(
         _get_tilt_series_v5_11, _get_tilt_angle_v5_11, _get_tilt_tag_v5_11
