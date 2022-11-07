@@ -206,7 +206,6 @@ class TomographyContext(Context):
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
             self._extract_tilt_tag = extract_tilt_tag
-        # time.sleep(5)
         try:
             tilt_series_num = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
@@ -470,7 +469,7 @@ class TomographyContext(Context):
         self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> List[str]:
         if environment:
-            if tomo_version := environment.software_verisons.get("tomo"):
+            if tomo_version := environment.software_versions.get("tomo"):
                 tilt_info_extraction = tomo_tilt_info.get(tomo_version)
                 if not tilt_info_extraction:
                     raise ValueError(
