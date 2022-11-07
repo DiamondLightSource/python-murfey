@@ -167,7 +167,7 @@ class Analyser(Observer):
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
-                        else:
+                        if dc_metadata:
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["tilt"] = TUIFormValue(
