@@ -270,7 +270,7 @@ def run():
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
-        software_versions=machine_data.software_versions,
+        software_versions=machine_data.get("software_versions", {}),
         source=Path(args.source),
         watcher=source_watcher,
         default_destination=args.destination
