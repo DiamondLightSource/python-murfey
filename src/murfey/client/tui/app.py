@@ -456,6 +456,7 @@ class DCParametersTomo(BaseModel):
     tilt: int
     acquisition_software: str
     dose_per_frame: float
+    tilt_offset: float
 
 
 class MurfeyTUI(App):

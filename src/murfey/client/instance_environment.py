@@ -43,6 +43,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
     processing_only_mode: bool = False
+    tilt_offset: Optional[float] = None
 
     class Config:
         validate_assignment: bool = True
@@ -139,6 +140,7 @@ class MurfeyInstanceEnvironment(BaseModel):
                             values["autoproc_program_ids"][tilt]["em-tomo-align"],
                             v[k][1],
                             file_tilt_list,
+                            values["tilt_offset"],
                         )
                     except KeyError:
                         pass
