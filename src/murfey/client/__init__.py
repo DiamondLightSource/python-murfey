@@ -20,7 +20,6 @@ from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
-import procrunner
 import requests
 
 import murfey.client.rsync
@@ -165,6 +164,12 @@ def run():
         default=False,
         help="Perform rsync transfers locally rather than remotely",
     )
+    parser.add_argument(
+        "--force_mdoc_metadata",
+        action="store_true",
+        default=False,
+        help="Force metadata to be read from mdoc files",
+    )
 
     args = parser.parse_args()
 
@@ -259,13 +264,13 @@ def run():
     main_loop_thread = Thread(
         target=main_loop,
         args=[source_watcher, args.appearance_time, args.transfer_all],
-        kwargs={"gain_ref": gain_ref},
         daemon=True,
     )
     main_loop_thread.start()
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
+        software_versions=machine_data.get("software_versions", {}),
         source=Path(args.source),
         watcher=source_watcher,
         default_destination=args.destination
@@ -288,6 +293,7 @@ def run():
     analyser = Analyser(
         instance_environment.source,
         environment=instance_environment if args.real_dc else None,
+        force_mdoc_metadata=args.force_mdoc_metadata,
     )
     # source_watcher.subscribe(analyser.enqueue)
     rsync_process.subscribe(analyser.enqueue)
@@ -303,6 +309,7 @@ def run():
         do_transfer=not args.no_transfer,
         rsync_process=rsync_process,
         analyser=analyser,
+        gain_ref=gain_ref,
     )
     rich_handler.redirect = False
 
@@ -320,17 +327,10 @@ def main_loop(
     source_watcher: murfey.client.watchdir.DirWatcher,
     appearance_time: float,
     transfer_all: bool,
-    gain_ref: Path | None = None,
 ):
     log.info(
         f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
     )
-    if gain_ref:
-        gain_rsync = procrunner.run(["rsync", str(gain_ref)])
-        if gain_rsync.returncode:
-            log.warning(
-                f"Gain reference file {gain_ref} was not successfully transferred"
-            )
     if appearance_time > 0:
         modification_time: float | None = time.time() - appearance_time * 3600
     else:

@@ -124,7 +124,8 @@ class DirWatcher(murfey.util.Observer):
                     self._statusbar.transferred[1] + 1,
                 ]
 
-        self.notify(Path(file_candidate))
+        if not Path(file_candidate).name.startswith("."):
+            self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
 
     def _scan_directory(

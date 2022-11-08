@@ -192,7 +192,7 @@ async def add_file(file: File):
 async def send_murfey_message(msg: RegistrationMessage):
     if _transport_object:
         _transport_object.transport.send(
-            "murfey_feedback", {"register": msg.registration}
+            machine_config.feedback_queue, {"register": msg.registration}
         )
 
 
@@ -223,6 +223,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
+            "feedback_queue": machine_config.feedback_queue,
             "dcid": proc_file.data_collection_id,
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
@@ -232,6 +233,8 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "image_number": proc_file.image_number,
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,
+            "ft_bin": proc_file.mc_binning,
+            "gain_ref": proc_file.gain_ref,
         },
     }
     # log.info(f"Sending Zocalo message {zocalo_message}")
@@ -312,7 +315,7 @@ def shutdown():
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
     check_path = (
-        machine_config["rsync_basepath"] / params.base_path
+        machine_config.rsync_basepath / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
@@ -320,7 +323,7 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
-    return {"suggested_path": check_path}
+    return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
 @router.post("/visits/{visit_name}/register_data_collection_group")
@@ -344,7 +347,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
 
     if _transport_object:
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+            machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
         )
     return dcg_parameters
 
@@ -378,9 +381,12 @@ def start_dc(visit_name, dc_params: DCParameters):
     }
 
     if _transport_object:
-        log.debug(f"Send registration message to murfey_feedback: {dc_parameters}")
+        log.debug(
+            f"Send registration message to {machine_config.feedback_queue}: {dc_parameters}"
+        )
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "data_collection", **dc_parameters}
+            machine_config.feedback_queue,
+            {"register": "data_collection", **dc_parameters},
         )
     return dc_params
 
@@ -394,9 +400,10 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
 
     if _transport_object:
         log.info(
-            f"Send processing registration message to murfey_feedback: {proc_parameters}"
+            f"Send processing registration message to {machine_config.feedback_queue}: {proc_parameters}"
         )
         _transport_object.transport.send(
-            "murfey_feedback", {"register": "processing_job", **proc_parameters}
+            machine_config.feedback_queue,
+            {"register": "processing_job", **proc_parameters},
         )
     return proc_params

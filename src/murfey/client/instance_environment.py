@@ -27,6 +27,7 @@ global_env_lock = RLock()
 
 class MurfeyInstanceEnvironment(BaseModel):
     url: ParseResult
+    software_versions: Dict[str, str] = {}
     source: Optional[Path] = None
     default_destination: str = ""
     watcher: Optional[DirWatcher] = None
@@ -44,6 +45,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     visit: str = ""
     processing_only_mode: bool = False
     tilt_offset: Optional[float] = None
+    gain_ref: Optional[Path] = None
 
     class Config:
         validate_assignment: bool = True

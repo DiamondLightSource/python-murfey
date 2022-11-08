@@ -9,6 +9,7 @@ import requests
 import xmltodict
 from pydantic import BaseModel
 
+from murfey.client.contexts.tomo import tomo_tilt_info
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -119,9 +120,11 @@ class TomographyContext(Context):
         tilt_offset: Optional[float],
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
-            tilt_series = self._extract_tilt_tag(
-                movie_path
-            ) + self._extract_tilt_series(movie_path)
+            tilt_series = (
+                f"{self._extract_tilt_tag(movie_path)}_{self._extract_tilt_series(movie_path)}"
+                if self._extract_tilt_tag(movie_path)
+                else self._extract_tilt_series(movie_path)
+            )
         else:
             return
 
@@ -185,6 +188,10 @@ class TomographyContext(Context):
                     ],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
+                    "mc_binning": environment.data_collection_parameters.get(
+                        "motion_corr_binning", 1
+                    ),
+                    "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 }
                 return new_dict
         except KeyError:
@@ -203,7 +210,6 @@ class TomographyContext(Context):
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
             self._extract_tilt_tag = extract_tilt_tag
-        # time.sleep(5)
         try:
             tilt_series_num = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
@@ -213,7 +219,9 @@ class TomographyContext(Context):
                 float(tilt_angle)
             except ValueError:
                 return []
-            tilt_series = tilt_tag + tilt_series_num
+            tilt_series = (
+                f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+            )
 
         except Exception:
             logger.info(
@@ -323,7 +331,11 @@ class TomographyContext(Context):
                 logger.error(f"ERROR {e}")
         else:
             if file_path not in self._tilt_series[tilt_series]:
-                self._tilt_series[tilt_series].append(file_path)
+                for p in self._tilt_series[tilt_series]:
+                    if tilt_angle == extract_tilt_angle(p):
+                        break
+                else:
+                    self._tilt_series[tilt_series].append(file_path)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
@@ -346,6 +358,10 @@ class TomographyContext(Context):
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
+                "mc_binning": environment.data_collection_parameters.get(
+                    "motion_corr_binning", 1
+                ),
+                "gain_ref": environment.data_collection_parameters.get("gain_ref"),
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
@@ -382,12 +398,16 @@ class TomographyContext(Context):
                     ]
 
         if self._last_transferred_file:
-            last_tilt_series = extract_tilt_tag(
-                self._last_transferred_file
-            ) + extract_tilt_series(self._last_transferred_file)
+            last_tilt_series = (
+                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
+                if extract_tilt_tag(self._last_transferred_file)
+                else extract_tilt_series(self._last_transferred_file)
+            )
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
-            if last_tilt_series != tilt_series and last_tilt_angle != tilt_angle:
+            if (
+                last_tilt_series != tilt_series and last_tilt_angle != tilt_angle
+            ) or self._completed_tilt_series:
                 newly_completed_series = []
                 if self._tilt_series:
                     tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
@@ -466,46 +486,22 @@ class TomographyContext(Context):
     def _add_tomo_tilt(
         self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> List[str]:
-        if "[" in file_path.name:
-            return self._add_tilt(
-                file_path,
-                lambda x: x.name.split("_")[1],
-                lambda x: x.name.split("[")[1].split("]")[0],
-                lambda x: x.name.split("_")[0],
-                environment=environment,
-            )
-
-        def _get_slice_index(tag: str) -> int:
-            slice_index = 0
-            for i, ch in enumerate(tag[::-1]):
-                if not ch.isnumeric():
-                    slice_index = -i
-                    break
-            if not slice_index:
-                raise ValueError(
-                    f"The file tag {tag} does not end in numeric characters or is entirely numeric: cannot parse"
-                )
-            return slice_index
-
-        def _extract_tilt_series(p: Path) -> str:
-            tag = p.name.split("_")[0]
-            slice_index = _get_slice_index(tag)
-            return tag[slice_index:]
-
-        def _extract_tilt_tag(p: Path) -> str:
-            tag = p.name.split("_")[0]
-            slice_index = _get_slice_index(tag)
-            return tag[:slice_index]
-
-        def _extract_tilt_angle(p: Path) -> str:
-            _split = p.name.split("_")[2].split(".")
-            return ".".join(_split[:-1])
-
+        if environment:
+            if tomo_version := environment.software_versions.get("tomo"):
+                tilt_info_extraction = tomo_tilt_info.get(tomo_version)
+                if not tilt_info_extraction:
+                    raise ValueError(
+                        f"Extraction routines for TFS Tomo version {tomo_version} unknown"
+                    )
+            else:
+                tilt_info_extraction = tomo_tilt_info["5.7"]
+        else:
+            tilt_info_extraction = tomo_tilt_info["5.7"]
         return self._add_tilt(
             file_path,
-            _extract_tilt_series,
-            _extract_tilt_angle,
-            _extract_tilt_tag,
+            tilt_info_extraction.series,
+            tilt_info_extraction.angle,
+            tilt_info_extraction.tag,
             environment=environment,
         )
 
@@ -546,7 +542,11 @@ class TomographyContext(Context):
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if role == "detector" and transferred_file.suffix in data_suffixes:
+        if (
+            role == "detector"
+            and transferred_file.suffix in data_suffixes
+            and "gain" not in transferred_file.name
+        ):
             if self._acquisition_software == "tomo":
                 completed_tilts = self._add_tomo_tilt(
                     transferred_file, environment=environment
@@ -594,10 +594,13 @@ class TomographyContext(Context):
             metadata["pixel_size_on_image"] = TUIFormValue(
                 float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
             )
+            metadata["motion_corr_binning"] = TUIFormValue(1)
+            metadata["gain_ref"] = TUIFormValue(None, top=True)
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
             )
             metadata["tilt_offset"] = TUIFormValue(None, top=True)
+            metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
             return metadata
@@ -613,10 +616,13 @@ class TomographyContext(Context):
         mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
             float(mdoc_data["PixelSpacing"]) * 1e-10
         )
+        mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
+        mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
         metadata["tilt_offset"] = TUIFormValue(None, top=True)
+        mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata

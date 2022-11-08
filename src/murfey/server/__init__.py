@@ -5,6 +5,7 @@ import logging
 import os
 import socket
 from functools import lru_cache, singledispatch
+from pathlib import Path
 from threading import Thread
 from typing import Any
 
@@ -24,6 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.websocket
+from murfey.server.config import MachineConfig, from_file
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -153,7 +155,22 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    rabbit_thread = Thread(target=feedback_listen, daemon=True)
+    murfey_machine_configuration = os.environ["MURFEY_MACHINE_CONFIGURATION"]
+    machine_config: MachineConfig = MachineConfig(
+        acquisition_software=[],
+        calibrations={},
+        data_directories={},
+        rsync_basepath=Path("dls/tmp"),
+    )
+    if murfey_machine_configuration:
+        microscope = get_microscope()
+        machine_config = from_file(Path(murfey_machine_configuration), microscope)
+
+    rabbit_thread = Thread(
+        target=feedback_listen,
+        kwargs={"feedback_queue": machine_config.feedback_queue},
+        daemon=True,
+    )
     logger.info("Starting Murfey RabbitMQ thread")
     if args.feedback:
         rabbit_thread.start()
@@ -312,7 +329,9 @@ def feedback_callback(header: dict, message: dict) -> None:
             experimentType=message["experiment_type"],
             experimentTypeId=message["experiment_type_id"],
         )
+        print(record)
         dcgid = _register(record, header)
+        print(dcgid)
         if _transport_object:
             if dcgid is None:
                 _transport_object.transport.nack(header)
@@ -433,8 +452,8 @@ def _(record: Base, header: dict):
         return None
 
 
-def feedback_listen():
+def feedback_listen(feedback_queue: str = "murfey_feedback"):
     if _transport_object:
         _transport_object.transport.subscribe(
-            "murfey_feedback", feedback_callback, acknowledgement=True
+            feedback_queue, feedback_callback, acknowledgement=True
         )
