@@ -234,6 +234,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,
             "ft_bin": proc_file.mc_binning,
+            "fm_dose": proc_file.dose_per_frame,
             "gain_ref": proc_file.gain_ref,
         },
     }

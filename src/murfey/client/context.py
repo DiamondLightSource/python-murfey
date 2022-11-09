@@ -186,6 +186,9 @@ class TomographyContext(Context):
                     ],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
+                    "dose_per_frame": environment.data_collection_parameters.get(
+                        "dose_per_frame"
+                    ),
                     "mc_binning": environment.data_collection_parameters.get(
                         "motion_corr_binning", 1
                     ),
@@ -356,6 +359,9 @@ class TomographyContext(Context):
                 "mc_uuid": environment.movies[
                     file_transferred_to
                 ].motion_correction_uuid,
+                "dose_per_frame": environment.data_collection_parameters.get(
+                    "dose_per_frame"
+                ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
