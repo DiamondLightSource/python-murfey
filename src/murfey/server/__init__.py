@@ -4,7 +4,7 @@ import argparse
 import logging
 import os
 import socket
-from functools import lru_cache, singledispatch
+from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
 from typing import Any
@@ -45,7 +45,7 @@ template_files = files("murfey") / "templates"
 templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
-_transport_object = None
+_transport_object: TransportManager | None = None
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -337,7 +337,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.nack(header)
                 return None
             global_state["data_collection_group_id"] = dcgid
-        _transport_object.transport.ack(header)
+            _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
         record = DataCollection(
@@ -454,6 +454,12 @@ def _(record: Base, header: dict):
 
 def feedback_listen(feedback_queue: str = "murfey_feedback"):
     if _transport_object:
+        _transport_object._connection_callback = partial(
+            _transport_object.transport.subscribe,
+            feedback_queue,
+            feedback_callback,
+            acknowledgement=True,
+        )
         _transport_object.transport.subscribe(
             feedback_queue, feedback_callback, acknowledgement=True
         )

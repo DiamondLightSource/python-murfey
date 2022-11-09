@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from typing import Callable
 
 import ispyb
 
@@ -40,6 +41,7 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.ispyb = ispyb.open()
+        self._connection_callback: Callable | None = None
 
     def do_insert_data_collection_group(
         self, record: DataCollectionGroup, message=None, **kwargs
@@ -62,6 +64,14 @@ class TransportManager:
                 exc_info=True,
             )
         return False
+
+    def send(self, queue: str, message: dict):
+        if self.transport:
+            if not self.transport.is_connected():
+                self.transport.connect()
+                if self._connection_callback:
+                    self._connection_callback()
+            self.transport.send(queue, message)
 
     def do_insert_data_collection(self, record: DataCollection, message=None, **kwargs):
         dc_params = self.ispyb.em_acquisition.get_data_collection_params()

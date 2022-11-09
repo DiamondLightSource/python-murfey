@@ -201,7 +201,7 @@ async def add_file(file: File):
 @router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     if _transport_object:
-        _transport_object.transport.send(
+        _transport_object.send(
             machine_config.feedback_queue, {"register": msg.registration}
         )
 
@@ -250,7 +250,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     }
     # log.info(f"Sending Zocalo message {zocalo_message}")
     if _transport_object:
-        _transport_object.transport.send("processing_recipe", zocalo_message)
+        _transport_object.send("processing_recipe", zocalo_message)
     else:
         log.error(
             f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
@@ -280,9 +280,9 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
             "movie_id": tilt_series.movie_id,
         },
     }
-    log.info(f"Sending Zocalo message {zocalo_message}")
     if _transport_object:
-        _transport_object.transport.send("processing_recipe", zocalo_message)
+        log.info(f"Sending Zocalo message {zocalo_message}")
+        _transport_object.send("processing_recipe", zocalo_message)
     else:
         log.error(
             f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
@@ -357,7 +357,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     }
 
     if _transport_object:
-        _transport_object.transport.send(
+        _transport_object.send(
             machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
         )
     return dcg_parameters
@@ -395,7 +395,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         log.debug(
             f"Send registration message to {machine_config.feedback_queue}: {dc_parameters}"
         )
-        _transport_object.transport.send(
+        _transport_object.send(
             machine_config.feedback_queue,
             {"register": "data_collection", **dc_parameters},
         )
@@ -413,7 +413,7 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
         log.info(
             f"Send processing registration message to {machine_config.feedback_queue}: {proc_parameters}"
         )
-        _transport_object.transport.send(
+        _transport_object.send(
             machine_config.feedback_queue,
             {"register": "processing_job", **proc_parameters},
         )
