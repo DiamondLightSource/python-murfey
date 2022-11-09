@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List, OrderedDict
+from typing import Callable, Dict, List, Optional, OrderedDict
 
 import requests
 import xmltodict
@@ -117,6 +117,7 @@ class TomographyContext(Context):
         appid: int,
         mvid: int,
         tilt_angles: List,
+        tilt_offset: Optional[float],
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
             tilt_series = (
@@ -154,6 +155,7 @@ class TomographyContext(Context):
                         "autoproc_program_id": appid,
                         "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
+                        "tilt_offset": tilt_offset,
                     }
                     requests.post(url, json=series_data)
                     with self._lock:
@@ -475,6 +477,9 @@ class TomographyContext(Context):
                                             ][1]
                                         ),
                                         file_tilt_list,
+                                        environment.data_collection_parameters.get(
+                                            "tilt_offset"
+                                        ),
                                     )
                 if newly_completed_series:
                     logger.info(
@@ -600,6 +605,7 @@ class TomographyContext(Context):
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
             )
+            metadata["tilt_offset"] = TUIFormValue(None, top=True)
             metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
@@ -621,6 +627,7 @@ class TomographyContext(Context):
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
+        mdoc_metadata["tilt_offset"] = TUIFormValue(None, top=True)
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")
