@@ -290,6 +290,7 @@ class RSyncer(Observer):
                 "-iiv",
                 "--times",
                 "--progress",
+                '--rsync-path="rsync --fake-super"',
                 "--outbuf=line",
                 "--files-from=-",
                 "-o",  # preserve ownership
