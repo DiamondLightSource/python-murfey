@@ -67,6 +67,16 @@ async def root(request: Request):
     )
 
 
+@router.get("/health/")
+def health_check(db=murfey.server.ispyb.DB):
+    conn = db.connection()
+    conn.close()
+    return {
+        "ispyb_connection": True,
+        "rabbitmq_connection": _transport_object.transport.is_connected(),
+    }
+
+
 @lru_cache(maxsize=1)
 @router.get("/machine/")
 def machine_info():
