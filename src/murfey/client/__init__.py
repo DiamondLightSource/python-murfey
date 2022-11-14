@@ -138,7 +138,7 @@ def run():
         help="Only consider top level directories that have appeared more recently than this many hours ago",
     )
     parser.add_argument(
-        "--real_dc",
+        "--fake_dc",
         action="store_true",
         default=False,
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
@@ -292,7 +292,7 @@ def run():
 
     analyser = Analyser(
         instance_environment.source,
-        environment=instance_environment if args.real_dc else None,
+        environment=instance_environment if not args.fake_dc else None,
         force_mdoc_metadata=args.force_mdoc_metadata,
     )
     # source_watcher.subscribe(analyser.enqueue)
@@ -305,7 +305,7 @@ def run():
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
-        dummy_dc=not args.real_dc,
+        dummy_dc=args.fake_dc,
         do_transfer=not args.no_transfer,
         rsync_process=rsync_process,
         analyser=analyser,
