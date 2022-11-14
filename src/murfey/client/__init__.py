@@ -138,15 +138,15 @@ def run():
         help="Only consider top level directories that have appeared more recently than this many hours ago",
     )
     parser.add_argument(
-        "--real_dc",
+        "--fake_dc",
         action="store_true",
         default=False,
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
     )
     parser.add_argument(
-        "--transfer_all",
+        "--time_based_transfer",
         action="store_true",
-        help="Transfer all files in current directory regardless of age",
+        help="Transfer new files",
     )
     parser.add_argument(
         "--no_transfer",
@@ -263,7 +263,7 @@ def run():
 
     main_loop_thread = Thread(
         target=main_loop,
-        args=[source_watcher, args.appearance_time, args.transfer_all],
+        args=[source_watcher, args.appearance_time, not args.time_based_transfer],
         daemon=True,
     )
     main_loop_thread.start()
@@ -292,7 +292,7 @@ def run():
 
     analyser = Analyser(
         instance_environment.source,
-        environment=instance_environment if args.real_dc else None,
+        environment=instance_environment if not args.fake_dc else None,
         force_mdoc_metadata=args.force_mdoc_metadata,
     )
     # source_watcher.subscribe(analyser.enqueue)
@@ -305,7 +305,7 @@ def run():
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
-        dummy_dc=not args.real_dc,
+        dummy_dc=args.fake_dc,
         do_transfer=not args.no_transfer,
         rsync_process=rsync_process,
         analyser=analyser,
