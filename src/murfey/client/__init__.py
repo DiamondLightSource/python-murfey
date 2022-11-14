@@ -144,9 +144,9 @@ def run():
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
     )
     parser.add_argument(
-        "--transfer_all",
+        "--time_based_transfer",
         action="store_true",
-        help="Transfer all files in current directory regardless of age",
+        help="Transfer new files",
     )
     parser.add_argument(
         "--no_transfer",
@@ -263,7 +263,7 @@ def run():
 
     main_loop_thread = Thread(
         target=main_loop,
-        args=[source_watcher, args.appearance_time, args.transfer_all],
+        args=[source_watcher, args.appearance_time, not args.time_based_transfer],
         daemon=True,
     )
     main_loop_thread.start()
