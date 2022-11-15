@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from itertools import count
 from pathlib import Path
@@ -50,6 +51,16 @@ class MurfeyInstanceEnvironment(BaseModel):
     class Config:
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
+
+    def write(self):
+        with open(Path.home() / ".murfey_cache.json", "w") as env_cache:
+            json.dump(self.dict(), env_cache)
+
+    @classmethod
+    def read(cls):
+        with open(Path.home() / ".murfey_cache.json", "r") as env_cache:
+            inst = cls(**json.read(env_cache))
+        return inst
 
     @validator("data_collection_group_id")
     def dcg_callback(cls, v, values):
