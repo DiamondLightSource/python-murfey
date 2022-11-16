@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 import procrunner
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Confirm
 
 from murfey.client import read_config
 
@@ -44,7 +44,7 @@ def run():
     if args.delete:
         cmd.append("--remove-source-files")
         num_files = len(f for f in Path(args.destination).glob("**/*") if f.is_file())
-        delete_prompt = Prompt.ask(
+        delete_prompt = Confirm.ask(
             f"Do you want to remove {num_files} from {args.source or Path('.').resolve()}?"
         )
         if not delete_prompt:
