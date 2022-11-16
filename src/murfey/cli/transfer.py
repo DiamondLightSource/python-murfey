@@ -54,7 +54,12 @@ def run():
         )
         if not delete_prompt:
             return
-    cmd.extend([args.source or ".", f"{murfey_url.hostname}::{args.destination}"])
+    if Path(args.source or ".").is_file():
+        cmd.extend([args.source or ".", f"{murfey_url.hostname}::{args.destination}"])
+    else:
+        cmd.append("-r")
+        cmd.extend(list(Path(args.source or ".").glob("*")))
+        cmd.append(f"{murfey_url.hostname}::{args.destination}")
 
     result = procrunner.run(cmd)
     if result.returncode:
