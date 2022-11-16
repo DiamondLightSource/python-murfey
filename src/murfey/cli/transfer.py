@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import procrunner
+import requests
 from rich.console import Console
 from rich.prompt import Confirm
 
@@ -32,6 +33,13 @@ def run():
 
     console = Console()
     murfey_url = urlparse(args.server, allow_fragments=False)
+
+    machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
+    if Path(args.source or ".").resolve() in machine_data.data_directories.keys():
+        console.print(
+            f"[red]Source directory is the base directory for the {machine_data.data_directories[Path(args.source or '.').resolve()]}, exiting"
+        )
+        return
 
     cmd = [
         "rsync",
