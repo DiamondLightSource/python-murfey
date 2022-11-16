@@ -258,7 +258,9 @@ class InputBox(Widget):
                 self._form = {
                     k: v
                     if k != "gain_ref" and v
-                    else f"data/2022/{self.app._environment.visit}/processing/gain.mrc"
+                    else TUIFormValue(
+                        f"data/2022/{self.app._environment.visit}/processing/gain.mrc"
+                    )
                     for k, v in msg.form.items()
                 }
                 self._model = msg.model
