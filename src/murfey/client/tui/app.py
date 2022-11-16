@@ -255,7 +255,12 @@ class InputBox(Widget):
                 self._unanswered_message = True
             self.input_text = ""
             if msg.form:
-                self._form = msg.form
+                self._form = {
+                    k: v
+                    if k != "gain_ref" and v
+                    else f"data/2022/{self.app._environment.visit}/processing/gain.mrc"
+                    for k, v in msg.form.items()
+                }
                 self._model = msg.model
             if msg.allowed_responses:
                 self.prompt = QuickPrompt(msg.question, msg.allowed_responses)
