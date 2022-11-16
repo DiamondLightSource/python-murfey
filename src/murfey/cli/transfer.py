@@ -43,7 +43,12 @@ def run():
     ]
     if args.delete:
         cmd.append("--remove-source-files")
-        num_files = len(f for f in Path(args.destination).glob("**/*") if f.is_file())
+        if Path(args.source or ".").is_file():
+            num_files = 1
+        else:
+            num_files = len(
+                [f for f in Path(args.source or ".").glob("**/*") if f.is_file()]
+            )
         delete_prompt = Confirm.ask(
             f"Do you want to remove {num_files} from {args.source or Path('.').resolve()}?"
         )
