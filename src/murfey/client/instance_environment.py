@@ -46,12 +46,14 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
     gain_ref: Optional[Path] = None
 
     def write(self, out_path: Path | None = None):
+        with open(out_path or Path.home() / ".murfey_cache.json", "r") as env_cache:
+            current_cache = json.load(env_cache)
         with open(out_path or Path.home() / ".murfey_cache.json", "w") as env_cache:
             as_dict = {}
             for k in MurfeyInstanceEnvironmentBase.__fields__.keys():
                 v = getattr(self, k)
                 as_dict[k] = str(v) if isinstance(v, Path) else v
-            json.dump({str(self.source): as_dict}, env_cache)
+            json.dump(current_cache.update({str(self.source): as_dict}), env_cache)
 
 
 class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
