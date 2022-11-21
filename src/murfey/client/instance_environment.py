@@ -68,6 +68,15 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
         self.cache_path = out_path or Path.home() / ".murfey_cache.json"
         self._cache_from_dict(self.cache_path, self.dict())
 
+    def clear_from_cache(self):
+        cache_path = self.cache_path or Path.home() / ".murfey_cache.json"
+        if cache_path.is_file():
+            with open(cache_path, "r") as env_cache:
+                current_cache = json.load(env_cache)
+            current_cache.pop(self.source)
+            with open(cache_path, "w") as env_cache:
+                json.dump(current_cache, env_cache)
+
 
 class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
     url: ParseResult

@@ -723,4 +723,5 @@ class MurfeyTUI(App):
             self.rsync_process.stop()
         if self.analyser:
             self.analyser.stop()
+        self._environment.clear_from_cache()
         await self.shutdown()
