@@ -54,12 +54,12 @@ class MurfeyInstanceEnvironment(BaseModel):
 
     def write(self):
         with open(Path.home() / ".murfey_cache.json", "w") as env_cache:
-            json.dump(self.dict(), env_cache)
+            json.dump({"source": self.dict()}, env_cache)
 
     @classmethod
-    def read(cls):
+    def read(cls, source: Path):
         with open(Path.home() / ".murfey_cache.json", "r") as env_cache:
-            inst = cls(**json.read(env_cache))
+            inst = cls(**json.load(env_cache).get(str(source)))
         return inst
 
     @validator("data_collection_group_id")
