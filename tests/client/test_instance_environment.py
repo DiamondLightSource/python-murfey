@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from urllib.parse import urlparse
 
 import pytest
@@ -33,3 +34,23 @@ def test_murfey_instance_environment_subscribe(env):
         "b": {"em-tomo-preprocess": 2},
     }
     assert dc.elem == "b"
+
+
+def test_murfey_instance_environment_write_to_json(env, tmp_path):
+    env.write(out_path=tmp_path / ".murfey_cache.json")
+    assert (tmp_path / ".murfey_cache.json").exists()
+
+
+def test_murfey_instance_environment_read_from_json(env, tmp_path):
+    env.source = tmp_path
+    env.gain_ref = tmp_path / "gain.mrc"
+    env.write(out_path=tmp_path / ".murfey_cache.json")
+    with open(tmp_path / ".murfey_cache.json", "r") as mc:
+        for k, v in json.load(mc).items():
+            print(k, v)
+    read_env = MurfeyInstanceEnvironment.read(
+        urlparse("http://localhost:8000", allow_fragments=False),
+        tmp_path,
+        in_path=tmp_path / ".murfey_cache.json",
+    )
+    assert read_env.gain_ref == tmp_path / "gain.mrc"

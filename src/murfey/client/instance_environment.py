@@ -26,12 +26,10 @@ class MovieTracker(NamedTuple):
 global_env_lock = RLock()
 
 
-class MurfeyInstanceEnvironment(BaseModel):
-    url: ParseResult
+class MurfeyInstanceEnvironmentBase(BaseModel):
     software_versions: Dict[str, str] = {}
     source: Optional[Path] = None
     default_destination: str = ""
-    watcher: Optional[DirWatcher] = None
     demo: bool = False
     data_collection_group_id: Optional[int] = None
     data_collection_ids: Dict[str, int] = {}
@@ -40,7 +38,6 @@ class MurfeyInstanceEnvironment(BaseModel):
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, List[str]] = {}
-    listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
@@ -48,18 +45,32 @@ class MurfeyInstanceEnvironment(BaseModel):
     tilt_offset: Optional[float] = None
     gain_ref: Optional[Path] = None
 
+    def write(self, out_path: Path | None = None):
+        with open(out_path or Path.home() / ".murfey_cache.json", "w") as env_cache:
+            as_dict = {}
+            for k in MurfeyInstanceEnvironmentBase.__fields__.keys():
+                v = getattr(self, k)
+                as_dict[k] = str(v) if isinstance(v, Path) else v
+            json.dump({str(self.source): as_dict}, env_cache)
+
+
+class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
+    url: ParseResult
+    watcher: Optional[DirWatcher] = None
+    listeners: Dict[str, Set[Callable]] = {}
+
     class Config:
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
 
-    def write(self):
-        with open(Path.home() / ".murfey_cache.json", "w") as env_cache:
-            json.dump({"source": self.dict()}, env_cache)
-
     @classmethod
-    def read(cls, source: Path):
-        with open(Path.home() / ".murfey_cache.json", "r") as env_cache:
-            inst = cls(**json.load(env_cache).get(str(source)))
+    def read(cls, url: ParseResult, source: Path, in_path: Path | None = None):
+        with open(in_path or Path.home() / ".murfey_cache.json", "r") as env_cache:
+            # only validate with the MurfeyInstanceEnvironmentBase validators to avoid calls to the callbacks below at init
+            validated_read = MurfeyInstanceEnvironmentBase(
+                **json.load(env_cache).get(str(source))
+            )
+            inst = cls.construct(url=url, **validated_read.dict())
         return inst
 
     @validator("data_collection_group_id")
@@ -99,64 +110,65 @@ class MurfeyInstanceEnvironment(BaseModel):
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
         # logger.info("motion corrected callback")
-        _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
-        for l in values.get("listeners", {}).get("motion_corrected_movies", []):
-            if values.get("motion_corrected_movies"):
-                for k in set(values["motion_corrected_movies"].keys()) ^ set(
-                    v.keys()
-                ):  # k is a path (key), v[k] is the value matching the key
-                    tilt = values["movie_tilt_pair"][k]
-                    file_tilt_list = []
-                    for movie, angle in values["tilt_angles"][tilt]:
-                        if movie in v:  # values["motion_corrected_movies"]:
-                            # file_tilt_list.append(
-                            #    [values["motion_corrected_movies"][movie], angle]
-                            # )
-                            file_tilt_list.append(
-                                [
-                                    str(v[Path(movie)][0]),
-                                    angle,
-                                    str(v[Path(movie)][1]),
-                                ]
-                            )
-                    l(
-                        k,
-                        v[k][0],
-                        _url,
-                        values["processing_job_ids"][k]["em-tomo-align"],
-                        values["autoproc_program_ids"][k]["em-tomo-align"],
-                        v[k][1],
-                        file_tilt_list,
-                    )
-            else:
-                for k in v.keys():
-                    try:
-                        # possible race condition here where values accessing by [k] sometimes aren't ready when we
-                        # try to access them - it throws a key error for a value which has just been set.
+        if values.get("visit"):
+            _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
+            for l in values.get("listeners", {}).get("motion_corrected_movies", []):
+                if values.get("motion_corrected_movies"):
+                    for k in set(values["motion_corrected_movies"].keys()) ^ set(
+                        v.keys()
+                    ):  # k is a path (key), v[k] is the value matching the key
                         tilt = values["movie_tilt_pair"][k]
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
-                            # file_tilt_list.append([str(movie), angle])
-                            file_tilt_list.append(
-                                [
-                                    str(v[Path(movie)][0]),
-                                    angle,
-                                    str(v[Path(movie)][1]),
-                                ]
-                            )  # or v(k)
+                            if movie in v:  # values["motion_corrected_movies"]:
+                                # file_tilt_list.append(
+                                #    [values["motion_corrected_movies"][movie], angle]
+                                # )
+                                file_tilt_list.append(
+                                    [
+                                        str(v[Path(movie)][0]),
+                                        angle,
+                                        str(v[Path(movie)][1]),
+                                    ]
+                                )
                         l(
                             k,
                             v[k][0],
                             _url,
-                            values["data_collection_ids"][tilt],
-                            values["processing_job_ids"][tilt]["em-tomo-align"],
-                            values["autoproc_program_ids"][tilt]["em-tomo-align"],
+                            values["processing_job_ids"][k]["em-tomo-align"],
+                            values["autoproc_program_ids"][k]["em-tomo-align"],
                             v[k][1],
                             file_tilt_list,
-                            values["tilt_offset"],
                         )
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        logger.warning(f"ERROR {e}")
+                else:
+                    for k in v.keys():
+                        try:
+                            # possible race condition here where values accessing by [k] sometimes aren't ready when we
+                            # try to access them - it throws a key error for a value which has just been set.
+                            tilt = values["movie_tilt_pair"][k]
+                            file_tilt_list = []
+                            for movie, angle in values["tilt_angles"][tilt]:
+                                # file_tilt_list.append([str(movie), angle])
+                                file_tilt_list.append(
+                                    [
+                                        str(v[Path(movie)][0]),
+                                        angle,
+                                        str(v[Path(movie)][1]),
+                                    ]
+                                )  # or v(k)
+                            l(
+                                k,
+                                v[k][0],
+                                _url,
+                                values["data_collection_ids"][tilt],
+                                values["processing_job_ids"][tilt]["em-tomo-align"],
+                                values["autoproc_program_ids"][tilt]["em-tomo-align"],
+                                v[k][1],
+                                file_tilt_list,
+                                values["tilt_offset"],
+                            )
+                        except KeyError:
+                            pass
+                        except Exception as e:
+                            logger.warning(f"ERROR {e}")
         return v
