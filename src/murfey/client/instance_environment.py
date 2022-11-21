@@ -64,13 +64,15 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
         arbitrary_types_allowed: bool = True
 
     @classmethod
-    def read(cls, url: ParseResult, source: Path, in_path: Path | None = None):
+    def read(
+        cls, url: ParseResult, source: Path, in_path: Path | None = None, **kwargs
+    ):
         with open(in_path or Path.home() / ".murfey_cache.json", "r") as env_cache:
             # only validate with the MurfeyInstanceEnvironmentBase validators to avoid calls to the callbacks below at init
             validated_read = MurfeyInstanceEnvironmentBase(
                 **json.load(env_cache).get(str(source))
             )
-            inst = cls.construct(url=url, **validated_read.dict())
+            inst = cls.construct(url=url, **validated_read.dict(), **kwargs)
         return inst
 
     @validator("data_collection_group_id")

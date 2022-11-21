@@ -170,6 +170,11 @@ def run():
         default=False,
         help="Force metadata to be read from mdoc files",
     )
+    parser.add_argument(
+        "--environment-cache",
+        default=None,
+        help="Path to the file used to cache each instance environment (defaults to ~/.murfey_cache.json)",
+    )
 
     args = parser.parse_args()
 
@@ -268,16 +273,26 @@ def run():
     )
     main_loop_thread.start()
 
-    instance_environment = MurfeyInstanceEnvironment(
-        url=murfey_url,
-        software_versions=machine_data.get("software_versions", {}),
-        source=Path(args.source),
-        watcher=source_watcher,
-        default_destination=args.destination
-        or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
-        demo=args.demo,
-        processing_only_mode=server_routing_prefix_found,
+    env_cache = (
+        Path(args.environment_cache)
+        if args.environment_cache
+        else Path.home() / ".murfey_cache.json"
     )
+    if env_cache.is_file():
+        instance_environment = MurfeyInstanceEnvironment.read(
+            murfey_url, Path(args.source), in_path=env_cache, watcher=source_watcher
+        )
+    else:
+        instance_environment = MurfeyInstanceEnvironment(
+            url=murfey_url,
+            software_versions=machine_data.get("software_versions", {}),
+            source=Path(args.source),
+            watcher=source_watcher,
+            default_destination=args.destination
+            or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+            demo=args.demo,
+            processing_only_mode=server_routing_prefix_found,
+        )
 
     ws.environment = instance_environment
 
