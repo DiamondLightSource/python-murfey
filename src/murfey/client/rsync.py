@@ -274,7 +274,7 @@ class RSyncer(Observer):
                 return
 
         def parse_stderr(line: str):
-            logger.error(line)
+            logger.warning(line)
 
         relative_filenames = []
         for f in files:
