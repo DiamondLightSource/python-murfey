@@ -73,7 +73,7 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
         if cache_path.is_file():
             with open(cache_path, "r") as env_cache:
                 current_cache = json.load(env_cache)
-            current_cache.pop(self.source)
+            current_cache.pop(str(self.source))
             with open(cache_path, "w") as env_cache:
                 json.dump(current_cache, env_cache)
 
