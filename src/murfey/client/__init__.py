@@ -292,6 +292,7 @@ def run():
             or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
             demo=args.demo,
             processing_only_mode=server_routing_prefix_found,
+            cache_path=Path.home() / ".murfey_cache.json",
         )
 
     ws.environment = instance_environment
