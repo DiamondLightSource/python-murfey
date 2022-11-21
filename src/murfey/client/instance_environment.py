@@ -44,21 +44,29 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
     processing_only_mode: bool = False
     tilt_offset: Optional[float] = None
     gain_ref: Optional[Path] = None
+    cache_path: Optional[Path] = None
 
-    def write(self, out_path: Path | None = None):
-        cache_path = out_path or Path.home() / ".murfey_cache.json"
-        if cache_path.is_file():
-            with open(cache_path, "r") as env_cache:
+    @classmethod
+    def _cache_from_dict(cls, out_path: Path, data: dict):
+        if not data.get("source"):
+            return
+        if out_path.is_file():
+            with open(out_path, "r") as env_cache:
                 current_cache = json.load(env_cache)
         else:
             current_cache = {}
-        with open(out_path or Path.home() / ".murfey_cache.json", "w") as env_cache:
+        print(out_path)
+        with open(out_path, "w") as env_cache:
             as_dict = {}
             for k in MurfeyInstanceEnvironmentBase.__fields__.keys():
-                v = getattr(self, k)
+                v = data.get(k)
                 as_dict[k] = str(v) if isinstance(v, Path) else v
-            current_cache.update({str(self.source): as_dict})
+            current_cache.update({str(data.get("source")): as_dict})
             json.dump(current_cache, env_cache)
+
+    def write(self, out_path: Path | None = None):
+        self.cache_path = out_path or Path.home() / ".murfey_cache.json"
+        self._cache_from_dict(self.cache_path, self.dict())
 
 
 class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
@@ -81,6 +89,12 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
             )
             inst = cls.construct(url=url, **validated_read.dict(), **kwargs)
         return inst
+
+    @validator("*")
+    def cache(cls, v, values):
+        if values.get("cache_path"):
+            cls._cache_from_dict(values["cache_path"], values)
+        return v
 
     @validator("data_collection_group_id")
     def dcg_callback(cls, v, values):

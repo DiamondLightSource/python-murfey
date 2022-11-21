@@ -37,6 +37,7 @@ def test_murfey_instance_environment_subscribe(env):
 
 
 def test_murfey_instance_environment_write_to_json(env, tmp_path):
+    env.source = tmp_path
     env.write(out_path=tmp_path / ".murfey_cache.json")
     assert (tmp_path / ".murfey_cache.json").exists()
 
