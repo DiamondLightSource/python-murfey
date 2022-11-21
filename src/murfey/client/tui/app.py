@@ -6,6 +6,7 @@ import copy
 import logging
 import string
 import threading
+from functools import partial
 from pathlib import Path
 from queue import Queue
 from typing import (
@@ -184,13 +185,15 @@ class HoverVisit(Widget):
                 else:
                     _default = "unknown"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default, visit_path)
+                    self.app._start_rsyncer(_default, visit_path=visit_path)
                 else:
                     self.app._queues["input"].put_nowait(
                         InputResponse(
                             question="Transfer to: ",
                             default=_default,
-                            callback=self.app._start_rsyncer,
+                            callback=partial(
+                                self.app._start_rsyncer, visit_path=visit_path
+                            ),
                         )
                     )
 
