@@ -41,13 +41,13 @@ def _get_tilt_series_v5_11(p: Path) -> str:
     return tag[slice_index:]
 
 
-def _get_tilt_angle_v5_11(p: Path) -> str:
+def _get_tilt_tag_v5_11(p: Path) -> str:
     tag = p.name.split("_")[0]
     slice_index = _get_slice_index_v5_11(tag)
     return tag[:slice_index]
 
 
-def _get_tilt_tag_v5_11(p: Path) -> str:
+def _get_tilt_angle_v5_11(p: Path) -> str:
     _split = p.name.split("_")[2].split(".")
     return ".".join(_split[:-1])
 
