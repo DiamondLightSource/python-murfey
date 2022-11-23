@@ -605,7 +605,7 @@ class TomographyContext(Context):
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
             )
-            metadata["tilt_offset"] = TUIFormValue(None, top=True)
+            metadata["tilt_offset"] = TUIFormValue(0, top=True)
             metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
@@ -627,7 +627,7 @@ class TomographyContext(Context):
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
-        mdoc_metadata["tilt_offset"] = TUIFormValue(None, top=True)
+        mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")
