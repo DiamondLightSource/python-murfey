@@ -385,6 +385,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "voltage": dc_params.voltage,
         "pixel_size": dc_params.pixel_size_on_image,
         "image_suffix": dc_params.file_extension,
+        "comments": dc_params.comments,
         "experiment_type": dc_params.experiment_type,
         "n_images": dc_params.tilt,
         "image_size_x": dc_params.image_size_x,

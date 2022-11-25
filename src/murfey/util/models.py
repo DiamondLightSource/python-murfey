@@ -85,6 +85,7 @@ class DCParameters(BaseModel):
     file_extension: str
     acquisition_software: str
     image_directory: str
+    comments: str
     tag: str
 
 

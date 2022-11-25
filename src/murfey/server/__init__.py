@@ -346,6 +346,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             imageDirectory=message["image_directory"],
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
+            comments=message["tag"],
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
         )
         dcid = _register(record, header)
