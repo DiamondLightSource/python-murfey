@@ -221,7 +221,7 @@ def validate_form(form: dict, model: BaseModel) -> dict:
         log.info(validated.dict())
         return validated.dict()
     except (AttributeError, ValidationError) as e:
-        log.warning(f"For validation failed: {str(e)}")
+        log.warning(f"Form validation failed: {str(e)}")
         return {}
 
 
