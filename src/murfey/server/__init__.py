@@ -348,7 +348,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             voltage=message["voltage"],
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
         )
-        dcid = _register(record, header)
+        dcid = _register(record, header, tag=message.get("tag"))
         if dcid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
@@ -411,12 +411,12 @@ def feedback_callback(header: dict, message: dict) -> None:
 
 
 @singledispatch
-def _register(record, header: dict):
+def _register(record, header: dict, **kwargs):
     raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
 
 
 @_register.register
-def _(record: Base, header: dict):
+def _(record: Base, header: dict, **kwargs):
     if not _transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
@@ -424,7 +424,9 @@ def _(record: Base, header: dict):
         return None
     try:
         if isinstance(record, DataCollection):
-            return _transport_object.do_insert_data_collection(record)["return_value"]
+            return _transport_object.do_insert_data_collection(record, **kwargs)[
+                "return_value"
+            ]
         if isinstance(record, DataCollectionGroup):
             return _transport_object.do_insert_data_collection_group(record)[
                 "return_value"
