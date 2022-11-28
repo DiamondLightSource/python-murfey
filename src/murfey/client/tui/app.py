@@ -220,9 +220,10 @@ class QuickPrompt:
 def validate_form(form: dict, model: BaseModel) -> dict:
     try:
         validated = model(**form)
+        log.info(validated.dict())
         return validated.dict()
     except (AttributeError, ValidationError) as e:
-        log.debug(e)
+        log.warning(f"Form validation failed: {str(e)}")
         return {}
 
 
@@ -474,17 +475,18 @@ class LogBook(Widget):
 
 
 class DCParametersTomo(BaseModel):
-    voltage: float
-    pixel_size_on_image: str
+    dose_per_frame: float
+    gain_ref: Optional[str]
     experiment_type: str
+    voltage: float
     image_size_x: int
     image_size_y: int
-    tilt: int
-    acquisition_software: str
-    dose_per_frame: float
-    tilt_offset: float
-    gain_ref: Optional[str]
+    pixel_size_on_image: str
     motion_corr_binning: int
+    tilt_offset: float
+    tilt: int
+    file_extension: str
+    acquisition_software: str
 
 
 class MurfeyTUI(App):
@@ -619,7 +621,7 @@ class MurfeyTUI(App):
                         if self.analyser
                         and isinstance(self.analyser._context, TomographyContext)
                         else None,
-                        callback=self.app._start_dc,
+                        callback=self.app._start_dc_confirm_prompt,
                     )
                 )
                 self._dc_metadata = r.get("form", OrderedDict({}))
@@ -648,6 +650,32 @@ class MurfeyTUI(App):
         elif self._register_dc is None:
             self._tmp_responses.append(response)
             self._data_collection_form_complete = True
+
+    def _start_dc_confirm_prompt(self, json: dict):
+        self._queues["input"].put_nowait(
+            InputResponse(
+                question="Would you like to start processing with chosen parameters?",
+                allowed_responses=["y", "n"],
+                callback=partial(self._start_dc_confirm, json=json),
+            )
+        )
+
+    def _start_dc_confirm(self, response: str, json: Optional[dict] = None):
+        json = json or {}
+        if response == "n":
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Data collection parameters:",
+                    form=OrderedDict({k: TUIFormValue(v) for k, v in json.items()}),
+                    model=DCParametersTomo
+                    if self.analyser
+                    and isinstance(self.analyser._context, TomographyContext)
+                    else None,
+                    callback=self.app._start_dc_confirm_prompt,
+                )
+            )
+        elif response == "y":
+            self._start_dc(json)
 
     def _start_dc(self, json):
         if self._dummy_dc:
