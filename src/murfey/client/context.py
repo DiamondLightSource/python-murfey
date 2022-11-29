@@ -227,7 +227,7 @@ class TomographyContext(Context):
             )
 
         except Exception:
-            logger.info(
+            logger.debug(
                 f"Tilt series and angle could not be determined for {file_path}"
             )
             return []
