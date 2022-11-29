@@ -784,22 +784,25 @@ class MurfeyTUI(App):
     def _confirm_clear(self, response: str):
         if response == "y":
             if self._do_transfer and self.rsync_process:
-                destination = (
-                    self.rsync_process._remote.split("::")[1]
-                    if "::" in self.rsync_process._remote
-                    else self.rsync_process._remote
-                )
+                destination = self.rsync_process._remote
                 self.rsync_process.stop()
                 if self.analyser:
                     self.analyser.stop()
-                self.rsync_process = RSyncer(
-                    self._source,
-                    basepath_remote=Path(destination),
-                    server_url=self._url,
-                    local=self._environment.demo,
-                    status_bar=self._statusbar,
-                    do_transfer=self._do_transfer,
-                    remove_files=True,
+                cmd = [
+                    "rsync",
+                    "-iiv",
+                    "-o",  # preserve ownership
+                    "-p",  # preserve permissions
+                    "--remove-source-files",
+                ]
+                cmd.extend(
+                    str(f.relative_to(self._source.absolute()))
+                    for f in self._source.absolute().glob("**/*")
+                )
+                cmd.append(destination)
+                result = procrunner.run(cmd)
+                log.info(
+                    f"rsync with removal finished with return code {result.returncode}"
                 )
 
             loop = asyncio.get_running_loop()
