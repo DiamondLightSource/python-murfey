@@ -52,10 +52,12 @@ class RSyncer(Observer):
         local: bool = False,
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
+        remove_files: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
         self._do_transfer = do_transfer
+        self._remove_files = remove_files
         if local:
             self._remote = str(basepath_remote)
         else:
@@ -283,20 +285,22 @@ class RSyncer(Observer):
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
         rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
+        rsync_cmd = [
+            "rsync",
+            "-iiv",
+            "--times",
+            "--progress",
+            "--outbuf=line",
+            "--files-from=-",
+            "-o",  # preserve ownership
+            "-p",  # preserve permissions
+        ]
+        if self._remove_files:
+            rsync_cmd.append("--remove-source-files")
+        rsync_cmd.extend([".", self._remote])
 
         result = procrunner.run(
-            [
-                "rsync",
-                "-iiv",
-                "--times",
-                "--progress",
-                "--outbuf=line",
-                "--files-from=-",
-                "-o",  # preserve ownership
-                "-p",  # preserve permissions
-                ".",
-                self._remote,
-            ],
+            rsync_cmd,
             callback_stdout=parse_stdout,
             callback_stderr=parse_stderr,
             working_directory=str(self._basepath),
