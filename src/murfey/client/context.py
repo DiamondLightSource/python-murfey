@@ -425,8 +425,7 @@ class TomographyContext(Context):
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
                     if (
-                        len(ta) >= tilt_series_size
-                        and ts not in self._completed_tilt_series
+                        ts not in self._completed_tilt_series
                         and (file_path.parent / (tilt_series + ".mdoc")).is_file()
                     ):
                         newly_completed_series.append(ts)
