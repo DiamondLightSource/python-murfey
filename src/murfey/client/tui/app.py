@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-# import asyncio
+import asyncio
+
 # import contextlib
 import copy
 import logging
@@ -716,6 +717,7 @@ class MurfeyTUI(App):
 
     async def on_load(self, event):
         await self.bind("q", "quit", show=True)
+        await self.bind("c", "clear", show=True)
 
     async def on_mount(self) -> None:
         self.input_box = InputBox(self, queue=self._queues.get("input"))
@@ -762,3 +764,17 @@ class MurfeyTUI(App):
         if self.analyser:
             self.analyser.stop()
         await self.shutdown()
+
+    async def action_clear(self) -> None:
+        self._queues["input"].put_nowait(
+            InputResponse(
+                question="Are you sure you want to remove all copied data?",
+                allowed_responses=["y", "n"],
+                callback=partial(self._confirm_clear),
+            )
+        )
+
+    def _confirm_clear(self, response: str):
+        if response == "y":
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.action_quit())
