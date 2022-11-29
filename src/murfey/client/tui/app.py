@@ -766,9 +766,16 @@ class MurfeyTUI(App):
         await self.shutdown()
 
     async def action_clear(self) -> None:
+        destination = ""
+        if self.rsync_process:
+            destination = (
+                self.rsync_process._remote.split("::")[1]
+                if "::" in self.rsync_process._remote
+                else self.rsync_process._remote
+            )
         self._queues["input"].put_nowait(
             InputResponse(
-                question="Are you sure you want to remove all copied data?",
+                question=f"Are you sure you want to remove all copied data? [{self._source} -> {destination}]",
                 allowed_responses=["y", "n"],
                 callback=partial(self._confirm_clear),
             )
