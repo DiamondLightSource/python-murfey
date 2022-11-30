@@ -208,7 +208,9 @@ class TomographyContext(Context):
         extract_tilt_angle: Callable[[Path], str],
         extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
+        required_position_files: List[Path] | None = None,
     ) -> List[str]:
+        # required_position_files = required_position_files or []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
@@ -419,14 +421,20 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
-                if this_tilt_series_size >= tilt_series_size:
+                if (
+                    this_tilt_series_size >= tilt_series_size
+                    and not required_position_files
+                ):
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
-                    if (
-                        len(ta) >= tilt_series_size
-                        and ts not in self._completed_tilt_series
-                    ):
+                    if required_position_files:
+                        completion_test = all(
+                            _f.is_file() for _f in required_position_files
+                        )
+                    else:
+                        completion_test = len(ta) >= tilt_series_size
+                    if ts not in self._completed_tilt_series and completion_test:
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
                         if environment:
@@ -489,7 +497,10 @@ class TomographyContext(Context):
         return []
 
     def _add_tomo_tilt(
-        self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
+        self,
+        file_path: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        required_position_files: List[Path] | None = None,
     ) -> List[str]:
         if environment:
             if tomo_version := environment.software_versions.get("tomo"):
@@ -502,12 +513,18 @@ class TomographyContext(Context):
                 tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
             tilt_info_extraction = tomo_tilt_info["5.7"]
+        tilt_tag = tilt_info_extraction.tag(file_path)
+        tilt_series_num = tilt_info_extraction.series(file_path)
+        tilt_series = f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,
             tilt_info_extraction.angle,
             tilt_info_extraction.tag,
             environment=environment,
+            required_position_files=required_position_files
+            if required_position_files is not None
+            else [file_path.parent / (tilt_series + ".mdoc")],
         )
 
     def _add_serialem_tilt(
@@ -554,7 +571,9 @@ class TomographyContext(Context):
         ):
             if self._acquisition_software == "tomo":
                 completed_tilts = self._add_tomo_tilt(
-                    transferred_file, environment=environment
+                    transferred_file,
+                    environment=environment,
+                    required_position_files=kwargs.get("required_position_files"),
                 )
             elif self._acquisition_software == "serialem":
                 completed_tilts = self._add_serialem_tilt(
