@@ -281,7 +281,6 @@ class TomographyContext(Context):
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
-                        "tilt": tilt_series_num,
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
                         "image_directory": str(file_path.parent),

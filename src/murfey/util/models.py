@@ -81,7 +81,6 @@ class DCParameters(BaseModel):
     experiment_type: str
     image_size_x: int
     image_size_y: int
-    tilt: int
     file_extension: str
     acquisition_software: str
     image_directory: str
