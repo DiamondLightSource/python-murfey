@@ -5,8 +5,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import procrunner
+import requests
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Confirm
 
 from murfey.client import read_config
 
@@ -33,6 +34,13 @@ def run():
     console = Console()
     murfey_url = urlparse(args.server, allow_fragments=False)
 
+    machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
+    if Path(args.source or ".").resolve() in machine_data.data_directories.keys():
+        console.print(
+            f"[red]Source directory is the base directory for the {machine_data.data_directories[Path(args.source or '.').resolve()]}, exiting"
+        )
+        return
+
     cmd = [
         "rsync",
         "-iiv",
@@ -43,13 +51,23 @@ def run():
     ]
     if args.delete:
         cmd.append("--remove-source-files")
-        num_files = len(f for f in Path(args.destination).glob("**/*") if f.is_file())
-        delete_prompt = Prompt.ask(
+        if Path(args.source or ".").is_file():
+            num_files = 1
+        else:
+            num_files = len(
+                [f for f in Path(args.source or ".").glob("**/*") if f.is_file()]
+            )
+        delete_prompt = Confirm.ask(
             f"Do you want to remove {num_files} from {args.source or Path('.').resolve()}?"
         )
         if not delete_prompt:
             return
-    cmd.extend([args.source or ".", f"{murfey_url.hostname}::{args.destination}"])
+    if Path(args.source or ".").is_file():
+        cmd.extend([args.source or ".", f"{murfey_url.hostname}::{args.destination}"])
+    else:
+        cmd.append("-r")
+        cmd.extend(list(Path(args.source or ".").glob("*")))
+        cmd.append(f"{murfey_url.hostname}::{args.destination}")
 
     result = procrunner.run(cmd)
     if result.returncode:
