@@ -386,7 +386,6 @@ def start_dc(visit_name, dc_params: DCParameters):
         "pixel_size": dc_params.pixel_size_on_image,
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
-        "n_images": dc_params.tilt,
         "image_size_x": dc_params.image_size_x,
         "image_size_y": dc_params.image_size_y,
         "acquisition_software": dc_params.acquisition_software,

@@ -224,9 +224,13 @@ class TomographyContext(Context):
                 float(tilt_angle)
             except ValueError:
                 return []
-            tilt_series = (
-                f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
-            )
+            if tilt_tag:
+                if f"{tilt_tag}_{tilt_series_num}" in file_path.name:
+                    tilt_series = f"{tilt_tag}_{tilt_series_num}"
+                else:
+                    tilt_series = f"{tilt_tag}{tilt_series_num}"
+            else:
+                tilt_series = tilt_series_num
 
         except Exception:
             logger.debug(
@@ -515,7 +519,13 @@ class TomographyContext(Context):
             tilt_info_extraction = tomo_tilt_info["5.7"]
         tilt_tag = tilt_info_extraction.tag(file_path)
         tilt_series_num = tilt_info_extraction.series(file_path)
-        tilt_series = f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+        if tilt_tag:
+            if f"{tilt_tag}_{tilt_series_num}" in file_path.name:
+                tilt_series = f"{tilt_tag}_{tilt_series_num}"
+            else:
+                tilt_series = f"{tilt_tag}{tilt_series_num}"
+        else:
+            tilt_series = tilt_series_num
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,

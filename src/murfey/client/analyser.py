@@ -141,9 +141,6 @@ class Analyser(Observer):
                             self._unseen_xml = []
                             if data_collection_question:
                                 self.notify({"allowed_responses": ["y", "n"]})
-                            dc_metadata["tilt"] = TUIFormValue(
-                                transferred_file.stem.split("_")[1]
-                            )
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
@@ -170,9 +167,6 @@ class Analyser(Observer):
                         if dc_metadata:
                             self._unseen_xml = []
                             self.notify({"allowed_responses": ["y", "n"]})
-                            dc_metadata["tilt"] = TUIFormValue(
-                                transferred_file.stem.split("_")[1]
-                            )
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
