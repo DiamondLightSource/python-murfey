@@ -184,6 +184,8 @@ def run():
         host=args.host,
         port=args.port,
         log_config=None,
+        ws_ping_interval=300,
+        ws_ping_timeout=300,
     )
 
     _running_server = uvicorn.Server(config=config)
