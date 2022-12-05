@@ -101,23 +101,43 @@ class TomographyContext(Context):
             ws.clear_cache()
         self._data_collection_stash = []
 
-    def _flush_processing_job(self, tag: str):
+    def _flush_processing_job(self, tag: str, ws: WSApp | None = None):
         # logger.info(
         #     f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
         # )
+        if ws:
+            ws.pause()
+            websocket.setdefaulttimeout(2)
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
+                if ws:
+                    ws.clear_cache()
+                    ws.recv()
             self._processing_job_stash.pop(tag)
+        if ws:
+            websocket.setdefaulttimeout(None)
+            ws.resume()
+            ws.clear_cache()
 
-    def _flush_preprocess(self, tag: str, app_id: int):
+    def _flush_preprocess(self, tag: str, app_id: int, ws: WSApp | None = None):
         # logger.info(f"Flushing preprocessing requests {tag}")
+        if ws:
+            ws.pause()
+            websocket.setdefaulttimeout(2)
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
                     requests.post(tr[0], json=process_file)
+                    if ws:
+                        ws.clear_cache()
+                        ws.recv()
             self._preprocessing_triggers.pop(tag)
+        if ws:
+            websocket.setdefaulttimeout(None)
+            ws.resume()
+            ws.clear_cache()
 
     def _check_for_alignment(
         self,

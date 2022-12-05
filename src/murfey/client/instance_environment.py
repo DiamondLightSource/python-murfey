@@ -66,10 +66,10 @@ class MurfeyInstanceEnvironment(BaseModel):
             for l in values.get("listeners", {}).get("data_collection_ids", []):
                 if values.get("data_collection_ids"):
                     for k in set(values["data_collection_ids"].keys()) ^ set(v.keys()):
-                        l(k)
+                        l(k, ws=values.get("websocket"))
                 else:
                     for k in v.keys():
-                        l(k)
+                        l(k, ws=values.get("websocket"))
         return v
 
     @validator("autoproc_program_ids")
@@ -80,11 +80,11 @@ class MurfeyInstanceEnvironment(BaseModel):
                 if values.get("autoproc_program_ids"):
                     for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
                         if v[k].get("em-tomo-preprocess"):
-                            l(k, v[k]["em-tomo-preprocess"])
+                            l(k, v[k]["em-tomo-preprocess"], ws=values.get("websocket"))
                 else:
                     for k in v.keys():
                         if v[k].get("em-tomo-preprocess"):
-                            l(k, v[k]["em-tomo-preprocess"])
+                            l(k, v[k]["em-tomo-preprocess"], ws=values.get("websocket"))
         return v
 
     @validator("motion_corrected_movies")
