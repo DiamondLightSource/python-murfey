@@ -277,6 +277,7 @@ def run():
         or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
         processing_only_mode=server_routing_prefix_found,
+        websocket=ws,
     )
 
     ws.environment = instance_environment

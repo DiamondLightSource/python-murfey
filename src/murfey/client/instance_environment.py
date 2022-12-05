@@ -10,6 +10,7 @@ from urllib.parse import ParseResult
 from pydantic import BaseModel, validator
 
 from murfey.client.watchdir import DirWatcher
+from murfey.client.websocket import WSApp
 
 logger = logging.getLogger("murfey.client.instance_environment")
 
@@ -46,6 +47,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     processing_only_mode: bool = False
     tilt_offset: Optional[float] = None
     gain_ref: Optional[Path] = None
+    websocket: Optional[WSApp] = None
 
     class Config:
         validate_assignment: bool = True
