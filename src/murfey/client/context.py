@@ -6,6 +6,7 @@ from threading import RLock
 from typing import Callable, Dict, List, Optional, OrderedDict
 
 import requests
+import websocket
 import xmltodict
 from pydantic import BaseModel
 
@@ -85,9 +86,19 @@ class TomographyContext(Context):
 
     def _flush_data_collections(self, ws: WSApp | None = None):
         logger.info("Flushing data collection API calls")
+        if ws:
+            ws.pause()
+            websocket.setdefaulttimeout(2)
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             requests.post(dc_data[0], json=data)
+            if ws:
+                ws.clear_cache()
+                ws.recv()
+        if ws:
+            websocket.setdefaulttimeout(None)
+            ws.resume()
+            ws.clear_cache()
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):

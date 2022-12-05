@@ -15,6 +15,8 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 log = logging.getLogger("murfey.client.websocket")
 
+_lock = threading.RLock()
+
 
 class WSApp:
     def __init__(self, *, server: str):
@@ -110,22 +112,23 @@ class WSApp:
         # log.info(f"Received message: {message!r}")
         try:
             if self._paused:
-                self._msg_cache.append(message)
+                with _lock:
+                    self._msg_cache.append(message)
             else:
-
-                def _handle_msg(msg: str):
-                    data = json.loads(msg)
-                    if data.get("message") == "state-update":
-                        self._register_id(data["attribute"], data["value"])
-                    elif data.get("message") == "state-update-partial":
-                        self._register_id_partial(data["attribute"], data["value"])
-
+                self.clear_cache()
                 if self._msg_cache:
                     for m in self._msg_cache:
-                        _handle_msg(m)
-                _handle_msg(message)
+                        self._handle_msg(m)
+                self._handle_msg(message)
         except Exception:
             pass
+
+    def _handle_msg(self, msg: str):
+        data = json.loads(msg)
+        if data.get("message") == "state-update":
+            self._register_id(data["attribute"], data["value"])
+        elif data.get("message") == "state-update-partial":
+            self._register_id_partial(data["attribute"], data["value"])
 
     def _register_id(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
@@ -158,3 +161,16 @@ class WSApp:
     def send(self, message: str):
         if self.alive:
             self._send_queue.put_nowait(message)
+
+    def recv(self):
+        try:
+            msg = self._ws.sock.recv()
+            self._handle_msg(msg)
+        except websocket.WebSocketTimeoutException:
+            return
+
+    def clear_cache(self):
+        with _lock:
+            for m in self._msg_cache:
+                self._handle_msg(m)
+            self._msg_cache = []
