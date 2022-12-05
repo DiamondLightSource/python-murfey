@@ -18,6 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
+from murfey.client.websocket import WSApp
 from murfey.util.mdoc import get_global_data
 
 # import time
@@ -82,7 +83,7 @@ class TomographyContext(Context):
         self._extract_tilt_series: Callable[[Path], str] | None = None
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
-    def _flush_data_collections(self):
+    def _flush_data_collections(self, ws: WSApp | None = None):
         logger.info("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}

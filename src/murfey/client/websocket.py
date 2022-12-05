@@ -7,7 +7,7 @@ import random
 import threading
 import time
 import urllib.parse
-from typing import Optional
+from typing import List, Optional
 
 import websocket
 
@@ -44,6 +44,8 @@ class WSApp:
         )
         self._feeder_thread.start()
         self.environment: MurfeyInstanceEnvironment | None = None
+        self._paused = False
+        self._msg_cache: List[str] = []
 
     def __repr__(self):
         if self.alive:
@@ -54,6 +56,12 @@ class WSApp:
         else:
             status = "closed"
         return f"<WSApp host={self._address!r} {status=} sendqueue={self._send_queue.qsize()}>"
+
+    def pause(self):
+        self._paused = True
+
+    def resume(self):
+        self._paused = False
 
     @property
     def alive(self):
@@ -101,11 +109,21 @@ class WSApp:
     def on_message(self, ws: websocket.WebSocketApp, message: str):
         # log.info(f"Received message: {message!r}")
         try:
-            data = json.loads(message)
-            if data.get("message") == "state-update":
-                self._register_id(data["attribute"], data["value"])
-            elif data.get("message") == "state-update-partial":
-                self._register_id_partial(data["attribute"], data["value"])
+            if self._paused:
+                self._msg_cache.append(message)
+            else:
+
+                def _handle_msg(msg: str):
+                    data = json.loads(msg)
+                    if data.get("message") == "state-update":
+                        self._register_id(data["attribute"], data["value"])
+                    elif data.get("message") == "state-update-partial":
+                        self._register_id_partial(data["attribute"], data["value"])
+
+                if self._msg_cache:
+                    for m in self._msg_cache:
+                        _handle_msg(m)
+                _handle_msg(message)
         except Exception:
             pass
 
