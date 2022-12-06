@@ -14,13 +14,14 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-
-# from multiprocessing import Process, Queue
 from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
+
+# from multiprocessing import Process, Queue
+from rich.prompt import Confirm
 
 import murfey.client.rsync
 import murfey.client.update
@@ -132,24 +133,24 @@ def run():
         action="store_true",
     )
     parser.add_argument(
-        "--appearance_time",
+        "--appearance-time",
         type=float,
         default=-1,
         help="Only consider top level directories that have appeared more recently than this many hours ago",
     )
     parser.add_argument(
-        "--fake_dc",
+        "--fake-dc",
         action="store_true",
         default=False,
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
     )
     parser.add_argument(
-        "--time_based_transfer",
+        "--time-based-transfer",
         action="store_true",
         help="Transfer new files",
     )
     parser.add_argument(
-        "--no_transfer",
+        "--no-transfer",
         action="store_true",
         help="Avoid actually transferring files",
     )
@@ -165,10 +166,16 @@ def run():
         help="Perform rsync transfers locally rather than remotely",
     )
     parser.add_argument(
-        "--ignore_mdoc_metadata",
+        "--ignore-mdoc-metadata",
         action="store_true",
         default=False,
         help="Do not attempt to read metadata from all mdoc files",
+    )
+    parser.add_argument(
+        "--remove-files",
+        action="store_true",
+        default=False,
+        help="Remove source files immediately after their transfer",
     )
 
     args = parser.parse_args()
@@ -179,6 +186,13 @@ def run():
         if "://" in args.server:
             exit("Unknown server protocol. Only http:// and https:// are allowed")
         args.server = f"http://{args.server}"
+
+    if args.remove_files:
+        remove_prompt = Confirm.ask(
+            f"Are you sure you want to remove files from {args.source or Path('.').resolve()}?"
+        )
+        if not remove_prompt:
+            exit("Exiting")
 
     murfey_url = urlparse(args.server, allow_fragments=False)
     if args.server != known_server:
@@ -287,6 +301,7 @@ def run():
         server_url=murfey_url,
         local=args.local or instance_environment.demo,
         do_transfer=not args.no_transfer,
+        remove_files=args.remove_files,
     )
     source_watcher.subscribe(rsync_process.enqueue)
 
