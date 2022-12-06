@@ -63,6 +63,9 @@ def run():
         )
         if not delete_prompt:
             return
+    console.print(
+        f"Copying {args.source} -> {murfey_url.hostname}::{args.destination_prefix}/{args.destination}"
+    )
     if Path(args.source or ".").is_file():
         cmd.extend(
             [
