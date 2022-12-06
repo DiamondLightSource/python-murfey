@@ -122,22 +122,12 @@ class TomographyContext(Context):
 
     def _flush_preprocess(self, tag: str, app_id: int, ws: WSApp | None = None):
         # logger.info(f"Flushing preprocessing requests {tag}")
-        if ws:
-            ws.pause()
-            websocket.setdefaulttimeout(2)
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
                     requests.post(tr[0], json=process_file)
-                    if ws:
-                        ws.clear_cache()
-                        ws.recv()
             self._preprocessing_triggers.pop(tag)
-        if ws:
-            websocket.setdefaulttimeout(None)
-            ws.resume()
-            ws.clear_cache()
 
     def _check_for_alignment(
         self,
@@ -229,8 +219,8 @@ class TomographyContext(Context):
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 }
                 return new_dict
-        except KeyError:
-            logger.warning("Key error encountered in _complete_process_file")
+        except KeyError as e:
+            logger.info(f"Key error encountered in _complete_process_file: {e}")
             return {}
 
     def _add_tilt(

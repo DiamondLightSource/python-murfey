@@ -7,15 +7,100 @@ import random
 import threading
 import time
 import urllib.parse
+from pathlib import Path
 from typing import List, Optional
 
 import websocket
 
-from murfey.client.instance_environment import MurfeyInstanceEnvironment
-
 log = logging.getLogger("murfey.client.websocket")
 
 _lock = threading.RLock()
+
+
+def registration_engine(env, attribute, old_value, value):
+    if attribute == "data_collection_group_id":
+        for l in env.listeners.get("data_collection_group_id", []):
+            l(ws=env.websocket)
+    elif attribute == "data_collection_ids":
+        for l in env.listeners.get("data_collection_ids", []):
+            if env.data_collection_ids:
+                for k in set(old_value.keys()) ^ set(value.keys()):
+                    log.info(f"calling callback with {k}, data collections exist")
+                    l(k, ws=env.websocket)
+            else:
+                for k in value.keys():
+                    l(k, ws=env.websocket)
+    elif attribute == "autoproc_program_ids":
+        for l in env.listeners.get("autoproc_program_ids", []):
+            if env.autoproc_program_ids:
+                for k in set(old_value.keys()) ^ set(value.keys()):
+                    if value[k].get("em-tomo-preprocess"):
+                        l(k, value[k]["em-tomo-preprocess"], ws=env.websocket)
+            else:
+                for k in value.keys():
+                    if value[k].get("em-tomo-preprocess"):
+                        l(k, value[k]["em-tomo-preprocess"], ws=env.websocket)
+    elif attribute == "motion_corrected_movies":
+        _url = f"{str(env.url.geturl())}/visits/{env.visit}/align"
+        for l in env.listeners.get("motion_corrected_movies", []):
+            if env.motion_corrected_movies:
+                for k in set(old_value.keys()) ^ set(
+                    value.keys()
+                ):  # k is a path (key), v[k] is the value matching the key
+                    tilt = env.movie_tilt_pair[k]
+                    file_tilt_list = []
+                    for movie, angle in env.tilt_angles[tilt]:
+                        if movie in value:  # values["motion_corrected_movies"]:
+                            # file_tilt_list.append(
+                            #    [values["motion_corrected_movies"][movie], angle]
+                            # )
+                            file_tilt_list.append(
+                                [
+                                    str(value[Path(movie)][0]),
+                                    angle,
+                                    str(value[Path(movie)][1]),
+                                ]
+                            )
+                    l(
+                        k,
+                        value[k][0],
+                        _url,
+                        env.processing_job_ids[k]["em-tomo-align"],
+                        env.autoproc_program_ids[k]["em-tomo-align"],
+                        value[k][1],
+                        file_tilt_list,
+                    )
+            else:
+                for k in value.keys():
+                    try:
+                        # possible race condition here where values accessing by [k] sometimes aren't ready when we
+                        # try to access them - it throws a key error for a value which has just been set.
+                        tilt = env.movie_tilt_pair[k]
+                        file_tilt_list = []
+                        for movie, angle in env.tilt_angles[tilt]:
+                            # file_tilt_list.append([str(movie), angle])
+                            file_tilt_list.append(
+                                [
+                                    str(value[Path(movie)][0]),
+                                    angle,
+                                    str(value[Path(movie)][1]),
+                                ]
+                            )  # or v(k)
+                        l(
+                            k,
+                            value[k][0],
+                            _url,
+                            env.data_collection_ids[tilt],
+                            env.processing_job_ids[tilt]["em-tomo-align"],
+                            env.autoproc_program_ids[tilt]["em-tomo-align"],
+                            value[k][1],
+                            file_tilt_list,
+                            env.tilt_offset,
+                        )
+                    except KeyError:
+                        pass
+                    except Exception as e:
+                        log.warning(f"ERROR {e}")
 
 
 class WSApp:
@@ -45,7 +130,7 @@ class WSApp:
             target=self._send_queue_feeder, daemon=True, name="websocket-send-queue"
         )
         self._feeder_thread.start()
-        self.environment: MurfeyInstanceEnvironment | None = None
+        self.environment = None  # type: ignore
         self._paused = False
         self._msg_cache: List[str] = []
 
@@ -132,17 +217,31 @@ class WSApp:
 
     def _register_id(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
+            old_value = getattr(self.environment, attribute)
             setattr(self.environment, attribute, value)
+            try:
+                registration_engine(self.environment, attribute, old_value, value)
+            except Exception as e:
+                log.info(f"Exception encountered in registration: {e}")
+                raise
 
     def _register_id_partial(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
             if isinstance(value, dict):
                 new_value = {**getattr(self.environment, attribute), **value}
+                old_value = getattr(self.environment, attribute)
                 setattr(
                     self.environment,
                     attribute,
                     new_value,
                 )
+                try:
+                    registration_engine(
+                        self.environment, attribute, old_value, new_value
+                    )
+                except Exception as e:
+                    log.info(f"Exception encountered in registration: {e}")
+                    raise
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
         log.error(str(error))

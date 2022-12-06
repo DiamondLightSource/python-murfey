@@ -370,7 +370,9 @@ def start_dc(visit_name, dc_params: DCParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
-    log.info(f"Starting data collection on microscope {get_microscope()}")
+    log.info(
+        f"Starting data collection on microscope {get_microscope()}: {dc_params.tag}"
+    )
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
@@ -386,7 +388,6 @@ def start_dc(visit_name, dc_params: DCParameters):
         "pixel_size": dc_params.pixel_size_on_image,
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
-        "n_images": dc_params.tilt,
         "image_size_x": dc_params.image_size_x,
         "image_size_y": dc_params.image_size_y,
         "acquisition_software": dc_params.acquisition_software,
