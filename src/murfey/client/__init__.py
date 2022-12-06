@@ -133,24 +133,24 @@ def run():
         action="store_true",
     )
     parser.add_argument(
-        "--appearance_time",
+        "--appearance-time",
         type=float,
         default=-1,
         help="Only consider top level directories that have appeared more recently than this many hours ago",
     )
     parser.add_argument(
-        "--fake_dc",
+        "--fake-dc",
         action="store_true",
         default=False,
         help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
     )
     parser.add_argument(
-        "--time_based_transfer",
+        "--time-based-transfer",
         action="store_true",
         help="Transfer new files",
     )
     parser.add_argument(
-        "--no_transfer",
+        "--no-transfer",
         action="store_true",
         help="Avoid actually transferring files",
     )
@@ -166,7 +166,7 @@ def run():
         help="Perform rsync transfers locally rather than remotely",
     )
     parser.add_argument(
-        "--ignore_mdoc_metadata",
+        "--ignore-mdoc-metadata",
         action="store_true",
         default=False,
         help="Do not attempt to read metadata from all mdoc files",
