@@ -19,7 +19,8 @@ def run():
     parser = argparse.ArgumentParser(description="Transfer using a remote rsync daemon")
 
     parser.add_argument("--source", type=str, default="")
-    parser.add_argument("--destination", type=str)
+    parser.add_argument("--destination", "-d", type=str)
+    parser.add_argument("--destination-prefix", type=str, default="data")
     parser.add_argument("--delete", action="store_true")
     parser.add_argument(
         "--server",
@@ -62,8 +63,16 @@ def run():
         )
         if not delete_prompt:
             return
+    console.print(
+        f"Copying {args.source} -> {murfey_url.hostname}::{args.destination_prefix}/{args.destination}"
+    )
     if Path(args.source or ".").is_file():
-        cmd.extend([args.source or ".", f"{murfey_url.hostname}::{args.destination}"])
+        cmd.extend(
+            [
+                args.source or ".",
+                f"{murfey_url.hostname}::{args.destination_prefix}/{args.destination}",
+            ]
+        )
     else:
         cmd.append("-r")
         cmd.extend(list(Path(args.source or ".").glob("*")))
