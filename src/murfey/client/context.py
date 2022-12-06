@@ -25,6 +25,16 @@ from murfey.util.mdoc import get_global_data
 logger = logging.getLogger("murfey.client.context")
 
 
+def _construct_tilt_series_name(
+    tilt_tag: str, tilt_series: str, file_path: Path
+) -> str:
+    if tilt_tag:
+        if f"{tilt_tag}_{tilt_series}" in file_path.name:
+            return f"{tilt_tag}_{tilt_series}"
+        return f"{tilt_tag}{tilt_series}"
+    return tilt_series
+
+
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
     glob = dir_for_transfer.glob("*")
     for f in glob:
@@ -224,8 +234,8 @@ class TomographyContext(Context):
                 float(tilt_angle)
             except ValueError:
                 return []
-            tilt_series = (
-                f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+            tilt_series = _construct_tilt_series_name(
+                tilt_tag, tilt_series_num, file_path
             )
 
         except Exception:
@@ -515,7 +525,7 @@ class TomographyContext(Context):
             tilt_info_extraction = tomo_tilt_info["5.7"]
         tilt_tag = tilt_info_extraction.tag(file_path)
         tilt_series_num = tilt_info_extraction.series(file_path)
-        tilt_series = f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+        tilt_series = _construct_tilt_series_name(tilt_tag, tilt_series_num, file_path)
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,
