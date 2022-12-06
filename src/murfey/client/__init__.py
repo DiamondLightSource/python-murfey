@@ -14,13 +14,14 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-
-# from multiprocessing import Process, Queue
 from threading import Thread
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
+
+# from multiprocessing import Process, Queue
+from rich.prompt import Confirm
 
 import murfey.client.rsync
 import murfey.client.update
@@ -170,6 +171,12 @@ def run():
         default=False,
         help="Do not attempt to read metadata from all mdoc files",
     )
+    parser.add_argument(
+        "--remove-files",
+        action="store_true",
+        default=False,
+        help="Remove source files immediately after their transfer",
+    )
 
     args = parser.parse_args()
 
@@ -179,6 +186,13 @@ def run():
         if "://" in args.server:
             exit("Unknown server protocol. Only http:// and https:// are allowed")
         args.server = f"http://{args.server}"
+
+    if args.remove_files:
+        remove_prompt = Confirm.ask(
+            f"Are you sure you want to remove files from {args.source or Path('.').resolve()}?"
+        )
+        if not remove_prompt:
+            exit("Exiting")
 
     murfey_url = urlparse(args.server, allow_fragments=False)
     if args.server != known_server:
@@ -287,6 +301,7 @@ def run():
         server_url=murfey_url,
         local=args.local or instance_environment.demo,
         do_transfer=not args.no_transfer,
+        remove_files=args.remove_files,
     )
     source_watcher.subscribe(rsync_process.enqueue)
 
