@@ -14,9 +14,11 @@ class Camera(Enum):
 
 async def prepare_gain(
     camera: int, gain_path: Path, executables: Dict[str, str]
-) -> bool:
+) -> Path | None:
+    if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
+        return None
     if camera == Camera.FALCON:
-        return True
+        return None
     if gain_path.suffix == ".dm4":
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
@@ -29,7 +31,7 @@ async def prepare_gain(
         )
         stdout, stderr = await dm4_proc.communicate()
         if dm4_proc.returncode:
-            return False
+            return None
         clip_proc = await asyncio.create_subprocess_shell(
             f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres}",
             stdout=asyncio.subprocess.PIPE,
@@ -37,7 +39,7 @@ async def prepare_gain(
         )
         stdout, stderr = await clip_proc.communicate()
         if clip_proc.returncode:
-            return False
+            return None
         newstack_proc = await asyncio.create_subprocess_shell(
             f"{executables['newstack']} {flip} {gain_path_superres} {gain_path_stdres}",
             stdout=asyncio.subprocess.PIPE,
@@ -45,6 +47,6 @@ async def prepare_gain(
         )
         stdout, stderr = await newstack_proc.communicate()
         if newstack_proc.returncode:
-            return False
-        return True
-    return False
+            return None
+        return gain_path_stdres
+    return None
