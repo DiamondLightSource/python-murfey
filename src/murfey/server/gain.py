@@ -19,8 +19,11 @@ async def prepare_gain(
         return True
     if gain_path.suffix == ".dm4":
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
+        gain_path_mrc = gain_path.with_suffix(".mrc")
+        gain_path_superres = gain_path.parent / (gain_path.name + "_superres.mrc")
+        gain_path_stdres = gain_path.parent / (gain_path.name + "_stdres.mrc")
         dm4_proc = await asyncio.create_subprocess_shell(
-            f"{executables['dm2mrc']} {gain_path} {gain_path.with_suffix('.mrc')}",
+            f"{executables['dm2mrc']} {gain_path} {gain_path_mrc}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -28,7 +31,7 @@ async def prepare_gain(
         if dm4_proc.returncode:
             return False
         clip_proc = await asyncio.create_subprocess_shell(
-            f"{executables['clip']} {flip} {gain_path.with_suffix('.mrc')} {gain_path.parent / (gain_path.name+'_superres.mrc')}",
+            f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -36,7 +39,7 @@ async def prepare_gain(
         if clip_proc.returncode:
             return False
         newstack_proc = await asyncio.create_subprocess_shell(
-            f"{executables['newstack']} {flip} {gain_path.with_suffix('.mrc')} {gain_path.parent / (gain_path.name+'_superres.mrc')}",
+            f"{executables['newstack']} {flip} {gain_path_superres} {gain_path_stdres}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
