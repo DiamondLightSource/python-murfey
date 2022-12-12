@@ -52,3 +52,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     class Config:
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
+
+    def __call__(self, tag: str, *args, **kwargs):
+        for l in self.listeners[tag]:
+            l(*args, **kwargs)
