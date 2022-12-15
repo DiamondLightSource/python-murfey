@@ -103,7 +103,8 @@ class Analyser(Observer):
             ):
                 if self._context:
                     dc_metadata = self._context.gather_metadata(
-                        mdoc_for_reading or transferred_file
+                        mdoc_for_reading or transferred_file,
+                        environment=self._environment,
                     )
                     mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
@@ -130,7 +131,8 @@ class Analyser(Observer):
                                 dc_metadata = self._context.gather_metadata(
                                     transferred_file.with_suffix(".mdoc")
                                     if self._context._acquisition_software == "serialem"
-                                    else transferred_file.with_suffix(".xml")
+                                    else transferred_file.with_suffix(".xml"),
+                                    environment=self._environment,
                                 )
                             except NotImplementedError:
                                 dc_metadata = {}
@@ -160,7 +162,8 @@ class Analyser(Observer):
                     if self._role == "detector":
                         if not dc_metadata:
                             dc_metadata = self._context.gather_metadata(
-                                transferred_file.with_suffix(".xml")
+                                transferred_file.with_suffix(".xml"),
+                                environment=self._environment,
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
@@ -185,7 +188,8 @@ class Analyser(Observer):
                 ):
                     if not dc_metadata:
                         dc_metadata = self._context.gather_metadata(
-                            transferred_file.with_suffix(".xml")
+                            transferred_file.with_suffix(".xml"),
+                            environment=self._environment,
                         )
                     self.notify({"form": dc_metadata})
 

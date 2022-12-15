@@ -57,7 +57,9 @@ class Context:
     def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
         self.post_transfer(transferred_file, role=role, **kwargs)
 
-    def gather_metadata(self, metadata_file: Path):
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
