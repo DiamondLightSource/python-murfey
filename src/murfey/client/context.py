@@ -652,10 +652,14 @@ class TomographyContext(Context):
         mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
         mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
         mdoc_metadata["magnification"] = TUIFormValue(int(mdoc_data["Magnification"]))
+        superres_binning = int(mdoc_data["Binning"])
+        binning_factor = 1
         if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
+            if server_config.get("superres") and superres_binning == 1:
+                binning_factor = 2
             ps_from_mag = (
                 server_config.get("calibrations", {})
                 .get("magnification", {})
@@ -663,13 +667,13 @@ class TomographyContext(Context):
             )
             if ps_from_mag:
                 mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-                    float(mdoc_data["PixelSpacing"]) * 1e-10
+                    float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
                 )
         if mdoc_metadata.get("pixel_size_on_image") is None:
             mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-                float(mdoc_data["PixelSpacing"]) * 1e-10
+                float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
             )
-        mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
+        mdoc_metadata["motion_corr_binning"] = TUIFormValue(binning_factor)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"

@@ -17,6 +17,7 @@ class MachineConfig(BaseModel):
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
     feedback_queue: str = "murfey_feedback"
+    superres: bool = False
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
