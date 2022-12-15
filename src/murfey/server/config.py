@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
-    calibrations: Dict[str, Union[dict, float]]
+    calibrations: Dict[str, Dict[str, Union[dict, float]]]
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     software_versions: Dict[str, str] = {}
