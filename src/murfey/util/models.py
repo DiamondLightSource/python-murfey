@@ -64,6 +64,8 @@ class TiltSeries(BaseModel):
     autoproc_program_id: int
     motion_corrected_path: str
     movie_id: int
+    pixel_size: float
+    manual_tilt_offset: int
 
 
 class SuggestedPathParameters(BaseModel):
