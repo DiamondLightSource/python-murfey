@@ -127,8 +127,7 @@ class TomographyContext(Context):
         appid: int,
         mvid: int,
         tilt_angles: List,
-        manual_tilt_offset: Optional[float],
-        pixel_size: Optional[float],
+        tilt_offset: Optional[float],
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
             tilt_series = (
@@ -166,8 +165,7 @@ class TomographyContext(Context):
                         "autoproc_program_id": appid,
                         "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
-                        "manual_tilt_offset": manual_tilt_offset,
-                        "pixel_size": pixel_size,
+                        "tilt_offset": tilt_offset,
                     }
                     requests.post(url, json=series_data)
                     with self._lock:
@@ -497,10 +495,7 @@ class TomographyContext(Context):
                                         ),
                                         file_tilt_list,
                                         environment.data_collection_parameters.get(
-                                            "manual_tilt_offset"
-                                        ),
-                                        environment.data_collection_parameters.get(
-                                            "pixel_size_on_image"
+                                            "tilt_offset"
                                         ),
                                     )
                 if newly_completed_series:
@@ -638,7 +633,7 @@ class TomographyContext(Context):
             metadata["dose_per_frame"] = TUIFormValue(
                 None, top=True, colour="dark_orange"
             )
-            metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+            metadata["tilt_offset"] = TUIFormValue(0, top=True)
             metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
@@ -660,7 +655,7 @@ class TomographyContext(Context):
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
         )
-        mdoc_metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+        mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")

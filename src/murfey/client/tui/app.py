@@ -484,7 +484,7 @@ class DCParametersTomo(BaseModel):
     image_size_y: int
     pixel_size_on_image: str
     motion_corr_binning: int
-    manual_tilt_offset: float
+    tilt_offset: float
     file_extension: str
     acquisition_software: str
 

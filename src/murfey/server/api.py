@@ -280,8 +280,6 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
             "appid": tilt_series.autoproc_program_id,
             "stack_file": str(stack_file),
             "movie_id": tilt_series.movie_id,
-            "pix_size": tilt_series.pixel_size,
-            "manual_tilt_offset": tilt_series.manual_tilt_offset,
         },
     }
     if _transport_object:
