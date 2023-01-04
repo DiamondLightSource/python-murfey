@@ -88,6 +88,9 @@ class TransportManager:
             imageDirectory=record.imageDirectory,
             imageSuffix=record.imageSuffix,
             voltage=record.voltage,
+            pixelSizeOnImage=record.pixelSizeOnImage,
+            imageSizeX=record.imageSizeX,
+            imageSizeY=record.imageSizeY,
         )
         try:
             db.add(insert)

@@ -349,6 +349,9 @@ def feedback_callback(header: dict, message: dict) -> None:
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
             dataCollectionGroupId=global_state.get("data_collection_group_id"),
+            pixelSizeOnImage=message["pixel_size"],
+            imageSizeX=message["image_size_x"],
+            imageSizeY=message["image_size_y"],
         )
         dcid = _register(record, header, tag=message.get("tag"))
         if dcid is None and _transport_object:
