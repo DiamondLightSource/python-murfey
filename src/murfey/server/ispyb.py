@@ -44,19 +44,17 @@ class TransportManager:
         self._connection_callback: Callable | None = None
 
     def do_insert_data_collection_group(
-        self, record: DataCollectionGroup, message=None, **kwargs
+        self,
+        record: DataCollectionGroup,
+        message=None,
+        **kwargs,
     ):
-        dcgparams = self.ispyb.em_acquisition.get_data_collection_group_params()
-        dcgparams["parentid"] = record.sessionId
-        dcgparams["experimenttype"] = record.experimentType
         try:
-            data_collection_group_id = (
-                self.ispyb.em_acquisition.upsert_data_collection_group(
-                    list(dcgparams.values())
-                )
-            )
-            log.info(f"Created DataCollectionGroup {data_collection_group_id}")
-            return {"success": True, "return_value": data_collection_group_id}
+            db = Session()
+            db.add(record)
+            db.commit()
+            log.info(f"Created DataCollection {record.dataCollectionGroupId}")
+            return {"success": True, "return_value": record.dataCollectionGroupId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection Group entry caused exception '%s'.",
@@ -73,15 +71,14 @@ class TransportManager:
                     self._connection_callback()
             self.transport.send(queue, message)
 
-    def do_insert_data_collection(
-        self, record: DataCollection, db: sqlalchemy.orm.Session, message=None, **kwargs
-    ):
+    def do_insert_data_collection(self, record: DataCollection, message=None, **kwargs):
         comment = (
             f"Tilt series: {kwargs['tag']}"
             if kwargs.get("tag")
             else "Created for Murfey"
         )
         try:
+            db = Session()
             db.add(record(comments=comment))
             db.commit()
             log.info(f"Created DataCollection {record.dataCollectionId}")
