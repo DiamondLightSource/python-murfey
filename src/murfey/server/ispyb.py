@@ -81,22 +81,11 @@ class TransportManager:
             if kwargs.get("tag")
             else "Created for Murfey"
         )
-        insert = record(
-            dataCollectionGroupId=record.dataCollectionGroupId,
-            SESSIONID=record.SESSIONID,
-            comments=comment,
-            imageDirectory=record.imageDirectory,
-            imageSuffix=record.imageSuffix,
-            voltage=record.voltage,
-            pixelSizeOnImage=record.pixelSizeOnImage,
-            imageSizeX=record.imageSizeX,
-            imageSizeY=record.imageSizeY,
-        )
         try:
-            db.add(insert)
+            db.add(record(comments=comment))
             db.commit()
-            log.info(f"Created DataCollection {insert.dataCollectionId}")
-            return {"success": True, "return_value": insert.dataCollectionId}
+            log.info(f"Created DataCollection {record.dataCollectionId}")
+            return {"success": True, "return_value": record.dataCollectionId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection entry caused exception '%s'.",

@@ -331,9 +331,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             experimentType=message["experiment_type"],
             experimentTypeId=message["experiment_type_id"],
         )
-        print(record)
         dcgid = _register(record, header)
-        print(dcgid)
         if _transport_object:
             if dcgid is None:
                 _transport_object.transport.nack(header)
