@@ -73,24 +73,27 @@ class TransportManager:
                     self._connection_callback()
             self.transport.send(queue, message)
 
-    def do_insert_data_collection(self, record: DataCollection, message=None, **kwargs):
-        dc_params = self.ispyb.em_acquisition.get_data_collection_params()
-        dc_params["parentid"] = record.dataCollectionGroupId
-        dc_params["visitid"] = record.SESSIONID
-        dc_params["comments"] = (
+    def do_insert_data_collection(
+        self, record: DataCollection, db: sqlalchemy.orm.Session, message=None, **kwargs
+    ):
+        comment = (
             f"Tilt series: {kwargs['tag']}"
             if kwargs.get("tag")
             else "Created for Murfey"
         )
-        dc_params["imgdir"] = record.imageDirectory
-        dc_params["imgsuffix"] = record.imageSuffix
-        dc_params["voltage"] = record.voltage
+        insert = record(
+            dataCollectionGroupId=record.dataCollectionGroupId,
+            SESSIONID=record.SESSIONID,
+            comments=comment,
+            imageDirectory=record.imageDirectory,
+            imageSuffix=record.imageSuffix,
+            voltage=record.voltage,
+        )
         try:
-            data_collection_id = self.ispyb.em_acquisition.upsert_data_collection(
-                list(dc_params.values())
-            )
-            log.info(f"Created DataCollection {data_collection_id}")
-            return {"success": True, "return_value": data_collection_id}
+            db.add(insert)
+            db.commit()
+            log.info(f"Created DataCollection {insert.dataCollectionId}")
+            return {"success": True, "return_value": insert.dataCollectionId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection entry caused exception '%s'.",
