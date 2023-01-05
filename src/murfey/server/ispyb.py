@@ -89,7 +89,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
     def do_create_ispyb_job(self, record: ProcessingJob, rw=None, **kwargs):
         dcid = record.dataCollectionId
@@ -114,7 +114,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
     def do_update_processing_status(self, record: AutoProcProgram, **kwargs):
         ppid = record.autoProcProgramId
@@ -141,7 +141,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
 
 def _get_session() -> sqlalchemy.orm.Session:
