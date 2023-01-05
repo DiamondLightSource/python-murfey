@@ -28,7 +28,7 @@ import murfey.server.websocket
 from murfey.server.config import MachineConfig, from_file
 
 try:
-    from murfey.server.ispyb import DB, TransportManager  # Session
+    from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
 from murfey.util.state import global_state
@@ -427,7 +427,7 @@ def _(record: Base, header: dict, **kwargs):
         return None
     try:
         if isinstance(record, DataCollection):
-            return _transport_object.do_insert_data_collection(record, DB, **kwargs)[
+            return _transport_object.do_insert_data_collection(record, **kwargs)[
                 "return_value"
             ]
         if isinstance(record, DataCollectionGroup):
