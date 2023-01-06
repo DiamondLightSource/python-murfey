@@ -667,7 +667,7 @@ class TomographyContext(Context):
             )
             if ps_from_mag:
                 mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-                    float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+                    float(ps_from_mag) * 1e-10 / binning_factor
                 )
         if mdoc_metadata.get("pixel_size_on_image") is None:
             mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
