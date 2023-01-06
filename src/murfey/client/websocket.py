@@ -42,18 +42,16 @@ def registration_engine(env, attribute, old_value, value):
                         l(k, value[k]["em-tomo-preprocess"], ws=env.websocket)
     elif attribute == "motion_corrected_movies":
         _url = f"{str(env.url.geturl())}/visits/{env.visit}/align"
+        value = {Path(k): v for k, v in value.items()}
         for l in env.listeners.get("motion_corrected_movies", []):
-            if env.motion_corrected_movies:
+            if old_value:
                 for k in set(old_value.keys()) ^ set(
                     value.keys()
                 ):  # k is a path (key), v[k] is the value matching the key
-                    tilt = env.movie_tilt_pair[k]
+                    tilt = env.movie_tilt_pair[Path(k)]
                     file_tilt_list = []
                     for movie, angle in env.tilt_angles[tilt]:
-                        if movie in value:  # values["motion_corrected_movies"]:
-                            # file_tilt_list.append(
-                            #    [values["motion_corrected_movies"][movie], angle]
-                            # )
+                        if Path(movie) in value:  # values["motion_corrected_movies"]:
                             file_tilt_list.append(
                                 [
                                     str(value[Path(movie)][0]),
@@ -63,12 +61,14 @@ def registration_engine(env, attribute, old_value, value):
                             )
                     l(
                         k,
-                        value[k][0],
+                        value[Path(k)][0],
                         _url,
-                        env.processing_job_ids[k]["em-tomo-align"],
-                        env.autoproc_program_ids[k]["em-tomo-align"],
-                        value[k][1],
+                        env.data_collection_ids[tilt],
+                        env.processing_job_ids[tilt]["em-tomo-align"],
+                        env.autoproc_program_ids[tilt]["em-tomo-align"],
+                        value[Path(k)][1],
                         file_tilt_list,
+                        env.tilt_offset,
                     )
             else:
                 for k in value.keys():
@@ -78,7 +78,6 @@ def registration_engine(env, attribute, old_value, value):
                         tilt = env.movie_tilt_pair[k]
                         file_tilt_list = []
                         for movie, angle in env.tilt_angles[tilt]:
-                            # file_tilt_list.append([str(movie), angle])
                             file_tilt_list.append(
                                 [
                                     str(value[Path(movie)][0]),
@@ -222,7 +221,7 @@ class WSApp:
             try:
                 registration_engine(self.environment, attribute, old_value, value)
             except Exception as e:
-                log.info(f"Exception encountered in registration: {e}")
+                log.info(f"Exception encountered in registration: {e=}, {type(e)=}")
                 raise
 
     def _register_id_partial(self, attribute: str, value):
@@ -240,7 +239,7 @@ class WSApp:
                         self.environment, attribute, old_value, new_value
                     )
                 except Exception as e:
-                    log.info(f"Exception encountered in registration: {e}")
+                    log.info(f"Exception encountered in registration: {e=}, {type(e)=}")
                     raise
 
     def on_error(self, ws: websocket.WebSocketApp, error: websocket.WebSocketException):
