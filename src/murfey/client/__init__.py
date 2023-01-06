@@ -314,8 +314,7 @@ def run():
     rsync_process.subscribe(analyser.enqueue)
 
     rich_handler.redirect = True
-    MurfeyTUI.run(
-        log_verbosity=2,
+    app = MurfeyTUI(
         environment=instance_environment,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
@@ -326,6 +325,7 @@ def run():
         analyser=analyser,
         gain_ref=gain_ref,
     )
+    app.run()
     rich_handler.redirect = False
 
     try:

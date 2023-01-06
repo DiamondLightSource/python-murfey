@@ -29,12 +29,15 @@ from rich.box import MINIMAL, SQUARE
 from rich.logging import RichHandler
 from rich.panel import Panel
 from textual import events
-from textual.app import App
+from textual.app import App, ComposeResult
+from textual.containers import Vertical, Horizontal, Grid
 from textual.keys import Keys
 from textual.reactive import Reactive
-from textual.views import DockView
+from textual.screen import Screen
+#from textual.views import DockView
 from textual.widget import Widget
-from textual.widgets import ScrollView
+from textual.widgets import Button, Static, Header, Footer, Input, Label
+from textual.scroll_view import ScrollView
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import SPAContext, TomographyContext
@@ -55,7 +58,6 @@ ReactiveType = TypeVar("ReactiveType")
 #         yield
 #     finally:
 #         lock.release()
-
 
 class InputResponse(NamedTuple):
     question: str
@@ -239,7 +241,7 @@ class InputBox(Widget):
     _question: str = ""
     _form: Reactive[OrderedDict] = Reactive(OrderedDict({}))
 
-    def __init__(self, app, queue: Queue | None = None):
+    def __init__(self, app, queue: Queue | None = None, **kwargs):
         self._app_reference = app
         self._queue: Queue = queue or Queue()
         # self._form: dict = {}
@@ -247,7 +249,7 @@ class InputBox(Widget):
         self._form_keys: List[str] = []
         self._unanswered_message = False
         self._model: BaseModel | None = None
-        super().__init__()
+        super().__init__(**kwargs)
 
     @property
     def _num_lines(self):
@@ -298,16 +300,15 @@ class InputBox(Widget):
             panel_msg = f"[white]❯[/white] {self.input_text}[blink]\u275a[/blink]"
         return Panel(
             panel_msg,
-            style=(
-                "on blue"
-                if self.mouse_over and not self._unanswered_message
-                else "on deep_pink4"
-                if self.mouse_over and self._unanswered_message
-                else "on red"
-                if self._unanswered_message
-                else ""
-            ),
-            box=SQUARE,
+            # style=(
+            #     "on blue"
+            #     if self.mouse_over and not self._unanswered_message
+            #     else "on deep_pink4"
+            #     if self.mouse_over and self._unanswered_message
+            #     else "on red"
+            #     if self._unanswered_message
+            #     else ""
+            # ),
         )
 
     def on_mount(self):
@@ -322,12 +323,12 @@ class InputBox(Widget):
     async def on_enter(self) -> None:
         if not self.lock:
             self.mouse_over = True
-            await self.focus()
+            self.focus()
 
     async def on_leave(self) -> None:
         if not self.lock:
             self.mouse_over = False
-            await self._app_reference.set_focus(None)
+            self._app_reference.set_focus(None)
 
     async def on_key(self, key: events.Key) -> None:
         if key.key == Keys.ControlH and (
@@ -488,8 +489,22 @@ class DCParametersTomo(BaseModel):
     file_extension: str
     acquisition_software: str
 
+class LaunchScreen(Screen):
+    CSS_PATH = "launcher.css"
+
+    def compose(self):
+        yield Static("Launch?", id="launch-text")
+        yield Button("Yes", id="launch")
+        yield Button("No", id="quit")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "quit":
+            self.app.exit()
+        else:
+            self.app.pop_screen()
 
 class MurfeyTUI(App):
+    CSS_PATH = "controller.css"
     input_box: InputBox
     log_book: ScrollView
     hover: List[str]
@@ -532,7 +547,9 @@ class MurfeyTUI(App):
         self.rsync_process = rsync_process
         self.analyser = analyser
         self._data_collection_form_complete = False
-        self._info_widget = InfoWidget("Welcome to Murfey :microscope: \n")
+        self._info_widget = InfoWidget("Welcome to Murfey :microscope: \n", id="info")
+        self._form_values = {}
+        self._form_readable_labels = {}
 
     @property
     def role(self) -> str:
@@ -715,54 +732,178 @@ class MurfeyTUI(App):
             self._request_destinations = True
 
     async def on_load(self, event):
-        await self.bind("q", "quit", show=True)
-        await self.bind("c", "clear", show=True)
+        self.bind("q", "quit", show=True)
+        self.bind("c", "clear", show=True)
+
+    def compose(self) -> ComposeResult:
+        self.input_box = InputBox(self, queue=self._queues.get("input"), id="input")
+        self.log_book = LogBook(self._queues["logs"], id="log_book")
+        # self._statusbar = StatusBar()
+        # self.hovers = (
+        #     [HoverVisit(v) for v in self.visits]
+        #     if len(self.visits)
+        #     else [HoverVisit("No ongoing visits found")]
+        # )
+        self.hovers = (
+            [Button(v, id="visit-btn") for v in self.visits]
+            if len(self.visits)
+            else [Button("No ongoing visits found")]
+        )
+        visit_select = Vertical(*self.hovers, id="visit-select")
+        # for h in self.hovers:
+        #     visit_select.mount(h)
+        inputs = []
+        for t in ("Pixel Size", "Magnification", "Image Size X", "Image Size Y", "Dose", "Gain Reference"):
+            inputs.append(Label(t, classes="label"))
+            inputs.append(Input(placeholder=t, classes="input"))
+        input_grid = Grid(*inputs, id="input-grid")
+        confirm_btn = Button("Confirm", id="confirm-btn")
+        input_form = Vertical(*inputs, confirm_btn, id="input-form")
+        yield Header()
+        yield visit_select
+        yield self.log_book
+        yield input_form
+        yield self._info_widget
+        yield Footer()
+
+    def on_input_changed(self, event: Input.Changed):
+        self._form_values[event.input.placeholder] = event.value
+
+    def on_input_submitted(self, event: Input.Submitted):
+        event.input.has_focus = False
+        self.screen.focused = None
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button._id == "confirm-btn":
+            for k, v in self._form_values.items(): 
+                self._info_widget.text += f"\n {k}: {v}"
+            return
+        self.input_box.lock = False
+        text = str(event.button.label)
+        self._visit = text
+        self._environment.visit = text
+        machine_data = requests.get(
+            f"{self._environment.url.geturl()}/machine/"
+        ).json()
+        _default = ""
+        visit_path = ""
+        if self._default_destination:
+            visit_path = self._default_destination + f"/{text}"
+            if (
+                self._environment.processing_only_mode
+                and self._environment.source
+            ):
+                _default = str(self._environment.source.resolve()) or str(
+                    Path.cwd()
+                )
+            elif machine_data.get("data_directories"):
+                for data_dir in machine_data["data_directories"].keys():
+                    if (
+                        self._environment.source
+                        and self._environment.source.resolve()
+                        == Path(data_dir)
+                    ):
+                        _default = (
+                            self._default_destination + f"/{text}"
+                        )
+                        if self.analyser:
+                            self.analyser._role = machine_data[
+                                "data_directories"
+                            ][data_dir]
+                        break
+                    elif self._environment.source:
+                        try:
+                            mid_path = self._environment.source.resolve().relative_to(
+                                data_dir
+                            )
+                            if (
+                                machine_data["data_directories"][data_dir]
+                                == "detector"
+                            ):
+                                suggested_path_response = requests.post(
+                                    url=f"{str(self._url.geturl())}/visits/{text}/suggested_path",
+                                    json={
+                                        "base_path": f"{self._default_destination}/{text}/{mid_path.parent}/raw"
+                                    },
+                                )
+                                _default = suggested_path_response.json().get(
+                                    "suggested_path"
+                                )
+                            else:
+                                _default = f"{self._default_destination}/{text}/{mid_path}"
+                            if self.analyser:
+                                self.analyser._role = machine_data[
+                                    "data_directories"
+                                ][data_dir]
+                            break
+                        except (ValueError, KeyError):
+                            _default = ""
+                else:
+                    _default = ""
+            else:
+                _default = self._default_destination + f"/{text}"
+        else:
+            _default = "unknown"
+        if self._environment.processing_only_mode:
+            self._start_rsyncer(_default, visit_path=visit_path)
+        else:
+            self._queues["input"].put_nowait(
+                InputResponse(
+                    question="Transfer to: ",
+                    default=_default,
+                    callback=partial(
+                        self._start_rsyncer, visit_path=visit_path
+                    ),
+                )
+            )
+
 
     async def on_mount(self) -> None:
-        self.input_box = InputBox(self, queue=self._queues.get("input"))
-        self.log_book = LogBook(self._queues["logs"])
-        # self._statusbar = StatusBar()
-        self.hovers = (
-            [HoverVisit(v) for v in self.visits]
-            if len(self.visits)
-            else [HoverVisit("No ongoing visits found")]
-        )
+        self.push_screen(LaunchScreen())
+        # self.input_box = InputBox(self, queue=self._queues.get("input"))
+        # self.log_book = LogBook(self._queues["logs"])
+        # # self._statusbar = StatusBar()
+        # self.hovers = (
+        #     [HoverVisit(v) for v in self.visits]
+        #     if len(self.visits)
+        #     else [HoverVisit("No ongoing visits found")]
+        # )
 
-        grid = await self.view.dock_grid(edge="left")
+        # grid = await self.view.dock_grid(edge="left")
 
-        grid.add_column(fraction=1, name="left")
-        grid.add_column(fraction=1, name="right")
-        grid.add_row(fraction=1, name="top")
-        grid.add_row(fraction=1, name="middle")
-        grid.add_row(fraction=1, name="bottom")
+        # grid.add_column(fraction=1, name="left")
+        # grid.add_column(fraction=1, name="right")
+        # grid.add_row(fraction=1, name="top")
+        # grid.add_row(fraction=1, name="middle")
+        # grid.add_row(fraction=1, name="bottom")
 
-        grid.add_areas(
-            area1="left,top",
-            area2="right,top-start|bottom-end",
-            # area3="left,middle",
-            area3="left,middle-start|bottom-end",
-        )
+        # grid.add_areas(
+        #     area1="left,top",
+        #     area2="right,top-start|bottom-end",
+        #     # area3="left,middle",
+        #     area3="left,middle-start|bottom-end",
+        # )
 
-        sub_view = DockView()
-        await sub_view.dock(*self.hovers, edge="top")
+        # sub_view = DockView()
+        # await sub_view.dock(*self.hovers, edge="top")
 
-        info_sub_view = DockView()
-        await info_sub_view.dock(self.input_box, self._info_widget, edge="top")
+        # info_sub_view = DockView()
+        # await info_sub_view.dock(self.input_box, self._info_widget, edge="top")
 
-        grid.place(
-            area1=sub_view,
-            area2=self.log_book,
-            # area3=self._statusbar,
-            # area4=self.input_box,
-            area3=info_sub_view,
-        )
+        # grid.place(
+        #     area1=sub_view,
+        #     area2=self.log_book,
+        #     # area3=self._statusbar,
+        #     # area4=self.input_box,
+        #     area3=info_sub_view,
+        # )
 
     async def action_quit(self) -> None:
         if self.rsync_process:
             self.rsync_process.stop()
         if self.analyser:
             self.analyser.stop()
-        await self.shutdown()
+        self.exit()
 
     async def action_clear(self) -> None:
         destination = ""

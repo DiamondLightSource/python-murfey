@@ -5,10 +5,11 @@ from typing import Any
 
 
 class TUIFormValue(UserString):
-    def __init__(self, seq: Any, top: bool = False, colour: str = ""):
+    def __init__(self, seq: Any, top: bool = False, colour: str = "", readable_label: str = ""):
         super().__init__(seq)
         self._top = top
         self._colour = colour
+        self.readable_label = readable_label or str(seq)
 
     def __str__(self):
         if self._colour:

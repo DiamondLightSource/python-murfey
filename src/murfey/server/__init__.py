@@ -29,7 +29,7 @@ from murfey.server.config import MachineConfig, from_file
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
-except AttributeError:
+except AttributeError as e:
     pass
 from murfey.util.state import global_state
 
