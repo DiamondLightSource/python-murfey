@@ -19,11 +19,13 @@ from murfey.server import _transport_object, get_hostname, get_microscope
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
+from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
     ContextInfo,
     DCGroupParameters,
     DCParameters,
     File,
+    GainReference,
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
@@ -421,3 +423,13 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
+
+
+@router.post("/visits/{visit_name}/process_gain")
+async def process_gain(visit_name, gain_reference_params: GainReference):
+    camera = getattr(Camera, machine_config.camera)
+    executables = machine_config.external_executables
+    new_gain_ref = await prepare_gain(
+        camera, gain_reference_params.gain_ref, executables
+    )
+    return {"gain_ref": new_gain_ref}

@@ -97,3 +97,7 @@ class ProcessingJobParameters(BaseModel):
 class RegistrationMessage(BaseModel):
     registration: str
     params: Optional[Dict[str, Any]] = None
+
+
+class GainReference(BaseModel):
+    gain_ref: Path
