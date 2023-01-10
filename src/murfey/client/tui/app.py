@@ -484,7 +484,7 @@ class DCParametersTomo(BaseModel):
     image_size_y: int
     pixel_size_on_image: str
     motion_corr_binning: int
-    tilt_offset: float
+    manual_tilt_offset: float
     file_extension: str
     acquisition_software: str
 
@@ -548,7 +548,7 @@ class MurfeyTUI(App):
                 gain_rsync = procrunner.run(
                     [
                         "rsync",
-                        str(self._enviornment.gain_ref),
+                        str(self._environment.gain_ref),
                         f"{self._url.hostname}::{visit_path}/processing",
                     ]
                 )
@@ -556,6 +556,12 @@ class MurfeyTUI(App):
                     log.warning(
                         f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
                     )
+                else:
+                    url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/process_gain"
+                    post_response = requests.post(
+                        url, {"gain_ref": self._environment.gain_ref}
+                    )
+                    self._environment.gain_ref = post_response.json().get("gain_ref")
         if not self.rsync_process:
             self.rsync_process = RSyncer(
                 self._source,

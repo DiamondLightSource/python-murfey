@@ -19,11 +19,13 @@ from murfey.server import _transport_object, get_hostname, get_microscope
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
+from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
     ContextInfo,
     DCGroupParameters,
     DCParameters,
     File,
+    GainReference,
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
@@ -280,6 +282,8 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
             "appid": tilt_series.autoproc_program_id,
             "stack_file": str(stack_file),
             "movie_id": tilt_series.movie_id,
+            "pix_size": tilt_series.pixel_size,
+            "manual_tilt_offset": tilt_series.manual_tilt_offset,
         },
     }
     if _transport_object:
@@ -419,3 +423,13 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
+
+
+@router.post("/visits/{visit_name}/process_gain")
+async def process_gain(visit_name, gain_reference_params: GainReference):
+    camera = getattr(Camera, machine_config.camera)
+    executables = machine_config.external_executables
+    new_gain_ref = await prepare_gain(
+        camera, gain_reference_params.gain_ref, executables
+    )
+    return {"gain_ref": new_gain_ref}
