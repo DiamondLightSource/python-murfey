@@ -142,7 +142,7 @@ def run():
         "--fake-dc",
         action="store_true",
         default=False,
-        help="Actually perform data collection related calls to API (will do inserts in ISPyB)",
+        help="Do not perform data collection related calls to API (avoids database inserts)",
     )
     parser.add_argument(
         "--time-based-transfer",
