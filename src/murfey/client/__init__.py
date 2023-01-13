@@ -237,7 +237,8 @@ def run():
     log_queue = Queue()
     input_queue = Queue()
 
-    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    # rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    rich_handler = DirectableRichHandler(enable_link_path=False)
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
@@ -324,6 +325,7 @@ def run():
         rsync_process=rsync_process,
         analyser=analyser,
         gain_ref=gain_ref,
+        redirected_logger=rich_handler,
     )
     app.run()
     rich_handler.redirect = False
