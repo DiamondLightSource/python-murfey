@@ -186,32 +186,52 @@ class ConfirmScreen(Screen):
 
 
 class ProcessingForm(Screen):
+    _form = Reactive({})
+    _vert = None
+
     def __init__(self, form: dict, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._form = form
+        self._readable_labels = {
+            "experiment_type": "Experiment Type",
+            "voltage": "Voltage",
+            "image_size_x": "Image Size X",
+            "image_size_y": "Image Size Y",
+            "pixel_size_on_image": "Pixel Size",
+            "motion_corr_binning": "Motion Correction Binning",
+            "gain_ref": "Gain Reference",
+            "dose_per_frame": "Dose Per Frame",
+            "tilt_offset": "Tilt Offset",
+            "file_extension": "File Extension",
+            "acquisition_software": "Acquisition Software",
+        }
 
     def compose(self):
         inputs = []
-        for t in (
-            "Pixel Size",
-            "Magnification",
-            "Image Size X",
-            "Image Size Y",
-            "Dose",
-            "Gain Reference",
-        ):
+        for k, v in self._form.items():
+            t = self._readable_labels.get(k, k)
             inputs.append(Label(t, classes="label"))
-            inputs.append(Input(placeholder=t, classes="input"))
+            i = Input(placeholder=t, classes="input")
+            i.value = v
+            inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
-        yield Vertical(*inputs, confirm_btn, id="input-form")
+        self._vert = Vertical(*inputs, confirm_btn, id="input-form")
+        yield self._vert
         yield confirm_btn
 
     def on_button_pressed(self, event):
         for k, v in self._form.items():
-            self.app._info_widget.write(f"{k}: {v}")
+            self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
-                ConfirmScreen("Launch processing?", params=self._form), "confirm"
+                ConfirmScreen(
+                    "Launch processing?",
+                    params={
+                        self._readable_labels.get(k, k): v
+                        for k, v in self._form.items()
+                    },
+                ),
+                "confirm",
             )
         self.app.push_screen("confirm")
 
@@ -314,15 +334,20 @@ class DestinationSelect(Screen):
     def __init__(self, destination: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._destination = destination
+        self._input = Input(placeholder="Destination")
 
     def compose(self):
-        dest_input = Input(placeholder="Destination", value=self._destination)
-        yield dest_input
-        dest_input.focus()
+        yield self._input
+
+    def on_mount(self):
+        self._input.value = self._destination
+        self._input.focus()
 
     def on_input_submitted(self, event):
         self._destination = event.value
         self.app._default_destination = self._destination
+        self.app._register_dc = True
+        self.app._start_rsyncer(self._destination)
         self.app.pop_screen()
 
 
@@ -331,10 +356,12 @@ class MurfeyTUI(App):
     SCREENS = {"launcher": LaunchScreen()}
     log_book: TextLog
     processing_btn: Button
+    processing_form: ProcessingForm
     hover: List[str]
     visits: List[str]
     rsync_process: RSyncer | None = None
     analyser: Analyser | None = None
+    _form_values: dict = Reactive({})
 
     def __init__(
         self,
@@ -373,7 +400,6 @@ class MurfeyTUI(App):
         self.analyser = analyser
         self._data_collection_form_complete = False
         self._info_widget = TextLog(id="info", markup=True)
-        self._form_values: dict = {}
         self._form_readable_labels: dict = {}
         self._redirected_logger = redirected_logger
 
@@ -476,20 +502,9 @@ class MurfeyTUI(App):
         if self._data_collection_form_complete:
             return
         if self._register_dc and response.get("form"):
-            self._queues["input"].put_nowait(
-                InputResponse(
-                    question="Data collection parameters:", form=response["form"]
-                )
-            )
+            self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
+            self.processing_btn.disabled = False
             self._data_collection_form_complete = True
-        elif response.get("allowed_responses"):
-            self._queues["input"].put_nowait(
-                InputResponse(
-                    question="Would you like to start a data collection?",
-                    allowed_responses=response["allowed_responses"],
-                    callback=self._set_register_dc,
-                )
-            )
         elif self._register_dc is None:
             self._tmp_responses.append(response)
             self._data_collection_form_complete = True
@@ -563,6 +578,10 @@ class MurfeyTUI(App):
         self.bind("c", "clear", description="Remove copied data and quit", show=True)
         self.bind("p", "process", description="Allow processing", show=True)
 
+    def _install_processing_form(self):
+        self.processing_form = ProcessingForm(self._form_values)
+        self.install_screen(self.processing_form, "processing-form")
+
     def compose(self) -> ComposeResult:
         self.log_book = TextLog(id="log_book", wrap=True, max_lines=200)
         if self._redirected_logger:
@@ -585,7 +604,7 @@ class MurfeyTUI(App):
         ):
             inputs.append(Label(t, classes="label"))
             inputs.append(Input(placeholder=t, classes="input"))
-        self.install_screen(ProcessingForm(self._form_values), "processing-form")
+        self.processing_form = ProcessingForm(self._form_values)
         yield Header()
         yield self._info_widget
         yield self.log_book
@@ -595,15 +614,13 @@ class MurfeyTUI(App):
         yield self.processing_btn
         yield Footer()
 
-    def on_input_changed(self, event: Input.Changed):
-        self._form_values[event.input.placeholder] = event.value
-
     def on_input_submitted(self, event: Input.Submitted):
         event.input.has_focus = False
         self.screen.focused = None
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button._id == "processing-btn":
+            self._install_processing_form()
             self.push_screen("processing-form")
 
     async def on_mount(self) -> None:

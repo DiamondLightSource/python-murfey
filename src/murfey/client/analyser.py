@@ -89,7 +89,6 @@ class Analyser(Observer):
     def _analyse(self):
         logger.info("Analyser thread started")
         mdoc_for_reading = None
-        data_collection_question = False
         while not self._halt_thread:
             transferred_file = self.queue.get()
             if not transferred_file:
@@ -139,8 +138,6 @@ class Analyser(Observer):
                             # continue
                         else:
                             self._unseen_xml = []
-                            if data_collection_question:
-                                self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
@@ -166,7 +163,6 @@ class Analyser(Observer):
                             self._unseen_xml.append(transferred_file)
                         if dc_metadata:
                             self._unseen_xml = []
-                            self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
@@ -193,7 +189,6 @@ class Analyser(Observer):
         if not self._stopping:
             absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
-            # self.queue.put(file_path)
 
     def start(self):
         if self.thread.is_alive():

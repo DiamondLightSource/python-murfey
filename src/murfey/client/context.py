@@ -652,9 +652,7 @@ class TomographyContext(Context):
         )
         mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
-        mdoc_metadata["dose_per_frame"] = TUIFormValue(
-            None, top=True, colour="dark_orange"
-        )
+        mdoc_metadata["dose_per_frame"] = TUIFormValue(None, top=True)
         mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
