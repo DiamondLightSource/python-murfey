@@ -57,7 +57,9 @@ class Context:
     def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
         self.post_transfer(transferred_file, role=role, **kwargs)
 
-    def gather_metadata(self, metadata_file: Path):
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
@@ -605,7 +607,9 @@ class TomographyContext(Context):
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 
-    def gather_metadata(self, metadata_file: Path) -> OrderedDict:
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ) -> OrderedDict:
         if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
@@ -652,10 +656,29 @@ class TomographyContext(Context):
         mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
         mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
         mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
-        mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-            float(mdoc_data["PixelSpacing"]) * 1e-10
-        )
-        mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
+        mdoc_metadata["magnification"] = TUIFormValue(int(mdoc_data["Magnification"]))
+        superres_binning = int(mdoc_data["Binning"])
+        binning_factor = 1
+        if environment:
+            server_config = requests.get(
+                f"{str(environment.url.geturl())}/machine/"
+            ).json()
+            if server_config.get("superres") and superres_binning == 1:
+                binning_factor = 2
+            ps_from_mag = (
+                server_config.get("calibrations", {})
+                .get("magnification", {})
+                .get(int(mdoc_data["Magnification"]))
+            )
+            if ps_from_mag:
+                mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(ps_from_mag) * 1e-10 / binning_factor
+                )
+        if mdoc_metadata.get("pixel_size_on_image") is None:
+            mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+                float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+            )
+        mdoc_metadata["motion_corr_binning"] = TUIFormValue(binning_factor)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             None, top=True, colour="dark_orange"
@@ -663,5 +686,4 @@ class TomographyContext(Context):
         mdoc_metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
-        # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata
