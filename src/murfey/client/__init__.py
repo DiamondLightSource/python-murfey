@@ -257,20 +257,6 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
-
-    # if start_dc == "y":
-    #     image_directory = str(args.destination)
-    #     image_suffix = Prompt.ask("Enter the image suffix", choices=[".tiff", ".tif", ".mrc", ".eer"])
-    #     visit = str(args.visit)
-    #     dc_params = {
-    #         "type": "start_dc",
-    #         "image_directory": image_directory,
-    #         "image_suffix": image_suffix,
-    #         "visit": visit,
-    #     }
-    #     ws.send(json.dumps(dc_params))
-
     status_bar = StatusBar()
     source_watcher = murfey.client.watchdir.DirWatcher(
         args.source, settling_time=1, status_bar=status_bar

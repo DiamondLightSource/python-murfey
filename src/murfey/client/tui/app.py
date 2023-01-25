@@ -711,7 +711,11 @@ class MurfeyTUI(App):
             dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
             requests.post(url, json=dcg_data)
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            json = {"tag": str(self._environment.source), **json}
             requests.post(url, json=json)
+            self._environment.listeners["autoproc_program_ids"] = {
+                self.analyser._context._launch_spa_pipeline
+            }
 
     def _update_info(self, new_text: str):
         self._info_widget.text = new_text

@@ -64,8 +64,85 @@ class Context:
 
 
 class SPAContext(Context):
-    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
+    def __init__(self, acquisition_software: str):
+        self.acquisition_software = acquisition_software
+        self._processing_job_stash: dict = {}
+        self._preprocessing_triggers: dict = {}
+
+    def _flush_processing_job(*args):
         pass
+
+    def _complete_process_file(*args):
+        pass
+
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        if role == "detector" and environment:
+            proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+            source = str(environment.source)
+            if environment.data_collection_ids.get(source) is None:
+                self._processing_job_stash[source] = [
+                    (
+                        proc_url,
+                        {"tag": source, "recipe": "relion"},
+                    )
+                ]
+            else:
+                if self._processing_job_stash.get(source):
+                    # self._flush_processing_job(source)
+                    pass
+                requests.post(
+                    proc_url,
+                    json={"tag": source, "recipe": "relion"},
+                )
+
+    def _launch_spa_pipeline(self, tag: str, app_id: int):
+        if tag_tr := self._preprocessing_triggers.get(tag):
+            for tr in tag_tr:
+                process_file = None  # self._complete_process_file(tr[1], tr[2], app_id)
+                if process_file:
+                    requests.post(tr[0], json=process_file)
+            self._preprocessing_triggers.pop(tag)
+
+    def gather_metadata(self, metadata_file: Path):
+        if metadata_file.suffix != ".xml":
+            raise ValueError(
+                f"SPA gather_metadata method expected xml file not {metadata_file.name}"
+            )
+        if not metadata_file.is_file():
+            logger.debug(f"Metadata file {metadata_file} not found")
+            return OrderedDict({})
+        with open(metadata_file, "r") as xml:
+            try:
+                for_parsing = xml.read()
+            except Exception:
+                logger.warning(f"Failed to parse file {metadata_file}")
+                return OrderedDict({})
+            data = xmltodict.parse(for_parsing)
+        metadata: OrderedDict = OrderedDict({})
+        metadata["experiment_type"] = TUIFormValue("tomography")
+        metadata["voltage"] = TUIFormValue(300)
+        metadata["image_size_x"] = TUIFormValue(
+            data["Acquisition"]["Info"]["ImageSize"]["Width"]
+        )
+        metadata["image_size_y"] = TUIFormValue(
+            data["Acquisition"]["Info"]["ImageSize"]["Height"]
+        )
+        metadata["pixel_size_on_image"] = TUIFormValue(
+            float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+        )
+        metadata["motion_corr_binning"] = TUIFormValue(1)
+        metadata["gain_ref"] = TUIFormValue(None, top=True)
+        metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+        metadata.move_to_end("gain_ref", last=False)
+        metadata.move_to_end("dose_per_frame", last=False)
+        return metadata
 
 
 class ProcessFileIncomplete(BaseModel):
@@ -101,19 +178,15 @@ class TomographyContext(Context):
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        # logger.info(
-        #     f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
-        # )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str, app_id: int):
-        # logger.info(f"Flushing preprocessing requests {tag}")
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
-                process_file = self._complete_process_file(tr[1], tr[2], app_id)
+                process_file = None  # self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
                     requests.post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
