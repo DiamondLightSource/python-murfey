@@ -145,6 +145,7 @@ class LaunchScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
+            exit()
         else:
             self.app._environment.source = (
                 Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path
@@ -156,10 +157,18 @@ class LaunchScreen(Screen):
 
 
 class ConfirmScreen(Screen):
-    def __init__(self, prompt: str, *args, params: dict | None = None, **kwargs):
+    def __init__(
+        self,
+        prompt: str,
+        *args,
+        params: dict | None = None,
+        pressed_callback: Callable | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._prompt = prompt
         self._params = params or {}
+        self._callback = pressed_callback
 
     def compose(self):
         if self._params:
@@ -183,6 +192,8 @@ class ConfirmScreen(Screen):
                 except ScreenStackError:
                     break
             self.app.uninstall_screen("confirm")
+        if self._callback and event.button.id == "launch":
+            self._callback(params=self._params)
 
 
 class ProcessingForm(Screen):
@@ -205,6 +216,7 @@ class ProcessingForm(Screen):
             "file_extension": "File Extension",
             "acquisition_software": "Acquisition Software",
         }
+        self._inputs: Dict[Input, str] = {}
 
     def compose(self):
         inputs = []
@@ -212,6 +224,7 @@ class ProcessingForm(Screen):
             t = self._readable_labels.get(k, k)
             inputs.append(Label(t, classes="label"))
             i = Input(placeholder=t, classes="input")
+            self._inputs[i] = k
             i.value = v
             inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
@@ -219,9 +232,18 @@ class ProcessingForm(Screen):
         yield self._vert
         yield confirm_btn
 
+    def _write_params(self, params: dict | None = None):
+        if params:
+            for k, v in params.items():
+                self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
+
+    def on_input_submitted(self, event):
+        k = self._inputs[event.input]
+        self._form[k] = event.value
+
     def on_button_pressed(self, event):
-        for k, v in self._form.items():
-            self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
+        # for k, v in self._form.items():
+        #    self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
                 ConfirmScreen(
@@ -230,6 +252,7 @@ class ProcessingForm(Screen):
                         self._readable_labels.get(k, k): v
                         for k, v in self._form.items()
                     },
+                    pressed_callback=self._write_params,
                 ),
                 "confirm",
             )
