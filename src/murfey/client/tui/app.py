@@ -18,7 +18,7 @@ from rich.box import SQUARE
 from rich.panel import Panel
 from textual.app import App, ComposeResult, ScreenStackError
 from textual.containers import Vertical
-from textual.reactive import Reactive
+from textual.reactive import Reactive, watch
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import (
@@ -118,9 +118,12 @@ class DCParametersTomo(BaseModel):
 
 
 class _DirectoryTree(DirectoryTree):
-    def __init__(self, *args, **kwargs):
+    valid_selection = Reactive(False)
+
+    def __init__(self, *args, data_directories: dict | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._selected_path = self.path
+        self._data_directories = data_directories or {}
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
@@ -129,18 +132,57 @@ class _DirectoryTree(DirectoryTree):
             return
         if dir_entry.is_dir:
             self._selected_path = dir_entry.path
+            for d in self._data_directories:
+                if Path(self._selected_path).resolve().is_relative_to(d):
+                    self.valid_selection = True
+                    break
+            else:
+                self.valid_selection = False
         else:
+            self.valid_selection = False
             self.emit_no_wait(self.FileSelected(self, dir_entry.path))
 
 
 class LaunchScreen(Screen):
     _selected_dir = Path(".")
+    _launch_btn: Button | None = None
 
     def compose(self):
-        self._dir_tree = _DirectoryTree("./", id="dir-select")
+        machine_data = requests.get(
+            f"{self.app._environment.url.geturl()}/machine/"
+        ).json()
+        self._dir_tree = _DirectoryTree(
+            "./",
+            data_directories=machine_data.get("data_directories", {}),
+            id="dir-select",
+        )
         yield self._dir_tree
-        yield Button("Launch", id="launch")
+        btn_disabled = True
+        for d in machine_data.get("data_directories", {}).keys():
+            if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
+                btn_disabled = False
+                break
+        self._launch_btn = Button("Launch", id="launch", disabled=btn_disabled)
+        watch(self._dir_tree, "valid_selection", self._check_valid_selection)
+        yield self._launch_btn
         yield Button("Quit", id="quit")
+
+    def _check_valid_selection(self, valid: bool):
+        if self._launch_btn:
+            if valid:
+                self._launch_btn.disabled = False
+            else:
+                self._launch_btn.disabled = True
+
+    # def on_tree_node_expanded(self, event):
+    #    log.info("node expanded")
+    #    machine_data = requests.get(
+    #        f"{self.app._environment.url.geturl()}/machine/"
+    #    ).json()
+    #    for d in machine_data.get("data_directories", []):
+    #        if Path(self._dir_tree.path).resolve().relative_to(d):
+    #            return
+    #    event.node.collapse()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
