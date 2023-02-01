@@ -174,16 +174,6 @@ class LaunchScreen(Screen):
             else:
                 self._launch_btn.disabled = True
 
-    # def on_tree_node_expanded(self, event):
-    #    log.info("node expanded")
-    #    machine_data = requests.get(
-    #        f"{self.app._environment.url.geturl()}/machine/"
-    #    ).json()
-    #    for d in machine_data.get("data_directories", []):
-    #        if Path(self._dir_tree.path).resolve().relative_to(d):
-    #            return
-    #    event.node.collapse()
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
