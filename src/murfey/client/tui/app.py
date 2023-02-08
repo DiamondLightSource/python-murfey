@@ -4,7 +4,7 @@ import asyncio
 
 # import contextlib
 import logging
-import threading
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 from queue import Queue
@@ -40,6 +40,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import TUIFormValue
 from murfey.client.tui.status_bar import StatusBar
+from murfey.client.watchdir import DirWatcher
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -104,6 +105,7 @@ def validate_form(form: dict, model: BaseModel) -> dict:
 
 
 class DCParametersTomo(BaseModel):
+    source: Path
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -163,28 +165,38 @@ class LaunchScreen(Screen):
                 btn_disabled = False
                 break
         self._launch_btn = Button("Launch", id="launch", disabled=btn_disabled)
+        self._add_btn = Button("Add directory", id="add", disabled=btn_disabled)
         watch(self._dir_tree, "valid_selection", self._check_valid_selection)
+        yield self._add_btn
         yield self._launch_btn
         yield Button("Quit", id="quit")
 
     def _check_valid_selection(self, valid: bool):
-        if self._launch_btn:
+        if self._add_btn:
             if valid:
-                self._launch_btn.disabled = False
+                self._add_btn.disabled = False
             else:
-                self._launch_btn.disabled = True
+                self._add_btn.disabled = True
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
             exit()
-        else:
-            self.app._environment.source = (
-                Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path
-            )
+        elif event.button.id == "add":
+            source = Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path
+            self.app._environment.sources.append(source)
+            machine_data = requests.get(
+                f"{self.app._environment.url.geturl()}/machine/"
+            ).json()
+            self.app._default_destinations[
+                source
+            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
             self.app._info_widget.write(
                 f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}"
             )
+            if self._launch_btn:
+                self._launch_btn.disabled = False
+        else:
             self.app.pop_screen()
 
 
@@ -313,8 +325,8 @@ class VisitSelection(Screen):
         ).json()
         _default = ""
         visit_path = ""
-        if self.app._default_destination:
-            visit_path = self.app._default_destination + f"/{text}"
+        for i, (s, defd) in enumerate(self.app._default_destinations.items()):
+            visit_path = defd + f"/{text}"
             if (
                 self.app._environment.processing_only_mode
                 and self.app._environment.source
@@ -324,39 +336,30 @@ class VisitSelection(Screen):
                 )
             elif machine_data.get("data_directories"):
                 for data_dir in machine_data["data_directories"].keys():
-                    if (
-                        self.app._environment.source
-                        and self.app._environment.source.resolve() == Path(data_dir)
-                    ):
-                        _default = self.app._default_destination + f"/{text}"
-                        if self.app.analyser:
-                            self.app.analyser._role = machine_data["data_directories"][
-                                data_dir
-                            ]
+                    if s.resolve() == Path(data_dir):
+                        _default = defd + f"/{text}"
+                        if self.app.analysers.get(s):
+                            self.app.analysers[s]._role = machine_data[
+                                "data_directories"
+                            ][data_dir]
                         break
-                    elif self.app._environment.source:
+                    else:
                         try:
-                            mid_path = (
-                                self.app._environment.source.resolve().relative_to(
-                                    data_dir
-                                )
-                            )
+                            mid_path = s.resolve().relative_to(data_dir)
                             if machine_data["data_directories"][data_dir] == "detector":
                                 suggested_path_response = requests.post(
                                     url=f"{str(self.app._url.geturl())}/visits/{text}/suggested_path",
                                     json={
-                                        "base_path": f"{self.app._default_destination}/{text}/{mid_path.parent}/raw"
+                                        "base_path": f"{defd}/{text}/{mid_path.parent}/raw"
                                     },
                                 )
                                 _default = suggested_path_response.json().get(
                                     "suggested_path"
                                 )
                             else:
-                                _default = (
-                                    f"{self.app._default_destination}/{text}/{mid_path}"
-                                )
-                            if self.app.analyser:
-                                self.app.analyser._role = machine_data[
+                                _default = f"{defd}/{text}/{mid_path}"
+                            if self.app.analysers.get(s):
+                                self.app.analysers[s]._role = machine_data[
                                     "data_directories"
                                 ][data_dir]
                             break
@@ -365,29 +368,48 @@ class VisitSelection(Screen):
                 else:
                     _default = ""
             else:
-                _default = self.app._default_destination + f"/{text}"
-        else:
-            _default = "unknown"
-        if self.app._environment.processing_only_mode:
-            self.app._start_rsyncer(_default, visit_path=visit_path)
-        else:
-            self.app._queues["input"].put_nowait(
-                InputResponse(
-                    question="Transfer to: ",
-                    default=_default,
-                    callback=partial(self.app._start_rsyncer, visit_path=visit_path),
+                _default = defd + f"/{text}"
+            if self.app._environment.processing_only_mode:
+                self.app._start_rsyncer(_default, visit_path=visit_path)
+            else:
+                self.app._queues["input"].put_nowait(
+                    InputResponse(
+                        question="Transfer to: ",
+                        default=_default,
+                        callback=partial(
+                            self.app._start_rsyncer, visit_path=visit_path
+                        ),
+                    )
                 )
+            self.app.install_screen(
+                DestinationSelect(s, _default), f"destination-select-screen-{s}"
             )
-        self.app.install_screen(
-            DestinationSelect(_default), "destination-select-screen"
-        )
-        self.app.pop_screen()
-        self.app.push_screen("destination-select-screen")
+            if not i:
+                self.app.pop_screen()
+            self.app.push_screen(f"destination-select-screen-{s}")
+        # if not self.app._default_destinations:
+        #     _default = "unknown"
+        # if self.app._environment.processing_only_mode:
+        #     self.app._start_rsyncer(_default, visit_path=visit_path)
+        # else:
+        #     self.app._queues["input"].put_nowait(
+        #         InputResponse(
+        #             question="Transfer to: ",
+        #             default=_default,
+        #             callback=partial(self.app._start_rsyncer, visit_path=visit_path),
+        #         )
+        #     )
+        # self.app.install_screen(
+        #     DestinationSelect(_default), "destination-select-screen-unknown"
+        # )
+        # self.app.pop_screen()
+        # self.app.push_screen("destination-select-screen-unknown")
 
 
 class DestinationSelect(Screen):
-    def __init__(self, destination: str, *args, **kwargs):
+    def __init__(self, source: Path, destination: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._source = source
         self._destination = destination
         self._input = Input(placeholder="Destination")
 
@@ -400,9 +422,9 @@ class DestinationSelect(Screen):
 
     def on_input_submitted(self, event):
         self._destination = event.value
-        self.app._default_destination = self._destination
+        self.app._default_destinations[self._source] = self._destination
         self.app._register_dc = True
-        self.app._start_rsyncer(self._destination)
+        self.app._start_rsyncer(self._source, self._destination)
         self.app.pop_screen()
 
 
@@ -414,8 +436,8 @@ class MurfeyTUI(App):
     processing_form: ProcessingForm
     hover: List[str]
     visits: List[str]
-    rsync_process: RSyncer | None = None
-    analyser: Analyser | None = None
+    rsync_processes: Dict[Path, RSyncer] = {}
+    analysers: Dict[Path, Analyser] = {}
     _form_values: dict = Reactive({})
 
     def __init__(
@@ -426,8 +448,8 @@ class MurfeyTUI(App):
         status_bar: StatusBar | None = None,
         dummy_dc: bool = True,
         do_transfer: bool = True,
-        rsync_process: RSyncer | None = None,
-        analyser: Analyser | None = None,
+        # rsync_process: RSyncer | None = None
+        # analyser: Analyser | None = None,
         gain_ref: Path | None = None,
         redirected_logger=None,
         **kwargs,
@@ -437,10 +459,10 @@ class MurfeyTUI(App):
             urlparse("http://localhost:8000")
         )
         self._environment.gain_ref = gain_ref
-        self._source = self._environment.source or Path(".")
+        self._sources = self._environment.sources or [Path(".")]
         self._url = self._environment.url
-        self._default_destination = self._environment.default_destination
-        self._watcher = self._environment.watcher
+        self._default_destinations = self._environment.default_destinations
+        # self._watcher = self._environment.watcher
         self.visits = visits or []
         self._queues = queues or {}
         self._statusbar = status_bar or StatusBar()
@@ -451,8 +473,8 @@ class MurfeyTUI(App):
         self._dc_metadata: dict = {}
         self._dummy_dc = dummy_dc
         self._do_transfer = do_transfer
-        self.rsync_process = rsync_process
-        self.analyser = analyser
+        # self.rsync_process = rsync_process
+        # self.analyser = analyser
         self._data_collection_form_complete = False
         self._info_widget = TextLog(id="info", markup=True)
         self._form_readable_labels: dict = {}
@@ -464,15 +486,14 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
-    def _start_rsyncer(self, destination: str, visit_path: str = ""):
-        new_rsyncer = False
+    def _start_rsyncer(self, source: Path, destination: str, visit_path: str = ""):
         if self._environment:
-            self._environment.default_destination = destination
+            self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
                 gain_rsync = procrunner.run(
                     [
                         "rsync",
-                        str(self._enviornment.gain_ref),
+                        str(self._environment.gain_ref),
                         f"{self._url.hostname}::{visit_path}/processing",
                     ]
                 )
@@ -480,31 +501,39 @@ class MurfeyTUI(App):
                     log.warning(
                         f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
                     )
-        if not self.rsync_process:
-            self.rsync_process = RSyncer(
-                self._source,
-                basepath_remote=Path(destination),
-                server_url=self._url,
-                local=self._environment.demo,
-                status_bar=self._statusbar,
-                do_transfer=self._do_transfer,
-            )
-            new_rsyncer = True
-        else:
-            if self._environment.demo:
-                _remote = destination
-            else:
-                _remote = f"{self._url.hostname}::{destination}"
-            self.rsync_process._remote = _remote
-            self.thread = threading.Thread(
-                name=f"RSync {self._source.absolute()}:{_remote}",
-                target=self.rsync_process._process,
-            )
+        self.rsync_processes[source] = RSyncer(
+            source,
+            basepath_remote=Path(destination),
+            server_url=self._url,
+            local=self._environment.demo,
+            status_bar=self._statusbar,
+            do_transfer=self._do_transfer,
+        )
+        # if not self.rsync_process:
+        #     self.rsync_process = RSyncer(
+        #         source,
+        #         basepath_remote=Path(destination),
+        #         server_url=self._url,
+        #         local=self._environment.demo,
+        #         status_bar=self._statusbar,
+        #         do_transfer=self._do_transfer,
+        #     )
+        #     new_rsyncer = True
+        # else:
+        #     if self._environment.demo:
+        #         _remote = destination
+        #     else:
+        #         _remote = f"{self._url.hostname}::{destination}"
+        #     self.rsync_process._remote = _remote
+        #     self.thread = threading.Thread(
+        #         name=f"RSync {self._source.absolute()}:{_remote}",
+        #         target=self.rsync_process._process,
+        #     )
 
-        self._info_widget.write(f"{self._source.resolve()} \u2192 {destination}")
+        self._info_widget.write(f"{source.resolve()} \u2192 {destination}")
 
         def rsync_result(update: RSyncerUpdate):
-            if not self.rsync_process:
+            if not self.rsync_processes.get(update.base_path):
                 raise ValueError("TUI rsync process does not exist")
             if update.outcome is TransferResult.SUCCESS:
                 # log.info(
@@ -513,25 +542,48 @@ class MurfeyTUI(App):
                 pass
             else:
                 log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-                self.rsync_process.enqueue(update.file_path)
+                self.rsync_processes[update.base_path].enqueue(update.file_path)
 
-        if self.rsync_process:
-            self.rsync_process.subscribe(rsync_result)
-            self.rsync_process.start()
-            new_analyser = False
-            if not self.analyser:
-                self.analyser = Analyser(
-                    self._source,
-                    environment=self._environment if not self._dummy_dc else None,
+        self.rsync_processes[source].subscribe(rsync_result)
+        # self.rsync_processes[source].start()
+        self._environment.watchers[source] = DirWatcher(source, settling_time=1)
+
+        # if self.rsync_process:
+        #     self.rsync_process.subscribe(rsync_result)
+        #     self.rsync_process.start()
+        #     new_analyser = False
+        #     if not self.analyser:
+        #         self.analyser = Analyser(
+        #             self._source,
+        #             environment=self._environment if not self._dummy_dc else None,
+        #         )
+        #         new_analyser = True
+        #     if self._watcher:
+        #         if new_rsyncer:
+        #             self._watcher.subscribe(self.rsync_process.enqueue)
+        #         if new_analyser:
+        #             self._watcher.subscribe(self.analyser.enqueue)
+        #     self.analyser.subscribe(self._data_collection_form)
+        #     self.analyser.start()
+
+        if not self.analysers.get(source):
+            self.analysers[source] = Analyser(
+                source,
+                environment=self._environment if not self._dummy_dc else None,
+            )
+            self.analysers[source].subscribe(self._data_collection_form)
+            self.analysers[source].start()
+            self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
+
+        self.rsync_processes[source].start()
+
+        if self._environment:
+            if self._environment.watchers.get(source):
+                self._environment.watchers[source].subscribe(
+                    self.rsync_processes[source].enqueue
                 )
-                new_analyser = True
-            if self._watcher:
-                if new_rsyncer:
-                    self._watcher.subscribe(self.rsync_process.enqueue)
-                if new_analyser:
-                    self._watcher.subscribe(self.analyser.enqueue)
-            self.analyser.subscribe(self._data_collection_form)
-            self.analyser.start()
+                # self._environment.watchers[source].subscribe(self.analysers[source].enqueue)
+                self._environment.watchers[source].start()
 
     def _set_register_dc(self, response: str):
         if response == "y":
@@ -542,8 +594,11 @@ class MurfeyTUI(App):
                         question="Data collection parameters:",
                         form=r.get("form", OrderedDict({})),
                         model=DCParametersTomo
-                        if self.analyser
-                        and isinstance(self.analyser._context, TomographyContext)
+                        if self.analysers
+                        and isinstance(
+                            self.analysers[r.get("form").get("source")]._context,
+                            TomographyContext,
+                        )
                         else None,
                         callback=self.app._start_dc_confirm_prompt,
                     )
@@ -554,6 +609,7 @@ class MurfeyTUI(App):
         self._tmp_responses = []
 
     def _data_collection_form(self, response: dict):
+        log.info("data collection form ready")
         if self._data_collection_form_complete:
             return
         if self._register_dc and response.get("form"):
@@ -581,8 +637,11 @@ class MurfeyTUI(App):
                     question="Data collection parameters:",
                     form=OrderedDict({k: TUIFormValue(v) for k, v in json.items()}),
                     model=DCParametersTomo
-                    if self.analyser
-                    and isinstance(self.analyser._context, TomographyContext)
+                    if self.analysers
+                    and isinstance(
+                        self.analysers[r.get("form").get("source")]._context,
+                        TomographyContext,
+                    )
                     else None,
                     callback=self.app._start_dc_confirm_prompt,
                 )
@@ -685,10 +744,15 @@ class MurfeyTUI(App):
         self.push_screen("launcher")
 
     async def action_quit(self) -> None:
-        if self.rsync_process:
-            self.rsync_process.stop()
-        if self.analyser:
-            self.analyser.stop()
+        if self._environment.watchers:
+            for w in self._environment.watchers.values():
+                w.stop()
+        if self.rsync_processes:
+            for rp in self.rsync_processes.values():
+                rp.stop()
+        if self.analysers:
+            for a in self.analysers.values():
+                a.stop()
         self.exit()
         exit()
 

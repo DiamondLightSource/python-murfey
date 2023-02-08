@@ -56,7 +56,7 @@ class Analyser(Observer):
                 or "fractions" in split_file_name[-1]
             ):
                 logger.info("Acquisition software: tomo")
-                self._context = TomographyContext("tomo")
+                self._context = TomographyContext("tomo", self._basepath)
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -77,7 +77,7 @@ class Analyser(Observer):
                     self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
-                self._context = TomographyContext("serialem")
+                self._context = TomographyContext("serialem", self._basepath)
                 if not self._role:
                     if "Frames" in file_path.parts:
                         self._role = "detector"
@@ -91,6 +91,7 @@ class Analyser(Observer):
         mdoc_for_reading = None
         while not self._halt_thread:
             transferred_file = self.queue.get()
+            logger.info(f"analysing file {transferred_file}")
             if not transferred_file:
                 self._halt_thread = True
                 continue

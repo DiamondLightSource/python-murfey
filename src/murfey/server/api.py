@@ -82,6 +82,7 @@ def health_check(db=murfey.server.ispyb.DB):
 def machine_info():
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
+        print(from_file(settings.murfey_machine_configuration, microscope))
         return from_file(settings.murfey_machine_configuration, microscope)
     return {}
 

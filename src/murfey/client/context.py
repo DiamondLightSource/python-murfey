@@ -78,8 +78,9 @@ class ProcessFileIncomplete(BaseModel):
 
 
 class TomographyContext(Context):
-    def __init__(self, acquisition_software: str):
+    def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
+        self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
@@ -634,6 +635,7 @@ class TomographyContext(Context):
                 None, top=True, colour="dark_orange"
             )
             metadata["tilt_offset"] = TUIFormValue(0, top=True)
+            metadata["source"] = TUIFormValue(str(self._basepath))
             metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
             # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
@@ -654,6 +656,7 @@ class TomographyContext(Context):
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(None, top=True)
         mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
+        mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         # logger.info(f"Metadata extracted from {metadata_file}")

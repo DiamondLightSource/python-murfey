@@ -6,6 +6,8 @@ import logging
 from rich.logging import RichHandler
 from textual.widgets import TextLog
 
+logger = logging.getLogger("murfey.client.customlogging")
+
 
 class CustomHandler(logging.Handler):
     def __init__(self, callback):
@@ -32,8 +34,10 @@ class DirectableRichHandler(RichHandler):
         self.text_log = text_log
         self.redirect = False
         self._last_time = None
+        self._count = 0
 
     def emit(self, record):
+        self._count += 1
         try:
             if self.text_log:
                 message = self.format(record)
@@ -42,5 +46,6 @@ class DirectableRichHandler(RichHandler):
                     record=record, traceback=None, message_renderable=message_renderable
                 )
                 self.text_log.write(log_renderable)
+                self.text_log.write(self._count)
         except Exception:
             self.handleError(record)

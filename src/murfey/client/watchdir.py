@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
+import sys
+import threading
 import time
 from pathlib import Path
 from typing import NamedTuple, Optional
@@ -23,6 +26,8 @@ class DirWatcher(murfey.util.Observer):
         self,
         path: str | os.PathLike,
         settling_time: float = 60,
+        appearance_time: float | None = None,
+        transfer_all: bool = True,
         status_bar: StatusBar | None = None,
     ):
         super().__init__()
@@ -31,11 +36,55 @@ class DirWatcher(murfey.util.Observer):
         self._file_candidates: dict[str, _FileInfo] = {}
         self._statusbar = status_bar
         self.settling_time = settling_time
+        self._appearance_time = appearance_time
+        self._transfer_all = transfer_all
         self._modification_overwrite: float | None = None
         self._init_time: float = time.time()
+        self.queue: queue.Queue[Path | None] = queue.Queue()
+        self.thread = threading.Thread(
+            name=f"DirWatcher {self._basepath}", target=self._process
+        )
+        self._stopping = False
+        self._halt_thread = False
 
     def __repr__(self) -> str:
         return f"<DirWatcher ({self._basepath})>"
+
+    def start(self):
+        if self.thread.is_alive():
+            raise RuntimeError("DirWatcher already running")
+        if self._stopping:
+            raise RuntimeError("DirWatcher has already stopped")
+        log.info(f"DirWatcher thread starting for {self}")
+        self.thread.start()
+
+    def stop(self):
+        log.debug("DirWatcher thread stop requested")
+        self._stopping = True
+        if self.thread.is_alive():
+            self.queue.join()
+
+        self._halt_thread = True
+        if self.thread.is_alive():
+            self.queue.put(None)
+            self.thread.join()
+        log.debug("DirWatcher thread stop completed")
+
+    def _process(self):
+        if self._appearance_time:
+            if self._appearance_time > 0:
+                modification_time: float | None = (
+                    time.time() - self._appearance_time * 3600
+                )
+            else:
+                modification_time = None
+        else:
+            modification_time = None
+        while not self._stopping:
+            self.scan(
+                modification_time=modification_time, transfer_all=self._transfer_all
+            )
+            time.sleep(15)
 
     def scan(self, modification_time: float | None = None, transfer_all: bool = False):
         try:
@@ -52,6 +101,8 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
+            # log.info(f"files found: {filelist}")
+            # log.info(f"file candidates: {self._file_candidates}")
             for x in sorted(
                 self._file_candidates,
                 key=lambda _x: self._file_candidates[_x].modification_time,

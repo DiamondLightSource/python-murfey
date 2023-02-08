@@ -28,9 +28,9 @@ global_env_lock = RLock()
 class MurfeyInstanceEnvironment(BaseModel):
     url: ParseResult
     software_versions: Dict[str, str] = {}
-    source: Optional[Path] = None
-    default_destination: str = ""
-    watcher: Optional[DirWatcher] = None
+    sources: List[Path] = []
+    default_destinations: Dict[Path, str] = {}
+    watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
     data_collection_group_id: Optional[int] = None
     data_collection_ids: Dict[str, int] = {}
