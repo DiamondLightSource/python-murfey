@@ -223,8 +223,13 @@ class TomographyContext(Context):
         extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
         required_position_files: List[Path] | None = None,
+        required_strings: List[str] | None = None,
     ) -> List[str]:
         # required_position_files = required_position_files or []
+        required_strings = required_strings or ["fractions"]
+        for r in required_strings:
+            if r not in file_path.name.lower():
+                return []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
