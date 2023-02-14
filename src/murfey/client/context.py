@@ -226,7 +226,9 @@ class TomographyContext(Context):
         required_strings: List[str] | None = None,
     ) -> List[str]:
         # required_position_files = required_position_files or []
-        required_strings = required_strings or ["fractions"]
+        required_strings = (
+            ["fractions"] if required_strings is None else required_strings
+        )
         for r in required_strings:
             if r not in file_path.name.lower():
                 return []
@@ -575,6 +577,7 @@ class TomographyContext(Context):
             lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
             lambda x: "",
             environment=environment,
+            required_strings=[],
         )
 
     def post_transfer(
