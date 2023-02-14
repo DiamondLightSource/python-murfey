@@ -7,7 +7,7 @@ Screen {
 
 LaunchScreen {
     layout: grid;
-    grid-size: 2;
+    grid-size: 3;
     padding: 2;
     border: hidden;
 }
@@ -49,6 +49,18 @@ DestinationSelect {
     background: teal;
 }
 
+#add {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: deeppink;
+    border: solid black;
+}
+
+#add:hover {
+    background: teal;
+}
+
 #launch {
     width: 100%;
     height: 100%;
@@ -64,7 +76,7 @@ DestinationSelect {
 #dir-select {
     width: 100%;
     height: 100%;
-    column-span: 2;
+    column-span: 3;
 }
 
 #launch-text {
