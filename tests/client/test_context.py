@@ -133,56 +133,35 @@ def test_tomography_context_initialisation_for_serialem():
 
 def test_tomography_context_add_serialem_tilt(tmp_path):
     context = TomographyContext("serialem")
-    context.post_transfer(
-        tmp_path / "tomography_1_2_30_fractions.tiff", role="detector"
-    )
-    assert context._tilt_series == {
-        "1": [tmp_path / "tomography_1_2_30_fractions.tiff"]
-    }
-    assert (
-        context._last_transferred_file == tmp_path / "tomography_1_2_30_fractions.tiff"
-    )
-    context.post_transfer(
-        tmp_path / "tomography_1_2_-30_fractions.tiff", role="detector"
-    )
+    context.post_transfer(tmp_path / "tomography_1_2_30.tiff", role="detector")
+    assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.tiff"]}
+    assert context._last_transferred_file == tmp_path / "tomography_1_2_30.tiff"
+    context.post_transfer(tmp_path / "tomography_1_2_-30.tiff", role="detector")
     assert context._tilt_series == {
         "1": [
-            tmp_path / "tomography_1_2_30_fractions.tiff",
-            tmp_path / "tomography_1_2_-30_fractions.tiff",
+            tmp_path / "tomography_1_2_30.tiff",
+            tmp_path / "tomography_1_2_-30.tiff",
         ]
     }
     assert not context._completed_tilt_series
-    context.post_transfer(
-        tmp_path / "tomography_2_2_30_fractions.tiff", role="detector"
-    )
+    context.post_transfer(tmp_path / "tomography_2_2_30.tiff", role="detector")
     assert len(context._tilt_series.values()) == 2
     assert context._completed_tilt_series == ["1"]
 
 
 def test_tomography_context_add_serialem_decimal_tilt(tmp_path):
     context = TomographyContext("serialem")
-    context.post_transfer(
-        tmp_path / "tomography_1_2_30.0_fractions.tiff", role="detector"
-    )
-    assert context._tilt_series == {
-        "1": [tmp_path / "tomography_1_2_30.0_fractions.tiff"]
-    }
-    assert (
-        context._last_transferred_file
-        == tmp_path / "tomography_1_2_30.0_fractions.tiff"
-    )
-    context.post_transfer(
-        tmp_path / "tomography_1_2_-30.0_fractions.tiff", role="detector"
-    )
+    context.post_transfer(tmp_path / "tomography_1_2_30.0.tiff", role="detector")
+    assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.0.tiff"]}
+    assert context._last_transferred_file == tmp_path / "tomography_1_2_30.0.tiff"
+    context.post_transfer(tmp_path / "tomography_1_2_-30.0.tiff", role="detector")
     assert context._tilt_series == {
         "1": [
-            tmp_path / "tomography_1_2_30.0_fractions.tiff",
-            tmp_path / "tomography_1_2_-30.0_fractions.tiff",
+            tmp_path / "tomography_1_2_30.0.tiff",
+            tmp_path / "tomography_1_2_-30.0.tiff",
         ]
     }
     assert not context._completed_tilt_series
-    context.post_transfer(
-        tmp_path / "tomography_2_2_30.0_fractions.tiff", role="detector"
-    )
+    context.post_transfer(tmp_path / "tomography_2_2_30.0.tiff", role="detector")
     assert len(context._tilt_series.values()) == 2
     assert context._completed_tilt_series == ["1"]
