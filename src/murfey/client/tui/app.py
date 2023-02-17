@@ -253,16 +253,6 @@ class LaunchScreen(Screen):
                     _default = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
                     self.app._start_rsyncer(_default, visit_path=visit_path)
-                else:
-                    self.app._queues["input"].put_nowait(
-                        InputResponse(
-                            question="Transfer to: ",
-                            default=_default,
-                            callback=partial(
-                                self.app._start_rsyncer, visit_path=visit_path
-                            ),
-                        )
-                    )
                 self.app.install_screen(
                     DestinationSelect(s, _default), f"destination-select-screen-{s}"
                 )
@@ -741,9 +731,8 @@ class MurfeyTUI(App):
         self.push_screen("visit-select-screen")
 
     async def action_quit(self) -> None:
-        if self._environment.watchers:
-            for w in self._environment.watchers.values():
-                w.stop()
+        log.info("quitting app")
+
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
                 rp.stop()

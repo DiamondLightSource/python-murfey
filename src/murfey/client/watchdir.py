@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import queue
-import sys
 import threading
 import time
 from pathlib import Path
@@ -42,7 +41,7 @@ class DirWatcher(murfey.util.Observer):
         self._init_time: float = time.time()
         self.queue: queue.Queue[Path | None] = queue.Queue()
         self.thread = threading.Thread(
-            name=f"DirWatcher {self._basepath}", target=self._process
+            name=f"DirWatcher {self._basepath}", target=self._process, daemon=True
         )
         self._stopping = False
         self._halt_thread = False
@@ -101,8 +100,6 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
-            # log.info(f"files found: {filelist}")
-            # log.info(f"file candidates: {self._file_candidates}")
             for x in sorted(
                 self._file_candidates,
                 key=lambda _x: self._file_candidates[_x].modification_time,
