@@ -34,10 +34,8 @@ class DirectableRichHandler(RichHandler):
         self.text_log = text_log
         self.redirect = False
         self._last_time = None
-        self._count = 0
 
     def emit(self, record):
-        self._count += 1
         try:
             if self.text_log:
                 message = self.format(record)
@@ -46,6 +44,5 @@ class DirectableRichHandler(RichHandler):
                     record=record, traceback=None, message_renderable=message_renderable
                 )
                 self.text_log.write(log_renderable)
-                self.text_log.write(self._count)
         except Exception:
             self.handleError(record)

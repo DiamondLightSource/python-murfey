@@ -5,7 +5,9 @@ from typing import Any
 
 
 class TUIFormValue(UserString):
-    def __init__(self, seq: Any, top: bool = False, colour: str = "", readable_label: str = ""):
+    def __init__(
+        self, seq: Any, top: bool = False, colour: str = "", readable_label: str = ""
+    ):
         super().__init__(seq)
         self._top = top
         self._colour = colour

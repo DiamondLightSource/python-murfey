@@ -109,7 +109,15 @@ def get_current_visits():
             name="cm31111-2",
             beamline="m12",
             proposal_title="Nothing of importance",
-        )
+        ),
+        Visit(
+            start=datetime.datetime.now(),
+            end=datetime.datetime.now() + datetime.timedelta(days=1),
+            session_id=1,
+            name="cm31111-3",
+            beamline="m12",
+            proposal_title="Nothing of importance",
+        ),
     ]
 
 

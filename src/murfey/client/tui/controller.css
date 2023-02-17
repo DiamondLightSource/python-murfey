@@ -21,7 +21,13 @@ ConfirmScreen {
 
 VisitSelection {
     layout: grid;
-    grid-size: 1;
+    grid-size: 4;
+    border: hidden;
+}
+
+DirectorySelection {
+    layout: grid;
+    grid-size: 4;
     border: hidden;
 }
 
@@ -99,17 +105,31 @@ DestinationSelect {
     row-span: 1;
 }
 
-#visit-btn {
+.btn-visit {
     width: 100%;
     height: 90fr;
     background: aquamarine;
 }
 
-#visit-btn:hover {
+.btn-visit:hover {
     background: aqua;
 }
 
-#visit-btn:focus {
+.btn-visit:focus {
+    background: darkslateblue;
+}
+
+.btn-directory {
+    width: 100%;
+    height: 90fr;
+    background: aquamarine;
+}
+
+.btn-directory:hover {
+    background: aqua;
+}
+
+.btn-directory:focus {
     background: darkslateblue;
 }
 
@@ -161,13 +181,54 @@ DestinationSelect {
     background: blueviolet;
 } 
 
-#visit-select {
+#select-visit {
     width: 100%;
     height: 100%;
-    column-span: 2;
-    row-span: 1;
+    column-span: 4;
+    row-span: 3;
     content-align: left top;
     background: blueviolet;
+}
+
+#switch-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 1;
+}
+
+#label-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 1;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#select-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    row-span: 3;
+    content-align: left top;
+    background: blueviolet;
+}
+
+#switch-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 1;
+}
+
+#label-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 1;
+    content-align: center middle;
+    text-style: bold;
 }
 
 #input-form {
