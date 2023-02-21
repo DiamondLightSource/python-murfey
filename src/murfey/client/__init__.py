@@ -14,7 +14,6 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-from threading import Thread
 from typing import List, Literal
 from urllib.parse import ParseResult, urlparse
 
@@ -27,11 +26,9 @@ import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
-from murfey.client.analyser import Analyser
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.client.rsync import RSyncer
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
 from murfey.util.models import Visit
@@ -249,26 +246,7 @@ def run():
 
     log.info("Starting Websocket connection")
 
-    # start_dc = Prompt.ask("Would you like to register a new data collection?", choices=["y", "n"])
-
-    # if start_dc == "y":
-    #     image_directory = str(args.destination)
-    #     image_suffix = Prompt.ask("Enter the image suffix", choices=[".tiff", ".tif", ".mrc", ".eer"])
-    #     visit = str(args.visit)
-    #     dc_params = {
-    #         "type": "start_dc",
-    #         "image_directory": image_directory,
-    #         "image_suffix": image_suffix,
-    #         "visit": visit,
-    #     }
-    #     ws.send(json.dumps(dc_params))
-
     status_bar = StatusBar()
-    source_watchers = [
-        murfey.client.watchdir.DirWatcher(
-            args.source, settling_time=1, status_bar=status_bar
-        )
-    ]
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
     gain_ref: Path | None = None
@@ -277,13 +255,6 @@ def run():
             gain_ref = determine_gain_ref(machine_data["gain_reference_directory"])
         except RuntimeError:
             pass
-
-    # main_loop_thread = Thread(
-    #     target=main_loop,
-    #     args=[source_watchers, args.appearance_time, not args.time_based_transfer],
-    #     daemon=True,
-    # )
-    # main_loop_thread.start()
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
@@ -298,24 +269,6 @@ def run():
 
     ws.environment = instance_environment
 
-    # rsync_process = RSyncer(
-    #     instance_environment.sources[0],
-    #     basepath_remote=Path(args.destination or f"data/{datetime.now().year}"),
-    #     server_url=murfey_url,
-    #     local=args.local or instance_environment.demo,
-    #     do_transfer=not args.no_transfer,
-    #     remove_files=args.remove_files,
-    # )
-    # source_watchers[0].subscribe(rsync_process.enqueue)
-
-    # analyser = Analyser(
-    #     instance_environment.sources[0],
-    #     environment=instance_environment if not args.fake_dc else None,
-    #     force_mdoc_metadata=not args.ignore_mdoc_metadata,
-    # )
-    # # source_watcher.subscribe(analyser.enqueue)
-    # rsync_process.subscribe(analyser.enqueue)
-
     rich_handler.redirect = True
     app = MurfeyTUI(
         environment=instance_environment,
@@ -328,18 +281,10 @@ def run():
         # analyser=analyser,
         gain_ref=gain_ref,
         redirected_logger=rich_handler,
+        force_mdoc_metadata=not args.ignore_mdoc_metadata,
     )
     app.run()
     rich_handler.redirect = False
-
-    # try:
-    #     main_loop_thread.join()
-    # except KeyboardInterrupt:
-    #     log.info("Encountered CTRL+C")
-    #     # if args.destination:
-    #     #     rsync_process.stop()
-    #     ws.close()
-    #     log.info("Client stopped")
 
 
 def main_loop(

@@ -105,7 +105,7 @@ class Analyser(Observer):
                     dc_metadata = self._context.gather_metadata(
                         mdoc_for_reading or transferred_file
                     )
-                    mdoc_for_reading = None
+                    # mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if (
@@ -158,7 +158,7 @@ class Analyser(Observer):
                     if self._role == "detector":
                         if not dc_metadata:
                             dc_metadata = self._context.gather_metadata(
-                                transferred_file.with_suffix(".xml")
+                                mdoc_for_reading or transferred_file.with_suffix(".xml")
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)

@@ -485,6 +485,7 @@ class MurfeyTUI(App):
         do_transfer: bool = True,
         gain_ref: Path | None = None,
         redirected_logger=None,
+        force_mdoc_metadata: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -511,6 +512,7 @@ class MurfeyTUI(App):
         self._redirected_logger = redirected_logger
         self._multigrid = False
         self._multigrid_watcher: MultigridDirWatcher | None = None
+        self._force_mdoc_metadata = force_mdoc_metadata
 
     @property
     def role(self) -> str:
@@ -547,6 +549,7 @@ class MurfeyTUI(App):
         visit_path: str = "",
         force_metadata: bool = False,
     ):
+        log.info(f"starting rsyncer: {source}")
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
@@ -593,7 +596,18 @@ class MurfeyTUI(App):
             self.analysers[source] = Analyser(
                 source,
                 environment=self._environment if not self._dummy_dc else None,
+                force_mdoc_metadata=self._force_mdoc_metadata,
             )
+            machine_data = requests.get(
+                f"{self._environment.url.geturl()}/machine/"
+            ).json()
+            for data_dir in machine_data["data_directories"].keys():
+                if source.resolve().is_relative_to(Path(data_dir)):
+                    self.analysers[source]._role = machine_data["data_directories"][
+                        data_dir
+                    ]
+                    log.info(f"role found for {source}")
+                    break
             if force_metadata:
                 self.analysers[source].subscribe(self._start_dc)
             else:
@@ -654,26 +668,6 @@ class MurfeyTUI(App):
             )
         )
 
-    def _start_dc_confirm(self, response: str, json: Optional[dict] = None):
-        json = json or {}
-        if response == "n":
-            self._queues["input"].put_nowait(
-                InputResponse(
-                    question="Data collection parameters:",
-                    form=OrderedDict({k: TUIFormValue(v) for k, v in json.items()}),
-                    model=DCParametersTomo
-                    if self.analysers
-                    and isinstance(
-                        self.analysers[json.get("form", {})["source"]]._context,
-                        TomographyContext,
-                    )
-                    else None,
-                    callback=self.app._start_dc_confirm_prompt,
-                )
-            )
-        elif response == "y":
-            self._start_dc(json)
-
     def _start_dc(self, json):
         if self._dummy_dc:
             return
@@ -682,23 +676,32 @@ class MurfeyTUI(App):
         }
         for k, v in json.items():
             self._info_widget.write(f"{k}: {v}")
-        if isinstance(self.analyser._context, TomographyContext):
+        context = None
+        for a in self.analysers.values():
+            if isinstance(a._context, TomographyContext):
+                context = TomographyContext
+                break
+            if isinstance(a.context, SPAContext):
+                context = SPAContext
+                break
+        if context == TomographyContext:
+            source = Path(json["source"])
             self._environment.listeners["data_collection_group_id"] = {
-                self.analyser._context._flush_data_collections
+                self.analysers[source]._context._flush_data_collections
             }
             self._environment.listeners["data_collection_ids"] = {
-                self.analyser._context._flush_processing_job
+                self.analysers[source]._context._flush_processing_job
             }
             self._environment.listeners["autoproc_program_ids"] = {
-                self.analyser._context._flush_preprocess
+                self.analysers[source]._context._flush_preprocess
             }
             self._environment.listeners["motion_corrected_movies"] = {
-                self.analyser._context._check_for_alignment
+                self.analysers[source]._context._check_for_alignment
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "tomo", "experiment_type_id": 36}
             requests.post(url, json=dcg_data)
-        elif isinstance(self.analyser._context, SPAContext):
+        elif context == SPAContext:
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
             requests.post(url, json=dcg_data)
