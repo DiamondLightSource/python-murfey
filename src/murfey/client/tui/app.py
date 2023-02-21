@@ -346,6 +346,7 @@ class ProcessingForm(Screen):
         if params:
             for k, v in params.items():
                 self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
+            self.app._start_dc(params)
 
     def on_input_submitted(self, event):
         k = self._inputs[event.input]
@@ -522,7 +523,6 @@ class MurfeyTUI(App):
         self._multigrid_watcher.subscribe(self._start_rsyncer_multigrid)
 
     def _start_rsyncer_multigrid(self, source: Path):
-        # is this safe when determining the integer following raw in the destination
         machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
         self._default_destinations[
             source
