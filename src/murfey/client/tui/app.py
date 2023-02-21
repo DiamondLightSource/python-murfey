@@ -42,10 +42,58 @@ from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import TUIFormValue
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
+from murfey.client.watchdir_multigrid import MultigridDirWatcher
 
 log = logging.getLogger("murfey.tui.app")
 
 ReactiveType = TypeVar("ReactiveType")
+
+
+def determine_default_destination(
+    visit: str,
+    source: Path,
+    destination: str,
+    environment: MurfeyInstanceEnvironment,
+    analysers: Dict[Path, Analyser],
+    touch: bool = False,
+):
+    machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
+    _default = ""
+    if environment.processing_only_mode and environment.source:
+        _default = str(environment.source.resolve()) or str(Path.cwd())
+    elif machine_data.get("data_directories"):
+        for data_dir in machine_data["data_directories"].keys():
+            if source.resolve() == Path(data_dir):
+                _default = destination + f"/{visit}"
+                if analysers.get(source):
+                    analysers[source]._role = machine_data["data_directories"][data_dir]
+                break
+            else:
+                try:
+                    mid_path = source.resolve().relative_to(data_dir)
+                    if machine_data["data_directories"][data_dir] == "detector":
+                        suggested_path_response = requests.post(
+                            url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
+                            json={
+                                "base_path": f"{destination}/{visit}/{mid_path.parent}/raw",
+                                "touch": touch,
+                            },
+                        )
+                        _default = suggested_path_response.json().get("suggested_path")
+                    else:
+                        _default = f"{destination}/{visit}/{mid_path}"
+                    if analysers.get(source):
+                        analysers[source]._role = machine_data["data_directories"][
+                            data_dir
+                        ]
+                    break
+                except (ValueError, KeyError):
+                    _default = ""
+        else:
+            _default = ""
+    else:
+        _default = destination + f"/{visit}"
+    return _default
 
 
 class InputResponse(NamedTuple):
@@ -202,55 +250,12 @@ class LaunchScreen(Screen):
             machine_data = requests.get(
                 f"{self.app._environment.url.geturl()}/machine/"
             ).json()
-            _default = ""
             visit_path = ""
             for i, (s, defd) in enumerate(self.app._default_destinations.items()):
+                _default = determine_default_destination(
+                    self.app._visit, s, defd, self.app._environment, self.app.analysers
+                )
                 visit_path = defd + f"/{text}"
-                if (
-                    self.app._environment.processing_only_mode
-                    and self.app._environment.source
-                ):
-                    _default = str(self.app._environment.source.resolve()) or str(
-                        Path.cwd()
-                    )
-                elif machine_data.get("data_directories"):
-                    for data_dir in machine_data["data_directories"].keys():
-                        if s.resolve() == Path(data_dir):
-                            _default = defd + f"/{text}"
-                            if self.app.analysers.get(s):
-                                self.app.analysers[s]._role = machine_data[
-                                    "data_directories"
-                                ][data_dir]
-                            break
-                        else:
-                            try:
-                                mid_path = s.resolve().relative_to(data_dir)
-                                if (
-                                    machine_data["data_directories"][data_dir]
-                                    == "detector"
-                                ):
-                                    suggested_path_response = requests.post(
-                                        url=f"{str(self.app._url.geturl())}/visits/{text}/suggested_path",
-                                        json={
-                                            "base_path": f"{defd}/{text}/{mid_path.parent}/raw"
-                                        },
-                                    )
-                                    _default = suggested_path_response.json().get(
-                                        "suggested_path"
-                                    )
-                                else:
-                                    _default = f"{defd}/{text}/{mid_path}"
-                                if self.app.analysers.get(s):
-                                    self.app.analysers[s]._role = machine_data[
-                                        "data_directories"
-                                    ][data_dir]
-                                break
-                            except (ValueError, KeyError):
-                                _default = ""
-                    else:
-                        _default = ""
-                else:
-                    _default = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
                     self.app._start_rsyncer(_default, visit_path=visit_path)
                 self.app.install_screen(
@@ -504,12 +509,36 @@ class MurfeyTUI(App):
         self._form_readable_labels: dict = {}
         self._redirected_logger = redirected_logger
         self._multigrid = False
+        self._multigrid_watcher: MultigridDirWatcher | None = None
 
     @property
     def role(self) -> str:
         if self.analyser:
             return self.analyser._role
         return ""
+
+    def _launch_multigrid_watcher(self, source: Path):
+        self._multigrid_watcher = MultigridDirWatcher(source)
+        self._multigrid_watcher.subscribe(self._start_rsyncer_multigrid)
+
+    def _start_rsyncer_multigrid(self, source: Path):
+        # is this safe when determining the integer following raw in the destination
+        machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
+        self._default_destinations[
+            source
+        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+        self._environment._default_destinations[
+            source
+        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+        destination = determine_default_destination(
+            self._visit,
+            source,
+            self._default_destinations[source],
+            self._environment,
+            self._analysers,
+            touch=True,
+        )
+        self._start_rsyncer(source, destination)
 
     def _start_rsyncer(self, source: Path, destination: str, visit_path: str = ""):
         if self._environment:

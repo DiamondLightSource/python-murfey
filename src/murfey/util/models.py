@@ -68,6 +68,7 @@ class TiltSeries(BaseModel):
 
 class SuggestedPathParameters(BaseModel):
     base_path: Path
+    touch: bool = False
 
 
 class DCGroupParameters(BaseModel):

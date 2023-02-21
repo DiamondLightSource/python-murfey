@@ -337,6 +337,8 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
+    if params.touch:
+        check_path.mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
