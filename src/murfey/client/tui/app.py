@@ -538,9 +538,15 @@ class MurfeyTUI(App):
             self._analysers,
             touch=True,
         )
-        self._start_rsyncer(source, destination)
+        self._start_rsyncer(source, destination, force_metadata=True)
 
-    def _start_rsyncer(self, source: Path, destination: str, visit_path: str = ""):
+    def _start_rsyncer(
+        self,
+        source: Path,
+        destination: str,
+        visit_path: str = "",
+        force_metadata: bool = False,
+    ):
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
@@ -588,7 +594,10 @@ class MurfeyTUI(App):
                 source,
                 environment=self._environment if not self._dummy_dc else None,
             )
-            self.analysers[source].subscribe(self._data_collection_form)
+            if force_metadata:
+                self.analysers[source].subscribe(self._start_dc)
+            else:
+                self.analysers[source].subscribe(self._data_collection_form)
             self.analysers[source].start()
             self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
 
