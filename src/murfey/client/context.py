@@ -221,6 +221,16 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         required_position_files: List[Path] | None = None,
     ) -> List[str]:
+        if not environment:
+            logger.warning("No environment passed in")
+            return []
+        for s in environment.sources:
+            if file_path.is_relative_to(s):
+                source = s
+                break
+        else:
+            logger.warning(f"No source sound for file {file_path}")
+            return []
         # required_position_files = required_position_files or []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
@@ -251,16 +261,16 @@ class TomographyContext(Context):
                 if environment.demo
                 else requests.get(f"{str(environment.url.geturl())}/machine/").json()
             )
-            if environment.visit in environment.default_destination:
+            if environment.visit in environment.default_destinations[source]:
                 file_transferred_to = (
                     Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destination)
+                    / Path(environment.default_destinations[source])
                     / file_path.name
                 )
             else:
                 file_transferred_to = (
                     Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destination)
+                    / Path(environment.default_destinations[source])
                     / environment.visit
                     / file_path.name
                 )
@@ -386,7 +396,7 @@ class TomographyContext(Context):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             pfi = ProcessFileIncomplete(
                 dest=file_transferred_to,
-                source=environment.source,
+                source=source,
                 image_number=environment.movies[file_transferred_to].movie_number,
                 mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
                 tag=tilt_series,
