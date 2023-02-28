@@ -83,6 +83,7 @@ class TomographyContext(Context):
     def __init__(self, acquisition_software: str):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
+        self._tilt_series_sizes: Dict[str, int | None] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
@@ -299,6 +300,8 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
+            if not self._tilt_series_sizes.get(tilt_series):
+                self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
@@ -454,7 +457,10 @@ class TomographyContext(Context):
                             _f.is_file() for _f in required_position_files
                         )
                     else:
-                        completion_test = len(ta) >= tilt_series_size
+                        if self._tilt_series_sizes.get(ts):
+                            completion_test = len(ta) == self._tilt_series_sizes[ts]
+                        else:
+                            completion_test = len(ta) >= tilt_series_size
                     if ts not in self._completed_tilt_series and completion_test:
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
