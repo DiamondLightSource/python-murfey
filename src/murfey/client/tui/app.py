@@ -251,6 +251,7 @@ class LaunchScreen(Screen):
                 f"{self.app._environment.url.geturl()}/machine/"
             ).json()
             visit_path = ""
+            transfer_routes = {}
             for i, (s, defd) in enumerate(self.app._default_destinations.items()):
                 _default = determine_default_destination(
                     self.app._visit, s, defd, self.app._environment, self.app.analysers
@@ -258,12 +259,12 @@ class LaunchScreen(Screen):
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
                     self.app._start_rsyncer(_default, visit_path=visit_path)
-                self.app.install_screen(
-                    DestinationSelect(s, _default), f"destination-select-screen-{s}"
-                )
-                if not i:
-                    self.app.pop_screen()
-                self.app.push_screen(f"destination-select-screen-{s}")
+                transfer_routes[s] = _default
+            self.app.install_screen(
+                DestinationSelect(transfer_routes), "destination-select-screen"
+            )
+            self.app.pop_screen()
+            self.app.push_screen("destination-select-screen")
 
 
 class ConfirmScreen(Screen):
@@ -441,25 +442,23 @@ class DirectorySelection(SwitchSelection):
 
 
 class DestinationSelect(Screen):
-    def __init__(self, source: Path, destination: str, *args, **kwargs):
+    def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._source = source
-        self._destination = destination
-        self._input = Input(placeholder="Destination")
+        self._transfer_routes = transfer_routes
 
     def compose(self):
-        yield Label(f"Copy the source {self._source} to:")
-        yield self._input
+        bulk = []
+        for s, d in self._transfer_routes.items():
+            bulk.append(Label(f"Copy the source {s} to:"))
+            bulk.append(Input(value=d, classes="input-destination"))
+        yield Vertical(*bulk, id="destination-holder")
+        yield Button("Confirm", id="destination-btn")
 
-    def on_mount(self):
-        self._input.value = self._destination
-        self._input.focus()
-
-    def on_input_submitted(self, event):
-        self._destination = event.value
-        self.app._default_destinations[self._source] = self._destination
-        self.app._register_dc = True
-        self.app._start_rsyncer(self._source, self._destination)
+    def on_button_pressed(self, event):
+        for s, d in self._transfer_routes.items():
+            self.app._default_destinations[s] = d
+            self.app._register_dc = True
+            self.app._start_rsyncer(s, d)
         self.app.pop_screen()
 
 

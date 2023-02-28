@@ -27,7 +27,7 @@ VisitSelection {
 
 DirectorySelection {
     layout: grid;
-    grid-size: 4;
+    grid-size: 2;
     border: hidden;
 }
 
@@ -39,7 +39,7 @@ ProcessingForm {
 
 DestinationSelect {
     layout: grid;
-    grid-size: 1;
+    grid-size: 5;
     border: hidden;
 }
 
@@ -146,6 +146,21 @@ DestinationSelect {
     background: darkslateblue;
 }
 
+#destination-btn {
+    width: 100%;
+    column-span: 5;
+    row-span: 1;
+    background: aquamarine;
+}
+
+#destination-btn:hover {
+    background: aqua;
+}
+
+#destination-btn:focus {
+    background: darkslateblue;
+}
+
 #processing-btn {
     width: 100%;
     height: 90fr;
@@ -234,6 +249,19 @@ DestinationSelect {
 #input-form {
     width: 100%;
     height: 100%;
+    background: blueviolet;
+}
+
+#destination-holder {
+    width: 100%;
+    height: 100%;
+    column-span: 5;
+    row-span: 4;
+    background: blueviolet;
+}
+
+.input-destination {
+    width: 100%;
     background: blueviolet;
 }
 
