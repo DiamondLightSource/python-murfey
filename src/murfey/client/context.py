@@ -18,7 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util.mdoc import get_global_data
+from murfey.util.mdoc import get_global_data, get_num_blocks
 
 # import time
 
@@ -595,21 +595,22 @@ class TomographyContext(Context):
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if (
-            role == "detector"
-            and transferred_file.suffix in data_suffixes
-            and "gain" not in transferred_file.name
-        ):
-            if self._acquisition_software == "tomo":
-                completed_tilts = self._add_tomo_tilt(
-                    transferred_file,
-                    environment=environment,
-                    required_position_files=kwargs.get("required_position_files"),
-                )
-            elif self._acquisition_software == "serialem":
-                completed_tilts = self._add_serialem_tilt(
-                    transferred_file, environment=environment
-                )
+        if role == "detector" and "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "tomo":
+                    completed_tilts = self._add_tomo_tilt(
+                        transferred_file,
+                        environment=environment,
+                        required_position_files=kwargs.get("required_position_files"),
+                    )
+                elif self._acquisition_software == "serialem":
+                    completed_tilts = self._add_serialem_tilt(
+                        transferred_file, environment=environment
+                    )
+            if transferred_file.suffix == ".mdoc":
+                with open(transferred_file, "r") as md:
+                    tilt_series = transferred_file.stem
+                    self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
         return completed_tilts
 
     def post_first_transfer(
