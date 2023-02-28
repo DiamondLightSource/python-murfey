@@ -28,7 +28,7 @@ def get_block(mdocfile: TextIO) -> dict:
 def get_num_blocks(mdocfile: TextIO) -> int:
     num_blocks = 0
     while line := mdocfile.readline():
-        if line.startswith("[ZValue]"):
+        if line.startswith("[ZValue"):
             num_blocks += 1
     return num_blocks
 
