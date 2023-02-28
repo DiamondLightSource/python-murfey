@@ -437,7 +437,9 @@ class TomographyContext(Context):
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
-                last_tilt_series != tilt_series and last_tilt_angle != tilt_angle
+                last_tilt_series != tilt_series
+                and last_tilt_angle != tilt_angle
+                or self._tilt_series_sizes.get(tilt_series)
             ) or self._completed_tilt_series:
                 newly_completed_series = []
                 if self._tilt_series:
@@ -445,22 +447,23 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
-                if (
-                    this_tilt_series_size >= tilt_series_size
-                    and not required_position_files
-                ):
+                tilt_series_size_check = (
+                    (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
+                    if self._tilt_series_sizes.get(tilt_series)
+                    else (this_tilt_series_size >= tilt_series_size)
+                )
+                if tilt_series_size_check and not required_position_files:
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
-                    if required_position_files:
+                    if self._tilt_series_sizes.get(ts):
+                        completion_test = len(ta) == self._tilt_series_sizes[ts]
+                    elif required_position_files:
                         completion_test = all(
                             _f.is_file() for _f in required_position_files
                         )
                     else:
-                        if self._tilt_series_sizes.get(ts):
-                            completion_test = len(ta) == self._tilt_series_sizes[ts]
-                        else:
-                            completion_test = len(ta) >= tilt_series_size
+                        completion_test = len(ta) >= tilt_series_size
                     if ts not in self._completed_tilt_series and completion_test:
                         newly_completed_series.append(ts)
                         self._completed_tilt_series.append(ts)
