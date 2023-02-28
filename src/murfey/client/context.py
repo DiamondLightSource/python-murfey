@@ -125,7 +125,7 @@ class SPAContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         metadata: OrderedDict = OrderedDict({})
-        metadata["experiment_type"] = TUIFormValue("tomography")
+        metadata["experiment_type"] = TUIFormValue("SPA")
         metadata["voltage"] = TUIFormValue(300)
         metadata["image_size_x"] = TUIFormValue(
             data["Acquisition"]["Info"]["ImageSize"]["Width"]
@@ -139,7 +139,6 @@ class SPAContext(Context):
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(None, top=True)
-        metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
         metadata.move_to_end("gain_ref", last=False)
         metadata.move_to_end("dose_per_frame", last=False)
         return metadata
