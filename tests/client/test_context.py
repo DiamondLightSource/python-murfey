@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from murfey.client.context import TomographyContext
 
 
@@ -165,3 +167,28 @@ def test_tomography_context_add_serialem_decimal_tilt(tmp_path):
     context.post_transfer(tmp_path / "tomography_2_2_30.0.tiff", role="detector")
     assert len(context._tilt_series.values()) == 2
     assert context._completed_tilt_series == ["1"]
+
+
+def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(tmp_path):
+    context = TomographyContext("tomo")
+    assert len(context._tilt_series_sizes) == 0
+    context.post_transfer(
+        Path(__file__).parent.parent / "util" / "test_1.mdoc", role="detector"
+    )
+    assert len(context._tilt_series_sizes) == 1
+    assert context._tilt_series_sizes == {"test_1": 11}
+    (tmp_path / "test_1.mdoc").touch()
+    tilt = -50
+    context.post_transfer(
+        tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff", role="detector"
+    )
+    assert context._tilt_series == {
+        "test_1": [tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff"]
+    }
+    for t in range(-40, 60, 10):
+        assert not context._completed_tilt_series
+        context.post_transfer(
+            tmp_path / f"test_1_[{t:.1f}]_fractions.tiff", role="detector"
+        )
+    assert len(context._tilt_series["test_1"]) == 11
+    assert context._completed_tilt_series == ["test_1"]

@@ -18,7 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util.mdoc import get_global_data
+from murfey.util.mdoc import get_global_data, get_num_blocks
 
 # import time
 
@@ -83,6 +83,7 @@ class TomographyContext(Context):
     def __init__(self, acquisition_software: str):
         super().__init__(acquisition_software)
         self._tilt_series: Dict[str, List[Path]] = {}
+        self._tilt_series_sizes: Dict[str, int | None] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
@@ -299,6 +300,8 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
+            if not self._tilt_series_sizes.get(tilt_series):
+                self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
@@ -434,7 +437,9 @@ class TomographyContext(Context):
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
-                last_tilt_series != tilt_series and last_tilt_angle != tilt_angle
+                last_tilt_series != tilt_series
+                and last_tilt_angle != tilt_angle
+                or self._tilt_series_sizes.get(tilt_series)
             ) or self._completed_tilt_series:
                 newly_completed_series = []
                 if self._tilt_series:
@@ -442,14 +447,18 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
-                if (
-                    this_tilt_series_size >= tilt_series_size
-                    and not required_position_files
-                ):
+                tilt_series_size_check = (
+                    (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
+                    if self._tilt_series_sizes.get(tilt_series)
+                    else (this_tilt_series_size >= tilt_series_size)
+                )
+                if tilt_series_size_check and not required_position_files:
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
-                    if required_position_files:
+                    if self._tilt_series_sizes.get(ts):
+                        completion_test = len(ta) == self._tilt_series_sizes[ts]
+                    elif required_position_files:
                         completion_test = all(
                             _f.is_file() for _f in required_position_files
                         )
@@ -589,21 +598,22 @@ class TomographyContext(Context):
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if (
-            role == "detector"
-            and transferred_file.suffix in data_suffixes
-            and "gain" not in transferred_file.name
-        ):
-            if self._acquisition_software == "tomo":
-                completed_tilts = self._add_tomo_tilt(
-                    transferred_file,
-                    environment=environment,
-                    required_position_files=kwargs.get("required_position_files"),
-                )
-            elif self._acquisition_software == "serialem":
-                completed_tilts = self._add_serialem_tilt(
-                    transferred_file, environment=environment
-                )
+        if role == "detector" and "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "tomo":
+                    completed_tilts = self._add_tomo_tilt(
+                        transferred_file,
+                        environment=environment,
+                        required_position_files=kwargs.get("required_position_files"),
+                    )
+                elif self._acquisition_software == "serialem":
+                    completed_tilts = self._add_serialem_tilt(
+                        transferred_file, environment=environment
+                    )
+            if transferred_file.suffix == ".mdoc":
+                with open(transferred_file, "r") as md:
+                    tilt_series = transferred_file.stem
+                    self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
         return completed_tilts
 
     def post_first_transfer(

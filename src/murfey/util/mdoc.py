@@ -25,6 +25,14 @@ def get_block(mdocfile: TextIO) -> dict:
     return as_dict
 
 
+def get_num_blocks(mdocfile: TextIO) -> int:
+    num_blocks = 0
+    while line := mdocfile.readline():
+        if line.startswith("[ZValue"):
+            num_blocks += 1
+    return num_blocks
+
+
 def get_global_data(mdocfile: TextIO) -> dict:
     as_dict = {}
     while line := mdocfile.readline():
