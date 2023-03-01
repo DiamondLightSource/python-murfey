@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable
+from typing import Callable, List
 
 import ispyb
 
@@ -16,6 +16,7 @@ from ispyb.sqlalchemy import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
+    ProcessingJobParameter,
     Proposal,
     url,
 )
@@ -93,7 +94,14 @@ class TransportManager:
             )
             return {"success": False, "return_value": None}
 
-    def do_create_ispyb_job(self, record: ProcessingJob, rw=None, **kwargs):
+    def do_create_ispyb_job(
+        self,
+        record: ProcessingJob,
+        params: List[ProcessingJobParameter] | None = None,
+        rw=None,
+        **kwargs,
+    ):
+        params = params or []
         dcid = record.dataCollectionId
         if not dcid:
             log.error("Can not create job: DCID not specified")
@@ -108,6 +116,12 @@ class TransportManager:
         log.info("Creating database entries...")
         try:
             jobid = self.ispyb.mx_processing.upsert_job(list(jp.values()))
+            for p in params:
+                pp = self.ispyb.mx_processing.get_job_parameter_params()
+                pp["jobid"] = jobid
+                pp["parameterkey"] = p.parameterKey
+                pp["parametervalue"] = p.parametervalue
+                self.ispyb.mx_processing.upsert_job_parameter(list(pp.values()))
             log.info(f"All done. Processing job {jobid} created")
             return {"success": True, "return_value": jobid}
         except ispyb.ISPyBException as e:
