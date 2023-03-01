@@ -80,7 +80,16 @@ def _check_for_updates(
 
 def _get_visit_list(api_base: ParseResult, demo: bool = False):
     get_visits_url = api_base._replace(path="/visits_raw")
-    server_reply = requests.get(get_visits_url.geturl())
+    server_reply = None
+    try:
+        server_reply = requests.get(get_visits_url.geturl())
+    except requests.exceptions.ConnectionError:
+        print("No server found.")
+        if os.getenv("TEMPORARY_SERVER"):
+            print(
+                "Run the following command to start a server:\nmurfey.server --temporary"
+            )
+        sys.exit()
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
     return [Visit.parse_obj(v) for v in server_reply.json()]
