@@ -40,7 +40,7 @@ class TransportManager:
     def __init__(self, transport_type):
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
-        self.feedback_queue = None
+        self.feedback_queue = ""
         self.ispyb = ispyb.open()
         self._connection_callback: Callable | None = None
 

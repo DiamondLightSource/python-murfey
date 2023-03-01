@@ -168,9 +168,7 @@ def run():
     if murfey_machine_configuration:
         microscope = get_microscope()
         machine_config = from_file(Path(murfey_machine_configuration), microscope)
-    if args.temporary:
-        _transport_object.feedback_queue = None
-    else:
+    if not args.temporary:
         _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
