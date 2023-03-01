@@ -383,10 +383,8 @@ def feedback_callback(header: dict, message: dict) -> None:
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
         if message.get("job_parameters"):
             job_parameters = [
-                ProcessingJobParameter(
-                    parameterKey=jp["parmeter"], parameterValue=jp["value"]
-                )
-                for jp in message["job_parameters"]
+                ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                for k, v in message["job_parameters"].items()
             ]
             pid = _register(ExtendedRecord(record, job_parameters))
         else:

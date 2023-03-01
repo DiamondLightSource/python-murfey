@@ -92,6 +92,7 @@ class DCParameters(BaseModel):
 class ProcessingJobParameters(BaseModel):
     tag: str
     recipe: str
+    parameters: Dict[str, Any] = {}
 
 
 class RegistrationMessage(BaseModel):

@@ -413,6 +413,7 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     proc_parameters = {
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
+        "job_parameters": proc_params.parameters,
     }
 
     if _transport_object:
