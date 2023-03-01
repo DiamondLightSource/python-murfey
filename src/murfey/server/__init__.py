@@ -115,7 +115,10 @@ def run():
         "--feedback",
         action="store_true",
     )
-
+    parser.add_argument(
+        "--temporary",
+        action="store_true",
+    )
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -165,10 +168,12 @@ def run():
     if murfey_machine_configuration:
         microscope = get_microscope()
         machine_config = from_file(Path(murfey_machine_configuration), microscope)
-
+    if args.temporary:
+        _transport_object.feedback_queue = None
+    else:
+        _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
-        kwargs={"feedback_queue": machine_config.feedback_queue},
         daemon=True,
     )
     logger.info("Starting Murfey RabbitMQ thread")
@@ -457,14 +462,20 @@ def _(record: Base, header: dict, **kwargs):
         return None
 
 
-def feedback_listen(feedback_queue: str = "murfey_feedback"):
+def feedback_listen():
+    if not _transport_object.feedback_queue:
+        _transport_object.feedback_queue = (
+            _transport_object.transport._subscribe_temporary(
+                channel_hint="", callback=None, sub_id=None
+            )
+        )
     if _transport_object:
         _transport_object._connection_callback = partial(
             _transport_object.transport.subscribe,
-            feedback_queue,
+            _transport_object.feedback_queue,
             feedback_callback,
             acknowledgement=True,
         )
         _transport_object.transport.subscribe(
-            feedback_queue, feedback_callback, acknowledgement=True
+            _transport_object.feedback_queue, feedback_callback, acknowledgement=True
         )
