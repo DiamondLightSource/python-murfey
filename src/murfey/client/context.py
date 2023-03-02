@@ -81,11 +81,11 @@ class SPAContext(Context):
                 **proc_job_future.message,
                 "acquisition_software": parameters["acquistion_software"],
                 "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_reference"],
-                "motioncor_doseperframe": parameters["dose"],
+                "motioncor_gainreference": parameters["gain_ref"],
+                "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": f"{Path(parameters['destination']).resolve()}/*{parameters['suffix']}",
-                "pixel_size": parameters["angpix"],
+                "angpix": parameters["pixel_size_on_image"],
                 "symmetry": parameters["symmetry"],
                 "extract_boxsize": parameters["boxsize"],
                 "extract_downscale": parameters["downscale"],
@@ -160,6 +160,13 @@ class SPAContext(Context):
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        metadata["use_cryolo"] = TUIFormValue(True)
+        metadata["symmetry"] = TUIFormValue("C1")
+        metadata["mask_diameter"] = TUIFormValue(190)
+        metadata["boxsize"] = TUIFormValue(256)
+        metadata["downscale"] = TUIFormValue(False)
+        metadata["small_boxsize"] = TUIFormValue(128)
+        metadata["eer_grouping"] = TUIFormValue(20)
         metadata.move_to_end("gain_ref", last=False)
         metadata.move_to_end("dose_per_frame", last=False)
         return metadata
