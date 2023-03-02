@@ -714,7 +714,10 @@ class MurfeyTUI(App):
             json = {"tag": str(self._environment.source), **json}
             requests.post(url, json=json)
             self._environment.listeners["autoproc_program_ids"] = {
-                self.analyser._context._launch_spa_pipeline
+                partial(
+                    self.analyser._context._launch_spa_pipeline,
+                    parameters=self._environment.data_collection_parameters,
+                )
             }
 
     def _update_info(self, new_text: str):

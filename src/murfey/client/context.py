@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List, Optional, OrderedDict
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
 
 import requests
 import xmltodict
@@ -21,6 +21,11 @@ from murfey.client.tui.forms import TUIFormValue
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
+
+
+class FutureRequest(NamedTuple):
+    url: str
+    message: Dict[str, Any]
 
 
 def _construct_tilt_series_name(
@@ -69,11 +74,26 @@ class SPAContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
-    def _flush_processing_job(*args):
-        pass
-
-    def _complete_process_file(*args):
-        pass
+    def _flush_processing_job(self, tag: str, parameters: Dict[str, Any] | None = None):
+        if parameters:
+            proc_job_future = self._processing_job_stash[tag]
+            msg = {
+                **proc_job_future.message,
+                "acquisition_software": parameters["acquistion_software"],
+                "voltage": parameters["voltage"],
+                "motioncor_gainreference": parameters["gain_reference"],
+                "motioncor_doseperframe": parameters["dose"],
+                "eer_grouping": parameters["eer_grouping"],
+                "import_images": f"{Path(parameters['destination']).resolve()}/*{parameters['suffix']}",
+                "pixel_size": parameters["angpix"],
+                "symmetry": parameters["symmetry"],
+                "extract_boxsize": parameters["boxsize"],
+                "extract_downscale": parameters["downscale"],
+                "extract_small_boxsize": parameters["small_boxsize"],
+                "mask_diameter": parameters["mask_diameter"],
+                "autopick_do_cryolo": parameters["use_cryolo"],
+            }
+            requests.post(proc_job_future.url, json=msg)
 
     def post_transfer(
         self,
@@ -86,28 +106,29 @@ class SPAContext(Context):
             proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
             source = str(environment.source)
             if environment.data_collection_ids.get(source) is None:
-                self._processing_job_stash[source] = [
-                    (
-                        proc_url,
-                        {"tag": source, "recipe": "relion"},
-                    )
-                ]
-            else:
+                self._processing_job_stash[source] = FutureRequest(
+                    proc_url,
+                    {"tag": source, "recipe": "relion"},
+                )
+            elif environment.data_collection_parameters:
                 if self._processing_job_stash.get(source):
                     # self._flush_processing_job(source)
                     pass
                 requests.post(
                     proc_url,
-                    json={"tag": source, "recipe": "relion"},
+                    json={
+                        "tag": source,
+                        "recipe": "relion",
+                        "parameters": environment.data_collection_parameters,
+                    },
                 )
 
-    def _launch_spa_pipeline(self, tag: str, app_id: int):
-        if tag_tr := self._preprocessing_triggers.get(tag):
-            for tr in tag_tr:
-                process_file = None  # self._complete_process_file(tr[1], tr[2], app_id)
-                if process_file:
-                    requests.post(tr[0], json=process_file)
-            self._preprocessing_triggers.pop(tag)
+    def _launch_spa_pipeline(
+        self, tag: str, app_id: int, parameters: Dict[str, Any] | None = None
+    ):
+        if self._processing_job_stash.get(tag):
+            self._flush_processing_job(tag, parameters=parameters)
+            self._processing_job_stash.pop(tag)
 
     def gather_metadata(self, metadata_file: Path):
         if metadata_file.suffix != ".xml":
