@@ -641,27 +641,30 @@ class TomographyContext(Context):
                     logger.warning(f"Failed to parse file {metadata_file}")
                     return OrderedDict({})
                 data = xmltodict.parse(for_parsing)
-            metadata: OrderedDict = OrderedDict({})
-            metadata["experiment_type"] = TUIFormValue("tomography")
-            metadata["voltage"] = TUIFormValue(300)
-            metadata["image_size_x"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            )
-            metadata["image_size_y"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Height"]
-            )
-            metadata["pixel_size_on_image"] = TUIFormValue(
-                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
-            )
-            metadata["motion_corr_binning"] = TUIFormValue(1)
-            metadata["gain_ref"] = TUIFormValue(None, top=True)
-            metadata["dose_per_frame"] = TUIFormValue(
-                None, top=True, colour="dark_orange"
-            )
-            metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
-            metadata.move_to_end("gain_ref", last=False)
-            metadata.move_to_end("dose_per_frame", last=False)
-            # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
+            try:
+                metadata: OrderedDict = OrderedDict({})
+                metadata["experiment_type"] = TUIFormValue("tomography")
+                metadata["voltage"] = TUIFormValue(300)
+                metadata["image_size_x"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Width"]
+                )
+                metadata["image_size_y"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Height"]
+                )
+                metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+                )
+                metadata["motion_corr_binning"] = TUIFormValue(1)
+                metadata["gain_ref"] = TUIFormValue(None, top=True)
+                metadata["dose_per_frame"] = TUIFormValue(
+                    None, top=True, colour="dark_orange"
+                )
+                metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+                metadata.move_to_end("gain_ref", last=False)
+                metadata.move_to_end("dose_per_frame", last=False)
+                # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
+            except KeyError:
+                return OrderedDict({})
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
