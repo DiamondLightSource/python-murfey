@@ -51,11 +51,11 @@ class TransportManager:
         **kwargs,
     ):
         try:
-            db = Session()
-            db.add(record)
-            db.commit()
-            log.info(f"Created DataCollection {record.dataCollectionGroupId}")
-            return {"success": True, "return_value": record.dataCollectionGroupId}
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created DataCollection {record.dataCollectionGroupId}")
+                return {"success": True, "return_value": record.dataCollectionGroupId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection Group entry caused exception '%s'.",
@@ -79,11 +79,12 @@ class TransportManager:
             else "Created for Murfey"
         )
         try:
-            db = Session()
-            db.add(record(comments=comment))
-            db.commit()
-            log.info(f"Created DataCollection {record.dataCollectionId}")
-            return {"success": True, "return_value": record.dataCollectionId}
+            with Session() as db:
+                record.comments = comment
+                db.add(record)
+                db.commit()
+                log.info(f"Created DataCollection {record.dataCollectionId}")
+                return {"success": True, "return_value": record.dataCollectionId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection entry caused exception '%s'.",
