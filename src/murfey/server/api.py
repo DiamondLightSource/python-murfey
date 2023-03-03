@@ -237,7 +237,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         "parameters": {
             "feedback_queue": machine_config.feedback_queue,
             "dcid": proc_file.data_collection_id,
-            "timestamp": datetime.datetime.now(),
+            # "timestamp": datetime.datetime.now(),
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
             "mrc_out": str(mrc_out),
