@@ -234,7 +234,7 @@ class TomographyContext(Context):
         required_strings: List[str] | None = None,
     ) -> List[str]:
         # required_position_files = required_position_files or []
-        required_strings = required_strings or []
+        required_strings = required_strings or ["fractions"]
         for r in required_strings:
             if r not in file_path.name.lower():
                 return []
@@ -249,7 +249,7 @@ class TomographyContext(Context):
             try:
                 float(tilt_series_num)
                 float(tilt_angle)
-            except ValueError:
+            except (ValueError, IndexError):
                 return []
             tilt_series = (
                 f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
@@ -456,10 +456,12 @@ class TomographyContext(Context):
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
                     if required_position_files:
+                        # logger.info(f"{required_position_files}")
                         completion_test = all(
                             _f.is_file() for _f in required_position_files
                         )
                     else:
+                        # logger.info(f"no required position files: {tilt_series_size}, {len(ta)}")
                         completion_test = len(ta) >= tilt_series_size
                     if ts not in self._completed_tilt_series and completion_test:
                         newly_completed_series.append(ts)
@@ -519,6 +521,8 @@ class TomographyContext(Context):
                     logger.info(
                         f"The following tilt series are considered complete: {newly_completed_series}"
                     )
+                    for s in newly_completed_series:
+                        logger.info([str(_) for _ in self._tilt_series[s]])
                 return newly_completed_series
         self._last_transferred_file = file_path
         return []
@@ -540,9 +544,15 @@ class TomographyContext(Context):
                 tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
             tilt_info_extraction = tomo_tilt_info["5.7"]
-        tilt_tag = tilt_info_extraction.tag(file_path)
-        tilt_series_num = tilt_info_extraction.series(file_path)
-        tilt_series = f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+        try:
+            tilt_tag = tilt_info_extraction.tag(file_path)
+            tilt_series_num = tilt_info_extraction.series(file_path)
+            tilt_series = (
+                f"{tilt_tag}_{tilt_series_num}" if tilt_tag else tilt_series_num
+            )
+        except IndexError:
+            logger.info(str(file_path))
+            return []
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,
@@ -600,7 +610,7 @@ class TomographyContext(Context):
                 completed_tilts = self._add_tomo_tilt(
                     transferred_file,
                     environment=environment,
-                    required_position_files=kwargs.get("required_position_files"),
+                    required_position_files=kwargs.get("required_position_files", []),
                 )
             elif self._acquisition_software == "serialem":
                 completed_tilts = self._add_serialem_tilt(
@@ -626,34 +636,37 @@ class TomographyContext(Context):
             logger.debug(f"Metadata file {metadata_file} not found")
             return OrderedDict({})
         if metadata_file.suffix == ".xml":
-            with open(metadata_file, "r") as xml:
-                try:
-                    for_parsing = xml.read()
-                except Exception:
-                    logger.warning(f"Failed to parse file {metadata_file}")
-                    return OrderedDict({})
-                data = xmltodict.parse(for_parsing)
-            metadata: OrderedDict = OrderedDict({})
-            metadata["experiment_type"] = TUIFormValue("tomography")
-            metadata["voltage"] = TUIFormValue(300)
-            metadata["image_size_x"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            )
-            metadata["image_size_y"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Height"]
-            )
-            metadata["pixel_size_on_image"] = TUIFormValue(
-                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
-            )
-            metadata["motion_corr_binning"] = TUIFormValue(1)
-            metadata["gain_ref"] = TUIFormValue(None, top=True)
-            metadata["dose_per_frame"] = TUIFormValue(
-                None, top=True, colour="dark_orange"
-            )
-            metadata["tilt_offset"] = TUIFormValue(0, top=True)
-            metadata.move_to_end("gain_ref", last=False)
-            metadata.move_to_end("dose_per_frame", last=False)
-            # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
+            try:
+                with open(metadata_file, "r") as xml:
+                    try:
+                        for_parsing = xml.read()
+                    except Exception:
+                        logger.warning(f"Failed to parse file {metadata_file}")
+                        return OrderedDict({})
+                    data = xmltodict.parse(for_parsing)
+                metadata: OrderedDict = OrderedDict({})
+                metadata["experiment_type"] = TUIFormValue("tomography")
+                metadata["voltage"] = TUIFormValue(300)
+                metadata["image_size_x"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Width"]
+                )
+                metadata["image_size_y"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Height"]
+                )
+                metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+                )
+                metadata["motion_corr_binning"] = TUIFormValue(1)
+                metadata["gain_ref"] = TUIFormValue(None, top=True)
+                metadata["dose_per_frame"] = TUIFormValue(
+                    None, top=True, colour="dark_orange"
+                )
+                metadata["tilt_offset"] = TUIFormValue(0, top=True)
+                metadata.move_to_end("gain_ref", last=False)
+                metadata.move_to_end("dose_per_frame", last=False)
+                # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
+            except KeyError:
+                return OrderedDict({})
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
