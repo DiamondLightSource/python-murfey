@@ -388,7 +388,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "image_directory": dc_params.image_directory,
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
-        "pixel_size": dc_params.pixel_size_on_image,
+        "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
         "image_size_x": dc_params.image_size_x,
