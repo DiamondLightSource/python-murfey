@@ -7,7 +7,7 @@ from typing import TextIO
 def _basic_parse(line: str) -> dict:
     kv = [p.strip() for p in line.split("=")]
     if kv[0] == "DateTime":
-        return {kv[0]: datetime.strptime(kv[1], "%d-%b-%y %H:%M:%S")}
+        return {kv[0]: datetime.strptime(kv[1], "%d-%b-%Y %H:%M:%S")}
     return {kv[0]: tuple(kv[1].split()) if " " in kv[1] else kv[1]}
 
 
