@@ -532,7 +532,14 @@ class TomographyContext(Context):
         file_path: Path,
         environment: MurfeyInstanceEnvironment | None = None,
         required_position_files: List[Path] | None = None,
+        required_strings: List[str] | None = None,
     ) -> List[str]:
+        required_strings = (
+            ["fractions"] if required_strings is None else required_strings
+        )
+        for r in required_strings:
+            if r not in file_path.name.lower():
+                return []
         if environment:
             if tomo_version := environment.software_versions.get("tomo"):
                 tilt_info_extraction = tomo_tilt_info.get(tomo_version)
