@@ -18,9 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util.mdoc import get_global_data, get_num_blocks
-
-# import time
+from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -667,6 +665,7 @@ class TomographyContext(Context):
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
+            mdoc_data_block = get_block(md)
         if not mdoc_data:
             return OrderedDict({})
         mdoc_metadata: OrderedDict = OrderedDict({})
@@ -674,8 +673,10 @@ class TomographyContext(Context):
         mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
         mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
         mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
-        mdoc_metadata["magnification"] = TUIFormValue(int(mdoc_data["Magnification"]))
-        superres_binning = int(mdoc_data["Binning"])
+        mdoc_metadata["magnification"] = TUIFormValue(
+            int(mdoc_data_block["Magnification"])
+        )
+        superres_binning = int(mdoc_data_block["Binning"])
         binning_factor = 1
         if environment:
             server_config = requests.get(
@@ -686,7 +687,7 @@ class TomographyContext(Context):
             ps_from_mag = (
                 server_config.get("calibrations", {})
                 .get("magnification", {})
-                .get(int(mdoc_data["Magnification"]))
+                .get(int(mdoc_data_block["Magnification"]))
             )
             if ps_from_mag:
                 mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
