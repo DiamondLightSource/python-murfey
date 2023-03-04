@@ -130,7 +130,9 @@ class SPAContext(Context):
             self._flush_processing_job(tag, parameters=parameters)
             self._processing_job_stash.pop(tag)
 
-    def gather_metadata(self, metadata_file: Path):
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         if metadata_file.suffix != ".xml":
             raise ValueError(
                 f"SPA gather_metadata method expected xml file not {metadata_file.name}"
