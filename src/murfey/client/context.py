@@ -70,7 +70,7 @@ class Context:
 
 class SPAContext(Context):
     def __init__(self, acquisition_software: str):
-        self.acquisition_software = acquisition_software
+        self._acquisition_software = acquisition_software
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 

@@ -89,6 +89,40 @@ class DCParameters(BaseModel):
     tag: str
 
 
+class DCParametersTomo(BaseModel):
+    dose_per_frame: float
+    gain_ref: Optional[str]
+    experiment_type: str
+    voltage: float
+    image_size_x: int
+    image_size_y: int
+    pixel_size_on_image: str
+    motion_corr_binning: int
+    manual_tilt_offset: float
+    file_extension: str
+    acquisition_software: str
+
+
+class DCParametersSPA(BaseModel):
+    dose_per_frame: float
+    gain_ref: Optional[str]
+    experiment_type: str
+    voltage: float
+    image_size_x: int
+    image_size_y: int
+    pixel_size_on_image: str
+    motion_corr_binning: int
+    file_extension: str
+    acquisition_software: str
+    use_cryolo: bool
+    symmetry: str
+    mask_diameter: int
+    boxsize: int
+    downscale: bool
+    small_boxsize: int
+    eer_grouping: int
+
+
 class ProcessingJobParameters(BaseModel):
     tag: str
     recipe: str

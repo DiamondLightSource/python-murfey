@@ -475,20 +475,6 @@ class LogBook(Widget):
             self.refresh()
 
 
-class DCParametersTomo(BaseModel):
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    manual_tilt_offset: float
-    file_extension: str
-    acquisition_software: str
-
-
 class MurfeyTUI(App):
     input_box: InputBox
     log_book: ScrollView
@@ -623,10 +609,7 @@ class MurfeyTUI(App):
                     InputResponse(
                         question="Data collection parameters:",
                         form=r.get("form", OrderedDict({})),
-                        model=DCParametersTomo
-                        if self.analyser
-                        and isinstance(self.analyser._context, TomographyContext)
-                        else None,
+                        model=getattr(self.analyser, "parameters_model", None),
                         callback=self.app._start_dc_confirm_prompt,
                     )
                 )
@@ -673,10 +656,7 @@ class MurfeyTUI(App):
                 InputResponse(
                     question="Data collection parameters:",
                     form=OrderedDict({k: TUIFormValue(v) for k, v in json.items()}),
-                    model=DCParametersTomo
-                    if self.analyser
-                    and isinstance(self.analyser._context, TomographyContext)
-                    else None,
+                    model=getattr(self.analyser, "parameters_model", None),
                     callback=self.app._start_dc_confirm_prompt,
                 )
             )
