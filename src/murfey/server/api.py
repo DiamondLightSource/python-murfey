@@ -29,6 +29,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
+    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeries,
     Visit,
@@ -206,6 +207,16 @@ async def send_murfey_message(msg: RegistrationMessage):
         _transport_object.send(
             machine_config.feedback_queue, {"register": msg.registration}
         )
+
+
+@router.post("/visits/{visit_name}/spa_processing")
+async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
+    zocalo_message = {
+        "parameters": {"ispyb_process": proc_params.job_id},
+        "recipes": ["relion"],
+    }
+    if _transport_object:
+        _transport_object.send("processing_recipe", zocalo_message)
 
 
 @router.post("/visits/{visit_name}/tomography_preprocess")

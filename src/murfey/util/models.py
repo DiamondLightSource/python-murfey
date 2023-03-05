@@ -40,6 +40,10 @@ class File(BaseModel):
     timestamp: float
 
 
+class SPAProcessingParameters(BaseModel):
+    job_id: int
+
+
 class ProcessFile(BaseModel):
     path: str
     description: str

@@ -701,7 +701,13 @@ class MurfeyTUI(App):
                 )
             }
             self._environment.listeners["data_collection_ids"] = {
-                partial(self.analyser._context._launch_spa_pipeline, parameters=json)
+                partial(
+                    self.analyser._context._register_processing_job, parameters=json
+                )
+            }
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
+            self._environment.listeners["processing_job_ids"] = {
+                partial(self.analyser._context._launch_spa_pipeline, url=url)
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}

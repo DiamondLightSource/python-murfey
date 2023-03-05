@@ -142,10 +142,16 @@ class SPAContext(Context):
                     },
                 )
 
-    def _launch_spa_pipeline(self, tag: str, parameters: Dict[str, Any] | None = None):
+    def _register_processing_job(
+        self, tag: str, parameters: Dict[str, Any] | None = None
+    ):
         if self._processing_job_stash.get(tag):
             self._flush_processing_job(tag, parameters=parameters)
             self._processing_job_stash.pop(tag)
+
+    def _launch_spa_pipeline(self, tag: str, jobid: int, url: str = ""):
+        data = {"job_id": jobid}
+        requests.post(url, json=data)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
