@@ -313,4 +313,5 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
         global_state["autoproc_program_ids"] = {
             proc_params.tag: {proc_params.recipe: 1}
         }
+    log.info(f"Processing job registered with parameters: {proc_params}")
     return proc_params

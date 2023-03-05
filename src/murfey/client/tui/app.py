@@ -687,18 +687,25 @@ class MurfeyTUI(App):
             dcg_data = {"experiment_type": "tomo", "experiment_type_id": 36}
             requests.post(url, json=dcg_data)
         elif isinstance(self.analyser._context, SPAContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            json = {
+                "tag": str(self._environment.source.resolve()),
+                "image_directory": str(
+                    Path(self._environment.default_destination).resolve()
+                ),
+                **json,
+            }
+            self._environment.listeners["data_collection_group_id"] = {
+                partial(
+                    self.analyser._context._register_data_collection, url=url, data=json
+                )
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                partial(self.analyser._context._launch_spa_pipeline, parameters=json)
+            }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
             requests.post(url, json=dcg_data)
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-            json = {"tag": str(self._environment.source), **json}
-            requests.post(url, json=json)
-            self._environment.listeners["data_collection_ids"] = {
-                partial(
-                    self.analyser._context._launch_spa_pipeline,
-                    parameters=self._environment.data_collection_parameters,
-                )
-            }
 
     def _update_info(self, new_text: str):
         self._info_widget.text = new_text

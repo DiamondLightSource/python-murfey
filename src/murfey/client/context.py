@@ -79,21 +79,37 @@ class SPAContext(Context):
             proc_job_future = self._processing_job_stash[tag]
             msg = {
                 **proc_job_future.message,
-                "acquisition_software": parameters["acquistion_software"],
-                "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_ref"],
-                "motioncor_doseperframe": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_grouping"],
-                "import_images": f"{Path(parameters['destination']).resolve()}/*{parameters['suffix']}",
-                "angpix": parameters["pixel_size_on_image"],
-                "symmetry": parameters["symmetry"],
-                "extract_boxsize": parameters["boxsize"],
-                "extract_downscale": parameters["downscale"],
-                "extract_small_boxsize": parameters["small_boxsize"],
-                "mask_diameter": parameters["mask_diameter"],
-                "autopick_do_cryolo": parameters["use_cryolo"],
+                "parameters": {
+                    "acquisition_software": parameters["acquisition_software"],
+                    "voltage": parameters["voltage"],
+                    "motioncor_gainreference": parameters["gain_ref"],
+                    "motioncor_doseperframe": parameters["dose_per_frame"],
+                    "eer_grouping": parameters["eer_grouping"],
+                    "import_images": f"{Path(parameters['image_directory']).resolve()}/*{parameters['file_extension']}",
+                    "angpix": parameters["pixel_size_on_image"],
+                    "symmetry": parameters["symmetry"],
+                    "extract_boxsize": parameters["boxsize"],
+                    "extract_downscale": parameters["downscale"],
+                    "extract_small_boxsize": parameters["small_boxsize"],
+                    "mask_diameter": parameters["mask_diameter"],
+                    "autopick_do_cryolo": parameters["use_cryolo"],
+                },
             }
             requests.post(proc_job_future.url, json=msg)
+
+    def _register_data_collection(self, url: str, data: dict):
+        json = {
+            "voltage": data["voltage"],
+            "pixel_size_on_image": data["pixel_size_on_image"],
+            "experiment_type": data["experiment_type"],
+            "image_size_x": data["image_size_x"],
+            "image_size_y": data["image_size_y"],
+            "file_extension": data["file_extension"],
+            "acquisition_software": data["acquisition_software"],
+            "image_directory": data["image_directory"],
+            "tag": data["tag"],
+        }
+        requests.post(url, json=json)
 
     def post_transfer(
         self,
@@ -104,7 +120,10 @@ class SPAContext(Context):
     ):
         if role == "detector" and environment:
             proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-            source = str(environment.source)
+            if environment.source:
+                source = str(environment.source.resolve())
+            else:
+                source = ""
             if environment.data_collection_ids.get(source) is None:
                 self._processing_job_stash[source] = FutureRequest(
                     proc_url,
@@ -123,9 +142,7 @@ class SPAContext(Context):
                     },
                 )
 
-    def _launch_spa_pipeline(
-        self, tag: str, app_id: int, parameters: Dict[str, Any] | None = None
-    ):
+    def _launch_spa_pipeline(self, tag: str, parameters: Dict[str, Any] | None = None):
         if self._processing_job_stash.get(tag):
             self._flush_processing_job(tag, parameters=parameters)
             self._processing_job_stash.pop(tag)
