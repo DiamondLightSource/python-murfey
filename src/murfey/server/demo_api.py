@@ -26,6 +26,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
+    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeries,
     Visit,
@@ -176,6 +177,16 @@ async def send_murfey_message(msg: RegistrationMessage):
     pass
 
 
+@router.post("/visits/{visit_name}/spa_processing")
+async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
+    zocalo_message = {
+        "parameters": {"ispyb_process": proc_params.job_id},
+        "recipes": ["relion"],
+    }
+    log.info(f"SPA processing requested with message: {zocalo_message}")
+    return proc_params
+
+
 @router.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
     if not Path(proc_file.path).exists():
@@ -271,8 +282,18 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
 
 @router.post("/visits/{visit_name}/register_data_collection_group")
 def register_dc_group(visit_name, dcg_params: DCGroupParameters):
-    log.info(f"Registering data collection group on microscope {get_microscope()}")
-    global_state["data_collection_group_id"] = 1
+    log.info(
+        f"Registering data collection group on microscope {get_microscope()} for source {dcg_params.tag}"
+    )
+    if global_state.get("data_collection_group_ids") and isinstance(
+        global_state["data_collection_group_ids"], dict
+    ):
+        global_state["data_collection_group_ids"] = {
+            **global_state["data_collection_group_ids"],
+            dcg_params.tag: 1,
+        }
+    else:
+        global_state["data_collection_group_ids"] = {dcg_params.tag: 1}
     return dcg_params
 
 
@@ -293,6 +314,7 @@ def start_dc(visit_name, dc_params: DCParameters):
 
 @router.post("/visits/{visit_name}/register_processing_job")
 def register_proc(visit_name, proc_params: ProcessingJobParameters):
+    log.info(f"Registering processing job with parameters: {proc_params}")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
         global_state["processing_job_ids"] = {

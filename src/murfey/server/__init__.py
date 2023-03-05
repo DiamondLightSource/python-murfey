@@ -7,7 +7,7 @@ import socket
 from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
-from typing import Any
+from typing import Any, List, NamedTuple
 
 import uvicorn
 import workflows
@@ -19,6 +19,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
+    ProcessingJobParameter,
 )
 from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
@@ -29,7 +30,7 @@ from murfey.server.config import MachineConfig, from_file
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
-except AttributeError as e:
+except AttributeError:
     pass
 from murfey.util.state import global_state
 
@@ -46,6 +47,11 @@ templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
+
+
+class ExtendedRecord(NamedTuple):
+    record: Base
+    record_params: List[Base]
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -331,24 +337,37 @@ def feedback_callback(header: dict, message: dict) -> None:
             experimentType=message["experiment_type"],
             experimentTypeId=message["experiment_type_id"],
         )
-        print(record)
         dcgid = _register(record, header)
-        print(dcgid)
         if _transport_object:
             if dcgid is None:
                 _transport_object.transport.nack(header)
                 return None
-            global_state["data_collection_group_id"] = dcgid
+            if global_state.get("data_collection_group_ids") and isinstance(
+                global_state["data_collection_group_ids"], dict
+            ):
+                global_state["data_collection_group_ids"] = {
+                    **global_state["data_collection_group_ids"],
+                    message.get("tag"): dcgid,
+                }
+            else:
+                global_state["data_collection_group_ids"] = {message.get("tag"): dcgid}
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
+        dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
+            message["tag"]
+        )
+        if dcgid is None:
+            raise ValueError(
+                f"No data collection group ID was found for image directory {message['image_directory']}"
+            )
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
             imageDirectory=message["image_directory"],
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
-            dataCollectionGroupId=global_state.get("data_collection_group_id"),
+            dataCollectionGroupId=dcgid,
         )
         dcid = _register(record, header, tag=message.get("tag"))
         if dcid is None and _transport_object:
@@ -371,7 +390,14 @@ def feedback_callback(header: dict, message: dict) -> None:
         assert isinstance(global_state["data_collection_ids"], dict)
         _dcid = global_state["data_collection_ids"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
-        pid = _register(record, header)
+        if message.get("job_parameters"):
+            job_parameters = [
+                ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                for k, v in message["job_parameters"].items()
+            ]
+            pid = _register(ExtendedRecord(record, job_parameters))
+        else:
+            pid = _register(record, header)
         if pid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
@@ -417,7 +443,7 @@ def _register(record, header: dict, **kwargs):
     raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
 
 
-@_register.register
+@_register.register  # type: ignore
 def _(record: Base, header: dict, **kwargs):
     if not _transport_object:
         logger.error(
@@ -454,6 +480,13 @@ def _(record: Base, header: dict, **kwargs):
             exc_info=True,
         )
         return None
+
+
+@_register.register  # type: ignore
+def _(extended_record: ExtendedRecord, header: dict, **kwargs):
+    return _transport_object.do_create_ispyb_job(
+        extended_record.record, params=extended_record.record_params
+    )["return_value"]
 
 
 def feedback_listen(feedback_queue: str = "murfey_feedback"):

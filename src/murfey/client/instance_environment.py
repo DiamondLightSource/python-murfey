@@ -32,7 +32,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     default_destinations: Dict[Path, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
-    data_collection_group_id: Optional[int] = None
+    data_collection_group_ids: Dict[str, int] = {}
     data_collection_ids: Dict[str, int] = {}
     processing_job_ids: Dict[str, Dict[str, int]] = {}
     autoproc_program_ids: Dict[str, Dict[str, int]] = {}
@@ -51,10 +51,10 @@ class MurfeyInstanceEnvironment(BaseModel):
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
 
-    @validator("data_collection_group_id")
+    @validator("data_collection_group_ids")
     def dcg_callback(cls, v, values):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("data_collection_group_id", []):
+            for l in values.get("listeners", {}).get("data_collection_group_ids", []):
                 l()
         return v
 
@@ -68,6 +68,18 @@ class MurfeyInstanceEnvironment(BaseModel):
                 else:
                     for k in v.keys():
                         l(k)
+        return v
+
+    @validator("processing_job_ids")
+    def job_callback(cls, v, values):
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("processing_job_ids", []):
+                if values.get("processing_job_ids"):
+                    for k in set(values["processing_job_ids"].keys()) ^ set(v.keys()):
+                        l(k, v[k]["relion"])
+                else:
+                    for k in v.keys():
+                        l(k, v[k]["relion"])
         return v
 
     @validator("autoproc_program_ids")

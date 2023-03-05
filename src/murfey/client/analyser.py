@@ -4,12 +4,14 @@ import logging
 import queue
 import threading
 from pathlib import Path
+from typing import Type
 
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import TUIFormValue
 from murfey.util import Observer
+from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -32,6 +34,9 @@ class Analyser(Observer):
         self._batch_store: dict = {}
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
+        self.parameters_model: Type[DCParametersSPA] | Type[
+            DCParametersTomo
+        ] | None = None
 
         self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
@@ -57,6 +62,7 @@ class Analyser(Observer):
             ):
                 logger.info("Acquisition software: tomo")
                 self._context = TomographyContext("tomo", self._basepath)
+                self.parameters_model = DCParametersTomo
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -72,12 +78,14 @@ class Analyser(Observer):
                         self._role = "detector"
                 return True
             if split_file_name[0].startswith("FoilHole"):
-                self._context = SPAContext("epu")
+                self._context = SPAContext("epu", self._basepath)
+                self.parameters_model = DCParametersSPA
                 if not self._role:
                     self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
                 self._context = TomographyContext("serialem", self._basepath)
+                self.parameters_model = DCParametersTomo
                 if not self._role:
                     if "Frames" in file_path.parts:
                         self._role = "detector"
@@ -102,6 +110,7 @@ class Analyser(Observer):
                 or mdoc_for_reading
             ):
                 if self._context:
+                    logger.info("gather metadata 1")
                     dc_metadata = self._context.gather_metadata(
                         mdoc_for_reading or transferred_file
                     )
@@ -121,12 +130,19 @@ class Analyser(Observer):
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
-                    self._context.post_first_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
+                    try:
+                        self._context.post_first_transfer(
+                            transferred_file,
+                            role=self._role,
+                            environment=self._environment,
+                        )
+                    except Exception as e:
+                        logger.info(f"exception encountered {e}")
+                    logger.info("post transfer called")
                     if self._role == "detector":
                         if not dc_metadata:
                             try:
+                                logger.info("gather metadata 2")
                                 dc_metadata = self._context.gather_metadata(
                                     transferred_file.with_suffix(".mdoc")
                                     if self._context._acquisition_software == "serialem"
@@ -152,11 +168,18 @@ class Analyser(Observer):
                     logger.info(
                         f"Context found successfully: {self._role}, {transferred_file}"
                     )
-                    self._context.post_first_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
+                    try:
+                        self._context.post_first_transfer(
+                            transferred_file,
+                            role=self._role,
+                            environment=self._environment,
+                        )
+                    except Exception as e:
+                        logger.info(f"exception encountered {e}")
+                    logger.info("post transfer called")
                     if self._role == "detector":
                         if not dc_metadata:
+                            logger.info("gather metadata 3")
                             dc_metadata = self._context.gather_metadata(
                                 mdoc_for_reading or transferred_file.with_suffix(".xml")
                             )
@@ -171,7 +194,7 @@ class Analyser(Observer):
                                 self._context._acquisition_software
                             )
                             self.notify({"form": dc_metadata})
-            else:
+            elif isinstance(self._context, TomographyContext):
                 _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(
                     transferred_file, role=self._role, environment=self._environment
@@ -181,6 +204,7 @@ class Analyser(Observer):
                     and self._role == "detector"
                 ):
                     if not dc_metadata:
+                        logger.info("gather metadata 4")
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml")
                         )

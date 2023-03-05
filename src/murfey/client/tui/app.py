@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Dict, List, NamedTuple, Optional, OrderedDict, TypeVar
+from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
 import procrunner
@@ -151,21 +151,6 @@ def validate_form(form: dict, model: BaseModel) -> dict:
     except (AttributeError, ValidationError) as e:
         log.warning(f"Form validation failed: {str(e)}")
         return {}
-
-
-class DCParametersTomo(BaseModel):
-    source: Path
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    tilt_offset: float
-    file_extension: str
-    acquisition_software: str
 
 
 class _DirectoryTree(DirectoryTree):
@@ -326,6 +311,8 @@ class ProcessingForm(Screen):
             "tilt_offset": "Tilt Offset",
             "file_extension": "File Extension",
             "acquisition_software": "Acquisition Software",
+            "use_cryolo": "Use crYOLO autopicking",
+            "symmetry": "Symmetry group",
         }
         self._inputs: Dict[Input, str] = {}
 
@@ -360,10 +347,11 @@ class ProcessingForm(Screen):
             self.app.install_screen(
                 ConfirmScreen(
                     "Launch processing?",
-                    params={
-                        self._readable_labels.get(k, k): v
-                        for k, v in self._form.items()
-                    },
+                    # params={
+                    #     self._readable_labels.get(k, k): v
+                    #     for k, v in self._form.items()
+                    # },
+                    params=self._form,
                     pressed_callback=self._write_params,
                 ),
                 "confirm",
@@ -631,13 +619,7 @@ class MurfeyTUI(App):
                     InputResponse(
                         question="Data collection parameters:",
                         form=r.get("form", OrderedDict({})),
-                        model=DCParametersTomo
-                        if self.analysers
-                        and isinstance(
-                            self.analysers[r.get("form", {})["source"]]._context,
-                            TomographyContext,
-                        )
-                        else None,
+                        model=getattr(self.analyser, "parameters_model", None),
                         callback=self.app._start_dc_confirm_prompt,
                     )
                 )
@@ -680,12 +662,12 @@ class MurfeyTUI(App):
             if isinstance(a._context, TomographyContext):
                 context = TomographyContext
                 break
-            if isinstance(a.context, SPAContext):
+            if isinstance(a._context, SPAContext):
                 context = SPAContext
                 break
         if context == TomographyContext:
             source = Path(json["source"])
-            self._environment.listeners["data_collection_group_id"] = {
+            self._environment.listeners["data_collection_group_ids"] = {
                 self.analysers[source]._context._flush_data_collections
             }
             self._environment.listeners["data_collection_ids"] = {
@@ -698,14 +680,46 @@ class MurfeyTUI(App):
                 self.analysers[source]._context._check_for_alignment
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
-            dcg_data = {"experiment_type": "tomo", "experiment_type_id": 36}
+            dcg_data = {
+                "experiment_type": "tomo",
+                "experiment_type_id": 36,
+                "tag": str(source),
+            }
             requests.post(url, json=dcg_data)
         elif context == SPAContext:
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
-            dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
-            requests.post(url, json=dcg_data)
+            source = Path(json["source"])
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-            requests.post(url, json=json)
+            json = {
+                "tag": str(source.resolve()),
+                "image_directory": str(
+                    Path(self._environment.default_destinations[source]).resolve()
+                ),
+                **json,
+            }
+            self._environment.listeners["data_collection_group_ids"] = {
+                partial(
+                    self.analysers[source]._context._register_data_collection,
+                    url=url,
+                    data=json,
+                )
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                partial(
+                    self.analysers[source]._context._register_processing_job,
+                    parameters=json,
+                )
+            }
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
+            self._environment.listeners["processing_job_ids"] = {
+                partial(self.analysers[source]._context._launch_spa_pipeline, url=url)
+            }
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            dcg_data = {
+                "experiment_type": "single particle",
+                "experiment_type_id": 37,
+                "tag": str(source),
+            }
+            requests.post(url, json=dcg_data)
 
     def _update_info(self, new_text: str):
         self._info_widget.write(new_text)
