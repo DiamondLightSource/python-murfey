@@ -171,11 +171,7 @@ async def send_murfey_message(msg: RegistrationMessage):
 
 @router.post("/visits/{visit_name}/spa_processing")
 async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    zocalo_message = {
-        "parameters": {"ispyb_process": proc_params.job_id},
-        "recipes": ["relion"],
-    }
-    log.info(f"SPA processing requested with message: {zocalo_message}")
+    log.info("SPA processing requested")
     return proc_params
 
 
@@ -324,5 +320,5 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
         global_state["autoproc_program_ids"] = {
             proc_params.tag: {proc_params.recipe: 1}
         }
-    log.info(f"Processing job registered with parameters: {proc_params}")
+    log.info("Processing job registered")
     return proc_params
