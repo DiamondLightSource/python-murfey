@@ -70,7 +70,7 @@ class Context:
 
 class SPAContext(Context):
     def __init__(self, acquisition_software: str):
-        self._acquisition_software = acquisition_software
+        super().__init__(acquisition_software)
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
@@ -238,7 +238,7 @@ class TomographyContext(Context):
     def _flush_preprocess(self, tag: str, app_id: int):
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
-                process_file = None  # self._complete_process_file(tr[1], tr[2], app_id)
+                process_file = self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
                     requests.post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
