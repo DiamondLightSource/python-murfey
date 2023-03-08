@@ -7,7 +7,7 @@ import socket
 from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
-from typing import Any
+from typing import Any, List, NamedTuple
 
 import uvicorn
 import workflows
@@ -19,6 +19,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
+    ProcessingJobParameter,
 )
 from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
@@ -46,6 +47,11 @@ templates = Jinja2Templates(directory=template_files)
 
 _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
+
+
+class ExtendedRecord(NamedTuple):
+    record: Base
+    record_params: List[Base]
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -168,7 +174,8 @@ def run():
     if murfey_machine_configuration:
         microscope = get_microscope()
         machine_config = from_file(Path(murfey_machine_configuration), microscope)
-    if not args.temporary:
+        print(machine_config)
+    if not args.temporary and not args.demo:
         _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
@@ -375,7 +382,14 @@ def feedback_callback(header: dict, message: dict) -> None:
         assert isinstance(global_state["data_collection_ids"], dict)
         _dcid = global_state["data_collection_ids"][message["tag"]]
         record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
-        pid = _register(record, header)
+        if message.get("job_parameters"):
+            job_parameters = [
+                ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                for k, v in message["job_parameters"].items()
+            ]
+            pid = _register(ExtendedRecord(record, job_parameters))
+        else:
+            pid = _register(record, header)
         if pid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
@@ -422,7 +436,7 @@ def _register(record, header: dict, **kwargs):
 
 
 @_register.register
-def _(record: Base, header: dict, **kwargs):
+def _(record: Base, header: dict, **kwargs):  # type: ignore
     if not _transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
@@ -458,6 +472,12 @@ def _(record: Base, header: dict, **kwargs):
             exc_info=True,
         )
         return None
+
+@_register.register  # type: ignore
+def _(extended_record: ExtendedRecord, header: dict, **kwargs):
+    return _transport_object.do_create_ispyb_job(
+        extended_record.record, params=extended_record.record_params
+    )["return_value"]
 
 
 def feedback_listen():

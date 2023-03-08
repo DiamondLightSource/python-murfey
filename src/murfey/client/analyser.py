@@ -4,12 +4,14 @@ import logging
 import queue
 import threading
 from pathlib import Path
+from typing import Type
 
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import TUIFormValue
 from murfey.util import Observer
+from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -32,6 +34,9 @@ class Analyser(Observer):
         self._batch_store: dict = {}
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
+        self.parameters_model: Type[DCParametersSPA] | Type[
+            DCParametersTomo
+        ] | None = None
 
         self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
@@ -57,6 +62,7 @@ class Analyser(Observer):
             ):
                 logger.info("Acquisition software: tomo")
                 self._context = TomographyContext("tomo")
+                self.parameters_model = DCParametersTomo
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -73,11 +79,13 @@ class Analyser(Observer):
                 return True
             if split_file_name[0].startswith("FoilHole"):
                 self._context = SPAContext("epu")
+                self.parameters_model = DCParametersSPA
                 if not self._role:
                     self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
                 self._context = TomographyContext("serialem")
+                self.parameters_model = DCParametersTomo
                 if not self._role:
                     if "Frames" in file_path.parts:
                         self._role = "detector"
@@ -177,7 +185,7 @@ class Analyser(Observer):
                                 self._context._acquisition_software
                             )
                             self.notify({"form": dc_metadata})
-            else:
+            elif isinstance(self._context, TomographyContext):
                 _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(
                     transferred_file, role=self._role, environment=self._environment

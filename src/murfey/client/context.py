@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List, Optional, OrderedDict
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
 
 import requests
 import xmltodict
@@ -21,6 +21,11 @@ from murfey.client.tui.forms import TUIFormValue
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
+
+
+class FutureRequest(NamedTuple):
+    url: str
+    message: Dict[str, Any]
 
 
 def _construct_tilt_series_name(
@@ -64,8 +69,132 @@ class Context:
 
 
 class SPAContext(Context):
-    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
-        pass
+    def __init__(self, acquisition_software: str):
+        super().__init__(acquisition_software)
+        self._processing_job_stash: dict = {}
+        self._preprocessing_triggers: dict = {}
+
+    def _flush_processing_job(self, tag: str, parameters: Dict[str, Any] | None = None):
+        if parameters:
+            proc_job_future = self._processing_job_stash[tag]
+            msg = {
+                **proc_job_future.message,
+                "parameters": {
+                    "acquisition_software": parameters["acquisition_software"],
+                    "voltage": parameters["voltage"],
+                    "motioncor_gainreference": parameters["gain_ref"],
+                    "motioncor_doseperframe": parameters["dose_per_frame"],
+                    "eer_grouping": parameters["eer_grouping"],
+                    "import_images": f"{Path(parameters['image_directory']).resolve()}/*{parameters['file_extension']}",
+                    "angpix": parameters["pixel_size_on_image"],
+                    "symmetry": parameters["symmetry"],
+                    "extract_boxsize": parameters["boxsize"],
+                    "extract_downscale": parameters["downscale"],
+                    "extract_small_boxsize": parameters["small_boxsize"],
+                    "mask_diameter": parameters["mask_diameter"],
+                    "autopick_do_cryolo": parameters["use_cryolo"],
+                },
+            }
+            requests.post(proc_job_future.url, json=msg)
+
+    def _register_data_collection(self, url: str, data: dict):
+        json = {
+            "voltage": data["voltage"],
+            "pixel_size_on_image": data["pixel_size_on_image"],
+            "experiment_type": data["experiment_type"],
+            "image_size_x": data["image_size_x"],
+            "image_size_y": data["image_size_y"],
+            "file_extension": data["file_extension"],
+            "acquisition_software": data["acquisition_software"],
+            "image_directory": data["image_directory"],
+            "tag": data["tag"],
+        }
+        requests.post(url, json=json)
+
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        if role == "detector" and environment:
+            proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+            if environment.source:
+                source = str(environment.source.resolve())
+            else:
+                source = ""
+            if environment.data_collection_ids.get(source) is None:
+                self._processing_job_stash[source] = FutureRequest(
+                    proc_url,
+                    {"tag": source, "recipe": "relion"},
+                )
+            elif environment.data_collection_parameters:
+                if self._processing_job_stash.get(source):
+                    # self._flush_processing_job(source)
+                    pass
+                requests.post(
+                    proc_url,
+                    json={
+                        "tag": source,
+                        "recipe": "relion",
+                        "parameters": environment.data_collection_parameters,
+                    },
+                )
+
+    def _register_processing_job(
+        self, tag: str, parameters: Dict[str, Any] | None = None
+    ):
+        if self._processing_job_stash.get(tag):
+            self._flush_processing_job(tag, parameters=parameters)
+            self._processing_job_stash.pop(tag)
+
+    def _launch_spa_pipeline(self, tag: str, jobid: int, url: str = ""):
+        data = {"job_id": jobid}
+        requests.post(url, json=data)
+
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
+        if metadata_file.suffix != ".xml":
+            raise ValueError(
+                f"SPA gather_metadata method expected xml file not {metadata_file.name}"
+            )
+        if not metadata_file.is_file():
+            logger.debug(f"Metadata file {metadata_file} not found")
+            return OrderedDict({})
+        with open(metadata_file, "r") as xml:
+            try:
+                for_parsing = xml.read()
+            except Exception:
+                logger.warning(f"Failed to parse file {metadata_file}")
+                return OrderedDict({})
+            data = xmltodict.parse(for_parsing)
+        metadata: OrderedDict = OrderedDict({})
+        metadata["experiment_type"] = TUIFormValue("SPA")
+        metadata["voltage"] = TUIFormValue(300)
+        metadata["image_size_x"] = TUIFormValue(
+            data["Acquisition"]["Info"]["ImageSize"]["Width"]
+        )
+        metadata["image_size_y"] = TUIFormValue(
+            data["Acquisition"]["Info"]["ImageSize"]["Height"]
+        )
+        metadata["pixel_size_on_image"] = TUIFormValue(
+            float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+        )
+        metadata["motion_corr_binning"] = TUIFormValue(1)
+        metadata["gain_ref"] = TUIFormValue(None, top=True)
+        metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        metadata["use_cryolo"] = TUIFormValue(True)
+        metadata["symmetry"] = TUIFormValue("C1")
+        metadata["mask_diameter"] = TUIFormValue(190)
+        metadata["boxsize"] = TUIFormValue(256)
+        metadata["downscale"] = TUIFormValue(False)
+        metadata["small_boxsize"] = TUIFormValue(128)
+        metadata["eer_grouping"] = TUIFormValue(20)
+        metadata.move_to_end("gain_ref", last=False)
+        metadata.move_to_end("dose_per_frame", last=False)
+        return metadata
 
 
 class ProcessFileIncomplete(BaseModel):
@@ -101,16 +230,12 @@ class TomographyContext(Context):
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        # logger.info(
-        #     f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
-        # )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str, app_id: int):
-        # logger.info(f"Flushing preprocessing requests {tag}")
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)

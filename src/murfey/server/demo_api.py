@@ -26,6 +26,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
+    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeries,
     Visit,
@@ -166,6 +167,12 @@ async def add_file(file: File):
 @router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     pass
+
+
+@router.post("/visits/{visit_name}/spa_processing")
+async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
+    log.info("SPA processing requested")
+    return proc_params
 
 
 @router.post("/visits/{visit_name}/tomography_preprocess")
@@ -313,4 +320,5 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
         global_state["autoproc_program_ids"] = {
             proc_params.tag: {proc_params.recipe: 1}
         }
+    log.info("Processing job registered")
     return proc_params

@@ -69,6 +69,18 @@ class MurfeyInstanceEnvironment(BaseModel):
                         l(k)
         return v
 
+    @validator("processing_job_ids")
+    def job_callback(cls, v, values):
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("processing_job_ids", []):
+                if values.get("processing_job_ids"):
+                    for k in set(values["processing_job_ids"].keys()) ^ set(v.keys()):
+                        l(k, v[k]["relion"])
+                else:
+                    for k in v.keys():
+                        l(k, v[k]["relion"])
+        return v
+
     @validator("autoproc_program_ids")
     def app_callback(cls, v, values):
         # logger.info(f"autoproc program ids validator: {v}")

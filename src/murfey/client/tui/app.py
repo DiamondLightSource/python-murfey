@@ -475,20 +475,6 @@ class LogBook(Widget):
             self.refresh()
 
 
-class DCParametersTomo(BaseModel):
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    manual_tilt_offset: float
-    file_extension: str
-    acquisition_software: str
-
-
 class MurfeyTUI(App):
     input_box: InputBox
     log_book: ScrollView
@@ -623,10 +609,7 @@ class MurfeyTUI(App):
                     InputResponse(
                         question="Data collection parameters:",
                         form=r.get("form", OrderedDict({})),
-                        model=DCParametersTomo
-                        if self.analyser
-                        and isinstance(self.analyser._context, TomographyContext)
-                        else None,
+                        model=getattr(self.analyser, "parameters_model", None),
                         callback=self.app._start_dc_confirm_prompt,
                     )
                 )
@@ -673,10 +656,7 @@ class MurfeyTUI(App):
                 InputResponse(
                     question="Data collection parameters:",
                     form=OrderedDict({k: TUIFormValue(v) for k, v in json.items()}),
-                    model=DCParametersTomo
-                    if self.analyser
-                    and isinstance(self.analyser._context, TomographyContext)
-                    else None,
+                    model=getattr(self.analyser, "parameters_model", None),
                     callback=self.app._start_dc_confirm_prompt,
                 )
             )
@@ -707,11 +687,31 @@ class MurfeyTUI(App):
             dcg_data = {"experiment_type": "tomo", "experiment_type_id": 36}
             requests.post(url, json=dcg_data)
         elif isinstance(self.analyser._context, SPAContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            json = {
+                "tag": str(self._environment.source.resolve()),
+                "image_directory": str(
+                    Path(self._environment.default_destination).resolve()
+                ),
+                **json,
+            }
+            self._environment.listeners["data_collection_group_id"] = {
+                partial(
+                    self.analyser._context._register_data_collection, url=url, data=json
+                )
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                partial(
+                    self.analyser._context._register_processing_job, parameters=json
+                )
+            }
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
+            self._environment.listeners["processing_job_ids"] = {
+                partial(self.analyser._context._launch_spa_pipeline, url=url)
+            }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {"experiment_type": "single particle", "experiment_type_id": 37}
             requests.post(url, json=dcg_data)
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-            requests.post(url, json=json)
 
     def _update_info(self, new_text: str):
         self._info_widget.text = new_text
