@@ -82,7 +82,8 @@ DestinationSelect {
 #dir-select {
     width: 100%;
     height: 100%;
-    column-span: 3;
+    column-span: 2;
+    row-span: 2;
 }
 
 #launch-text {
@@ -228,6 +229,13 @@ DestinationSelect {
     row-span: 3;
     content-align: left top;
     background: blueviolet;
+}
+
+#selected-directories {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 2;
 }
 
 #switch-directory {

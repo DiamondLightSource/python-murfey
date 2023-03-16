@@ -18,7 +18,7 @@ from rich.box import SQUARE
 from rich.panel import Panel
 from textual.app import App, ComposeResult, ScreenStackError
 from textual.containers import Vertical
-from textual.reactive import Reactive
+from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import (
@@ -108,7 +108,7 @@ class InputResponse(NamedTuple):
 
 
 class InfoWidget(Widget):
-    text: Reactive[str] = Reactive("")
+    text: reactive[str] = reactive("")
 
     def __init__(self, text: str, **kwargs):
         super().__init__(**kwargs)
@@ -154,7 +154,7 @@ def validate_form(form: dict, model: BaseModel) -> dict:
 
 
 class _DirectoryTree(DirectoryTree):
-    valid_selection = Reactive(False)
+    valid_selection = reactive(False)
 
     def __init__(self, *args, data_directories: dict | None = None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -182,6 +182,7 @@ class _DirectoryTree(DirectoryTree):
 class LaunchScreen(Screen):
     _selected_dir = Path(".")
     _launch_btn: Button | None = None
+    _selected_directories: TextLog = TextLog(id="selected-directories")
 
     def compose(self):
         machine_data = requests.get(
@@ -193,6 +194,8 @@ class LaunchScreen(Screen):
             id="dir-select",
         )
         yield self._dir_tree
+        yield self._selected_directories
+        self._selected_directories.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
             if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
@@ -230,7 +233,8 @@ class LaunchScreen(Screen):
             )
             if self._launch_btn:
                 self._launch_btn.disabled = False
-        else:
+            self._selected_directories.write(str(source) + "\n")
+        elif event.button.id == "launch":
             text = self.app._visit
             machine_data = requests.get(
                 f"{self.app._environment.url.geturl()}/machine/"
@@ -293,7 +297,7 @@ class ConfirmScreen(Screen):
 
 
 class ProcessingForm(Screen):
-    _form = Reactive({})
+    _form = reactive({})
     _vert = None
 
     def __init__(self, form: dict, *args, **kwargs):
@@ -460,7 +464,7 @@ class MurfeyTUI(App):
     visits: List[str]
     rsync_processes: Dict[Path, RSyncer] = {}
     analysers: Dict[Path, Analyser] = {}
-    _form_values: dict = Reactive({})
+    _form_values: dict = reactive({})
 
     def __init__(
         self,
