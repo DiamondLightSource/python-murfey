@@ -43,40 +43,45 @@ DestinationSelect {
     border: hidden;
 }
 
+Input {
+    background: white;
+    border: solid teal;
+}
+
 #quit {
     width: 100%;
     height: 100%;
     column-span: 1;
-    background: deeppink;
+    background: teal;
     border: solid black;
 }
 
 #quit:hover {
-    background: teal;
+    background: deeppink;
 }
 
 #add {
     width: 100%;
     height: 100%;
     column-span: 1;
-    background: deeppink;
+    background: teal;
     border: solid black;
 }
 
 #add:hover {
-    background: teal;
+    background: purple;
 }
 
 #launch {
     width: 100%;
     height: 100%;
     column-span: 1;
-    background: deeppink;
+    background: teal;
     border: solid black;
 }
 
 #launch:hover {
-    background: teal;
+    background: purple;
 }
 
 #dir-select {
@@ -228,7 +233,7 @@ DestinationSelect {
     column-span: 4;
     row-span: 3;
     content-align: left top;
-    background: blueviolet;
+    background: gray;
 }
 
 #selected-directories {
@@ -265,7 +270,7 @@ DestinationSelect {
     height: 100%;
     column-span: 6;
     row-span: 4;
-    background: blueviolet;
+    background: black;
 }
 
 #dose-per-frame {
@@ -273,12 +278,12 @@ DestinationSelect {
     height: 100%;
     column-span: 6;
     row-span: 1;
-    background: blueviolet;
+    background: black;
 }
 
 .input-destination {
     width: 100%;
-    background: blueviolet;
+    background: black;
 }
 
 #log_book {
