@@ -437,6 +437,7 @@ class DestinationSelect(Screen):
     def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
+        self._dose_per_frame = None
 
     def compose(self):
         bulk = []
@@ -444,13 +445,30 @@ class DestinationSelect(Screen):
             bulk.append(Label(f"Copy the source {s} to:"))
             bulk.append(Input(value=d, classes="input-destination"))
         yield Vertical(*bulk, id="destination-holder")
+        yield Vertical(
+            Label("Dose per frame (e- / Angstrom^2 / frame)"),
+            Input(id="dose", classes="input-destination"),
+            id="dose-per-frame",
+        )
         yield Button("Confirm", id="destination-btn")
 
+    def on_input_changed(self, event):
+        if event.input.id == "dose":
+            try:
+                self._dose_per_frame = float(event.value)
+            except ValueError:
+                pass
+
     def on_button_pressed(self, event):
+        if self._dose_per_frame is None:
+            return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
             self.app._register_dc = True
             self.app._start_rsyncer(s, d)
+        self.app._environment.data_collection_parameters[
+            "dose_per_frame"
+        ] = self._dose_per_frame
         self.app.pop_screen()
 
 

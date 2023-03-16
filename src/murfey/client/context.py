@@ -187,7 +187,12 @@ class SPAContext(Context):
         )
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
-        metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        metadata["dose_per_frame"] = TUIFormValue(
+            environment.data_collection_parameters.get("dose_per_frame")
+            if environment
+            else None,
+            top=True,
+        )
         metadata["use_cryolo"] = TUIFormValue(True)
         metadata["symmetry"] = TUIFormValue("C1")
         metadata["mask_diameter"] = TUIFormValue(190)
@@ -744,7 +749,9 @@ class TomographyContext(Context):
     ):
         self.post_transfer(transferred_file, role=role, environment=environment)
 
-    def gather_metadata(self, metadata_file: Path) -> OrderedDict:
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ) -> OrderedDict:
         if metadata_file.suffix not in (".mdoc", ".xml"):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
@@ -775,7 +782,11 @@ class TomographyContext(Context):
             metadata["motion_corr_binning"] = TUIFormValue(1)
             metadata["gain_ref"] = TUIFormValue(None, top=True)
             metadata["dose_per_frame"] = TUIFormValue(
-                None, top=True, colour="dark_orange"
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                else None,
+                top=True,
+                colour="dark_orange",
             )
             metadata["tilt_offset"] = TUIFormValue(0, top=True)
             metadata["source"] = TUIFormValue(str(self._basepath))
@@ -797,7 +808,12 @@ class TomographyContext(Context):
         )
         mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
-        mdoc_metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        mdoc_metadata["dose_per_frame"] = TUIFormValue(
+            environment.data_collection_parameters.get("dose_per_frame")
+            if environment
+            else None,
+            top=True,
+        )
         mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
         mdoc_metadata.move_to_end("gain_ref", last=False)

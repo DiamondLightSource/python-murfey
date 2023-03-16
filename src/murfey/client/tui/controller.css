@@ -39,7 +39,7 @@ ProcessingForm {
 
 DestinationSelect {
     layout: grid;
-    grid-size: 5;
+    grid-size: 6;
     border: hidden;
 }
 
@@ -149,7 +149,7 @@ DestinationSelect {
 
 #destination-btn {
     width: 100%;
-    column-span: 5;
+    column-span: 6;
     row-span: 1;
     background: aquamarine;
 }
@@ -263,8 +263,16 @@ DestinationSelect {
 #destination-holder {
     width: 100%;
     height: 100%;
-    column-span: 5;
+    column-span: 6;
     row-span: 4;
+    background: blueviolet;
+}
+
+#dose-per-frame {
+    width: 100%;
+    height: 100%;
+    column-span: 6;
+    row-span: 1;
     background: blueviolet;
 }
 
