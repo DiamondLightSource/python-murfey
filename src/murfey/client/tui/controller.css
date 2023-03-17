@@ -44,7 +44,7 @@ DestinationSelect {
 }
 
 Input {
-    background: white;
+    background: black;
     border: solid teal;
 }
 
@@ -114,11 +114,12 @@ Input {
 .btn-visit {
     width: 100%;
     height: 90fr;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 .btn-visit:hover {
-    background: aqua;
+    background: purple;
 }
 
 .btn-visit:focus {
@@ -128,11 +129,12 @@ Input {
 .btn-directory {
     width: 100%;
     height: 90fr;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 .btn-directory:hover {
-    background: aqua;
+    background: purple;
 }
 
 .btn-directory:focus {
@@ -141,11 +143,12 @@ Input {
 
 #confirm-btn {
     width: 100%;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 #confirm-btn:hover {
-    background: aqua;
+    background: purple;
 }
 
 #confirm-btn:focus {
@@ -156,11 +159,12 @@ Input {
     width: 100%;
     column-span: 6;
     row-span: 1;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 #destination-btn:hover {
-    background: aqua;
+    background: purple;
 }
 
 #destination-btn:focus {
@@ -171,22 +175,24 @@ Input {
     width: 100%;
     height: 90fr;
     column-span: 2;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 #processing-btn:hover {
-    background: aqua;
+    background: purple;
 }
 
 #new-visit-btn {
     width: 100%;
     height: 90fr;
     column-span: 1;
-    background: aquamarine;
+    background: teal;
+    border: solid black;
 }
 
 #new-visit-btn:hover {
-    background: aqua;
+    background: purple;
 }
 
 #input {
@@ -273,7 +279,7 @@ Input {
 #input-form {
     width: 100%;
     height: 100%;
-    background: blueviolet;
+    background: black;
 }
 
 #destination-holder {
