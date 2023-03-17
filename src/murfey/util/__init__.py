@@ -5,7 +5,20 @@ import inspect
 from queue import Queue
 from threading import Thread
 from typing import Awaitable, Callable, Optional
+from urllib.parse import ParseResult
 from uuid import uuid4
+
+import requests
+
+from murfey.util.models import Visit
+
+
+def _get_visit_list(api_base: ParseResult):
+    get_visits_url = api_base._replace(path="/visits_raw")
+    server_reply = requests.get(get_visits_url.geturl())
+    if server_reply.status_code != 200:
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
+    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 class Observer:

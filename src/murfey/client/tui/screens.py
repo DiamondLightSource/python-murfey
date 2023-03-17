@@ -19,6 +19,8 @@ from textual.widgets import (
     Button,
     DataTable,
     DirectoryTree,
+    Footer,
+    Header,
     Input,
     Label,
     Static,
@@ -169,7 +171,6 @@ class _DirectoryTree(DirectoryTree):
 class LaunchScreen(Screen):
     _selected_dir = Path(".")
     _launch_btn: Button | None = None
-    _selected_directories: TextLog = TextLog(id="selected-directories")
 
     def compose(self):
         machine_data = requests.get(
@@ -181,8 +182,9 @@ class LaunchScreen(Screen):
             id="dir-select",
         )
         yield self._dir_tree
-        yield self._selected_directories
-        self._selected_directories.write("Selected directories:\n")
+        text_log = TextLog(id="selected-directories")
+        yield text_log
+        text_log.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
             if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
@@ -215,12 +217,13 @@ class LaunchScreen(Screen):
             self.app._default_destinations[
                 source
             ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            self.app._info_widget.write(
-                f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}"
-            )
+            # self.app.query_one("#info").write(f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}")
+            # self.app._info_widget.write(
+            #     f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}"
+            # )
             if self._launch_btn:
                 self._launch_btn.disabled = False
-            self._selected_directories.write(str(source) + "\n")
+            self.query_one("#selected-directories").write(str(source) + "\n")
         elif event.button.id == "launch":
             text = self.app._visit
             machine_data = requests.get(
@@ -275,9 +278,12 @@ class ConfirmScreen(Screen):
         else:
             while True:
                 try:
+                    if self.app.screen._name == "main":
+                        break
                     self.app.pop_screen()
                 except ScreenStackError:
                     break
+            self.app.push_screen("main")
             self.app.uninstall_screen("confirm")
         if self._callback and event.button.id == "launch":
             self._callback(params=self._params)
@@ -324,7 +330,9 @@ class ProcessingForm(Screen):
     def _write_params(self, params: dict | None = None):
         if params:
             for k, v in params.items():
-                self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
+                self.app.query_one("#info").write(
+                    f"{self._readable_labels.get(k, k)}: {v}"
+                )
             self.app._start_dc(params)
 
     def on_input_submitted(self, event):
@@ -332,16 +340,10 @@ class ProcessingForm(Screen):
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
-        # for k, v in self._form.items():
-        #    self.app._info_widget.write(f"{self._readable_labels.get(k, k)}: {v}")
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
                 ConfirmScreen(
                     "Launch processing?",
-                    # params={
-                    #     self._readable_labels.get(k, k): v
-                    #     for k, v in self._form.items()
-                    # },
                     params=self._form,
                     pressed_callback=self._write_params,
                 ),
@@ -457,3 +459,44 @@ class DestinationSelect(Screen):
             "dose_per_frame"
         ] = self._dose_per_frame
         self.app.pop_screen()
+        self.app.push_screen("main")
+
+
+class MainScreen(Screen):
+    def compose(self):
+        self.app.log_book = TextLog(id="log_book", wrap=True, max_lines=200)
+        if self.app._redirected_logger:
+            log.info("connecting logger")
+            self.app._redirected_logger.text_log = self.app.log_book
+            log.info("logger connected")
+        self.app.hovers = (
+            [Button(v, id="visit-btn") for v in self.app.visits]
+            if len(self.app.visits)
+            else [Button("No ongoing visits found")]
+        )
+        inputs = []
+        for t in (
+            "Pixel Size",
+            "Magnification",
+            "Image Size X",
+            "Image Size Y",
+            "Dose",
+            "Gain Reference",
+        ):
+            inputs.append(Label(t, classes="label"))
+            inputs.append(Input(placeholder=t, classes="input"))
+        self.app.processing_form = ProcessingForm(self.app._form_values)
+        # log_book = TextLog(id="info", markup=True)
+        yield Header()
+        info_widget = TextLog(id="info", markup=True)
+        yield info_widget
+        yield self.app.log_book
+        info_widget.write("[bold]Welcome to Murfey[/bold]")
+        self.app.processing_btn = Button(
+            "Request processing",
+            id="processing-btn",
+            disabled=not self.app._form_values,
+        )
+        yield self.app.processing_btn
+        yield Button("Visit complete", id="new-visit-btn")
+        yield Footer()

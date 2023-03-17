@@ -51,6 +51,26 @@ class MurfeyInstanceEnvironment(BaseModel):
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
 
+    def clear(self):
+        self.sources = []
+        self.default_destinations = {}
+        for w in self.watchers.values():
+            w.stop()
+        self.watchers = {}
+        self.data_collection_group_ids = {}
+        self.data_collection_ids = {}
+        self.processing_job_ids = {}
+        self.autoproc_program_ids = {}
+        self.data_collection_parameters = {}
+        self.movies = {}
+        self.motion_corrected_movies = {}
+        self.listeners = {}
+        self.movie_tilt_pair = {}
+        self.tilt_angles = {}
+        self.visit = ""
+        self.tilt_offset = None
+        self.gain_ref = None
+
     @validator("data_collection_group_ids")
     def dcg_callback(cls, v, values):
         with global_env_lock:

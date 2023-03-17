@@ -13,9 +13,9 @@ from urllib.parse import urlparse
 
 import procrunner
 import requests
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.reactive import reactive
-from textual.widgets import Button, Footer, Header, Input, Label, TextLog
+from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import SPAContext, TomographyContext
@@ -24,6 +24,7 @@ from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
     InputResponse,
     LaunchScreen,
+    MainScreen,
     ProcessingForm,
     VisitSelection,
     determine_default_destination,
@@ -31,6 +32,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
+from murfey.util import _get_visit_list
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -40,7 +42,6 @@ ReactiveType = TypeVar("ReactiveType")
 class MurfeyTUI(App):
     CSS_PATH = "controller.css"
     SCREENS = {"launcher": LaunchScreen()}
-    log_book: TextLog
     processing_btn: Button
     processing_form: ProcessingForm
     hover: List[str]
@@ -81,12 +82,12 @@ class MurfeyTUI(App):
         self._dummy_dc = dummy_dc
         self._do_transfer = do_transfer
         self._data_collection_form_complete = False
-        self._info_widget = TextLog(id="info", markup=True)
         self._form_readable_labels: dict = {}
         self._redirected_logger = redirected_logger
         self._multigrid = False
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
+        self.install_screen(MainScreen(), "main")
 
     @property
     def role(self) -> str:
@@ -146,8 +147,6 @@ class MurfeyTUI(App):
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
         )
-
-        self._info_widget.write(f"{source.resolve()} \u2192 {destination}")
 
         def rsync_result(update: RSyncerUpdate):
             if not update.base_path:
@@ -242,8 +241,6 @@ class MurfeyTUI(App):
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
-        for k, v in json.items():
-            self._info_widget.write(f"{k}: {v}")
         context = None
         for a in self.analysers.values():
             if isinstance(a._context, TomographyContext):
@@ -308,9 +305,6 @@ class MurfeyTUI(App):
             }
             requests.post(url, json=dcg_data)
 
-    def _update_info(self, new_text: str):
-        self._info_widget.write(new_text)
-
     def _set_request_destination(self, response: str):
         if response == "y":
             self._request_destinations = True
@@ -324,39 +318,6 @@ class MurfeyTUI(App):
         self.processing_form = ProcessingForm(self._form_values)
         self.install_screen(self.processing_form, "processing-form")
 
-    def compose(self) -> ComposeResult:
-        self.log_book = TextLog(id="log_book", wrap=True, max_lines=200)
-        if self._redirected_logger:
-            log.info("connecting logger")
-            self._redirected_logger.text_log = self.log_book
-            log.info("logger connected")
-        self.hovers = (
-            [Button(v, id="visit-btn") for v in self.visits]
-            if len(self.visits)
-            else [Button("No ongoing visits found")]
-        )
-        inputs = []
-        for t in (
-            "Pixel Size",
-            "Magnification",
-            "Image Size X",
-            "Image Size Y",
-            "Dose",
-            "Gain Reference",
-        ):
-            inputs.append(Label(t, classes="label"))
-            inputs.append(Input(placeholder=t, classes="input"))
-        self.processing_form = ProcessingForm(self._form_values)
-        yield Header()
-        yield self._info_widget
-        yield self.log_book
-        self.processing_btn = Button(
-            "Request processing", id="processing-btn", disabled=not self._form_values
-        )
-        yield self.processing_btn
-        yield Button("Visit complete", id="new-visit-btn")
-        yield Footer()
-
     def on_input_submitted(self, event: Input.Submitted):
         event.input.has_focus = False
         self.screen.focused = None
@@ -365,9 +326,45 @@ class MurfeyTUI(App):
         if event.button._id == "processing-btn":
             self._install_processing_form()
             self.push_screen("processing-form")
+        elif event.button._id == "new-visit-btn":
+            self.reset()
+            if self.rsync_processes:
+                for rp in self.rsync_processes.values():
+                    rp.stop()
+            if self.analysers:
+                for a in self.analysers.values():
+                    a.stop()
+            self.rsync_processes = {}
+            self.analysers = {}
+            self.push_screen("visit-select-screen")
 
     async def on_mount(self) -> None:
-        self._info_widget.write("[bold]Welcome to Murfey[/bold]")
+        self.install_screen(VisitSelection(self.visits), "visit-select-screen")
+        self.push_screen("launcher")
+        self.push_screen("visit-select-screen")
+
+    def reset(self):
+        self._environment.clear()
+        if self.rsync_processes:
+            for rp in self.rsync_processes.values():
+                rp.stop()
+            self.rsync_processes = {}
+        if self.analysers:
+            for a in self.analysers.values():
+                a.stop()
+            self.analysers = {}
+        self.visits = [v.name for v in _get_visit_list(self._environment.url)]
+        self._data_collection_form_complete = False
+        self._form_values = {}
+        self.uninstall_screen("visit-select-screen")
+        self.uninstall_screen("launcher")
+        self.install_screen(LaunchScreen(), "launcher")
+        self.uninstall_screen("destination-select-screen")
+        self.uninstall_screen("processing-form")
+        self.pop_screen()
+        self.uninstall_screen("main")
+        self.install_screen(MainScreen(), "main")
+        self.push_screen("main")
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
         self.push_screen("launcher")
         self.push_screen("visit-select-screen")

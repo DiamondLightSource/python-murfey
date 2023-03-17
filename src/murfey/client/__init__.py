@@ -31,7 +31,7 @@ from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util.models import Visit
+from murfey.util import _get_visit_list
 
 # from asyncio import Queue
 
@@ -75,12 +75,12 @@ def _check_for_updates(
         print(f"Murfey update check failed with {e}")
 
 
-def _get_visit_list(api_base: ParseResult, demo: bool = False):
-    get_visits_url = api_base._replace(path="/visits_raw")
-    server_reply = requests.get(get_visits_url.geturl())
-    if server_reply.status_code != 200:
-        raise ValueError(f"Server unreachable ({server_reply.status_code})")
-    return [Visit.parse_obj(v) for v in server_reply.json()]
+# def _get_visit_list(api_base: ParseResult):
+#     get_visits_url = api_base._replace(path="/visits_raw")
+#     server_reply = requests.get(get_visits_url.geturl())
+#     if server_reply.status_code != 200:
+#         raise ValueError(f"Server unreachable ({server_reply.status_code})")
+#     return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def run():
@@ -224,7 +224,7 @@ def run():
                 break
     if not ongoing_visits:
         print("Ongoing visits:")
-        ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
+        ongoing_visits = _get_visit_list(murfey_url)
         pprint(ongoing_visits)
         ongoing_visits = [v.name for v in ongoing_visits]
 
