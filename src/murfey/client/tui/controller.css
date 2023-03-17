@@ -170,11 +170,22 @@ Input {
 #processing-btn {
     width: 100%;
     height: 90fr;
-    column-span: 3;
+    column-span: 2;
     background: aquamarine;
 }
 
 #processing-btn:hover {
+    background: aqua;
+}
+
+#new-visit-btn {
+    width: 100%;
+    height: 90fr;
+    column-span: 1;
+    background: aquamarine;
+}
+
+#new-visit-btn:hover {
     background: aqua;
 }
 
