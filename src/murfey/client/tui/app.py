@@ -94,15 +94,14 @@ class MurfeyTUI(App):
         return ""
 
     def _launch_multigrid_watcher(self, source: Path):
+        log.info(f"Launching multigrid watcher for source {source}")
         self._multigrid_watcher = MultigridDirWatcher(source)
         self._multigrid_watcher.subscribe(self._start_rsyncer_multigrid)
+        self._multigrid_watcher.start()
 
     def _start_rsyncer_multigrid(self, source: Path):
         machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
-        self._default_destinations[
-            source
-        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-        self._environment._default_destinations[
+        self._environment.default_destinations[
             source
         ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
         destination = determine_default_destination(
@@ -110,7 +109,7 @@ class MurfeyTUI(App):
             source,
             self._default_destinations[source],
             self._environment,
-            self._analysers,
+            self.analysers,
             touch=True,
         )
         self._start_rsyncer(source, destination, force_metadata=True)
@@ -164,6 +163,7 @@ class MurfeyTUI(App):
         self._environment.watchers[source] = DirWatcher(source, settling_time=1)
 
         if not self.analysers.get(source):
+            log.info(f"Starting analyser for {source}")
             self.analysers[source] = Analyser(
                 source,
                 environment=self._environment if not self._dummy_dc else None,
@@ -180,7 +180,9 @@ class MurfeyTUI(App):
                     log.info(f"role found for {source}")
                     break
             if force_metadata:
-                self.analysers[source].subscribe(self._start_dc)
+                self.analysers[source].subscribe(
+                    partial(self._start_dc, from_form=True)
+                )
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
             self.analysers[source].start()
@@ -233,33 +235,40 @@ class MurfeyTUI(App):
             )
         )
 
-    def _start_dc(self, json):
+    def _start_dc(self, json, from_form: bool = False):
         if self._dummy_dc:
             return
+        # for multigrid the analyser sends the message straight to _start_dc by-passing user input
+        # it is then necessary to extract the data from the message
+        if from_form:
+            json = json.get("form", {})
+            json = {k: str(v) for k, v in json.items()}
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
-        context = None
-        for a in self.analysers.values():
-            if isinstance(a._context, TomographyContext):
-                context = TomographyContext
-                break
-            if isinstance(a._context, SPAContext):
-                context = SPAContext
-                break
-        if context == TomographyContext:
+        # context = None
+        # for a in self.analysers.values():
+        #     if isinstance(a._context, TomographyContext):
+        #         context = TomographyContext
+        #         break
+        #     if isinstance(a._context, SPAContext):
+        #         context = SPAContext
+        #         break
+        source = Path(json["source"])
+        context = self.analysers[source]._context
+        if isinstance(context, TomographyContext):
             source = Path(json["source"])
             self._environment.listeners["data_collection_group_ids"] = {
-                self.analysers[source]._context._flush_data_collections
+                context._flush_data_collections
             }
             self._environment.listeners["data_collection_ids"] = {
-                self.analysers[source]._context._flush_processing_job
+                context._flush_processing_job
             }
             self._environment.listeners["autoproc_program_ids"] = {
-                self.analysers[source]._context._flush_preprocess
+                context._flush_preprocess
             }
             self._environment.listeners["motion_corrected_movies"] = {
-                self.analysers[source]._context._check_for_alignment
+                context._check_for_alignment
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {
@@ -268,7 +277,7 @@ class MurfeyTUI(App):
                 "tag": str(source),
             }
             requests.post(url, json=dcg_data)
-        elif context == SPAContext:
+        elif isinstance(context, SPAContext):
             source = Path(json["source"])
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             json = {
@@ -280,20 +289,20 @@ class MurfeyTUI(App):
             }
             self._environment.listeners["data_collection_group_ids"] = {
                 partial(
-                    self.analysers[source]._context._register_data_collection,
+                    context._register_data_collection,
                     url=url,
                     data=json,
                 )
             }
             self._environment.listeners["data_collection_ids"] = {
                 partial(
-                    self.analysers[source]._context._register_processing_job,
+                    context._register_processing_job,
                     parameters=json,
                 )
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
             self._environment.listeners["processing_job_ids"] = {
-                partial(self.analysers[source]._context._launch_spa_pipeline, url=url)
+                partial(context._launch_spa_pipeline, url=url)
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {
@@ -351,6 +360,7 @@ class MurfeyTUI(App):
                 a.stop()
             self.analysers = {}
         self.visits = [v.name for v in _get_visit_list(self._environment.url)]
+        self._default_destinations = self._environment.default_destinations
         self._data_collection_form_complete = False
         self._form_values = {}
         self.uninstall_screen("visit-select-screen")

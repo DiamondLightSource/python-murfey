@@ -36,7 +36,7 @@ class MultigridDirWatcher(murfey.util.Observer):
     def _process(self):
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.is_dir():
+                if d.is_dir() and d not in self._seen_dirs:
                     self.notify(d)
                     self._seen_dirs.append(d)
             time.sleep(15)

@@ -240,7 +240,7 @@ class LaunchScreen(Screen):
             text = self.app._visit
             visit_path = ""
             transfer_routes = {}
-            for i, (s, defd) in enumerate(self.app._default_destinations.items()):
+            for s, defd in self.app._default_destinations.items():
                 _default = determine_default_destination(
                     self.app._visit, s, defd, self.app._environment, self.app.analysers
                 )
@@ -453,9 +453,10 @@ class DestinationSelect(Screen):
 
     def compose(self):
         bulk = []
-        for s, d in self._transfer_routes.items():
-            bulk.append(Label(f"Copy the source {s} to:"))
-            bulk.append(Input(value=d, classes="input-destination"))
+        if not self.app._multigrid:
+            for s, d in self._transfer_routes.items():
+                bulk.append(Label(f"Copy the source {s} to:"))
+                bulk.append(Input(value=d, classes="input-destination"))
         yield Vertical(*bulk, id="destination-holder")
         yield Vertical(
             Label("Dose per frame (e- / Angstrom^2 / frame)"),
@@ -477,7 +478,10 @@ class DestinationSelect(Screen):
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
             self.app._register_dc = True
-            self.app._start_rsyncer(s, d)
+            if self.app._multigrid:
+                self.app._launch_multigrid_watcher(s)
+            else:
+                self.app._start_rsyncer(s, d)
         self.app._environment.data_collection_parameters[
             "dose_per_frame"
         ] = self._dose_per_frame
