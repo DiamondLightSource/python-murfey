@@ -217,10 +217,6 @@ class LaunchScreen(Screen):
             self.app._default_destinations[
                 source
             ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            # self.app.query_one("#info").write(f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}")
-            # self.app._info_widget.write(
-            #     f"{Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path}"
-            # )
             if self._launch_btn:
                 self._launch_btn.disabled = False
             self.query_one("#selected-directories").write(str(source) + "\n")
@@ -304,12 +300,18 @@ class ProcessingForm(Screen):
             "pixel_size_on_image": "Pixel Size",
             "motion_corr_binning": "Motion Correction Binning",
             "gain_ref": "Gain Reference",
-            "dose_per_frame": "Dose Per Frame",
+            "dose_per_frame": "Dose Per Frame (e- / Angstrom^2 / frame)",
             "tilt_offset": "Tilt Offset",
             "file_extension": "File Extension",
             "acquisition_software": "Acquisition Software",
-            "use_cryolo": "Use crYOLO autopicking",
-            "symmetry": "Symmetry group",
+            "use_cryolo": "Use crYOLO Autopicking",
+            "symmetry": "Symmetry Group",
+            "boxsize": "Box Size",
+            "eer_grouping": "EER Grouping",
+            "mask_diameter": "Mask Diameter (2D classification)",
+            "downscale": "Downscale Extracted Particles",
+            "source": "Source Directory",
+            "small_boxsize": "Downscaled Extracted Particle Size (pixels)",
         }
         self._inputs: Dict[Input, str] = {}
 
@@ -486,7 +488,6 @@ class MainScreen(Screen):
             inputs.append(Label(t, classes="label"))
             inputs.append(Input(placeholder=t, classes="input"))
         self.app.processing_form = ProcessingForm(self.app._form_values)
-        # log_book = TextLog(id="info", markup=True)
         yield Header()
         info_widget = TextLog(id="info", markup=True)
         yield info_widget
