@@ -157,6 +157,9 @@ class _DirectoryTree(DirectoryTree):
             return
         if dir_entry.is_dir:
             self._selected_path = dir_entry.path
+            if not self._data_directories:
+                self.valid_selection = True
+                return
             for d in self._data_directories:
                 if Path(self._selected_path).resolve().is_relative_to(d):
                     self.valid_selection = True
@@ -185,7 +188,9 @@ class LaunchScreen(Screen):
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
-            data_directories=machine_data.get("data_directories", {}),
+            data_directories=machine_data.get("data_directories", {})
+            if self.app._strict
+            else {},
             id="dir-select",
         )
 

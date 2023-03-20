@@ -59,6 +59,7 @@ class MurfeyTUI(App):
         gain_ref: Path | None = None,
         redirected_logger=None,
         force_mdoc_metadata: bool = False,
+        strict: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -85,6 +86,7 @@ class MurfeyTUI(App):
         self._multigrid = False
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
+        self._strict = strict
         self.install_screen(MainScreen(), "main")
 
     @property
@@ -246,14 +248,6 @@ class MurfeyTUI(App):
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
-        # context = None
-        # for a in self.analysers.values():
-        #     if isinstance(a._context, TomographyContext):
-        #         context = TomographyContext
-        #         break
-        #     if isinstance(a._context, SPAContext):
-        #         context = SPAContext
-        #         break
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):

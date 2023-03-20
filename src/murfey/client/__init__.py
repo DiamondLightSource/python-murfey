@@ -174,6 +174,12 @@ def run():
         default=False,
         help="Remove source files immediately after their transfer",
     )
+    parser.add_argument(
+        "--relax",
+        action="store_true",
+        default=False,
+        help="Relax the condition that the source directory needs to be recognised from the configuration",
+    )
 
     args = parser.parse_args()
 
@@ -277,11 +283,10 @@ def run():
         status_bar=status_bar,
         dummy_dc=args.fake_dc,
         do_transfer=not args.no_transfer,
-        # rsync_process=rsync_process,
-        # analyser=analyser,
         gain_ref=gain_ref,
         redirected_logger=rich_handler,
         force_mdoc_metadata=not args.ignore_mdoc_metadata,
+        strict=not args.relax,
     )
     app.run()
     rich_handler.redirect = False
