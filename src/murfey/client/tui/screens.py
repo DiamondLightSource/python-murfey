@@ -169,21 +169,30 @@ class _DirectoryTree(DirectoryTree):
 
 
 class LaunchScreen(Screen):
-    _selected_dir = Path(".")
+    # _selected_dir = Path(".")
     _launch_btn: Button | None = None
+
+    def __init__(
+        self, *args, basepath: Path = Path("."), add_basepath: bool = False, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._selected_dir = basepath
+        self._add_basepath = add_basepath
 
     def compose(self):
         machine_data = requests.get(
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()
         self._dir_tree = _DirectoryTree(
-            "./",
+            str(self._selected_dir),
             data_directories=machine_data.get("data_directories", {}),
             id="dir-select",
         )
+
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
         yield text_log
+
         text_log.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
@@ -197,6 +206,10 @@ class LaunchScreen(Screen):
         yield self._launch_btn
         yield Button("Quit", id="quit")
 
+    def on_mount(self):
+        if self._add_basepath:
+            self._add_directory(str(self._selected_dir))
+
     def _check_valid_selection(self, valid: bool):
         if self._add_btn:
             if valid:
@@ -204,27 +217,27 @@ class LaunchScreen(Screen):
             else:
                 self._add_btn.disabled = True
 
+    def _add_directory(self, directory: str):
+        source = Path(self._dir_tree.path).resolve() / directory
+        self.app._environment.sources.append(source)
+        machine_data = requests.get(
+            f"{self.app._environment.url.geturl()}/machine/"
+        ).json()
+        self.app._default_destinations[
+            source
+        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+        if self._launch_btn:
+            self._launch_btn.disabled = False
+        self.query_one("#selected-directories").write(str(source) + "\n")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
             exit()
         elif event.button.id == "add":
-            source = Path(self._dir_tree.path).resolve() / self._dir_tree._selected_path
-            self.app._environment.sources.append(source)
-            machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine/"
-            ).json()
-            self.app._default_destinations[
-                source
-            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            if self._launch_btn:
-                self._launch_btn.disabled = False
-            self.query_one("#selected-directories").write(str(source) + "\n")
+            self._add_directory(self._dir_tree._selected_path)
         elif event.button.id == "launch":
             text = self.app._visit
-            machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine/"
-            ).json()
             visit_path = ""
             transfer_routes = {}
             for i, (s, defd) in enumerate(self.app._default_destinations.items()):
@@ -412,6 +425,9 @@ class VisitSelection(SwitchSelection):
         self.app.pop_screen()
         if self._switch_status:
             self.app.push_screen("directory-select")
+        else:
+            self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
+            self.app.push_screen("launcher")
 
 
 class DirectorySelection(SwitchSelection):
@@ -420,8 +436,13 @@ class DirectorySelection(SwitchSelection):
 
     def on_button_pressed(self, event: Button.Pressed):
         self.app._multigrid = self._switch_status
-        (Path(str(event.button.label)) / self.app._visit).mkdir(exist_ok=True)
+        visit_dir = Path(str(event.button.label)) / self.app._visit
+        visit_dir.mkdir(exist_ok=True)
+        self.app.install_screen(
+            LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
+        )
         self.app.pop_screen()
+        self.app.push_screen("launcher")
 
 
 class DestinationSelect(Screen):

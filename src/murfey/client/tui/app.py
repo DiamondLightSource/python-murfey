@@ -23,7 +23,6 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
     InputResponse,
-    LaunchScreen,
     MainScreen,
     ProcessingForm,
     VisitSelection,
@@ -41,7 +40,6 @@ ReactiveType = TypeVar("ReactiveType")
 
 class MurfeyTUI(App):
     CSS_PATH = "controller.css"
-    SCREENS = {"launcher": LaunchScreen()}
     processing_btn: Button
     processing_form: ProcessingForm
     hover: List[str]
@@ -340,7 +338,6 @@ class MurfeyTUI(App):
 
     async def on_mount(self) -> None:
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("launcher")
         self.push_screen("visit-select-screen")
 
     def reset(self):
@@ -358,7 +355,6 @@ class MurfeyTUI(App):
         self._form_values = {}
         self.uninstall_screen("visit-select-screen")
         self.uninstall_screen("launcher")
-        self.install_screen(LaunchScreen(), "launcher")
         self.uninstall_screen("destination-select-screen")
         self.uninstall_screen("processing-form")
         self.pop_screen()
@@ -366,7 +362,6 @@ class MurfeyTUI(App):
         self.install_screen(MainScreen(), "main")
         self.push_screen("main")
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("launcher")
         self.push_screen("visit-select-screen")
 
     async def action_quit(self) -> None:
