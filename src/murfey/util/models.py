@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -136,3 +136,8 @@ class ProcessingJobParameters(BaseModel):
 class RegistrationMessage(BaseModel):
     registration: str
     params: Optional[Dict[str, Any]] = None
+
+
+class ConnectionFileParameters(BaseModel):
+    file_path: Path
+    destinations: List[str]

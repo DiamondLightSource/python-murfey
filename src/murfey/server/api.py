@@ -20,6 +20,7 @@ from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
 from murfey.util.models import (
+    ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
     DCParameters,
@@ -433,3 +434,10 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
+
+
+@router.post("/visits/{visit_name}/write_connections_file")
+def write_conn_file(visit_name, params: ConnectionFileParameters):
+    with open(params.file_path, "w") as f:
+        for d in params.destinations:
+            f.write(f"{d}\n")
