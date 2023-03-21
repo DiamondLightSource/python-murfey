@@ -349,4 +349,12 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
 
 @router.post("/visits/{visit_name}/write_connections_file")
 def write_conn_file(visit_name, params: ConnectionFileParameters):
-    pass
+    filepath = (
+        Path(machine_config["rsync_basepath"])
+        / (machine_config.get("rsync_module") or "data")
+        / str(datetime.datetime.now().year)
+        / visit_name
+    )
+    log.info(
+        f"Write to connection file to {filepath / params.filename}: {' '.join(params.destinations)}"
+    )

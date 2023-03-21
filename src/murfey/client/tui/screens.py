@@ -168,11 +168,10 @@ class _DirectoryTree(DirectoryTree):
                 self.valid_selection = False
         else:
             self.valid_selection = False
-            self.emit_no_wait(self.FileSelected(self, dir_entry.path))
+            self.post_message(self.FileSelected(dir_entry.path))
 
 
 class LaunchScreen(Screen):
-    # _selected_dir = Path(".")
     _launch_btn: Button | None = None
 
     def __init__(
@@ -490,6 +489,16 @@ class DestinationSelect(Screen):
         self.app._environment.data_collection_parameters[
             "dose_per_frame"
         ] = self._dose_per_frame
+        if len(self._transfer_routes) > 1:
+            requests.post(
+                f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
+                json={
+                    "filename": f"murfey-{datetime.now().strftime('%Y-%m-%d-%H_%M_%S')}.txt",
+                    "destinations": [
+                        Path(n).name for n in self._transfer_routes.values()
+                    ],
+                },
+            )
         self.app.pop_screen()
         self.app.push_screen("main")
 

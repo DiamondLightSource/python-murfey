@@ -139,5 +139,5 @@ class RegistrationMessage(BaseModel):
 
 
 class ConnectionFileParameters(BaseModel):
-    file_path: Path
+    filename: str
     destinations: List[str]
