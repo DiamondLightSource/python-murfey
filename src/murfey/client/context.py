@@ -367,7 +367,7 @@ class TomographyContext(Context):
                 source = s
                 break
         else:
-            logger.warning(f"No source sound for file {file_path}")
+            logger.warning(f"No source found for file {file_path}")
             return []
         # required_position_files = required_position_files or []
         if not self._extract_tilt_series:
