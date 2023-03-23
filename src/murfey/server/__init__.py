@@ -487,6 +487,12 @@ def _(record: Base, header: dict, **kwargs):
         )
         return None
 
+@_register.register  # type: ignore
+def _(extended_record: ExtendedRecord, header: dict, **kwargs):
+    return _transport_object.do_create_ispyb_job(
+        extended_record.record, params=extended_record.record_params
+    )["return_value"]
+
 
 @_register.register  # type: ignore
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):

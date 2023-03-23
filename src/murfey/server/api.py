@@ -290,12 +290,11 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
     zocalo_message = {
         "recipes": ["em-tomo-align"],
         "parameters": {
-            # "ispyb_process": tilt_series.processing_job, #
             "input_file_list": tilt_series.file_tilt_list,
+            "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
             "dcid": tilt_series.dcid,
             "appid": tilt_series.autoproc_program_id,
             "stack_file": str(stack_file),
-            "movie_id": tilt_series.movie_id,
             "pix_size": tilt_series.pixel_size,
             "manual_tilt_offset": tilt_series.manual_tilt_offset,
         },
@@ -428,6 +427,7 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     proc_parameters = {
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
+        "job_parameters": proc_params.parameters,
     }
 
     if _transport_object:
