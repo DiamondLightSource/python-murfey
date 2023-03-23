@@ -180,11 +180,7 @@ async def send_murfey_message(msg: RegistrationMessage):
 
 @router.post("/visits/{visit_name}/spa_processing")
 async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    zocalo_message = {
-        "parameters": {"ispyb_process": proc_params.job_id},
-        "recipes": ["relion"],
-    }
-    log.info(f"SPA processing requested with message: {zocalo_message}")
+    log.info("SPA processing requested")
     return proc_params
 
 
@@ -283,9 +279,7 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
 
 @router.post("/visits/{visit_name}/register_data_collection_group")
 def register_dc_group(visit_name, dcg_params: DCGroupParameters):
-    log.info(
-        f"Registering data collection group on microscope {get_microscope()} for source {dcg_params.tag}"
-    )
+    log.info(f"Registering data collection group on microscope {get_microscope()}")
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
     ):
@@ -315,7 +309,7 @@ def start_dc(visit_name, dc_params: DCParameters):
 
 @router.post("/visits/{visit_name}/register_processing_job")
 def register_proc(visit_name, proc_params: ProcessingJobParameters):
-    log.info(f"Registering processing job with parameters: {proc_params}")
+    log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
         global_state["processing_job_ids"] = {
@@ -356,6 +350,4 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
         / str(datetime.datetime.now().year)
         / visit_name
     )
-    log.info(
-        f"Write to connection file to {filepath / params.filename}: {' '.join(params.destinations)}"
-    )
+    log.info(f"Write to connection file at {filepath}")

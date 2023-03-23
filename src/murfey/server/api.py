@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseSettings
+from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.ispyb
@@ -344,10 +345,12 @@ def shutdown():
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
+    secure_path_parts = [secure_filename(p) for p in params.base_path.parts]
+    base_path = "/".join(secure_path_parts)
     check_path = (
-        machine_config.rsync_basepath / params.base_path
+        machine_config.rsync_basepath / base_path
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / params.base_path
+        else Path(f"/dls/{get_microscope()}") / base_path
     )
     check_path_name = check_path.name
     while check_path.exists():
@@ -449,7 +452,7 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
         / str(datetime.datetime.now().year)
         / visit_name
     )
-    with open(filepath / params.filename, "w") as f:
+    with open(filepath / secure_filename(params.filename), "w") as f:
         for d in params.destinations:
             f.write(f"{d}\n")
 
