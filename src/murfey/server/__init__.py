@@ -174,7 +174,7 @@ def run():
     if murfey_machine_configuration:
         microscope = get_microscope()
         machine_config = from_file(Path(murfey_machine_configuration), microscope)
-    if not args.temporary:
+    if not args.temporary and _transport_object:
         _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
@@ -496,13 +496,13 @@ def _(extended_record: ExtendedRecord, header: dict, **kwargs):
 
 
 def feedback_listen():
-    if not _transport_object.feedback_queue:
-        _transport_object.feedback_queue = (
-            _transport_object.transport._subscribe_temporary(
-                channel_hint="", callback=None, sub_id=None
-            )
-        )
     if _transport_object:
+        if not _transport_object.feedback_queue:
+            _transport_object.feedback_queue = (
+                _transport_object.transport._subscribe_temporary(
+                    channel_hint="", callback=None, sub_id=None
+                )
+            )
         _transport_object._connection_callback = partial(
             _transport_object.transport.subscribe,
             _transport_object.feedback_queue,
