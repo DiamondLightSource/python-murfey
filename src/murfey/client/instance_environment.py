@@ -28,11 +28,11 @@ global_env_lock = RLock()
 class MurfeyInstanceEnvironment(BaseModel):
     url: ParseResult
     software_versions: Dict[str, str] = {}
-    source: Optional[Path] = None
-    default_destination: str = ""
-    watcher: Optional[DirWatcher] = None
+    sources: List[Path] = []
+    default_destinations: Dict[Path, str] = {}
+    watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
-    data_collection_group_id: Optional[int] = None
+    data_collection_group_ids: Dict[str, int] = {}
     data_collection_ids: Dict[str, int] = {}
     processing_job_ids: Dict[str, Dict[str, int]] = {}
     autoproc_program_ids: Dict[str, Dict[str, int]] = {}
@@ -50,10 +50,29 @@ class MurfeyInstanceEnvironment(BaseModel):
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
 
-    @validator("data_collection_group_id")
+    def clear(self):
+        self.sources = []
+        self.default_destinations = {}
+        for w in self.watchers.values():
+            w.stop()
+        self.watchers = {}
+        self.data_collection_group_ids = {}
+        self.data_collection_ids = {}
+        self.processing_job_ids = {}
+        self.autoproc_program_ids = {}
+        self.data_collection_parameters = {}
+        self.movies = {}
+        self.motion_corrected_movies = {}
+        self.listeners = {}
+        self.movie_tilt_pair = {}
+        self.tilt_angles = {}
+        self.visit = ""
+        self.gain_ref = None
+
+    @validator("data_collection_group_ids")
     def dcg_callback(cls, v, values):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("data_collection_group_id", []):
+            for l in values.get("listeners", {}).get("data_collection_group_ids", []):
                 l()
         return v
 

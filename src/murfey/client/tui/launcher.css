@@ -1,0 +1,25 @@
+Screen {
+    layout: grid;
+    grid-size: 2;
+    padding: 2;
+    border: hidden;
+}
+
+#quit {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: aquamarine;
+}
+
+#launch {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+}
+
+#launch-text {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+}

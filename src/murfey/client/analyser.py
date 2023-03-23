@@ -61,7 +61,7 @@ class Analyser(Observer):
                 or "fractions" in split_file_name[-1]
             ):
                 logger.info("Acquisition software: tomo")
-                self._context = TomographyContext("tomo")
+                self._context = TomographyContext("tomo", self._basepath)
                 self.parameters_model = DCParametersTomo
                 if not self._role:
                     if (
@@ -78,13 +78,13 @@ class Analyser(Observer):
                         self._role = "detector"
                 return True
             if split_file_name[0].startswith("FoilHole"):
-                self._context = SPAContext("epu")
+                self._context = SPAContext("epu", self._basepath)
                 self.parameters_model = DCParametersSPA
                 if not self._role:
                     self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
-                self._context = TomographyContext("serialem")
+                self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = DCParametersTomo
                 if not self._role:
                     if "Frames" in file_path.parts:
@@ -97,9 +97,9 @@ class Analyser(Observer):
     def _analyse(self):
         logger.info("Analyser thread started")
         mdoc_for_reading = None
-        data_collection_question = False
         while not self._halt_thread:
             transferred_file = self.queue.get()
+            logger.info(f"analysing file {transferred_file}")
             if not transferred_file:
                 self._halt_thread = True
                 continue
@@ -114,12 +114,9 @@ class Analyser(Observer):
                         mdoc_for_reading or transferred_file,
                         environment=self._environment,
                     )
-                    mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
-            if (
-                not self._context
-            ):  # self._experiment_type or not self._acquisition_software:
+            if not self._context:
                 if not self._extension:
                     self._find_extension(transferred_file)
                 found = self._find_context(transferred_file)
@@ -130,9 +127,14 @@ class Analyser(Observer):
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
-                    self._context.post_first_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
+                    try:
+                        self._context.post_first_transfer(
+                            transferred_file,
+                            role=self._role,
+                            environment=self._environment,
+                        )
+                    except Exception as e:
+                        logger.info(f"exception encountered {e}")
                     if self._role == "detector":
                         if not dc_metadata:
                             try:
@@ -146,11 +148,8 @@ class Analyser(Observer):
                                 dc_metadata = {}
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
-                            # continue
                         else:
                             self._unseen_xml = []
-                            if data_collection_question:
-                                self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
@@ -164,20 +163,25 @@ class Analyser(Observer):
                     logger.info(
                         f"Context found successfully: {self._role}, {transferred_file}"
                     )
-                    self._context.post_first_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
+                    try:
+                        self._context.post_first_transfer(
+                            transferred_file,
+                            role=self._role,
+                            environment=self._environment,
+                        )
+                    except Exception as e:
+                        logger.info(f"exception encountered {e}")
                     if self._role == "detector":
                         if not dc_metadata:
                             dc_metadata = self._context.gather_metadata(
-                                transferred_file.with_suffix(".xml"),
+                                mdoc_for_reading
+                                or transferred_file.with_suffix(".xml"),
                                 environment=self._environment,
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
                         if dc_metadata:
                             self._unseen_xml = []
-                            self.notify({"allowed_responses": ["y", "n"]})
                             dc_metadata["file_extension"] = TUIFormValue(
                                 self._extension
                             )
@@ -195,6 +199,7 @@ class Analyser(Observer):
                     and self._role == "detector"
                 ):
                     if not dc_metadata:
+                        logger.info("gather metadata 4")
                         dc_metadata = self._context.gather_metadata(
                             transferred_file.with_suffix(".xml"),
                             environment=self._environment,
@@ -205,7 +210,6 @@ class Analyser(Observer):
         if not self._stopping:
             absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
-            # self.queue.put(file_path)
 
     def start(self):
         if self.thread.is_alive():

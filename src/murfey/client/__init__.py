@@ -14,8 +14,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
-from threading import Thread
-from typing import Literal
+from typing import List, Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
@@ -27,14 +26,12 @@ import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
-from murfey.client.analyser import Analyser
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.client.rsync import RSyncer
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util.models import Visit
+from murfey.util import _get_visit_list
 
 # from asyncio import Queue
 
@@ -76,23 +73,6 @@ def _check_for_updates(
         murfey.client.update.check(server)
     except Exception as e:
         print(f"Murfey update check failed with {e}")
-
-
-def _get_visit_list(api_base: ParseResult, demo: bool = False):
-    get_visits_url = api_base._replace(path="/visits_raw")
-    server_reply = None
-    try:
-        server_reply = requests.get(get_visits_url.geturl())
-    except requests.exceptions.ConnectionError:
-        print("No server found.")
-        if os.getenv("TEMPORARY_SERVER"):
-            print(
-                "Run the following command to start a server:\nmurfey.server --temporary"
-            )
-        sys.exit()
-    if server_reply.status_code != 200:
-        raise ValueError(f"Server unreachable ({server_reply.status_code})")
-    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def run():
@@ -186,6 +166,12 @@ def run():
         default=False,
         help="Remove source files immediately after their transfer",
     )
+    parser.add_argument(
+        "--relax",
+        action="store_true",
+        default=False,
+        help="Relax the condition that the source directory needs to be recognised from the configuration",
+    )
 
     args = parser.parse_args()
 
@@ -236,7 +222,7 @@ def run():
                 break
     if not ongoing_visits:
         print("Ongoing visits:")
-        ongoing_visits = _get_visit_list(murfey_url, demo=args.demo)
+        ongoing_visits = _get_visit_list(murfey_url)
         pprint(ongoing_visits)
         ongoing_visits = [v.name for v in ongoing_visits]
 
@@ -246,7 +232,8 @@ def run():
     log_queue = Queue()
     input_queue = Queue()
 
-    rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    # rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    rich_handler = DirectableRichHandler(enable_link_path=False)
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
     ws = murfey.client.websocket.WSApp(server=args.server)
     logging.getLogger().addHandler(rich_handler)
@@ -258,9 +245,6 @@ def run():
     log.info("Starting Websocket connection")
 
     status_bar = StatusBar()
-    source_watcher = murfey.client.watchdir.DirWatcher(
-        args.source, settling_time=1, status_bar=status_bar
-    )
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
     gain_ref: Path | None = None
@@ -270,18 +254,11 @@ def run():
         except RuntimeError:
             pass
 
-    main_loop_thread = Thread(
-        target=main_loop,
-        args=[source_watcher, args.appearance_time, not args.time_based_transfer],
-        daemon=True,
-    )
-    main_loop_thread.start()
-
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         software_versions=machine_data.get("software_versions", {}),
-        source=Path(args.source),
-        watcher=source_watcher,
+        # sources=[Path(args.source)],
+        # watchers=source_watchers,
         default_destination=args.destination
         or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
@@ -290,51 +267,25 @@ def run():
 
     ws.environment = instance_environment
 
-    rsync_process = RSyncer(
-        instance_environment.source,
-        basepath_remote=Path(args.destination or f"data/{datetime.now().year}"),
-        server_url=murfey_url,
-        local=args.local or instance_environment.demo,
-        do_transfer=not args.no_transfer,
-        remove_files=args.remove_files,
-    )
-    source_watcher.subscribe(rsync_process.enqueue)
-
-    analyser = Analyser(
-        instance_environment.source,
-        environment=instance_environment if not args.fake_dc else None,
-        force_mdoc_metadata=not args.ignore_mdoc_metadata,
-    )
-    # source_watcher.subscribe(analyser.enqueue)
-    rsync_process.subscribe(analyser.enqueue)
-
     rich_handler.redirect = True
-    MurfeyTUI.run(
-        log_verbosity=2,
+    app = MurfeyTUI(
         environment=instance_environment,
         visits=ongoing_visits,
         queues={"input": input_queue, "logs": log_queue},
         status_bar=status_bar,
         dummy_dc=args.fake_dc,
         do_transfer=not args.no_transfer,
-        rsync_process=rsync_process,
-        analyser=analyser,
         gain_ref=gain_ref,
+        redirected_logger=rich_handler,
+        force_mdoc_metadata=not args.ignore_mdoc_metadata,
+        strict=not args.relax,
     )
+    app.run()
     rich_handler.redirect = False
-
-    try:
-        main_loop_thread.join()
-    except KeyboardInterrupt:
-        log.info("Encountered CTRL+C")
-        # if args.destination:
-        #     rsync_process.stop()
-        ws.close()
-        log.info("Client stopped")
 
 
 def main_loop(
-    source_watcher: murfey.client.watchdir.DirWatcher,
+    source_watchers: List[murfey.client.watchdir.DirWatcher],
     appearance_time: float,
     transfer_all: bool,
 ):
@@ -346,9 +297,8 @@ def main_loop(
     else:
         modification_time = None
     while True:
-        source_watcher.scan(
-            modification_time=modification_time, transfer_all=transfer_all
-        )
+        for sw in source_watchers:
+            sw.scan(modification_time=modification_time, transfer_all=transfer_all)
         time.sleep(15)
 
 

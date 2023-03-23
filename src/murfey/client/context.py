@@ -28,6 +28,12 @@ class FutureRequest(NamedTuple):
     message: Dict[str, Any]
 
 
+class ProcessingParameter(NamedTuple):
+    name: str
+    label: str
+    default: Any = None
+
+
 def _construct_tilt_series_name(
     tilt_tag: str, tilt_series: str, file_path: Path
 ) -> str:
@@ -49,6 +55,9 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
 
 
 class Context:
+    user_params: List[ProcessingParameter] = []
+    metadata_params: List[ProcessingParameter] = []
+
     def __init__(self, acquisition_software: str):
         self._acquisition_software = acquisition_software
 
@@ -69,8 +78,34 @@ class Context:
 
 
 class SPAContext(Context):
-    def __init__(self, acquisition_software: str):
+    user_params = [
+        ProcessingParameter(
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+        ),
+        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
+        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
+        ProcessingParameter("boxsize", "Box Size", default=256),
+        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter(
+            "mask_diameter", "Mask Diameter (2D classification)", default=190
+        ),
+        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
+        ProcessingParameter(
+            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
+        ),
+    ]
+    metadata_params = [
+        ProcessingParameter("voltage", "Voltage"),
+        ProcessingParameter("image_size_x", "Image Size X"),
+        ProcessingParameter("image_size_y", "Image Size Y"),
+        ProcessingParameter("pixel_size_on_image", "Pixel Size"),
+        ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("gain_ref", "Gain Reference"),
+    ]
+
+    def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
+        self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
@@ -98,6 +133,7 @@ class SPAContext(Context):
             requests.post(proc_job_future.url, json=msg)
 
     def _register_data_collection(self, url: str, data: dict):
+        logger.info(f"registering data collection with data {data}")
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],
@@ -119,11 +155,12 @@ class SPAContext(Context):
         **kwargs,
     ):
         if role == "detector" and environment:
+            source = ""
+            for s in environment.sources:
+                if transferred_file.is_relative_to(s):
+                    source = str(s)
+                    break
             proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-            if environment.source:
-                source = str(environment.source.resolve())
-            else:
-                source = ""
             if environment.data_collection_ids.get(source) is None:
                 self._processing_job_stash[source] = FutureRequest(
                     proc_url,
@@ -184,7 +221,12 @@ class SPAContext(Context):
         )
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
-        metadata["dose_per_frame"] = TUIFormValue(None, top=True)
+        metadata["dose_per_frame"] = TUIFormValue(
+            environment.data_collection_parameters.get("dose_per_frame")
+            if environment
+            else None,
+            top=True,
+        )
         metadata["use_cryolo"] = TUIFormValue(True)
         metadata["symmetry"] = TUIFormValue("C1")
         metadata["mask_diameter"] = TUIFormValue(190)
@@ -192,6 +234,7 @@ class SPAContext(Context):
         metadata["downscale"] = TUIFormValue(False)
         metadata["small_boxsize"] = TUIFormValue(128)
         metadata["eer_grouping"] = TUIFormValue(20)
+        metadata["source"] = TUIFormValue(str(self._basepath))
         metadata.move_to_end("gain_ref", last=False)
         metadata.move_to_end("dose_per_frame", last=False)
         return metadata
@@ -207,8 +250,24 @@ class ProcessFileIncomplete(BaseModel):
 
 
 class TomographyContext(Context):
-    def __init__(self, acquisition_software: str):
+    user_params = [
+        ProcessingParameter(
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+        ),
+        ProcessingParameter("tilt_offset", "Tilt Offset"),
+    ]
+    metadata_params = [
+        ProcessingParameter("voltage", "Voltage"),
+        ProcessingParameter("image_size_x", "Image Size X"),
+        ProcessingParameter("image_size_y", "Image Size Y"),
+        ProcessingParameter("pixel_size_on_image", "Pixel Size"),
+        ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("gain_ref", "Gain Reference"),
+    ]
+
+    def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
+        self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_sizes: Dict[str, int | None] = {}
         self._completed_tilt_series: List[str] = []
@@ -349,6 +408,16 @@ class TomographyContext(Context):
         required_position_files: List[Path] | None = None,
         required_strings: List[str] | None = None,
     ) -> List[str]:
+        if not environment:
+            logger.warning("No environment passed in")
+            return []
+        for s in environment.sources:
+            if file_path.is_relative_to(s):
+                source = s
+                break
+        else:
+            logger.warning(f"No source found for file {file_path}")
+            return []
         # required_position_files = required_position_files or []
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
@@ -385,16 +454,16 @@ class TomographyContext(Context):
                 if environment.demo
                 else requests.get(f"{str(environment.url.geturl())}/machine/").json()
             )
-            if environment.visit in environment.default_destination:
+            if environment.visit in environment.default_destinations[source]:
                 file_transferred_to = (
                     Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destination)
+                    / Path(environment.default_destinations[source])
                     / file_path.name
                 )
             else:
                 file_transferred_to = (
                     Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destination)
+                    / Path(environment.default_destinations[source])
                     / environment.visit
                     / file_path.name
                 )
@@ -452,7 +521,7 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
-                    if environment.data_collection_group_id is None:
+                    if environment.data_collection_group_ids.get(tilt_series) is None:
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         requests.post(url, json=data)
@@ -522,7 +591,7 @@ class TomographyContext(Context):
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             pfi = ProcessFileIncomplete(
                 dest=file_transferred_to,
-                source=environment.source,
+                source=source,
                 image_number=environment.movies[file_transferred_to].movie_number,
                 mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
                 tag=tilt_series,
@@ -789,12 +858,16 @@ class TomographyContext(Context):
                 metadata["motion_corr_binning"] = TUIFormValue(1)
                 metadata["gain_ref"] = TUIFormValue(None, top=True)
                 metadata["dose_per_frame"] = TUIFormValue(
-                    None, top=True, colour="dark_orange"
+                    environment.data_collection_parameters.get("dose_per_frame")
+                    if environment
+                    else None,
+                    top=True,
+                    colour="dark_orange",
                 )
                 metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+                metadata["source"] = TUIFormValue(str(self._basepath))
                 metadata.move_to_end("gain_ref", last=False)
                 metadata.move_to_end("dose_per_frame", last=False)
-                # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
             except KeyError:
                 return OrderedDict({})
             return metadata
@@ -835,9 +908,13 @@ class TomographyContext(Context):
         mdoc_metadata["motion_corr_binning"] = TUIFormValue(binning_factor)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
-            None, top=True, colour="dark_orange"
+            environment.data_collection_parameters.get("dose_per_frame")
+            if environment
+            else None,
+            top=True,
         )
         mdoc_metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+        mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
         return mdoc_metadata

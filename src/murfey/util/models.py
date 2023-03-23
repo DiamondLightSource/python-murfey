@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -74,11 +74,13 @@ class TiltSeries(BaseModel):
 
 class SuggestedPathParameters(BaseModel):
     base_path: Path
+    touch: bool = False
 
 
 class DCGroupParameters(BaseModel):
     experiment_type: str
     experiment_type_id: int
+    tag: str
 
 
 class DCParameters(BaseModel):
@@ -136,6 +138,11 @@ class ProcessingJobParameters(BaseModel):
 class RegistrationMessage(BaseModel):
     registration: str
     params: Optional[Dict[str, Any]] = None
+
+
+class ConnectionFileParameters(BaseModel):
+    filename: str
+    destinations: List[str]
 
 
 class GainReference(BaseModel):

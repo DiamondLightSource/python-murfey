@@ -1,0 +1,322 @@
+Screen {
+    layout: grid;
+    grid-size: 6;
+    padding: 2;   
+    outline: hidden;
+}
+
+LaunchScreen {
+    layout: grid;
+    grid-size: 3;
+    padding: 2;
+    border: hidden;
+}
+
+ConfirmScreen {
+    layout: grid;
+    grid-size: 2;
+    padding: 2;
+    border: hidden;
+}
+
+VisitSelection {
+    layout: grid;
+    grid-size: 4;
+    border: hidden;
+}
+
+DirectorySelection {
+    layout: grid;
+    grid-size: 2;
+    border: hidden;
+}
+
+ProcessingForm {
+    layout: grid;
+    grid-size: 1;
+    border: hidden;
+}
+
+DestinationSelect {
+    layout: grid;
+    grid-size: 7;
+    border: hidden;
+}
+
+Input {
+    background: black;
+    border: solid teal;
+}
+
+#quit {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#quit:hover {
+    background: deeppink;
+}
+
+#add {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#add:hover {
+    background: purple;
+}
+
+#launch {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#launch:hover {
+    background: purple;
+}
+
+#dir-select {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    row-span: 2;
+}
+
+#launch-text {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    text-align: center;
+}
+
+#prompt {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    text-align: center;
+}
+
+#input-grid {
+    width: 100%;
+    column-span: 2;
+    row-span: 1;
+}
+
+.btn-visit {
+    width: 100%;
+    height: 90fr;
+    background: teal;
+    border: solid black;
+}
+
+.btn-visit:hover {
+    background: purple;
+}
+
+.btn-visit:focus {
+    background: darkslateblue;
+}
+
+.btn-directory {
+    width: 100%;
+    height: 90fr;
+    background: teal;
+    border: solid black;
+}
+
+.btn-directory:hover {
+    background: purple;
+}
+
+.btn-directory:focus {
+    background: darkslateblue;
+}
+
+#confirm-btn {
+    width: 100%;
+    background: teal;
+    border: solid black;
+}
+
+#confirm-btn:hover {
+    background: purple;
+}
+
+#confirm-btn:focus {
+    background: darkslateblue;
+}
+
+#destination-btn {
+    width: 100%;
+    height: 90fr;
+    column-span: 7;
+    background: teal;
+    border: solid black;
+}
+
+#destination-btn:hover {
+    background: purple;
+}
+
+#destination-btn:focus {
+    background: darkslateblue;
+}
+
+#processing-btn {
+    width: 100%;
+    height: 90fr;
+    column-span: 2;
+    background: teal;
+    border: solid black;
+}
+
+#processing-btn:hover {
+    background: purple;
+}
+
+#new-visit-btn {
+    width: 100%;
+    height: 90fr;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#new-visit-btn:hover {
+    background: purple;
+}
+
+#input {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    row-span: 1;
+    content-align: left middle;
+    text-style: bold;
+    background: blueviolet;
+} 
+
+#input:hover {
+    background: blue;
+}
+
+#info {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 5;
+    content-align: left bottom;
+    text-style: bold;
+    background: blueviolet;
+} 
+
+#select-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    row-span: 3;
+    content-align: left top;
+    background: blueviolet;
+}
+
+#switch-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 1;
+}
+
+#label-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 1;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#select-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    row-span: 3;
+    content-align: left top;
+    background: gray;
+}
+
+#selected-directories {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 2;
+}
+
+#switch-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 1;
+}
+
+#label-directory {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 1;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#input-form {
+    width: 100%;
+    height: 100%;
+    background: black;
+}
+
+#destination-holder {
+    width: 100%;
+    height: 100%;
+    column-span: 7;
+    row-span: 3;
+    background: black;
+}
+
+#user-params {
+    width: 100%;
+    height: 100%;
+    column-span: 7;
+    row-span: 3;
+    background: black;
+}
+
+.input-destination {
+    width: 100%;
+    background: black;
+}
+
+#log_book {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 6;
+    content-align: right top;
+    text-style: bold;
+}
+
+.label {
+    width: 100%;
+    content-align: center middle;
+}
+
+.input {
+    width: 100%;
+}

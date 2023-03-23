@@ -19,6 +19,7 @@ from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file
 from murfey.util.models import (
+    ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
     DCParameters,
@@ -110,7 +111,15 @@ def get_current_visits():
             name="cm31111-2",
             beamline="m12",
             proposal_title="Nothing of importance",
-        )
+        ),
+        Visit(
+            start=datetime.datetime.now(),
+            end=datetime.datetime.now() + datetime.timedelta(days=1),
+            session_id=1,
+            name="cm31111-3",
+            beamline="m12",
+            proposal_title="Nothing of importance",
+        ),
     ]
 
 
@@ -271,7 +280,15 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
 @router.post("/visits/{visit_name}/register_data_collection_group")
 def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
-    global_state["data_collection_group_id"] = 1
+    if global_state.get("data_collection_group_ids") and isinstance(
+        global_state["data_collection_group_ids"], dict
+    ):
+        global_state["data_collection_group_ids"] = {
+            **global_state["data_collection_group_ids"],
+            dcg_params.tag: 1,
+        }
+    else:
+        global_state["data_collection_group_ids"] = {dcg_params.tag: 1}
     return dcg_params
 
 
@@ -292,6 +309,7 @@ def start_dc(visit_name, dc_params: DCParameters):
 
 @router.post("/visits/{visit_name}/register_processing_job")
 def register_proc(visit_name, proc_params: ProcessingJobParameters):
+    log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
         global_state["processing_job_ids"] = {
@@ -322,3 +340,13 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
         }
     log.info("Processing job registered")
     return proc_params
+
+
+@router.post("/visits/{visit_name}/write_connections_file")
+def write_conn_file(visit_name, params: ConnectionFileParameters):
+    filepath = (
+        Path(machine_config["rsync_basepath"])
+        / (machine_config.get("rsync_module") or "data")
+        / str(datetime.datetime.now().year)
+    )
+    log.info(f"Write to connection file at {filepath}")

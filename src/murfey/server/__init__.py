@@ -174,8 +174,7 @@ def run():
     if murfey_machine_configuration:
         microscope = get_microscope()
         machine_config = from_file(Path(murfey_machine_configuration), microscope)
-        print(machine_config)
-    if not args.temporary and not args.demo:
+    if not args.temporary and _transport_object:
         _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
@@ -346,17 +345,32 @@ def feedback_callback(header: dict, message: dict) -> None:
             if dcgid is None:
                 _transport_object.transport.nack(header)
                 return None
-            global_state["data_collection_group_id"] = dcgid
+            if global_state.get("data_collection_group_ids") and isinstance(
+                global_state["data_collection_group_ids"], dict
+            ):
+                global_state["data_collection_group_ids"] = {
+                    **global_state["data_collection_group_ids"],
+                    message.get("tag"): dcgid,
+                }
+            else:
+                global_state["data_collection_group_ids"] = {message.get("tag"): dcgid}
             _transport_object.transport.ack(header)
         return None
     elif message["register"] == "data_collection":
+        dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
+            message["tag"]
+        )
+        if dcgid is None:
+            raise ValueError(
+                f"No data collection group ID was found for image directory {message['image_directory']}"
+            )
         record = DataCollection(
             SESSIONID=message["session_id"],
             experimenttype=message["experiment_type"],
             imageDirectory=message["image_directory"],
             imageSuffix=message["image_suffix"],
             voltage=message["voltage"],
-            dataCollectionGroupId=global_state.get("data_collection_group_id"),
+            dataCollectionGroupId=dcgid,
             pixelSizeOnImage=message["pixel_size"],
             imageSizeX=message["image_size_x"],
             imageSizeY=message["image_size_y"],
@@ -435,8 +449,8 @@ def _register(record, header: dict, **kwargs):
     raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
 
 
-@_register.register
-def _(record: Base, header: dict, **kwargs):  # type: ignore
+@_register.register  # type: ignore
+def _(record: Base, header: dict, **kwargs):
     if not _transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
@@ -480,14 +494,21 @@ def _(extended_record: ExtendedRecord, header: dict, **kwargs):
     )["return_value"]
 
 
+@_register.register  # type: ignore
+def _(extended_record: ExtendedRecord, header: dict, **kwargs):
+    return _transport_object.do_create_ispyb_job(
+        extended_record.record, params=extended_record.record_params
+    )["return_value"]
+
+
 def feedback_listen():
-    if not _transport_object.feedback_queue:
-        _transport_object.feedback_queue = (
-            _transport_object.transport._subscribe_temporary(
-                channel_hint="", callback=None, sub_id=None
-            )
-        )
     if _transport_object:
+        if not _transport_object.feedback_queue:
+            _transport_object.feedback_queue = (
+                _transport_object.transport._subscribe_temporary(
+                    channel_hint="", callback=None, sub_id=None
+                )
+            )
         _transport_object._connection_callback = partial(
             _transport_object.transport.subscribe,
             _transport_object.feedback_queue,

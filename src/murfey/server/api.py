@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseSettings
+from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.ispyb
@@ -21,6 +22,7 @@ from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
+    ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
     DCParameters,
@@ -85,6 +87,7 @@ def health_check(db=murfey.server.ispyb.DB):
 def machine_info():
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
+        print(from_file(settings.murfey_machine_configuration, microscope))
         return from_file(settings.murfey_machine_configuration, microscope)
     return {}
 
@@ -342,15 +345,19 @@ def shutdown():
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
+    secure_path_parts = [secure_filename(p) for p in params.base_path.parts]
+    base_path = "/".join(secure_path_parts)
     check_path = (
-        machine_config.rsync_basepath / params.base_path
+        machine_config.rsync_basepath / base_path
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / params.base_path
+        else Path(f"/dls/{get_microscope()}") / base_path
     )
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
+    if params.touch:
+        check_path.mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
@@ -435,6 +442,19 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
+
+
+@router.post("/visits/{visit_name}/write_connections_file")
+def write_conn_file(visit_name, params: ConnectionFileParameters):
+    filepath = (
+        Path(machine_config["rsync_basepath"])
+        / (machine_config.get("rsync_module") or "data")
+        / str(datetime.datetime.now().year)
+        / secure_filename(visit_name)
+    )
+    with open(filepath / secure_filename(params.filename), "w") as f:
+        for d in params.destinations:
+            f.write(f"{d}\n")
 
 
 @router.post("/visits/{visit_name}/process_gain")
