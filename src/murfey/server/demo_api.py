@@ -348,6 +348,5 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
         Path(machine_config["rsync_basepath"])
         / (machine_config.get("rsync_module") or "data")
         / str(datetime.datetime.now().year)
-        / visit_name
     )
     log.info(f"Write to connection file at {filepath}")

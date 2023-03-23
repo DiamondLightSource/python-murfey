@@ -450,7 +450,7 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
         Path(machine_config["rsync_basepath"])
         / (machine_config.get("rsync_module") or "data")
         / str(datetime.datetime.now().year)
-        / visit_name
+        / secure_filename(visit_name)
     )
     with open(filepath / secure_filename(params.filename), "w") as f:
         for d in params.destinations:
