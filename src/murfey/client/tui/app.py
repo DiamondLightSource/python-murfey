@@ -364,6 +364,7 @@ class MurfeyTUI(App):
         self.uninstall_screen("launcher")
         self.uninstall_screen("destination-select-screen")
         self.uninstall_screen("processing-form")
+        self.uninstall_screen("directory-select")
         self.pop_screen()
         self.uninstall_screen("main")
         self.install_screen(MainScreen(), "main")

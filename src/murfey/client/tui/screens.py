@@ -442,7 +442,6 @@ class DestinationSelect(Screen):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
         self._user_params: Dict[str, str] = {}
-        self._dose_per_frame = None
 
     def compose(self):
         bulk = []
@@ -470,9 +469,7 @@ class DestinationSelect(Screen):
                 self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if not self._user_params or any(
-            v == "None" for v in self._user_params.values()
-        ):
+        if self.app._multigrid or any(v == "None" for v in self._user_params.values()):
             return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
