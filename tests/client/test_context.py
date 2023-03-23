@@ -229,7 +229,7 @@ def test_tomography_context_add_serialem_decimal_tilt(mock_get, tmp_path):
 
 
 def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(tmp_path):
-    context = TomographyContext("tomo")
+    context = TomographyContext("tomo", tmp_path)
     assert len(context._tilt_series_sizes) == 0
     context.post_transfer(
         Path(__file__).parent.parent / "util" / "test_1.mdoc", role="detector"
