@@ -30,6 +30,7 @@ from textual.widgets import (
 )
 
 from murfey.client.analyser import Analyser
+from murfey.client.context import SPAContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.forms import TUIFormValue
 
@@ -309,37 +310,17 @@ class ProcessingForm(Screen):
     def __init__(self, form: dict, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._form = form
-        self._readable_labels = {
-            "experiment_type": "Experiment Type",
-            "voltage": "Voltage",
-            "image_size_x": "Image Size X",
-            "image_size_y": "Image Size Y",
-            "pixel_size_on_image": "Pixel Size",
-            "motion_corr_binning": "Motion Correction Binning",
-            "gain_ref": "Gain Reference",
-            "dose_per_frame": "Dose Per Frame (e- / Angstrom^2 / frame)",
-            "tilt_offset": "Tilt Offset",
-            "file_extension": "File Extension",
-            "acquisition_software": "Acquisition Software",
-            "use_cryolo": "Use crYOLO Autopicking",
-            "symmetry": "Symmetry Group",
-            "boxsize": "Box Size",
-            "eer_grouping": "EER Grouping",
-            "mask_diameter": "Mask Diameter (2D classification)",
-            "downscale": "Downscale Extracted Particles",
-            "source": "Source Directory",
-            "small_boxsize": "Downscaled Extracted Particle Size (pixels)",
-        }
         self._inputs: Dict[Input, str] = {}
 
     def compose(self):
         inputs = []
-        for k, v in self._form.items():
-            t = self._readable_labels.get(k, k)
+        analyser = list(self.app.analysers.values())[0]
+        for k in analyser._context.user_params + analyser._context.metadata_params:
+            t = k.label
             inputs.append(Label(t, classes="label"))
             i = Input(placeholder=t, classes="input")
-            self._inputs[i] = k
-            i.value = v
+            self._inputs[i] = k.name
+            i.value = self._form.get(k.name)
             inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
         self._vert = Vertical(*inputs, confirm_btn, id="input-form")
@@ -348,10 +329,9 @@ class ProcessingForm(Screen):
 
     def _write_params(self, params: dict | None = None):
         if params:
-            for k, v in params.items():
-                self.app.query_one("#info").write(
-                    f"{self._readable_labels.get(k, k)}: {v}"
-                )
+            analyser = list(self.app.analysers.values())[0]
+            for k in analyser._context.user_params + analyser._context.metadata_params:
+                self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
 
     def on_input_submitted(self, event):
@@ -453,6 +433,7 @@ class DestinationSelect(Screen):
     def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
+        self._user_params: Dict[str, str] = {}
         self._dose_per_frame = None
 
     def compose(self):
@@ -462,22 +443,28 @@ class DestinationSelect(Screen):
                 bulk.append(Label(f"Copy the source {s} to:"))
                 bulk.append(Input(value=d, classes="input-destination"))
         yield Vertical(*bulk, id="destination-holder")
+        params_bulk = []
+        if self.app._multigrid:
+            for k in SPAContext.user_params:
+                params_bulk.append(Label(k.label))
+                params_bulk.append(
+                    Input(value=str(k.default), id=k.name, classes="input-destination")
+                )
         yield Vertical(
-            Label("Dose per frame (e- / Angstrom^2 / frame)"),
-            Input(id="dose", classes="input-destination"),
+            *params_bulk,
             id="dose-per-frame",
         )
         yield Button("Confirm", id="destination-btn")
 
     def on_input_changed(self, event):
-        if event.input.id == "dose":
-            try:
-                self._dose_per_frame = float(event.value)
-            except ValueError:
-                pass
+        for k in SPAContext.user_params:
+            if event.input.id == k.name:
+                self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if self._dose_per_frame is None:
+        if not self._user_params or any(
+            v == "None" for v in self._user_params.values()
+        ):
             return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
@@ -486,9 +473,8 @@ class DestinationSelect(Screen):
                 self.app._launch_multigrid_watcher(s)
             else:
                 self.app._start_rsyncer(s, d)
-        self.app._environment.data_collection_parameters[
-            "dose_per_frame"
-        ] = self._dose_per_frame
+        for k, v in self._user_params.items():
+            self.app._environment.data_collection_parameters[k] = v
         if len(self._transfer_routes) > 1:
             requests.post(
                 f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
@@ -515,17 +501,6 @@ class MainScreen(Screen):
             if len(self.app.visits)
             else [Button("No ongoing visits found")]
         )
-        inputs = []
-        for t in (
-            "Pixel Size",
-            "Magnification",
-            "Image Size X",
-            "Image Size Y",
-            "Dose",
-            "Gain Reference",
-        ):
-            inputs.append(Label(t, classes="label"))
-            inputs.append(Input(placeholder=t, classes="input"))
         self.app.processing_form = ProcessingForm(self.app._form_values)
         yield Header()
         info_widget = TextLog(id="info", markup=True)

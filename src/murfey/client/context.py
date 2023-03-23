@@ -30,6 +30,12 @@ class FutureRequest(NamedTuple):
     message: Dict[str, Any]
 
 
+class ProcessingParameter(NamedTuple):
+    name: str
+    label: str
+    default: Any = None
+
+
 def _construct_tilt_series_name(
     tilt_tag: str, tilt_series: str, file_path: Path
 ) -> str:
@@ -51,6 +57,9 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
 
 
 class Context:
+    user_params: List[ProcessingParameter] = []
+    metadata_params: List[ProcessingParameter] = []
+
     def __init__(self, acquisition_software: str):
         self._acquisition_software = acquisition_software
 
@@ -69,9 +78,34 @@ class Context:
 
 
 class SPAContext(Context):
+    user_params = [
+        ProcessingParameter(
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+        ),
+        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
+        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
+        ProcessingParameter("boxsize", "Box Size", default=256),
+        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter(
+            "mask_diameter", "Mask Diameter (2D classification)", default=190
+        ),
+        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
+        ProcessingParameter(
+            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
+        ),
+    ]
+    metadata_params = [
+        ProcessingParameter("voltage", "Voltage"),
+        ProcessingParameter("image_size_x", "Image Size X"),
+        ProcessingParameter("image_size_y", "Image Size Y"),
+        ProcessingParameter("pixel_size_on_image", "Pixel Size"),
+        ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("gain_ref", "Gain Reference"),
+    ]
+
     def __init__(self, acquisition_software: str, basepath: Path):
+        super().__init__(acquisition_software)
         self._basepath = basepath
-        self._acquisition_software = acquisition_software
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
@@ -216,6 +250,21 @@ class ProcessFileIncomplete(BaseModel):
 
 
 class TomographyContext(Context):
+    user_params = [
+        ProcessingParameter(
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+        ),
+        ProcessingParameter("tilt_offset", "Tilt Offset"),
+    ]
+    metadata_params = [
+        ProcessingParameter("voltage", "Voltage"),
+        ProcessingParameter("image_size_x", "Image Size X"),
+        ProcessingParameter("image_size_y", "Image Size Y"),
+        ProcessingParameter("pixel_size_on_image", "Pixel Size"),
+        ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("gain_ref", "Gain Reference"),
+    ]
+
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
         self._basepath = basepath
@@ -239,16 +288,12 @@ class TomographyContext(Context):
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
-        # logger.info(
-        #     f"Flushing processing job {tag}, {self._processing_job_stash.get(tag)}"
-        # )
         if proc_data := self._processing_job_stash.get(tag):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
 
     def _flush_preprocess(self, tag: str, app_id: int):
-        # logger.info(f"Flushing preprocessing requests {tag}")
         if tag_tr := self._preprocessing_triggers.get(tag):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
