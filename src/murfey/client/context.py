@@ -837,7 +837,6 @@ class TomographyContext(Context):
             metadata["source"] = TUIFormValue(str(self._basepath))
             metadata.move_to_end("gain_ref", last=False)
             metadata.move_to_end("dose_per_frame", last=False)
-            # logger.info(f"Metadata extracted from {metadata_file}: {metadata}")
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)

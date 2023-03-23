@@ -343,6 +343,9 @@ class MurfeyTUI(App):
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
         self.push_screen("visit-select-screen")
 
+    def on_log_book_log(self, message):
+        self.log_book.write(message.renderable)
+
     def reset(self):
         self._environment.clear()
         if self.rsync_processes:

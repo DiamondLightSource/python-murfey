@@ -4,7 +4,8 @@ import json
 import logging
 
 from rich.logging import RichHandler
-from textual.widgets import TextLog
+
+from murfey.client.tui.screens import LogBook
 
 logger = logging.getLogger("murfey.client.customlogging")
 
@@ -29,7 +30,7 @@ class CustomHandler(logging.Handler):
 
 
 class DirectableRichHandler(RichHandler):
-    def __init__(self, text_log: TextLog | None = None, **kwargs):
+    def __init__(self, text_log: LogBook | None = None, **kwargs):
         super().__init__(**kwargs)
         self.text_log = text_log
         self.redirect = False
@@ -43,6 +44,6 @@ class DirectableRichHandler(RichHandler):
                 log_renderable = self.render(
                     record=record, traceback=None, message_renderable=message_renderable
                 )
-                self.text_log.write(log_renderable)
+                self.text_log.post_message(self.text_log.Log(log_renderable))
         except Exception:
             self.handleError(record)

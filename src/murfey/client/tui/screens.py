@@ -12,6 +12,7 @@ from rich.box import SQUARE
 from rich.panel import Panel
 from textual.app import ScreenStackError
 from textual.containers import Vertical
+from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widget import Widget
@@ -95,6 +96,13 @@ class InputResponse(NamedTuple):
     kwargs: dict | None = None
     form: OrderedDict[str, TUIFormValue] | None = None
     model: BaseModel | None = None
+
+
+class LogBook(TextLog):
+    class Log(Message):
+        def __init__(self, log_renderable):
+            self.renderable = log_renderable
+            super().__init__()
 
 
 class InfoWidget(Widget):
@@ -491,7 +499,7 @@ class DestinationSelect(Screen):
 
 class MainScreen(Screen):
     def compose(self):
-        self.app.log_book = TextLog(id="log_book", wrap=True, max_lines=200)
+        self.app.log_book = LogBook(id="log_book", wrap=True, max_lines=200)
         if self.app._redirected_logger:
             log.info("connecting logger")
             self.app._redirected_logger.text_log = self.app.log_book
