@@ -460,7 +460,7 @@ class DestinationSelect(Screen):
                 )
         yield Vertical(
             *params_bulk,
-            id="dose-per-frame",
+            id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
 
