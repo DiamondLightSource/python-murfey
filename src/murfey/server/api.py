@@ -19,12 +19,14 @@ from murfey.server import _transport_object, get_hostname, get_microscope
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
+from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
     DCParameters,
     File,
+    GainReference,
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
@@ -248,6 +250,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         "parameters": {
             "feedback_queue": machine_config.feedback_queue,
             "dcid": proc_file.data_collection_id,
+            # "timestamp": datetime.datetime.now(),
             "autoproc_program_id": proc_file.autoproc_program_id,
             "movie": proc_file.path,
             "mrc_out": str(mrc_out),
@@ -293,6 +296,8 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
             "appid": tilt_series.autoproc_program_id,
             "stack_file": str(stack_file),
             "movie_id": tilt_series.movie_id,
+            "pix_size": tilt_series.pixel_size,
+            "manual_tilt_offset": tilt_series.manual_tilt_offset,
         },
     }
     if _transport_object:
@@ -398,7 +403,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "image_directory": dc_params.image_directory,
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
-        "pixel_size": dc_params.pixel_size_on_image,
+        "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
         "image_size_x": dc_params.image_size_x,
@@ -447,3 +452,13 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
     with open(filepath / params.filename, "w") as f:
         for d in params.destinations:
             f.write(f"{d}\n")
+
+
+@router.post("/visits/{visit_name}/process_gain")
+async def process_gain(visit_name, gain_reference_params: GainReference):
+    camera = getattr(Camera, machine_config.camera)
+    executables = machine_config.external_executables
+    new_gain_ref = await prepare_gain(
+        camera, gain_reference_params.gain_ref, executables
+    )
+    return {"gain_ref": new_gain_ref}

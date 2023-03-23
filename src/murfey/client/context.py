@@ -18,9 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util.mdoc import get_global_data
-
-# import time
+from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
 
@@ -71,7 +69,9 @@ class Context:
     def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
         self.post_transfer(transferred_file, role=role, **kwargs)
 
-    def gather_metadata(self, metadata_file: Path):
+    def gather_metadata(
+        self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
+    ):
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
@@ -269,6 +269,7 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
+        self._tilt_series_sizes: Dict[str, int | None] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
@@ -311,7 +312,8 @@ class TomographyContext(Context):
         appid: int,
         mvid: int,
         tilt_angles: List,
-        tilt_offset: Optional[float],
+        manual_tilt_offset: Optional[float],
+        pixel_size: Optional[float],
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
             tilt_series = (
@@ -349,7 +351,8 @@ class TomographyContext(Context):
                         "autoproc_program_id": appid,
                         "motion_corrected_path": str(motion_corrected_path),
                         "movie_id": mvid,
-                        "tilt_offset": tilt_offset,
+                        "manual_tilt_offset": manual_tilt_offset,
+                        "pixel_size": pixel_size,
                     }
                     requests.post(url, json=series_data)
                     with self._lock:
@@ -403,6 +406,7 @@ class TomographyContext(Context):
         extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
         required_position_files: List[Path] | None = None,
+        required_strings: List[str] | None = None,
     ) -> List[str]:
         if not environment:
             logger.warning("No environment passed in")
@@ -415,6 +419,12 @@ class TomographyContext(Context):
             logger.warning(f"No source found for file {file_path}")
             return []
         # required_position_files = required_position_files or []
+        required_strings = (
+            ["fractions"] if required_strings is None else required_strings
+        )
+        for r in required_strings:
+            if r not in file_path.name.lower():
+                return []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
@@ -482,6 +492,8 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
+            if not self._tilt_series_sizes.get(tilt_series):
+                self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
                     url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
@@ -617,7 +629,9 @@ class TomographyContext(Context):
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
-                last_tilt_series != tilt_series and last_tilt_angle != tilt_angle
+                last_tilt_series != tilt_series
+                and last_tilt_angle != tilt_angle
+                or self._tilt_series_sizes.get(tilt_series)
             ) or self._completed_tilt_series:
                 newly_completed_series = []
                 if self._tilt_series:
@@ -625,14 +639,18 @@ class TomographyContext(Context):
                 else:
                     tilt_series_size = 0
                 this_tilt_series_size = len(self._tilt_series[tilt_series])
-                if (
-                    this_tilt_series_size >= tilt_series_size
-                    and not required_position_files
-                ):
+                tilt_series_size_check = (
+                    (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
+                    if self._tilt_series_sizes.get(tilt_series)
+                    else (this_tilt_series_size >= tilt_series_size)
+                )
+                if tilt_series_size_check and not required_position_files:
                     self._completed_tilt_series.append(tilt_series)
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
-                    if required_position_files:
+                    if self._tilt_series_sizes.get(ts):
+                        completion_test = len(ta) == self._tilt_series_sizes[ts]
+                    elif required_position_files:
                         completion_test = all(
                             _f.is_file() for _f in required_position_files
                         )
@@ -689,7 +707,10 @@ class TomographyContext(Context):
                                         ),
                                         file_tilt_list,
                                         environment.data_collection_parameters.get(
-                                            "tilt_offset"
+                                            "manual_tilt_offset"
+                                        ),
+                                        environment.data_collection_parameters.get(
+                                            "pixel_size_on_image"
                                         ),
                                     )
                 if newly_completed_series:
@@ -705,7 +726,14 @@ class TomographyContext(Context):
         file_path: Path,
         environment: MurfeyInstanceEnvironment | None = None,
         required_position_files: List[Path] | None = None,
+        required_strings: List[str] | None = None,
     ) -> List[str]:
+        required_strings = (
+            ["fractions"] if required_strings is None else required_strings
+        )
+        for r in required_strings:
+            if r not in file_path.name.lower():
+                return []
         if environment:
             if tomo_version := environment.software_versions.get("tomo"):
                 tilt_info_extraction = tomo_tilt_info.get(tomo_version)
@@ -757,6 +785,7 @@ class TomographyContext(Context):
             lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
             lambda x: "",
             environment=environment,
+            required_strings=[],
         )
 
     def post_transfer(
@@ -768,21 +797,22 @@ class TomographyContext(Context):
     ) -> List[str]:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if (
-            role == "detector"
-            and transferred_file.suffix in data_suffixes
-            and "gain" not in transferred_file.name
-        ):
-            if self._acquisition_software == "tomo":
-                completed_tilts = self._add_tomo_tilt(
-                    transferred_file,
-                    environment=environment,
-                    required_position_files=kwargs.get("required_position_files"),
-                )
-            elif self._acquisition_software == "serialem":
-                completed_tilts = self._add_serialem_tilt(
-                    transferred_file, environment=environment
-                )
+        if role == "detector" and "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "tomo":
+                    completed_tilts = self._add_tomo_tilt(
+                        transferred_file,
+                        environment=environment,
+                        required_position_files=kwargs.get("required_position_files"),
+                    )
+                elif self._acquisition_software == "serialem":
+                    completed_tilts = self._add_serialem_tilt(
+                        transferred_file, environment=environment
+                    )
+            if transferred_file.suffix == ".mdoc":
+                with open(transferred_file, "r") as md:
+                    tilt_series = transferred_file.stem
+                    self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
         return completed_tilts
 
     def post_first_transfer(
@@ -812,34 +842,38 @@ class TomographyContext(Context):
                     logger.warning(f"Failed to parse file {metadata_file}")
                     return OrderedDict({})
                 data = xmltodict.parse(for_parsing)
-            metadata: OrderedDict = OrderedDict({})
-            metadata["experiment_type"] = TUIFormValue("tomography")
-            metadata["voltage"] = TUIFormValue(300)
-            metadata["image_size_x"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            )
-            metadata["image_size_y"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Height"]
-            )
-            metadata["pixel_size_on_image"] = TUIFormValue(
-                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
-            )
-            metadata["motion_corr_binning"] = TUIFormValue(1)
-            metadata["gain_ref"] = TUIFormValue(None, top=True)
-            metadata["dose_per_frame"] = TUIFormValue(
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                else None,
-                top=True,
-                colour="dark_orange",
-            )
-            metadata["tilt_offset"] = TUIFormValue(0, top=True)
-            metadata["source"] = TUIFormValue(str(self._basepath))
-            metadata.move_to_end("gain_ref", last=False)
-            metadata.move_to_end("dose_per_frame", last=False)
+            try:
+                metadata: OrderedDict = OrderedDict({})
+                metadata["experiment_type"] = TUIFormValue("tomography")
+                metadata["voltage"] = TUIFormValue(300)
+                metadata["image_size_x"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Width"]
+                )
+                metadata["image_size_y"] = TUIFormValue(
+                    data["Acquisition"]["Info"]["ImageSize"]["Height"]
+                )
+                metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+                )
+                metadata["motion_corr_binning"] = TUIFormValue(1)
+                metadata["gain_ref"] = TUIFormValue(None, top=True)
+                metadata["dose_per_frame"] = TUIFormValue(
+                    environment.data_collection_parameters.get("dose_per_frame")
+                    if environment
+                    else None,
+                    top=True,
+                    colour="dark_orange",
+                )
+                metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
+                metadata["source"] = TUIFormValue(str(self._basepath))
+                metadata.move_to_end("gain_ref", last=False)
+                metadata.move_to_end("dose_per_frame", last=False)
+            except KeyError:
+                return OrderedDict({})
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
+            mdoc_data_block = get_block(md)
         if not mdoc_data:
             return OrderedDict({})
         mdoc_metadata: OrderedDict = OrderedDict({})
@@ -847,10 +881,31 @@ class TomographyContext(Context):
         mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
         mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
         mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
-        mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
-            float(mdoc_data["PixelSpacing"]) * 1e-10
+        mdoc_metadata["magnification"] = TUIFormValue(
+            int(mdoc_data_block["Magnification"])
         )
-        mdoc_metadata["motion_corr_binning"] = TUIFormValue(1)
+        superres_binning = int(mdoc_data_block["Binning"])
+        binning_factor = 1
+        if environment:
+            server_config = requests.get(
+                f"{str(environment.url.geturl())}/machine/"
+            ).json()
+            if server_config.get("superres") and superres_binning == 1:
+                binning_factor = 2
+            ps_from_mag = (
+                server_config.get("calibrations", {})
+                .get("magnification", {})
+                .get(int(mdoc_data_block["Magnification"]))
+            )
+            if ps_from_mag:
+                mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(ps_from_mag) * 1e-10 / binning_factor
+                )
+        if mdoc_metadata.get("pixel_size_on_image") is None:
+            mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+                float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+            )
+        mdoc_metadata["motion_corr_binning"] = TUIFormValue(binning_factor)
         mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
         mdoc_metadata["dose_per_frame"] = TUIFormValue(
             environment.data_collection_parameters.get("dose_per_frame")
@@ -858,9 +913,8 @@ class TomographyContext(Context):
             else None,
             top=True,
         )
-        mdoc_metadata["tilt_offset"] = TUIFormValue(0, top=True)
+        mdoc_metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
         mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
-        # logger.info(f"Metadata extracted from {metadata_file}")
         return mdoc_metadata

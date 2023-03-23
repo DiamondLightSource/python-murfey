@@ -114,12 +114,9 @@ class Analyser(Observer):
                         mdoc_for_reading or transferred_file,
                         environment=self._environment,
                     )
-                    # mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
-            if (
-                not self._context
-            ):  # self._experiment_type or not self._acquisition_software:
+            if not self._context:
                 if not self._extension:
                     self._find_extension(transferred_file)
                 found = self._find_context(transferred_file)
@@ -138,7 +135,6 @@ class Analyser(Observer):
                         )
                     except Exception as e:
                         logger.info(f"exception encountered {e}")
-                    logger.info("post transfer called")
                     if self._role == "detector":
                         if not dc_metadata:
                             try:
@@ -152,7 +148,6 @@ class Analyser(Observer):
                                 dc_metadata = {}
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
-                            # continue
                         else:
                             self._unseen_xml = []
                             dc_metadata["file_extension"] = TUIFormValue(
@@ -176,10 +171,8 @@ class Analyser(Observer):
                         )
                     except Exception as e:
                         logger.info(f"exception encountered {e}")
-                    logger.info("post transfer called")
                     if self._role == "detector":
                         if not dc_metadata:
-                            logger.info("gather metadata 3")
                             dc_metadata = self._context.gather_metadata(
                                 mdoc_for_reading
                                 or transferred_file.with_suffix(".xml"),

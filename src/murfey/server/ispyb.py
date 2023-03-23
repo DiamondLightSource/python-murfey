@@ -41,23 +41,22 @@ class TransportManager:
     def __init__(self, transport_type):
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
+        self.feedback_queue = ""
         self.ispyb = ispyb.open()
         self._connection_callback: Callable | None = None
 
     def do_insert_data_collection_group(
-        self, record: DataCollectionGroup, message=None, **kwargs
+        self,
+        record: DataCollectionGroup,
+        message=None,
+        **kwargs,
     ):
-        dcgparams = self.ispyb.em_acquisition.get_data_collection_group_params()
-        dcgparams["parentid"] = record.sessionId
-        dcgparams["experimenttype"] = record.experimentType
         try:
-            data_collection_group_id = (
-                self.ispyb.em_acquisition.upsert_data_collection_group(
-                    list(dcgparams.values())
-                )
-            )
-            log.info(f"Created DataCollectionGroup {data_collection_group_id}")
-            return {"success": True, "return_value": data_collection_group_id}
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created DataCollection {record.dataCollectionGroupId}")
+                return {"success": True, "return_value": record.dataCollectionGroupId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection Group entry caused exception '%s'.",
@@ -75,30 +74,25 @@ class TransportManager:
             self.transport.send(queue, message)
 
     def do_insert_data_collection(self, record: DataCollection, message=None, **kwargs):
-        dc_params = self.ispyb.em_acquisition.get_data_collection_params()
-        dc_params["parentid"] = record.dataCollectionGroupId
-        dc_params["visitid"] = record.SESSIONID
-        dc_params["comments"] = (
+        comment = (
             f"Tilt series: {kwargs['tag']}"
             if kwargs.get("tag")
             else "Created for Murfey"
         )
-        dc_params["imgdir"] = record.imageDirectory
-        dc_params["imgsuffix"] = record.imageSuffix
-        dc_params["voltage"] = record.voltage
         try:
-            data_collection_id = self.ispyb.em_acquisition.upsert_data_collection(
-                list(dc_params.values())
-            )
-            log.info(f"Created DataCollection {data_collection_id}")
-            return {"success": True, "return_value": data_collection_id}
+            with Session() as db:
+                record.comments = comment
+                db.add(record)
+                db.commit()
+                log.info(f"Created DataCollection {record.dataCollectionId}")
+                return {"success": True, "return_value": record.dataCollectionId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
     def do_create_ispyb_job(
         self,
@@ -136,7 +130,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
     def do_update_processing_status(self, record: AutoProcProgram, **kwargs):
         ppid = record.autoProcProgramId
@@ -163,7 +157,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-            return False
+            return {"success": False, "return_value": None}
 
 
 def _get_session() -> sqlalchemy.orm.Session:
