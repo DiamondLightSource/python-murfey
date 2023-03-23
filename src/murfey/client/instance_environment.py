@@ -67,7 +67,6 @@ class MurfeyInstanceEnvironment(BaseModel):
         self.movie_tilt_pair = {}
         self.tilt_angles = {}
         self.visit = ""
-        self.tilt_offset = None
         self.gain_ref = None
 
     @validator("data_collection_group_ids")
