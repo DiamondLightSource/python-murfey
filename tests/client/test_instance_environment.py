@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
@@ -48,3 +50,15 @@ def test_murfey_instance_environment_read_from_json(env, tmp_path):
         base_path=tmp_path,
     )
     assert read_env.gain_ref == tmp_path / "gain.mrc"
+
+
+def test_murfey_instance_environment_cache_on_edit(tmp_path):
+    env = MurfeyInstanceEnvironment(
+        url=urlparse("http://localhost:8000", allow_fragments=False),
+        cache_path=tmp_path,
+    )
+    env.gain_ref = tmp_path / "gain.mrc"
+    assert (tmp_path / ".murfey_cache.json").is_file()
+    with open(tmp_path / ".murfey_cache.json", "r") as cache:
+        data = json.load(cache)
+    assert Path(data.get("gain_ref")) == tmp_path / "gain.mrc"

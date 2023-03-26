@@ -101,8 +101,10 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
         self.cache_path = None
 
     @validator("*")
-    def cache(cls, v, values):
-        cls._cache_from_dict(values, base_path=values.get("cache_path"))
+    def cache(cls, v, field, values):
+        cls._cache_from_dict(
+            {field.name: v, **values}, base_path=values.get("cache_path")
+        )
         return v
 
     @validator("data_collection_group_ids", pre=True)
