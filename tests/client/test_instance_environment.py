@@ -33,3 +33,18 @@ def test_murfey_instance_environment_subscribe(env):
         "b": {"em-tomo-preprocess": 2},
     }
     assert dc.elem == "b"
+
+
+def test_murfey_instance_environment_write_to_json(env, tmp_path):
+    env.write(base_path=tmp_path)
+    assert (tmp_path / ".murfey_cache.json").exists()
+
+
+def test_murfey_instance_environment_read_from_json(env, tmp_path):
+    env.gain_ref = tmp_path / "gain.mrc"
+    env.write(base_path=tmp_path)
+    read_env = MurfeyInstanceEnvironment.read(
+        urlparse("http://localhost:8000", allow_fragments=False),
+        base_path=tmp_path,
+    )
+    assert read_env.gain_ref == tmp_path / "gain.mrc"

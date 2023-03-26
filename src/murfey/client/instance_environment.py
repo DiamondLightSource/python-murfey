@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from itertools import count
 from pathlib import Path
@@ -25,12 +26,10 @@ class MovieTracker(NamedTuple):
 global_env_lock = RLock()
 
 
-class MurfeyInstanceEnvironment(BaseModel):
-    url: ParseResult
+class MurfeyInstanceEnvironmentBase(BaseModel):
     software_versions: Dict[str, str] = {}
     sources: List[Path] = []
     default_destinations: Dict[Path, str] = {}
-    watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
     data_collection_group_ids: Dict[str, int] = {}
     data_collection_ids: Dict[str, int] = {}
@@ -39,12 +38,37 @@ class MurfeyInstanceEnvironment(BaseModel):
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, List[str]] = {}
-    listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
     visit: str = ""
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
+
+    def write(self, base_path: Path | None = None):
+        with open((base_path or Path.home()) / ".murfey_cache.json", "w") as env_cache:
+            base_keys = list(MurfeyInstanceEnvironmentBase.__fields__.keys())
+            json.dump(
+                {
+                    k: str(getattr(self, k))
+                    if isinstance(getattr(self, k), Path)
+                    else getattr(self, k)
+                    for k in base_keys
+                },
+                env_cache,
+            )
+
+    @classmethod
+    def read(cls, url: ParseResult, base_path: Path | None = None, **kwargs):
+        with open((base_path or Path.home()) / ".murfey_cache.json", "r") as env_cache:
+            validated_read = MurfeyInstanceEnvironmentBase(**json.load(env_cache))
+            inst = cls.construct(url=url, **validated_read.dict(), **kwargs)
+        return inst
+
+
+class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
+    url: ParseResult
+    watchers: Dict[Path, DirWatcher] = {}
+    listeners: Dict[str, Set[Callable]] = {}
 
     class Config:
         validate_assignment: bool = True
