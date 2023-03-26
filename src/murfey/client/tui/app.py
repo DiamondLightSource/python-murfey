@@ -23,6 +23,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
     InputResponse,
+    LoadCache,
     MainScreen,
     ProcessingForm,
     VisitSelection,
@@ -319,6 +320,11 @@ class MurfeyTUI(App):
         self.processing_form = ProcessingForm(self._form_values)
         self.install_screen(self.processing_form, "processing-form")
 
+    def _load_environment_from_cache(self):
+        self._environment = MurfeyInstanceEnvironment.read(
+            self._environment.url, base_path=self._environment.cache_path or Path.home()
+        )
+
     def on_input_submitted(self, event: Input.Submitted):
         event.input.has_focus = False
         self.screen.focused = None
@@ -340,8 +346,14 @@ class MurfeyTUI(App):
             self.push_screen("visit-select-screen")
 
     async def on_mount(self) -> None:
-        self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("visit-select-screen")
+        if (
+            (self._environment.cache_path or Path.home()) / ".murfey_cache.json"
+        ).is_file():
+            self.install_screen(LoadCache(self.visits), "load-cache-screen")
+            self.push_screen("load-cache-screen")
+        else:
+            self.install_screen(VisitSelection(self.visits), "visit-select-screen")
+            self.push_screen("visit-select-screen")
 
     def on_log_book_log(self, message):
         self.log_book.write(message.renderable)

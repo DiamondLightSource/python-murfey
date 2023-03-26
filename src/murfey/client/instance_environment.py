@@ -67,8 +67,8 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
             inst = cls.construct(url=url, **validated_read.dict(), **kwargs)
         return inst
 
-    def clear_cache(self):
-        ((self.cahce_path or Path.home()) / ",murfey_cache.json").unlink()
+    def remove_cache(self):
+        ((self.cache_path or Path.home()) / ",murfey_cache.json").unlink()
 
 
 class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
@@ -99,12 +99,14 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
         self.visit = ""
         self.gain_ref = None
         self.cache_path = None
+        self.remove_cache()
 
     @validator("*")
     def cache(cls, v, field, values):
-        cls._cache_from_dict(
-            {field.name: v, **values}, base_path=values.get("cache_path")
-        )
+        if values.get("visit") or field.name == "visit":
+            cls._cache_from_dict(
+                {field.name: v, **values}, base_path=values.get("cache_path")
+            )
         return v
 
     @validator("data_collection_group_ids", pre=True)

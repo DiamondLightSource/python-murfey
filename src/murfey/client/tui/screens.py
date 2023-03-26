@@ -311,6 +311,26 @@ class ConfirmScreen(Screen):
             self._callback(params=self._params)
 
 
+class LoadCache(Screen):
+    def __init__(self, visits: List[str], *args, **kwargs):
+        self.visits = visits
+        super().__init__(*args, **kwargs)
+
+    def compose(self):
+        yield Static("Load state from existing cache?", id="load-cache")
+        yield Button("Load", id="load")
+        yield Button("New session", id="new-session")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "load":
+            self.app._load_environment_from_cache()
+            self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
+            self.app.push_screen("launcher")
+        else:
+            self.app.install_screen(VisitSelection(self.visits), "visit-select-screen")
+            self.app.push_screen("visit-select-screen")
+
+
 class ProcessingForm(Screen):
     _form = reactive({})
     _vert = None

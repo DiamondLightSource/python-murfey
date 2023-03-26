@@ -19,6 +19,13 @@ ConfirmScreen {
     border: hidden;
 }
 
+LoadCache {
+    layout: grid;
+    grid-size: 2;
+    padding: 2;
+    border: hidden;
+}
+
 VisitSelection {
     layout: grid;
     grid-size: 4;
@@ -60,6 +67,30 @@ Input {
     background: deeppink;
 }
 
+#load{
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#load:hover {
+    background: purple;
+}
+
+#new-session{
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#new-session:hover {
+    background: purple;
+}
+
 #add {
     width: 100%;
     height: 100%;
@@ -99,6 +130,13 @@ Input {
 }
 
 #prompt {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    text-align: center;
+}
+
+#load-cache {
     width: 100%;
     height: 100%;
     column-span: 2;
