@@ -43,19 +43,22 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
     visit: str = ""
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
+    cache_path: Path | None = None
 
     def write(self, base_path: Path | None = None):
+        self._cache_from_dict(self.dict(), base_path=base_path)
+
+    @staticmethod
+    def _cache_from_dict(values: dict, base_path: Path | None = None):
         with open((base_path or Path.home()) / ".murfey_cache.json", "w") as env_cache:
             base_keys = list(MurfeyInstanceEnvironmentBase.__fields__.keys())
-            json.dump(
-                {
-                    k: str(getattr(self, k))
-                    if isinstance(getattr(self, k), Path)
-                    else getattr(self, k)
-                    for k in base_keys
-                },
-                env_cache,
-            )
+            serializable_values = {
+                k: str(values.get(k))
+                if isinstance(values.get(k), Path)
+                else values.get(k)
+                for k in base_keys
+            }
+            json.dump(serializable_values, env_cache)
 
     @classmethod
     def read(cls, url: ParseResult, base_path: Path | None = None, **kwargs):
@@ -63,6 +66,9 @@ class MurfeyInstanceEnvironmentBase(BaseModel):
             validated_read = MurfeyInstanceEnvironmentBase(**json.load(env_cache))
             inst = cls.construct(url=url, **validated_read.dict(), **kwargs)
         return inst
+
+    def clear_cache(self):
+        ((self.cahce_path or Path.home()) / ",murfey_cache.json").unlink()
 
 
 class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
@@ -92,15 +98,21 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
         self.tilt_angles = {}
         self.visit = ""
         self.gain_ref = None
+        self.cache_path = None
 
-    @validator("data_collection_group_ids")
+    @validator("*")
+    def cache(cls, v, values):
+        cls._cache_from_dict(values, base_path=values.get("cache_path"))
+        return v
+
+    @validator("data_collection_group_ids", pre=True)
     def dcg_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_group_ids", []):
                 l()
         return v
 
-    @validator("data_collection_ids")
+    @validator("data_collection_ids", pre=True)
     def dc_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_ids", []):
@@ -112,7 +124,7 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
                         l(k)
         return v
 
-    @validator("processing_job_ids")
+    @validator("processing_job_ids", pre=True)
     def job_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("processing_job_ids", []):
@@ -124,9 +136,8 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
                         l(k, v[k]["relion"])
         return v
 
-    @validator("autoproc_program_ids")
+    @validator("autoproc_program_ids", pre=True)
     def app_callback(cls, v, values):
-        # logger.info(f"autoproc program ids validator: {v}")
         with global_env_lock:
             for l in values.get("listeners", {}).get("autoproc_program_ids", []):
                 if values.get("autoproc_program_ids"):
@@ -139,9 +150,8 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
                             l(k, v[k]["em-tomo-preprocess"])
         return v
 
-    @validator("motion_corrected_movies")
+    @validator("motion_corrected_movies", pre=True)
     def motion_corrected_callback(cls, v, values):
-        # logger.info("motion corrected callback")
         _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
         for l in values.get("listeners", {}).get("motion_corrected_movies", []):
             if values.get("motion_corrected_movies"):
@@ -151,10 +161,7 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
                     tilt = values["movie_tilt_pair"][k]
                     file_tilt_list = []
                     for movie, angle in values["tilt_angles"][tilt]:
-                        if movie in v:  # values["motion_corrected_movies"]:
-                            # file_tilt_list.append(
-                            #    [values["motion_corrected_movies"][movie], angle]
-                            # )
+                        if movie in v:
                             file_tilt_list.append(
                                 [
                                     str(v[Path(movie)][0]),
@@ -181,7 +188,6 @@ class MurfeyInstanceEnvironment(MurfeyInstanceEnvironmentBase):
                         tilt = values["movie_tilt_pair"][k]
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
-                            # file_tilt_list.append([str(movie), angle])
                             file_tilt_list.append(
                                 [
                                     str(v[Path(movie)][0]),
