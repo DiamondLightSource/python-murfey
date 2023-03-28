@@ -50,6 +50,9 @@ class Analyser(Observer):
         ):
             logger.info(f"File extension determined: {file_path.suffix}")
             self._extension = file_path.suffix
+        elif file_path.suffix in (".tiff", ".tif", ".eer"):
+            logger.info(f"File extension re-evaluated: {file_path.suffix}")
+            self._extension = file_path.suffix
 
     def _find_context(self, file_path: Path) -> bool:
         split_file_name = file_path.name.split("_")
@@ -117,8 +120,7 @@ class Analyser(Observer):
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if not self._context:
-                if not self._extension:
-                    self._find_extension(transferred_file)
+                self._find_extension(transferred_file)
                 found = self._find_context(transferred_file)
                 if not found:
                     # logger.warning(
@@ -150,9 +152,12 @@ class Analyser(Observer):
                             self._unseen_xml.append(transferred_file)
                         else:
                             self._unseen_xml = []
-                            dc_metadata["file_extension"] = TUIFormValue(
-                                self._extension
-                            )
+                            if dc_metadata.get("file_extension"):
+                                self._extension = dc_metadata["file_extension"].data
+                            else:
+                                dc_metadata["file_extension"] = TUIFormValue(
+                                    self._extension
+                                )
                             dc_metadata["acquisition_software"] = TUIFormValue(
                                 self._context._acquisition_software
                             )
@@ -182,9 +187,12 @@ class Analyser(Observer):
                             self._unseen_xml.append(transferred_file)
                         if dc_metadata:
                             self._unseen_xml = []
-                            dc_metadata["file_extension"] = TUIFormValue(
-                                self._extension
-                            )
+                            if dc_metadata.get("file_extension"):
+                                self._extension = dc_metadata["file_extension"].data
+                            else:
+                                dc_metadata["file_extension"] = TUIFormValue(
+                                    self._extension
+                                )
                             dc_metadata["acquisition_software"] = TUIFormValue(
                                 self._context._acquisition_software
                             )

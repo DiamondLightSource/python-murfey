@@ -917,4 +917,7 @@ class TomographyContext(Context):
         mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
         mdoc_metadata.move_to_end("gain_ref", last=False)
         mdoc_metadata.move_to_end("dose_per_frame", last=False)
+        mdoc_metadata["file_extension"] = TUIFormValue(
+            f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+        )
         return mdoc_metadata
