@@ -448,7 +448,11 @@ class DestinationSelect(Screen):
         if not self.app._multigrid:
             for s, d in self._transfer_routes.items():
                 bulk.append(Label(f"Copy the source {s} to:"))
-                bulk.append(Input(value=d, classes="input-destination"))
+                bulk.append(
+                    Input(
+                        value=d, id=f"destination-{str(s)}", classes="input-destination"
+                    )
+                )
         yield Vertical(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid:
@@ -464,9 +468,12 @@ class DestinationSelect(Screen):
         yield Button("Confirm", id="destination-btn")
 
     def on_input_changed(self, event):
-        for k in SPAContext.user_params:
-            if event.input.id == k.name:
-                self._user_params[k.name] = event.value
+        if event.input.id.startswith("destination-"):
+            self._transfer_routes[Path(event.input.id[12:])] = event.value
+        else:
+            for k in SPAContext.user_params:
+                if event.input.id == k.name:
+                    self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
         if self.app._multigrid or any(v == "None" for v in self._user_params.values()):
