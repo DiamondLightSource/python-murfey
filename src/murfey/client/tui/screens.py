@@ -394,7 +394,13 @@ class SwitchSelection(Screen):
 
 class VisitSelection(SwitchSelection):
     def __init__(self, visits: List[str], *args, **kwargs):
-        super().__init__("visit", visits, "Create visit directory", *args, **kwargs)
+        super().__init__(
+            "visit",
+            visits,
+            "Create visit directory (if you have already started an acquisiton session disable this)",
+            *args,
+            **kwargs,
+        )
 
     def on_button_pressed(self, event: Button.Pressed):
         text = str(event.button.label)
