@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
@@ -32,6 +33,13 @@ class ProcessingParameter(NamedTuple):
     name: str
     label: str
     default: Any = None
+
+
+@lru_cache(maxsize=5)
+def get_machine_config(url: str, demo: bool = False):
+    if demo:
+        return {}
+    return requests.get(f"{url}/machine/").json()
 
 
 def _construct_tilt_series_name(
@@ -449,10 +457,8 @@ class TomographyContext(Context):
             return []
 
         if environment:
-            machine_config = (
-                {}
-                if environment.demo
-                else requests.get(f"{str(environment.url.geturl())}/machine/").json()
+            machine_config = get_machine_config(
+                str(environment.url.geturl()), demo=environment.demo
             )
             if environment.visit in environment.default_destinations[source]:
                 file_transferred_to = (
@@ -757,6 +763,7 @@ class TomographyContext(Context):
             required_position_files=required_position_files
             if required_position_files is not None
             else [file_path.parent / (tilt_series + ".mdoc")],
+            required_strings=required_strings,
         )
 
     def _add_serialem_tilt(
@@ -800,10 +807,21 @@ class TomographyContext(Context):
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
+                    if environment:
+                        machine_config = get_machine_config(
+                            str(environment.url.geturl()), demo=environment.demo
+                        )
+                    else:
+                        machine_config = {}
+                    required_strings = machine_config.get(
+                        "data_required_substrings", {}
+                    ).get("tomo")
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
                         required_position_files=kwargs.get("required_position_files"),
+                        required_strings=required_strings
+                        or kwargs.get("required_strings"),
                     )
                 elif self._acquisition_software == "serialem":
                     completed_tilts = self._add_serialem_tilt(
@@ -822,7 +840,9 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        self.post_transfer(transferred_file, role=role, environment=environment)
+        self.post_transfer(
+            transferred_file, role=role, environment=environment, **kwargs
+        )
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None

@@ -20,6 +20,7 @@ class MachineConfig(BaseModel):
     feedback_queue: str = "murfey_feedback"
     superres: bool = False
     camera: str = "FALCON"
+    data_required_substrings: Dict[str, List[str]] = {}
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
