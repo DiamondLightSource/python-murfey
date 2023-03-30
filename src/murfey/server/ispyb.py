@@ -139,7 +139,7 @@ class TransportManager:
                 job_id=record.processingJobId,
             )
             log.info(
-                f"Updating program {ppid} with status {message!r}",
+                f"Updating program {result} with status {status!r}",
             )
             return {"success": True, "return_value": result}
         except ispyb.ISPyBException as e:
