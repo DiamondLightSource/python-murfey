@@ -23,13 +23,6 @@ from ispyb.sqlalchemy import (
 
 from murfey.util.models import Visit
 
-# _BLSession = ispyb.sqlalchemy.BLSession
-# _Proposal = ispyb.sqlalchemy.Proposal
-# _DataCollection = ispyb.sqlalchemy.DataCollection
-# _ProcessingJob = ispyb.sqlalchemy.ProcessingJob
-# _DataCollectionGroup = ispyb.sqlalchemy.DataCollectionGroup
-# _AutoProcProgram = ispyb.sqlalchemy.AutoProcProgram
-
 log = logging.getLogger("murfey.server.ispyb")
 
 Session = sqlalchemy.orm.sessionmaker(
@@ -55,7 +48,7 @@ class TransportManager:
             with Session() as db:
                 db.add(record)
                 db.commit()
-                log.info(f"Created DataCollection {record.dataCollectionGroupId}")
+                log.info(f"Created DataCollectionGroup {record.dataCollectionGroupId}")
                 return {"success": True, "return_value": record.dataCollectionGroupId}
         except ispyb.ISPyBException as e:
             log.error(
