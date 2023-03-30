@@ -378,6 +378,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
         "start_time": str(datetime.datetime.now()),
         "experiment_type": dcg_params.experiment_type,
         "experiment_type_id": dcg_params.experiment_type_id,
+        "tag": dcg_params.tag,
     }
 
     if _transport_object:
@@ -412,6 +413,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "image_size_y": dc_params.image_size_y,
         "acquisition_software": dc_params.acquisition_software,
         "tag": dc_params.tag,
+        "source": dc_params.source,
     }
 
     if _transport_object:

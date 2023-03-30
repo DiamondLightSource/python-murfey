@@ -509,6 +509,7 @@ class TomographyContext(Context):
                         "acquisition_software": self._acquisition_software,
                         "image_directory": str(file_path.parent),
                         "tag": tilt_series,
+                        "source": str(self._basepath),
                     }
                     if environment.data_collection_parameters:
                         data.update(
@@ -527,7 +528,10 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
-                    if environment.data_collection_group_ids.get(tilt_series) is None:
+                    if (
+                        environment.data_collection_group_ids.get(str(self._basepath))
+                        is None
+                    ):
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         requests.post(url, json=data)

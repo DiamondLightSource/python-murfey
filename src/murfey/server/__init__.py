@@ -358,7 +358,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         return None
     elif message["register"] == "data_collection":
         dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
-            message["tag"]
+            message["source"]
         )
         if dcgid is None:
             raise ValueError(
@@ -486,6 +486,7 @@ def _(record: Base, header: dict, **kwargs):
             exc_info=True,
         )
         return None
+
 
 @_register.register  # type: ignore
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):

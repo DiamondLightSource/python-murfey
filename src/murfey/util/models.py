@@ -93,6 +93,7 @@ class DCParameters(BaseModel):
     acquisition_software: str
     image_directory: str
     tag: str
+    source: str
 
 
 class DCParametersTomo(BaseModel):
