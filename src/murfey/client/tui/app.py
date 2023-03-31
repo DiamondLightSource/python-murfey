@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
-# import contextlib
 import logging
 from datetime import datetime
 from functools import partial
@@ -390,7 +387,11 @@ class MurfeyTUI(App):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following: {sources}"
             self.install_screen(
-                ConfirmScreen(prompt, pressed_callback=self._remove_data),
+                ConfirmScreen(
+                    prompt,
+                    pressed_callback=self._remove_data,
+                    button_names={"launch": "Yes", "quit": "No"},
+                ),
                 "clear-confirm",
             )
             self.push_screen("clear-confirm")
@@ -429,30 +430,3 @@ class MurfeyTUI(App):
 
     async def action_process(self) -> None:
         self.processing_btn.disabled = False
-
-    def _confirm_clear(self, response: str):
-        if response == "y":
-            if self._do_transfer and self.rsync_process:
-                destination = self.rsync_process._remote
-                self.rsync_process.stop()
-                if self.analyser:
-                    self.analyser.stop()
-                cmd = [
-                    "rsync",
-                    "-iiv",
-                    "-o",  # preserve ownership
-                    "-p",  # preserve permissions
-                    "--remove-source-files",
-                ]
-                cmd.extend(
-                    str(f.relative_to(self._source.absolute()))
-                    for f in self._source.absolute().glob("**/*")
-                )
-                cmd.append(destination)
-                result = procrunner.run(cmd)
-                log.info(
-                    f"rsync with removal finished with return code {result.returncode}"
-                )
-
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.action_quit())
