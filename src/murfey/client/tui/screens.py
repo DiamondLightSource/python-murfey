@@ -342,7 +342,7 @@ class ProcessingForm(Screen):
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
 
-    def on_input_submitted(self, event):
+    def on_input_changed(self, event):
         k = self._inputs[event.input]
         self._form[k] = event.value
 
