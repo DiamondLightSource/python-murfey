@@ -297,6 +297,7 @@ class ConfirmScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.pop_screen()
+            self.app.uninstall_screen(self)
         else:
             while True:
                 try:
