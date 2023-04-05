@@ -30,6 +30,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     software_versions: Dict[str, str] = {}
     sources: List[Path] = []
     default_destinations: Dict[Path, str] = {}
+    destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
     data_collection_group_ids: Dict[str, int] = {}

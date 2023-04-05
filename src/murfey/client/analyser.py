@@ -57,15 +57,24 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         split_file_name = file_path.name.split("_")
         if split_file_name:
+            if split_file_name[0].startswith("FoilHole"):
+                if not self._context:
+                    logger.info("Acquisition software: EPU")
+                    self._context = SPAContext("epu", self._basepath)
+                self.parameters_model = DCParametersSPA
+                if not self._role:
+                    self._role = "detector"
+                return True
             if (
                 split_file_name[0] == "Position"
                 or "[" in file_path.name
                 or "Fractions" in split_file_name[-1]
                 or "fractions" in split_file_name[-1]
             ):
-                logger.info("Acquisition software: tomo")
-                self._context = TomographyContext("tomo", self._basepath)
-                self.parameters_model = DCParametersTomo
+                if not self._context:
+                    logger.info("Acquisition software: tomo")
+                    self._context = TomographyContext("tomo", self._basepath)
+                    self.parameters_model = DCParametersTomo
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -80,13 +89,9 @@ class Analyser(Observer):
                     else:
                         self._role = "detector"
                 return True
-            if split_file_name[0].startswith("FoilHole"):
-                self._context = SPAContext("epu", self._basepath)
-                self.parameters_model = DCParametersSPA
-                if not self._role:
-                    self._role = "detector"
-                return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                if file_path.with_suffix(".jpg").is_file():
+                    return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = DCParametersTomo
                 if not self._role:

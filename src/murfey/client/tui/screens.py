@@ -32,7 +32,10 @@ from textual.widgets import (
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import SPAContext
-from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.client.instance_environment import (
+    MurfeyInstanceEnvironment,
+    global_env_lock,
+)
 from murfey.client.tui.forms import TUIFormValue
 
 log = logging.getLogger("murfey.tui.screens")
@@ -47,6 +50,8 @@ def determine_default_destination(
     environment: MurfeyInstanceEnvironment,
     analysers: Dict[Path, Analyser],
     touch: bool = False,
+    extra_directory: str = "",
+    include_mid_path: bool = True,
 ):
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
@@ -63,14 +68,21 @@ def determine_default_destination(
                 try:
                     mid_path = source.resolve().relative_to(data_dir)
                     if machine_data["data_directories"][data_dir] == "detector":
-                        suggested_path_response = requests.post(
-                            url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
-                            json={
-                                "base_path": f"{destination}/{visit}/{mid_path.parent}/raw",
-                                "touch": touch,
-                            },
-                        )
-                        _default = suggested_path_response.json().get("suggested_path")
+                        with global_env_lock:
+                            if environment.destination_registry.get(source.name):
+                                _default = environment.destination_registry[source.name]
+                            else:
+                                suggested_path_response = requests.post(
+                                    url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
+                                    json={
+                                        "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
+                                        "touch": touch,
+                                    },
+                                )
+                                _default = suggested_path_response.json().get(
+                                    "suggested_path"
+                                )
+                                environment.destination_registry[source.name] = _default
                     else:
                         _default = f"{destination}/{visit}/{mid_path}"
                     if analysers.get(source):
@@ -84,7 +96,7 @@ def determine_default_destination(
             _default = ""
     else:
         _default = destination + f"/{visit}"
-    return _default
+    return _default + f"/{extra_directory}"
 
 
 class InputResponse(NamedTuple):
@@ -189,6 +201,7 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
+        self._multigrid_metadata_paths: List[Path] = []
 
     def compose(self):
         machine_data = requests.get(
@@ -221,6 +234,10 @@ class LaunchScreen(Screen):
 
     def on_mount(self):
         if self._add_basepath:
+            if self.app._multigrid:
+                self._multigrid_metadata_paths.append(
+                    Path(self._dir_tree.path).resolve() / self._selected_dir
+                )
             self._add_directory(str(self._selected_dir))
 
     def _check_valid_selection(self, valid: bool):
@@ -255,7 +272,15 @@ class LaunchScreen(Screen):
             transfer_routes = {}
             for s, defd in self.app._default_destinations.items():
                 _default = determine_default_destination(
-                    self.app._visit, s, defd, self.app._environment, self.app.analysers
+                    self.app._visit,
+                    s,
+                    defd,
+                    self.app._environment,
+                    self.app.analysers,
+                    extra_directory="metadata"
+                    if s in self._multigrid_metadata_paths
+                    else "",
+                    include_mid_path=s not in self._multigrid_metadata_paths,
                 )
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:

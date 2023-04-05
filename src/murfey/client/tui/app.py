@@ -101,7 +101,9 @@ class MurfeyTUI(App):
         self._multigrid_watcher.subscribe(self._start_rsyncer_multigrid)
         self._multigrid_watcher.start()
 
-    def _start_rsyncer_multigrid(self, source: Path):
+    def _start_rsyncer_multigrid(
+        self, source: Path, extra_directory: str = "", include_mid_path: bool = True
+    ):
         machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
         self._environment.default_destinations[
             source
@@ -113,7 +115,10 @@ class MurfeyTUI(App):
             self._environment,
             self.analysers,
             touch=True,
+            extra_directory=extra_directory,
+            include_mid_path=include_mid_path,
         )
+        self._environment.sources.append(source)
         self._start_rsyncer(source, destination, force_metadata=True)
 
     def _start_rsyncer(
