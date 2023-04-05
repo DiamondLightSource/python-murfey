@@ -6,6 +6,7 @@ import threading
 from pathlib import Path
 from typing import Type
 
+from murfey.client import machine_data
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
@@ -148,7 +149,7 @@ class Analyser(Observer):
                                 dc_metadata = self._context.gather_metadata(
                                     transferred_file.with_suffix(".mdoc")
                                     if self._context._acquisition_software == "serialem"
-                                    else transferred_file.with_suffix(".xml"),
+                                    else self._xml_file(transferred_file),
                                     environment=self._environment,
                                 )
                             except NotImplementedError:
@@ -184,8 +185,7 @@ class Analyser(Observer):
                     if self._role == "detector":
                         if not dc_metadata:
                             dc_metadata = self._context.gather_metadata(
-                                mdoc_for_reading
-                                or transferred_file.with_suffix(".xml"),
+                                mdoc_for_reading or self._xml_file(transferred_file),
                                 environment=self._environment,
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
@@ -212,12 +212,27 @@ class Analyser(Observer):
                     and self._role == "detector"
                 ):
                     if not dc_metadata:
-                        logger.info("gather metadata 4")
                         dc_metadata = self._context.gather_metadata(
-                            transferred_file.with_suffix(".xml"),
+                            self._xml_file(transferred_file),
                             environment=self._environment,
                         )
                     self.notify({"form": dc_metadata})
+
+    def _xml_file(self, data_file: Path) -> Path:
+        if (fxml := data_file.with_suffix(".xml")).is_file() or not self._environment:
+            return fxml
+        file_name = (
+            f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
+        )
+        data_directories = machine_data(self._environment)
+        for dd in data_directories.keys():
+            if str(data_file).startswith(str(dd)):
+                base_dir = dd
+                mid_dir = data_file.relative_to(dd).parent
+                break
+        else:
+            return data_file.with_suffix(".xml")
+        return base_dir / self._environment.visit / mid_dir / file_name
 
     def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping:

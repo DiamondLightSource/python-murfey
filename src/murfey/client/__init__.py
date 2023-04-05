@@ -12,6 +12,7 @@ import sys
 import time
 import webbrowser
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from queue import Queue
 from typing import List, Literal
@@ -46,6 +47,11 @@ def _enable_webbrowser_in_cygwin():
     """Helper function to make webbrowser.open() work in CygWin"""
     if "cygwin" in platform.system().lower() and shutil.which("cygstart"):
         webbrowser.register("cygstart", None, webbrowser.GenericBrowser("cygstart"))
+
+
+@lru_cache(maxsize=1)
+def machine_data(environment: MurfeyInstanceEnvironment) -> dict:
+    return requests.get(f"{environment.url.geturl()}/machine/").json()
 
 
 def _check_for_updates(
