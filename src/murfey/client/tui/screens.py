@@ -52,6 +52,7 @@ def determine_default_destination(
     touch: bool = False,
     extra_directory: str = "",
     include_mid_path: bool = True,
+    use_suggested_path: bool = True,
 ):
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
@@ -67,7 +68,10 @@ def determine_default_destination(
             else:
                 try:
                     mid_path = source.resolve().relative_to(data_dir)
-                    if machine_data["data_directories"][data_dir] == "detector":
+                    if (
+                        machine_data["data_directories"][data_dir] == "detector"
+                        and use_suggested_path
+                    ):
                         with global_env_lock:
                             if environment.destination_registry.get(source.name):
                                 _default = environment.destination_registry[source.name]
@@ -84,7 +88,7 @@ def determine_default_destination(
                                 )
                                 environment.destination_registry[source.name] = _default
                     else:
-                        _default = f"{destination}/{visit}/{mid_path}"
+                        _default = f"{destination}/{visit}/{mid_path if include_mid_path else source.name}"
                     if analysers.get(source):
                         analysers[source]._role = machine_data["data_directories"][
                             data_dir
@@ -201,7 +205,6 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        self._multigrid_metadata_paths: List[Path] = []
 
     def compose(self):
         machine_data = requests.get(
@@ -234,11 +237,9 @@ class LaunchScreen(Screen):
 
     def on_mount(self):
         if self._add_basepath:
-            if self.app._multigrid:
-                self._multigrid_metadata_paths.append(
-                    Path(self._dir_tree.path).resolve() / self._selected_dir
-                )
-            self._add_directory(str(self._selected_dir))
+            self._add_directory(
+                str(self._selected_dir), add_destination=not self.app._multigrid
+            )
 
     def _check_valid_selection(self, valid: bool):
         if self._add_btn:
@@ -247,15 +248,16 @@ class LaunchScreen(Screen):
             else:
                 self._add_btn.disabled = True
 
-    def _add_directory(self, directory: str):
+    def _add_directory(self, directory: str, add_destination: bool = True):
         source = Path(self._dir_tree.path).resolve() / directory
-        self.app._environment.sources.append(source)
-        machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine/"
-        ).json()
-        self.app._default_destinations[
-            source
-        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+        if add_destination:
+            self.app._environment.sources.append(source)
+            machine_data = requests.get(
+                f"{self.app._environment.url.geturl()}/machine/"
+            ).json()
+            self.app._default_destinations[
+                source
+            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
@@ -277,10 +279,6 @@ class LaunchScreen(Screen):
                     defd,
                     self.app._environment,
                     self.app.analysers,
-                    extra_directory="metadata"
-                    if s in self._multigrid_metadata_paths
-                    else "",
-                    include_mid_path=s not in self._multigrid_metadata_paths,
                 )
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
@@ -461,6 +459,7 @@ class DirectorySelection(SwitchSelection):
         self.app._multigrid = self._switch_status
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
+        (visit_dir / "atlas").mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
         )
