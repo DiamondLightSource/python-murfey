@@ -11,13 +11,14 @@ from uuid import uuid4
 
 import requests
 
-from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.models import Visit
 
 
 @lru_cache(maxsize=1)
-def machine_data(environment: MurfeyInstanceEnvironment) -> dict:
-    return requests.get(f"{environment.url.geturl()}/machine/").json()
+def get_machine_config(url: str, demo: bool = False) -> dict:
+    if demo:
+        return {}
+    return requests.get(f"{url}/machine/").json()
 
 
 def _get_visit_list(api_base: ParseResult):

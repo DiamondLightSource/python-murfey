@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
@@ -19,6 +18,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import TUIFormValue
+from murfey.util import get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
@@ -33,13 +33,6 @@ class ProcessingParameter(NamedTuple):
     name: str
     label: str
     default: Any = None
-
-
-@lru_cache(maxsize=5)
-def get_machine_config(url: str, demo: bool = False):
-    if demo:
-        return {}
-    return requests.get(f"{url}/machine/").json()
 
 
 def _construct_tilt_series_name(

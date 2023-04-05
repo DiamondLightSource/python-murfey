@@ -10,7 +10,7 @@ from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util import Observer, machine_data
+from murfey.util import Observer, get_machine_config
 from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -223,7 +223,9 @@ class Analyser(Observer):
         file_name = (
             f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
         )
-        data_directories = machine_data(self._environment)
+        data_directories = get_machine_config(self._environment.url.geturl()).get(
+            "data_directories", {}
+        )
         for dd in data_directories.keys():
             if str(data_file).startswith(str(dd)):
                 base_dir = dd
