@@ -6,12 +6,11 @@ import threading
 from pathlib import Path
 from typing import Type
 
-from murfey.client import machine_data
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import TUIFormValue
-from murfey.util import Observer
+from murfey.util import Observer, machine_data
 from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")

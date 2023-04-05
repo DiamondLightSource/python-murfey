@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from functools import lru_cache
 from queue import Queue
 from threading import Thread
 from typing import Awaitable, Callable, Optional
@@ -10,7 +11,13 @@ from uuid import uuid4
 
 import requests
 
+from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.models import Visit
+
+
+@lru_cache(maxsize=1)
+def machine_data(environment: MurfeyInstanceEnvironment) -> dict:
+    return requests.get(f"{environment.url.geturl()}/machine/").json()
 
 
 def _get_visit_list(api_base: ParseResult):
