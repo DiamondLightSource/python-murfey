@@ -94,6 +94,7 @@ class DCParameters(BaseModel):
     image_directory: str
     tag: str
     source: str
+    magnification: float
 
 
 class DCParametersTomo(BaseModel):

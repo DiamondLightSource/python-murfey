@@ -227,7 +227,8 @@ class SPAContext(Context):
                     data["MicroscopeImage"]["microscopeData"]["gun"][
                         "AccelerationVoltage"
                     ]
-                ) / 1000
+                )
+                / 1000
             )
             metadata["image_size_x"] = TUIFormValue(
                 data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
@@ -244,8 +245,14 @@ class SPAContext(Context):
                     "numericValue"
                 ]
             )
+            metadata["magnification"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["optics"]["TemMagnification"][
+                    "NominalMagnification"
+                ]
+            )
         else:
             logger.warning("Metadata file format is not recognised")
+            return OrderedDict({})
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(
