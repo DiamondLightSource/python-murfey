@@ -403,7 +403,9 @@ def start_dc(visit_name, dc_params: DCParameters):
             visit_number=ispyb_visit_number,
             db=murfey.server.ispyb.Session(),
         ),
-        "image_directory": dc_params.image_directory,
+        "image_directory": str(
+            machine_config["rsync_basepath"] / dc_params.image_directory
+        ),
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),

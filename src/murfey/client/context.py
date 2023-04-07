@@ -533,7 +533,13 @@ class TomographyContext(Context):
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
-                        "image_directory": str(file_path.parent),
+                        "image_directory": str(
+                            Path(
+                                environment.default_destinations.get(
+                                    file_path.parent, file_path.parent
+                                )
+                            ).resolve()
+                        ),
                         "tag": tilt_series,
                         "source": str(self._basepath),
                     }
