@@ -113,6 +113,10 @@ class SPAContext(Context):
     def _flush_processing_job(self, tag: str, parameters: Dict[str, Any] | None = None):
         if parameters:
             proc_job_future = self._processing_job_stash[tag]
+            if self._acquisition_software == "epu":
+                import_images = f"{Path(parameters['image_directory']).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
+            else:
+                import_images = f"{Path(parameters['image_directory']).resolve()}/*{parameters['file_extension']}"
             msg = {
                 **proc_job_future.message,
                 "parameters": {
@@ -121,7 +125,7 @@ class SPAContext(Context):
                     "motioncor_gainreference": parameters["gain_ref"],
                     "motioncor_doseperframe": parameters["dose_per_frame"],
                     "eer_grouping": parameters["eer_grouping"],
-                    "import_images": f"{Path(parameters['image_directory']).resolve()}/*{parameters['file_extension']}",
+                    "import_images": import_images,
                     "angpix": parameters["pixel_size_on_image"],
                     "symmetry": parameters["symmetry"],
                     "extract_boxsize": parameters["boxsize"],
