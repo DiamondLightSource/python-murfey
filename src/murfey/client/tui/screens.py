@@ -506,7 +506,7 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if self.app._multigrid or any(v == "None" for v in self._user_params.values()):
+        if any(v == "None" for v in self._user_params.values()):
             return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
