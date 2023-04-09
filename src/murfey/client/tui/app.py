@@ -95,10 +95,17 @@ class MurfeyTUI(App):
             return self.analyser._role
         return ""
 
-    def _launch_multigrid_watcher(self, source: Path):
+    def _launch_multigrid_watcher(
+        self, source: Path, destination_overrides: Dict[Path, str] | None = None
+    ):
         log.info(f"Launching multigrid watcher for source {source}")
         self._multigrid_watcher = MultigridDirWatcher(source)
-        self._multigrid_watcher.subscribe(self._start_rsyncer_multigrid)
+        self._multigrid_watcher.subscribe(
+            partial(
+                self._start_rsyncer_multigrid,
+                destination_overrides=destination_overrides or {},
+            )
+        )
         self._multigrid_watcher.start()
 
     def _start_rsyncer_multigrid(
@@ -107,28 +114,33 @@ class MurfeyTUI(App):
         extra_directory: str = "",
         include_mid_path: bool = True,
         use_suggested_path: bool = True,
+        destination_overrides: Dict[Path, str] | None = None,
     ):
+        destination_overrides = destination_overrides or {}
         machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
-        self._environment.default_destinations[
-            source
-        ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-        destination = determine_default_destination(
-            self._visit,
-            source,
-            self._default_destinations[source],
-            self._environment,
-            self.analysers,
-            touch=True,
-            extra_directory=extra_directory,
-            include_mid_path=include_mid_path,
-            use_suggested_path=use_suggested_path,
-        )
+        if destination_overrides.get(source):
+            destination = destination_overrides[source]
+        else:
+            self._environment.default_destinations[
+                source
+            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+            destination = determine_default_destination(
+                self._visit,
+                source,
+                self._default_destinations[source],
+                self._environment,
+                self.analysers,
+                touch=True,
+                extra_directory=extra_directory,
+                include_mid_path=include_mid_path,
+                use_suggested_path=use_suggested_path,
+            )
         self._environment.sources.append(source)
         self._start_rsyncer(
             source,
             destination,
             force_metadata=True,
-            analyse=not include_mid_path and use_suggested_path,
+            analyse=not extra_directory and use_suggested_path,
         )
 
     def _start_rsyncer(

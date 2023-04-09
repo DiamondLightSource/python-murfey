@@ -237,9 +237,7 @@ class LaunchScreen(Screen):
 
     def on_mount(self):
         if self._add_basepath:
-            self._add_directory(
-                str(self._selected_dir), add_destination=not self.app._multigrid
-            )
+            self._add_directory(str(self._selected_dir))
 
     def _check_valid_selection(self, valid: bool):
         if self._add_btn:
@@ -475,6 +473,28 @@ class DestinationSelect(Screen):
 
     def compose(self):
         bulk = []
+        if self.app._multigrid:
+            for s in self._transfer_routes.keys():
+                for d in s.glob("*"):
+                    if d.is_dir():
+                        machine_data = requests.get(
+                            f"{self.app._environment.url.geturl()}/machine/"
+                        ).json()
+                        dest = determine_default_destination(
+                            self.app._visit,
+                            s,
+                            f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+                            self.app._environment,
+                            self.app.analysers,
+                        )
+                        bulk.append(Label(f"Copy the source {d} to:"))
+                        bulk.append(
+                            Input(
+                                value=dest,
+                                id=f"destination-{str(d)}",
+                                classes="input-destination",
+                            )
+                        )
         if not self.app._multigrid:
             for s, d in self._transfer_routes.items():
                 bulk.append(Label(f"Copy the source {s} to:"))
