@@ -486,6 +486,7 @@ class DestinationSelect(Screen):
                             f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
                             self.app._environment,
                             self.app.analysers,
+                            touch=True,
                         )
                         bulk.append(Label(f"Copy the source {d} to:"))
                         bulk.append(
