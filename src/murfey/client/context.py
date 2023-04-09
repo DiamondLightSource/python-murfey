@@ -212,6 +212,7 @@ class SPAContext(Context):
                 logger.warning(f"Failed to parse file {metadata_file}")
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
+        magnification = 0
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = TUIFormValue("SPA")
         if data.get("Acquisition"):
@@ -249,11 +250,10 @@ class SPAContext(Context):
                     "numericValue"
                 ]
             )
-            metadata["magnification"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["optics"]["TemMagnification"][
-                    "NominalMagnification"
-                ]
-            )
+            magnification = data["MicroscopeImage"]["microscopeData"]["optics"][
+                "TemMagnification"
+            ]["NominalMagnification"]
+            metadata["magnification"] = TUIFormValue(magnification)
             metadata["total_exposed_dose"] = TUIFormValue(
                 data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][0][
                     "a:Value"
@@ -285,6 +285,19 @@ class SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
+        if environment and magnification:
+            server_config = requests.get(
+                f"{str(environment.url.geturl())}/machine/"
+            ).json()
+            ps_from_mag = (
+                server_config.get("calibrations", {})
+                .get("magnification", {})
+                .get(int(magnification))
+            )
+            if ps_from_mag:
+                metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(ps_from_mag) * 1e-10
+                )
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(
