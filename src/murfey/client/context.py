@@ -254,6 +254,34 @@ class SPAContext(Context):
                     "NominalMagnification"
                 ]
             )
+            metadata["total_exposed_dose"] = TUIFormValue(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][0][
+                    "a:Value"
+                ]["#text"]
+            )
+            metadata["c2aperture"] = TUIFormValue(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][3][
+                    "a:Value"
+                ]["#text"]
+            )
+            metadata["exposure_time"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "ExposureTime"
+                ]
+            )
+            metadata["slit_width"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["optics"]["EnergyFilter"][
+                    "EnergySelectionSlitWidth"
+                ]
+            )
+            metadata["phase_plate"] = TUIFormValue(
+                1
+                if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
+                    11
+                ]["a:Value"]["#text"]
+                == "true"
+                else 0
+            )
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})

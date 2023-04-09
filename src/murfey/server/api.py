@@ -416,6 +416,12 @@ def start_dc(visit_name, dc_params: DCParameters):
         "acquisition_software": dc_params.acquisition_software,
         "tag": dc_params.tag,
         "source": dc_params.source,
+        "magnification": dc_params.magnification,
+        "total_exposed_dose": dc_params.total_exposed_dose,
+        "c2paerture": dc_params.c2aperture,
+        "exposure_time": dc_params.exposure_time,
+        "slit_width": dc_params.slit_width,
+        "phase_plate": dc_params.phase_plate,
     }
 
     if _transport_object:
