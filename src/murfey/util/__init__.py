@@ -16,8 +16,6 @@ from murfey.util.models import Visit
 
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
-    if demo:
-        return {}
     return requests.get(f"{url}/machine/").json()
 
 

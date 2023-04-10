@@ -33,6 +33,14 @@ class MultigridDirWatcher(murfey.util.Observer):
         log.info(f"MultigridDirWatcher thread starting for {self}")
         self.thread.start()
 
+    def stop(self):
+        log.debug("MultigridDirWatcher thread stop requested")
+        self._stopping = True
+        self._halt_thread = True
+        if self.thread.is_alive():
+            self.thread.join()
+        log.debug("MultigridDirWatcher thread stop completed")
+
     def _process(self):
         while not self._stopping:
             for d in self._basepath.glob("*"):

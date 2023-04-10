@@ -31,7 +31,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import _get_visit_list
+from murfey.util import _get_visit_list, get_machine_config
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -116,10 +116,11 @@ class MurfeyTUI(App):
         use_suggested_path: bool = True,
         destination_overrides: Dict[Path, str] | None = None,
     ):
+        log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
         machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
         if destination_overrides.get(source):
-            destination = destination_overrides[source]
+            destination = destination_overrides[source] + f"/{extra_directory}"
         else:
             self._environment.default_destinations[
                 source
@@ -170,7 +171,7 @@ class MurfeyTUI(App):
             source,
             basepath_remote=Path(destination),
             server_url=self._url,
-            local=self._environment.demo,
+            # local=self._environment.demo,
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
         )
@@ -301,11 +302,15 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
         elif isinstance(context, SPAContext):
             source = Path(json["source"])
+            machine_config = get_machine_config(
+                str(self._url.geturl()), demo=self._environment.demo
+            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             json = {
                 "tag": str(source.resolve()),
                 "image_directory": str(
-                    Path(self._environment.default_destinations[source]).resolve()
+                    Path(machine_config.get("rsync_basepath", "."))
+                    / self._environment.default_destinations[source]
                 ),
                 **json,
             }
@@ -409,6 +414,8 @@ class MurfeyTUI(App):
         if self.analysers:
             for a in self.analysers.values():
                 a.stop()
+        if self._multigrid_watcher:
+            self._multigrid_watcher.stop()
         self.exit()
         exit()
 

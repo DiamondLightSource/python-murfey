@@ -142,9 +142,7 @@ class RSyncer(Observer):
             except queue.Empty:
                 pass
 
-            logger.info(
-                f"Preparing to transfer {len(files_to_transfer)} files: {files_to_transfer}, {self}"
-            )
+            logger.info(f"Preparing to transfer {len(files_to_transfer)} files")
             if self._do_transfer:
                 try:
                     success = self._transfer(files_to_transfer)

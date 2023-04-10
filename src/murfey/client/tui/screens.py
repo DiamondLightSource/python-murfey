@@ -469,6 +469,7 @@ class DestinationSelect(Screen):
     def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
+        self._destination_overrides: Dict[Path, str] = {}
         self._user_params: Dict[str, str] = {}
 
     def compose(self):
@@ -476,7 +477,7 @@ class DestinationSelect(Screen):
         if self.app._multigrid:
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
-                    if d.is_dir():
+                    if d.is_dir() and d.name != "atlas":
                         machine_data = requests.get(
                             f"{self.app._environment.url.geturl()}/machine/"
                         ).json()
@@ -496,7 +497,7 @@ class DestinationSelect(Screen):
                                 classes="input-destination",
                             )
                         )
-        if not self.app._multigrid:
+        else:
             for s, d in self._transfer_routes.items():
                 bulk.append(Label(f"Copy the source {s} to:"))
                 bulk.append(
@@ -520,7 +521,10 @@ class DestinationSelect(Screen):
 
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):
-            self._transfer_routes[Path(event.input.id[12:])] = event.value
+            if not self.app._multigrid:
+                self._transfer_routes[Path(event.input.id[12:])] = event.value
+            else:
+                self._destination_overrides[Path(event.input.id[12:])] = event.value
         else:
             for k in SPAContext.user_params:
                 if event.input.id == k.name:
@@ -533,7 +537,11 @@ class DestinationSelect(Screen):
             self.app._default_destinations[s] = d
             self.app._register_dc = True
             if self.app._multigrid:
-                self.app._launch_multigrid_watcher(s)
+                for k, v in self._destination_overrides.items():
+                    self.app._environment.destination_registry[k.name] = v
+                self.app._launch_multigrid_watcher(
+                    s, destination_overrides=self._destination_overrides
+                )
             else:
                 self.app._start_rsyncer(s, d)
         for k, v in self._user_params.items():

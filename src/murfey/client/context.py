@@ -149,6 +149,13 @@ class SPAContext(Context):
             "acquisition_software": data["acquisition_software"],
             "image_directory": data["image_directory"],
             "tag": data["tag"],
+            "source": data["source"],
+            "magnification": data["magnification"],
+            "total_exposed_dose": data.get("total_exposed_dose"),
+            "c2aperture": data.get("c2aperture"),
+            "exposure_time": data.get("exposure_time"),
+            "slit_width": data.get("slit_width"),
+            "phase_plate": data.get("phase_plate", False),
         }
         requests.post(url, json=json)
 
@@ -187,6 +194,7 @@ class SPAContext(Context):
     def _register_processing_job(
         self, tag: str, parameters: Dict[str, Any] | None = None
     ):
+        logger.info(f"registering processing job with parameters: {parameters}")
         if self._processing_job_stash.get(tag):
             self._flush_processing_job(tag, parameters=parameters)
             self._processing_job_stash.pop(tag)
