@@ -250,7 +250,6 @@ class RSyncer(Observer):
 
                 self._files_transferred += 1
                 if self._statusbar:
-                    logger.debug("Incrementing number of transferred files")
                     with self._statusbar.lock:
                         self._statusbar.transferred = [
                             self._statusbar.transferred[0] + 1,

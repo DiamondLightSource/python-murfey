@@ -227,8 +227,8 @@ class Analyser(Observer):
             "data_directories", {}
         )
         for dd in data_directories.keys():
-            if str(data_file).startswith(str(dd)):
-                base_dir = dd
+            if str(data_file).startswith(dd):
+                base_dir = Path(dd)
                 mid_dir = data_file.relative_to(dd).parent
                 break
         else:

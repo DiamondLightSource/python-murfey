@@ -124,7 +124,12 @@ class MurfeyTUI(App):
             use_suggested_path=use_suggested_path,
         )
         self._environment.sources.append(source)
-        self._start_rsyncer(source, destination, force_metadata=True)
+        self._start_rsyncer(
+            source,
+            destination,
+            force_metadata=True,
+            analyse=not include_mid_path and use_suggested_path,
+        )
 
     def _start_rsyncer(
         self,
@@ -132,6 +137,7 @@ class MurfeyTUI(App):
         destination: str,
         visit_path: str = "",
         force_metadata: bool = False,
+        analyse: bool = True,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -174,7 +180,7 @@ class MurfeyTUI(App):
         self.rsync_processes[source].subscribe(rsync_result)
         self._environment.watchers[source] = DirWatcher(source, settling_time=1)
 
-        if not self.analysers.get(source):
+        if not self.analysers.get(source) and analyse:
             log.info(f"Starting analyser for {source}")
             self.analysers[source] = Analyser(
                 source,
