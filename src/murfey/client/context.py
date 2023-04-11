@@ -188,7 +188,7 @@ class SPAContext(Context):
                 "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": import_images,
-                "angpix": parameters["pixel_size_on_image"],
+                "angpix": parameters["pixel_size_on_image"] * 1e10,
                 "symmetry": parameters["symmetry"],
                 "extract_boxsize": parameters["boxsize"],
                 "extract_downscale": parameters["downscale"],
