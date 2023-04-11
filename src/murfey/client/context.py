@@ -210,16 +210,49 @@ class SPAContext(Context):
             data = xmltodict.parse(for_parsing)
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = TUIFormValue("SPA")
-        metadata["voltage"] = TUIFormValue(300)
-        metadata["image_size_x"] = TUIFormValue(
-            data["Acquisition"]["Info"]["ImageSize"]["Width"]
-        )
-        metadata["image_size_y"] = TUIFormValue(
-            data["Acquisition"]["Info"]["ImageSize"]["Height"]
-        )
-        metadata["pixel_size_on_image"] = TUIFormValue(
-            float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
-        )
+        if data.get("Acquisition"):
+            metadata["voltage"] = TUIFormValue(300)
+            metadata["image_size_x"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Width"]
+            )
+            metadata["image_size_y"] = TUIFormValue(
+                data["Acquisition"]["Info"]["ImageSize"]["Height"]
+            )
+            metadata["pixel_size_on_image"] = TUIFormValue(
+                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+            )
+        elif data.get("MicroscopeImage"):
+            metadata["voltage"] = TUIFormValue(
+                float(
+                    data["MicroscopeImage"]["microscopeData"]["gun"][
+                        "AccelerationVoltage"
+                    ]
+                )
+                / 1000
+            )
+            metadata["image_size_x"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "ReadoutArea"
+                ]["a:width"]
+            )
+            metadata["image_size_y"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "ReadoutArea"
+                ]["a:height"]
+            )
+            metadata["pixel_size_on_image"] = TUIFormValue(
+                data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                    "numericValue"
+                ]
+            )
+            metadata["magnification"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["optics"]["TemMagnification"][
+                    "NominalMagnification"
+                ]
+            )
+        else:
+            logger.warning("Metadata file format is not recognised")
+            return OrderedDict({})
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(
