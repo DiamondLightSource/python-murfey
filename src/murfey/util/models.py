@@ -95,6 +95,11 @@ class DCParameters(BaseModel):
     tag: str
     source: str
     magnification: float
+    total_exposed_dose: Optional[float] = None
+    c2aperture: Optional[float] = None
+    exposure_time: Optional[float] = None
+    slit_width: Optional[float] = None
+    phase_plate: bool = False
 
 
 class DCParametersTomo(BaseModel):
@@ -129,6 +134,12 @@ class DCParametersSPA(BaseModel):
     downscale: bool
     small_boxsize: int
     eer_grouping: int
+    magnification: Optional[int] = None
+    total_exposed_dose: Optional[float] = None
+    c2aperture: Optional[float] = None
+    exposure_time: Optional[float] = None
+    slit_width: Optional[float] = None
+    phase_plate: bool = False
 
 
 class ProcessingJobParameters(BaseModel):

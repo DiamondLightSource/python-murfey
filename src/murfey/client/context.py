@@ -149,6 +149,13 @@ class SPAContext(Context):
             "acquisition_software": data["acquisition_software"],
             "image_directory": data["image_directory"],
             "tag": data["tag"],
+            "source": data["source"],
+            "magnification": data["magnification"],
+            "total_exposed_dose": data.get("total_exposed_dose"),
+            "c2aperture": data.get("c2aperture"),
+            "exposure_time": data.get("exposure_time"),
+            "slit_width": data.get("slit_width"),
+            "phase_plate": data.get("phase_plate", False),
         }
         requests.post(url, json=json)
 
@@ -187,6 +194,7 @@ class SPAContext(Context):
     def _register_processing_job(
         self, tag: str, parameters: Dict[str, Any] | None = None
     ):
+        logger.info(f"registering processing job with parameters: {parameters}")
         if self._processing_job_stash.get(tag):
             self._flush_processing_job(tag, parameters=parameters)
             self._processing_job_stash.pop(tag)
@@ -212,6 +220,7 @@ class SPAContext(Context):
                 logger.warning(f"Failed to parse file {metadata_file}")
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
+        magnification = 0
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = TUIFormValue("SPA")
         if data.get("Acquisition"):
@@ -249,14 +258,54 @@ class SPAContext(Context):
                     "numericValue"
                 ]
             )
-            metadata["magnification"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["optics"]["TemMagnification"][
-                    "NominalMagnification"
+            magnification = data["MicroscopeImage"]["microscopeData"]["optics"][
+                "TemMagnification"
+            ]["NominalMagnification"]
+            metadata["magnification"] = TUIFormValue(magnification)
+            metadata["total_exposed_dose"] = TUIFormValue(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][0][
+                    "a:Value"
+                ]["#text"]
+            )
+            metadata["c2aperture"] = TUIFormValue(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][3][
+                    "a:Value"
+                ]["#text"]
+            )
+            metadata["exposure_time"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "ExposureTime"
                 ]
+            )
+            metadata["slit_width"] = TUIFormValue(
+                data["MicroscopeImage"]["microscopeData"]["optics"]["EnergyFilter"][
+                    "EnergySelectionSlitWidth"
+                ]
+            )
+            metadata["phase_plate"] = TUIFormValue(
+                1
+                if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
+                    11
+                ]["a:Value"]["#text"]
+                == "true"
+                else 0
             )
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
+        if environment and magnification:
+            server_config = requests.get(
+                f"{str(environment.url.geturl())}/machine/"
+            ).json()
+            ps_from_mag = (
+                server_config.get("calibrations", {})
+                .get("magnification", {})
+                .get(int(magnification))
+            )
+            if ps_from_mag:
+                metadata["pixel_size_on_image"] = TUIFormValue(
+                    float(ps_from_mag) * 1e-10
+                )
         metadata["motion_corr_binning"] = TUIFormValue(1)
         metadata["gain_ref"] = TUIFormValue(None, top=True)
         metadata["dose_per_frame"] = TUIFormValue(

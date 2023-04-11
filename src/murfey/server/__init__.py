@@ -374,6 +374,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             pixelSizeOnImage=message["pixel_size"],
             imageSizeX=message["image_size_x"],
             imageSizeY=message["image_size_y"],
+            slitGapHorizontal=message.get("slit_width"),
+            magnification=message.get("magnification"),
+            exposureTime=message.get("exposure_time"),
+            totalExposedDose=message.get("total_exposed_dose"),
+            c2aperture=message.get("c2aperture"),
+            phasePlate=int(message.get("phase_plate", 0)),
         )
         dcid = _register(record, header, tag=message.get("tag"))
         if dcid is None and _transport_object:
