@@ -37,6 +37,12 @@ class MurfeyInstanceEnvironment(BaseModel):
     data_collection_ids: Dict[str, int] = {}
     processing_job_ids: Dict[str, Dict[str, int]] = {}
     autoproc_program_ids: Dict[str, Dict[str, int]] = {}
+    id_tag_registry: Dict[str, List[str]] = {
+        "data_collection_group": [],
+        "data_collection": [],
+        "processing_job": [],
+        "auto_proc_program": [],
+    }
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, List[str]] = {}
@@ -81,7 +87,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                         l(k)
                 else:
                     for k in v.keys():
-                        l(k)
+                        if k not in values["id_tag_registry"]["data_collection"]:
+                            l(k)
         return v
 
     @validator("data_collection_ids")
@@ -93,7 +100,8 @@ class MurfeyInstanceEnvironment(BaseModel):
                         l(k)
                 else:
                     for k in v.keys():
-                        l(k)
+                        if k not in values["id_tag_registry"]["processing_job"]:
+                            l(k)
         return v
 
     @validator("processing_job_ids")
@@ -102,10 +110,11 @@ class MurfeyInstanceEnvironment(BaseModel):
             for l in values.get("listeners", {}).get("processing_job_ids", []):
                 if values.get("processing_job_ids"):
                     for k in set(values["processing_job_ids"].keys()) ^ set(v.keys()):
-                        l(k, v[k]["relion"])
+                        l(k, v[k]["ispyb-relion"])
                 else:
                     for k in v.keys():
-                        l(k, v[k]["relion"])
+                        if k not in values["id_tag_registry"]["auto_proc_program"]:
+                            l(k, v[k]["ispyb-relion"])
         return v
 
     @validator("autoproc_program_ids")
