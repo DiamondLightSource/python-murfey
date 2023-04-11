@@ -407,7 +407,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ProcessingJobParameter(parameterKey=k, parameterValue=v)
                 for k, v in message["job_parameters"].items()
             ]
-            pid = _register(ExtendedRecord(record, job_parameters))
+            pid = _register(ExtendedRecord(record, job_parameters), header)
         else:
             pid = _register(record, header)
         if pid is None and _transport_object:
@@ -424,6 +424,8 @@ def feedback_callback(header: dict, message: dict) -> None:
         else:
             prids = {message["tag"]: {message["recipe"]: pid}}
             global_state["processing_job_ids"] = prids
+        if message.get("job_parameters"):
+            return None
         record = AutoProcProgram(processingJobId=pid)
         appid = _register(record, header)
         if appid is None and _transport_object:
@@ -492,13 +494,6 @@ def _(record: Base, header: dict, **kwargs):
             exc_info=True,
         )
         return None
-
-
-@_register.register  # type: ignore
-def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    return _transport_object.do_create_ispyb_job(
-        extended_record.record, params=extended_record.record_params
-    )["return_value"]
 
 
 @_register.register  # type: ignore

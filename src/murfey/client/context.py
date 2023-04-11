@@ -110,13 +110,27 @@ class SPAContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
-    def _flush_processing_job(self, tag: str, parameters: Dict[str, Any] | None = None):
+    def _flush_processing_job(
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
+    ):
         if parameters:
             proc_job_future = self._processing_job_stash[tag]
+            machine_config = get_machine_config(
+                str(environment.url.geturl()), demo=environment.demo
+            )
+            image_directory = str(
+                Path(machine_config.get("rsync_basepath", "."))
+                / environment.default_destinations[Path(tag)]
+            )
             if self._acquisition_software == "epu":
-                import_images = f"{Path(parameters['image_directory']).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
+                import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
             else:
-                import_images = f"{Path(parameters['image_directory']).resolve()}/*{parameters['file_extension']}"
+                import_images = (
+                    f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
+                )
             msg = {
                 **proc_job_future.message,
                 "parameters": {
@@ -137,8 +151,21 @@ class SPAContext(Context):
             }
             requests.post(proc_job_future.url, json=msg)
 
-    def _register_data_collection(self, url: str, data: dict):
+    def _register_data_collection(
+        self,
+        tag: str,
+        url: str,
+        data: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
         logger.info(f"registering data collection with data {data}")
+        machine_config = get_machine_config(
+            str(environment.url.geturl()), demo=environment.demo
+        )
+        image_directory = str(
+            Path(machine_config.get("rsync_basepath", "."))
+            / environment.default_destinations[Path(tag)]
+        )
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],
@@ -147,9 +174,9 @@ class SPAContext(Context):
             "image_size_y": data["image_size_y"],
             "file_extension": data["file_extension"],
             "acquisition_software": data["acquisition_software"],
-            "image_directory": data["image_directory"],
-            "tag": data["tag"],
-            "source": data["source"],
+            "image_directory": image_directory,
+            "tag": tag,
+            "source": tag,
             "magnification": data["magnification"],
             "total_exposed_dose": data.get("total_exposed_dose"),
             "c2aperture": data.get("c2aperture"),
@@ -176,7 +203,7 @@ class SPAContext(Context):
             if environment.data_collection_ids.get(source) is None:
                 self._processing_job_stash[source] = FutureRequest(
                     proc_url,
-                    {"tag": source, "recipe": "relion"},
+                    {"tag": source, "recipe": "ispyb-relion"},
                 )
             elif environment.data_collection_parameters:
                 if self._processing_job_stash.get(source):
@@ -186,17 +213,38 @@ class SPAContext(Context):
                     proc_url,
                     json={
                         "tag": source,
-                        "recipe": "relion",
+                        "recipe": "ispyb-relion",
                         "parameters": environment.data_collection_parameters,
                     },
                 )
 
     def _register_processing_job(
-        self, tag: str, parameters: Dict[str, Any] | None = None
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
     ):
         logger.info(f"registering processing job with parameters: {parameters}")
+        machine_config = get_machine_config(
+            str(environment.url.geturl()), demo=environment.demo
+        )
+        image_directory = str(
+            Path(machine_config.get("rsync_basepath", "."))
+            / environment.default_destinations[Path(tag)]
+        )
         if self._processing_job_stash.get(tag):
-            self._flush_processing_job(tag, parameters=parameters)
+            params = {
+                "tag": tag,
+                "source": tag,
+                "image_directory": image_directory,
+            }
+            if parameters:
+                params.update(parameters)
+            self._flush_processing_job(
+                tag,
+                environment,
+                parameters=params,
+            )
             self._processing_job_stash.pop(tag)
 
     def _launch_spa_pipeline(self, tag: str, jobid: int, url: str = ""):
@@ -368,7 +416,7 @@ class TomographyContext(Context):
         self._extract_tilt_series: Callable[[Path], str] | None = None
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
-    def _flush_data_collections(self):
+    def _flush_data_collections(self, tag: str):
         logger.info("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}

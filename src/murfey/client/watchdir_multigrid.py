@@ -59,6 +59,6 @@ class MultigridDirWatcher(murfey.util.Observer):
                     else:
                         d02 = d.parent.parent / d.name
                     if d02.is_dir() and d02 not in self._seen_dirs:
-                        self.notify(d02)
+                        self.notify(d02, include_mid_path=False)
                         self._seen_dirs.append(d02)
             time.sleep(15)

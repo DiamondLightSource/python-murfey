@@ -117,9 +117,9 @@ class TransportManager:
             jobid = self.ispyb.mx_processing.upsert_job(list(jp.values()))
             for p in params:
                 pp = self.ispyb.mx_processing.get_job_parameter_params()
-                pp["jobid"] = jobid
-                pp["parameterkey"] = p.parameterKey
-                pp["parametervalue"] = p.parametervalue
+                pp["job_id"] = jobid
+                pp["parameter_key"] = p.parameterKey
+                pp["parameter_value"] = p.parameterValue
                 self.ispyb.mx_processing.upsert_job_parameter(list(pp.values()))
             log.info(f"All done. Processing job {jobid} created")
             return {"success": True, "return_value": jobid}

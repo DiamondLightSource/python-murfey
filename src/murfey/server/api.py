@@ -216,7 +216,7 @@ async def send_murfey_message(msg: RegistrationMessage):
 async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
     zocalo_message = {
         "parameters": {"ispyb_process": proc_params.job_id},
-        "recipes": ["relion"],
+        "recipes": ["ispyb-relion"],
     }
     if _transport_object:
         _transport_object.send("processing_recipe", zocalo_message)
@@ -404,7 +404,7 @@ def start_dc(visit_name, dc_params: DCParameters):
             db=murfey.server.ispyb.Session(),
         ),
         "image_directory": str(
-            machine_config["rsync_basepath"] / dc_params.image_directory
+            machine_config.rsync_basepath / dc_params.image_directory
         ),
         "start_time": str(datetime.datetime.now()),
         "voltage": dc_params.voltage,

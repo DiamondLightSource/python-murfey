@@ -307,11 +307,9 @@ class MurfeyTUI(App):
             )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
             json = {
-                "tag": str(source.resolve()),
-                "image_directory": str(
-                    Path(machine_config.get("rsync_basepath", "."))
-                    / self._environment.default_destinations[source]
-                ),
+                "image_directory": Path(
+                    machine_config.get("rsync_basepath", ".")
+                ).resolve(),
                 **json,
             }
             self._environment.listeners["data_collection_group_ids"] = {
@@ -319,17 +317,21 @@ class MurfeyTUI(App):
                     context._register_data_collection,
                     url=url,
                     data=json,
+                    environment=self._environment,
                 )
             }
             self._environment.listeners["data_collection_ids"] = {
                 partial(
                     context._register_processing_job,
                     parameters=json,
+                    environment=self._environment,
                 )
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
             self._environment.listeners["processing_job_ids"] = {
-                partial(context._launch_spa_pipeline, url=url)
+                partial(
+                    context._launch_spa_pipeline, url=url, environment=self._environment
+                )
             }
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {

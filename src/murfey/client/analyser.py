@@ -233,17 +233,17 @@ class Analyser(Observer):
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)
                 mid_dir = data_file.relative_to(dd).parent
-                if (
-                    base_dir
-                    / self._environment.visit
-                    / mid_dir.parts[0]
-                    / "Images-Disc1"
-                ).is_dir():
-                    mid_dir = Path(
-                        mid_dir.parts[0]
-                        + "/Images-Disc1/"
-                        + "/".join(mid_dir.parts[1:])
-                    )
+                # if (
+                #     base_dir
+                #     / self._environment.visit
+                #     / mid_dir.parts[0]
+                #     / "Images-Disc1"
+                # ).is_dir():
+                #     mid_dir = Path(
+                #         mid_dir.parts[0]
+                #         + "/Images-Disc1/"
+                #         + "/".join(mid_dir.parts[1:])
+                #     )
                 break
         else:
             return data_file.with_suffix(".xml")

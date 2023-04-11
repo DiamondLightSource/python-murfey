@@ -73,8 +73,13 @@ def determine_default_destination(
                         and use_suggested_path
                     ):
                         with global_env_lock:
-                            if environment.destination_registry.get(source.name):
-                                _default = environment.destination_registry[source.name]
+                            source_name = (
+                                source.name
+                                if source.name != "Images-Disc1"
+                                else source.parent.name
+                            )
+                            if environment.destination_registry.get(source_name):
+                                _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = requests.post(
                                     url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
@@ -86,7 +91,7 @@ def determine_default_destination(
                                 _default = suggested_path_response.json().get(
                                     "suggested_path"
                                 )
-                                environment.destination_registry[source.name] = _default
+                                environment.destination_registry[source_name] = _default
                     else:
                         _default = f"{destination}/{visit}/{mid_path if include_mid_path else source.name}"
                     if analysers.get(source):

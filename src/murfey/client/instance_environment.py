@@ -74,7 +74,14 @@ class MurfeyInstanceEnvironment(BaseModel):
     def dcg_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_group_ids", []):
-                l()
+                if values.get("data_collection_group_ids"):
+                    for k in set(values["data_collection_group_ids"].keys()) ^ set(
+                        v.keys()
+                    ):
+                        l(k)
+                else:
+                    for k in v.keys():
+                        l(k)
         return v
 
     @validator("data_collection_ids")
