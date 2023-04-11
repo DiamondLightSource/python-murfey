@@ -141,11 +141,7 @@ class MurfeyTUI(App):
             source,
             destination,
             force_metadata=True,
-<<<<<<< HEAD
             analyse=not extra_directory and use_suggested_path,
-=======
-            analyse=not include_mid_path and use_suggested_path,
->>>>>>> 8b7e9e5 (For multigrid do not start analysers on metadata directories)
         )
 
     def _start_rsyncer(
