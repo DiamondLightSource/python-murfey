@@ -110,47 +110,6 @@ class SPAContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
-    def _flush_processing_job(
-        self,
-        tag: str,
-        environment: MurfeyInstanceEnvironment,
-        parameters: Dict[str, Any] | None = None,
-    ):
-        if parameters:
-            proc_job_future = self._processing_job_stash[tag]
-            machine_config = get_machine_config(
-                str(environment.url.geturl()), demo=environment.demo
-            )
-            image_directory = str(
-                Path(machine_config.get("rsync_basepath", "."))
-                / environment.default_destinations[Path(tag)]
-            )
-            if self._acquisition_software == "epu":
-                import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
-            else:
-                import_images = (
-                    f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
-                )
-            msg = {
-                **proc_job_future.message,
-                "parameters": {
-                    "acquisition_software": parameters["acquisition_software"],
-                    "voltage": parameters["voltage"],
-                    "motioncor_gainreference": parameters["gain_ref"],
-                    "motioncor_doseperframe": parameters["dose_per_frame"],
-                    "eer_grouping": parameters["eer_grouping"],
-                    "import_images": import_images,
-                    "angpix": parameters["pixel_size_on_image"],
-                    "symmetry": parameters["symmetry"],
-                    "extract_boxsize": parameters["boxsize"],
-                    "extract_downscale": parameters["downscale"],
-                    "extract_small_boxsize": parameters["small_boxsize"],
-                    "mask_diameter": parameters["mask_diameter"],
-                    "autopick_do_cryolo": parameters["use_cryolo"],
-                },
-            }
-            requests.post(proc_job_future.url, json=msg)
-
     def _register_data_collection(
         self,
         tag: str,
@@ -159,6 +118,7 @@ class SPAContext(Context):
         environment: MurfeyInstanceEnvironment,
     ):
         logger.info(f"registering data collection with data {data}")
+        environment.id_tag_registry["data_collection"].append(tag)
         machine_config = get_machine_config(
             str(environment.url.geturl()), demo=environment.demo
         )
@@ -193,30 +153,7 @@ class SPAContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        if role == "detector" and environment:
-            source = ""
-            for s in environment.sources:
-                if transferred_file.is_relative_to(s):
-                    source = str(s)
-                    break
-            proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-            if environment.data_collection_ids.get(source) is None:
-                self._processing_job_stash[source] = FutureRequest(
-                    proc_url,
-                    {"tag": source, "recipe": "ispyb-relion"},
-                )
-            elif environment.data_collection_parameters:
-                if self._processing_job_stash.get(source):
-                    # self._flush_processing_job(source)
-                    pass
-                requests.post(
-                    proc_url,
-                    json={
-                        "tag": source,
-                        "recipe": "ispyb-relion",
-                        "parameters": environment.data_collection_parameters,
-                    },
-                )
+        return
 
     def _register_processing_job(
         self,
@@ -225,6 +162,9 @@ class SPAContext(Context):
         parameters: Dict[str, Any] | None = None,
     ):
         logger.info(f"registering processing job with parameters: {parameters}")
+        parameters = parameters or {}
+        environment.id_tag_registry["processing_job"].append(tag)
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
         machine_config = get_machine_config(
             str(environment.url.geturl()), demo=environment.demo
         )
@@ -232,22 +172,41 @@ class SPAContext(Context):
             Path(machine_config.get("rsync_basepath", "."))
             / environment.default_destinations[Path(tag)]
         )
-        if self._processing_job_stash.get(tag):
-            params = {
-                "tag": tag,
-                "source": tag,
-                "image_directory": image_directory,
-            }
-            if parameters:
-                params.update(parameters)
-            self._flush_processing_job(
-                tag,
-                environment,
-                parameters=params,
+        if self._acquisition_software == "epu":
+            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
+        else:
+            import_images = (
+                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
             )
-            self._processing_job_stash.pop(tag)
+        msg = {
+            "tag": tag,
+            "recipe": "ispyb-relion",
+            "parameters": {
+                "acquisition_software": parameters["acquisition_software"],
+                "voltage": parameters["voltage"],
+                "motioncor_gainreference": parameters["gain_ref"],
+                "motioncor_doseperframe": parameters["dose_per_frame"],
+                "eer_grouping": parameters["eer_grouping"],
+                "import_images": import_images,
+                "angpix": parameters["pixel_size_on_image"] * 1e10,
+                "symmetry": parameters["symmetry"],
+                "extract_boxsize": parameters["boxsize"],
+                "extract_downscale": parameters["downscale"],
+                "extract_small_boxsize": parameters["small_boxsize"],
+                "mask_diameter": parameters["mask_diameter"],
+                "autopick_do_cryolo": parameters["use_cryolo"],
+            },
+        }
+        requests.post(proc_url, json=msg)
 
-    def _launch_spa_pipeline(self, tag: str, jobid: int, url: str = ""):
+    def _launch_spa_pipeline(
+        self,
+        tag: str,
+        jobid: int,
+        environment: MurfeyInstanceEnvironment,
+        url: str = "",
+    ):
+        environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
         requests.post(url, json=data)
 

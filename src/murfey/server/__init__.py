@@ -358,7 +358,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         return None
     elif message["register"] == "data_collection":
         dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
-            message["source"]
+            message["tag"]
         )
         if dcgid is None:
             raise ValueError(

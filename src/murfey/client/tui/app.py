@@ -31,7 +31,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import _get_visit_list, get_machine_config
+from murfey.util import _get_visit_list
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -293,6 +293,9 @@ class MurfeyTUI(App):
             self._environment.listeners["motion_corrected_movies"] = {
                 context._check_for_alignment
             }
+            self._environment.id_tag_registry["data_collection_group"].append(
+                str(source)
+            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
@@ -302,16 +305,7 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
         elif isinstance(context, SPAContext):
             source = Path(json["source"])
-            machine_config = get_machine_config(
-                str(self._url.geturl()), demo=self._environment.demo
-            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
-            json = {
-                "image_directory": Path(
-                    machine_config.get("rsync_basepath", ".")
-                ).resolve(),
-                **json,
-            }
             self._environment.listeners["data_collection_group_ids"] = {
                 partial(
                     context._register_data_collection,
