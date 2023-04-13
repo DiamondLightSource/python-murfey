@@ -22,6 +22,7 @@ from murfey.server import templates
 from murfey.server.config import MachineConfig, from_file
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
+    ClearanceKeys,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -36,6 +37,7 @@ from murfey.util.models import (
     TiltSeries,
     Visit,
 )
+from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.api")
 
@@ -475,3 +477,39 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         camera, gain_reference_params.gain_ref, executables
     )
     return {"gain_ref": new_gain_ref}
+
+
+@router.post("/visits/{visit_name}/clean_state")
+async def clean_state(visit_name, for_clearance: ClearanceKeys):
+    if global_state.get("data_collection_group_ids") and isinstance(
+        global_state["data_collection_group_ids"], dict
+    ):
+        global_state["data_collection_group_ids"] = {
+            k: v
+            for k, v in global_state["data_collection_group_ids"].items()
+            if k not in for_clearance.data_collection_group
+        }
+    if global_state.get("data_collection_ids") and isinstance(
+        global_state["data_collection_ids"], dict
+    ):
+        global_state["data_collection_ids"] = {
+            k: v
+            for k, v in global_state["data_collection_ids"].items()
+            if k not in for_clearance.data_collection
+        }
+    if global_state.get("processing_job_ids") and isinstance(
+        global_state["processing_job_ids"], dict
+    ):
+        global_state["processing_job_ids"] = {
+            k: v
+            for k, v in global_state["processing_job_ids"].items()
+            if k not in for_clearance.processing_job
+        }
+    if global_state.get("autoproc_program_ids") and isinstance(
+        global_state["autoproc_program_ids"], dict
+    ):
+        global_state["autoproc_program_ids"] = {
+            k: v
+            for k, v in global_state["autoproc_program_ids"].items()
+            if k not in for_clearance.autoproc_program
+        }

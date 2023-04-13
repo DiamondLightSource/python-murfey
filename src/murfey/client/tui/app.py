@@ -375,7 +375,20 @@ class MurfeyTUI(App):
     def on_log_book_log(self, message):
         self.log_book.write(message.renderable)
 
+    def _clear_state(self):
+        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/clear_state"
+        data = {
+            "data_collection_group": self._environment.id_tag_registry[
+                "data_collection_group"
+            ],
+            "data_collection": self._environment.id_tag_registry["data_collection"],
+            "processing_job": self._environment.id_tag_registry["processing_job"],
+            "autoproc_program": self._environment.id_tag_registry["auto_proc_program"],
+        }
+        requests.post(url, json=data)
+
     def reset(self):
+        self._clear_state()
         self._environment.clear()
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -412,6 +425,7 @@ class MurfeyTUI(App):
                 a.stop()
         if self._multigrid_watcher:
             self._multigrid_watcher.stop()
+        self._clear_state()
         self.exit()
         exit()
 
