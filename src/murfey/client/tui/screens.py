@@ -354,7 +354,8 @@ class ProcessingForm(Screen):
             inputs.append(Label(t, classes="label"))
             i = Input(placeholder=t, classes="input")
             self._inputs[i] = k.name
-            i.value = self._form.get(k.name)
+            default = self._form.get(k.name)
+            i.value = "None" if default is None else default
             inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
         self._vert = Vertical(*inputs, confirm_btn, id="input-form")

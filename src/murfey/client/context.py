@@ -348,7 +348,7 @@ class TomographyContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
         ),
-        ProcessingParameter("tilt_offset", "Tilt Offset"),
+        ProcessingParameter("manual_tilt_offset", "Tilt Offset"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
