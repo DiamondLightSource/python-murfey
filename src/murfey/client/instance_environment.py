@@ -80,41 +80,27 @@ class MurfeyInstanceEnvironment(BaseModel):
     def dcg_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_group_ids", []):
-                if values.get("data_collection_group_ids"):
-                    for k in set(values["data_collection_group_ids"].keys()) ^ set(
-                        v.keys()
-                    ):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["data_collection"]:
                         l(k)
-                else:
-                    for k in v.keys():
-                        if k not in values["id_tag_registry"]["data_collection"]:
-                            l(k)
         return v
 
     @validator("data_collection_ids")
     def dc_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("data_collection_ids", []):
-                if values.get("data_collection_ids"):
-                    for k in set(values["data_collection_ids"].keys()) ^ set(v.keys()):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["processing_job"]:
                         l(k)
-                else:
-                    for k in v.keys():
-                        if k not in values["id_tag_registry"]["processing_job"]:
-                            l(k)
         return v
 
     @validator("processing_job_ids")
     def job_callback(cls, v, values):
         with global_env_lock:
             for l in values.get("listeners", {}).get("processing_job_ids", []):
-                if values.get("processing_job_ids"):
-                    for k in set(values["processing_job_ids"].keys()) ^ set(v.keys()):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["auto_proc_program"]:
                         l(k, v[k]["ispyb-relion"])
-                else:
-                    for k in v.keys():
-                        if k not in values["id_tag_registry"]["auto_proc_program"]:
-                            l(k, v[k]["ispyb-relion"])
         return v
 
     @validator("autoproc_program_ids")
@@ -122,19 +108,13 @@ class MurfeyInstanceEnvironment(BaseModel):
         # logger.info(f"autoproc program ids validator: {v}")
         with global_env_lock:
             for l in values.get("listeners", {}).get("autoproc_program_ids", []):
-                if values.get("autoproc_program_ids"):
-                    for k in set(values["autoproc_program_ids"].keys()) ^ set(v.keys()):
-                        if v[k].get("em-tomo-preprocess"):
-                            l(k, v[k]["em-tomo-preprocess"])
-                else:
-                    for k in v.keys():
-                        if v[k].get("em-tomo-preprocess"):
-                            l(k, v[k]["em-tomo-preprocess"])
+                for k in v.keys():
+                    if v[k].get("em-tomo-preprocess"):
+                        l(k, v[k]["em-tomo-preprocess"])
         return v
 
     @validator("motion_corrected_movies")
     def motion_corrected_callback(cls, v, values):
-        # logger.info("motion corrected callback")
         _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
         for l in values.get("listeners", {}).get("motion_corrected_movies", []):
             if values.get("motion_corrected_movies"):
@@ -145,9 +125,6 @@ class MurfeyInstanceEnvironment(BaseModel):
                     file_tilt_list = []
                     for movie, angle in values["tilt_angles"][tilt]:
                         if movie in v:  # values["motion_corrected_movies"]:
-                            # file_tilt_list.append(
-                            #    [values["motion_corrected_movies"][movie], angle]
-                            # )
                             file_tilt_list.append(
                                 [
                                     str(v[Path(movie)][0]),
