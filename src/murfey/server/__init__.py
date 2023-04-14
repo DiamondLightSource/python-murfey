@@ -381,7 +381,13 @@ def feedback_callback(header: dict, message: dict) -> None:
             c2aperture=message.get("c2aperture"),
             phasePlate=int(message.get("phase_plate", 0)),
         )
-        dcid = _register(record, header, tag=message.get("tag"))
+        dcid = _register(
+            record,
+            header,
+            tag=message.get("tag")
+            if message["experiment_type"] == "tomography"
+            else "",
+        )
         if dcid is None and _transport_object:
             _transport_object.transport.nack(header)
             return None
