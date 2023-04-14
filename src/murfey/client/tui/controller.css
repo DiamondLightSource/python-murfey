@@ -84,6 +84,18 @@ Input {
     background: purple;
 }
 
+#clear {
+    width: 100%;
+    height: 20%;
+    column-span: 1;
+    background: teal;
+    border: solid black;
+}
+
+#clear:hover {
+    background: purple;
+}
+
 #dir-select {
     width: 100%;
     height: 100%;
@@ -255,7 +267,7 @@ Input {
 
 #selected-directories {
     width: 100%;
-    height: 100%;
+    height:75%;
     column-span: 1;
     row-span: 2;
 }
@@ -279,6 +291,13 @@ Input {
 #input-form {
     width: 100%;
     height: 100%;
+    background: black;
+}
+
+#selected-directories-vert {
+    width: 100%;
+    height: 100%;
+    row-span: 2;
     background: black;
 }
 

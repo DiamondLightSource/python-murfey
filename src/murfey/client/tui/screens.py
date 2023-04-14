@@ -225,7 +225,10 @@ class LaunchScreen(Screen):
 
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
-        yield text_log
+        text_log_block = Vertical(
+            text_log, Button("Clear", id="clear"), id="selected-directories-vert"
+        )
+        yield text_log_block
 
         text_log.write("Selected directories:\n")
         btn_disabled = True
@@ -292,6 +295,15 @@ class LaunchScreen(Screen):
             )
             self.app.pop_screen()
             self.app.push_screen("destination-select-screen")
+        elif event.button.id == "clear":
+            sel_dir = self.query_one("#selected-directories")
+            for line in sel_dir.lines[1:]:
+                source = Path(line.text)
+                if source in self.app._environment.sources:
+                    self.app._environment.sources.remove(source)
+                    del self.app._default_destinations[source]
+            sel_dir.clear()
+            sel_dir.write("Selected directories:\n")
 
 
 class ConfirmScreen(Screen):
