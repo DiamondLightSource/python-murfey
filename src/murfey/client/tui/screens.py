@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
 
+import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
@@ -32,6 +33,7 @@ from textual.widgets import (
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import SPAContext
+from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
@@ -198,7 +200,25 @@ class _DirectoryTree(DirectoryTree):
                 self.valid_selection = False
         else:
             self.valid_selection = False
-            self.post_message(self.FileSelected(dir_entry.path))
+
+
+class _DirectoryTreeGain(DirectoryTree):
+    valid_selection = reactive(False)
+
+    def __init__(self, gain_reference: Path, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._gain_reference = gain_reference
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        event.stop()
+        dir_entry = event.node.data
+        if dir_entry is None:
+            return
+        if not dir_entry.is_dir:
+            self.valid_selection = True
+            self._gain_reference = Path(dir_entry.path)
+        else:
+            self.valid_selection = False
 
 
 class LaunchScreen(Screen):
@@ -467,10 +487,10 @@ class VisitSelection(SwitchSelection):
         text = str(event.button.label)
         self.app._visit = text
         self.app._environment.visit = text
+        machine_data = requests.get(
+            f"{self.app._environment.url.geturl()}/machine/"
+        ).json()
         if self._switch_status:
-            machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine/"
-            ).json()
             self.app.install_screen(
                 DirectorySelection(
                     [
@@ -482,6 +502,84 @@ class VisitSelection(SwitchSelection):
                 "directory-select",
             )
         self.app.pop_screen()
+
+        if machine_data.get("gain_reference_directory"):
+            self.app.install_screen(
+                GainReference(
+                    determine_gain_ref(Path(machine_data["gain_reference_directory"])),
+                    self._switch_status,
+                ),
+                "gain-ref-select",
+            )
+            self.app.push_screen("gain-ref-select")
+        else:
+            if self._switch_status:
+                self.app.push_screen("directory-select")
+            else:
+                self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
+                self.app.push_screen("launcher")
+
+
+class GainReference(Screen):
+    def __init__(self, gain_reference: Path, switch_status: bool, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._gain_reference = gain_reference
+        self._switch_status = switch_status
+
+    def compose(self):
+        self._dir_tree = _DirectoryTreeGain(
+            self._gain_reference,
+            str(self._gain_reference.parent.parent),
+            id="gain-select",
+        )
+        yield self._dir_tree
+        self._launch_btn = Button("Launch", id="launch")
+        self.watch(self._dir_tree, "valid_selection", self._check_valid_selection)
+        yield self._launch_btn
+        yield Button("No gain", id="skip-gain")
+
+    def _check_valid_selection(self, valid: bool):
+        if self._launch_btn:
+            if valid:
+                self._launch_btn.disabled = False
+            else:
+                self._launch_btn.disabled = True
+
+    def on_button_pressed(self, event):
+        if event.button.id == "skip-gain":
+            self.app.pop_screen()
+        else:
+            visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
+            cmd = [
+                "rsync",
+                str(self._dir_tree._gain_reference),
+                f"{self.app._environment.url.hostname}::{visit_path}/processing",
+            ]
+            if self.app._environment.demo:
+                log.info(f"Would perform {' '.join(cmd)}")
+            else:
+                gain_rsync = procrunner.run(cmd)
+                if gain_rsync.returncode:
+                    log.warning(
+                        f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
+                    )
+        process_gain_response = requests.post(
+            url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
+            json={
+                "gain_ref": str(self._dir_tree._gain_reference),
+            },
+        )
+        if str(process_gain_response.status_code).startswith("4"):
+            log.warning(
+                f"Gain processing failed: status code {process_gain_response.status_code}"
+            )
+        else:
+            log.info(
+                f"Gain reference file {process_gain_response.json().get('gain_ref')}"
+            )
+            self.app._environment.data_collection_parameters[
+                "gain_ref"
+            ] = process_gain_response.json().get("gain_ref")
         if self._switch_status:
             self.app.push_screen("directory-select")
         else:
