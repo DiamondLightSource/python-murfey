@@ -24,6 +24,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    GainReference,
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
@@ -350,3 +351,21 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
         / str(datetime.datetime.now().year)
     )
     log.info(f"Write to connection file at {filepath}")
+
+
+@router.post("/visits/{visit_name}/process_gain")
+async def process_gain(visit_name, gain_reference_params: GainReference):
+    if machine_config.get("rsync_basepath"):
+        filepath = (
+            Path(machine_config["rsync_basepath"])
+            / (machine_config.get("rsync_module") or "data")
+            / str(datetime.datetime.now().year)
+            / visit_name
+        )
+    else:
+        return {"gain_ref": None}
+    return {
+        "gain_ref": (filepath / "processing" / "gain.mrc").relative_to(
+            Path(machine_config["rsync_basepath"])
+        )
+    }

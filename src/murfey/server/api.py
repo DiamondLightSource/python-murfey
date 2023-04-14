@@ -459,8 +459,8 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
 @router.post("/visits/{visit_name}/write_connections_file")
 def write_conn_file(visit_name, params: ConnectionFileParameters):
     filepath = (
-        Path(machine_config["rsync_basepath"])
-        / (machine_config.get("rsync_module") or "data")
+        Path(machine_config.rsync_basepath)
+        / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
     )
@@ -473,10 +473,21 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
     executables = machine_config.external_executables
-    new_gain_ref = await prepare_gain(
-        camera, gain_reference_params.gain_ref, executables
+    filepath = (
+        Path(machine_config.rsync_basepath)
+        / (machine_config.rsync_module or "data")
+        / str(datetime.datetime.now().year)
+        / secure_filename(visit_name)
     )
-    return {"gain_ref": new_gain_ref}
+    new_gain_ref = await prepare_gain(
+        camera, filepath / gain_reference_params.gain_ref.name, executables
+    )
+    if new_gain_ref:
+        return {
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath))
+        }
+    else:
+        return {"gain_ref": new_gain_ref}
 
 
 @router.post("/visits/{visit_name}/clean_state")

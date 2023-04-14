@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
-# import contextlib
 import logging
 from datetime import datetime
 from functools import partial
@@ -22,6 +19,7 @@ from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
+    ConfirmScreen,
     InputResponse,
     MainScreen,
     ProcessingForm,
@@ -251,6 +249,15 @@ class MurfeyTUI(App):
             return
         if self._register_dc and response.get("form"):
             self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
+            log.info(
+                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
+            )
+            if self._form_values.get("gain_ref") in (None, "None"):
+                log.info(self._form_values)
+                self._form_values[
+                    "gain_ref"
+                ] = self._environment.data_collection_parameters.get("gain_ref")
+            log.info(self._form_values)
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
         elif self._register_dc is None:
@@ -430,31 +437,28 @@ class MurfeyTUI(App):
         exit()
 
     async def action_clear(self) -> None:
-        destination = ""
-        if self.rsync_process:
-            destination = (
-                self.rsync_process._remote.split("::")[1]
-                if "::" in self.rsync_process._remote
-                else self.rsync_process._remote
+        if self.rsync_processes:
+            sources = "\n".join(str(k) for k in self.rsync_processes.keys())
+            prompt = f"Remove files from the following: {sources}"
+            self.install_screen(
+                ConfirmScreen(
+                    prompt,
+                    pressed_callback=self._remove_data,
+                    button_names={"launch": "Yes", "quit": "No"},
+                ),
+                "clear-confirm",
             )
-        self._queues["input"].put_nowait(
-            InputResponse(
-                question=f"Are you sure you want to remove all copied data? [{self._source} -> {destination}]",
-                allowed_responses=["y", "n"],
-                callback=partial(self._confirm_clear),
-            )
+            self.push_screen("clear-confirm")
+
+    def _remove_data(self, **kwargs):
+        log.info(
+            f"Starting to remove data files {self._environment.demo}, {len(self.rsync_processes)}"
         )
-
-    async def action_process(self) -> None:
-        self.processing_btn.disabled = False
-
-    def _confirm_clear(self, response: str):
-        if response == "y":
-            if self._do_transfer and self.rsync_process:
-                destination = self.rsync_process._remote
-                self.rsync_process.stop()
-                if self.analyser:
-                    self.analyser.stop()
+        if self.rsync_processes or self._environment.demo:
+            for k, rp in self.rsync_processes.items():
+                rp.stop()
+                if self.analysers.get(k):
+                    self.analysers[k].stop()
                 cmd = [
                     "rsync",
                     "-iiv",
@@ -463,14 +467,20 @@ class MurfeyTUI(App):
                     "--remove-source-files",
                 ]
                 cmd.extend(
-                    str(f.relative_to(self._source.absolute()))
-                    for f in self._source.absolute().glob("**/*")
+                    str(f.relative_to(k.absolute())) for f in k.absolute().glob("**/*")
                 )
-                cmd.append(destination)
-                result = procrunner.run(cmd)
-                log.info(
-                    f"rsync with removal finished with return code {result.returncode}"
-                )
+                cmd.append(rp._remote)
+                if self._environment.demo:
+                    log.info(
+                        f"rsync command {' '.join(cmd)} with removal in working directory {rp._basepath}"
+                    )
+                else:
+                    result = procrunner.run(cmd, working_directory=str(rp._basepath))
+                    log.info(
+                        f"rsync command {' '.join(cmd)} with removal finished with return code {result.returncode}"
+                    )
+        self.exit()
+        exit()
 
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.action_quit())
+    async def action_process(self) -> None:
+        self.processing_btn.disabled = False
