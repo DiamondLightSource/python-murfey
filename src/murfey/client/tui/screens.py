@@ -335,6 +335,7 @@ class ConfirmScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.pop_screen()
+            self.app.uninstall_screen("confirm")
         else:
             while True:
                 try:
@@ -364,15 +365,24 @@ class ProcessingForm(Screen):
         for k in analyser._context.user_params + analyser._context.metadata_params:
             t = k.label
             inputs.append(Label(t, classes="label"))
-            i = Input(placeholder=t, classes="input")
+            i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
             self._inputs[i] = k.name
             default = self._form.get(k.name)
             i.value = "None" if default is None else default
             inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
-        self._vert = Vertical(*inputs, confirm_btn, id="input-form")
+        if self._form.get("motion_corr_binning") == "2":
+            self._vert = Vertical(
+                *inputs,
+                Label("Collected in super resoultion mode:"),
+                Switch(id="superres", value=True),
+                confirm_btn,
+                id="input-form",
+            )
+        else:
+            self._vert = Vertical(*inputs, confirm_btn, id="input-form")
         yield self._vert
-        yield confirm_btn
+        # yield confirm_btn
 
     def _write_params(self, params: dict | None = None):
         if params:
@@ -380,6 +390,16 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
+
+    def on_switch_changed(self, event):
+        pix_size = self.query_one("#input_pixel_size_on_image")
+        motion_corr_binning = self.query_one("#input_motion_corr_binning")
+        if event.value:
+            pix_size.value = str(float(pix_size.value) / 2)
+            motion_corr_binning.value = "2"
+        else:
+            pix_size.value = str(float(pix_size.value) * 2)
+            motion_corr_binning.value = "1"
 
     def on_input_changed(self, event):
         k = self._inputs[event.input]
