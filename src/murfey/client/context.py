@@ -94,6 +94,14 @@ class SPAContext(Context):
         ProcessingParameter(
             "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
+        ProcessingParameter(
+            "estimate_particle_diameter",
+            "Use crYOLO to Estimate Particle Diameter",
+            default=True,
+        ),
+        ProcessingParameter(
+            "particle_diameter", "Particle Diameter (Angstroms)", default=0
+        ),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -195,6 +203,8 @@ class SPAContext(Context):
                 "extract_small_boxsize": parameters["small_boxsize"],
                 "mask_diameter": parameters["mask_diameter"],
                 "autopick_do_cryolo": parameters["use_cryolo"],
+                "particle_diameter": parameters["particle_diameter"],
+                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
             },
         }
         requests.post(proc_url, json=msg)
@@ -329,6 +339,8 @@ class SPAContext(Context):
         metadata["small_boxsize"] = TUIFormValue(128)
         metadata["eer_grouping"] = TUIFormValue(20)
         metadata["source"] = TUIFormValue(str(self._basepath))
+        metadata["particle_diameter"] = TUIFormValue(0)
+        metadata["estimate_particle_diameter"] = TUIFormValue(True)
         metadata.move_to_end("gain_ref", last=False)
         metadata.move_to_end("dose_per_frame", last=False)
         return metadata

@@ -247,11 +247,6 @@ def run():
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
     gain_ref: Path | None = None
-    # if machine_data.get("gain_reference_directory"):
-    #     try:
-    #         gain_ref = determine_gain_ref(machine_data["gain_reference_directory"])
-    #     except RuntimeError:
-    #         pass
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
