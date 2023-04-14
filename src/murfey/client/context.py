@@ -186,7 +186,7 @@ class SPAContext(Context):
             import_images = (
                 f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
             )
-        msg = {
+        msg: Dict[str, Any] = {
             "tag": tag,
             "recipe": "ispyb-relion",
             "parameters": {
@@ -203,10 +203,11 @@ class SPAContext(Context):
                 "extract_small_boxsize": parameters["small_boxsize"],
                 "mask_diameter": parameters["mask_diameter"],
                 "autopick_do_cryolo": parameters["use_cryolo"],
-                "particle_diameter": parameters["particle_diameter"],
                 "estimate_particle_diameter": parameters["estimate_particle_diameter"],
             },
         }
+        if parameters["particle_diameter"]:
+            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
         requests.post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
