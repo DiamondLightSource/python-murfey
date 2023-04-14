@@ -251,6 +251,15 @@ class MurfeyTUI(App):
             return
         if self._register_dc and response.get("form"):
             self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
+            log.info(
+                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
+            )
+            if self._form_values.get("gain_ref") in (None, "None"):
+                log.info(self._form_values)
+                self._form_values[
+                    "gain_ref"
+                ] = self._environment.data_collection_parameters.get("gain_ref")
+            log.info(self._form_values)
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
         elif self._register_dc is None:

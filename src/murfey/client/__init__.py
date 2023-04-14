@@ -27,7 +27,6 @@ import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler, DirectableRichHandler
-from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
@@ -248,11 +247,11 @@ def run():
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
     gain_ref: Path | None = None
-    if machine_data.get("gain_reference_directory"):
-        try:
-            gain_ref = determine_gain_ref(machine_data["gain_reference_directory"])
-        except RuntimeError:
-            pass
+    # if machine_data.get("gain_reference_directory"):
+    #     try:
+    #         gain_ref = determine_gain_ref(machine_data["gain_reference_directory"])
+    #     except RuntimeError:
+    #         pass
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
