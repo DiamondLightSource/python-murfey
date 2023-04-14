@@ -127,13 +127,7 @@ class SPAContext(Context):
     ):
         logger.info(f"registering data collection with data {data}")
         environment.id_tag_registry["data_collection"].append(tag)
-        machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
-        )
-        image_directory = str(
-            Path(machine_config.get("rsync_basepath", "."))
-            / environment.default_destinations[Path(tag)]
-        )
+        image_directory = str(environment.default_destinations[Path(tag)])
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],

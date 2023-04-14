@@ -420,7 +420,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "source": dc_params.source,
         "magnification": dc_params.magnification,
         "total_exposed_dose": dc_params.total_exposed_dose,
-        "c2paerture": dc_params.c2aperture,
+        "c2aperture": dc_params.c2aperture,
         "exposure_time": dc_params.exposure_time,
         "slit_width": dc_params.slit_width,
         "phase_plate": dc_params.phase_plate,
