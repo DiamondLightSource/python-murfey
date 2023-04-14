@@ -313,12 +313,14 @@ class ConfirmScreen(Screen):
         *args,
         params: dict | None = None,
         pressed_callback: Callable | None = None,
+        button_names: dict | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._prompt = prompt
         self._params = params or {}
         self._callback = pressed_callback
+        self._button_names = button_names or {}
 
     def compose(self):
         if self._params:
@@ -329,8 +331,8 @@ class ConfirmScreen(Screen):
             yield dt
         else:
             yield Static(self._prompt, id="prompt")
-        yield Button("Launch", id="launch")
-        yield Button("Back", id="quit")
+        yield Button(self._button_names.get("launch") or "Launch", id="launch")
+        yield Button(self._button_names.get("quit") or "Back", id="quit")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
