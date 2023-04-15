@@ -9,7 +9,7 @@ from typing import Type
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
-from murfey.client.tui.forms import FormDependency, TUIFormValue
+from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
 from murfey.util.models import DCParametersSPA, DCParametersTomo
 
@@ -177,14 +177,12 @@ class Analyser(Observer):
                         else:
                             self._unseen_xml = []
                             if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"].data
+                                self._extension = dc_metadata["file_extension"]
                             else:
-                                dc_metadata["file_extension"] = TUIFormValue(
-                                    self._extension
-                                )
-                            dc_metadata["acquisition_software"] = TUIFormValue(
-                                self._context._acquisition_software
-                            )
+                                dc_metadata["file_extension"] = self._extension
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
                             self.notify(
                                 {
                                     "form": dc_metadata,
@@ -218,14 +216,12 @@ class Analyser(Observer):
                         if dc_metadata:
                             self._unseen_xml = []
                             if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"].data
+                                self._extension = dc_metadata["file_extension"]
                             else:
-                                dc_metadata["file_extension"] = TUIFormValue(
-                                    self._extension
-                                )
-                            dc_metadata["acquisition_software"] = TUIFormValue(
-                                self._context._acquisition_software
-                            )
+                                dc_metadata["file_extension"] = self._extension
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
                             self.notify(
                                 {
                                     "form": dc_metadata,

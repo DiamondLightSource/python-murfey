@@ -38,7 +38,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.client.tui.forms import FormDependency, TUIFormValue
+from murfey.client.tui.forms import FormDependency
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -117,7 +117,7 @@ class InputResponse(NamedTuple):
     callback: Callable | None = None
     key_change_callback: Callable | None = None
     kwargs: dict | None = None
-    form: OrderedDict[str, TUIFormValue] | None = None
+    form: OrderedDict[str, Any] | None = None
     model: BaseModel | None = None
 
 
