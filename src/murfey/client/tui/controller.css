@@ -298,11 +298,6 @@ Input {
     row-span: 1;
 }
 
-#superres {
-    width: 50%;
-    height: 10fr;
-}
-
 #label-directory {
     width: 100%;
     height: 100%;

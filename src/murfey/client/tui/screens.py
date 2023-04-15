@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
 from rich.panel import Panel
 from textual.app import ScreenStackError
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import Screen
@@ -245,7 +245,7 @@ class LaunchScreen(Screen):
 
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
-        text_log_block = Vertical(
+        text_log_block = VerticalScroll(
             text_log, Button("Clear", id="clear"), id="selected-directories-vert"
         )
         yield text_log_block
@@ -399,15 +399,15 @@ class ProcessingForm(Screen):
             inputs.append(i)
         confirm_btn = Button("Confirm", id="confirm-btn")
         if self._form.get("motion_corr_binning") == "2":
-            self._vert = Vertical(
+            self._vert = VerticalScroll(
                 *inputs,
                 Label("Collected in super resoultion mode:"),
-                Switch(id="superres", value=True),
+                Switch(id="superres", value=True, classes="input"),
                 confirm_btn,
                 id="input-form",
             )
         else:
-            self._vert = Vertical(*inputs, confirm_btn, id="input-form")
+            self._vert = VerticalScroll(*inputs, confirm_btn, id="input-form")
         yield self._vert
 
     def _write_params(self, params: dict | None = None):
@@ -473,7 +473,7 @@ class SwitchSelection(Screen):
             if self._elements
             else [Button("No elements found")]
         )
-        yield Vertical(*hovers, id=f"select-{self._name}")
+        yield VerticalScroll(*hovers, id=f"select-{self._name}")
         yield Static(self._switch_label, id=f"label-{self._name}")
         yield Switch(id=f"switch-{self._name}", value=self._switch_status)
 
@@ -651,7 +651,7 @@ class DestinationSelect(Screen):
                         value=d, id=f"destination-{str(s)}", classes="input-destination"
                     )
                 )
-        yield Vertical(*bulk, id="destination-holder")
+        yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid:
             for k in SPAContext.user_params:
@@ -659,7 +659,7 @@ class DestinationSelect(Screen):
                 params_bulk.append(
                     Input(value=str(k.default), id=k.name, classes="input-destination")
                 )
-        yield Vertical(
+        yield VerticalScroll(
             *params_bulk,
             id="user-params",
         )
