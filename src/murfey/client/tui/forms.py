@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from collections import UserString
-from typing import Any
+from typing import Any, Dict, NamedTuple
+
+
+class FormDependency(NamedTuple):
+    dependencies: Dict[str, bool | str]
+    trigger_value: bool = True
 
 
 class TUIFormValue(UserString):

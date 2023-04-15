@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
+from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
 
 import procrunner
 import requests
@@ -38,7 +38,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.client.tui.forms import TUIFormValue
+from murfey.client.tui.forms import FormDependency, TUIFormValue
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -164,14 +164,14 @@ class QuickPrompt:
         return bool(self._text)
 
 
-def validate_form(form: dict, model: BaseModel) -> dict:
+def validate_form(form: dict, model: BaseModel) -> bool:
     try:
         validated = model(**form)
         log.info(validated.dict())
-        return validated.dict()
+        return True
     except (AttributeError, ValidationError) as e:
         log.warning(f"Form validation failed: {str(e)}")
-        return {}
+        return False
 
 
 class _DirectoryTree(DirectoryTree):
@@ -321,7 +321,8 @@ class LaunchScreen(Screen):
                 source = Path(line.text)
                 if source in self.app._environment.sources:
                     self.app._environment.sources.remove(source)
-                    del self.app._default_destinations[source]
+                    if self.app._default_destinations.get(source):
+                        del self.app._default_destinations[source]
             sel_dir.clear()
             sel_dir.write("Selected directories:\n")
 
@@ -376,10 +377,19 @@ class ProcessingForm(Screen):
     _form = reactive({})
     _vert = None
 
-    def __init__(self, form: dict, *args, **kwargs):
+    def __init__(
+        self,
+        form: dict,
+        *args,
+        dependencies: Dict[str, FormDependency] | None = None,
+        model: BaseModel | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._form = form
         self._inputs: Dict[Input, str] = {}
+        self._dependencies = dependencies or {}
+        self._model = model
 
     def compose(self):
         inputs = []
@@ -393,10 +403,13 @@ class ProcessingForm(Screen):
                 i = Switch(value=False, classes="input", id=f"switch_{k.name}")
             else:
                 i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
+                default = self._form.get(k.name)
+                i.value = "None" if default is None else default
             self._inputs[i] = k.name
-            default = self._form.get(k.name)
-            i.value = "None" if default is None else default
             inputs.append(i)
+        for i, k in self._inputs.items():
+            log.info(f"checking dependency {k}, {i.value}")
+            self._check_dependency(k, i.value)
         confirm_btn = Button("Confirm", id="confirm-btn")
         if self._form.get("motion_corr_binning") == "2":
             self._vert = VerticalScroll(
@@ -430,12 +443,33 @@ class ProcessingForm(Screen):
         else:
             k = self._inputs[event.switch]
             self._form[k] = event.value
+            self._check_dependency(k, event.value)
+
+    def _check_dependency(self, key: str, value: Any):
+        if x := self._dependencies.get(key):
+            for d, v in x.dependencies.items():
+                if value == x.trigger_value:
+                    self._form[d] = v
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.value = v
+                            i.disabled = True
+                            break
+                else:
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.disabled = False
+                            break
 
     def on_input_changed(self, event):
         k = self._inputs[event.input]
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
+        if self._model:
+            valid = validate_form(self._form, self._model)
+            if not valid:
+                return
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
                 ConfirmScreen(
@@ -718,7 +752,9 @@ class MainScreen(Screen):
             if len(self.app.visits)
             else [Button("No ongoing visits found")]
         )
-        self.app.processing_form = ProcessingForm(self.app._form_values)
+        self.app.processing_form = ProcessingForm(
+            self.app._form_values, dependencies=self.app._form_dependencies
+        )
         yield Header()
         info_widget = TextLog(id="info", markup=True)
         yield info_widget

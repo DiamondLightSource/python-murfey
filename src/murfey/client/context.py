@@ -83,17 +83,6 @@ class SPAContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
         ),
-        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
-        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
-        ProcessingParameter("boxsize", "Box Size", default=256),
-        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
-        ProcessingParameter(
-            "mask_diameter", "Mask Diameter (2D classification)", default=190
-        ),
-        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
-        ProcessingParameter(
-            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
-        ),
         ProcessingParameter(
             "estimate_particle_diameter",
             "Use crYOLO to Estimate Particle Diameter",
@@ -101,6 +90,17 @@ class SPAContext(Context):
         ),
         ProcessingParameter(
             "particle_diameter", "Particle Diameter (Angstroms)", default=0
+        ),
+        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
+        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
+        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter(
+            "mask_diameter", "Mask Diameter (2D classification)", default=190
+        ),
+        ProcessingParameter("boxsize", "Box Size", default=256),
+        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
+        ProcessingParameter(
+            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
     ]
     metadata_params = [
