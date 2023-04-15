@@ -387,7 +387,12 @@ class ProcessingForm(Screen):
         for k in analyser._context.user_params + analyser._context.metadata_params:
             t = k.label
             inputs.append(Label(t, classes="label"))
-            i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
+            if self._form.get(k.name) in ("true", "True", True):
+                i = Switch(value=True, classes="input", id=f"switch_{k.name}")
+            elif self._form.get(k.name) in ("false", "False", False):
+                i = Switch(value=False, classes="input", id=f"switch_{k.name}")
+            else:
+                i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
             self._inputs[i] = k.name
             default = self._form.get(k.name)
             i.value = "None" if default is None else default
@@ -404,7 +409,6 @@ class ProcessingForm(Screen):
         else:
             self._vert = Vertical(*inputs, confirm_btn, id="input-form")
         yield self._vert
-        # yield confirm_btn
 
     def _write_params(self, params: dict | None = None):
         if params:
@@ -414,14 +418,18 @@ class ProcessingForm(Screen):
             self.app._start_dc(params)
 
     def on_switch_changed(self, event):
-        pix_size = self.query_one("#input_pixel_size_on_image")
-        motion_corr_binning = self.query_one("#input_motion_corr_binning")
-        if event.value:
-            pix_size.value = str(float(pix_size.value) / 2)
-            motion_corr_binning.value = "2"
+        if event.switch.id == "superres":
+            pix_size = self.query_one("#input_pixel_size_on_image")
+            motion_corr_binning = self.query_one("#input_motion_corr_binning")
+            if event.value:
+                pix_size.value = str(float(pix_size.value) / 2)
+                motion_corr_binning.value = "2"
+            else:
+                pix_size.value = str(float(pix_size.value) * 2)
+                motion_corr_binning.value = "1"
         else:
-            pix_size.value = str(float(pix_size.value) * 2)
-            motion_corr_binning.value = "1"
+            k = self._inputs[event.switch]
+            self._form[k] = event.value
 
     def on_input_changed(self, event):
         k = self._inputs[event.input]
