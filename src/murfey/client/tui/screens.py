@@ -647,7 +647,13 @@ class GainReference(Screen):
 
 class DirectorySelection(SwitchSelection):
     def __init__(self, directories: List[str], *args, **kwargs):
-        super().__init__("directory", directories, "Multigrid", *args, **kwargs)
+        super().__init__(
+            "directory",
+            directories,
+            "Automatically transfer and trigger processing for new directories (recommended for multigrid)",
+            *args,
+            **kwargs,
+        )
 
     def on_button_pressed(self, event: Button.Pressed):
         self.app._multigrid = self._switch_status
