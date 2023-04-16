@@ -126,7 +126,6 @@ class Analyser(Observer):
         mdoc_for_reading = None
         while not self._halt_thread:
             transferred_file = self.queue.get()
-            logger.info(f"analysing file {transferred_file}")
             if not transferred_file:
                 self._halt_thread = True
                 continue
