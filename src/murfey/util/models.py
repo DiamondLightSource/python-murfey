@@ -122,6 +122,11 @@ class DCParametersTomo(BaseModel):
     file_extension: str
     acquisition_software: str
 
+    class Base(BaseModel):
+        dose_per_frame: float
+        gain_ref: Optional[str]
+        manual_tilt_offset: float
+
 
 class DCParametersSPA(BaseModel):
     dose_per_frame: float

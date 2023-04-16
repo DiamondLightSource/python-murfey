@@ -339,7 +339,8 @@ class TomographyContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
         ),
-        ProcessingParameter("manual_tilt_offset", "Tilt Offset"),
+        ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
+        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -347,7 +348,6 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
-        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):

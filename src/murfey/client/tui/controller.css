@@ -284,9 +284,14 @@ Input {
     background: gray;
 }
 
+#modality-select {
+    width: 100%;
+    height: 10%;
+}
+
 #selected-directories {
     width: 100%;
-    height:75%;
+    height:65%;
     column-span: 1;
     row-span: 2;
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
+from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
 
 import procrunner
 import requests
@@ -25,6 +25,7 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    OptionList,
     Static,
     Switch,
     TextLog,
@@ -32,7 +33,7 @@ from textual.widgets import (
 )
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.context import SPAContext
+from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
@@ -40,7 +41,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.tui.forms import FormDependency
 from murfey.util import get_machine_config
-from murfey.util.models import DCParametersSPA
+from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -233,6 +234,7 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
+        self._context = SPAContext
 
     def compose(self):
         machine_data = requests.get(
@@ -248,9 +250,11 @@ class LaunchScreen(Screen):
 
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
-        text_log_block = VerticalScroll(
-            text_log, Button("Clear", id="clear"), id="selected-directories-vert"
-        )
+        widgets = [text_log, Button("Clear", id="clear")]
+        if self.app._multigrid:
+            widgets.append(Label("Data collection modality:"))
+            widgets.append(OptionList("SPA", "Tomography", id="modality-select"))
+        text_log_block = VerticalScroll(*widgets, id="selected-directories-vert")
         yield text_log_block
 
         text_log.write("Selected directories:\n")
@@ -291,6 +295,14 @@ class LaunchScreen(Screen):
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
 
+    def on_option_list_option_selected(self, event):
+        log.info(f"option selected: {event.option}")
+        if event.option.prompt == "Tomography":
+            log.info("switching context to tomo")
+            self._context = TomographyContext
+        elif event.option.prompt == "SPA":
+            self._context = SPAContext
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
@@ -314,7 +326,9 @@ class LaunchScreen(Screen):
                     self.app._start_rsyncer(_default, visit_path=visit_path)
                 transfer_routes[s] = _default
             self.app.install_screen(
-                DestinationSelect(transfer_routes, dependencies=spa_form_dependencies),
+                DestinationSelect(
+                    transfer_routes, self._context, dependencies=spa_form_dependencies
+                ),
                 "destination-select-screen",
             )
             self.app.pop_screen()
@@ -651,6 +665,7 @@ class DestinationSelect(Screen):
     def __init__(
         self,
         transfer_routes: Dict[Path, str],
+        context: Type[SPAContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
         **kwargs,
@@ -661,6 +676,7 @@ class DestinationSelect(Screen):
         self._user_params: Dict[str, str] = {}
         self._dependencies = dependencies or {}
         self._inputs: Dict[Input, str] = {}
+        self._context = context
 
     def compose(self):
         bulk = []
@@ -698,7 +714,7 @@ class DestinationSelect(Screen):
         yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid:
-            for k in SPAContext.user_params:
+            for k in self._context.user_params:
                 params_bulk.append(Label(k.label))
                 val = self.app._environment.data_collection_parameters.get(
                     k.name
@@ -755,7 +771,7 @@ class DestinationSelect(Screen):
         if event.switch.id == "superres-multigrid":
             self.app._environment.superres = event.value
         else:
-            for k in SPAContext.user_params:
+            for k in self._context.user_params:
                 if event.switch.id == k.name:
                     self._user_params[k.name] = event.value
                     self._check_dependency(k.name, event.value)
@@ -767,13 +783,16 @@ class DestinationSelect(Screen):
             else:
                 self._destination_overrides[Path(event.input.id[12:])] = event.value
         else:
-            for k in SPAContext.user_params:
+            for k in self._context.user_params:
                 if event.input.id == k.name:
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
         if self.app._multigrid:
-            valid = validate_form(self._user_params, DCParametersSPA.Base)
+            if self._context == TomographyContext:
+                valid = validate_form(self._user_params, DCParametersTomo.Base)
+            else:
+                valid = validate_form(self._user_params, DCParametersSPA.Base)
             if not valid:
                 return
         for s, d in self._transfer_routes.items():
