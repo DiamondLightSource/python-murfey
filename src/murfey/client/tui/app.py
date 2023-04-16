@@ -45,6 +45,7 @@ class MurfeyTUI(App):
     rsync_processes: Dict[Path, RSyncer] = {}
     analysers: Dict[Path, Analyser] = {}
     _form_values: dict = reactive({})
+    _form_dependencies: dict = {}
 
     def __init__(
         self,
@@ -253,11 +254,10 @@ class MurfeyTUI(App):
                 f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
             )
             if self._form_values.get("gain_ref") in (None, "None"):
-                log.info(self._form_values)
                 self._form_values[
                     "gain_ref"
                 ] = self._environment.data_collection_parameters.get("gain_ref")
-            log.info(self._form_values)
+            self._form_dependencies = response.get("dependencies", {})
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
         elif self._register_dc is None:
@@ -352,7 +352,9 @@ class MurfeyTUI(App):
         self.bind("p", "process", description="Allow processing", show=True)
 
     def _install_processing_form(self):
-        self.processing_form = ProcessingForm(self._form_values)
+        self.processing_form = ProcessingForm(
+            self._form_values, dependencies=self._form_dependencies
+        )
         self.install_screen(self.processing_form, "processing-form")
 
     def on_input_submitted(self, event: Input.Submitted):

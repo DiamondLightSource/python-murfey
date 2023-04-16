@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, NamedTuple, OrderedDict, TypeVar
+from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
 
 import procrunner
 import requests
@@ -12,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
 from rich.panel import Panel
 from textual.app import ScreenStackError
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import Screen
@@ -25,20 +25,23 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    OptionList,
     Static,
     Switch,
     TextLog,
     Tree,
 )
 
-from murfey.client.analyser import Analyser
-from murfey.client.context import SPAContext
+from murfey.client.analyser import Analyser, spa_form_dependencies
+from murfey.client.context import SPAContext, TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.client.tui.forms import TUIFormValue
+from murfey.client.tui.forms import FormDependency
+from murfey.util import get_machine_config
+from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -117,7 +120,7 @@ class InputResponse(NamedTuple):
     callback: Callable | None = None
     key_change_callback: Callable | None = None
     kwargs: dict | None = None
-    form: OrderedDict[str, TUIFormValue] | None = None
+    form: OrderedDict[str, Any] | None = None
     model: BaseModel | None = None
 
 
@@ -164,14 +167,15 @@ class QuickPrompt:
         return bool(self._text)
 
 
-def validate_form(form: dict, model: BaseModel) -> dict:
+def validate_form(form: dict, model: BaseModel) -> bool:
     try:
-        validated = model(**form)
+        convert = lambda x: None if x == "None" else x
+        validated = model(**{k: convert(v) for k, v in form.items()})
         log.info(validated.dict())
-        return validated.dict()
+        return True
     except (AttributeError, ValidationError) as e:
         log.warning(f"Form validation failed: {str(e)}")
-        return {}
+        return False
 
 
 class _DirectoryTree(DirectoryTree):
@@ -230,6 +234,7 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
+        self._context = SPAContext
 
     def compose(self):
         machine_data = requests.get(
@@ -245,9 +250,11 @@ class LaunchScreen(Screen):
 
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
-        text_log_block = Vertical(
-            text_log, Button("Clear", id="clear"), id="selected-directories-vert"
-        )
+        widgets = [text_log, Button("Clear", id="clear")]
+        if self.app._multigrid:
+            widgets.append(Label("Data collection modality:"))
+            widgets.append(OptionList("SPA", "Tomography", id="modality-select"))
+        text_log_block = VerticalScroll(*widgets, id="selected-directories-vert")
         yield text_log_block
 
         text_log.write("Selected directories:\n")
@@ -288,6 +295,14 @@ class LaunchScreen(Screen):
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
 
+    def on_option_list_option_selected(self, event):
+        log.info(f"option selected: {event.option}")
+        if event.option.prompt == "Tomography":
+            log.info("switching context to tomo")
+            self._context = TomographyContext
+        elif event.option.prompt == "SPA":
+            self._context = SPAContext
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
             self.app.exit()
@@ -311,7 +326,10 @@ class LaunchScreen(Screen):
                     self.app._start_rsyncer(_default, visit_path=visit_path)
                 transfer_routes[s] = _default
             self.app.install_screen(
-                DestinationSelect(transfer_routes), "destination-select-screen"
+                DestinationSelect(
+                    transfer_routes, self._context, dependencies=spa_form_dependencies
+                ),
+                "destination-select-screen",
             )
             self.app.pop_screen()
             self.app.push_screen("destination-select-screen")
@@ -321,7 +339,8 @@ class LaunchScreen(Screen):
                 source = Path(line.text)
                 if source in self.app._environment.sources:
                     self.app._environment.sources.remove(source)
-                    del self.app._default_destinations[source]
+                    if self.app._default_destinations.get(source):
+                        del self.app._default_destinations[source]
             sel_dir.clear()
             sel_dir.write("Selected directories:\n")
 
@@ -376,10 +395,17 @@ class ProcessingForm(Screen):
     _form = reactive({})
     _vert = None
 
-    def __init__(self, form: dict, *args, **kwargs):
+    def __init__(
+        self,
+        form: dict,
+        *args,
+        dependencies: Dict[str, FormDependency] | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._form = form
         self._inputs: Dict[Input, str] = {}
+        self._dependencies = dependencies or {}
 
     def compose(self):
         inputs = []
@@ -387,24 +413,30 @@ class ProcessingForm(Screen):
         for k in analyser._context.user_params + analyser._context.metadata_params:
             t = k.label
             inputs.append(Label(t, classes="label"))
-            i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
+            if self._form.get(k.name) in ("true", "True", True):
+                i = Switch(value=True, classes="input", id=f"switch_{k.name}")
+            elif self._form.get(k.name) in ("false", "False", False):
+                i = Switch(value=False, classes="input", id=f"switch_{k.name}")
+            else:
+                i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
+                default = self._form.get(k.name)
+                i.value = "None" if default is None else default
             self._inputs[i] = k.name
-            default = self._form.get(k.name)
-            i.value = "None" if default is None else default
             inputs.append(i)
+        for i, k in self._inputs.items():
+            self._check_dependency(k, i.value)
         confirm_btn = Button("Confirm", id="confirm-btn")
         if self._form.get("motion_corr_binning") == "2":
-            self._vert = Vertical(
+            self._vert = VerticalScroll(
                 *inputs,
-                Label("Collected in super resoultion mode:"),
-                Switch(id="superres", value=True),
+                Label("Collected in super resoultion mode unbinned:"),
+                Switch(id="superres", value=True, classes="input"),
                 confirm_btn,
                 id="input-form",
             )
         else:
-            self._vert = Vertical(*inputs, confirm_btn, id="input-form")
+            self._vert = VerticalScroll(*inputs, confirm_btn, id="input-form")
         yield self._vert
-        # yield confirm_btn
 
     def _write_params(self, params: dict | None = None):
         if params:
@@ -414,20 +446,46 @@ class ProcessingForm(Screen):
             self.app._start_dc(params)
 
     def on_switch_changed(self, event):
-        pix_size = self.query_one("#input_pixel_size_on_image")
-        motion_corr_binning = self.query_one("#input_motion_corr_binning")
-        if event.value:
-            pix_size.value = str(float(pix_size.value) / 2)
-            motion_corr_binning.value = "2"
+        if event.switch.id == "superres":
+            pix_size = self.query_one("#input_pixel_size_on_image")
+            motion_corr_binning = self.query_one("#input_motion_corr_binning")
+            if event.value:
+                pix_size.value = str(float(pix_size.value) / 2)
+                motion_corr_binning.value = "2"
+            else:
+                pix_size.value = str(float(pix_size.value) * 2)
+                motion_corr_binning.value = "1"
         else:
-            pix_size.value = str(float(pix_size.value) * 2)
-            motion_corr_binning.value = "1"
+            k = self._inputs[event.switch]
+            self._form[k] = event.value
+            self._check_dependency(k, event.value)
+
+    def _check_dependency(self, key: str, value: Any):
+        if x := self._dependencies.get(key):
+            for d, v in x.dependencies.items():
+                if value == x.trigger_value:
+                    self._form[d] = v
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.value = v
+                            i.disabled = True
+                            break
+                else:
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.disabled = False
+                            break
 
     def on_input_changed(self, event):
         k = self._inputs[event.input]
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
+        if self.app.analysers.get(Path(self._form.get("source", ""))):
+            if model := self.app.analysers[Path(self._form["source"])].parameters_model:
+                valid = validate_form(self._form, model)
+                if not valid:
+                    return
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
                 ConfirmScreen(
@@ -465,7 +523,7 @@ class SwitchSelection(Screen):
             if self._elements
             else [Button("No elements found")]
         )
-        yield Vertical(*hovers, id=f"select-{self._name}")
+        yield VerticalScroll(*hovers, id=f"select-{self._name}")
         yield Static(self._switch_label, id=f"label-{self._name}")
         yield Switch(id=f"switch-{self._name}", value=self._switch_status)
 
@@ -604,11 +662,21 @@ class DirectorySelection(SwitchSelection):
 
 
 class DestinationSelect(Screen):
-    def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
+    def __init__(
+        self,
+        transfer_routes: Dict[Path, str],
+        context: Type[SPAContext] | Type[TomographyContext],
+        *args,
+        dependencies: Dict[str, FormDependency] | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
         self._destination_overrides: Dict[Path, str] = {}
         self._user_params: Dict[str, str] = {}
+        self._dependencies = dependencies or {}
+        self._inputs: Dict[Input, str] = {}
+        self._context = context
 
     def compose(self):
         bulk = []
@@ -643,19 +711,70 @@ class DestinationSelect(Screen):
                         value=d, id=f"destination-{str(s)}", classes="input-destination"
                     )
                 )
-        yield Vertical(*bulk, id="destination-holder")
+        yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid:
-            for k in SPAContext.user_params:
+            for k in self._context.user_params:
                 params_bulk.append(Label(k.label))
+                val = self.app._environment.data_collection_parameters.get(
+                    k.name
+                ) or str(k.default)
+                self._user_params[k.name] = val
+                if val in ("true", "True", True):
+                    i = Switch(value=True, id=k.name, classes="input-destination")
+                elif val in ("false", "False", False):
+                    i = Switch(value=False, id=k.name, classes="input-destination")
+                else:
+                    i = Input(value=val, id=k.name, classes="input-destination")
+                params_bulk.append(i)
+                self._inputs[i] = k.name
+            machine_config = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if machine_config.get("superres"):
                 params_bulk.append(
-                    Input(value=str(k.default), id=k.name, classes="input-destination")
+                    Label("Collected in super resoultion mode unbinned:")
                 )
-        yield Vertical(
+                params_bulk.append(
+                    Switch(
+                        value=False,
+                        id="superres-multigrid",
+                        classes="input-destination",
+                    )
+                )
+                self.app._environment.superres = False
+            for i, k in self._inputs.items():
+                self._check_dependency(k, i.value)
+        yield VerticalScroll(
             *params_bulk,
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
+
+    def _check_dependency(self, key: str, value: Any):
+        if x := self._dependencies.get(key):
+            for d, v in x.dependencies.items():
+                if value == x.trigger_value:
+                    self._user_params[d] = str(v)
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.value = v
+                            i.disabled = True
+                            break
+                else:
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.disabled = False
+                            break
+
+    def on_switch_changed(self, event):
+        if event.switch.id == "superres-multigrid":
+            self.app._environment.superres = event.value
+        else:
+            for k in self._context.user_params:
+                if event.switch.id == k.name:
+                    self._user_params[k.name] = event.value
+                    self._check_dependency(k.name, event.value)
 
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):
@@ -664,13 +783,18 @@ class DestinationSelect(Screen):
             else:
                 self._destination_overrides[Path(event.input.id[12:])] = event.value
         else:
-            for k in SPAContext.user_params:
+            for k in self._context.user_params:
                 if event.input.id == k.name:
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if any(v == "None" for v in self._user_params.values()):
-            return
+        if self.app._multigrid:
+            if self._context == TomographyContext:
+                valid = validate_form(self._user_params, DCParametersTomo.Base)
+            else:
+                valid = validate_form(self._user_params, DCParametersSPA.Base)
+            if not valid:
+                return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
             self.app._register_dc = True
@@ -710,7 +834,9 @@ class MainScreen(Screen):
             if len(self.app.visits)
             else [Button("No ongoing visits found")]
         )
-        self.app.processing_form = ProcessingForm(self.app._form_values)
+        self.app.processing_form = ProcessingForm(
+            self.app._form_values, dependencies=self.app._form_dependencies
+        )
         yield Header()
         info_widget = TextLog(id="info", markup=True)
         yield info_widget

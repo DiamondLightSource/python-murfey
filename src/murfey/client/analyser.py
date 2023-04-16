@@ -9,11 +9,27 @@ from typing import Type
 from murfey.client.context import Context, SPAContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
-from murfey.client.tui.forms import TUIFormValue
+from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
 from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
+
+spa_form_dependencies: dict = {
+    "use_cryolo": FormDependency(
+        dependencies={"estimate_particle_diameter": False}, trigger_value=False
+    ),
+    "estimate_particle_diameter": FormDependency(
+        dependencies={
+            "use_cryolo": True,
+            "boxsize": "None",
+            "small_boxsize": "None",
+            "mask_diameter": "None",
+            "particle_diameter": "None",
+        },
+        trigger_value=True,
+    ),
+}
 
 
 class Analyser(Observer):
@@ -161,15 +177,20 @@ class Analyser(Observer):
                         else:
                             self._unseen_xml = []
                             if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"].data
+                                self._extension = dc_metadata["file_extension"]
                             else:
-                                dc_metadata["file_extension"] = TUIFormValue(
-                                    self._extension
-                                )
-                            dc_metadata["acquisition_software"] = TUIFormValue(
-                                self._context._acquisition_software
+                                dc_metadata["file_extension"] = self._extension
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
+                            self.notify(
+                                {
+                                    "form": dc_metadata,
+                                    "dependencies": spa_form_dependencies
+                                    if isinstance(self._context, SPAContext)
+                                    else {},
+                                }
                             )
-                            self.notify({"form": dc_metadata})
             elif not self._extension or self._unseen_xml:
                 self._find_extension(transferred_file)
                 if self._extension:
@@ -195,15 +216,20 @@ class Analyser(Observer):
                         if dc_metadata:
                             self._unseen_xml = []
                             if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"].data
+                                self._extension = dc_metadata["file_extension"]
                             else:
-                                dc_metadata["file_extension"] = TUIFormValue(
-                                    self._extension
-                                )
-                            dc_metadata["acquisition_software"] = TUIFormValue(
-                                self._context._acquisition_software
+                                dc_metadata["file_extension"] = self._extension
+                            dc_metadata[
+                                "acquisition_software"
+                            ] = self._context._acquisition_software
+                            self.notify(
+                                {
+                                    "form": dc_metadata,
+                                    "dependencies": spa_form_dependencies
+                                    if isinstance(self._context, SPAContext)
+                                    else {},
+                                }
                             )
-                            self.notify({"form": dc_metadata})
             elif isinstance(self._context, TomographyContext):
                 _tilt_series = set(self._context._tilt_series.keys())
                 self._context.post_transfer(

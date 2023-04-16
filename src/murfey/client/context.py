@@ -17,7 +17,6 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.client.tui.forms import TUIFormValue
 from murfey.util import get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
@@ -83,17 +82,6 @@ class SPAContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
         ),
-        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
-        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
-        ProcessingParameter("boxsize", "Box Size", default=256),
-        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
-        ProcessingParameter(
-            "mask_diameter", "Mask Diameter (2D classification)", default=190
-        ),
-        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
-        ProcessingParameter(
-            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
-        ),
         ProcessingParameter(
             "estimate_particle_diameter",
             "Use crYOLO to Estimate Particle Diameter",
@@ -102,6 +90,18 @@ class SPAContext(Context):
         ProcessingParameter(
             "particle_diameter", "Particle Diameter (Angstroms)", default=0
         ),
+        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
+        ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
+        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter(
+            "mask_diameter", "Mask Diameter (2D classification)", default=190
+        ),
+        ProcessingParameter("boxsize", "Box Size", default=256),
+        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
+        ProcessingParameter(
+            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
+        ),
+        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -109,7 +109,6 @@ class SPAContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
-        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
@@ -234,20 +233,18 @@ class SPAContext(Context):
             data = xmltodict.parse(for_parsing)
         magnification = 0
         metadata: OrderedDict = OrderedDict({})
-        metadata["experiment_type"] = TUIFormValue("SPA")
+        metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
-            metadata["voltage"] = TUIFormValue(300)
-            metadata["image_size_x"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Width"]
-            )
-            metadata["image_size_y"] = TUIFormValue(
-                data["Acquisition"]["Info"]["ImageSize"]["Height"]
-            )
-            metadata["pixel_size_on_image"] = TUIFormValue(
-                float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
+            metadata["voltage"] = 300
+            metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"]["Width"]
+            metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
+                "Height"
+            ]
+            metadata["pixel_size_on_image"] = float(
+                data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
             )
         elif data.get("MicroscopeImage"):
-            metadata["voltage"] = TUIFormValue(
+            metadata["voltage"] = (
                 float(
                     data["MicroscopeImage"]["microscopeData"]["gun"][
                         "AccelerationVoltage"
@@ -255,46 +252,32 @@ class SPAContext(Context):
                 )
                 / 1000
             )
-            metadata["image_size_x"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                    "ReadoutArea"
-                ]["a:width"]
-            )
-            metadata["image_size_y"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                    "ReadoutArea"
-                ]["a:height"]
-            )
-            metadata["pixel_size_on_image"] = TUIFormValue(
-                data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-                    "numericValue"
-                ]
-            )
+            metadata["image_size_x"] = data["MicroscopeImage"]["microscopeData"][
+                "acquisition"
+            ]["camera"]["ReadoutArea"]["a:width"]
+            metadata["image_size_y"] = data["MicroscopeImage"]["microscopeData"][
+                "acquisition"
+            ]["camera"]["ReadoutArea"]["a:height"]
+            metadata["pixel_size_on_image"] = data["MicroscopeImage"]["SpatialScale"][
+                "pixelSize"
+            ]["x"]["numericValue"]
             magnification = data["MicroscopeImage"]["microscopeData"]["optics"][
                 "TemMagnification"
             ]["NominalMagnification"]
-            metadata["magnification"] = TUIFormValue(magnification)
-            metadata["total_exposed_dose"] = TUIFormValue(
-                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][0][
-                    "a:Value"
-                ]["#text"]
-            )
-            metadata["c2aperture"] = TUIFormValue(
-                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][3][
-                    "a:Value"
-                ]["#text"]
-            )
-            metadata["exposure_time"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                    "ExposureTime"
-                ]
-            )
-            metadata["slit_width"] = TUIFormValue(
-                data["MicroscopeImage"]["microscopeData"]["optics"]["EnergyFilter"][
-                    "EnergySelectionSlitWidth"
-                ]
-            )
-            metadata["phase_plate"] = TUIFormValue(
+            metadata["magnification"] = magnification
+            metadata["total_exposed_dose"] = data["MicroscopeImage"]["CustomData"][
+                "a:KeyValueOfstringanyType"
+            ][0]["a:Value"]["#text"]
+            metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
+                "a:KeyValueOfstringanyType"
+            ][3]["a:Value"]["#text"]
+            metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
+                "acquisition"
+            ]["camera"]["ExposureTime"]
+            metadata["slit_width"] = data["MicroscopeImage"]["microscopeData"][
+                "optics"
+            ]["EnergyFilter"]["EnergySelectionSlitWidth"]
+            metadata["phase_plate"] = (
                 1
                 if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
                     11
@@ -305,39 +288,41 @@ class SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
-        if environment and magnification:
+        binning_factor = 1
+        if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            ps_from_mag = (
-                server_config.get("calibrations", {})
-                .get("magnification", {})
-                .get(int(magnification))
-            )
-            if ps_from_mag:
-                metadata["pixel_size_on_image"] = TUIFormValue(
-                    float(ps_from_mag) * 1e-10
+            if server_config.get("superres") and environment.superres:
+                binning_factor = 2
+            if magnification:
+                ps_from_mag = (
+                    server_config.get("calibrations", {})
+                    .get("magnification", {})
+                    .get(int(magnification))
                 )
-        metadata["motion_corr_binning"] = TUIFormValue(1)
-        metadata["gain_ref"] = TUIFormValue(None, top=True)
-        metadata["dose_per_frame"] = TUIFormValue(
+                if ps_from_mag:
+                    metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
+        metadata["pixel_size_on_image"] = (
+            metadata["pixel_size_on_image"] / binning_factor
+        )
+        metadata["motion_corr_binning"] = binning_factor
+        metadata["gain_ref"] = None
+        metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
             if environment
-            else None,
-            top=True,
+            else None
         )
-        metadata["use_cryolo"] = TUIFormValue(True)
-        metadata["symmetry"] = TUIFormValue("C1")
-        metadata["mask_diameter"] = TUIFormValue(190)
-        metadata["boxsize"] = TUIFormValue(256)
-        metadata["downscale"] = TUIFormValue(False)
-        metadata["small_boxsize"] = TUIFormValue(128)
-        metadata["eer_grouping"] = TUIFormValue(20)
-        metadata["source"] = TUIFormValue(str(self._basepath))
-        metadata["particle_diameter"] = TUIFormValue(0)
-        metadata["estimate_particle_diameter"] = TUIFormValue(True)
-        metadata.move_to_end("gain_ref", last=False)
-        metadata.move_to_end("dose_per_frame", last=False)
+        metadata["use_cryolo"] = True
+        metadata["symmetry"] = "C1"
+        metadata["mask_diameter"] = 190
+        metadata["boxsize"] = 256
+        metadata["downscale"] = False
+        metadata["small_boxsize"] = 128
+        metadata["eer_grouping"] = 20
+        metadata["source"] = str(self._basepath)
+        metadata["particle_diameter"] = 0
+        metadata["estimate_particle_diameter"] = True
         return metadata
 
 
@@ -355,7 +340,8 @@ class TomographyContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
         ),
-        ProcessingParameter("manual_tilt_offset", "Tilt Offset"),
+        ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
+        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -363,7 +349,6 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
-        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
@@ -610,7 +595,10 @@ class TomographyContext(Context):
                         "tag": tilt_series,
                         "source": str(self._basepath),
                     }
-                    if environment.data_collection_parameters:
+                    if (
+                        environment.data_collection_parameters
+                        and environment.data_collection_parameters.get("voltage")
+                    ):
                         data.update(
                             {
                                 "voltage": environment.data_collection_parameters[
@@ -657,7 +645,7 @@ class TomographyContext(Context):
                             json={"tag": tilt_series, "recipe": "em-tomo-align"},
                         )
             except Exception as e:
-                logger.error(f"ERROR {e}")
+                logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
         else:
             if file_path not in self._tilt_series[tilt_series]:
                 for p in self._tilt_series[tilt_series]:
@@ -967,30 +955,26 @@ class TomographyContext(Context):
                 data = xmltodict.parse(for_parsing)
             try:
                 metadata: OrderedDict = OrderedDict({})
-                metadata["experiment_type"] = TUIFormValue("tomography")
-                metadata["voltage"] = TUIFormValue(300)
-                metadata["image_size_x"] = TUIFormValue(
-                    data["Acquisition"]["Info"]["ImageSize"]["Width"]
+                metadata["experiment_type"] = "tomography"
+                metadata["voltage"] = 300
+                metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"][
+                    "Width"
+                ]
+                metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
+                    "Height"
+                ]
+                metadata["pixel_size_on_image"] = float(
+                    data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
                 )
-                metadata["image_size_y"] = TUIFormValue(
-                    data["Acquisition"]["Info"]["ImageSize"]["Height"]
-                )
-                metadata["pixel_size_on_image"] = TUIFormValue(
-                    float(data["Acquisition"]["Info"]["SensorPixelSize"]["Height"])
-                )
-                metadata["motion_corr_binning"] = TUIFormValue(1)
-                metadata["gain_ref"] = TUIFormValue(None, top=True)
-                metadata["dose_per_frame"] = TUIFormValue(
+                metadata["motion_corr_binning"] = 1
+                metadata["gain_ref"] = None
+                metadata["dose_per_frame"] = (
                     environment.data_collection_parameters.get("dose_per_frame")
                     if environment
-                    else None,
-                    top=True,
-                    colour="dark_orange",
+                    else None
                 )
-                metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
-                metadata["source"] = TUIFormValue(str(self._basepath))
-                metadata.move_to_end("gain_ref", last=False)
-                metadata.move_to_end("dose_per_frame", last=False)
+                metadata["manual_tilt_offset"] = 0
+                metadata["source"] = str(self._basepath)
             except KeyError:
                 return OrderedDict({})
             return metadata
@@ -1000,20 +984,22 @@ class TomographyContext(Context):
         if not mdoc_data:
             return OrderedDict({})
         mdoc_metadata: OrderedDict = OrderedDict({})
-        mdoc_metadata["experiment_type"] = TUIFormValue("tomography")
-        mdoc_metadata["voltage"] = TUIFormValue(float(mdoc_data["Voltage"]))
-        mdoc_metadata["image_size_x"] = TUIFormValue(int(mdoc_data["ImageSize"][0]))
-        mdoc_metadata["image_size_y"] = TUIFormValue(int(mdoc_data["ImageSize"][1]))
-        mdoc_metadata["magnification"] = TUIFormValue(
-            int(mdoc_data_block["Magnification"])
-        )
+        mdoc_metadata["experiment_type"] = "tomography"
+        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
+        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
+        mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
         superres_binning = int(mdoc_data_block["Binning"])
         binning_factor = 1
         if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            if server_config.get("superres") and superres_binning == 1:
+            if (
+                server_config.get("superres")
+                and superres_binning == 1
+                and environment.superres
+            ):
                 binning_factor = 2
             ps_from_mag = (
                 server_config.get("calibrations", {})
@@ -1021,26 +1007,23 @@ class TomographyContext(Context):
                 .get(int(mdoc_data_block["Magnification"]))
             )
             if ps_from_mag:
-                mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+                mdoc_metadata["pixel_size_on_image"] = (
                     float(ps_from_mag) * 1e-10 / binning_factor
                 )
         if mdoc_metadata.get("pixel_size_on_image") is None:
-            mdoc_metadata["pixel_size_on_image"] = TUIFormValue(
+            mdoc_metadata["pixel_size_on_image"] = (
                 float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
             )
-        mdoc_metadata["motion_corr_binning"] = TUIFormValue(binning_factor)
-        mdoc_metadata["gain_ref"] = TUIFormValue(None, top=True)
-        mdoc_metadata["dose_per_frame"] = TUIFormValue(
+        mdoc_metadata["motion_corr_binning"] = binning_factor
+        mdoc_metadata["gain_ref"] = None
+        mdoc_metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
             if environment
-            else None,
-            top=True,
+            else None
         )
-        mdoc_metadata["manual_tilt_offset"] = TUIFormValue(0, top=True)
-        mdoc_metadata["source"] = TUIFormValue(str(self._basepath))
-        mdoc_metadata.move_to_end("gain_ref", last=False)
-        mdoc_metadata.move_to_end("dose_per_frame", last=False)
-        mdoc_metadata["file_extension"] = TUIFormValue(
-            f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
-        )
+        mdoc_metadata["manual_tilt_offset"] = 0
+        mdoc_metadata["source"] = str(self._basepath)
+        mdoc_metadata[
+            "file_extension"
+        ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
         return mdoc_metadata

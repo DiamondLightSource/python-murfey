@@ -122,6 +122,11 @@ class DCParametersTomo(BaseModel):
     file_extension: str
     acquisition_software: str
 
+    class Base(BaseModel):
+        dose_per_frame: float
+        gain_ref: Optional[str]
+        manual_tilt_offset: float
+
 
 class DCParametersSPA(BaseModel):
     dose_per_frame: float
@@ -136,10 +141,10 @@ class DCParametersSPA(BaseModel):
     acquisition_software: str
     use_cryolo: bool
     symmetry: str
-    mask_diameter: int
-    boxsize: int
+    mask_diameter: Optional[int]
+    boxsize: Optional[int]
     downscale: bool
-    small_boxsize: int
+    small_boxsize: Optional[int]
     eer_grouping: int
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
@@ -147,6 +152,17 @@ class DCParametersSPA(BaseModel):
     exposure_time: Optional[float] = None
     slit_width: Optional[float] = None
     phase_plate: bool = False
+
+    class Base(BaseModel):
+        dose_per_frame: float
+        gain_ref: Optional[str]
+        use_cryolo: bool
+        symmetry: str
+        mask_diameter: Optional[int]
+        boxsize: Optional[int]
+        downscale: bool
+        small_boxsize: Optional[int]
+        eer_grouping: int
 
 
 class ProcessingJobParameters(BaseModel):
