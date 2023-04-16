@@ -29,7 +29,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import _get_visit_list
+from murfey.util import _get_visit_list, get_machine_config
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -439,7 +439,10 @@ class MurfeyTUI(App):
         exit()
 
     async def action_clear(self) -> None:
-        if self.rsync_processes:
+        machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
+        if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following: {sources}"
             self.install_screen(
