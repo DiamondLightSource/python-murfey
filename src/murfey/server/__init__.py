@@ -316,146 +316,153 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
 
 
 def feedback_callback(header: dict, message: dict) -> None:
-    record = None
-    if "environment" in message:
-        message = message["payload"]
-    if message["register"] == "motion_corrected":
-        global_state.update(
-            "motion_corrected_movies",
-            {
-                message.get("movie"): [
-                    message.get("mrc_out"),
-                    message.get("movie_id"),
-                ]
-            },
-            perform_state_update=False,
-        )
+    try:
+        record = None
+        if "environment" in message:
+            message = message["payload"]
+        if message["register"] == "motion_corrected":
+            global_state.update(
+                "motion_corrected_movies",
+                {
+                    message.get("movie"): [
+                        message.get("mrc_out"),
+                        message.get("movie_id"),
+                    ]
+                },
+                perform_state_update=False,
+            )
 
-        if _transport_object:
-            _transport_object.transport.ack(header)
-        return None
-    elif message["register"] == "data_collection_group":
-        record = DataCollectionGroup(
-            sessionId=message["session_id"],
-            experimentType=message["experiment_type"],
-            experimentTypeId=message["experiment_type_id"],
-        )
-        dcgid = _register(record, header)
-        if _transport_object:
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "data_collection_group":
+            record = DataCollectionGroup(
+                sessionId=message["session_id"],
+                experimentType=message["experiment_type"],
+                experimentTypeId=message["experiment_type_id"],
+            )
+            dcgid = _register(record, header)
+            if _transport_object:
+                if dcgid is None:
+                    _transport_object.transport.nack(header)
+                    return None
+                if global_state.get("data_collection_group_ids") and isinstance(
+                    global_state["data_collection_group_ids"], dict
+                ):
+                    global_state["data_collection_group_ids"] = {
+                        **global_state["data_collection_group_ids"],
+                        message.get("tag"): dcgid,
+                    }
+                else:
+                    global_state["data_collection_group_ids"] = {
+                        message.get("tag"): dcgid
+                    }
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "data_collection":
+            dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
+                message["source"]
+            )
             if dcgid is None:
+                raise ValueError(
+                    f"No data collection group ID was found for image directory {message['image_directory']}"
+                )
+            record = DataCollection(
+                SESSIONID=message["session_id"],
+                experimenttype=message["experiment_type"],
+                imageDirectory=message["image_directory"],
+                imageSuffix=message["image_suffix"],
+                voltage=message["voltage"],
+                dataCollectionGroupId=dcgid,
+                pixelSizeOnImage=message["pixel_size"],
+                imageSizeX=message["image_size_x"],
+                imageSizeY=message["image_size_y"],
+                slitGapHorizontal=message.get("slit_width"),
+                magnification=message.get("magnification"),
+                exposureTime=message.get("exposure_time"),
+                totalExposedDose=message.get("total_exposed_dose"),
+                c2aperture=message.get("c2aperture"),
+                phasePlate=int(message.get("phase_plate", 0)),
+            )
+            dcid = _register(
+                record,
+                header,
+                tag=message.get("tag")
+                if message["experiment_type"] == "tomography"
+                else "",
+            )
+            if dcid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
-            if global_state.get("data_collection_group_ids") and isinstance(
-                global_state["data_collection_group_ids"], dict
+            logger.debug(f"registered: {message.get('tag')}")
+            if global_state.get("data_collection_ids") and isinstance(
+                global_state["data_collection_ids"], dict
             ):
-                global_state["data_collection_group_ids"] = {
-                    **global_state["data_collection_group_ids"],
-                    message.get("tag"): dcgid,
+                global_state["data_collection_ids"] = {
+                    **global_state["data_collection_ids"],
+                    message.get("tag"): dcid,
                 }
             else:
-                global_state["data_collection_group_ids"] = {message.get("tag"): dcgid}
-            _transport_object.transport.ack(header)
-        return None
-    elif message["register"] == "data_collection":
-        dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
-            message["source"]
-        )
-        if dcgid is None:
-            raise ValueError(
-                f"No data collection group ID was found for image directory {message['image_directory']}"
-            )
-        record = DataCollection(
-            SESSIONID=message["session_id"],
-            experimenttype=message["experiment_type"],
-            imageDirectory=message["image_directory"],
-            imageSuffix=message["image_suffix"],
-            voltage=message["voltage"],
-            dataCollectionGroupId=dcgid,
-            pixelSizeOnImage=message["pixel_size"],
-            imageSizeX=message["image_size_x"],
-            imageSizeY=message["image_size_y"],
-            slitGapHorizontal=message.get("slit_width"),
-            magnification=message.get("magnification"),
-            exposureTime=message.get("exposure_time"),
-            totalExposedDose=message.get("total_exposed_dose"),
-            c2aperture=message.get("c2aperture"),
-            phasePlate=int(message.get("phase_plate", 0)),
-        )
-        dcid = _register(
-            record,
-            header,
-            tag=message.get("tag")
-            if message["experiment_type"] == "tomography"
-            else "",
-        )
-        if dcid is None and _transport_object:
-            _transport_object.transport.nack(header)
+                global_state["data_collection_ids"] = {message.get("tag"): dcid}
+            if _transport_object:
+                _transport_object.transport.ack(header)
             return None
-        logger.debug(f"registered: {message.get('tag')}")
-        if global_state.get("data_collection_ids") and isinstance(
-            global_state["data_collection_ids"], dict
-        ):
-            global_state["data_collection_ids"] = {
-                **global_state["data_collection_ids"],
-                message.get("tag"): dcid,
-            }
-        else:
-            global_state["data_collection_ids"] = {message.get("tag"): dcid}
+        elif message["register"] == "processing_job":
+            assert isinstance(global_state["data_collection_ids"], dict)
+            _dcid = global_state["data_collection_ids"][message["tag"]]
+            record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
+            if message.get("job_parameters"):
+                job_parameters = [
+                    ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                    for k, v in message["job_parameters"].items()
+                ]
+                pid = _register(ExtendedRecord(record, job_parameters), header)
+            else:
+                pid = _register(record, header)
+            if pid is None and _transport_object:
+                _transport_object.transport.nack(header)
+                return None
+            if global_state.get("processing_job_ids"):
+                global_state["processing_job_ids"] = {
+                    **global_state["processing_job_ids"],  # type: ignore
+                    message.get("tag"): {
+                        **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                        message["recipe"]: pid,
+                    },
+                }
+            else:
+                prids = {message["tag"]: {message["recipe"]: pid}}
+                global_state["processing_job_ids"] = prids
+            if message.get("job_parameters"):
+                return None
+            record = AutoProcProgram(processingJobId=pid)
+            appid = _register(record, header)
+            if appid is None and _transport_object:
+                _transport_object.transport.nack(header)
+                return None
+            if global_state.get("autoproc_program_ids"):
+                assert isinstance(global_state["autoproc_program_ids"], dict)
+                global_state["autoproc_program_ids"] = {
+                    **global_state["autoproc_program_ids"],
+                    message.get("tag"): {
+                        **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                        message["recipe"]: appid,
+                    },
+                }
+            else:
+                global_state["autoproc_program_ids"] = {
+                    message["tag"]: {message["recipe"]: appid}
+                }
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         if _transport_object:
-            _transport_object.transport.ack(header)
+            _transport_object.transport.nack(header, requeue=False)
         return None
-    elif message["register"] == "processing_job":
-        assert isinstance(global_state["data_collection_ids"], dict)
-        _dcid = global_state["data_collection_ids"][message["tag"]]
-        record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
-        if message.get("job_parameters"):
-            job_parameters = [
-                ProcessingJobParameter(parameterKey=k, parameterValue=v)
-                for k, v in message["job_parameters"].items()
-            ]
-            pid = _register(ExtendedRecord(record, job_parameters), header)
-        else:
-            pid = _register(record, header)
-        if pid is None and _transport_object:
-            _transport_object.transport.nack(header)
-            return None
-        if global_state.get("processing_job_ids"):
-            global_state["processing_job_ids"] = {
-                **global_state["processing_job_ids"],  # type: ignore
-                message.get("tag"): {
-                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
-                    message["recipe"]: pid,
-                },
-            }
-        else:
-            prids = {message["tag"]: {message["recipe"]: pid}}
-            global_state["processing_job_ids"] = prids
-        if message.get("job_parameters"):
-            return None
-        record = AutoProcProgram(processingJobId=pid)
-        appid = _register(record, header)
-        if appid is None and _transport_object:
-            _transport_object.transport.nack(header)
-            return None
-        if global_state.get("autoproc_program_ids"):
-            assert isinstance(global_state["autoproc_program_ids"], dict)
-            global_state["autoproc_program_ids"] = {
-                **global_state["autoproc_program_ids"],
-                message.get("tag"): {
-                    **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
-                    message["recipe"]: appid,
-                },
-            }
-        else:
-            global_state["autoproc_program_ids"] = {
-                message["tag"]: {message["recipe"]: appid}
-            }
-        if _transport_object:
-            _transport_object.transport.ack(header)
-        return None
-    if _transport_object:
-        _transport_object.transport.nack(header, requeue=False)
-    return None
+    except Exception:
+        logger.warning(
+            "Exception encountered in server RabbitMQ callback", exc_info=True
+        )
 
 
 @singledispatch
