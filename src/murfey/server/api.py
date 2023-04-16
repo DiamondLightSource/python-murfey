@@ -84,6 +84,11 @@ def health_check(db=murfey.server.ispyb.DB):
     }
 
 
+@router.get("/connections/")
+def connections_check():
+    return {"connections": list(ws.manager.active_connections.keys())}
+
+
 @lru_cache(maxsize=1)
 @router.get("/machine/")
 def machine_info():
