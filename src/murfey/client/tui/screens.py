@@ -382,14 +382,12 @@ class ProcessingForm(Screen):
         form: dict,
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
-        model: BaseModel | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._form = form
         self._inputs: Dict[Input, str] = {}
         self._dependencies = dependencies or {}
-        self._model = model
 
     def compose(self):
         inputs = []
@@ -466,10 +464,11 @@ class ProcessingForm(Screen):
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
-        if self._model:
-            valid = validate_form(self._form, self._model)
-            if not valid:
-                return
+        if self.app.analysers.get(Path(self._form.get("source", ""))):
+            if model := self.app.analysers[Path(self._form["source"])].parameters_model:
+                valid = validate_form(self._form, model)
+                if not valid:
+                    return
         if "confirm" not in self.app._installed_screens:
             self.app.install_screen(
                 ConfirmScreen(
