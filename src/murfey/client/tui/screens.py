@@ -563,23 +563,23 @@ class GainReference(Screen):
                     log.warning(
                         f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
                     )
-        process_gain_response = requests.post(
-            url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
-            json={
-                "gain_ref": str(self._dir_tree._gain_reference),
-            },
-        )
-        if str(process_gain_response.status_code).startswith("4"):
-            log.warning(
-                f"Gain processing failed: status code {process_gain_response.status_code}"
+            process_gain_response = requests.post(
+                url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
+                json={
+                    "gain_ref": str(self._dir_tree._gain_reference),
+                },
             )
-        else:
-            log.info(
-                f"Gain reference file {process_gain_response.json().get('gain_ref')}"
-            )
-            self.app._environment.data_collection_parameters[
-                "gain_ref"
-            ] = process_gain_response.json().get("gain_ref")
+            if str(process_gain_response.status_code).startswith("4"):
+                log.warning(
+                    f"Gain processing failed: status code {process_gain_response.status_code}"
+                )
+            else:
+                log.info(
+                    f"Gain reference file {process_gain_response.json().get('gain_ref')}"
+                )
+                self.app._environment.data_collection_parameters[
+                    "gain_ref"
+                ] = process_gain_response.json().get("gain_ref")
         if self._switch_status:
             self.app.push_screen("directory-select")
         else:
