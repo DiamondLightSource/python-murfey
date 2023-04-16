@@ -39,6 +39,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import FormDependency
+from murfey.util import get_machine_config
 from murfey.util.models import DCParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
@@ -414,7 +415,7 @@ class ProcessingForm(Screen):
         if self._form.get("motion_corr_binning") == "2":
             self._vert = VerticalScroll(
                 *inputs,
-                Label("Collected in super resoultion mode:"),
+                Label("Collected in super resoultion mode unbinned:"),
                 Switch(id="superres", value=True, classes="input"),
                 confirm_btn,
                 id="input-form",
@@ -711,6 +712,21 @@ class DestinationSelect(Screen):
                     i = Input(value=val, id=k.name, classes="input-destination")
                 params_bulk.append(i)
                 self._inputs[i] = k.name
+            machine_config = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if machine_config.get("superres"):
+                params_bulk.append(
+                    Label("Collected in super resoultion mode unbinned:")
+                )
+                params_bulk.append(
+                    Switch(
+                        value=False,
+                        id="superres-multigrid",
+                        classes="input-destination",
+                    )
+                )
+                self.app._environment.superres = False
             for i, k in self._inputs.items():
                 self._check_dependency(k, i.value)
         yield VerticalScroll(
@@ -736,10 +752,13 @@ class DestinationSelect(Screen):
                             break
 
     def on_switch_changed(self, event):
-        for k in SPAContext.user_params:
-            if event.switch.id == k.name:
-                self._user_params[k.name] = event.value
-                self._check_dependency(k.name, event.value)
+        if event.switch.id == "superres-multigrid":
+            self.app._environment.superres = event.value
+        else:
+            for k in SPAContext.user_params:
+                if event.switch.id == k.name:
+                    self._user_params[k.name] = event.value
+                    self._check_dependency(k.name, event.value)
 
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):

@@ -52,6 +52,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     visit: str = ""
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
+    superres: bool = True
 
     class Config:
         validate_assignment: bool = True

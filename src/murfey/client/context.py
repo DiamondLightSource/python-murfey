@@ -288,18 +288,24 @@ class SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
-        if environment and magnification:
+        if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            ps_from_mag = (
-                server_config.get("calibrations", {})
-                .get("magnification", {})
-                .get(int(magnification))
-            )
-            if ps_from_mag:
-                metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
-        metadata["motion_corr_binning"] = 1
+            if server_config.get("superres") and environment.superres:
+                binning_factor = 2
+            if magnification:
+                ps_from_mag = (
+                    server_config.get("calibrations", {})
+                    .get("magnification", {})
+                    .get(int(magnification))
+                )
+                if ps_from_mag:
+                    metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
+        metadata["pixel_size_on_image"] = (
+            metadata["pixel_size_on_image"] / binning_factor
+        )
+        metadata["motion_corr_binning"] = binning_factor
         metadata["gain_ref"] = None
         metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
@@ -988,7 +994,11 @@ class TomographyContext(Context):
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            if server_config.get("superres") and superres_binning == 1:
+            if (
+                server_config.get("superres")
+                and superres_binning == 1
+                and environment.superres
+            ):
                 binning_factor = 2
             ps_from_mag = (
                 server_config.get("calibrations", {})
