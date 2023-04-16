@@ -31,7 +31,7 @@ from textual.widgets import (
     Tree,
 )
 
-from murfey.client.analyser import Analyser
+from murfey.client.analyser import Analyser, spa_form_dependencies
 from murfey.client.context import SPAContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
@@ -312,7 +312,8 @@ class LaunchScreen(Screen):
                     self.app._start_rsyncer(_default, visit_path=visit_path)
                 transfer_routes[s] = _default
             self.app.install_screen(
-                DestinationSelect(transfer_routes), "destination-select-screen"
+                DestinationSelect(transfer_routes, dependencies=spa_form_dependencies),
+                "destination-select-screen",
             )
             self.app.pop_screen()
             self.app.push_screen("destination-select-screen")
@@ -646,11 +647,19 @@ class DirectorySelection(SwitchSelection):
 
 
 class DestinationSelect(Screen):
-    def __init__(self, transfer_routes: Dict[Path, str], *args, **kwargs):
+    def __init__(
+        self,
+        transfer_routes: Dict[Path, str],
+        *args,
+        dependencies: Dict[str, FormDependency] | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
         self._destination_overrides: Dict[Path, str] = {}
         self._user_params: Dict[str, str] = {}
+        self._dependencies = dependencies or {}
+        self._inputs: Dict[Input, str] = {}
 
     def compose(self):
         bulk = []
@@ -690,14 +699,44 @@ class DestinationSelect(Screen):
         if self.app._multigrid:
             for k in SPAContext.user_params:
                 params_bulk.append(Label(k.label))
-                params_bulk.append(
-                    Input(value=str(k.default), id=k.name, classes="input-destination")
-                )
+                val = self.app._environment.data_collection_parameters.get(
+                    k.name
+                ) or str(k.default)
+                if val in ("true", "True", True):
+                    i = Switch(value=True, id=k.name, classes="input-destination")
+                elif val in ("false", "False", False):
+                    i = Switch(value=False, id=k.name, classes="input-destination")
+                else:
+                    i = Input(value=val, id=k.name, classes="input-destination")
+                params_bulk.append(i)
+                self._inputs[i] = k.name
         yield VerticalScroll(
             *params_bulk,
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
+
+    def _check_dependency(self, key: str, value: Any):
+        if x := self._dependencies.get(key):
+            for d, v in x.dependencies.items():
+                if value == x.trigger_value:
+                    self._user_params[d] = str(v)
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.value = v
+                            i.disabled = True
+                            break
+                else:
+                    for i, dk in self._inputs.items():
+                        if dk == d:
+                            i.disabled = False
+                            break
+
+    def on_switch_changed(self, event):
+        for k in SPAContext.user_params:
+            if event.switch.id == k.name:
+                self._user_params[k.name] = event.value
+                self._check_dependency(k.name, event.value)
 
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):

@@ -148,6 +148,8 @@ class DCParametersSPA(BaseModel):
     slit_width: Optional[float] = None
     phase_plate: bool = False
 
+    # class Base(BaseModel):
+
 
 class ProcessingJobParameters(BaseModel):
     tag: str

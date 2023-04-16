@@ -101,6 +101,7 @@ class SPAContext(Context):
         ProcessingParameter(
             "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
+        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -108,7 +109,6 @@ class SPAContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
-        ProcessingParameter("gain_ref", "Gain Reference"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
