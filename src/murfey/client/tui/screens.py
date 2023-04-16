@@ -39,6 +39,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import FormDependency
+from murfey.util.models import DCParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -408,7 +409,6 @@ class ProcessingForm(Screen):
             self._inputs[i] = k.name
             inputs.append(i)
         for i, k in self._inputs.items():
-            log.info(f"checking dependency {k}, {i.value}")
             self._check_dependency(k, i.value)
         confirm_btn = Button("Confirm", id="confirm-btn")
         if self._form.get("motion_corr_binning") == "2":
@@ -702,6 +702,7 @@ class DestinationSelect(Screen):
                 val = self.app._environment.data_collection_parameters.get(
                     k.name
                 ) or str(k.default)
+                self._user_params[k.name] = val
                 if val in ("true", "True", True):
                     i = Switch(value=True, id=k.name, classes="input-destination")
                 elif val in ("false", "False", False):
@@ -710,6 +711,8 @@ class DestinationSelect(Screen):
                     i = Input(value=val, id=k.name, classes="input-destination")
                 params_bulk.append(i)
                 self._inputs[i] = k.name
+            for i, k in self._inputs.items():
+                self._check_dependency(k, i.value)
         yield VerticalScroll(
             *params_bulk,
             id="user-params",
@@ -750,8 +753,10 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if any(v == "None" for v in self._user_params.values()):
-            return
+        if self.app._multigrid:
+            valid = validate_form(self._user_params, DCParametersSPA.Base)
+            if not valid:
+                return
         for s, d in self._transfer_routes.items():
             self.app._default_destinations[s] = d
             self.app._register_dc = True

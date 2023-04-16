@@ -148,7 +148,16 @@ class DCParametersSPA(BaseModel):
     slit_width: Optional[float] = None
     phase_plate: bool = False
 
-    # class Base(BaseModel):
+    class Base(BaseModel):
+        dose_per_frame: float
+        gain_ref: Optional[str]
+        use_cryolo: bool
+        symmetry: str
+        mask_diameter: Optional[int]
+        boxsize: Optional[int]
+        downscale: bool
+        small_boxsize: Optional[int]
+        eer_grouping: int
 
 
 class ProcessingJobParameters(BaseModel):
