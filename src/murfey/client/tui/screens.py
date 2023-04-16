@@ -166,7 +166,8 @@ class QuickPrompt:
 
 def validate_form(form: dict, model: BaseModel) -> bool:
     try:
-        validated = model(**form)
+        convert = lambda x: None if x == "None" else x
+        validated = model(**{k: convert(v) for k, v in form.items()})
         log.info(validated.dict())
         return True
     except (AttributeError, ValidationError) as e:

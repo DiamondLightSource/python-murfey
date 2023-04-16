@@ -136,10 +136,10 @@ class DCParametersSPA(BaseModel):
     acquisition_software: str
     use_cryolo: bool
     symmetry: str
-    mask_diameter: int
-    boxsize: int
+    mask_diameter: Optional[int]
+    boxsize: Optional[int]
     downscale: bool
-    small_boxsize: int
+    small_boxsize: Optional[int]
     eer_grouping: int
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
