@@ -355,7 +355,7 @@ class TomographyContext(Context):
         super().__init__(acquisition_software)
         self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
-        self._tilt_series_sizes: Dict[str, int | None] = {}
+        self._tilt_series_sizes: Dict[str, int] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
         self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
@@ -613,6 +613,9 @@ class TomographyContext(Context):
                                 "image_size_y": environment.data_collection_parameters[
                                     "image_size_y"
                                 ],
+                                "magnification": environment.data_collection_parameters[
+                                    "magnification"
+                                ],
                             }
                         )
                     if (
@@ -746,7 +749,7 @@ class TomographyContext(Context):
                     newly_completed_series.append(tilt_series)
                 for ts, ta in self._tilt_series.items():
                     if self._tilt_series_sizes.get(ts):
-                        completion_test = len(ta) == self._tilt_series_sizes[ts]
+                        completion_test = len(ta) >= self._tilt_series_sizes[ts]
                     elif required_position_files:
                         completion_test = all(
                             _f.is_file() for _f in required_position_files
