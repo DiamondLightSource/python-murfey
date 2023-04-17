@@ -522,6 +522,33 @@ class TomographyContext(Context):
             logger.warning("Key error encountered in _complete_process_file")
             return {}
 
+    def _file_transferred_to(
+        self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    ):
+        machine_config = get_machine_config(
+            str(environment.url.geturl()), demo=environment.demo
+        )
+        if environment.visit in environment.default_destinations[source]:
+            return (
+                Path(machine_config.get("rsync_basepath", ""))
+                / Path(environment.default_destinations[source])
+                / file_path.name
+            )
+        return (
+            Path(machine_config.get("rsync_basepath", ""))
+            / Path(environment.default_destinations[source])
+            / environment.visit
+            / file_path.name
+        )
+
+    def _get_source(
+        self, file_path: Path, environment: MurfeyInstanceEnvironment
+    ) -> Path | None:
+        for s in environment.sources:
+            if file_path.is_relative_to(s):
+                return s
+        return None
+
     def _add_tilt(
         self,
         file_path: Path,
@@ -535,11 +562,8 @@ class TomographyContext(Context):
         if not environment:
             logger.warning("No environment passed in")
             return []
-        for s in environment.sources:
-            if file_path.is_relative_to(s):
-                source = s
-                break
-        else:
+        source = self._get_source(file_path, environment)
+        if not source:
             logger.warning(f"No source found for file {file_path}")
             return []
         # required_position_files = required_position_files or []
@@ -573,22 +597,9 @@ class TomographyContext(Context):
             return []
 
         if environment:
-            machine_config = get_machine_config(
-                str(environment.url.geturl()), demo=environment.demo
+            file_transferred_to = self._file_transferred_to(
+                environment, source, file_path
             )
-            if environment.visit in environment.default_destinations[source]:
-                file_transferred_to = (
-                    Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destinations[source])
-                    / file_path.name
-                )
-            else:
-                file_transferred_to = (
-                    Path(machine_config.get("rsync_basepath", ""))
-                    / Path(environment.default_destinations[source])
-                    / environment.visit
-                    / file_path.name
-                )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
                 motion_correction_uuid=next(MurfeyID),
@@ -771,93 +782,99 @@ class TomographyContext(Context):
                 and last_tilt_angle != tilt_angle
                 or self._tilt_series_sizes.get(tilt_series)
             ) or self._completed_tilt_series:
-                newly_completed_series = []
-                if self._tilt_series:
-                    tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
-                else:
-                    tilt_series_size = 0
-                this_tilt_series_size = len(self._tilt_series[tilt_series])
-                tilt_series_size_check = (
-                    (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
-                    if self._tilt_series_sizes.get(tilt_series)
-                    else (this_tilt_series_size >= tilt_series_size)
+                return self._check_tilt_series(
+                    tilt_series,
+                    required_position_files or [],
+                    file_transferred_to,
+                    environment=environment,
                 )
-                if tilt_series_size_check and not required_position_files:
-                    self._completed_tilt_series.append(tilt_series)
-                    newly_completed_series.append(tilt_series)
-                for ts, ta in self._tilt_series.items():
-                    if self._tilt_series_sizes.get(ts):
-                        completion_test = len(ta) >= self._tilt_series_sizes[ts]
-                    elif required_position_files:
-                        completion_test = all(
-                            _f.is_file() for _f in required_position_files
-                        )
-                    else:
-                        completion_test = len(ta) >= tilt_series_size
-                    if ts not in self._completed_tilt_series and completion_test:
-                        newly_completed_series.append(ts)
-                        self._completed_tilt_series.append(ts)
-                        if environment:
-                            file_tilt_list = []
-                            movie: str
-                            angle: str
-                            for movie, angle in environment.tilt_angles[ts]:
-                                if environment.motion_corrected_movies.get(Path(movie)):
-                                    file_tilt_list.append(
-                                        [
-                                            str(
-                                                environment.motion_corrected_movies[
-                                                    Path(movie)
-                                                ][0]
-                                            ),
-                                            angle,
-                                            str(
-                                                environment.motion_corrected_movies[
-                                                    Path(movie)
-                                                ][1]
-                                            ),
-                                        ]
-                                    )
-                                if environment.motion_corrected_movies.get(
-                                    file_transferred_to
-                                ):
-                                    self._check_for_alignment(
-                                        file_transferred_to,
-                                        Path(
-                                            environment.motion_corrected_movies[  # key error PosixPath
-                                                file_transferred_to
-                                            ][
-                                                0
-                                            ]
-                                        ),
-                                        environment.url.geturl(),
-                                        environment.data_collection_ids[ts],
-                                        environment.processing_job_ids[ts][
-                                            "em-tomo-align"
-                                        ],
-                                        environment.autoproc_program_ids[ts][
-                                            "em-tomo-align"
-                                        ],
-                                        int(
-                                            environment.motion_corrected_movies[
-                                                file_transferred_to
-                                            ][1]
-                                        ),
-                                        file_tilt_list,
-                                        environment.data_collection_parameters.get(
-                                            "manual_tilt_offset"
-                                        ),
-                                        environment.data_collection_parameters.get(
-                                            "pixel_size_on_image"
-                                        ),
-                                    )
-                if newly_completed_series:
-                    logger.info(
-                        f"The following tilt series are considered complete: {newly_completed_series}"
-                    )
-                return newly_completed_series
         self._last_transferred_file = file_path
         return []
+
+    def _check_tilt_series(
+        self,
+        tilt_series: str,
+        required_position_files: List[Path],
+        file_transferred_to: Path | None,
+        environment: MurfeyInstanceEnvironment | None = None,
+    ):
+        newly_completed_series = []
+        if self._tilt_series:
+            tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
+        else:
+            tilt_series_size = 0
+        this_tilt_series_size = len(self._tilt_series[tilt_series])
+        tilt_series_size_check = (
+            (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
+            if self._tilt_series_sizes.get(tilt_series)
+            else (this_tilt_series_size >= tilt_series_size)
+        )
+        if tilt_series_size_check and not required_position_files:
+            self._completed_tilt_series.append(tilt_series)
+            newly_completed_series.append(tilt_series)
+        for ts, ta in self._tilt_series.items():
+            if self._tilt_series_sizes.get(ts):
+                completion_test = len(ta) >= self._tilt_series_sizes[ts]
+            elif required_position_files:
+                completion_test = all(_f.is_file() for _f in required_position_files)
+            else:
+                completion_test = len(ta) >= tilt_series_size
+            if ts not in self._completed_tilt_series and completion_test:
+                newly_completed_series.append(ts)
+                self._completed_tilt_series.append(ts)
+                if environment and file_transferred_to:
+                    file_tilt_list = []
+                    movie: str
+                    angle: str
+                    for movie, angle in environment.tilt_angles[ts]:
+                        if environment.motion_corrected_movies.get(Path(movie)):
+                            file_tilt_list.append(
+                                [
+                                    str(
+                                        environment.motion_corrected_movies[
+                                            Path(movie)
+                                        ][0]
+                                    ),
+                                    angle,
+                                    str(
+                                        environment.motion_corrected_movies[
+                                            Path(movie)
+                                        ][1]
+                                    ),
+                                ]
+                            )
+                        if environment.motion_corrected_movies.get(file_transferred_to):
+                            self._check_for_alignment(
+                                file_transferred_to,
+                                Path(
+                                    environment.motion_corrected_movies[  # key error PosixPath
+                                        file_transferred_to
+                                    ][
+                                        0
+                                    ]
+                                ),
+                                environment.url.geturl(),
+                                environment.data_collection_ids[ts],
+                                environment.processing_job_ids[ts]["em-tomo-align"],
+                                environment.autoproc_program_ids[ts]["em-tomo-align"],
+                                int(
+                                    environment.motion_corrected_movies[
+                                        file_transferred_to
+                                    ][1]
+                                ),
+                                file_tilt_list,
+                                environment.data_collection_parameters.get(
+                                    "manual_tilt_offset"
+                                ),
+                                environment.data_collection_parameters.get(
+                                    "pixel_size_on_image"
+                                ),
+                            )
+        if newly_completed_series:
+            logger.info(
+                f"The following tilt series are considered complete: {newly_completed_series}"
+            )
+        return newly_completed_series
 
     def _add_tomo_tilt(
         self,
@@ -963,6 +980,17 @@ class TomographyContext(Context):
                 with open(transferred_file, "r") as md:
                     tilt_series = transferred_file.stem
                     self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
+                if environment:
+                    source = self._get_source(transferred_file, environment)
+                    if source:
+                        completed_tilts = self._check_tilt_series(
+                            tilt_series,
+                            kwargs.get("required_position_files") or [],
+                            self._file_transferred_to(
+                                environment, source, transferred_file
+                            ),
+                            environment=environment,
+                        )
         return completed_tilts
 
     def post_first_transfer(
