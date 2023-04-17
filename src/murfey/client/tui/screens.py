@@ -62,7 +62,7 @@ def determine_default_destination(
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
     if environment.processing_only_mode and environment.source:
-        _default = str(environment.source.resolve()) or str(Path.cwd())
+        _default = str(source.resolve()) or str(Path.cwd())
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"].keys():
             if source.resolve() == Path(data_dir):
@@ -197,9 +197,12 @@ class _DirectoryTree(DirectoryTree):
                 self.valid_selection = True
                 return
             for d in self._data_directories:
-                if Path(self._selected_path).resolve().is_relative_to(d):
+                try:
+                    Path(self._selected_path).resolve().relative_to(d)
                     self.valid_selection = True
                     break
+                except ValueError:
+                    pass
             else:
                 self.valid_selection = False
         else:
@@ -260,9 +263,12 @@ class LaunchScreen(Screen):
         text_log.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
-            if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
+            try:
+                Path(self._dir_tree._selected_path).resolve().relative_to(d)
                 btn_disabled = False
                 break
+            except ValueError:
+                pass
         self._launch_btn = Button("Launch", id="launch", disabled=btn_disabled)
         self._add_btn = Button("Add directory", id="add", disabled=btn_disabled)
         self.watch(self._dir_tree, "valid_selection", self._check_valid_selection)
@@ -310,8 +316,6 @@ class LaunchScreen(Screen):
         elif event.button.id == "add":
             self._add_directory(self._dir_tree._selected_path)
         elif event.button.id == "launch":
-            text = self.app._visit
-            visit_path = ""
             transfer_routes = {}
             for s, defd in self.app._default_destinations.items():
                 _default = determine_default_destination(
@@ -321,9 +325,6 @@ class LaunchScreen(Screen):
                     self.app._environment,
                     self.app.analysers,
                 )
-                visit_path = defd + f"/{text}"
-                if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default, visit_path=visit_path)
                 transfer_routes[s] = _default
             self.app.install_screen(
                 DestinationSelect(
@@ -559,6 +560,7 @@ class VisitSelection(SwitchSelection):
                 ),
                 "directory-select",
             )
+        log.info("popping screen")
         self.app.pop_screen()
 
         if machine_data.get("gain_reference_directory"):
@@ -574,8 +576,16 @@ class VisitSelection(SwitchSelection):
             if self._switch_status:
                 self.app.push_screen("directory-select")
             else:
-                self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
-                self.app.push_screen("launcher")
+                if not self.app._environment.processing_only_mode:
+                    self.app.install_screen(
+                        LaunchScreen(basepath=Path("./")), "launcher"
+                    )
+                    self.app.push_screen("launcher")
+                else:
+                    source = Path(".").resolve()
+                    self.app._environment.sources.append(source)
+                    self.app._start_rsyncer(source, str(source))
+                    self.app.push_screen("main")
 
 
 class GainReference(Screen):

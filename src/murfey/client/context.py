@@ -498,9 +498,12 @@ class TomographyContext(Context):
             logger.warning("No environment passed in")
             return []
         for s in environment.sources:
-            if file_path.is_relative_to(s):
+            try:
+                file_path.relative_to(s)
                 source = s
                 break
+            except ValueError:
+                pass
         else:
             logger.warning(f"No source found for file {file_path}")
             return []

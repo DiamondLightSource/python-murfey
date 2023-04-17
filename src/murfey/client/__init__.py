@@ -174,6 +174,9 @@ def run():
 
     args = parser.parse_args()
 
+    if server_routing_prefix_found:
+        args.no_transfer = True
+
     if not args.server:
         exit("Murfey server not set. Please run with --server host:port")
     if not args.server.startswith(("http://", "https://")):

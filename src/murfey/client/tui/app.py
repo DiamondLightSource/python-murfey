@@ -203,12 +203,15 @@ class MurfeyTUI(App):
                 f"{self._environment.url.geturl()}/machine/"
             ).json()
             for data_dir in machine_data["data_directories"].keys():
-                if source.resolve().is_relative_to(Path(data_dir)):
+                try:
+                    source.resolve().relative_to(Path(data_dir))
                     self.analysers[source]._role = machine_data["data_directories"][
                         data_dir
                     ]
                     log.info(f"role found for {source}")
                     break
+                except ValueError:
+                    pass
             if force_metadata:
                 self.analysers[source].subscribe(
                     partial(self._start_dc, from_form=True)
