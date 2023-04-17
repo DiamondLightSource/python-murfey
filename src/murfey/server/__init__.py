@@ -457,6 +457,7 @@ def _(record: Base, header: dict, **kwargs):
 
 
 def feedback_listen(feedback_queue: str = "murfey_feedback"):
+    logger.info(f"listening to {feedback_queue}")
     if _transport_object:
         _transport_object._connection_callback = partial(
             _transport_object.transport.subscribe,

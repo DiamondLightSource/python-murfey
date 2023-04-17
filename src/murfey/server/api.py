@@ -276,6 +276,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeries):
         "parameters": {
             # "ispyb_process": tilt_series.processing_job, #
             "input_file_list": tilt_series.file_tilt_list,
+            "path_pattern": "",
             "dcid": tilt_series.dcid,
             "appid": tilt_series.autoproc_program_id,
             "stack_file": str(stack_file),
