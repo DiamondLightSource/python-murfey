@@ -246,8 +246,8 @@ class Analyser(Observer):
                     self.notify({"form": dc_metadata})
 
     def _xml_file(self, data_file: Path) -> Path:
-        if (fxml := data_file.with_suffix(".xml")).is_file() or not self._environment:
-            return fxml
+        if not self._environment:
+            return data_file.with_suffix(".xml")
         file_name = (
             f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
         )

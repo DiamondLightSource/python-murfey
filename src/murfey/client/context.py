@@ -243,6 +243,7 @@ class SPAContext(Context):
             metadata["pixel_size_on_image"] = float(
                 data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
             )
+            metadata["magnification"] = magnification
         elif data.get("MicroscopeImage"):
             metadata["voltage"] = (
                 float(
@@ -313,16 +314,53 @@ class SPAContext(Context):
             if environment
             else None
         )
-        metadata["use_cryolo"] = True
-        metadata["symmetry"] = "C1"
-        metadata["mask_diameter"] = 190
-        metadata["boxsize"] = 256
-        metadata["downscale"] = False
-        metadata["small_boxsize"] = 128
-        metadata["eer_grouping"] = 20
+
+        metadata["use_cryolo"] = (
+            environment.data_collection_parameters.get("use_cryolo")
+            if environment
+            else None
+        ) or True
+        metadata["symmetry"] = (
+            environment.data_collection_parameters.get("symmetry")
+            if environment
+            else None
+        ) or "C1"
+        metadata["mask_diameter"] = (
+            environment.data_collection_parameters.get("mask_diameter")
+            if environment
+            else None
+        ) or 190
+        metadata["boxsize"] = (
+            environment.data_collection_parameters.get("boxsize")
+            if environment
+            else None
+        ) or 256
+        metadata["downscale"] = (
+            environment.data_collection_parameters.get("downscale")
+            if environment
+            else None
+        ) or True
+        metadata["small_boxsize"] = (
+            environment.data_collection_parameters.get("small_boxsize")
+            if environment
+            else None
+        ) or 128
+        metadata["eer_grouping"] = (
+            environment.data_collection_parameters.get("eer_grouping")
+            if environment
+            else None
+        ) or 20
         metadata["source"] = str(self._basepath)
-        metadata["particle_diameter"] = 0
-        metadata["estimate_particle_diameter"] = True
+        metadata["particle_diameter"] = (
+            environment.data_collection_parameters.get("particle_diameter")
+            if environment
+            else None
+        ) or 0
+        metadata["estimate_particle_diameter"] = (
+            environment.data_collection_parameters.get("estimate_particle_diameter")
+            if environment
+            else None
+        ) or True
         return metadata
 
 
