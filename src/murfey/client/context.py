@@ -803,7 +803,7 @@ class TomographyContext(Context):
             tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
         else:
             tilt_series_size = 0
-        this_tilt_series_size = len(self._tilt_series[tilt_series])
+        this_tilt_series_size = len(self._tilt_series.get(tilt_series, []))
         tilt_series_size_check = (
             (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
             if self._tilt_series_sizes.get(tilt_series)
