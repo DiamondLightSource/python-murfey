@@ -189,7 +189,7 @@ class SPAContext(Context):
                 "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": import_images,
-                "angpix": parameters["pixel_size_on_image"] * 1e10,
+                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
                 "symmetry": parameters["symmetry"],
                 "extract_boxsize": parameters["boxsize"],
                 "extract_downscale": parameters["downscale"],
@@ -259,9 +259,11 @@ class SPAContext(Context):
             metadata["image_size_y"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ReadoutArea"]["a:height"]
-            metadata["pixel_size_on_image"] = data["MicroscopeImage"]["SpatialScale"][
-                "pixelSize"
-            ]["x"]["numericValue"]
+            metadata["pixel_size_on_image"] = float(
+                data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                    "numericValue"
+                ]
+            )
             magnification = data["MicroscopeImage"]["microscopeData"]["optics"][
                 "TemMagnification"
             ]["NominalMagnification"]

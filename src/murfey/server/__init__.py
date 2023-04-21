@@ -434,6 +434,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 prids = {message["tag"]: {message["recipe"]: pid}}
                 global_state["processing_job_ids"] = prids
             if message.get("job_parameters"):
+                if _transport_object:
+                    _transport_object.transport.ack(header)
                 return None
             record = AutoProcProgram(processingJobId=pid)
             appid = _register(record, header)

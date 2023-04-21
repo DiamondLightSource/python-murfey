@@ -58,7 +58,11 @@ class MultigridDirWatcher(murfey.util.Observer):
                         d02 = d.parent.parent / d.name / "Images-Disc1"
                     else:
                         d02 = d.parent.parent / d.name
-                    if d02.is_dir() and d02 not in self._seen_dirs:
+                    if (
+                        d02.is_dir()
+                        and d02 not in self._seen_dirs
+                        and list((d.parent.parent / d.name).iterdir())
+                    ):
                         self.notify(d02, include_mid_path=False)
                         self._seen_dirs.append(d02)
             time.sleep(15)
