@@ -26,6 +26,7 @@ class WSApp:
         self._alive = True
         self._ready = False
         self._send_queue: queue.Queue[Optional[str]] = queue.Queue()
+        self._receive_queue: queue.Queue[Optional[str]] = queue.Queue()
         self._ws = websocket.WebSocketApp(
             url._replace(path=f"/ws/test/{id}").geturl(),
             on_close=self.on_close,
@@ -43,6 +44,10 @@ class WSApp:
             target=self._send_queue_feeder, daemon=True, name="websocket-send-queue"
         )
         self._feeder_thread.start()
+        self._receiver_thread = threading.Thread(
+            target=self._receive_msgs, daemon=True, name="websocket-receive-queue"
+        )
+        self._receiver_thread.start()
         self.environment: MurfeyInstanceEnvironment | None = None
 
     def __repr__(self):
@@ -88,6 +93,20 @@ class WSApp:
             self._send_queue.task_done()
         log.debug("Websocket send-queue-feeder thread stopped")
 
+    def _receive_msgs(self):
+        while self.alive:
+            element = self._receive_queue.get()
+            if element is None:
+                self._send_queue.task_done()
+                continue
+            while not self._ready:
+                time.sleep(0.3)
+            try:
+                self._handle_msg(element)
+            except json.decoder.JSONDecodeError:
+                pass
+            self._receive_queue.task_done()
+
     def close(self):
         log.info("Closing websocket connection")
         if self._feeder_thread.is_alive():
@@ -96,18 +115,19 @@ class WSApp:
         if self._feeder_thread.is_alive():
             self._send_queue.put(None)
             self._feeder_thread.join()
+            self._receiver_thread.join()
         self._ws.close()
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
+        self._receive_queue.put(message)
+
+    def _handle_msg(self, message: str):
         # log.info(f"Received message: {message!r}")
-        try:
-            data = json.loads(message)
-            if data.get("message") == "state-update":
-                self._register_id(data["attribute"], data["value"])
-            elif data.get("message") == "state-update-partial":
-                self._register_id_partial(data["attribute"], data["value"])
-        except Exception:
-            pass
+        data = json.loads(message)
+        if data.get("message") == "state-update":
+            self._register_id(data["attribute"], data["value"])
+        elif data.get("message") == "state-update-partial":
+            self._register_id_partial(data["attribute"], data["value"])
 
     def _register_id(self, attribute: str, value):
         if self.environment and hasattr(self.environment, attribute):
