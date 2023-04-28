@@ -130,11 +130,11 @@ class RSyncer(Observer):
                 self.queue.task_done()
                 continue
 
-            files_to_transfer = [first]
+            files_to_transfer = [first] if not first.name.startswith(".") else []
             try:
                 while True:
                     next_file = self.queue.get(block=True, timeout=0.1)
-                    if next_file:
+                    if next_file and not next_file.name.startswith("."):
                         files_to_transfer.append(next_file)
                     else:
                         self.queue.task_done()

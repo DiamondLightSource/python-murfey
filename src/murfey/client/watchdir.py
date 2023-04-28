@@ -172,7 +172,9 @@ class DirWatcher(murfey.util.Observer):
                     self._statusbar.transferred[1] + 1,
                 ]
 
-        if not Path(file_candidate).name.startswith("."):
+        if not Path(file_candidate).name.startswith(".") or Path(
+            file_candidate
+        ).name.endswith("downloading"):
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
 
