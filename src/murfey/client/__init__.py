@@ -273,6 +273,7 @@ def run():
         redirected_logger=rich_handler,
         force_mdoc_metadata=not args.ignore_mdoc_metadata,
         strict=not args.relax,
+        processing_enabled=machine_data.get("processing_enabled", True),
     )
     app.run()
     rich_handler.redirect = False

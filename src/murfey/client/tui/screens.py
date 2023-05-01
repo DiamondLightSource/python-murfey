@@ -719,7 +719,7 @@ class DestinationSelect(Screen):
                 )
         yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
-        if self.app._multigrid:
+        if self.app._multigrid and self.app._processing_enabled:
             for k in self._context.user_params:
                 params_bulk.append(Label(k.label))
                 val = self.app._environment.data_collection_parameters.get(
