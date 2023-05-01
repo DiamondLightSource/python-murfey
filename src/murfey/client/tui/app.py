@@ -114,6 +114,7 @@ class MurfeyTUI(App):
         include_mid_path: bool = True,
         use_suggested_path: bool = True,
         destination_overrides: Dict[Path, str] | None = None,
+        remove_files: bool = False,
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
@@ -141,6 +142,7 @@ class MurfeyTUI(App):
             destination,
             force_metadata=True,
             analyse=not extra_directory and use_suggested_path,
+            remove_files=remove_files,
         )
 
     def _start_rsyncer(
@@ -150,6 +152,7 @@ class MurfeyTUI(App):
         visit_path: str = "",
         force_metadata: bool = False,
         analyse: bool = True,
+        remove_files: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -173,6 +176,7 @@ class MurfeyTUI(App):
             # local=self._environment.demo,
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
+            remove_files=remove_files,
         )
 
         def rsync_result(update: RSyncerUpdate):

@@ -63,6 +63,9 @@ class MultigridDirWatcher(murfey.util.Observer):
                         and d02 not in self._seen_dirs
                         and list((d.parent.parent / d.name).iterdir())
                     ):
-                        self.notify(d02, include_mid_path=False)
+                        if d02.name == "Images-Disc1":
+                            self.notify(d02, include_mid_path=False, remove_files=True)
+                        else:
+                            self.notify(d02, include_mid_path=False)
                         self._seen_dirs.append(d02)
             time.sleep(15)
