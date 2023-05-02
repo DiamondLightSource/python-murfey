@@ -84,7 +84,7 @@ class MurfeyTUI(App):
         self._form_readable_labels: dict = {}
         self._redirected_logger = redirected_logger
         self._multigrid = False
-        self._processing_enabled = True
+        self._processing_enabled = processing_enabled
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
