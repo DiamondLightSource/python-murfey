@@ -196,7 +196,7 @@ class MurfeyTUI(App):
                 self.rsync_processes[update.base_path].enqueue(update.file_path)
 
         self.rsync_processes[source].subscribe(rsync_result)
-        self._environment.watchers[source] = DirWatcher(source, settling_time=1)
+        self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:
             log.info(f"Starting analyser for {source}")
