@@ -794,7 +794,7 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if self.app._multigrid:
+        if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
                 valid = validate_form(self._user_params, DCParametersTomo.Base)
             else:
