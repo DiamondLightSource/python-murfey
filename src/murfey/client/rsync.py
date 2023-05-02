@@ -293,7 +293,6 @@ class RSyncer(Observer):
             "--progress",
             "--outbuf=line",
             "--files-from=-",
-            "-o",  # preserve ownership
             "-p",  # preserve permissions
         ]
         if self._remove_files:
