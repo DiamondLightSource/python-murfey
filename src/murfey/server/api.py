@@ -16,9 +16,7 @@ from werkzeug.utils import secure_filename
 import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
-from murfey.server import _transport_object, get_hostname, get_microscope
-from murfey.server import shutdown as _shutdown
-from murfey.server import templates
+from murfey.server import _transport_object, get_hostname, get_microscope, templates
 from murfey.server.config import MachineConfig, from_file
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
@@ -337,16 +335,6 @@ def get_version(client_version: str = ""):
         result["client-needs-downgrade"] = client > server
 
     return result
-
-
-@router.get("/shutdown", include_in_schema=False)
-def shutdown():
-    """A method to stop the server. This should be removed before Murfey is
-    deployed in production. To remove it we need to figure out how to control
-    to process (eg. systemd) and who to run it as."""
-    log.info("Server shutdown request received")
-    _shutdown()
-    return {"success": True}
 
 
 @router.post("/visits/{visit_name}/suggested_path")
