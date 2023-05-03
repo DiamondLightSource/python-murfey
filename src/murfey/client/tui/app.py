@@ -142,7 +142,7 @@ class MurfeyTUI(App):
         self._start_rsyncer(
             source,
             destination,
-            force_metadata=True,
+            force_metadata=self._processing_enabled,
             analyse=not extra_directory and use_suggested_path,
             remove_files=remove_files,
         )
