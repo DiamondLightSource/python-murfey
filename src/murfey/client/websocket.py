@@ -17,8 +17,8 @@ log = logging.getLogger("murfey.client.websocket")
 
 
 class WSApp:
-    def __init__(self, *, server: str):
-        id = random.randint(0, 100)
+    def __init__(self, *, server: str, id: int | None = None):
+        id = random.randint(0, 100) if id is None else id
         log.info(f"Opening websocket connection for Client {id}")
         websocket.enableTrace(True)
         url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")

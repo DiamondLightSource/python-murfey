@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sqlalchemy
 import yaml
+from sqlmodel import Session, create_engine
 
 from murfey.server.config import MachineConfig, get_machine_config
 
@@ -15,13 +15,8 @@ def url(machine_config: MachineConfig | None = None) -> str:
 
 def get_murfey_db_session(
     machine_config: MachineConfig | None = None,
-) -> sqlalchemy.orm.Session:
-    url = url(machine_config)
-    Session = sqlalchemy.orm.sessionmaker(
-        bind=sqlalchemy.create_engine(url, connect_args={"use_pure": True})
-    )
-    db = Session()
-    try:
-        yield db
-    finally:
-        db.close()
+) -> Session:
+    _url = url(machine_config)
+    engine = create_engine(_url)
+    with Session(engine) as session:
+        yield session

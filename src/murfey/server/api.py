@@ -10,6 +10,7 @@ import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
+from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
@@ -20,11 +21,13 @@ from murfey.server import (
     get_hostname,
     get_machine_config,
     get_microscope,
+    murfey_db,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
+from murfey.util.db import ClientEnvironment
 from murfey.util.models import (
     ClearanceKeys,
     ConnectionFileParameters,
@@ -518,3 +521,12 @@ async def clean_state(visit_name, for_clearance: ClearanceKeys):
             for k, v in global_state["autoproc_program_ids"].items()
             if k not in for_clearance.autoproc_program
         }
+
+
+@router.get("/new_client_id/")
+async def new_client_id(db=murfey_db):
+    clients = db.exec(select(ClientEnvironment)).all()
+    if not clients:
+        return {"new_id": 0}
+    sorted_ids = sorted([c.client_id for c in clients])
+    return {"new_id": sorted_ids[-1] + 1}

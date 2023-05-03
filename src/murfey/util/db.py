@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from sqlmodel import Field, SQLModel, create_engine
 
 
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
-    client_id: int = Field(primary_key=True)
+    client_id: Optional[int] = Field(primary_key=True, unique=True)
     visit: str = Field(default="")
     connected: bool
 

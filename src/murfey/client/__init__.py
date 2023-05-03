@@ -234,7 +234,11 @@ def run():
     # rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
     rich_handler = DirectableRichHandler(enable_link_path=False)
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
-    ws = murfey.client.websocket.WSApp(server=args.server)
+
+    client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
+    print(f"suggested client id {client_id}, {murfey_url.geturl()}")
+    ws = murfey.client.websocket.WSApp(server=args.server, id=client_id["new_id"])
+
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
     logging.getLogger().addHandler(handler)

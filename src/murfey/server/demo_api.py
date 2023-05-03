@@ -11,13 +11,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
+from sqlmodel import select
 
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
-from murfey.server import feedback_callback_async, get_hostname, get_microscope
+from murfey.server import (
+    feedback_callback_async,
+    get_hostname,
+    get_microscope,
+    murfey_db,
+)
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file
+from murfey.util.db import ClientEnvironment
 from murfey.util.models import (
     ConnectionFileParameters,
     ContextInfo,
@@ -369,3 +376,12 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             Path(machine_config["rsync_basepath"])
         )
     }
+
+
+@router.get("/new_client_id/")
+async def new_client_id(db=murfey_db):
+    clients = db.exec(select(ClientEnvironment)).all()
+    if not clients:
+        return {"new_id": 0}
+    sorted_ids = sorted([c.client_id for c in clients])
+    return {"new_id": sorted_ids[-1] + 1}
