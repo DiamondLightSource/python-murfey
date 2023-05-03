@@ -3,15 +3,14 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import socket
-from functools import lru_cache, partial, singledispatch
-from pathlib import Path
+from functools import partial, singledispatch
 from threading import Thread
 from typing import Any, List, NamedTuple
 
 import uvicorn
 import workflows
 import zocalo.configuration
+from fastapi import Depends
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -26,7 +25,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import murfey
 import murfey.server.websocket
-from murfey.server.config import MachineConfig, from_file
+from murfey.server.config import get_hostname, get_machine_config, get_microscope
+from murfey.server.murfey_db import get_murfey_db_session
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -52,6 +52,9 @@ _transport_object: TransportManager | None = None
 class ExtendedRecord(NamedTuple):
     record: Base
     record_params: List[Base]
+
+
+murfey_db = Depends(partial(get_murfey_db_session, get_machine_config()))
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -164,16 +167,7 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    murfey_machine_configuration = os.environ["MURFEY_MACHINE_CONFIGURATION"]
-    machine_config: MachineConfig = MachineConfig(
-        acquisition_software=[],
-        calibrations={},
-        data_directories={},
-        rsync_basepath=Path("dls/tmp"),
-    )
-    if murfey_machine_configuration:
-        microscope = get_microscope()
-        machine_config = from_file(Path(murfey_machine_configuration), microscope)
+    machine_config = get_machine_config()
     if not args.temporary and _transport_object:
         _transport_object.feedback_queue = machine_config.feedback_queue
     rabbit_thread = Thread(
@@ -207,22 +201,6 @@ def shutdown():
     if _running_server:
         _running_server.should_exit = True
         _running_server.force_exit = True
-
-
-@lru_cache()
-def get_microscope():
-    try:
-        hostname = get_hostname()
-        microscope_from_hostname = hostname.split(".")[0]
-    except OSError:
-        microscope_from_hostname = "Unknown"
-    microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
-    return microscope_name
-
-
-@lru_cache()
-def get_hostname():
-    return socket.gethostname()
 
 
 def _set_up_logging(quiet: bool, verbosity: int):

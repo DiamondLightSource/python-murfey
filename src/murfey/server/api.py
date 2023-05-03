@@ -10,16 +10,20 @@ import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
-from pydantic import BaseSettings
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
-from murfey.server import _transport_object, get_hostname, get_microscope
+from murfey.server import (
+    _transport_object,
+    get_hostname,
+    get_machine_config,
+    get_microscope,
+)
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.config import MachineConfig, from_file
+from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
     ClearanceKeys,
@@ -41,22 +45,7 @@ from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.api")
 
-
-class Settings(BaseSettings):
-    murfey_machine_configuration: str = ""
-
-
-settings = Settings()
-
-machine_config: MachineConfig = MachineConfig(
-    acquisition_software=[],
-    calibrations={},
-    data_directories={},
-    rsync_basepath=Path("dls/tmp"),
-)
-if settings.murfey_machine_configuration:
-    microscope = get_microscope()
-    machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
+machine_config = get_machine_config()
 
 router = APIRouter()
 
