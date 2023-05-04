@@ -190,6 +190,21 @@ class MurfeyTUI(App):
                 self.rsync_processes[update.base_path].enqueue(update.file_path)
 
         self.rsync_processes[source].subscribe(rsync_result)
+        self.rsync_processes[source].subscribe(
+            partial(
+                self._increment_transferred_files,
+                destination=destination,
+                source=str(source),
+            )
+        )
+        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/rsyncer"
+        rsyncer_data = {
+            "source": str(source),
+            "destination": destination,
+            "client_id": self._environment.client_id,
+            "transferring": self._do_transfer,
+        }
+        requests.post(url, json=rsyncer_data)
         self._environment.watchers[source] = DirWatcher(source, settling_time=1)
 
         if not self.analysers.get(source) and analyse:
@@ -225,7 +240,36 @@ class MurfeyTUI(App):
                 self._environment.watchers[source].subscribe(
                     self.rsync_processes[source].enqueue
                 )
+                self._environment.watchers[source].subscribe(
+                    partial(
+                        self._increment_file_count,
+                        destination=destination,
+                        source=str(source),
+                    )
+                )
                 self._environment.watchers[source].start()
+
+    def _increment_file_count(self, observed_file: Path, source: str, destination: str):
+        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
+        data = {
+            "source": source,
+            "destination": destination,
+            "client_id": self._environment.client_id,
+        }
+        requests.post(url, json=data)
+
+    def _increment_transferred_files(
+        self, update: RSyncerUpdate, source: str, destination: str
+    ):
+        if update.outcome is not TransferResult.SUCCESS:
+            return
+        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files"
+        data = {
+            "source": source,
+            "destination": destination,
+            "client_id": self._environment.client_id,
+        }
+        requests.post(url, json=data)
 
     def _set_register_dc(self, response: str):
         if response == "y":

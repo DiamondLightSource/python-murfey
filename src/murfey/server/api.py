@@ -27,7 +27,7 @@ from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.util.db import ClientEnvironment
+from murfey.util.db import ClientEnvironment, RsyncInstance
 from murfey.util.models import (
     ClearanceKeys,
     ClientInfo,
@@ -40,6 +40,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
+    RsyncerInfo,
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeries,
@@ -139,6 +140,54 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
         db.commit()
         db.close()
     return client_info
+
+
+@router.post("/visits/{visit_name}/rsyncer")
+def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
+    rsync_instance = RsyncInstance(
+        source=rsyncer_info.source,
+        client_id=rsyncer_info.client_id,
+        transferring=rsyncer_info.transferring,
+        destination=rsyncer_info.destination,
+    )
+    db.add(rsync_instance)
+    db.commit()
+    db.close()
+    return rsyncer_info
+
+
+@router.post("/visits/{visit_name}/increment_rsync_file_count")
+def increment_rsync_file_count(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
+    rsync_instance = db.exec(
+        select(RsyncInstance).where(
+            RsyncInstance.source == rsyncer_info.source,
+            RsyncInstance.destination == rsyncer_info.destination,
+            RsyncInstance.client_id == rsyncer_info.client_id,
+        )
+    ).one()
+    rsync_instance.files_counted += 1
+    db.add(rsync_instance)
+    db.commit()
+    db.close()
+
+
+@router.post("/visits/{visit_name}/increment_rsync_transferred_files")
+def increment_rsync_transferred_files(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
+    rsync_instance = db.exec(
+        select(RsyncInstance).where(
+            RsyncInstance.source == rsyncer_info.source,
+            RsyncInstance.destination == rsyncer_info.destination,
+            RsyncInstance.client_id == rsyncer_info.client_id,
+        )
+    ).one()
+    rsync_instance.files_transferred += 1
+    db.add(rsync_instance)
+    db.commit()
+    db.close()
 
 
 @router.get("/demo/visits_raw", response_model=List[Visit])

@@ -37,6 +37,13 @@ class ClientInfo(BaseModel):
     id: int
 
 
+class RsyncerInfo(BaseModel):
+    source: str
+    destination: str
+    client_id: int
+    transferring: bool = True
+
+
 class ClearanceKeys(BaseModel):
     data_collection_group: List[str]
     data_collection: List[str]
