@@ -26,6 +26,7 @@ from murfey.server import templates
 from murfey.server.config import from_file
 from murfey.util.db import ClientEnvironment
 from murfey.util.models import (
+    ClientInfo,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -107,6 +108,19 @@ def all_visit_info(request: Request):
         "activevisits.html",
         {"request": request, "info": return_query, "microscope": microscope},
     )
+
+
+@router.post("/visits/{visit_name}")
+def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey_db):
+    client_env = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
+    ).one()
+    if client_env:
+        client_env.visit = visit_name
+        db.add(client_env)
+        db.commit()
+        db.close()
+    return client_info
 
 
 @router.get("/visits_raw", response_model=List[Visit])
@@ -385,3 +399,9 @@ async def new_client_id(db=murfey_db):
         return {"new_id": 0}
     sorted_ids = sorted([c.client_id for c in clients])
     return {"new_id": sorted_ids[-1] + 1}
+
+
+@router.get("/clients")
+async def get_clients(db=murfey_db):
+    clients = db.exec(select(ClientEnvironment)).all()
+    return clients

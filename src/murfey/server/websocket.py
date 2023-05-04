@@ -7,7 +7,10 @@ from datetime import datetime
 from typing import Any, Dict, Generic, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlmodel import select
 
+from murfey.server.murfey_db import get_murfey_db_session
+from murfey.util.db import ClientEnvironment
 from murfey.util.state import State, global_state
 
 T = TypeVar("T")
@@ -18,17 +21,33 @@ log = logging.getLogger("murfey.server.websocket")
 
 class ConnectionManager(Generic[T]):
     def __init__(self, state: State[T]):
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: Dict[int, WebSocket] = {}
         self._state = state
         self._state.subscribe(self._broadcast_state_update)
 
-    async def connect(self, websocket: WebSocket, client_id):
+    async def connect(self, websocket: WebSocket, client_id: int):
         await websocket.accept()
         self.active_connections[client_id] = websocket
+        self._register_new_client(client_id)
         await websocket.send_json({"message": "state-full", "state": self._state.data})
 
-    def disconnect(self, websocket: WebSocket, client_id):
+    @staticmethod
+    def _register_new_client(client_id: int):
+        new_client = ClientEnvironment(client_id=client_id, connected=True)
+        murfey_db = next(get_murfey_db_session())
+        murfey_db.add(new_client)
+        murfey_db.commit()
+        murfey_db.close()
+
+    def disconnect(self, websocket: WebSocket, client_id: int):
         self.active_connections.pop(client_id)
+        murfey_db = next(get_murfey_db_session())
+        client_env = murfey_db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        ).one()
+        murfey_db.delete(client_env)
+        murfey_db.commit()
+        murfey_db.close()
 
     async def broadcast(self, message: str):
         for connection in self.active_connections:
@@ -58,7 +77,6 @@ manager = ConnectionManager(global_state)
 @ws.websocket("/test/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
     await manager.connect(websocket, client_id)
-
     await manager.broadcast(f"Client {client_id} joined")
     await manager.set_state(f"Client {client_id}", "joined")
     try:
@@ -101,7 +119,15 @@ async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
 
 
 @ws.delete("/test/{client_id}")
-async def close_ws_connection(client_id):
+async def close_ws_connection(client_id: int):
+    murfey_db = next(get_murfey_db_session())
+    client_env = murfey_db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    client_env.connected = False
+    murfey_db.add(client_env)
+    murfey_db.commit()
+    murfey_db.close()
     log.info("Disconnecting", client_id)
     manager.disconnect(manager.active_connections[client_id], client_id)
     await manager.broadcast(f"Client #{client_id} disconnected")

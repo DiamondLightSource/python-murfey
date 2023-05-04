@@ -545,6 +545,11 @@ class VisitSelection(SwitchSelection):
         text = str(event.button.label)
         self.app._visit = text
         self.app._environment.visit = text
+        response = requests.post(
+            f"{self.app._environment.url.geturl()}/visits/{text}",
+            json={"id": self.app._environment.client_id},
+        )
+        log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()

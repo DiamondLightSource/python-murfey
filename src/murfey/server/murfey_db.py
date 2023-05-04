@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from functools import partial
+
 import yaml
+from fastapi import Depends
 from sqlmodel import Session, create_engine
 
 from murfey.server.config import MachineConfig, get_machine_config
@@ -20,3 +23,6 @@ def get_murfey_db_session(
     engine = create_engine(_url)
     with Session(engine) as session:
         yield session
+
+
+murfey_db = Depends(partial(get_murfey_db_session, get_machine_config()))

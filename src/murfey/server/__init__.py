@@ -10,7 +10,6 @@ from typing import Any, List, NamedTuple
 import uvicorn
 import workflows
 import zocalo.configuration
-from fastapi import Depends
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -26,7 +25,6 @@ from sqlalchemy.exc import SQLAlchemyError
 import murfey
 import murfey.server.websocket
 from murfey.server.config import get_hostname, get_machine_config, get_microscope
-from murfey.server.murfey_db import get_murfey_db_session
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -52,9 +50,6 @@ _transport_object: TransportManager | None = None
 class ExtendedRecord(NamedTuple):
     record: Base
     record_params: List[Base]
-
-
-murfey_db = Depends(partial(get_murfey_db_session, get_machine_config()))
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):

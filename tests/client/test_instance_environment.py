@@ -10,7 +10,8 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 @pytest.fixture
 def env():
     return MurfeyInstanceEnvironment(
-        url=urlparse("http://localhost:8000", allow_fragments=False)
+        url=urlparse("http://localhost:8000", allow_fragments=False),
+        client_id=0,
     )
 
 

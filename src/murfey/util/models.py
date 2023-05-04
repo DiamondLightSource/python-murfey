@@ -33,6 +33,10 @@ class ContextInfo(BaseModel):
     acquisition_software: str
 
 
+class ClientInfo(BaseModel):
+    id: int
+
+
 class ClearanceKeys(BaseModel):
     data_collection_group: List[str]
     data_collection: List[str]
