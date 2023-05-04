@@ -15,15 +15,11 @@ from sqlmodel import select
 
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
-from murfey.server import (
-    feedback_callback_async,
-    get_hostname,
-    get_microscope,
-    murfey_db,
-)
+from murfey.server import feedback_callback_async, get_hostname, get_microscope
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file
+from murfey.server.murfey_db import murfey_db
 from murfey.util.db import ClientEnvironment
 from murfey.util.models import (
     ClientInfo,

@@ -21,12 +21,12 @@ from murfey.server import (
     get_hostname,
     get_machine_config,
     get_microscope,
-    murfey_db,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
+from murfey.server.murfey_db import murfey_db
 from murfey.util.db import ClientEnvironment
 from murfey.util.models import (
     ClearanceKeys,
