@@ -1,5 +1,3 @@
-# from __future__ import annotations
-
 from __future__ import annotations
 
 from typing import List, Optional
@@ -14,6 +12,9 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     rsync_instances: List["RsyncInstance"] = Relationship(
         back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
     )
+    tilt_series: List["TiltSeries"] = Relationship(
+        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class RsyncInstance(SQLModel, table=True):  # type: ignore
@@ -24,6 +25,24 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
     files_counted: int = Field(default=0)
     transferring: bool = Field(default=False)
     client: Optional[ClientEnvironment] = Relationship(back_populates="rsync_instances")
+
+
+class TiltSeries(SQLModel, table=True):  # type: ignore
+    tag: str = Field(primary_key=True)
+    client_id: int = Field(foreign_key="clientenvironment.client_id")
+    complete: bool = False
+    processing_requested: bool = False
+    client: Optional[ClientEnvironment] = Relationship(back_populates="tilt_series")
+    tilts: List["Tilt"] = Relationship(
+        back_populates="tilt_series", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
+class Tilt(SQLModel, table=True):  # type: ignore
+    movie_path: str = Field(primary_key=True)
+    tilt_series_tag: str = Field(foreign_key="tiltseries.tag")
+    motion_corrected: bool = False
+    tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 
 
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
