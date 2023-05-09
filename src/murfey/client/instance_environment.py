@@ -153,7 +153,7 @@ class MurfeyInstanceEnvironment(BaseModel):
                         file_tilt_list = []
                         for movie, angle in values["tilt_angles"][tilt]:
                             # file_tilt_list.append([str(movie), angle])
-                            if movie in v:
+                            if Path(movie) in v:
                                 file_tilt_list.append(
                                     [
                                         str(v[Path(movie)][0]),
