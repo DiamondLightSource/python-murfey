@@ -109,6 +109,8 @@ class Analyser(Observer):
                         self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                if any(p in file_path.parts for p in ("Batch", "SearchMaps")):
+                    return False
                 if file_path.with_suffix(".jpg").is_file():
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
