@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: Murfey
+  title: Murfey
+  description: Client-Server architecture hauling Cryo-EM data around systems and triggering processing
+  annotations:
+    github.com/project-slug: DiamondLightSouce/python-murfey
+spec:
+  type: other
+  lifecycle: production
+  owner: user:kif41228
+  providesApis:
+    - restapi
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: restapi
+  title: restapi
+  description: REST API registering data collections and requesting processing
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:kif41228
