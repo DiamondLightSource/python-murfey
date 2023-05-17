@@ -291,7 +291,18 @@ class SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
-        binning_factor = 1
+        binning_factor = int(
+            data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                "Binning"
+            ]["a:x"]
+        )
+        if binning_factor == 2:
+            metadata["image_size_x"] = str(
+                int(metadata["image_size_x"]) * binning_factor
+            )
+            metadata["image_size_y"] = str(
+                int(metadata["image_size_y"]) * binning_factor
+            )
         if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
