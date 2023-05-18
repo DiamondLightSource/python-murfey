@@ -268,9 +268,11 @@ class SPAContext(Context):
                 "TemMagnification"
             ]["NominalMagnification"]
             metadata["magnification"] = magnification
-            # metadata["total_exposed_dose"] = data["MicroscopeImage"]["CustomData"][
-            #     "a:KeyValueOfstringanyType"
-            # ][0]["a:Value"]["#text"]
+            metadata["total_exposed_dose"] = data["MicroscopeImage"]["CustomData"][
+                "a:KeyValueOfstringanyType"
+            ][10]["a:Value"]["#text"] * (
+                1e-20
+            )  # convert e / m^2 to e / A^2
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
