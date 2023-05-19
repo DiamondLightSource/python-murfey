@@ -78,7 +78,12 @@ class ProcessFile(BaseModel):
     gain_ref: Optional[str] = None
 
 
-class TiltSeries(BaseModel):
+class TiltSeriesInfo(BaseModel):
+    client_id: int
+    tag: str
+
+
+class TiltSeriesProcessingDetails(BaseModel):
     name: str
     file_tilt_list: str
     dcid: int

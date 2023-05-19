@@ -16,6 +16,8 @@ class MachineConfig(BaseModel):
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     murfey_db_credentials: str
+    display_name: str = ""
+    image_path: Path | None = None
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
     rsync_module: str = ""

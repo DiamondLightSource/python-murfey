@@ -627,6 +627,9 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
+            ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_tilt_series"
+            ts_data = {"client_id": environment.client_id, "tag": tilt_series}
+            requests.post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
             try:

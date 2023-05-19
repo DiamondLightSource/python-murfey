@@ -8,7 +8,7 @@ from typing import List
 
 import packaging.version
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
 from sqlmodel import select
@@ -20,7 +20,7 @@ from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file
 from murfey.server.murfey_db import murfey_db
-from murfey.util.db import ClientEnvironment, RsyncInstance
+from murfey.util.db import ClientEnvironment, RsyncInstance, TiltSeries
 from murfey.util.models import (
     ClientInfo,
     ConnectionFileParameters,
@@ -35,7 +35,8 @@ from murfey.util.models import (
     RsyncerInfo,
     SPAProcessingParameters,
     SuggestedPathParameters,
-    TiltSeries,
+    TiltSeriesInfo,
+    TiltSeriesProcessingDetails,
     Visit,
 )
 from murfey.util.state import global_state
@@ -86,7 +87,16 @@ def machine_info():
 @router.get("/microscope/")
 def get_mic():
     microscope = get_microscope()
-    return {"microscope": microscope}
+    return {
+        "microscope": microscope,
+        "display_name": machine_config.get("display_name", ""),
+    }
+
+
+@router.get("/microscope_image/")
+def get_mic_image():
+    if machine_config.get("image_path"):
+        return FileResponse(machine_config["image_path"])
 
 
 @router.get("/visits/")
@@ -136,10 +146,13 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
 
 @router.get("/clients/{client_id}/rsyncers")
 def get_rsyncers_for_client(client_id: int, db=murfey_db):
+    log.info("rsyncers requested")
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
     )
-    return rsync_instances.all()
+    res = rsync_instances.all()
+    log.info(res)
+    return res
 
 
 @router.post("/visits/{visit_name}/increment_rsync_file_count")
@@ -172,6 +185,16 @@ def increment_rsync_transferred_files(
     ).one()
     rsync_instance.files_transferred += 1
     db.add(rsync_instance)
+    db.commit()
+    db.close()
+
+
+@router.post("/visits/{visit_name}/tilt_series")
+def register_tilt_series(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
+    db.add(tilt_series)
     db.commit()
     db.close()
 
@@ -295,7 +318,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
 
 
 @router.post("/visits/{visit_name}/align")
-async def request_tilt_series_alignment(tilt_series: TiltSeries):
+async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails):
     stack_file = (
         Path(tilt_series.motion_corrected_path).parents[1]
         / "align_output"
