@@ -982,9 +982,11 @@ class TomographyContext(Context):
                         )
                     else:
                         machine_config = {}
-                    required_strings = machine_config.get(
-                        "data_required_substrings", {}
-                    ).get("tomo")
+                    required_strings = (
+                        machine_config.get("data_required_substrings", {})
+                        .get("tomo", {})
+                        .get(transferred_file.suffix)
+                    )
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
