@@ -23,6 +23,8 @@ spec:
   owner: user:kif41228
   providesApis:
     - murfey-rest
+  dependsOn:
+    - component:ispyb-api
 
 ---
 
