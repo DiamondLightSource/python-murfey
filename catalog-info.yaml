@@ -61,4 +61,4 @@ spec:
   lifecycle: production
   owner: user:kif41228
   definition:
-    $openapi: https://github.com/DiamondLightSource/python-murfey/blob/main/api-spec.yaml
+    $text: https://github.com/DiamondLightSource/python-murfey/blob/main/api-spec.yaml
