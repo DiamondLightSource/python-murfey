@@ -17,6 +17,8 @@ metadata:
   description: A server allowing for the monitoring of Cryo-EM data transfer from microscope systems and triggering relevant processing
   annotations:
     github.com/project-slug: DiamondLightSouce/python-murfey
+  tags:
+    - python
 spec:
   type: service
   lifecycle: production
@@ -37,6 +39,8 @@ metadata:
   description: A client for automated data transfer and Cryo-EM metadata extraction from EM systems
   annotations:
     github.com/project-slug: DiamondLightSouce/python-murfey
+  tags:
+    - python
 spec:
   type: user-interface
   lifecycle: production
@@ -56,3 +60,5 @@ spec:
   type: openapi
   lifecycle: production
   owner: user:kif41228
+  definition:
+    $openapi: https://github.com/DiamondLightSource/python-murfey/blob/main/api-spec.yaml
