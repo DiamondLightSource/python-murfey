@@ -25,6 +25,7 @@ spec:
     - murfey-rest
   dependsOn:
     - component:ispyb-api
+    - component:zocalo
 
 ---
 
