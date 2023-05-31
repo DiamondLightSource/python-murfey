@@ -21,15 +21,18 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel import select
 
 import murfey
 import murfey.server.websocket
 from murfey.server.config import get_hostname, get_machine_config, get_microscope
+from murfey.server.murfey_db import murfey_db
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
+import murfey.util.db as db
 from murfey.util.state import global_state
 
 try:
@@ -294,6 +297,13 @@ def feedback_callback(header: dict, message: dict) -> None:
         if "environment" in message:
             message = message["payload"]
         if message["register"] == "motion_corrected":
+            relevant_tilt = murfey_db.exec(
+                select(db.Tilt).where(db.Tilt.movie_path == message.get("movie"))
+            ).one()
+            relevant_tilt.motion_corrected = True
+            murfey_db.add(relevant_tilt)
+            murfey_db.commit()
+            murfey_db.close()
             global_state.update(
                 "motion_corrected_movies",
                 {
