@@ -55,6 +55,15 @@ class ExtendedRecord(NamedTuple):
     record_params: List[Base]
 
 
+def check_tilt_series_mc(tag: str) -> bool:
+    results = murfey_db.exec(
+        select(db.Tilt, db.TiltSeries).where(
+            db.Tilt.tilt_series_tag == db.TiltSeries.tag
+        )
+    )
+    return all(r[0].motion_corrected for r in results) and results[0][1].completed
+
+
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
     template_parameters = {
         "hostname": get_hostname(),

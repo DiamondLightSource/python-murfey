@@ -27,7 +27,7 @@ from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.util.db import ClientEnvironment, RsyncInstance
+from murfey.util.db import ClientEnvironment, RsyncInstance, TiltSeries
 from murfey.util.models import (
     ClearanceKeys,
     ClientInfo,
@@ -43,7 +43,8 @@ from murfey.util.models import (
     RsyncerInfo,
     SPAProcessingParameters,
     SuggestedPathParameters,
-    TiltSeries,
+    TiltSeriesInfo,
+    TiltSeriesProcessingDetails,
     Visit,
 )
 from murfey.util.state import global_state
@@ -204,6 +205,16 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
+@router.post("/visits/{visit_name}/tilt_series")
+def register_tilt_series(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
+    db.add(tilt_series)
+    db.commit()
+    db.close()
+
+
 @router.get("/visits_raw", response_model=List[Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
@@ -350,7 +361,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
 
 
 @router.post("/visits/{visit_name}/align")
-async def request_tilt_series_alignment(tilt_series: TiltSeries):
+async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails):
     stack_file = (
         Path(tilt_series.motion_corrected_path).parents[1]
         / "align_output"
