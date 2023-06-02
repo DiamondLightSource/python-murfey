@@ -313,6 +313,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
             murfey_db.close()
+
             global_state.update(
                 "motion_corrected_movies",
                 {
@@ -383,6 +384,15 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if message["experiment_type"] == "tomography"
                 else "",
             )
+            murfey_dc = db.DataCollection(
+                id=dcid,
+                client=message["client_id"],
+                tag=message.get("tag"),
+                dcg_id=dcgid,
+            )
+            murfey_db.add(murfey_dc)
+            murfey_db.commit()
+            murfey_db.close()
             if dcid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
@@ -411,6 +421,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                 pid = _register(ExtendedRecord(record, job_parameters), header)
             else:
                 pid = _register(record, header)
+            murfey_pj = db.ProcessingJob(id=pid, recipe=message["recipe"], dc_id=_dcid)
+            murfey_db.add(murfey_pj)
+            murfey_db.commit()
+            murfey_db.close()
             if pid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
@@ -434,6 +448,10 @@ def feedback_callback(header: dict, message: dict) -> None:
             if appid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
+            murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
+            murfey_db.add(murfey_app)
+            murfey_db.commit()
+            murfey_db.close()
             if global_state.get("autoproc_program_ids"):
                 assert isinstance(global_state["autoproc_program_ids"], dict)
                 global_state["autoproc_program_ids"] = {

@@ -634,7 +634,7 @@ class TomographyContext(Context):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,

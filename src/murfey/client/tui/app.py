@@ -356,7 +356,7 @@ class MurfeyTUI(App):
             requests.post(url, json=dcg_data)
         elif isinstance(context, SPAContext):
             source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
             self._environment.listeners["data_collection_group_ids"] = {
                 partial(
                     context._register_data_collection,

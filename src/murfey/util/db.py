@@ -58,10 +58,13 @@ class DataCollection(SQLModel, table=True):  # type: ignore
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    client: int = Field(primary_key=True)
     recipe: str = Field(primary_key=True)
-    tag: str
     dc_id: int = Field(foreign_key="datacollection.id")
+
+
+class AutoProcProgram(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True, unique=True)
+    pj_id: int = Field(foreign_key="processingjob.id")
 
 
 def setup(url: str):

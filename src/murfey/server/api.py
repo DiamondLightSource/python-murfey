@@ -469,8 +469,8 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     return dcg_parameters
 
 
-@router.post("/visits/{visit_name}/start_data_collection")
-def start_dc(visit_name, dc_params: DCParameters):
+@router.post("/visits/{visit_name}/{client_id}/start_data_collection")
+def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
@@ -503,6 +503,7 @@ def start_dc(visit_name, dc_params: DCParameters):
         "exposure_time": dc_params.exposure_time,
         "slit_width": dc_params.slit_width,
         "phase_plate": dc_params.phase_plate,
+        "client_id": client_id,
     }
 
     if _transport_object:
