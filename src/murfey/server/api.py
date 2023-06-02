@@ -442,8 +442,8 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
-@router.post("/visits/{visit_name}/register_data_collection_group")
-def register_dc_group(visit_name, dcg_params: DCGroupParameters):
+@router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
+def register_dc_group(visit_name, client_id: int, dcg_params: DCGroupParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
@@ -460,6 +460,7 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
         "experiment_type": dcg_params.experiment_type,
         "experiment_type_id": dcg_params.experiment_type_id,
         "tag": dcg_params.tag,
+        "client_id": client_id,
     }
 
     if _transport_object:

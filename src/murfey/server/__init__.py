@@ -351,6 +351,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
+            murfey_dcg = db.DataCollectionGroup(
+                id=dcgid,
+                client=message["client_id"],
+                tag=message.get("tag"),
+            )
+            murfey_db.add(murfey_dcg)
+            murfey_db.commit()
+            murfey_db.close()
             return None
         elif message["register"] == "data_collection":
             dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore

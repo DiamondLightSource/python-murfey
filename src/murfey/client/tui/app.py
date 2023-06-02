@@ -347,7 +347,7 @@ class MurfeyTUI(App):
             self._environment.id_tag_registry["data_collection_group"].append(
                 str(source)
             )
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
@@ -378,7 +378,7 @@ class MurfeyTUI(App):
                     context._launch_spa_pipeline, url=url, environment=self._environment
                 )
             }
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/register_data_collection_group"
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
