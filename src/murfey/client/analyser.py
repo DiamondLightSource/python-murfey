@@ -113,6 +113,18 @@ class Analyser(Observer):
                     return False
                 if file_path.with_suffix(".jpg").is_file():
                     return False
+                if (
+                    len(
+                        list(
+                            file_path.parent.glob(
+                                f"{file_path.name}*{file_path.suffix}"
+                            )
+                        )
+                    )
+                    > 1
+                ):
+                    # This covers the case of ignoring the averaged movies written out by the Falcon
+                    return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = DCParametersTomo
                 if not self._role:
