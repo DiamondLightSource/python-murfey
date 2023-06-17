@@ -59,6 +59,7 @@ class JobIDs(NamedTuple):
     dcid: int
     pid: int
     appid: int
+    client_id: int
 
 
 def check_tilt_series_mc(tag: str) -> bool:
@@ -79,7 +80,21 @@ def get_job_ids(tag: str) -> JobIDs:
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
     )
-    return JobIDs(dcid=results[0][-1], pid=results[0][-2], appid=results[0][-3])
+    return JobIDs(
+        dcid=results[0][-1].id,
+        pid=results[0][-2].id,
+        appid=results[0][-3].id,
+        client_id=results[0][0].client_id,
+    )
+
+
+def get_tomo_proc_params(client_id: int, *args) -> db.TomographyProcessingParameters:
+    results = murfey_db.exec(
+        select(db.TomographyProcessingParameters).where(
+            db.TomographyProcessingParameters.client_id == client_id
+        )
+    )
+    return results[0]
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -334,8 +349,20 @@ def feedback_callback(header: dict, message: dict) -> None:
             if check_tilt_series_mc(relevant_tilt.tilt_series_tag):
                 tilts = get_all_tilts(relevant_tilt.tilt_series_tag)
                 ids = get_job_ids(relevant_tilt.tilt_series_tag)
+                params = get_tomo_proc_params(ids.client_id)
+                tilt_series_proc_params = {
+                    "name": relevant_tilt.tilt_series_tag,
+                    "file_tilt_list": str(tilts),
+                    "dcid": ids.dcid,
+                    "processing_job": ids.pid,
+                    "autoproc_program_id": ids.appid,
+                    "motion_corrected_path": message.get("mrc_out"),
+                    "movie_id": message.get("movie_id"),
+                    "pixel_size": params.pixel_size,
+                    "manual_tilt_offset": params.manual_tilt_offset,
+                }
                 logger.info(
-                    f"Tilt series information gathered. Tilts: {tilts}. IDs: {ids}"
+                    f"Sending processing request with parameters: {tilt_series_proc_params}"
                 )
 
             global_state.update(

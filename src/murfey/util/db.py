@@ -64,7 +64,7 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    pid: int = Field(primary_key=True, foreign_key="processingjob.id")
+    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     pixel_size: float
     maunal_tilt_offset: int
 
