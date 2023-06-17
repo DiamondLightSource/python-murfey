@@ -28,6 +28,7 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
 class TiltSeries(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     client_id: int = Field(foreign_key="clientenvironment.client_id")
+    auto_proc_program_id: int = Field(foreign_key="autoprocprogram.id")
     complete: bool = False
     processing_requested: bool = False
     client: Optional[ClientEnvironment] = Relationship(back_populates="tilt_series")
@@ -60,6 +61,12 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     recipe: str = Field(primary_key=True)
     dc_id: int = Field(foreign_key="datacollection.id")
+
+
+class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
+    pid: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pixel_size: float
+    maunal_tilt_offset: int
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore

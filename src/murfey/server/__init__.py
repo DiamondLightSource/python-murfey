@@ -55,13 +55,31 @@ class ExtendedRecord(NamedTuple):
     record_params: List[Base]
 
 
+class JobIDs(NamedTuple):
+    dcid: int
+    pid: int
+    appid: int
+
+
 def check_tilt_series_mc(tag: str) -> bool:
-    results = murfey_db.exec(
-        select(db.Tilt, db.TiltSeries).where(
-            db.Tilt.tilt_series_tag == db.TiltSeries.tag
-        )
-    )
+    results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
     return all(r[0].motion_corrected for r in results) and results[0][1].completed
+
+
+def get_all_tilts(tag: str) -> List[str]:
+    results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
+    return [r.movie_path for r in results]
+
+
+def get_job_ids(tag: str) -> JobIDs:
+    results = murfey_db.exec(
+        select(db.TiltSeries, db.AutoProcProgram, db.ProcessingJob, db.DataCollection)
+        .where(db.TiltSeries.tag == tag)
+        .where(db.AutoProcProgram.id == db.TiltSeries.auto_proc_program_id)
+        .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
+        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+    )
+    return JobIDs(dcid=results[0][-1], pid=results[0][-2], appid=results[0][-3])
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -313,6 +331,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
             murfey_db.close()
+            if check_tilt_series_mc(relevant_tilt.tilt_series_tag):
+                tilts = get_all_tilts(relevant_tilt.tilt_series_tag)
+                ids = get_job_ids(relevant_tilt.tilt_series_tag)
+                logger.info(
+                    f"Tilt series information gathered. Tilts: {tilts}. IDs: {ids}"
+                )
 
             global_state.update(
                 "motion_corrected_movies",
