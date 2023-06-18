@@ -3,6 +3,7 @@ from __future__ import annotations
 # import contextlib
 import logging
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
 
@@ -438,12 +439,21 @@ class ProcessingForm(Screen):
             self._vert = VerticalScroll(*inputs, confirm_btn, id="input-form")
         yield self._vert
 
-    def _write_params(self, params: dict | None = None):
+    def _write_params(
+        self,
+        params: dict | None = None,
+        model: DCParametersTomo | DCParametersSPA | None = None,
+    ):
         if params:
             analyser = list(self.app.analysers.values())[0]
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
+            if model == DCParametersTomo:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    json=params,
+                )
 
     def on_switch_changed(self, event):
         if event.switch.id == "superres":
@@ -481,6 +491,7 @@ class ProcessingForm(Screen):
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
+        model = None
         if self.app.analysers.get(Path(self._form.get("source", ""))):
             if model := self.app.analysers[Path(self._form["source"])].parameters_model:
                 valid = validate_form(self._form, model)
@@ -491,7 +502,7 @@ class ProcessingForm(Screen):
                 ConfirmScreen(
                     "Launch processing?",
                     params=self._form,
-                    pressed_callback=self._write_params,
+                    pressed_callback=partial(self._write_params, model=model),
                 ),
                 "confirm",
             )
