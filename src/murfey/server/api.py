@@ -27,7 +27,12 @@ from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.util.db import ClientEnvironment, RsyncInstance, TiltSeries
+from murfey.util.db import (
+    ClientEnvironment,
+    RsyncInstance,
+    TiltSeries,
+    TomographyProcessingParameters,
+)
 from murfey.util.models import (
     ClearanceKeys,
     ClientInfo,
@@ -35,6 +40,7 @@ from murfey.util.models import (
     ContextInfo,
     DCGroupParameters,
     DCParameters,
+    DCParametersTomo,
     File,
     GainReference,
     ProcessFile,
@@ -203,6 +209,20 @@ def increment_rsync_transferred_files(
 def get_current_visits_demo(db=murfey.server.ispyb.DB):
     microscope = "m12"
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: DCParametersTomo, db=murfey_db
+):
+    params = TomographyProcessingParameters(
+        client_id=client_id,
+        pixel_size=proc_params.pixel_size_on_image,
+        manual_tilt_offest=proc_params.manual_tilt_offset,
+    )
+    db.add(params)
+    db.commit()
+    db.close()
 
 
 @router.post("/visits/{visit_name}/tilt_series")
