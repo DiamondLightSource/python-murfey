@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
@@ -323,7 +324,11 @@ class SPAContext(Context):
             metadata["pixel_size_on_image"] / binning_factor
         )
         metadata["motion_corr_binning"] = binning_factor
-        metadata["gain_ref"] = None
+        metadata["gain_ref"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            if environment
+            else None
+        )
         metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
             if environment
@@ -1104,7 +1109,11 @@ class TomographyContext(Context):
                 float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
             )
         mdoc_metadata["motion_corr_binning"] = binning_factor
-        mdoc_metadata["gain_ref"] = None
+        mdoc_metadata["gain_ref"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            if environment
+            else None
+        )
         mdoc_metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
             if environment
