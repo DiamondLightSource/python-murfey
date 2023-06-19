@@ -183,3 +183,4 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+    rescale: bool = True

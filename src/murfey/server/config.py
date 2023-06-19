@@ -14,6 +14,7 @@ class MachineConfig(BaseModel):
     rsync_basepath: Path
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
+    external_environment: Dict[str, str] = {}
     rsync_module: str = ""
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
