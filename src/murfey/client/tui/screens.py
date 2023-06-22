@@ -33,7 +33,8 @@ from textual.widgets import (
 )
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.context import SPAContext, TomographyContext
+from murfey.client.contexts.spa import SPAContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
