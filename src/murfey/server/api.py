@@ -10,6 +10,7 @@ import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
+from PIL import Image
 from pydantic import BaseSettings
 from werkzeug.utils import secure_filename
 
@@ -27,6 +28,7 @@ from murfey.util.models import (
     DCParameters,
     File,
     GainReference,
+    MillingParameters,
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
@@ -486,6 +488,33 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         }
     else:
         return {"gain_ref": new_gain_ref}
+
+
+@router.post("/visits/{year}/{visit_name}/make_milling_gif")
+async def make_gif(year, visit_name, gif_params: MillingParameters):
+    output_dir = (
+        Path(machine_config.rsync_basepath)
+        / (machine_config.rsync_module or "data")
+        / year
+        / secure_filename(visit_name)
+        / "processed"
+    )
+    output_dir.mkdir(exist_ok=True)
+    output_dir = output_dir / gif_params.raw_directory
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
+    images = [Image.open(f) for f in gif_params.images]
+    for im in images:
+        im.thumbnail((512, 512))
+    images[0].save(
+        output_path,
+        format="GIF",
+        append_images=images[1:],
+        save_all=True,
+        duration=30,
+        loop=0,
+    )
+    return {"output_gif": str(output_path)}
 
 
 @router.post("/visits/{visit_name}/clean_state")

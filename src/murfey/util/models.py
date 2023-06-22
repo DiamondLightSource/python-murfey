@@ -184,3 +184,9 @@ class ConnectionFileParameters(BaseModel):
 class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
+
+
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
