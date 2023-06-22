@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, NamedTuple
+from typing import Dict, List, NamedTuple, Optional
 
 import requests
+import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -16,16 +17,26 @@ logger = logging.getLogger("murfey.client.contexts.fib")
 class Lamella(NamedTuple):
     name: str
     number: int
+    angle: Optional[float] = None
+
+
+class MillingProgress(NamedTuple):
     file: Path
     timestamp: float
-    angle: float = 0
+
+
+def _number_from_name(name: str) -> int:
+    return int(
+        name.strip().replace("Lamella", "").replace("(", "").replace(")", "") or 1
+    )
 
 
 class FIBContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
         self._basepath = basepath
-        self._lamellae: Dict[int, List[Lamella]] = {}
+        self._milling: Dict[int, List[MillingProgress]] = {}
+        self._lamellae: Dict[int, Lamella] = {}
 
     def post_transfer(
         self,
@@ -38,13 +49,7 @@ class FIBContext(Context):
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":
                 lamella_name = parts[parts.index("Sites") + 1]
-                lamella_number = int(
-                    lamella_name.strip()
-                    .replace("Lamella", "")
-                    .replace("(", "")
-                    .replace(")", "")
-                    or 1
-                )
+                lamella_number = _number_from_name(lamella_name)
                 time_from_name = transferred_file.name.split("-")[:6]
                 timestamp = datetime.timestamp(
                     datetime(
@@ -57,19 +62,20 @@ class FIBContext(Context):
                     )
                 )
                 if not self._lamellae.get(lamella_number):
-                    self._lamellae[lamella_number] = [
-                        Lamella(
-                            name=lamella_name,
-                            number=lamella_number,
+                    self._lamellae[lamella_number] = Lamella(
+                        name=lamella_name,
+                        number=lamella_number,
+                    )
+                if not self._milling.get(lamella_number):
+                    self._milling[lamella_number] = [
+                        MillingProgress(
                             timestamp=timestamp,
                             file=transferred_file,
                         )
                     ]
                 else:
-                    self._lamellae[lamella_number].append(
-                        Lamella(
-                            name=lamella_name,
-                            number=lamella_number,
+                    self._milling[lamella_number].append(
+                        MillingProgress(
                             timestamp=timestamp,
                             file=transferred_file,
                         )
@@ -77,7 +83,7 @@ class FIBContext(Context):
                 gif_list = [
                     l.file
                     for l in sorted(
-                        self._lamellae[lamella_number], key=lambda x: x.timestamp
+                        self._milling[lamella_number], key=lambda x: x.timestamp
                     )
                 ]
                 if environment:
@@ -93,3 +99,19 @@ class FIBContext(Context):
                             "raw_directory": raw_directory,
                         },
                     )
+            elif transferred_file.name == "ProjectData.dat":
+                with open(transferred_file, "r") as dat:
+                    try:
+                        for_parsing = dat.read()
+                    except Exception:
+                        logger.warning(f"Failed to parse file {transferred_file}")
+                        return
+                    metadata = xmltodict.parse(for_parsing)
+                sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
+                for site in sites:
+                    number = _number_from_name(site["Name"])
+                    milling_angle = site["Workflow"]["Recipe"][0]["Activites"][
+                        "MillingAngleActivity"
+                    ].get("MillingAngle")
+                    if self._lamellae.get(number):
+                        self._lamellae[number]._replace(angle=milling_angle)
