@@ -659,7 +659,11 @@ class DirectorySelection(SwitchSelection):
         self.app._multigrid = self._switch_status
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
-        (visit_dir / "atlas").mkdir(exist_ok=True)
+        machine_config = get_machine_config(
+            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        )
+        for dir in machine_config["create_directories"]:
+            (visit_dir / dir).mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
         )
