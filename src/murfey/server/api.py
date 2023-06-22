@@ -503,7 +503,10 @@ async def make_gif(year, visit_name, gif_params: MillingParameters):
     output_dir = output_dir / gif_params.raw_directory
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-    images = [Image.open(f) for f in gif_params.images]
+    image_full_paths = [
+        output_dir.parent / gif_params.raw_directory / i for i in gif_params.images
+    ]
+    images = [Image.open(f) for f in image_full_paths]
     for im in images:
         im.thumbnail((512, 512))
     images[0].save(

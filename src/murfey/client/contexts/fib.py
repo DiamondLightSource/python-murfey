@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, NamedTuple
 
 import requests
 
@@ -13,11 +13,19 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 logger = logging.getLogger("murfey.client.contexts.fib")
 
 
+class Lamella(NamedTuple):
+    name: str
+    number: int
+    file: Path
+    timestamp: float
+    angle: float = 0
+
+
 class FIBContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__(acquisition_software)
         self._basepath = basepath
-        self._lamellae: Dict[int, List[tuple]] = {}
+        self._lamellae: Dict[int, List[Lamella]] = {}
 
     def post_transfer(
         self,
@@ -49,12 +57,28 @@ class FIBContext(Context):
                     )
                 )
                 if not self._lamellae.get(lamella_number):
-                    self._lamellae[lamella_number] = [(timestamp, transferred_file)]
+                    self._lamellae[lamella_number] = [
+                        Lamella(
+                            name=lamella_name,
+                            number=lamella_number,
+                            timestamp=timestamp,
+                            file=transferred_file,
+                        )
+                    ]
                 else:
-                    self._lamellae[lamella_number].append((timestamp, transferred_file))
+                    self._lamellae[lamella_number].append(
+                        Lamella(
+                            name=lamella_name,
+                            number=lamella_number,
+                            timestamp=timestamp,
+                            file=transferred_file,
+                        )
+                    )
                 gif_list = [
-                    l[1]
-                    for l in sorted(self._lamellae[lamella_number], key=lambda x: x[0])
+                    l.file
+                    for l in sorted(
+                        self._lamellae[lamella_number], key=lambda x: x.timestamp
+                    )
                 ]
                 if environment:
                     raw_directory = Path(
