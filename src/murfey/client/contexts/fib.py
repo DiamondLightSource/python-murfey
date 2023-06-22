@@ -28,7 +28,7 @@ class FIBContext(Context):
     ):
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
-            if "DCImages" in parts:
+            if "DCImages" in parts and transferred_file.suffix == ".png":
                 lamella_name = parts[parts.index("Sites") + 1]
                 lamella_number = int(
                     lamella_name.strip()
