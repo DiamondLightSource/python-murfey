@@ -113,5 +113,7 @@ class FIBContext(Context):
                     milling_angle = site["Workflow"]["Recipe"][0]["Activites"][
                         "MillingAngleActivity"
                     ].get("MillingAngle")
-                    if self._lamellae.get(number):
-                        self._lamellae[number]._replace(angle=milling_angle)
+                    if self._lamellae.get(number) and milling_angle:
+                        self._lamellae[number]._replace(
+                            angle=float(milling_angle.split(" ")[0])
+                        )
