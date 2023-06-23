@@ -97,7 +97,7 @@ class TransportManager:
             )
             return {"success": False, "return_value": None}
 
-    def do_insert_sample_group(self, record: BLSampleGroup):
+    def do_insert_sample_group(self, record: BLSampleGroup) -> dict:
         try:
             with Session() as db:
                 db.add(record)
@@ -107,6 +107,29 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Sample Group entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+            return {"success": False, "return_value": None}
+
+    def do_insert_sample(self, record: BLSample, sample_group_id: int) -> dict:
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created BLSample {record.blSampleId}")
+                linking_record = BLSampleGroupHasBLSample(
+                    blSampleId=record.blSampleId, blSampleGroupId=sample_group_id
+                )
+                db.add(linking_record)
+                db.commit()
+                log.info(
+                    f"Linked BLSample {record.blSampleId} to BLSampleGroup {sample_group_id}"
+                )
+                return {"success": True, "return_value": record.blSampleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting Sample entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )

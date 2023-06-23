@@ -9,7 +9,7 @@ from typing import List
 import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from ispyb.sqlalchemy import BLSampleGroup, BLSession, Proposal
+from ispyb.sqlalchemy import BLSample, BLSampleGroup, BLSession, Proposal
 from PIL import Image
 from pydantic import BaseSettings
 from werkzeug.utils import secure_filename
@@ -21,6 +21,7 @@ from murfey.server import _transport_object, get_hostname, get_microscope, templ
 from murfey.server.config import MachineConfig, from_file
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
+    BLSampleParameters,
     ClearanceKeys,
     ConnectionFileParameters,
     ContextInfo,
@@ -161,6 +162,14 @@ def register_sample_group(visit_name: str, db=murfey.server.ispyb.DB) -> dict:
     record = BLSampleGroup(proposalId=proposal_id)
     if _transport_object:
         return _transport_object.do_insert_sample_group(record)
+    return {"success": False}
+
+
+@router.post("/visit/{visit_name}/sample")
+def register_sample(visit_name: str, sample_params: BLSampleParameters) -> dict:
+    record = BLSample()
+    if _transport_object:
+        return _transport_object.do_insert_sample(record, sample_params.sample_group_id)
     return {"success": False}
 
 
