@@ -12,7 +12,11 @@ import workflows.transport
 from fastapi import Depends
 from ispyb.sqlalchemy import (
     AutoProcProgram,
+    BLSample,
+    BLSampleGroup,
+    BLSampleGroupHasBLSample,
     BLSession,
+    BLSubSample,
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
@@ -21,7 +25,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
-from murfey.util.models import Visit
+from murfey.util.models import Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -192,6 +196,46 @@ def get_session_id(
         .all()
     )
     return query[0][1]
+
+
+def get_proposal_id(
+    proposal_code: str, proposal_number: str, db: sqlalchemy.orm.Session
+) -> int:
+    query = (
+        db.query(Proposal)
+        .filter(
+            Proposal.proposalCode == proposal_code,
+            Proposal.proposalNumber == proposal_number,
+        )
+        .all()
+    )
+    return query[0].proposalId
+
+
+def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[Sample]:
+    proposal_id = get_proposal_id(visit[:2], visit.split("-")[0][2:], db)
+    samples = (
+        db.query(BLSampleGroup, BLSampleGroupHasBLSample, BLSample, BLSubSample)
+        .join(BLSample, BLSample.blSampleId == BLSampleGroupHasBLSample.blSampleId)
+        .join(
+            BLSampleGroup,
+            BLSample.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
+        )
+        .join(BLSubSample, BLSubSample.blSampleId == BLSample.blSampleId)
+        .filter(BLSampleGroup.proposalId == proposal_id)
+        .all()
+    )
+    res = []
+    for s in samples:
+        res.append(
+            Sample(
+                sample_group_id=s[1].blSampleGroupId,
+                sample_id=s[2].blSampleId,
+                subsample_id=s[3].blSubSampleId,
+                image_path=s[3].imgFilePath,
+            )
+        )
+    return [s[3] for s in samples]
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:

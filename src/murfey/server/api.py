@@ -32,6 +32,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     RegistrationMessage,
+    Sample,
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeries,
@@ -145,6 +146,11 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
 def get_current_visits(db=murfey.server.ispyb.DB):
     microscope = get_microscope()
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
+
+
+@router.get("/visit/{visit_name}/samples")
+def get_samples(visit_name: str, db=murfey.server.ispyb.DB) -> List[Sample]:
+    return murfey.server.ispyb.get_sub_samples_from_visit(visit_name, db=db)
 
 
 @router.get("/visits/{visit_name}")

@@ -28,6 +28,13 @@ class Visit(BaseModel):
         )
 
 
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
 class ContextInfo(BaseModel):
     experiment_type: str
     acquisition_software: str
