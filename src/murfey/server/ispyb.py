@@ -135,6 +135,21 @@ class TransportManager:
             )
             return {"success": False, "return_value": None}
 
+    def do_insert_subsample(self, record: BLSubSample) -> dict:
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created BLSubSample {record.blSubSampleId}")
+                return {"success": True, "return_value": record.blSubSampleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting SubSample entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+            return {"success": False, "return_value": None}
+
     def do_create_ispyb_job(
         self,
         record: ProcessingJob,

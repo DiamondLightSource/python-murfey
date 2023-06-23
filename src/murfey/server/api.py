@@ -9,7 +9,7 @@ from typing import List
 import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from ispyb.sqlalchemy import BLSample, BLSampleGroup, BLSession, Proposal
+from ispyb.sqlalchemy import BLSample, BLSampleGroup, BLSession, BLSubSample, Proposal
 from PIL import Image
 from pydantic import BaseSettings
 from werkzeug.utils import secure_filename
@@ -22,6 +22,7 @@ from murfey.server.config import MachineConfig, from_file
 from murfey.server.gain import Camera, prepare_gain
 from murfey.util.models import (
     BLSampleParameters,
+    BLSubSampleParameters,
     ClearanceKeys,
     ConnectionFileParameters,
     ContextInfo,
@@ -170,6 +171,18 @@ def register_sample(visit_name: str, sample_params: BLSampleParameters) -> dict:
     record = BLSample()
     if _transport_object:
         return _transport_object.do_insert_sample(record, sample_params.sample_group_id)
+    return {"success": False}
+
+
+@router.post("/visit/{visit_name}/subsample")
+def register_subsample(
+    visit_name: str, subsample_params: BLSubSampleParameters
+) -> dict:
+    record = BLSubSample(
+        blSampleId=subsample_params.sample_id, imgFilePath=subsample_params.image_path
+    )
+    if _transport_object:
+        return _transport_object.do_insert_subsample(record)
     return {"success": False}
 
 

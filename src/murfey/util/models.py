@@ -39,6 +39,11 @@ class BLSampleParameters(BaseModel):
     sample_group_id: int
 
 
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
 class ContextInfo(BaseModel):
     experiment_type: str
     acquisition_software: str
