@@ -235,7 +235,7 @@ def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[S
                 image_path=s[3].imgFilePath,
             )
         )
-    return [s[3] for s in samples]
+    return res
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
