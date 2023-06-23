@@ -9,7 +9,7 @@ from typing import List
 import packaging.version
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from ispyb.sqlalchemy import BLSession, Proposal
+from ispyb.sqlalchemy import BLSampleGroup, BLSession, Proposal
 from PIL import Image
 from pydantic import BaseSettings
 from werkzeug.utils import secure_filename
@@ -151,6 +151,17 @@ def get_current_visits(db=murfey.server.ispyb.DB):
 @router.get("/visit/{visit_name}/samples")
 def get_samples(visit_name: str, db=murfey.server.ispyb.DB) -> List[Sample]:
     return murfey.server.ispyb.get_sub_samples_from_visit(visit_name, db=db)
+
+
+@router.post("/visit/{visit_name}/sample_group")
+def register_sample_group(visit_name: str, db=murfey.server.ispyb.DB) -> dict:
+    proposal_id = murfey.server.ispyb.get_proposal_id(
+        visit_name[:2], visit_name.split("-")[0][2:], db=db
+    )
+    record = BLSampleGroup(proposalId=proposal_id)
+    if _transport_object:
+        return _transport_object.do_insert_sample_group(record)
+    return {"success": False}
 
 
 @router.get("/visits/{visit_name}")

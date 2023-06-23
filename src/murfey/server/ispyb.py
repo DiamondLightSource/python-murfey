@@ -97,6 +97,21 @@ class TransportManager:
             )
             return {"success": False, "return_value": None}
 
+    def do_insert_sample_group(self, record: BLSampleGroup):
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created BLSampleGroup {record.blSampleGroupId}")
+                return {"success": True, "return_value": record.blSampleGroupId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting Sample Group entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+            return {"success": False, "return_value": None}
+
     def do_create_ispyb_job(
         self,
         record: ProcessingJob,
