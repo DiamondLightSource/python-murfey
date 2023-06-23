@@ -219,7 +219,7 @@ def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[S
         .join(BLSample, BLSample.blSampleId == BLSampleGroupHasBLSample.blSampleId)
         .join(
             BLSampleGroup,
-            BLSample.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
+            BLSampleGroup.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
         )
         .join(BLSubSample, BLSubSample.blSampleId == BLSample.blSampleId)
         .filter(BLSampleGroup.proposalId == proposal_id)
