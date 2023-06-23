@@ -225,16 +225,15 @@ def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[S
         .filter(BLSampleGroup.proposalId == proposal_id)
         .all()
     )
-    res = []
-    for s in samples:
-        res.append(
-            Sample(
-                sample_group_id=s[1].blSampleGroupId,
-                sample_id=s[2].blSampleId,
-                subsample_id=s[3].blSubSampleId,
-                image_path=s[3].imgFilePath,
-            )
+    res = [
+        Sample(
+            sample_group_id=s[1].blSampleGroupId,
+            sample_id=s[2].blSampleId,
+            subsample_id=s[3].blSubSampleId,
+            image_path=s[3].imgFilePath,
         )
+        for s in samples
+    ]
     return res
 
 
