@@ -472,6 +472,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
+        / machine_config.gain_directory_name
     )
     new_gain_ref = await prepare_gain(
         camera,

@@ -18,6 +18,7 @@ class MachineConfig(BaseModel):
     rsync_module: str = ""
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
+    gain_directory_name: str = "processing"
     feedback_queue: str = "murfey_feedback"
     superres: bool = False
     camera: str = "FALCON"
