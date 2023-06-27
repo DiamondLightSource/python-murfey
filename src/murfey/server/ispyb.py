@@ -191,7 +191,9 @@ def get_session_id(
         .add_columns(BLSession.sessionId)
         .all()
     )
-    return query[0][1]
+    res = query[0][1]
+    db.close()
+    return res
 
 
 def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
