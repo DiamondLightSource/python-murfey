@@ -34,7 +34,7 @@ async def prepare_gain(
         gain_out = gain_path.parent / "gain.mrc"
         for k, v in env.items():
             os.environ[k] = v
-        (gain_path / "gain").mkdir(exist_ok=True)
+        (gain_path.parent / "gain").mkdir(exist_ok=True)
         gain_path = _sanitise(gain_path)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
