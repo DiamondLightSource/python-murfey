@@ -15,6 +15,7 @@ from ispyb.sqlalchemy import (
     BLSample,
     BLSampleGroup,
     BLSampleGroupHasBLSample,
+    BLSampleImage,
     BLSession,
     BLSubSample,
     DataCollection,
@@ -145,6 +146,21 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting SubSample entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+            return {"success": False, "return_value": None}
+
+    def do_insert_sample_image(self, record: BLSampleImage) -> dict:
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created BLSampleImage {record.blSampleImageId}")
+                return {"success": True, "return_value": record.blSampleImageId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting Sample Image entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )

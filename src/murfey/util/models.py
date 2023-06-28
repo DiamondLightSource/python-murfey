@@ -35,6 +35,11 @@ class Sample(BaseModel):
     image_path: Optional[Path]
 
 
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
 class BLSampleParameters(BaseModel):
     sample_group_id: int
 
