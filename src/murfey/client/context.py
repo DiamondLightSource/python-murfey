@@ -45,6 +45,16 @@ def _construct_tilt_series_name(
     return tilt_series
 
 
+def _midpoint(angles: List[float]) -> float:
+    sorted_angles = sorted(angles)
+    return (
+        sorted_angles[len(sorted_angles) // 2]
+        if sorted_angles[len(sorted_angles) // 2]
+        and sorted_angles[len(sorted_angles) // 2 + 1]
+        else 0
+    )
+
+
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
     glob = dir_for_transfer.glob("*")
     for f in glob:
@@ -1074,7 +1084,10 @@ class TomographyContext(Context):
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
-            mdoc_data_block = get_block(md)
+            num_blocks = get_num_blocks(md)
+            md.seek(0)
+            blocks = [get_block(md) for i in range(num_blocks)]
+            mdoc_data_block = blocks[0]
         if not mdoc_data:
             return OrderedDict({})
         mdoc_metadata: OrderedDict = OrderedDict({})
@@ -1119,7 +1132,9 @@ class TomographyContext(Context):
             if environment
             else None
         )
-        mdoc_metadata["manual_tilt_offset"] = 0
+        mdoc_metadata["manual_tilt_offset"] = _midpoint(
+            [float(b["TiltAngle"]) for b in blocks]
+        )
         mdoc_metadata["source"] = str(self._basepath)
         mdoc_metadata[
             "file_extension"
