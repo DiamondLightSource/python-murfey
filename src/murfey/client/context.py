@@ -1132,7 +1132,7 @@ class TomographyContext(Context):
             if environment
             else None
         )
-        mdoc_metadata["manual_tilt_offset"] = _midpoint(
+        mdoc_metadata["manual_tilt_offset"] = -_midpoint(
             [float(b["TiltAngle"]) for b in blocks]
         )
         mdoc_metadata["source"] = str(self._basepath)
