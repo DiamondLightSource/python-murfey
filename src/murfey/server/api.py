@@ -435,7 +435,9 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     proc_parameters = {
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
-        "job_parameters": proc_params.parameters,
+        "job_parameters": {
+            k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
+        },
     }
 
     if _transport_object:

@@ -394,10 +394,6 @@ class SPAContext(Context):
             else None
         ) or True
 
-        for k, v in metadata.items():
-            if v == "None":
-                metadata.pop(k)
-
         return metadata
 
 
