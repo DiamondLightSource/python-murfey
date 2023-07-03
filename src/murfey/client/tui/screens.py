@@ -706,11 +706,11 @@ class DestinationSelect(Screen):
                             dest_path = Path(dest)
                             name_root = ""
                             dest_num = 0
-                            for i, s in enumerate(dest_path.name):
-                                if s.isnumeric():
+                            for i, st in enumerate(dest_path.name):
+                                if st.isnumeric():
                                     dest_num = int(dest_path.name[i:])
                                     break
-                                name_root += s
+                                name_root += st
                             if dest_num:
                                 dest = str(
                                     dest_path.parent / f"{name_root}{dest_num+1}"
