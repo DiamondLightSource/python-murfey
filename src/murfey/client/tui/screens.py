@@ -58,7 +58,7 @@ def determine_default_destination(
     extra_directory: str = "",
     include_mid_path: bool = True,
     use_suggested_path: bool = True,
-):
+) -> str:
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
     if environment.processing_only_mode and environment.source:
@@ -687,6 +687,7 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
+            destinations = []
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
                     if d.is_dir() and d.name != "atlas":
@@ -701,6 +702,22 @@ class DestinationSelect(Screen):
                             self.app.analysers,
                             touch=True,
                         )
+                        if dest and dest in destinations:
+                            dest_path = Path(dest)
+                            name_root = ""
+                            dest_num = 0
+                            for i, s in enumerate(dest_path.name):
+                                if s.isnumeric():
+                                    dest_num = int(dest_path.name[i:])
+                                    break
+                                name_root += s
+                            if dest_num:
+                                dest = str(
+                                    dest_path.parent / f"{name_root}{dest_num+1}"
+                                )
+                            else:
+                                dest = str(dest_path.parent / f"{name_root}2")
+                        destinations.append(dest)
                         bulk.append(Label(f"Copy the source {d} to:"))
                         bulk.append(
                             Input(
