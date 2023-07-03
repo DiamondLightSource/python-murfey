@@ -284,6 +284,9 @@ class LaunchScreen(Screen):
     def _add_directory(self, directory: str, add_destination: bool = True):
         source = Path(self._dir_tree.path).resolve() / directory
         if add_destination:
+            for s in self.app._environment.sources:
+                if source.is_relative_to(s):
+                    return
             self.app._environment.sources.append(source)
             machine_data = requests.get(
                 f"{self.app._environment.url.geturl()}/machine/"
