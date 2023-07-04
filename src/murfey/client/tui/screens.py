@@ -867,7 +867,9 @@ class MainScreen(Screen):
         info_widget = TextLog(id="info", markup=True)
         yield info_widget
         yield self.app.log_book
-        info_widget.write("[bold]Welcome to Murfey[/bold]")
+        info_widget.write(
+            f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
+        )
         self.app.processing_btn = Button(
             "Request processing",
             id="processing-btn",
