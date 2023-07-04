@@ -396,7 +396,6 @@ class MurfeyTUI(App):
         machine_config = get_machine_config(
             str(self._environment.url.geturl()), demo=self._environment.demo
         )
-        log.info(f"{bool(self.rsync_processes)}, {machine_config.get('allow_removal')}")
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following:\n {sources}"
@@ -406,9 +405,9 @@ class MurfeyTUI(App):
                     pressed_callback=self._remove_data,
                     button_names={"launch": "Yes", "quit": "No"},
                 ),
-                "clear-confirm",
+                "confirm",
             )
-            self.push_screen("clear-confirm")
+            self.push_screen("confirm")
 
     async def action_quit(self) -> None:
         log.info("quitting app")
