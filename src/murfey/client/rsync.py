@@ -84,7 +84,7 @@ class RSyncer(Observer):
         return f"<RSyncer {self._basepath} → {self._remote} ({self.status})"
 
     @classmethod
-    def from_rsyncer(cl, rsyncer: RSyncer, **kwargs):
+    def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
         kwarguments_from_rsyncer = {
             "local": rsyncer._local,
             "status_bar": rsyncer._statusbar,
@@ -97,7 +97,7 @@ class RSyncer(Observer):
             assert isinstance(kwarguments_from_rsyncer["status_bar"], StatusBar)
         assert isinstance(kwarguments_from_rsyncer["do_transfer"], bool)
         assert isinstance(kwarguments_from_rsyncer["remove_files"], bool)
-        return cl(
+        return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,
             rsyncer._server_url,
