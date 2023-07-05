@@ -74,6 +74,59 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(foreign_key="processingjob.id")
 
 
+class CtfParameters(SQLModel, table=True):  # type: ignore
+    micrographs_file: str = Field(primary_key=True)
+    coord_list_file: str
+    extract_file: str
+    ctf_image: str
+    ctf_max_resolution: float
+    ctf_figure_of_merit: float
+    defocus_u: float
+    defocus_v: float
+    defocus_angle: float
+
+
+class ParticleSizes(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True, unique=True)
+    particle_size: float
+
+
+class SPARelionParameters(SQLModel, table=True):  # type: ignore
+    pixel_size_on_image: float = Field(primary_key=True, unique=True)
+    dose_per_frame: float
+    gain_ref: str
+    voltage: int
+    motion_corr_binning: int
+    eer_grouping: int
+    symmetry: str
+    particle_diameter: float
+    downscale: bool
+    do_icebreaker_jobs: bool = True
+
+
+class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True, unique=True)
+    particle_diameter: float
+    hold_class2d: bool = False
+    hold_class3d: bool = False
+    class_selection_score: float
+    star_combination_job: int
+    initial_model: str
+    next_job: int
+
+
+class Class2DParameters(SQLModel, table=True):  # type: ignore
+    particles_file: str = Field(primary_key=True, unique=True)
+    class2d_dir: str
+    batch_size: int
+
+
+class Class3DParameters(SQLModel, table=True):  # type: ignore
+    particles_file: str = Field(primary_key=True, unique=True)
+    class3d_dir: str
+    batch_size: int
+
+
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
