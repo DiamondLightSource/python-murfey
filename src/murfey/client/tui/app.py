@@ -29,7 +29,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import _get_visit_list, get_machine_config
+from murfey.util import get_machine_config
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -354,7 +354,6 @@ class MurfeyTUI(App):
 
     async def on_load(self, event):
         self.bind("q", "quit", description="Quit", show=True)
-        self.bind("c", "clear", description="Remove copied data and quit", show=True)
         self.bind("p", "process", description="Allow processing", show=True)
 
     def _install_processing_form(self):
@@ -367,21 +366,12 @@ class MurfeyTUI(App):
         event.input.has_focus = False
         self.screen.focused = None
 
-    def on_button_pressed(self, event: Button.Pressed):
+    async def on_button_pressed(self, event: Button.Pressed):
         if event.button._id == "processing-btn":
             self._install_processing_form()
             self.push_screen("processing-form")
         elif event.button._id == "new-visit-btn":
-            self.reset()
-            if self.rsync_processes:
-                for rp in self.rsync_processes.values():
-                    rp.stop()
-            if self.analysers:
-                for a in self.analysers.values():
-                    a.stop()
-            self.rsync_processes = {}
-            self.analysers = {}
-            self.push_screen("visit-select-screen")
+            await self.reset()
 
     async def on_mount(self) -> None:
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
@@ -402,32 +392,22 @@ class MurfeyTUI(App):
         }
         requests.post(url, json=data)
 
-    def reset(self):
-        self._clear_state()
-        self._environment.clear()
-        if self.rsync_processes:
-            for rp in self.rsync_processes.values():
-                rp.stop()
-            self.rsync_processes = {}
-        if self.analysers:
-            for a in self.analysers.values():
-                a.stop()
-            self.analysers = {}
-        self.visits = [v.name for v in _get_visit_list(self._environment.url)]
-        self._default_destinations = self._environment.default_destinations
-        self._data_collection_form_complete = False
-        self._form_values = {}
-        self.uninstall_screen("visit-select-screen")
-        self.uninstall_screen("launcher")
-        self.uninstall_screen("destination-select-screen")
-        self.uninstall_screen("processing-form")
-        self.uninstall_screen("directory-select")
-        self.pop_screen()
-        self.uninstall_screen("main")
-        self.install_screen(MainScreen(), "main")
-        self.push_screen("main")
-        self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("visit-select-screen")
+    async def reset(self):
+        machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
+        if self.rsync_processes and machine_config.get("allow_removal"):
+            sources = "\n".join(str(k) for k in self.rsync_processes.keys())
+            prompt = f"Remove files from the following:\n {sources}"
+            self.install_screen(
+                ConfirmScreen(
+                    prompt,
+                    pressed_callback=self._remove_data,
+                    button_names={"launch": "Yes", "quit": "No"},
+                ),
+                "confirm",
+            )
+            self.push_screen("confirm")
 
     async def action_quit(self) -> None:
         log.info("quitting app")
@@ -444,23 +424,6 @@ class MurfeyTUI(App):
         self.exit()
         exit()
 
-    async def action_clear(self) -> None:
-        machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
-        )
-        if self.rsync_processes and machine_config.get("allow_removal"):
-            sources = "\n".join(str(k) for k in self.rsync_processes.keys())
-            prompt = f"Remove files from the following: {sources}"
-            self.install_screen(
-                ConfirmScreen(
-                    prompt,
-                    pressed_callback=self._remove_data,
-                    button_names={"launch": "Yes", "quit": "No"},
-                ),
-                "clear-confirm",
-            )
-            self.push_screen("clear-confirm")
-
     def _remove_data(self, **kwargs):
         log.info(
             f"Starting to remove data files {self._environment.demo}, {len(self.rsync_processes)}"
@@ -470,26 +433,12 @@ class MurfeyTUI(App):
                 rp.stop()
                 if self.analysers.get(k):
                     self.analysers[k].stop()
-                cmd = [
-                    "rsync",
-                    "-iiv",
-                    "-o",  # preserve ownership
-                    "-p",  # preserve permissions
-                    "--remove-source-files",
-                ]
-                cmd.extend(
-                    str(f.relative_to(k.absolute())) for f in k.absolute().glob("**/*")
-                )
-                cmd.append(rp._remote)
-                if self._environment.demo:
-                    log.info(
-                        f"rsync command {' '.join(cmd)} with removal in working directory {rp._basepath}"
-                    )
-                else:
-                    result = procrunner.run(cmd, working_directory=str(rp._basepath))
-                    log.info(
-                        f"rsync command {' '.join(cmd)} with removal finished with return code {result.returncode}"
-                    )
+                removal_rp = RSyncer.from_rsyncer(rp, remove_files=True)
+                removal_rp.start()
+                for f in k.absolute().glob("**/*"):
+                    removal_rp.queue.put(f)
+                removal_rp.stop()
+                log.info(f"rsyncer {rp} rerun with removal")
         self.exit()
         exit()
 
