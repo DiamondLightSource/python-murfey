@@ -65,6 +65,13 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
     return ""
 
 
+def _get_xml_list_index(key: str, xml_list: list) -> int:
+    for i, elem in enumerate(xml_list):
+        if elem["a:Key"] == key:
+            return i
+    raise ValueError(f"Key not found in XML list: {key}")
+
+
 class Context:
     user_params: List[ProcessingParameter] = []
     metadata_params: List[ProcessingParameter] = []
@@ -280,15 +287,22 @@ class SPAContext(Context):
                 "TemMagnification"
             ]["NominalMagnification"]
             metadata["magnification"] = magnification
-            metadata["total_exposed_dose"] = round(
-                float(
-                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
-                        10
-                    ]["a:Value"]["#text"]
+            try:
+                dose_index = _get_xml_list_index(
+                    "Dose",
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"],
                 )
-                * (1e-20),
-                2,
-            )  # convert e / m^2 to e / A^2
+                metadata["total_exposed_dose"] = round(
+                    float(
+                        data["MicroscopeImage"]["CustomData"][
+                            "a:KeyValueOfstringanyType"
+                        ][dose_index]["a:Value"]["#text"]
+                    )
+                    * (1e-20),
+                    2,
+                )  # convert e / m^2 to e / A^2
+            except ValueError:
+                metadata["total_exposed_dose"] = 1
             num_fractions = int(
                 data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
                     "CameraSpecificInput"
