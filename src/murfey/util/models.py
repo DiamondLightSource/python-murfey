@@ -154,7 +154,7 @@ class DCParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: float
+        dose_per_frame: Optional[float]
         gain_ref: Optional[str]
         use_cryolo: bool
         symmetry: str

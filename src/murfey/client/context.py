@@ -243,6 +243,7 @@ class SPAContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         magnification = 0
+        num_fractions = 1
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
@@ -279,13 +280,20 @@ class SPAContext(Context):
                 "TemMagnification"
             ]["NominalMagnification"]
             metadata["magnification"] = magnification
-            metadata["total_exposed_dose"] = float(
-                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][10][
-                    "a:Value"
-                ]["#text"]
-            ) * (
-                1e-20
+            metadata["total_exposed_dose"] = round(
+                float(
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
+                        10
+                    ]["a:Value"]["#text"]
+                )
+                * (1e-20),
+                2,
             )  # convert e / m^2 to e / A^2
+            num_fractions = int(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "CameraSpecificInput"
+                ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
+            )
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
@@ -341,11 +349,20 @@ class SPAContext(Context):
             if environment
             else None
         )
-        metadata["dose_per_frame"] = (
-            environment.data_collection_parameters.get("dose_per_frame")
-            if environment
-            else None
-        )
+        if metadata.get("total_exposed_dose"):
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                and environment.data_collection_parameters.get("dose_per_frame")
+                not in (None, "None")
+                else round(metadata["total_exposed_dose"] / num_fractions, 3)
+            )
+        else:
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                else None
+            )
 
         metadata["use_cryolo"] = (
             environment.data_collection_parameters.get("use_cryolo")
