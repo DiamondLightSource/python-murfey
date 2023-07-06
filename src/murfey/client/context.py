@@ -350,7 +350,7 @@ class SPAContext(Context):
                 ps_from_mag = (
                     server_config.get("calibrations", {})
                     .get("magnification", {})
-                    .get(int(magnification))
+                    .get(magnification)
                 )
                 if ps_from_mag:
                     metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
@@ -1140,7 +1140,7 @@ class TomographyContext(Context):
             ps_from_mag = (
                 server_config.get("calibrations", {})
                 .get("magnification", {})
-                .get(int(mdoc_data_block["Magnification"]))
+                .get(mdoc_data_block["Magnification"])
             )
             if ps_from_mag:
                 mdoc_metadata["pixel_size_on_image"] = (
