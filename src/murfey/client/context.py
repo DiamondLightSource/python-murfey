@@ -354,6 +354,11 @@ class SPAContext(Context):
                 )
                 if ps_from_mag:
                     metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
+                    # this is a bit of a hack to cover the case when the data is binned K3
+                    # then the pixel size from the magnification table will be correct but the binning_factor will be 2
+                    # this is divided out later so multiply it in here to cancel
+                    if server_config.get("superres") and not environment.superres:
+                        metadata["pixel_size_on_image"] *= binning_factor
         metadata["pixel_size_on_image"] = (
             metadata["pixel_size_on_image"] / binning_factor
         )
