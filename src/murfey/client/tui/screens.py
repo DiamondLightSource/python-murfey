@@ -641,6 +641,9 @@ class GainReference(Screen):
                 self.app._environment.data_collection_parameters[
                     "gain_ref"
                 ] = process_gain_response.json().get("gain_ref")
+                self.app._environment.data_collection_parameters[
+                    "gain_ref_superres"
+                ] = process_gain_response.json().get("gain_ref_superres")
         if self._switch_status:
             self.app.push_screen("directory-select")
         else:
