@@ -56,18 +56,28 @@ class MultigridDirWatcher(murfey.util.Observer):
                             include_mid_path=False,
                         )
                         self._seen_dirs.append(d)
-                    if (d.parent.parent / d.name / "Images-Disc1").is_dir():
-                        d02 = d.parent.parent / d.name / "Images-Disc1"
-                    else:
+                    processing_started = bool(
+                        set(self._seen_dirs).intersection(
+                            set((d.parent.parent / d.name).glob("Images-Disc*"))
+                        )
+                    )
+                    for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
+                        if d02 not in self._seen_dirs:
+                            self.notify(
+                                d02,
+                                include_mid_path=False,
+                                remove_files=True,
+                                analyse=not processing_started,
+                            )
+                            processing_started = True
+                    if not processing_started:
                         d02 = d.parent.parent / d.name
-                    if (
-                        d02.is_dir()
-                        and d02 not in self._seen_dirs
-                        and list((d.parent.parent / d.name).iterdir())
-                    ):
-                        if d02.name == "Images-Disc1":
-                            self.notify(d02, include_mid_path=False, remove_files=True)
-                        else:
+                        if (
+                            d02.is_dir()
+                            and d02 not in self._seen_dirs
+                            and list((d.parent.parent / d.name).iterdir())
+                        ):
                             self.notify(d02, include_mid_path=False)
-                        self._seen_dirs.append(d02)
+                            self._seen_dirs.append(d02)
+
             time.sleep(15)
