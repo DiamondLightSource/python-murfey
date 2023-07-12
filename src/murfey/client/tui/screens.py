@@ -42,7 +42,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.tui.forms import FormDependency
 from murfey.util import get_machine_config
-from murfey.util.models import DCParametersSPA, DCParametersTomo
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -442,14 +442,14 @@ class ProcessingForm(Screen):
     def _write_params(
         self,
         params: dict | None = None,
-        model: DCParametersTomo | DCParametersSPA | None = None,
+        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
             analyser = list(self.app.analysers.values())[0]
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
-            if model == DCParametersTomo:
+            if model == ProcessingParametersTomo:
                 requests.post(
                     f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
                     json=params,
@@ -812,9 +812,9 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid:
             if self._context == TomographyContext:
-                valid = validate_form(self._user_params, DCParametersTomo.Base)
+                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
             else:
-                valid = validate_form(self._user_params, DCParametersSPA.Base)
+                valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:
                 return
         for s, d in self._transfer_routes.items():

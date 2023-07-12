@@ -66,7 +66,7 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     pixel_size: float
-    maunal_tilt_offset: int
+    manual_tilt_offset: int
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
@@ -92,7 +92,7 @@ class ParticleSizes(SQLModel, table=True):  # type: ignore
 
 
 class SPARelionParameters(SQLModel, table=True):  # type: ignore
-    pixel_size_on_image: float = Field(primary_key=True, unique=True)
+    angpix: float = Field(primary_key=True, unique=True)
     dose_per_frame: float
     gain_ref: str
     voltage: int
@@ -102,11 +102,14 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     particle_diameter: float
     downscale: bool
     do_icebreaker_jobs: bool = True
+    boxsize: int = 256
+    small_boxsize: int = 64
+    mask_diameter: float = 190
 
 
 class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    particle_diameter: float
+    estimate_particle_diameter: bool = True
     hold_class2d: bool = False
     hold_class3d: bool = False
     class_selection_score: float

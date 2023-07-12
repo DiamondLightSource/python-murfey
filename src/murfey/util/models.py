@@ -125,7 +125,7 @@ class DCParameters(BaseModel):
     phase_plate: bool = False
 
 
-class DCParametersTomo(BaseModel):
+class ProcessingParametersTomo(BaseModel):
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -144,7 +144,7 @@ class DCParametersTomo(BaseModel):
         manual_tilt_offset: float
 
 
-class DCParametersSPA(BaseModel):
+class ProcessingParametersSPA(BaseModel):
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str

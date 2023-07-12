@@ -392,7 +392,6 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
 
 @router.post("/visits/{visit_name}/start_data_collection")
 def start_dc(visit_name, dc_params: DCParameters):
-    log.info(f"Starting data collection on microscope {get_microscope()}")
     if global_state.get("data_collection_ids") and isinstance(
         global_state["data_collection_ids"], dict
     ):

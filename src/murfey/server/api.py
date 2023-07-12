@@ -40,11 +40,11 @@ from murfey.util.models import (
     ContextInfo,
     DCGroupParameters,
     DCParameters,
-    DCParametersTomo,
     File,
     GainReference,
     ProcessFile,
     ProcessingJobParameters,
+    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     SPAProcessingParameters,
@@ -213,7 +213,7 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
 
 @router.post("/clients/{client_id}/tomography_processing_parameters")
 def register_tomo_proc_params(
-    client_id: int, proc_params: DCParametersTomo, db=murfey_db
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     params = TomographyProcessingParameters(
         client_id=client_id,

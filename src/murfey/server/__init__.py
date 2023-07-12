@@ -335,79 +335,54 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                 )
 
 
-def _register_picked_particles(message: dict):
+def _register_picked_particles_use_diameter(message: dict):
     """Received picked particles from the autopick service"""
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
-    if isinstance(params_to_forward, dict):
-        ctf_params = db.CtfParameters(
-            micrographs_file=params_to_forward["micrographs_file"],
-            coord_list_file=params_to_forward["coords_list_file"],
-            ctf_image=params_to_forward["ctf_values"]["CtfImage"],
-            ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
-            ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
-            defocus_u=params_to_forward["ctf_values"]["DefocusU"],
-            defocus_v=params_to_forward["ctf_values"]["DefocusV"],
-            defocus_angle=params_to_forward["ctf_values"]["DefocusAngle"],
-        )
-        murfey_db.add(ctf_params)
-        murfey_db.commit()
-        murfey_db.close()
+    assert isinstance(params_to_forward, dict)
+    ctf_params = db.CtfParameters(
+        micrographs_file=params_to_forward["micrographs_file"],
+        coord_list_file=params_to_forward["coords_list_file"],
+        ctf_image=params_to_forward["ctf_values"]["CtfImage"],
+        ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
+        ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
+        defocus_u=params_to_forward["ctf_values"]["DefocusU"],
+        defocus_v=params_to_forward["ctf_values"]["DefocusV"],
+        defocus_angle=params_to_forward["ctf_values"]["DefocusAngle"],
+    )
+    murfey_db.add(ctf_params)
+    murfey_db.commit()
+    murfey_db.close()
 
-        picking_db_len = murfey_db.exec(select(func.count(db.ParticleSizes))).one()
-        if picking_db_len > 10000:
-            # If there are enough particles to get a diameter
-            feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
-            relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-            if not feedback_params.particle_diameter:
-                # If the diameter has not been calculated then find it
-                picking_db = murfey_db.exec(
-                    select(db.ParticleSizes.particle_size)
-                ).all()
-                particle_diameter = np.quantile(list(picking_db), 0.75)
-                feedback_params.particle_diameter = particle_diameter
-                murfey_db.add(feedback_params)
-                murfey_db.commit()
-                murfey_db.close()
+    picking_db_len = murfey_db.exec(select(func.count(db.ParticleSizes))).one()
+    if picking_db_len > 10000:
+        # If there are enough particles to get a diameter
+        feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+        relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
+        if not feedback_params.particle_diameter:
+            # If the diameter has not been calculated then find it
+            picking_db = murfey_db.exec(select(db.ParticleSizes.particle_size)).all()
+            particle_diameter = np.quantile(list(picking_db), 0.75)
+            feedback_params.particle_diameter = particle_diameter
+            murfey_db.add(feedback_params)
+            murfey_db.commit()
+            murfey_db.close()
 
-                ctf_db = murfey_db.exec(select(db.CtfParameters)).all()
-                for saved_message in ctf_db:
-                    # Send on all saved messages to extraction
-                    zocalo_message = {
-                        "parameters": {
-                            "micrographs_file": saved_message.micrographs_file,
-                            "coord_list_file": saved_message.coords_list_file,
-                            "output_file": saved_message.extract_file,
-                            "pix_size": relion_params.pixel_size_on_image,
-                            "ctf_image": saved_message.ctf_image,
-                            "ctf_max_resolution": saved_message.ctf_max_resolution,
-                            "ctf_figure_of_merit": saved_message.ctf_figure_of_merit,
-                            "defocus_u": saved_message.defocus_u,
-                            "defocus_v": saved_message.defocus_v,
-                            "defocus_angle": saved_message.defocus_angle,
-                            "particle_diameter": particle_diameter,
-                            "downscale": relion_params.downscale,
-                            "relion_options": dict(relion_params),
-                        },
-                        "recipes": ["em-spa-extract"],
-                    }
-                    if _transport_object:
-                        _transport_object.send("processing_recipe", zocalo_message)
-            else:
-                # If the diameter is known then just send the new message
-                particle_diameter = feedback_params.particle_diameter
+            ctf_db = murfey_db.exec(select(db.CtfParameters)).all()
+            for saved_message in ctf_db:
+                # Send on all saved messages to extraction
                 zocalo_message = {
                     "parameters": {
-                        "micrographs_file": params_to_forward["micrographs_file"],
-                        "coord_list_file": params_to_forward["coords_list_file"],
-                        "output_file": params_to_forward["extract_file"],
-                        "pix_size": relion_params.pixel_size_on_image,
-                        "ctf_image": params_to_forward["ctf_image"],
-                        "ctf_max_resolution": params_to_forward["ctf_max_resolution"],
-                        "ctf_figure_of_merit": params_to_forward["ctf_figure_of_merit"],
-                        "defocus_u": params_to_forward["defocus_u"],
-                        "defocus_v": params_to_forward["defocus_v"],
-                        "defocus_angle": params_to_forward["defocus_angle"],
+                        "micrographs_file": saved_message.micrographs_file,
+                        "coord_list_file": saved_message.coords_list_file,
+                        "output_file": saved_message.extract_file,
+                        "pix_size": relion_params.angpix,
+                        "ctf_image": saved_message.ctf_image,
+                        "ctf_max_resolution": saved_message.ctf_max_resolution,
+                        "ctf_figure_of_merit": saved_message.ctf_figure_of_merit,
+                        "defocus_u": saved_message.defocus_u,
+                        "defocus_v": saved_message.defocus_v,
+                        "defocus_angle": saved_message.defocus_angle,
                         "particle_diameter": particle_diameter,
                         "downscale": relion_params.downscale,
                         "relion_options": dict(relion_params),
@@ -416,16 +391,90 @@ def _register_picked_particles(message: dict):
                 }
                 if _transport_object:
                     _transport_object.send("processing_recipe", zocalo_message)
-
         else:
-            # If not enough particles then save the new sizes
-            particle_list = message.get("particle_sizes_list")
-            if isinstance(particle_list, list):
-                for particle in particle_list:
-                    new_particle = db.ParticleSizes(particle_size=particle)
-                    murfey_db.add(new_particle)
-                    murfey_db.commit()
-                    murfey_db.close()
+            # If the diameter is known then just send the new message
+            particle_diameter = feedback_params.particle_diameter
+            zocalo_message = {
+                "parameters": {
+                    "micrographs_file": params_to_forward["micrographs_file"],
+                    "coord_list_file": params_to_forward["coords_list_file"],
+                    "output_file": params_to_forward["extract_file"],
+                    "pix_size": relion_params.angpix,
+                    "ctf_image": params_to_forward["ctf_image"],
+                    "ctf_max_resolution": params_to_forward["ctf_max_resolution"],
+                    "ctf_figure_of_merit": params_to_forward["ctf_figure_of_merit"],
+                    "defocus_u": params_to_forward["defocus_u"],
+                    "defocus_v": params_to_forward["defocus_v"],
+                    "defocus_angle": params_to_forward["defocus_angle"],
+                    "particle_diameter": particle_diameter,
+                    "downscale": relion_params.downscale,
+                    "relion_options": dict(relion_params),
+                },
+                "recipes": ["em-spa-extract"],
+            }
+            if _transport_object:
+                _transport_object.send("processing_recipe", zocalo_message)
+
+    else:
+        # If not enough particles then save the new sizes
+        particle_list = message.get("particle_sizes_list")
+        assert isinstance(particle_list, list)
+        for particle in particle_list:
+            new_particle = db.ParticleSizes(particle_size=particle)
+            murfey_db.add(new_particle)
+            murfey_db.commit()
+            murfey_db.close()
+
+
+def _register_picked_particles_use_boxsize(message: dict):
+    """Received picked particles from the autopick service"""
+    # Add this message to the table of seen messages
+    params_to_forward = message.get("extraction_parameters")
+    assert isinstance(params_to_forward, dict)
+    ctf_params = db.CtfParameters(
+        micrographs_file=params_to_forward["micrographs_file"],
+        coord_list_file=params_to_forward["coords_list_file"],
+        ctf_image=params_to_forward["ctf_values"]["CtfImage"],
+        ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
+        ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
+        defocus_u=params_to_forward["ctf_values"]["DefocusU"],
+        defocus_v=params_to_forward["ctf_values"]["DefocusV"],
+        defocus_angle=params_to_forward["ctf_values"]["DefocusAngle"],
+    )
+    murfey_db.add(ctf_params)
+    murfey_db.commit()
+    murfey_db.close()
+
+    # Set particle diameter as zero and send box sizes
+    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
+    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    feedback_params.particle_diameter = 0
+    murfey_db.add(feedback_params)
+    murfey_db.commit()
+    murfey_db.close()
+
+    # Send the message to extraction with the box sizes
+    zocalo_message = {
+        "parameters": {
+            "micrographs_file": params_to_forward["micrographs_file"],
+            "coord_list_file": params_to_forward["coords_list_file"],
+            "output_file": params_to_forward["extract_file"],
+            "pix_size": relion_params.angpix,
+            "ctf_image": params_to_forward["ctf_image"],
+            "ctf_max_resolution": params_to_forward["ctf_max_resolution"],
+            "ctf_figure_of_merit": params_to_forward["ctf_figure_of_merit"],
+            "defocus_u": params_to_forward["defocus_u"],
+            "defocus_v": params_to_forward["defocus_v"],
+            "defocus_angle": params_to_forward["defocus_angle"],
+            "boxsize": relion_params.boxsize,
+            "small_boxsize": relion_params.small_boxsize,
+            "downscale": relion_params.downscale,
+            "relion_options": dict(relion_params),
+        },
+        "recipes": ["em-spa-extract"],
+    }
+    if _transport_object:
+        _transport_object.send("processing_recipe", zocalo_message)
 
 
 def _register_incomplete_2d_batch(message: dict):
@@ -433,82 +482,84 @@ def _register_incomplete_2d_batch(message: dict):
     relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
     feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
     class2d_message = message.get("class2d_message")
-    if isinstance(class2d_message, dict):
+    assert isinstance(class2d_message, dict)
+    zocalo_message = {
+        "parameters": {
+            "particles_file": class2d_message["particles_file"],
+            "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+            "batch_is_complete": False,
+            "batch_size": class2d_message["batch_size"],
+            "particle_diameter": feedback_params.particle_diameter,
+            "combine_star_job_number": -1,
+            "relion_options": dict(relion_params),
+        },
+        "recipes": ["relion-class2d"],
+    }
+    if _transport_object:
+        _transport_object.send("processing_recipe", zocalo_message)
+
+
+def _register_complete_2d_batch(message: dict):
+    """Received full batch from particle selection service"""
+    class2d_message = message.get("class2d_message")
+    assert isinstance(class2d_message, dict)
+    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
+    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    if feedback_params.hold_class2d:
+        # If waiting then save the message
+        class2d_params = db.Class2DParameters(
+            particles_file=class2d_message["particles_file"],
+            class2d_dir=class2d_message["class2d_dir"],
+            batch_size=class2d_message["batch_size"],
+        )
+        murfey_db.add(class2d_params)
+        murfey_db.commit()
+        murfey_db.close()
+    elif not feedback_params.class_selection_score:
+        # For the first batch, start a container and set the database to wait
+        feedback_params.star_combination_job = feedback_params.next_job + 2
         zocalo_message = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
                 "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
-                "batch_is_complete": False,
+                "batch_is_complete": True,
                 "batch_size": class2d_message["batch_size"],
                 "particle_diameter": feedback_params.particle_diameter,
-                "combine_star_job_number": -1,
+                "mask_diameter": relion_params.mask_diameter,
+                "combine_star_job_number": feedback_params.star_combination_job,
                 "relion_options": dict(relion_params),
             },
             "recipes": ["relion-class2d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
-
-
-def _register_complete_2d_batch(message: dict):
-    """Received full batch from particle selection service"""
-    class2d_message = message.get("class2d_message")
-    if isinstance(class2d_message, dict):
-        relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-        feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
-        if feedback_params.hold_class2d:
-            # If waiting then save the message
-            class2d_params = db.CtfParameters(
-                particles_file=class2d_message["particles_file"],
-                class2d_dir=class2d_message["class2d_dir"],
-                batch_size=class2d_message["batch_size"],
-            )
-            murfey_db.add(class2d_params)
-            murfey_db.commit()
-            murfey_db.close()
-        elif not feedback_params.class_selection_score:
-            # For the first batch, start a container and set the database to wait
-            feedback_params.star_combination_job = feedback_params.next_job + 2
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": class2d_message["particles_file"],
-                    "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
-                    "batch_is_complete": True,
-                    "batch_size": class2d_message["batch_size"],
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "combine_star_job_number": feedback_params.star_combination_job,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class2d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.hold_class2d = True
-            feedback_params.next_job += 3
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            murfey_db.close()
-        else:
-            # Send all other messages on to a container
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": class2d_message["particles_file"],
-                    "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
-                    "batch_is_complete": True,
-                    "batch_size": class2d_message["batch_size"],
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "combine_star_job_number": feedback_params.star_combination_job,
-                    "autoselect_min_score": feedback_params.class_selection_score,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class2d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.next_job += 2
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            murfey_db.close()
+        feedback_params.hold_class2d = True
+        feedback_params.next_job += 3
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
+        murfey_db.close()
+    else:
+        # Send all other messages on to a container
+        zocalo_message = {
+            "parameters": {
+                "particles_file": class2d_message["particles_file"],
+                "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+                "batch_is_complete": True,
+                "batch_size": class2d_message["batch_size"],
+                "particle_diameter": feedback_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": feedback_params.class_selection_score,
+                "relion_options": dict(relion_params),
+            },
+            "recipes": ["relion-class2d"],
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        feedback_params.next_job += 2
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
+        murfey_db.close()
 
 
 def _register_class_selection(message: dict):
@@ -518,88 +569,91 @@ def _register_class_selection(message: dict):
     # Add the class selection score to the database
     feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
     feedback_params.class_selection_score = message.get("class_selection_score")
-    if isinstance(feedback_params.class_selection_score, dict):
-        feedback_params.hold_class2d = False
-        for saved_message in class2d_db:
-            # Send all held Class2D messages on with the selection score added
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": saved_message.particles_file,
-                    "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
-                    "batch_is_complete": True,
-                    "batch_size": saved_message.batch_size,
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "combine_star_job_number": feedback_params.star_combination_job,
-                    "autoselect_min_score": feedback_params.class_selection_score,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class2d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.next_job += 2
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+    assert isinstance(feedback_params.class_selection_score, dict)
+    feedback_params.hold_class2d = False
+    for saved_message in class2d_db:
+        # Send all held Class2D messages on with the selection score added
+        zocalo_message = {
+            "parameters": {
+                "particles_file": saved_message.particles_file,
+                "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
+                "batch_is_complete": True,
+                "batch_size": saved_message.batch_size,
+                "particle_diameter": feedback_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": feedback_params.class_selection_score,
+                "relion_options": dict(relion_params),
+            },
+            "recipes": ["relion-class2d"],
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        feedback_params.next_job += 2
+    murfey_db.add(feedback_params)
+    murfey_db.commit()
+    murfey_db.close()
 
 
 def _register_3d_batch(message: dict):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
-    if isinstance(class3d_message, dict):
-        relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-        feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    assert isinstance(class3d_message, dict)
+    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
+    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
 
-        if feedback_params.hold_class3d:
-            # If waiting then save the message
-            class3d_params = db.CtfParameters(
-                particles_file=class3d_message["particles_file"],
-                class2d_dir=class3d_message["class3d_dir"],
-                batch_size=class3d_message["batch_size"],
-            )
-            murfey_db.add(class3d_params)
-            murfey_db.commit()
-            murfey_db.close()
-        elif not feedback_params.initial_model:
-            # For the first batch, start a container and set the database to wait
-            feedback_params.star_combination_job = feedback_params.next_job + 2
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": class3d_message["particles_file"],
-                    "class3d_dir": f"{class3d_message['class3d_dir']}{feedback_params.next_job:03}",
-                    "batch_size": class3d_message["batch_size"],
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "do_initial_model": True,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class3d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.hold_class3d = True
-            feedback_params.next_job += 2
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            murfey_db.close()
-        else:
-            # Send all other messages on to a container
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": class3d_message["particles_file"],
-                    "class3d_dir": f"{class3d_message['class3d_dir']}{feedback_params.next_job:03}",
-                    "batch_size": class3d_message["batch_size"],
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "initial_model_file": feedback_params.initial_model,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class3d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.next_job += 1
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            murfey_db.close()
+    if feedback_params.hold_class3d:
+        # If waiting then save the message
+        class3d_params = db.Class3DParameters(
+            particles_file=class3d_message["particles_file"],
+            class2d_dir=class3d_message["class3d_dir"],
+            batch_size=class3d_message["batch_size"],
+        )
+        murfey_db.add(class3d_params)
+        murfey_db.commit()
+        murfey_db.close()
+    elif not feedback_params.initial_model:
+        # For the first batch, start a container and set the database to wait
+        feedback_params.star_combination_job = feedback_params.next_job + 2
+        zocalo_message = {
+            "parameters": {
+                "particles_file": class3d_message["particles_file"],
+                "class3d_dir": f"{class3d_message['class3d_dir']}{feedback_params.next_job:03}",
+                "batch_size": class3d_message["batch_size"],
+                "particle_diameter": feedback_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "do_initial_model": True,
+                "relion_options": dict(relion_params),
+            },
+            "recipes": ["relion-class3d"],
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        feedback_params.hold_class3d = True
+        feedback_params.next_job += 2
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
+        murfey_db.close()
+    else:
+        # Send all other messages on to a container
+        zocalo_message = {
+            "parameters": {
+                "particles_file": class3d_message["particles_file"],
+                "class3d_dir": f"{class3d_message['class3d_dir']}{feedback_params.next_job:03}",
+                "batch_size": class3d_message["batch_size"],
+                "particle_diameter": feedback_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "initial_model_file": feedback_params.initial_model,
+                "relion_options": dict(relion_params),
+            },
+            "recipes": ["relion-class3d"],
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        feedback_params.next_job += 1
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
+        murfey_db.close()
 
 
 def _register_initial_model(message: dict):
@@ -609,27 +663,28 @@ def _register_initial_model(message: dict):
     # Add the initial model file to the database
     feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
     feedback_params.class_selection_score = message.get("initial_model")
-    if isinstance(feedback_params.class_selection_score, dict):
-        feedback_params.hold_class3d = False
-        for saved_message in class3d_db:
-            # Send all held Class3D messages with the initial model added
-            zocalo_message = {
-                "parameters": {
-                    "particles_file": saved_message.particles_file,
-                    "class3d_dir": f"{saved_message.class3d_dir}{feedback_params.next_job:03}",
-                    "batch_size": saved_message.batch_size,
-                    "particle_diameter": feedback_params.particle_diameter,
-                    "initial_model_file": feedback_params.initial_model,
-                    "relion_options": dict(relion_params),
-                },
-                "recipes": ["relion-class3d"],
-            }
-            if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
-            feedback_params.next_job += 1
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            murfey_db.close()
+    assert isinstance(feedback_params.class_selection_score, dict)
+    feedback_params.hold_class3d = False
+    for saved_message in class3d_db:
+        # Send all held Class3D messages with the initial model added
+        zocalo_message = {
+            "parameters": {
+                "particles_file": saved_message.particles_file,
+                "class3d_dir": f"{saved_message.class3d_dir}{feedback_params.next_job:03}",
+                "batch_size": saved_message.batch_size,
+                "particle_diameter": feedback_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "initial_model_file": feedback_params.initial_model,
+                "relion_options": dict(relion_params),
+            },
+            "recipes": ["relion-class3d"],
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        feedback_params.next_job += 1
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
+        murfey_db.close()
 
 
 def feedback_callback(header: dict, message: dict) -> None:
@@ -771,6 +826,39 @@ def feedback_callback(header: dict, message: dict) -> None:
             assert isinstance(global_state["data_collection_ids"], dict)
             _dcid = global_state["data_collection_ids"][message["tag"]]
             record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
+            run_parameters = message.get("parameters")
+            assert isinstance(run_parameters, dict)
+            if run_parameters["experiment_type"] == "spa":
+                murfey_processing = db.SPARelionParameters(
+                    angpix=run_parameters["angpix"],
+                    dose_per_frame=run_parameters["dose_per_frame"],
+                    gain_ref=run_parameters["gain_ref"],
+                    voltage=run_parameters["voltage"],
+                    motion_corr_binning=run_parameters["motion_corr_binning"],
+                    eer_grouping=run_parameters["eer_grouping"],
+                    symmetry=run_parameters["symmetry"],
+                    downscale=run_parameters["downscale"],
+                )
+                murfey_feedback = db.SPAFeedbackParameters(
+                    estimate_particle_diameter=run_parameters[
+                        "estimate_particle_diameter"
+                    ],
+                    hold_class2d=False,
+                    hold_class3d=False,
+                    class_selection_score=0,
+                    star_combination_job=0,
+                    initial_model="",
+                    next_job=0,
+                )
+                murfey_db.add(murfey_feedback)
+            else:
+                murfey_processing = db.TomographyProcessingParameters(
+                    pixel_size=run_parameters["angpix"],
+                    manual_tilt_offset=run_parameters["manual_tilt_offset"],
+                )
+            murfey_db.add(murfey_processing)
+            murfey_db.commit()
+            murfey_db.close()
             if message.get("job_parameters"):
                 job_parameters = [
                     ProcessingJobParameter(parameterKey=k, parameterValue=v)
@@ -827,7 +915,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "picked_particles":
-            _register_picked_particles(message)
+            feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+            if feedback_params.estimate_particle_diameter:
+                _register_picked_particles_use_diameter(message)
+            else:
+                _register_picked_particles_use_boxsize(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
