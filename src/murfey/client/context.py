@@ -45,9 +45,9 @@ def _construct_tilt_series_name(
     return tilt_series
 
 
-def _midpoint(angles: List[float]) -> float:
+def _midpoint(angles: List[float]) -> int:
     sorted_angles = sorted(angles)
-    return (
+    return round(
         sorted_angles[len(sorted_angles) // 2]
         if sorted_angles[len(sorted_angles) // 2]
         and sorted_angles[len(sorted_angles) // 2 + 1]
