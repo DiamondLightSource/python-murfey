@@ -18,7 +18,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
@@ -223,7 +223,7 @@ class SPAContext(Context):
         }
         if parameters["particle_diameter"]:
             msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
+        capture_post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
         self,
@@ -234,7 +234,7 @@ class SPAContext(Context):
     ):
         environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
-        requests.post(url, json=data)
+        capture_post(url, json=data)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -487,7 +487,7 @@ class TomographyContext(Context):
         logger.info("Flushing data collection API calls")
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
-            requests.post(dc_data[0], json=data)
+            capture_post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
@@ -501,7 +501,7 @@ class TomographyContext(Context):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
-                    requests.post(tr[0], json=process_file)
+                    capture_post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
 
     def _check_for_alignment(
@@ -556,7 +556,7 @@ class TomographyContext(Context):
                         "manual_tilt_offset": manual_tilt_offset,
                         "pixel_size": pixel_size,
                     }
-                    requests.post(url, json=series_data)
+                    capture_post(url, json=series_data)
                     with self._lock:
                         self._aligned_tilt_series.append(tilt_series)
                 except Exception as e:
@@ -751,7 +751,7 @@ class TomographyContext(Context):
                     ):
                         self._data_collection_stash.append((url, environment, data))
                     else:
-                        requests.post(url, json=data)
+                        capture_post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
@@ -766,11 +766,11 @@ class TomographyContext(Context):
                     else:
                         if self._processing_job_stash.get(tilt_series):
                             self._flush_processing_job(tilt_series)
-                        requests.post(
+                        capture_post(
                             proc_url,
                             json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
                         )
-                        requests.post(
+                        capture_post(
                             proc_url,
                             json={"tag": tilt_series, "recipe": "em-tomo-align"},
                         )
@@ -813,7 +813,7 @@ class TomographyContext(Context):
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
             }
-            requests.post(preproc_url, json=preproc_data)
+            capture_post(preproc_url, json=preproc_data)
         elif environment:
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             pfi = ProcessFileIncomplete(

@@ -29,7 +29,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -316,7 +316,7 @@ class MurfeyTUI(App):
                 "experiment_type_id": 36,
                 "tag": str(source),
             }
-            requests.post(url, json=dcg_data)
+            capture_post(url, json=dcg_data)
         elif isinstance(context, SPAContext):
             source = Path(json["source"])
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/start_data_collection"
@@ -347,7 +347,7 @@ class MurfeyTUI(App):
                 "experiment_type_id": 37,
                 "tag": str(source),
             }
-            requests.post(url, json=dcg_data)
+            capture_post(url, json=dcg_data)
 
     def _set_request_destination(self, response: str):
         if response == "y":
@@ -391,7 +391,7 @@ class MurfeyTUI(App):
             "processing_job": self._environment.id_tag_registry["processing_job"],
             "autoproc_program": self._environment.id_tag_registry["auto_proc_program"],
         }
-        requests.post(url, json=data)
+        capture_post(url, json=data)
 
     async def reset(self):
         machine_config = get_machine_config(
