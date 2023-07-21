@@ -469,6 +469,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
     executables = machine_config.external_executables
     env = machine_config.external_environment
+    safe_path = secure_filename(gain_reference_params.gain_ref)
     filepath = (
         Path(machine_config.rsync_basepath)
         / (machine_config.rsync_module or "data")
@@ -478,7 +479,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
     )
     new_gain_ref, new_gain_ref_superres = await prepare_gain(
         camera,
-        filepath / gain_reference_params.gain_ref.name,
+        filepath / safe_path.name,
         executables,
         env,
         rescale=gain_reference_params.rescale,
