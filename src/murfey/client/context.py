@@ -120,6 +120,7 @@ class SPAContext(Context):
             "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
         ProcessingParameter("gain_ref", "Gain Reference"),
+        ProcessingParameter("gain_ref_superres", "Unbinned Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -203,7 +204,9 @@ class SPAContext(Context):
             "parameters": {
                 "acquisition_software": parameters["acquisition_software"],
                 "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_ref"],
+                "motioncor_gainreference": parameters["gain_ref_superres"]
+                if parameters.get("motion_corr_binning") == 2
+                else parameters["gain_ref"],
                 "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": import_images,
@@ -365,6 +368,11 @@ class SPAContext(Context):
         metadata["motion_corr_binning"] = binning_factor
         metadata["gain_ref"] = (
             f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            if environment
+            else None
+        )
+        metadata["gain_ref_superres"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
             if environment
             else None
         )

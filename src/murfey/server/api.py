@@ -469,6 +469,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
     executables = machine_config.external_executables
     env = machine_config.external_environment
+    safe_path = secure_filename(gain_reference_params.gain_ref)
     filepath = (
         Path(machine_config.rsync_basepath)
         / (machine_config.rsync_module or "data")
@@ -476,19 +477,22 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
-    new_gain_ref = await prepare_gain(
+    new_gain_ref, new_gain_ref_superres = await prepare_gain(
         camera,
-        filepath / gain_reference_params.gain_ref.name,
+        filepath / safe_path.name,
         executables,
         env,
         rescale=gain_reference_params.rescale,
     )
-    if new_gain_ref:
+    if new_gain_ref and new_gain_ref_superres:
         return {
-            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath))
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref_superres": new_gain_ref_superres.relative_to(
+                Path(machine_config.rsync_basepath)
+            ),
         }
     else:
-        return {"gain_ref": new_gain_ref}
+        return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
 
 
 @router.post("/visits/{visit_name}/clean_state")
