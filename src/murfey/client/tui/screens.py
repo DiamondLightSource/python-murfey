@@ -40,7 +40,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import FormDependency
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 from murfey.util.models import DCParametersSPA, DCParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
@@ -86,7 +86,7 @@ def determine_default_destination(
                             if environment.destination_registry.get(source_name):
                                 _default = environment.destination_registry[source_name]
                             else:
-                                suggested_path_response = requests.post(
+                                suggested_path_response = capture_post(
                                     url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
@@ -838,7 +838,7 @@ class DestinationSelect(Screen):
         for k, v in self._user_params.items():
             self.app._environment.data_collection_parameters[k] = v
         if len(self._transfer_routes) > 1:
-            requests.post(
+            capture_post(
                 f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
                 json={
                     "filename": f"murfey-{datetime.now().strftime('%Y-%m-%d-%H_%M_%S')}.txt",
