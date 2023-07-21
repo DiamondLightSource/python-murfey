@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from functools import lru_cache
 from queue import Queue
 from threading import Thread
@@ -12,6 +13,8 @@ from uuid import uuid4
 import requests
 
 from murfey.util.models import Visit
+
+logger = logging.getLogger("murfey.util")
 
 
 @lru_cache(maxsize=1)
@@ -25,6 +28,15 @@ def _get_visit_list(api_base: ParseResult):
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
     return [Visit.parse_obj(v) for v in server_reply.json()]
+
+
+def capture_post(url: str, json: dict = {}) -> requests.Response:
+    response = requests.post(url, json=json)
+    if response.status_code != 200:
+        logger.warning(
+            f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
+        )
+    return response
 
 
 class Observer:
