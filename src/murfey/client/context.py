@@ -146,6 +146,7 @@ class SPAContext(Context):
         logger.info(f"registering data collection with data {data}")
         environment.id_tag_registry["data_collection"].append(tag)
         image_directory = str(environment.default_destinations[Path(tag)])
+        logger.info(f"Image directory for data collection is {image_directory}")
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],
