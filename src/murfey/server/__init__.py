@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 from functools import partial, singledispatch
+from pathlib import Path
 from threading import Thread
 from typing import Any, List, NamedTuple
 
@@ -704,31 +705,30 @@ def feedback_callback(header: dict, message: dict) -> None:
                 tilts = get_all_tilts(relevant_tilt.tilt_series_tag)
                 ids = get_job_ids(relevant_tilt.tilt_series_tag)
                 params = get_tomo_proc_params(ids.client_id)
-                tilt_series_proc_params = {
-                    "name": relevant_tilt.tilt_series_tag,
-                    "file_tilt_list": str(tilts),
-                    "dcid": ids.dcid,
-                    "processing_job": ids.pid,
-                    "autoproc_program_id": ids.appid,
-                    "motion_corrected_path": message.get("mrc_out"),
-                    "movie_id": message.get("movie_id"),
-                    "pixel_size": params.pixel_size,
-                    "manual_tilt_offset": params.manual_tilt_offset,
-                }
-                logger.info(
-                    f"Sending processing request with parameters: {tilt_series_proc_params}"
+                stack_file = (
+                    Path(message["mrc_out"]).parents[1]
+                    / "align_output"
+                    / f"{relevant_tilt.tilt_series_tag}_stack.mrc"
                 )
-
-            global_state.update(
-                "motion_corrected_movies",
-                {
-                    message.get("movie"): [
-                        message.get("mrc_out"),
-                        message.get("movie_id"),
-                    ]
-                },
-                perform_state_update=False,
-            )
+                if not stack_file.parent.exists():
+                    stack_file.parent.mkdir(parents=True)
+                zocalo_message = {
+                    "recipes": ["em-tomo-align"],
+                    "parameters": {
+                        "input_file_list": str(tilts),
+                        "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
+                        "dcid": ids.dcid,
+                        "appid": ids.appid,
+                        "stack_file": str(stack_file),
+                        "pix_size": params.pixel_size,
+                        "manual_tilt_offset": params.manual_tilt_offset,
+                    },
+                }
+                if _transport_object:
+                    logger.info(
+                        f"Sending Zocalo message for processing: {zocalo_message}"
+                    )
+                    _transport_object.send("processing_recipe", zocalo_message)
 
             if _transport_object:
                 _transport_object.transport.ack(header)
