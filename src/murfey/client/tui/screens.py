@@ -31,6 +31,7 @@ from textual.widgets import (
     TextLog,
     Tree,
 )
+from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
 from murfey.client.context import SPAContext, TomographyContext
@@ -614,7 +615,7 @@ class GainReference(Screen):
             cmd = [
                 "rsync",
                 str(self._dir_tree._gain_reference),
-                f"{self.app._environment.url.hostname}::{visit_path}/processing",
+                f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
