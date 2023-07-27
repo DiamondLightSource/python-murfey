@@ -16,9 +16,11 @@ class MultigridDirWatcher(murfey.util.Observer):
     def __init__(
         self,
         path: str | os.PathLike,
+        skip_existing_processing: bool = False,
     ):
         super().__init__()
         self._basepath = Path(path)
+        self._skip_existing_processing = skip_existing_processing
         self._seen_dirs: List[Path] = []
         self._stopping = False
         self.thread = threading.Thread(
@@ -42,6 +44,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         log.debug("MultigridDirWatcher thread stop completed")
 
     def _process(self):
+        first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
                 if d.name == "atlas":
@@ -63,11 +66,15 @@ class MultigridDirWatcher(murfey.util.Observer):
                     )
                     for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
                         if d02 not in self._seen_dirs:
+                            # if skip exisiting processing is set then do not process for any
+                            # data directories found on the first loop
+                            # this allows you to avoid triggering processing again if murfey is restarted
                             self.notify(
                                 d02,
                                 include_mid_path=False,
                                 remove_files=True,
-                                analyse=not processing_started,
+                                analyse=not processing_started
+                                and not (first_loop and self._skip_existing_processing),
                             )
                             self._seen_dirs.append(d02)
                             processing_started = True
@@ -81,4 +88,6 @@ class MultigridDirWatcher(murfey.util.Observer):
                             self.notify(d02, include_mid_path=False)
                             self._seen_dirs.append(d02)
 
+            if first_loop:
+                first_loop = False
             time.sleep(15)

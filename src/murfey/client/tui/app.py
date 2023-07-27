@@ -60,6 +60,7 @@ class MurfeyTUI(App):
         force_mdoc_metadata: bool = False,
         strict: bool = False,
         processing_enabled: bool = True,
+        skip_existing_processing: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -88,6 +89,7 @@ class MurfeyTUI(App):
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
+        self._skip_existing_processing = skip_existing_processing
         self.install_screen(MainScreen(), "main")
 
     @property
@@ -100,7 +102,9 @@ class MurfeyTUI(App):
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
         log.info(f"Launching multigrid watcher for source {source}")
-        self._multigrid_watcher = MultigridDirWatcher(source)
+        self._multigrid_watcher = MultigridDirWatcher(
+            source, skip_existing_processing=self._skip_existing_processing
+        )
         self._multigrid_watcher.subscribe(
             partial(
                 self._start_rsyncer_multigrid,

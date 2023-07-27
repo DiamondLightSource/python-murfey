@@ -171,6 +171,12 @@ def run():
         default=False,
         help="Relax the condition that the source directory needs to be recognised from the configuration",
     )
+    parser.add_argument(
+        "--skip-exisitng-processing",
+        action="store_true",
+        default=False,
+        help="Do not trigger processing for any data directories currently on disk (you may have started processing for them in a previous murfey run)",
+    )
 
     args = parser.parse_args()
 
@@ -274,6 +280,7 @@ def run():
         force_mdoc_metadata=not args.ignore_mdoc_metadata,
         strict=not args.relax,
         processing_enabled=machine_data.get("processing_enabled", True),
+        skip_existing_processing=args.skip_existing_processing,
     )
     app.run()
     rich_handler.redirect = False
