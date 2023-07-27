@@ -183,3 +183,10 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+
+
+class FractionationParameters(BaseModel):
+    num_frames: int
+    fractionation: int
+    dose_per_frame: float
+    fractionation_file_name: str = "eer_fractionation.txt"
