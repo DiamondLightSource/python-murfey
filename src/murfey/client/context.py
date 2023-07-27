@@ -9,6 +9,7 @@ import requests
 import xmltodict
 from pydantic import BaseModel
 
+import murfey.util.eer
 from murfey.client.contexts.tomo import tomo_tilt_info
 from murfey.client.instance_environment import (
     MovieID,
@@ -1117,4 +1118,11 @@ class TomographyContext(Context):
         mdoc_metadata[
             "file_extension"
         ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+
+        data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
+        if data_file.split(".")[-1] == "eer":
+            mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
+                metadata_file.stem / data_file
+            )
+
         return mdoc_metadata
