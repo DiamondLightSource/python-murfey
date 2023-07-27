@@ -69,6 +69,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                                 remove_files=True,
                                 analyse=not processing_started,
                             )
+                            self._seen_dirs.append(d02)
                             processing_started = True
                     if not processing_started:
                         d02 = d.parent.parent / d.name
