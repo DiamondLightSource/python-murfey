@@ -172,7 +172,7 @@ def run():
         help="Relax the condition that the source directory needs to be recognised from the configuration",
     )
     parser.add_argument(
-        "--skip-exisitng-processing",
+        "--skip-existing-processing",
         action="store_true",
         default=False,
         help="Do not trigger processing for any data directories currently on disk (you may have started processing for them in a previous murfey run)",
