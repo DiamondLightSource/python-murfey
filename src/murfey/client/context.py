@@ -401,6 +401,7 @@ class TomographyContext(Context):
         ),
         ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
         ProcessingParameter("gain_ref", "Gain Reference"),
+        ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -755,6 +756,9 @@ class TomographyContext(Context):
                     "motion_corr_binning", 1
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                "eer_fractionation_file": environment.data_collection_parameters.get(
+                    "eer_fractionation_file"
+                ),
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
@@ -1124,5 +1128,6 @@ class TomographyContext(Context):
             mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
                 metadata_file.stem / data_file
             )
+            mdoc_metadata["eer_fractionation_file"] = "eer_fractionation.txt"
 
         return mdoc_metadata

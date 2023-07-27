@@ -65,6 +65,7 @@ class ProcessFile(BaseModel):
     dose_per_frame: float
     mc_binning: int = 1
     gain_ref: Optional[str] = None
+    eer_fractionation_file: Optional[str] = None
 
 
 class TiltSeries(BaseModel):
