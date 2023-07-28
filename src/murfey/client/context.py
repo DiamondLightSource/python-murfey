@@ -516,6 +516,21 @@ class TomographyContext(Context):
             with global_env_lock:
                 tag = incomplete_process_file.tag
 
+                eer_fractionation_file = None
+                if environment.data_collection_parameters.get("num_eer_frames"):
+                    response = requests.post(
+                        f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                        json={
+                            "num_frames": environment.data_collection_parameters[
+                                "num_eer_frames"
+                            ],
+                            "fractionation": environment.data_collection_parameters[
+                                "eer_fractionation"
+                            ],
+                        },
+                    )
+                    eer_fractionation_file = response.json()["eer_fractionation_file"]
+
                 new_dict = {
                     "path": str(incomplete_process_file.dest),
                     "description": incomplete_process_file.description,
@@ -538,6 +553,7 @@ class TomographyContext(Context):
                         "motion_corr_binning", 1
                     ),
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                    "eer_fractionation_file": eer_fractionation_file,
                 }
                 return new_dict
         except KeyError:
@@ -738,7 +754,7 @@ class TomographyContext(Context):
                             "num_eer_frames"
                         ],
                         "fractionation": environment.data_collection_parameters[
-                            "fractionation"
+                            "eer_fractionation"
                         ],
                     },
                 )
