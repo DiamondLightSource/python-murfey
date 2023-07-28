@@ -729,6 +729,20 @@ class TomographyContext(Context):
                     self._tilt_series[tilt_series].append(file_path)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
+            eer_fractionation_file = None
+            if environment.data_collection_parameters.get("num_eer_frames"):
+                response = requests.post(
+                    f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                    json={
+                        "num_frames": environment.data_collection_parameters[
+                            "num_eer_frames"
+                        ],
+                        "fractionation": environment.data_collection_parameters[
+                            "fractionation"
+                        ],
+                    },
+                )
+                eer_fractionation_file = response.json()["eer_fractionation_file"]
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             preproc_data = {
                 "path": str(file_transferred_to),
@@ -756,9 +770,7 @@ class TomographyContext(Context):
                     "motion_corr_binning", 1
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
-                "eer_fractionation_file": environment.data_collection_parameters.get(
-                    "eer_fractionation_file"
-                ),
+                "eer_fractionation_file": eer_fractionation_file,
             }
             requests.post(preproc_url, json=preproc_data)
         elif environment:
@@ -1128,6 +1140,5 @@ class TomographyContext(Context):
             mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
                 metadata_file.stem / data_file
             )
-            mdoc_metadata["eer_fractionation_file"] = "eer_fractionation.txt"
 
         return mdoc_metadata
