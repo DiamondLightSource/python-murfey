@@ -66,6 +66,6 @@ async def prepare_gain(
             if newstack_proc.returncode:
                 return None, None
         if rescale:
-            gain_path_superres.symlink_to(gain_out_superres)
+            gain_out_superres.symlink_to(gain_path_superres)
         return gain_out, gain_out_superres if rescale else gain_out
     return None, None
