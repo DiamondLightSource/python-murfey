@@ -1154,7 +1154,7 @@ class TomographyContext(Context):
         data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
         if data_file.split(".")[-1] == "eer":
             mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
-                metadata_file.stem / data_file
+                metadata_file.parent / data_file
             )
 
         return mdoc_metadata
