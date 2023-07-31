@@ -281,24 +281,9 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
     for f in stashed_files:
-        visit_idx = Path(f.file_path).parts.index(visit_name)
-        core = Path(*Path(f.file_path).parts[: visit_idx + 1])
         ppath = Path(f.file_path)
-        sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
-        movies_path_index = ppath.parts.index("Movies")
-        mrc_out = (
-            core
-            / machine_config.processed_directory_name
-            / sub_dataset
-            / "MotionCorr"
-            / "job002"
-            / "Movies"
-            / "/".join(ppath.parts[movies_path_index:-1])
-            / str(ppath.stem + "_motion_corrected.mrc")
-        )
-
-        if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True)
+        if not f.mrc_out.parent.exists():
+            f.mrc_out.parent.mkdir(parents=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -306,7 +291,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
                 "dcid": collected_ids[1].id,
                 "autoproc_program_id": collected_ids[3].id,
                 "movie": f.file_path,
-                "mrc_out": str(mrc_out),
+                "mrc_out": f.mrc_out,
                 "pix_size": proc_params.angpix,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
