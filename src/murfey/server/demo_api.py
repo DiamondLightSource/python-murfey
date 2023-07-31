@@ -384,6 +384,7 @@ async def write_eer_fractionation_file(
         / secure_filename(visit_name)
         / secure_filename(fractionation_params.fractionation_file_name)
     )
+    log.info(f"EER fractionation file {file_path} creation requested")
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
     with open(file_path, "w") as frac_file:

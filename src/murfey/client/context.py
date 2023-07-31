@@ -81,7 +81,8 @@ class Context:
 class SPAContext(Context):
     user_params = [
         ProcessingParameter(
-            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+            "dose_per_frame",
+            "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
         ),
         ProcessingParameter(
             "estimate_particle_diameter",
@@ -409,6 +410,7 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
@@ -428,7 +430,9 @@ class TomographyContext(Context):
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
     def _flush_data_collections(self, tag: str):
-        logger.info("Flushing data collection API calls")
+        logger.info(
+            f"Flushing {len(self._data_collection_stash)} data collection API calls"
+        )
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             requests.post(dc_data[0], json=data)
@@ -526,6 +530,9 @@ class TomographyContext(Context):
                             ],
                             "fractionation": environment.data_collection_parameters[
                                 "eer_fractionation"
+                            ],
+                            "dose_per_frame": environment.data_collection_parameters[
+                                "dose_per_frame"
                             ],
                         },
                     )
