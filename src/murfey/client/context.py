@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, OrderedDict
@@ -18,7 +19,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.context")
@@ -45,6 +46,16 @@ def _construct_tilt_series_name(
     return tilt_series
 
 
+def _midpoint(angles: List[float]) -> int:
+    sorted_angles = sorted(angles)
+    return round(
+        sorted_angles[len(sorted_angles) // 2]
+        if sorted_angles[len(sorted_angles) // 2]
+        and sorted_angles[len(sorted_angles) // 2 + 1]
+        else 0
+    )
+
+
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
     glob = dir_for_transfer.glob("*")
     for f in glob:
@@ -53,6 +64,13 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
         if f.name.startswith("Position") or f.suffix == ".mdoc":
             return "tomo"
     return ""
+
+
+def _get_xml_list_index(key: str, xml_list: list) -> int:
+    for i, elem in enumerate(xml_list):
+        if elem["a:Key"] == key:
+            return i
+    raise ValueError(f"Key not found in XML list: {key}")
 
 
 class Context:
@@ -104,6 +122,7 @@ class SPAContext(Context):
             "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
         ProcessingParameter("gain_ref", "Gain Reference"),
+        ProcessingParameter("gain_ref_superres", "Unbinned Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -129,6 +148,7 @@ class SPAContext(Context):
         logger.info(f"registering data collection with data {data}")
         environment.id_tag_registry["data_collection"].append(tag)
         image_directory = str(environment.default_destinations[Path(tag)])
+        logger.info(f"Image directory for data collection is {image_directory}")
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],
@@ -187,7 +207,9 @@ class SPAContext(Context):
             "parameters": {
                 "acquisition_software": parameters["acquisition_software"],
                 "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_ref"],
+                "motioncor_gainreference": parameters["gain_ref_superres"]
+                if parameters.get("motion_corr_binning") == 2
+                else parameters["gain_ref"],
                 "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": import_images,
@@ -203,7 +225,7 @@ class SPAContext(Context):
         }
         if parameters["particle_diameter"]:
             msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
+        capture_post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
         self,
@@ -214,7 +236,7 @@ class SPAContext(Context):
     ):
         environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
-        requests.post(url, json=data)
+        capture_post(url, json=data)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -234,6 +256,7 @@ class SPAContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         magnification = 0
+        num_fractions = 1
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
@@ -270,11 +293,27 @@ class SPAContext(Context):
                 "TemMagnification"
             ]["NominalMagnification"]
             metadata["magnification"] = magnification
-            metadata["total_exposed_dose"] = data["MicroscopeImage"]["CustomData"][
-                "a:KeyValueOfstringanyType"
-            ][10]["a:Value"]["#text"] * (
-                1e-20
-            )  # convert e / m^2 to e / A^2
+            try:
+                dose_index = _get_xml_list_index(
+                    "Dose",
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"],
+                )
+                metadata["total_exposed_dose"] = round(
+                    float(
+                        data["MicroscopeImage"]["CustomData"][
+                            "a:KeyValueOfstringanyType"
+                        ][dose_index]["a:Value"]["#text"]
+                    )
+                    * (1e-20),
+                    2,
+                )  # convert e / m^2 to e / A^2
+            except ValueError:
+                metadata["total_exposed_dose"] = 1
+            num_fractions = int(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "CameraSpecificInput"
+                ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
+            )
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
@@ -317,20 +356,43 @@ class SPAContext(Context):
                 ps_from_mag = (
                     server_config.get("calibrations", {})
                     .get("magnification", {})
-                    .get(int(magnification))
+                    .get(magnification)
                 )
                 if ps_from_mag:
                     metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
+                    # this is a bit of a hack to cover the case when the data is binned K3
+                    # then the pixel size from the magnification table will be correct but the binning_factor will be 2
+                    # this is divided out later so multiply it in here to cancel
+                    if server_config.get("superres") and not environment.superres:
+                        metadata["pixel_size_on_image"] *= binning_factor
         metadata["pixel_size_on_image"] = (
             metadata["pixel_size_on_image"] / binning_factor
         )
         metadata["motion_corr_binning"] = binning_factor
-        metadata["gain_ref"] = None
-        metadata["dose_per_frame"] = (
-            environment.data_collection_parameters.get("dose_per_frame")
+        metadata["gain_ref"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
             if environment
             else None
         )
+        metadata["gain_ref_superres"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
+            if environment
+            else None
+        )
+        if metadata.get("total_exposed_dose"):
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                and environment.data_collection_parameters.get("dose_per_frame")
+                not in (None, "None")
+                else round(metadata["total_exposed_dose"] / num_fractions, 3)
+            )
+        else:
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                else None
+            )
 
         metadata["use_cryolo"] = (
             environment.data_collection_parameters.get("use_cryolo")
@@ -378,10 +440,6 @@ class SPAContext(Context):
             if environment
             else None
         ) or True
-
-        for k, v in metadata.items():
-            if v == "None":
-                metadata.pop(k)
 
         return metadata
 
@@ -435,7 +493,7 @@ class TomographyContext(Context):
         )
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
-            requests.post(dc_data[0], json=data)
+            capture_post(dc_data[0], json=data)
         self._data_collection_stash = []
 
     def _flush_processing_job(self, tag: str):
@@ -449,7 +507,7 @@ class TomographyContext(Context):
             for tr in tag_tr:
                 process_file = self._complete_process_file(tr[1], tr[2], app_id)
                 if process_file:
-                    requests.post(tr[0], json=process_file)
+                    capture_post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
 
     def _check_for_alignment(
@@ -504,7 +562,7 @@ class TomographyContext(Context):
                         "manual_tilt_offset": manual_tilt_offset,
                         "pixel_size": pixel_size,
                     }
-                    requests.post(url, json=series_data)
+                    capture_post(url, json=series_data)
                     with self._lock:
                         self._aligned_tilt_series.append(tilt_series)
                 except Exception as e:
@@ -718,7 +776,7 @@ class TomographyContext(Context):
                     ):
                         self._data_collection_stash.append((url, environment, data))
                     else:
-                        requests.post(url, json=data)
+                        capture_post(url, json=data)
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
                     if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
@@ -733,11 +791,11 @@ class TomographyContext(Context):
                     else:
                         if self._processing_job_stash.get(tilt_series):
                             self._flush_processing_job(tilt_series)
-                        requests.post(
+                        capture_post(
                             proc_url,
                             json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
                         )
-                        requests.post(
+                        capture_post(
                             proc_url,
                             json={"tag": tilt_series, "recipe": "em-tomo-align"},
                         )
@@ -795,7 +853,7 @@ class TomographyContext(Context):
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 "eer_fractionation_file": eer_fractionation_file,
             }
-            requests.post(preproc_url, json=preproc_data)
+            capture_post(preproc_url, json=preproc_data)
         elif environment:
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             pfi = ProcessFileIncomplete(
@@ -1111,7 +1169,10 @@ class TomographyContext(Context):
             return metadata
         with open(metadata_file, "r") as md:
             mdoc_data = get_global_data(md)
-            mdoc_data_block = get_block(md)
+            num_blocks = get_num_blocks(md)
+            md.seek(0)
+            blocks = [get_block(md) for i in range(num_blocks)]
+            mdoc_data_block = blocks[0]
         if not mdoc_data:
             return OrderedDict({})
         mdoc_metadata: OrderedDict = OrderedDict({})
@@ -1135,7 +1196,7 @@ class TomographyContext(Context):
             ps_from_mag = (
                 server_config.get("calibrations", {})
                 .get("magnification", {})
-                .get(int(mdoc_data_block["Magnification"]))
+                .get(mdoc_data_block["Magnification"])
             )
             if ps_from_mag:
                 mdoc_metadata["pixel_size_on_image"] = (
@@ -1146,13 +1207,19 @@ class TomographyContext(Context):
                 float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
             )
         mdoc_metadata["motion_corr_binning"] = binning_factor
-        mdoc_metadata["gain_ref"] = None
+        mdoc_metadata["gain_ref"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            if environment
+            else None
+        )
         mdoc_metadata["dose_per_frame"] = (
             environment.data_collection_parameters.get("dose_per_frame")
             if environment
             else None
         )
-        mdoc_metadata["manual_tilt_offset"] = 0
+        mdoc_metadata["manual_tilt_offset"] = -_midpoint(
+            [float(b["TiltAngle"]) for b in blocks]
+        )
         mdoc_metadata["source"] = str(self._basepath)
         mdoc_metadata[
             "file_extension"

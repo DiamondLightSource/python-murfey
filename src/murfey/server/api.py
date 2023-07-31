@@ -437,7 +437,9 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     proc_parameters = {
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
-        "job_parameters": proc_params.parameters,
+        "job_parameters": {
+            k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
+        },
     }
 
     if _transport_object:
@@ -468,21 +470,31 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
     executables = machine_config.external_executables
+    env = machine_config.external_environment
+    safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
         Path(machine_config.rsync_basepath)
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
+        / machine_config.gain_directory_name
     )
-    new_gain_ref = await prepare_gain(
-        camera, filepath / gain_reference_params.gain_ref.name, executables
+    new_gain_ref, new_gain_ref_superres = await prepare_gain(
+        camera,
+        filepath / safe_path_name,
+        executables,
+        env,
+        rescale=gain_reference_params.rescale,
     )
-    if new_gain_ref:
+    if new_gain_ref and new_gain_ref_superres:
         return {
-            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath))
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref_superres": new_gain_ref_superres.relative_to(
+                Path(machine_config.rsync_basepath)
+            ),
         }
     else:
-        return {"gain_ref": new_gain_ref}
+        return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
 
 
 @router.post("/visits/{visit_name}/eer_fractionation_file")

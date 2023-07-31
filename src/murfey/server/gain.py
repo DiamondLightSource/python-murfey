@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 
 class Camera(Enum):
@@ -12,18 +13,33 @@ class Camera(Enum):
     FALCON = 3
 
 
+def _sanitise(gain_path: Path) -> Path:
+    dest = gain_path.parent / "gain" / gain_path.name.replace(" ", "_")
+    dest.write_bytes(gain_path.read_bytes())
+    return dest
+
+
 async def prepare_gain(
-    camera: int, gain_path: Path, executables: Dict[str, str]
-) -> Path | None:
+    camera: int,
+    gain_path: Path,
+    executables: Dict[str, str],
+    env: Dict[str, str],
+    rescale: bool = True,
+) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
-        return None
+        return None, None
     if camera == Camera.FALCON:
-        return None
+        return None, None
     if gain_path.suffix == ".dm4":
+        gain_out = gain_path.parent / "gain.mrc"
+        gain_out_superres = gain_path.parent / "gain_superres.mrc"
+        for k, v in env.items():
+            os.environ[k] = v
+        (gain_path.parent / "gain").mkdir(exist_ok=True)
+        gain_path = _sanitise(gain_path)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
         gain_path_superres = gain_path.parent / (gain_path.name + "_superres.mrc")
-        gain_path_stdres = gain_path.parent / (gain_path.name + "_stdres.mrc")
         dm4_proc = await asyncio.create_subprocess_shell(
             f"{executables['dm2mrc']} {gain_path} {gain_path_mrc}",
             stdout=asyncio.subprocess.PIPE,
@@ -31,22 +47,25 @@ async def prepare_gain(
         )
         stdout, stderr = await dm4_proc.communicate()
         if dm4_proc.returncode:
-            return None
+            return None, None
         clip_proc = await asyncio.create_subprocess_shell(
-            f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres}",
+            f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres if rescale else gain_out}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await clip_proc.communicate()
         if clip_proc.returncode:
-            return None
-        newstack_proc = await asyncio.create_subprocess_shell(
-            f"{executables['newstack']} {flip} {gain_path_superres} {gain_path_stdres}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await newstack_proc.communicate()
-        if newstack_proc.returncode:
-            return None
-        return gain_path_stdres
-    return None
+            return None, None
+        if rescale:
+            newstack_proc = await asyncio.create_subprocess_shell(
+                f"{executables['newstack']} -bin 2 {gain_path_superres} {gain_out}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await newstack_proc.communicate()
+            if newstack_proc.returncode:
+                return None, None
+        if rescale:
+            gain_out_superres.symlink_to(gain_path_superres)
+        return gain_out, gain_out_superres if rescale else gain_out
+    return None, None

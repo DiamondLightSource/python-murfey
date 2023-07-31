@@ -155,7 +155,7 @@ class DCParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: float
+        dose_per_frame: Optional[float]
         gain_ref: Optional[str]
         use_cryolo: bool
         symmetry: str
@@ -184,6 +184,7 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+    rescale: bool = True
 
 
 class FractionationParameters(BaseModel):
@@ -191,3 +192,4 @@ class FractionationParameters(BaseModel):
     fractionation: int
     dose_per_frame: float
     fractionation_file_name: str = "eer_fractionation.txt"
+
