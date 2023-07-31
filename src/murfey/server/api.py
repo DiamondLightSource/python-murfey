@@ -271,6 +271,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
             if proc_file.gain_ref
             else proc_file.gain_ref,
+            "fm_int_file": proc_file.eer_fractionation_file,
         },
     }
     # log.info(f"Sending Zocalo message {zocalo_message}")
