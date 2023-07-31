@@ -331,6 +331,11 @@ class MurfeyTUI(App):
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
+            if from_form:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    json=json,
+                )
             source = Path(json["source"])
             self._environment.listeners["data_collection_group_ids"] = {
                 context._flush_data_collections
@@ -355,6 +360,14 @@ class MurfeyTUI(App):
             }
             requests.post(url, json=dcg_data)
         elif isinstance(context, SPAContext):
+            if from_form:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    json=json,
+                )
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing"
+                )
             source = Path(json["source"])
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
             self._environment.listeners["data_collection_group_ids"] = {

@@ -454,6 +454,14 @@ class ProcessingForm(Screen):
                     f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
                     json=params,
                 )
+            elif model == ProcessingParametersSPA:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    json=params,
+                )
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing"
+                )
 
     def on_switch_changed(self, event):
         if event.switch.id == "superres":
