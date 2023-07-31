@@ -320,11 +320,11 @@ class SPAModularContext(_SPAContext):
 
                     if not environment:
                         logger.warning("No environment passed in")
-                        return []
+                        return
                     source = _get_source(transferred_file, environment)
                     if not source:
                         logger.warning(f"No source found for file {transferred_file}")
-                        return []
+                        return
 
                     for r in required_strings:
                         if r not in transferred_file.name.lower():
@@ -339,7 +339,7 @@ class SPAModularContext(_SPAContext):
                             motion_correction_uuid=next(MurfeyID),
                         )
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",

@@ -830,6 +830,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             assert isinstance(run_parameters, dict)
             if run_parameters["experiment_type"] == "spa":
                 murfey_processing = db.SPARelionParameters(
+                    client_id=run_parameters["client_id"],
                     angpix=run_parameters["angpix"],
                     dose_per_frame=run_parameters["dose_per_frame"],
                     gain_ref=run_parameters["gain_ref"],
@@ -853,6 +854,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.add(murfey_feedback)
             else:
                 murfey_processing = db.TomographyProcessingParameters(
+                    client_id=run_parameters["client_id"],
                     pixel_size=run_parameters["angpix"],
                     manual_tilt_offset=run_parameters["manual_tilt_offset"],
                 )

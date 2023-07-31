@@ -63,6 +63,14 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     dc_id: int = Field(foreign_key="datacollection.id")
 
 
+class PreprocessStash(SQLModel, table=True):  # type: ignore
+    file_path: str = Field(primary_key=True)
+    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    image_number: int
+    mc_uuid: int
+    mrc_out: str
+
+
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     pixel_size: float

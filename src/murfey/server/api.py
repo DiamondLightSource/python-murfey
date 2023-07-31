@@ -29,7 +29,9 @@ from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
     ClientEnvironment,
+    PreprocessStash,
     RsyncInstance,
+    SPARelionParameters,
     TiltSeries,
     TomographyProcessingParameters,
 )
@@ -323,8 +325,10 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
         _transport_object.send("processing_recipe", zocalo_message)
 
 
-@router.post("/visits/{visit_name}/spa_preprocess")
-async def request_spa_preprocessing(visit_name: str, proc_file: ProcessFile):
+@router.post("/visits/{visit_name}/{client_id}/spa_preprocess")
+async def request_spa_preprocessing(
+    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+):
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
@@ -340,36 +344,54 @@ async def request_spa_preprocessing(visit_name: str, proc_file: ProcessFile):
         / "/".join(ppath.parts[movies_path_index:-1])
         / str(ppath.stem + "_motion_corrected.mrc")
     )
-    if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True)
-    zocalo_message = {
-        "recipes": ["em-spa-preprocess"],
-        "parameters": {
-            "feedback_queue": machine_config.feedback_queue,
-            "dcid": proc_file.data_collection_id,
-            "autoproc_program_id": proc_file.autoproc_program_id,
-            "movie": proc_file.path,
-            "mrc_out": str(mrc_out),
-            "pix_size": (proc_file.pixel_size) * 10**10,
-            "image_number": proc_file.image_number,
-            "microscope": get_microscope(),
-            "mc_uuid": proc_file.mc_uuid,
-            "ft_bin": proc_file.mc_binning,
-            "fm_dose": proc_file.dose_per_frame,
-            "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
-            if proc_file.gain_ref
-            else proc_file.gain_ref,
-            "downscale": proc_file.extract_downscale,
-        },
-    }
-    # log.info(f"Sending Zocalo message {zocalo_message}")
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
+    proc_params = db.exec(
+        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
+    ).one()
+    if proc_params:
+
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True)
+        zocalo_message = {
+            "recipes": ["em-spa-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config.feedback_queue,
+                "dcid": proc_file.data_collection_id,
+                "autoproc_program_id": proc_file.autoproc_program_id,
+                "movie": proc_file.path,
+                "mrc_out": str(mrc_out),
+                "pix_size": (proc_file.pixel_size) * 10**10,
+                "image_number": proc_file.image_number,
+                "microscope": get_microscope(),
+                "mc_uuid": proc_file.mc_uuid,
+                "ft_bin": proc_file.mc_binning,
+                "fm_dose": proc_file.dose_per_frame,
+                "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
+                if proc_file.gain_ref
+                else proc_file.gain_ref,
+                "downscale": proc_file.extract_downscale,
+            },
+        }
+        # log.info(f"Sending Zocalo message {zocalo_message}")
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        else:
+            log.error(
+                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+            )
+            return proc_file
+
     else:
-        log.error(
-            f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+        for_stash = PreprocessStash(
+            file_path=str(proc_file.path),
+            client_id=client_id,
+            image_number=proc_file.image_number,
+            mc_uuid=proc_file.mc_uuid,
+            mrc_out=str(mrc_out),
         )
-        return proc_file
+        db.add(for_stash)
+        db.commit()
+        db.close()
+
     return proc_file
 
 
