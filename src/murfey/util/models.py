@@ -163,6 +163,7 @@ class ProcessingParametersSPA(BaseModel):
     downscale: bool
     small_boxsize: Optional[int]
     eer_grouping: int
+    particle_diameter: float = 0
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
     c2aperture: Optional[float] = None

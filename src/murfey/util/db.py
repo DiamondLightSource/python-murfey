@@ -100,7 +100,8 @@ class ParticleSizes(SQLModel, table=True):  # type: ignore
 
 
 class SPARelionParameters(SQLModel, table=True):  # type: ignore
-    angpix: float = Field(primary_key=True, unique=True)
+    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    angpix: float
     dose_per_frame: float
     gain_ref: str
     voltage: int

@@ -50,6 +50,7 @@ from murfey.util.models import (
     GainReference,
     ProcessFile,
     ProcessingJobParameters,
+    ProcessingParametersSPA,
     ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
@@ -229,6 +230,102 @@ def register_tomo_proc_params(
     db.add(params)
     db.commit()
     db.close()
+
+
+@router.post("/clients/{client_id}/spa_processing_parameters")
+def register_spa_proc_params(
+    client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
+):
+    params = SPARelionParameters(
+        client_id=client_id,
+        angpix=proc_params.pixel_size_on_image,
+        dose_per_frame=proc_params.dose_per_frame,
+        gain_ref=proc_params.gain_ref,
+        votage=proc_params.voltage,
+        motion_corr_binning=proc_params.motion_corr_binning,
+        eer_grouping=proc_params.eer_grouping,
+        symmetry=proc_params.symmetry,
+        particle_diameter=proc_params.particle_diameter,
+        downscale=proc_params.downscale,
+        boxsize=proc_params.boxsize,
+        small_boxsize=proc_params.small_boxsize,
+        mask_diameter=proc_params.mask_diameter,
+    )
+    db.add(params)
+    db.commit()
+    db.close()
+
+
+@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
+def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
+    stashed_files = db.exec(
+        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
+    ).all()
+    proc_params = db.exec(
+        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
+    ).one()
+    if not proc_params:
+        log.warning(
+            f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
+        )
+        return
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(
+            DataCollectionGroup.client_id == client_id
+            and DataCollectionGroup.tag == "spa"
+        )
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-spa-preprocess")
+    ).one()
+    for f in stashed_files:
+        visit_idx = Path(f.file_path).parts.index(visit_name)
+        core = Path(*Path(f.file_path).parts[: visit_idx + 1])
+        ppath = Path(f.file_path)
+        sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+        movies_path_index = ppath.parts.index("Movies")
+        mrc_out = (
+            core
+            / machine_config.processed_directory_name
+            / sub_dataset
+            / "MotionCorr"
+            / "job002"
+            / "Movies"
+            / "/".join(ppath.parts[movies_path_index:-1])
+            / str(ppath.stem + "_motion_corrected.mrc")
+        )
+
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True)
+        zocalo_message = {
+            "recipes": ["em-spa-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config.feedback_queue,
+                "dcid": collected_ids[1].id,
+                "autoproc_program_id": collected_ids[3].id,
+                "movie": f.file_path,
+                "mrc_out": str(mrc_out),
+                "pix_size": proc_params.angpix,
+                "image_number": f.image_number,
+                "microscope": get_microscope(),
+                "mc_uuid": f.mc_uuid,
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
+                if proc_params.gain_ref
+                else proc_params.gain_ref,
+                "downscale": proc_params.downscale,
+            },
+        }
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        else:
+            log.error(
+                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+            )
+    return
 
 
 @router.post("/visits/{visit_name}/tilt_series")
