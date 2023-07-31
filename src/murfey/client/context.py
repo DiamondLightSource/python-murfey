@@ -44,6 +44,33 @@ def _construct_tilt_series_name(
     return tilt_series
 
 
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+):
+    machine_config = get_machine_config(
+        str(environment.url.geturl()), demo=environment.demo
+    )
+    if environment.visit in environment.default_destinations[source]:
+        return (
+            Path(machine_config.get("rsync_basepath", ""))
+            / Path(environment.default_destinations[source])
+            / file_path.name
+        )
+    return (
+        Path(machine_config.get("rsync_basepath", ""))
+        / Path(environment.default_destinations[source])
+        / environment.visit
+        / file_path.name
+    )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            return s
+    return None
+
+
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
     glob = dir_for_transfer.glob("*")
     for f in glob:
@@ -77,7 +104,7 @@ class Context:
         )
 
 
-class SPAContext(Context):
+class _SPAContext(Context):
     user_params = [
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
@@ -116,103 +143,6 @@ class SPAContext(Context):
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
-
-    def _register_data_collection(
-        self,
-        tag: str,
-        url: str,
-        data: dict,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        logger.info(f"registering data collection with data {data}")
-        environment.id_tag_registry["data_collection"].append(tag)
-        image_directory = str(environment.default_destinations[Path(tag)])
-        json = {
-            "voltage": data["voltage"],
-            "pixel_size_on_image": data["pixel_size_on_image"],
-            "experiment_type": data["experiment_type"],
-            "image_size_x": data["image_size_x"],
-            "image_size_y": data["image_size_y"],
-            "file_extension": data["file_extension"],
-            "acquisition_software": data["acquisition_software"],
-            "image_directory": image_directory,
-            "tag": tag,
-            "source": tag,
-            "magnification": data["magnification"],
-            "total_exposed_dose": data.get("total_exposed_dose"),
-            "c2aperture": data.get("c2aperture"),
-            "exposure_time": data.get("exposure_time"),
-            "slit_width": data.get("slit_width"),
-            "phase_plate": data.get("phase_plate", False),
-        }
-        requests.post(url, json=json)
-
-    def post_transfer(
-        self,
-        transferred_file: Path,
-        role: str = "",
-        environment: MurfeyInstanceEnvironment | None = None,
-        **kwargs,
-    ):
-        return
-
-    def _register_processing_job(
-        self,
-        tag: str,
-        environment: MurfeyInstanceEnvironment,
-        parameters: Dict[str, Any] | None = None,
-    ):
-        logger.info(f"registering processing job with parameters: {parameters}")
-        parameters = parameters or {}
-        environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-        machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
-        )
-        image_directory = str(
-            Path(machine_config.get("rsync_basepath", "."))
-            / environment.default_destinations[Path(tag)]
-        )
-        if self._acquisition_software == "epu":
-            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
-        else:
-            import_images = (
-                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
-            )
-        msg: Dict[str, Any] = {
-            "tag": tag,
-            "recipe": "ispyb-relion",
-            "parameters": {
-                "acquisition_software": parameters["acquisition_software"],
-                "voltage": parameters["voltage"],
-                "gain_ref": parameters["gain_ref"],
-                "dose_per_frame": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_grouping"],
-                "import_images": import_images,
-                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
-                "symmetry": parameters["symmetry"],
-                "boxsize": parameters["boxsize"],
-                "downscale": parameters["downscale"],
-                "small_boxsize": parameters["small_boxsize"],
-                "mask_diameter": parameters["mask_diameter"],
-                "use_cryolo": parameters["use_cryolo"],
-                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
-            },
-        }
-        if parameters["particle_diameter"]:
-            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
-
-    def _launch_spa_pipeline(
-        self,
-        tag: str,
-        jobid: int,
-        environment: MurfeyInstanceEnvironment,
-        url: str = "",
-    ):
-        environment.id_tag_registry["auto_proc_program"].append(tag)
-        data = {"job_id": jobid}
-        requests.post(url, json=data)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -364,6 +294,184 @@ class SPAContext(Context):
             else None
         ) or True
         return metadata
+
+
+class SPAModularContext(_SPAContext):
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
+        if role == "detector" and "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "epu":
+                    if environment:
+                        machine_config = get_machine_config(
+                            str(environment.url.geturl()), demo=environment.demo
+                        )
+                    else:
+                        machine_config = {}
+                    required_strings = machine_config.get(
+                        "data_required_substrings", {}
+                    ).get("epu", ["fractions"])
+
+                    if not environment:
+                        logger.warning("No environment passed in")
+                        return []
+                    source = _get_source(transferred_file, environment)
+                    if not source:
+                        logger.warning(f"No source found for file {transferred_file}")
+                        return []
+
+                    for r in required_strings:
+                        if r not in transferred_file.name.lower():
+                            return
+
+                    if environment:
+                        file_transferred_to = _file_transferred_to(
+                            environment, source, transferred_file
+                        )
+                        environment.movies[file_transferred_to] = MovieTracker(
+                            movie_number=next(MovieID),
+                            motion_correction_uuid=next(MurfeyID),
+                        )
+
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/spa_preprocess"
+                        preproc_data = {
+                            "path": str(file_transferred_to),
+                            "description": "",
+                            "size": transferred_file.stat().st_size,
+                            "timestamp": transferred_file.stat().st_ctime,
+                            "processing_job": None,
+                            "data_collection_id": None,
+                            "image_number": environment.movies[
+                                file_transferred_to
+                            ].movie_number,
+                            "pixel_size": environment.data_collection_parameters[
+                                "pixel_size_on_image"
+                            ],
+                            "autoproc_program_id": None,
+                            "mc_uuid": environment.movies[
+                                file_transferred_to
+                            ].motion_correction_uuid,
+                            "dose_per_frame": environment.data_collection_parameters.get(
+                                "dose_per_frame"
+                            ),
+                            "mc_binning": environment.data_collection_parameters.get(
+                                "motion_corr_binning", 1
+                            ),
+                            "gain_ref": environment.data_collection_parameters.get(
+                                "gain_ref"
+                            ),
+                            "downscale": environment.data_collection_parameters.get(
+                                "downscale"
+                            ),
+                        }
+                        requests.post(preproc_url, json=preproc_data)
+
+        return
+
+
+class SPAContext(_SPAContext):
+    def _register_data_collection(
+        self,
+        tag: str,
+        url: str,
+        data: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        logger.info(f"registering data collection with data {data}")
+        environment.id_tag_registry["data_collection"].append(tag)
+        image_directory = str(environment.default_destinations[Path(tag)])
+        json = {
+            "voltage": data["voltage"],
+            "pixel_size_on_image": data["pixel_size_on_image"],
+            "experiment_type": data["experiment_type"],
+            "image_size_x": data["image_size_x"],
+            "image_size_y": data["image_size_y"],
+            "file_extension": data["file_extension"],
+            "acquisition_software": data["acquisition_software"],
+            "image_directory": image_directory,
+            "tag": tag,
+            "source": tag,
+            "magnification": data["magnification"],
+            "total_exposed_dose": data.get("total_exposed_dose"),
+            "c2aperture": data.get("c2aperture"),
+            "exposure_time": data.get("exposure_time"),
+            "slit_width": data.get("slit_width"),
+            "phase_plate": data.get("phase_plate", False),
+        }
+        requests.post(url, json=json)
+
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        return
+
+    def _register_processing_job(
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
+    ):
+        logger.info(f"registering processing job with parameters: {parameters}")
+        parameters = parameters or {}
+        environment.id_tag_registry["processing_job"].append(tag)
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+        machine_config = get_machine_config(
+            str(environment.url.geturl()), demo=environment.demo
+        )
+        image_directory = str(
+            Path(machine_config.get("rsync_basepath", "."))
+            / environment.default_destinations[Path(tag)]
+        )
+        if self._acquisition_software == "epu":
+            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
+        else:
+            import_images = (
+                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
+            )
+        msg: Dict[str, Any] = {
+            "tag": tag,
+            "recipe": "ispyb-relion",
+            "parameters": {
+                "acquisition_software": parameters["acquisition_software"],
+                "voltage": parameters["voltage"],
+                "gain_ref": parameters["gain_ref"],
+                "dose_per_frame": parameters["dose_per_frame"],
+                "eer_grouping": parameters["eer_grouping"],
+                "import_images": import_images,
+                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
+                "symmetry": parameters["symmetry"],
+                "boxsize": parameters["boxsize"],
+                "downscale": parameters["downscale"],
+                "small_boxsize": parameters["small_boxsize"],
+                "mask_diameter": parameters["mask_diameter"],
+                "use_cryolo": parameters["use_cryolo"],
+                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
+            },
+        }
+        if parameters["particle_diameter"]:
+            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
+        requests.post(proc_url, json=msg)
+
+    def _launch_spa_pipeline(
+        self,
+        tag: str,
+        jobid: int,
+        environment: MurfeyInstanceEnvironment,
+        url: str = "",
+    ):
+        environment.id_tag_registry["auto_proc_program"].append(tag)
+        data = {"job_id": jobid}
+        requests.post(url, json=data)
 
 
 class ProcessFileIncomplete(BaseModel):
@@ -524,33 +632,6 @@ class TomographyContext(Context):
             logger.warning("Key error encountered in _complete_process_file")
             return {}
 
-    def _file_transferred_to(
-        self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
-    ):
-        machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
-        )
-        if environment.visit in environment.default_destinations[source]:
-            return (
-                Path(machine_config.get("rsync_basepath", ""))
-                / Path(environment.default_destinations[source])
-                / file_path.name
-            )
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source])
-            / environment.visit
-            / file_path.name
-        )
-
-    def _get_source(
-        self, file_path: Path, environment: MurfeyInstanceEnvironment
-    ) -> Path | None:
-        for s in environment.sources:
-            if file_path.is_relative_to(s):
-                return s
-        return None
-
     def _add_tilt(
         self,
         file_path: Path,
@@ -564,7 +645,7 @@ class TomographyContext(Context):
         if not environment:
             logger.warning("No environment passed in")
             return []
-        source = self._get_source(file_path, environment)
+        source = _get_source(file_path, environment)
         if not source:
             logger.warning(f"No source found for file {file_path}")
             return []
@@ -599,9 +680,7 @@ class TomographyContext(Context):
             return []
 
         if environment:
-            file_transferred_to = self._file_transferred_to(
-                environment, source, file_path
-            )
+            file_transferred_to = _file_transferred_to(environment, source, file_path)
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
                 motion_correction_uuid=next(MurfeyID),
@@ -986,14 +1065,12 @@ class TomographyContext(Context):
                     tilt_series = transferred_file.stem
                     self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
                 if environment:
-                    source = self._get_source(transferred_file, environment)
+                    source = _get_source(transferred_file, environment)
                     if source:
                         completed_tilts = self._check_tilt_series(
                             tilt_series,
                             kwargs.get("required_position_files") or [],
-                            self._file_transferred_to(
-                                environment, source, transferred_file
-                            ),
+                            _file_transferred_to(environment, source, transferred_file),
                             environment=environment,
                         )
         return completed_tilts
