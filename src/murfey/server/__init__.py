@@ -831,7 +831,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if run_parameters["experiment_type"] == "spa":
                 murfey_processing = db.SPARelionParameters(
                     client_id=run_parameters["client_id"],
-                    angpix=run_parameters["angpix"],
+                    angpix=run_parameters["angpix"] * 1e-10,
                     dose_per_frame=run_parameters["dose_per_frame"],
                     gain_ref=run_parameters["gain_ref"],
                     voltage=run_parameters["voltage"],

@@ -28,8 +28,12 @@ from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
+    AutoProcProgram,
     ClientEnvironment,
+    DataCollection,
+    DataCollectionGroup,
     PreprocessStash,
+    ProcessingJob,
     RsyncInstance,
     SPARelionParameters,
     TiltSeries,
@@ -349,26 +353,38 @@ async def request_spa_preprocessing(
     ).one()
     if proc_params:
 
+        collected_ids = db.exec(
+            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+            .where(
+                DataCollectionGroup.client_id == client_id
+                and DataCollectionGroup.tag == "spa"
+            )
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-spa-preprocess")
+        ).one()
+
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
-                "dcid": proc_file.data_collection_id,
-                "autoproc_program_id": proc_file.autoproc_program_id,
+                "dcid": collected_ids[1].id,
+                "autoproc_program_id": collected_ids[3].id,
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": (proc_file.pixel_size) * 10**10,
+                "pix_size": proc_params.angpix,
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": proc_file.mc_uuid,
-                "ft_bin": proc_file.mc_binning,
-                "fm_dose": proc_file.dose_per_frame,
-                "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
-                if proc_file.gain_ref
-                else proc_file.gain_ref,
-                "downscale": proc_file.extract_downscale,
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
+                if proc_params.gain_ref
+                else proc_params.gain_ref,
+                "downscale": proc_params.downscale,
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
