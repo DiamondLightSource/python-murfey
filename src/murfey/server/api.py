@@ -323,6 +323,56 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
         _transport_object.send("processing_recipe", zocalo_message)
 
 
+@router.post("/visits/{visit_name}/spa_preprocess")
+async def request_spa_preprocessing(visit_name: str, proc_file: ProcessFile):
+    visit_idx = Path(proc_file.path).parts.index(visit_name)
+    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
+    ppath = Path(proc_file.path)
+    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    movies_path_index = ppath.parts.index("Movies")
+    mrc_out = (
+        core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / "MotionCorr"
+        / "job002"
+        / "Movies"
+        / "/".join(ppath.parts[movies_path_index:-1])
+        / str(ppath.stem + "_motion_corrected.mrc")
+    )
+    if not mrc_out.parent.exists():
+        mrc_out.parent.mkdir(parents=True)
+    zocalo_message = {
+        "recipes": ["em-spa-preprocess"],
+        "parameters": {
+            "feedback_queue": machine_config.feedback_queue,
+            "dcid": proc_file.data_collection_id,
+            "autoproc_program_id": proc_file.autoproc_program_id,
+            "movie": proc_file.path,
+            "mrc_out": str(mrc_out),
+            "pix_size": (proc_file.pixel_size) * 10**10,
+            "image_number": proc_file.image_number,
+            "microscope": get_microscope(),
+            "mc_uuid": proc_file.mc_uuid,
+            "ft_bin": proc_file.mc_binning,
+            "fm_dose": proc_file.dose_per_frame,
+            "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
+            if proc_file.gain_ref
+            else proc_file.gain_ref,
+            "downscale": proc_file.extract_downscale,
+        },
+    }
+    # log.info(f"Sending Zocalo message {zocalo_message}")
+    if _transport_object:
+        _transport_object.send("processing_recipe", zocalo_message)
+    else:
+        log.error(
+            f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+        )
+        return proc_file
+    return proc_file
+
+
 @router.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
     visit_idx = Path(proc_file.path).parts.index(visit_name)

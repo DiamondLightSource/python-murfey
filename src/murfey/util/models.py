@@ -76,6 +76,7 @@ class ProcessFile(BaseModel):
     dose_per_frame: float
     mc_binning: int = 1
     gain_ref: Optional[str] = None
+    extract_downscale: int = 1
 
 
 class TiltSeriesInfo(BaseModel):

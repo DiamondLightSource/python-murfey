@@ -282,6 +282,35 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
     return proc_params
 
 
+@router.post("/visits/{visit_name}/spa_preprocess")
+async def request_spa_preprocessing(visit_name: str, proc_file: ProcessFile):
+    if not Path(proc_file.path).exists():
+        log.warning(f"{proc_file.path} has not been transferred before preprocessing")
+    visit_idx = Path(proc_file.path).parts.index(visit_name)
+    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
+    ppath = Path(proc_file.path)
+    sub_dataset = (
+        ppath.relative_to(core).parts[0]
+        if len(ppath.relative_to(core).parts) > 1
+        else ""
+    )
+    movies_path_index = ppath.parts.index("Movies")
+    mrc_out = (
+        core
+        / machine_config["processed_directory_name"]
+        / sub_dataset
+        / "MotionCorr"
+        / "job002"
+        / "Movies"
+        / "/".join(ppath.parts[movies_path_index:-1])
+        / str(ppath.stem + "_motion_corrected.mrc")
+    )
+    if not mrc_out.parent.exists():
+        mrc_out.parent.mkdir(parents=True)
+    mrc_out.touch()
+    return proc_file
+
+
 @router.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
     if not Path(proc_file.path).exists():
