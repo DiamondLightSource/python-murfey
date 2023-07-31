@@ -419,7 +419,7 @@ class ProcessingForm(Screen):
                 i = Switch(value=False, classes="input", id=f"switch_{k.name}")
             else:
                 i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
-                default = self._form.get(k.name)
+                default = self._form.get(k.name, str(k.default))
                 i.value = "None" if default is None else default
             self._inputs[i] = k.name
             inputs.append(i)
