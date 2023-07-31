@@ -218,6 +218,16 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
+@router.get("/clients/{client_id}/tomography_processing_parameters")
+def get_tomo_proc_params(client_id: int, db=murfey_db) -> List[dict]:
+    params = db.exec(
+        select(TomographyProcessingParameters).where(
+            TomographyProcessingParameters.client_id == client_id
+        )
+    ).all()
+    return [p.json() for p in params]
+
+
 @router.post("/clients/{client_id}/tomography_processing_parameters")
 def register_tomo_proc_params(
     client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
@@ -254,6 +264,14 @@ def register_spa_proc_params(
     db.add(params)
     db.commit()
     db.close()
+
+
+@router.get("/clients/{client_id}/spa_processing_parameters")
+def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
+    params = db.exec(
+        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
+    ).all()
+    return [p.json() for p in params]
 
 
 @router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
