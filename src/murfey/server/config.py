@@ -28,6 +28,7 @@ class MachineConfig(BaseModel):
     camera: str = "FALCON"
     data_required_substrings: Dict[str, List[str]] = {}
     allow_removal: bool = False
+    modular_spa: bool = False
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

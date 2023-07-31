@@ -6,7 +6,12 @@ import threading
 from pathlib import Path
 from typing import Type
 
-from murfey.client.context import Context, SPAContext, TomographyContext
+from murfey.client.context import (
+    Context,
+    SPAContext,
+    SPAModularContext,
+    TomographyContext,
+)
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import FormDependency
@@ -79,7 +84,12 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    self._context = SPAContext("epu", self._basepath)
+                    cfg = get_machine_config()
+                    self._context = (
+                        SPAModularContext("epu", self._basepath)
+                        if cfg.get("modular_spa")
+                        else SPAContext("epu", self._basepath)
+                    )
                 self.parameters_model = ProcessingParametersSPA
                 if not self._role:
                     self._role = "detector"
@@ -187,6 +197,7 @@ class Analyser(Observer):
                                     "form": dc_metadata,
                                     "dependencies": spa_form_dependencies
                                     if isinstance(self._context, SPAContext)
+                                    or isinstance(self._context, SPAModularContext)
                                     else {},
                                 }
                             )
@@ -226,6 +237,7 @@ class Analyser(Observer):
                                     "form": dc_metadata,
                                     "dependencies": spa_form_dependencies
                                     if isinstance(self._context, SPAContext)
+                                    or isinstance(self._context, SPAModularContext)
                                     else {},
                                 }
                             )

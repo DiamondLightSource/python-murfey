@@ -34,7 +34,7 @@ from textual.widgets import (
 )
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.context import SPAContext, TomographyContext
+from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
@@ -302,7 +302,11 @@ class LaunchScreen(Screen):
             log.info("switching context to tomo")
             self._context = TomographyContext
         elif event.option.prompt == "SPA":
-            self._context = SPAContext
+            cfg = get_machine_config()
+            if cfg.get("modular_spa"):
+                self._context = SPAContext
+            else:
+                self._context = SPAModularContext
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
@@ -695,7 +699,7 @@ class DestinationSelect(Screen):
     def __init__(
         self,
         transfer_routes: Dict[Path, str],
-        context: Type[SPAContext] | Type[TomographyContext],
+        context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
         **kwargs,
