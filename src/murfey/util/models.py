@@ -79,6 +79,23 @@ class ProcessFile(BaseModel):
     extract_downscale: int = 1
 
 
+class SPAProcessFile(BaseModel):
+    path: str
+    description: str
+    size: int
+    timestamp: float
+    processing_job: Optional[int]
+    data_collection_id: Optional[int]
+    image_number: int
+    mc_uuid: int
+    autoproc_program_id: Optional[int]
+    pixel_size: Optional[float]
+    dose_per_frame: Optional[float]
+    mc_binning: Optional[int] = 1
+    gain_ref: Optional[str] = None
+    extract_downscale: bool = True
+
+
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
@@ -163,7 +180,7 @@ class ProcessingParametersSPA(BaseModel):
     downscale: bool
     small_boxsize: Optional[int]
     eer_grouping: int
-    particle_diameter: float = 0
+    particle_diameter: Optional[float]
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
     c2aperture: Optional[float] = None
@@ -201,3 +218,8 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+
+
+class SessionInfo(BaseModel):
+    session_id: Optional[int]
+    session_name: str = ""

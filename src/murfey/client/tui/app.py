@@ -15,7 +15,7 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
-from murfey.client.context import SPAContext, TomographyContext
+from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
@@ -318,6 +318,7 @@ class MurfeyTUI(App):
         )
 
     def _start_dc(self, json, from_form: bool = False):
+        log.info("star dc called")
         if self._dummy_dc:
             return
         # for multigrid the analyser sends the message straight to _start_dc by-passing user input
@@ -359,12 +360,22 @@ class MurfeyTUI(App):
                 "tag": str(source),
             }
             requests.post(url, json=dcg_data)
-        elif isinstance(context, SPAContext):
+        elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
+            dcg_data = {
+                "experiment_type": "single particle",
+                "experiment_type_id": 37,
+                "tag": str(source),
+            }
+            requests.post(url, json=dcg_data)
             if from_form:
-                requests.post(
+                log.info(f"Posting SPA processing parameters: {json}")
+                response = requests.post(
                     f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
-                    json=json,
+                    json={k: None if v == "None" else v for k, v in json.items()},
                 )
+                if not str(response.status_code).startswith("2"):
+                    log.warning(f"{response.reason}")
                 requests.post(
                     f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing"
                 )
@@ -391,13 +402,13 @@ class MurfeyTUI(App):
                     context._launch_spa_pipeline, url=url, environment=self._environment
                 )
             }
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
-            dcg_data = {
-                "experiment_type": "single particle",
-                "experiment_type_id": 37,
-                "tag": str(source),
-            }
-            requests.post(url, json=dcg_data)
+            # url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
+            # dcg_data = {
+            #     "experiment_type": "single particle",
+            #     "experiment_type_id": 37,
+            #     "tag": str(source),
+            # }
+            # requests.post(url, json=dcg_data)
 
     def _set_request_destination(self, response: str):
         if response == "y":
@@ -407,6 +418,9 @@ class MurfeyTUI(App):
         self.bind("q", "quit", description="Quit", show=True)
         self.bind("c", "clear", description="Remove copied data and quit", show=True)
         self.bind("p", "process", description="Allow processing", show=True)
+        self.bind(
+            "d", "remove_session", description="Quit and remove session", show=True
+        )
 
     def _install_processing_form(self):
         self.processing_form = ProcessingForm(
@@ -483,6 +497,22 @@ class MurfeyTUI(App):
     async def action_quit(self) -> None:
         log.info("quitting app")
 
+        if self.rsync_processes:
+            for rp in self.rsync_processes.values():
+                rp.stop()
+        if self.analysers:
+            for a in self.analysers.values():
+                a.stop()
+        if self._multigrid_watcher:
+            self._multigrid_watcher.stop()
+        self._clear_state()
+        self.exit()
+        exit()
+
+    async def action_remove_session(self) -> None:
+        requests.delete(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+        )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
                 rp.stop()

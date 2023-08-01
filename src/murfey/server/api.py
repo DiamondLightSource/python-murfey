@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 import packaging.version
+import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
@@ -35,6 +36,7 @@ from murfey.util.db import (
     PreprocessStash,
     ProcessingJob,
     RsyncInstance,
+    Session,
     SPARelionParameters,
     TiltSeries,
     TomographyProcessingParameters,
@@ -54,6 +56,8 @@ from murfey.util.models import (
     ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
+    SessionInfo,
+    SPAProcessFile,
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltSeriesInfo,
@@ -431,13 +435,18 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
 
 @router.post("/visits/{visit_name}/{client_id}/spa_preprocess")
 async def request_spa_preprocessing(
-    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+    visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
-    movies_path_index = ppath.parts.index("Movies")
+    for i, p in enumerate(ppath.parts):
+        if p.startswith("raw"):
+            movies_path_index = i
+            break
+    else:
+        raise ValueError(f"{proc_file.path} does not contain a raw directory")
     mrc_out = (
         core
         / machine_config.processed_directory_name
@@ -445,12 +454,17 @@ async def request_spa_preprocessing(
         / "MotionCorr"
         / "job002"
         / "Movies"
-        / "/".join(ppath.parts[movies_path_index:-1])
+        / "/".join(ppath.parts[movies_path_index + 1 : -1])
         / str(ppath.stem + "_motion_corrected.mrc")
     )
-    proc_params = db.exec(
-        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
-    ).one()
+    try:
+        proc_params = db.exec(
+            select(SPARelionParameters, ClientEnvironment)
+            .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
+            .where(ClientEnvironment.client_id == client_id)
+        ).one()[0]
+    except sqlalchemy.exc.NoResultFound:
+        proc_params = None
     if proc_params:
 
         collected_ids = db.exec(
@@ -828,3 +842,38 @@ async def new_client_id(db=murfey_db):
 async def get_clients(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
+
+
+@router.post("/clients/{client_id}/session")
+def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
+    sid = sess.session_id
+    if sid is None:
+        s = Session(name=sess.session_name)
+        db.add(s)
+        db.commit()
+        sid = s.id
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    client.session_id = sid
+    db.add(client)
+    db.commit()
+    db.close()
+    return sid
+
+
+@router.delete("/clients/{client_id}/session")
+def remove_session(client_id: int, db=murfey_db):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    client.session_id = None
+    db.add(client)
+    db.commit()
+    assert session_id is not None
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    db.delete(session)
+    db.commit()
+    db.close()
+    return

@@ -147,6 +147,7 @@ class _SPAContext(Context):
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
     ):
+        logger.info(f"trying to gather metadata on {metadata_file}")
         if metadata_file.suffix != ".xml":
             raise ValueError(
                 f"SPA gather_metadata method expected xml file not {metadata_file.name}"
@@ -293,6 +294,7 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
+        logger.info(f"SPA metadata read: {metadata}")
         return metadata
 
 
@@ -304,6 +306,7 @@ class SPAModularContext(_SPAContext):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
+        logger.info(f"post transfer {transferred_file}")
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -350,9 +353,9 @@ class SPAModularContext(_SPAContext):
                             "image_number": environment.movies[
                                 file_transferred_to
                             ].movie_number,
-                            "pixel_size": environment.data_collection_parameters[
+                            "pixel_size": environment.data_collection_parameters.get(
                                 "pixel_size_on_image"
-                            ],
+                            ),
                             "autoproc_program_id": None,
                             "mc_uuid": environment.movies[
                                 file_transferred_to
@@ -370,8 +373,42 @@ class SPAModularContext(_SPAContext):
                                 "downscale"
                             ),
                         }
-                        requests.post(preproc_url, json=preproc_data)
+                        logger.info(f"Request SPA preprocessing {preproc_data}")
+                        response = requests.post(
+                            preproc_url,
+                            json={
+                                k: None if v == "None" else v
+                                for k, v in preproc_data.items()
+                            },
+                        )
+                        logger.info(response.reason)
 
+        return
+
+    def _register_data_collection(
+        self,
+        tag: str,
+        url: str,
+        data: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        return
+
+    def _register_processing_job(
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
+    ):
+        return
+
+    def _launch_spa_pipeline(
+        self,
+        tag: str,
+        jobid: int,
+        environment: MurfeyInstanceEnvironment,
+        url: str = "",
+    ):
         return
 
 

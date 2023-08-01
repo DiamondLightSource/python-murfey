@@ -302,7 +302,9 @@ class LaunchScreen(Screen):
             log.info("switching context to tomo")
             self._context = TomographyContext
         elif event.option.prompt == "SPA":
-            cfg = get_machine_config()
+            cfg = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
             if cfg.get("modular_spa"):
                 self._context = SPAContext
             else:

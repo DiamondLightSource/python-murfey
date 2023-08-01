@@ -756,9 +756,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
+            client = murfey_db.exec(
+                select(db.ClientEnvironment.client_id == message["client_id"])
+            ).one()
             murfey_dcg = db.DataCollectionGroup(
                 id=dcgid,
-                client=message["client_id"],
+                session_id=client.session_id,
                 tag=message.get("tag"),
             )
             murfey_db.add(murfey_dcg)

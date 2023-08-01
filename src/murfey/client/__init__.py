@@ -171,6 +171,12 @@ def run():
         default=False,
         help="Relax the condition that the source directory needs to be recognised from the configuration",
     )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default="",
+        help="Name of Murfey session to be created",
+    )
 
     args = parser.parse_args()
 
@@ -207,7 +213,7 @@ def run():
     _check_for_updates(server=murfey_url, install_version=args.update)
 
     if args.no_transfer:
-        log.info("No files will be transferred as --no_transfer flag was specified")
+        log.info("No files will be transferred as --no-transfer flag was specified")
 
     from pprint import pprint
 
@@ -236,8 +242,11 @@ def run():
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
-    print(f"suggested client id {client_id}, {murfey_url.geturl()}")
-    ws = murfey.client.websocket.WSApp(server=args.server, id=client_id["new_id"])
+    ws = murfey.client.websocket.WSApp(
+        server=args.server,
+        session_name=args.name or "Client connection",
+        id=client_id["new_id"],
+    )
 
     logging.getLogger().addHandler(rich_handler)
     handler = CustomHandler(ws.send)
