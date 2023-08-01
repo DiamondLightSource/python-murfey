@@ -266,11 +266,10 @@ class Analyser(Observer):
                             environment=self._environment,
                         )
                     self.notify({"form": dc_metadata})
-            # elif isinstance(self._context, SPAModularContext):
-            #     logger.info(f"call to post transfer {transferred_file}")
-            #     self._context.post_transfer(
-            #         transferred_file, role=self._role, environment=self._environment
-            #     )
+            elif isinstance(self._context, SPAModularContext):
+                self._context.post_transfer(
+                    transferred_file, role=self._role, environment=self._environment
+                )
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:

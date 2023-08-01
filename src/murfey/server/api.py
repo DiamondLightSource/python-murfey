@@ -283,6 +283,8 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     stashed_files = db.exec(
         select(PreprocessStash).where(PreprocessStash.client_id == client_id)
     ).all()
+    if not stashed_files:
+        return
     proc_params = db.exec(
         select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
     ).one()
@@ -326,10 +328,13 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
+            db.delete(f)
         else:
             log.error(
                 f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
             )
+    db.commit()
+    db.close()
     return
 
 
@@ -464,11 +469,19 @@ async def request_spa_preprocessing(
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     if proc_params:
-
+        session_id = (
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.client_id == client_id
+                )
+            )
+            .one()
+            .session_id
+        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(
-                DataCollectionGroup.client_id == client_id
+                DataCollectionGroup.session_id == session_id
                 and DataCollectionGroup.tag == "spa"
             )
             .where(DataCollection.dcg_id == DataCollectionGroup.id)

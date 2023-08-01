@@ -306,7 +306,6 @@ class SPAModularContext(_SPAContext):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        logger.info(f"post transfer {transferred_file}")
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -373,15 +372,13 @@ class SPAModularContext(_SPAContext):
                                 "downscale"
                             ),
                         }
-                        logger.info(f"Request SPA preprocessing {preproc_data}")
-                        response = requests.post(
+                        requests.post(
                             preproc_url,
                             json={
                                 k: None if v == "None" else v
                                 for k, v in preproc_data.items()
                             },
                         )
-                        logger.info(response.reason)
 
         return
 
