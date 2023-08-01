@@ -35,6 +35,9 @@ class Session(SQLModel, table=True):  # type: ignore
     spa_parameters: List["SPARelionParameters"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    data_collection_groups: List["DataCollectionGroup"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -60,19 +63,35 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str
+    session: Optional[Session] = Relationship(back_populates="data_collection_groups")
+    data_collections: List["DataCollection"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
 
 
 class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    client: int = Field(primary_key=True)
     tag: str
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="data_collections"
+    )
+    processing_jobs: List["ProcessingJob"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     recipe: str = Field(primary_key=True)
     dc_id: int = Field(foreign_key="datacollection.id")
+    data_collection: Optional[DataCollection] = Relationship(
+        back_populates="processing_jobs"
+    )
+    auto_proc_programs: List["AutoProcProgram"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class PreprocessStash(SQLModel, table=True):  # type: ignore
@@ -95,6 +114,9 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     pj_id: int = Field(foreign_key="processingjob.id")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="auto_proc_programs"
+    )
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore

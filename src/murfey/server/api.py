@@ -293,19 +293,17 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         return
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(
-            DataCollectionGroup.client_id == client_id
-            and DataCollectionGroup.tag == "spa"
-        )
+        .where(DataCollectionGroup.client_id == client_id)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
     for f in stashed_files:
+        mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
-        if not f.mrc_out.parent.exists():
-            f.mrc_out.parent.mkdir(parents=True)
+        if not mrcp.parent.exists():
+            mrcp.parent.mkdir(parents=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {

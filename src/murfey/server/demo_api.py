@@ -361,18 +361,16 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         return
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(
-            DataCollectionGroup.session_id == session_id
-            and DataCollectionGroup.tag == "spa"
-        )
+        .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
     for f in stashed_files:
-        if not f.mrc_out.parent.exists():
-            f.mrc_out.parent.mkdir(parents=True)
+        p = Path(f.mrc_out)
+        if not p.parent.exists():
+            p.parent.mkdir(parents=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -590,7 +588,24 @@ def register_dc_group(
     )
     db.add(murfey_dcg)
     db.commit()
+
+    murfey_dc = DataCollection(
+        id=1,
+        tag=dcg_params.tag,
+        dcg_id=1,
+    )
+    db.add(murfey_dc)
+    db.commit()
+
+    murfey_pj = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
+    db.add(murfey_pj)
+    db.commit()
+
+    murfey_app = AutoProcProgram(id=1, pj_id=1)
+    db.add(murfey_app)
+    db.commit()
     db.close()
+
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
     ):
