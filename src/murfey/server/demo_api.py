@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import random
 from functools import lru_cache
 from pathlib import Path
 from typing import List
@@ -16,7 +17,12 @@ from sqlmodel import select
 
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
-from murfey.server import feedback_callback_async, get_hostname, get_microscope
+from murfey.server import (
+    _register_picked_particles_use_diameter,
+    feedback_callback_async,
+    get_hostname,
+    get_microscope,
+)
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.config import from_file
@@ -30,6 +36,7 @@ from murfey.util.db import (
     ProcessingJob,
     RsyncInstance,
     Session,
+    SPAFeedbackParameters,
     SPARelionParameters,
     TiltSeries,
 )
@@ -231,9 +238,20 @@ def register_spa_proc_params(
             small_boxsize=proc_params.small_boxsize,
             mask_diameter=proc_params.mask_diameter,
         )
+        feedback_params = SPAFeedbackParameters(
+            session_id=session_id,
+            estimate_particle_diameter=proc_params.particle_diameter is None,
+            hold_class2d=False,
+            hold_class3d=False,
+            class_selection_score=0,
+            star_combination_job=0,
+            initial_model="",
+            next_job=0,
+        )
     except Exception as e:
         log.warning(f"registration failed: {e}")
     db.add(params)
+    db.add(feedback_params)
     db.commit()
     db.close()
 
@@ -478,6 +496,26 @@ async def request_spa_preprocessing(
             },
         }
         log.info(f"Sending Zocalo message {zocalo_message}")
+        _register_picked_particles_use_diameter(
+            {
+                "session_id": session_id,
+                "extraction_parameters": {
+                    "micrographs_file": "MotionCorr/job002/micrographs.star",
+                    "coords_list_file": "AutoPick/job007/coords.star",
+                    "extract_file": "Extract/job008/particles.star",
+                    "ctf_values": {
+                        "CtfMaxResolution": 4,
+                        "CtfFigureOfMerit": 0.8,
+                        "DefocusU": 1,
+                        "DefocusV": 1,
+                        "DefocusAngle": 10,
+                        "CtfImage": "CtfFind/job006/ctf.mrc",
+                    },
+                },
+                "particle_sizes_list": [random.randint(20, 30) for i in range(400)],
+            },
+            _db=db,
+        )
 
     else:
         for_stash = PreprocessStash(

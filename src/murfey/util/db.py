@@ -35,7 +35,16 @@ class Session(SQLModel, table=True):  # type: ignore
     spa_parameters: List["SPARelionParameters"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    ctf_parameters: List["CtfParameters"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    particle_sizes: List["ParticleSizes"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -120,7 +129,9 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
-    micrographs_file: str = Field(primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="session.id")
+    micrographs_file: str
     coord_list_file: str
     extract_file: str
     ctf_image: str
@@ -129,11 +140,14 @@ class CtfParameters(SQLModel, table=True):  # type: ignore
     defocus_u: float
     defocus_v: float
     defocus_angle: float
+    session: Optional[Session] = Relationship(back_populates="ctf_parameters")
 
 
 class ParticleSizes(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="session.id")
     particle_size: float
+    session: Optional[Session] = Relationship(back_populates="particle_sizes")
 
 
 class SPARelionParameters(SQLModel, table=True):  # type: ignore
@@ -155,7 +169,7 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
 
 
 class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
     hold_class3d: bool = False
@@ -163,6 +177,7 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     star_combination_job: int
     initial_model: str
     next_job: int
+    session: Optional[Session] = Relationship(back_populates="spa_feedback_parameters")
 
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
