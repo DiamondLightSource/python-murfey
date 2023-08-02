@@ -444,7 +444,10 @@ class ProcessingForm(Screen):
 
     def _write_params(self, params: dict | None = None):
         if params:
-            analyser = list(self.app.analysers.values())[0]
+            try:
+                analyser = [a for a in self.app.analysers.values() if a._context][0]
+            except IndexError:
+                return
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
