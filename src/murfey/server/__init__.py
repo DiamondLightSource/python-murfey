@@ -336,7 +336,9 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                 )
 
 
-def _register_picked_particles_use_diameter(message: dict, _db=murfey_db):
+def _register_picked_particles_use_diameter(
+    message: dict, _db=murfey_db, demo: bool = False
+):
     """Received picked particles from the autopick service"""
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
@@ -425,6 +427,19 @@ def _register_picked_particles_use_diameter(message: dict, _db=murfey_db):
             }
             if _transport_object:
                 _transport_object.send("processing_recipe", zocalo_message)
+            if demo:
+                _register_incomplete_2d_batch(
+                    {
+                        "session_id": message["session_id"],
+                        "class2d_message": {
+                            "particles_file": "Select/job009/particles_split_1.star",
+                            "class2d_dir": "Class2D",
+                            "batch_size": 50000,
+                        },
+                    },
+                    _db=_db,
+                    demo=demo,
+                )
 
     else:
         # If not enough particles then save the new sizes
@@ -490,16 +505,16 @@ def _register_picked_particles_use_boxsize(message: dict):
         _transport_object.send("processing_recipe", zocalo_message)
 
 
-def _register_incomplete_2d_batch(message: dict):
+def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    relion_params = _db.exec(select(db.SPARelionParameters)).one()
+    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
     zocalo_message = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+            "class2d_dir": f"{class2d_message['class2d_dir']}/job{feedback_params.next_job:03}",
             "batch_is_complete": False,
             "batch_size": class2d_message["batch_size"],
             "particle_diameter": relion_params.particle_diameter,
@@ -510,24 +525,42 @@ def _register_incomplete_2d_batch(message: dict):
     }
     if _transport_object:
         _transport_object.send("processing_recipe", zocalo_message)
+    if demo:
+        logger.info("Incomplete 2D batch registered in demo mode")
+        if not _db.exec(
+            select(func.count(db.Class2DParameters.particles_file)).where(
+                db.Class2DParameters.particles_file == class2d_message["particles_file"]
+                and db.Class2DParameters.session_id == message["session_id"]
+            )
+        ).one():
+            _register_complete_2d_batch(message, _db=_db, demo=demo)
+            message["class2d_message"]["particles_file"] = (
+                message["class2d_message"]["particles_file"] + "_new"
+            )
+            _register_complete_2d_batch(message, _db=_db, demo=demo)
 
 
-def _register_complete_2d_batch(message: dict):
+def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received full batch from particle selection service"""
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    relion_params = _db.exec(select(db.SPARelionParameters)).one()
+    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
     if feedback_params.hold_class2d:
         # If waiting then save the message
         class2d_params = db.Class2DParameters(
+            session_id=message["session_id"],
             particles_file=class2d_message["particles_file"],
             class2d_dir=class2d_message["class2d_dir"],
             batch_size=class2d_message["batch_size"],
         )
-        murfey_db.add(class2d_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(class2d_params)
+        _db.commit()
+        _db.close()
+        if demo:
+            _register_class_selection(
+                {"class_selection_score": 0.5}, _db=_db, demo=demo
+            )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
         feedback_params.star_combination_job = feedback_params.next_job + 2
@@ -548,9 +581,9 @@ def _register_complete_2d_batch(message: dict):
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.hold_class2d = True
         feedback_params.next_job += 3
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
     else:
         # Send all other messages on to a container
         zocalo_message = {
@@ -559,7 +592,7 @@ def _register_complete_2d_batch(message: dict):
                 "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
                 "batch_is_complete": True,
                 "batch_size": class2d_message["batch_size"],
-                "particle_diameter": feedback_params.particle_diameter,
+                "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
@@ -570,19 +603,18 @@ def _register_complete_2d_batch(message: dict):
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.next_job += 2
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
 
 
-def _register_class_selection(message: dict):
+def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     """Received selection score from class selection service"""
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    class2d_db = murfey_db.exec(select(db.Class2DParameters)).all()
+    relion_params = _db.exec(select(db.SPARelionParameters)).one()
+    class2d_db = _db.exec(select(db.Class2DParameters)).all()
     # Add the class selection score to the database
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
     feedback_params.class_selection_score = message.get("class_selection_score")
-    assert isinstance(feedback_params.class_selection_score, dict)
     feedback_params.hold_class2d = False
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
@@ -603,9 +635,9 @@ def _register_class_selection(message: dict):
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.next_job += 2
-    murfey_db.add(feedback_params)
-    murfey_db.commit()
-    murfey_db.close()
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
 
 
 def _register_3d_batch(message: dict):
@@ -855,6 +887,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     symmetry=run_parameters["symmetry"],
                     downscale=run_parameters["downscale"],
                 )
+
                 murfey_feedback = db.SPAFeedbackParameters(
                     estimate_particle_diameter=run_parameters[
                         "estimate_particle_diameter"

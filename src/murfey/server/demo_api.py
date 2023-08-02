@@ -515,6 +515,7 @@ async def request_spa_preprocessing(
                 "particle_sizes_list": [random.randint(20, 30) for i in range(400)],
             },
             _db=db,
+            demo=True,
         )
 
     else:

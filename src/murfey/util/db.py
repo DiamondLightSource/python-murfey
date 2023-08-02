@@ -41,6 +41,12 @@ class Session(SQLModel, table=True):  # type: ignore
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    class2d_parameters: List["Class2DParameters"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3d_parameters: List["Class3DParameters"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -182,14 +188,18 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     class2d_dir: str
     batch_size: int
+    session: Optional[Session] = Relationship(back_populates="class2d_parameters")
 
 
 class Class3DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     class3d_dir: str
     batch_size: int
+    session: Optional[Session] = Relationship(back_populates="class3d_parameters")
 
 
 def setup(url: str):
