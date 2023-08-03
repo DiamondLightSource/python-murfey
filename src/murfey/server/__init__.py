@@ -366,18 +366,30 @@ def _register_picked_particles_use_diameter(
     ).one()
     if picking_db_len > 10000:
         # If there are enough particles to get a diameter
-        relion_params = _db.exec(select(db.SPARelionParameters)).one()
+        relion_params = _db.exec(
+            select(db.SPARelionParameters).where(
+                db.SPARelionParameters.session_id == message["session_id"]
+            )
+        ).one()
         relion_options = dict(relion_params)
         if not relion_params.particle_diameter:
             # If the diameter has not been calculated then find it
-            picking_db = _db.exec(select(db.ParticleSizes.particle_size)).all()
+            picking_db = _db.exec(
+                select(db.ParticleSizes.particle_size).where(
+                    db.ParticleSizes.session_id == message["session_id"]
+                )
+            ).all()
             particle_diameter = np.quantile(list(picking_db), 0.75)
             relion_params.particle_diameter = particle_diameter
             _db.add(relion_params)
             _db.commit()
             _db.close()
 
-            ctf_db = _db.exec(select(db.CtfParameters)).all()
+            ctf_db = _db.exec(
+                select(db.CtfParameters).where(
+                    db.CtfParameters.session_id == message["session_id"]
+                )
+            ).all()
             for saved_message in ctf_db:
                 # Send on all saved messages to extraction
                 zocalo_message = {
@@ -507,8 +519,16 @@ def _register_picked_particles_use_boxsize(message: dict):
 
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
-    relion_params = _db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.session_id == message["session_id"]
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.session_id == message["session_id"]
+        )
+    ).one()
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
     zocalo_message = {
@@ -544,8 +564,16 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
     """Received full batch from particle selection service"""
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
-    relion_params = _db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.session_id == message["session_id"]
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.session_id == message["session_id"]
+        )
+    ).one()
     if feedback_params.hold_class2d:
         # If waiting then save the message
         class2d_params = db.Class2DParameters(
@@ -559,7 +587,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
         _db.close()
         if demo:
             _register_class_selection(
-                {"class_selection_score": 0.5}, _db=_db, demo=demo
+                {"session_id": message["session_id"], "class_selection_score": 0.5},
+                _db=_db,
+                demo=demo,
             )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
@@ -610,12 +640,25 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
 
 def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     """Received selection score from class selection service"""
-    relion_params = _db.exec(select(db.SPARelionParameters)).one()
-    class2d_db = _db.exec(select(db.Class2DParameters)).all()
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.session_id == message["session_id"]
+        )
+    ).one()
+    class2d_db = _db.exec(
+        select(db.Class2DParameters).where(
+            db.Class2DParameters.session_id == message["session_id"]
+        )
+    ).all()
     # Add the class selection score to the database
-    feedback_params = _db.exec(select(db.SPAFeedbackParameters)).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.session_id == message["session_id"]
+        )
+    ).one()
     feedback_params.class_selection_score = message.get("class_selection_score")
     feedback_params.hold_class2d = False
+    next_job = feedback_params.next_job
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
         zocalo_message = {
@@ -634,29 +677,78 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
-        feedback_params.next_job += 2
+        if demo:
+            particles_file = saved_message.particles_file
+            logger.info("Complete 2D classification registered in demo mode")
+            _register_3d_batch(
+                {
+                    "session_id": message["session_id"],
+                    "class3d_message": {
+                        "particles_file": particles_file,
+                        "class3d_dir": "Class3D",
+                        "batch_size": 50000,
+                    },
+                },
+                _db=_db,
+                demo=demo,
+            )
+            logger.info("3D classification registered in demo mode")
+            _register_3d_batch(
+                {
+                    "session_id": message["session_id"],
+                    "class3d_message": {
+                        "particles_file": particles_file + "_new",
+                        "class3d_dir": "Class3D",
+                        "batch_size": 50000,
+                    },
+                },
+                _db=_db,
+                demo=demo,
+            )
+            _register_initial_model(
+                {
+                    "session_id": message["session_id"],
+                    "initial_model": "InitialModel/job015/model.mrc",
+                },
+                _db=_db,
+                demo=demo,
+            )
+        next_job += 2
+    feedback_params.next_job = next_job
+    _db.close()
     _db.add(feedback_params)
+    for sm in class2d_db:
+        _db.delete(sm)
     _db.commit()
     _db.close()
 
 
-def _register_3d_batch(message: dict):
+def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
     assert isinstance(class3d_message, dict)
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.session_id == message["session_id"]
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.session_id == message["session_id"]
+        )
+    ).one()
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
         class3d_params = db.Class3DParameters(
+            session_id=message["session_id"],
             particles_file=class3d_message["particles_file"],
-            class2d_dir=class3d_message["class3d_dir"],
+            class3d_dir=class3d_message["class3d_dir"],
             batch_size=class3d_message["batch_size"],
         )
-        murfey_db.add(class3d_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(class3d_params)
+        _db.commit()
+        _db.close()
     elif not feedback_params.initial_model:
         # For the first batch, start a container and set the database to wait
         feedback_params.star_combination_job = feedback_params.next_job + 2
@@ -676,9 +768,9 @@ def _register_3d_batch(message: dict):
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.hold_class3d = True
         feedback_params.next_job += 2
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
     else:
         # Send all other messages on to a container
         zocalo_message = {
@@ -696,19 +788,30 @@ def _register_3d_batch(message: dict):
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.next_job += 1
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
 
 
-def _register_initial_model(message: dict):
+def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     """Received initial model from 3d classification service"""
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    class3d_db = murfey_db.exec(select(db.Class3DParameters)).all()
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.session_id == message["session_id"]
+        )
+    ).one()
+    class3d_db = _db.exec(
+        select(db.Class3DParameters).where(
+            db.Class3DParameters.session_id == message["session_id"]
+        )
+    ).all()
     # Add the initial model file to the database
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
-    feedback_params.class_selection_score = message.get("initial_model")
-    assert isinstance(feedback_params.class_selection_score, dict)
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.session_id == message["session_id"]
+        )
+    ).one()
+    feedback_params.initial_model = message.get("initial_model")
     feedback_params.hold_class3d = False
     for saved_message in class3d_db:
         # Send all held Class3D messages with the initial model added
@@ -727,9 +830,10 @@ def _register_initial_model(message: dict):
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
         feedback_params.next_job += 1
-        murfey_db.add(feedback_params)
-        murfey_db.commit()
-        murfey_db.close()
+        _db.delete(saved_message)
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
 
 
 def feedback_callback(header: dict, message: dict) -> None:
