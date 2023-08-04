@@ -161,17 +161,13 @@ class RSyncer(Observer):
             try:
                 num_files = 0
                 while True:
-                    next_file = self.queue.get(block=True, timeout=0.1)
-                    if (
-                        next_file
-                        and not next_file.name.startswith(".")
-                        and num_files < 50
-                    ):
-                        files_to_transfer.append(next_file)
-                        num_files += 1
-                    else:
+                    if num_files > 100:
                         self.queue.task_done()
                         break
+                    next_file = self.queue.get(block=True, timeout=0.1)
+                    if next_file and not next_file.name.startswith("."):
+                        files_to_transfer.append(next_file)
+                        num_files += 1
             except queue.Empty:
                 pass
 
