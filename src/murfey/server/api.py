@@ -26,6 +26,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FractionationParameters,
     GainReference,
     ProcessFile,
     ProcessingJobParameters,
@@ -270,6 +271,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
             if proc_file.gain_ref
             else proc_file.gain_ref,
+            "fm_int_file": proc_file.eer_fractionation_file,
         },
     }
     # log.info(f"Sending Zocalo message {zocalo_message}")
@@ -493,6 +495,26 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         }
     else:
         return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
+
+
+@router.post("/visits/{visit_name}/eer_fractionation_file")
+async def write_eer_fractionation_file(
+    visit_name: str, fractionation_params: FractionationParameters
+) -> dict:
+    file_path = (
+        Path(machine_config.rsync_basepath)
+        / (machine_config.rsync_module or "data")
+        / str(datetime.datetime.now().year)
+        / secure_filename(visit_name)
+        / secure_filename(fractionation_params.fractionation_file_name)
+    )
+    if file_path.is_file():
+        return {"eer_fractionation_file": str(file_path)}
+    with open(file_path, "w") as frac_file:
+        frac_file.write(
+            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+        )
+    return {"eer_fractionation_file": str(file_path)}
 
 
 @router.post("/visits/{visit_name}/clean_state")

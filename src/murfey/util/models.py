@@ -65,6 +65,7 @@ class ProcessFile(BaseModel):
     dose_per_frame: float
     mc_binning: int = 1
     gain_ref: Optional[str] = None
+    eer_fractionation_file: Optional[str] = None
 
 
 class TiltSeries(BaseModel):
@@ -184,3 +185,11 @@ class ConnectionFileParameters(BaseModel):
 class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
+
+
+class FractionationParameters(BaseModel):
+    num_frames: int
+    fractionation: int
+    dose_per_frame: float
+    fractionation_file_name: str = "eer_fractionation.txt"
+

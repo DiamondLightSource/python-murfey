@@ -58,8 +58,23 @@ class Analyser(Observer):
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
         self._stopping = False
         self._halt_thread = False
+        self._murfey_config = (
+            get_machine_config(str(environment.url.geturl()), demo=environment.demo)
+            if environment
+            else {}
+        )
 
     def _find_extension(self, file_path: Path):
+        if (
+            required_substrings := self._murfey_config.get(
+                "data_required_substrings", {}
+            )
+            .get(self._acquisition_software, {})
+            .get(file_path.suffix)
+        ):
+            for rs in required_substrings:
+                if rs not in file_path.name:
+                    return
         if (
             file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
             and not self._extension
@@ -265,9 +280,7 @@ class Analyser(Observer):
         file_name = (
             f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
         )
-        data_directories = get_machine_config(self._environment.url.geturl()).get(
-            "data_directories", {}
-        )
+        data_directories = self._murfey_config.get("data_directories", {})
         for dd in data_directories.keys():
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)

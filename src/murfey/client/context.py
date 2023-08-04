@@ -10,6 +10,7 @@ import requests
 import xmltodict
 from pydantic import BaseModel
 
+import murfey.util.eer
 from murfey.client.contexts.tomo import tomo_tilt_info
 from murfey.client.instance_environment import (
     MovieID,
@@ -98,7 +99,8 @@ class Context:
 class SPAContext(Context):
     user_params = [
         ProcessingParameter(
-            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+            "dose_per_frame",
+            "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
         ),
         ProcessingParameter(
             "estimate_particle_diameter",
@@ -458,6 +460,7 @@ class TomographyContext(Context):
         ),
         ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
         ProcessingParameter("gain_ref", "Gain Reference"),
+        ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -465,6 +468,7 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
@@ -484,7 +488,9 @@ class TomographyContext(Context):
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
     def _flush_data_collections(self, tag: str):
-        logger.info("Flushing data collection API calls")
+        logger.info(
+            f"Flushing {len(self._data_collection_stash)} data collection API calls"
+        )
         for dc_data in self._data_collection_stash:
             data = {**dc_data[2], **dc_data[1].data_collection_parameters}
             capture_post(dc_data[0], json=data)
@@ -572,6 +578,24 @@ class TomographyContext(Context):
             with global_env_lock:
                 tag = incomplete_process_file.tag
 
+                eer_fractionation_file = None
+                if environment.data_collection_parameters.get("num_eer_frames"):
+                    response = requests.post(
+                        f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                        json={
+                            "num_frames": environment.data_collection_parameters[
+                                "num_eer_frames"
+                            ],
+                            "fractionation": environment.data_collection_parameters[
+                                "eer_fractionation"
+                            ],
+                            "dose_per_frame": environment.data_collection_parameters[
+                                "dose_per_frame"
+                            ],
+                        },
+                    )
+                    eer_fractionation_file = response.json()["eer_fractionation_file"]
+
                 new_dict = {
                     "path": str(incomplete_process_file.dest),
                     "description": incomplete_process_file.description,
@@ -594,6 +618,7 @@ class TomographyContext(Context):
                         "motion_corr_binning", 1
                     ),
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                    "eer_fractionation_file": eer_fractionation_file,
                 }
                 return new_dict
         except KeyError:
@@ -785,6 +810,20 @@ class TomographyContext(Context):
                     self._tilt_series[tilt_series].append(file_path)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
+            eer_fractionation_file = None
+            if environment.data_collection_parameters.get("num_eer_frames"):
+                response = requests.post(
+                    f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                    json={
+                        "num_frames": environment.data_collection_parameters[
+                            "num_eer_frames"
+                        ],
+                        "fractionation": environment.data_collection_parameters[
+                            "eer_fractionation"
+                        ],
+                    },
+                )
+                eer_fractionation_file = response.json()["eer_fractionation_file"]
             preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
             preproc_data = {
                 "path": str(file_transferred_to),
@@ -812,6 +851,7 @@ class TomographyContext(Context):
                     "motion_corr_binning", 1
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                "eer_fractionation_file": eer_fractionation_file,
             }
             capture_post(preproc_url, json=preproc_data)
         elif environment:
@@ -1040,9 +1080,11 @@ class TomographyContext(Context):
                         )
                     else:
                         machine_config = {}
-                    required_strings = machine_config.get(
-                        "data_required_substrings", {}
-                    ).get("tomo")
+                    required_strings = (
+                        machine_config.get("data_required_substrings", {})
+                        .get("tomo", {})
+                        .get(transferred_file.suffix)
+                    )
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
@@ -1182,4 +1224,11 @@ class TomographyContext(Context):
         mdoc_metadata[
             "file_extension"
         ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+
+        data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
+        if data_file.split(".")[-1] == "eer":
+            mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
+                metadata_file.parent / data_file
+            )
+
         return mdoc_metadata
