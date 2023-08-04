@@ -129,20 +129,25 @@ class MurfeyTUI(App):
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:
-            self._environment.default_destinations[
-                source
-            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            destination = determine_default_destination(
-                self._visit,
-                source,
-                self._default_destinations[source],
-                self._environment,
-                self.analysers,
-                touch=True,
-                extra_directory=extra_directory,
-                include_mid_path=include_mid_path,
-                use_suggested_path=use_suggested_path,
-            )
+            for k, v in destination_overrides.items():
+                if Path(v).name in source.parts:
+                    destination = str(k / extra_directory)
+                    break
+            else:
+                self._environment.default_destinations[
+                    source
+                ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                destination = determine_default_destination(
+                    self._visit,
+                    source,
+                    self._default_destinations[source],
+                    self._environment,
+                    self.analysers,
+                    touch=True,
+                    extra_directory=extra_directory,
+                    include_mid_path=include_mid_path,
+                    use_suggested_path=use_suggested_path,
+                )
         self._environment.sources.append(source)
         self._start_rsyncer(
             source,
