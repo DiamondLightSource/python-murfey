@@ -6,7 +6,7 @@ import os
 from functools import partial, singledispatch
 from pathlib import Path
 from threading import Thread
-from typing import Any, List, NamedTuple
+from typing import Any, Dict, List, NamedTuple
 
 import numpy as np
 import uvicorn
@@ -378,6 +378,26 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, session_id: int
     _db.close()
 
 
+def _2d_class_murfey_ids(particles_file: str, session_id: int, _db) -> Dict[str, int]:
+    classes = _db.exec(
+        select(db.Class2D).where(
+            db.Class2D.particles_file == particles_file
+            and db.Class2D.session_id == session_id
+        )
+    ).all()
+    return {str(cl.class_number): cl.murfey_id for cl in classes}
+
+
+def _3d_class_murfey_ids(particles_file: str, session_id: int, _db) -> Dict[str, int]:
+    classes = _db.exec(
+        select(db.Class3D).where(
+            db.Class3D.particles_file == particles_file
+            and db.Class3D.session_id == session_id
+        )
+    ).all()
+    return {str(cl.class_number): cl.murfey_id for cl in classes}
+
+
 def _app_id(recipe: str, session_id: int, _db) -> int:
     collected_ids = _db.exec(
         select(
@@ -591,17 +611,56 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             db.SPAFeedbackParameters.session_id == message["session_id"]
         )
     ).one()
+    relion_options = dict(relion_params)
+    other_options = dict(feedback_params)
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
+    if not _db.exec(
+        select(func.count(db.Class2DParameters.particles_file)).where(
+            db.Class2DParameters.particles_file == class2d_message["particles_file"]
+            and db.Class2DParameters.session_id == message["session_id"]
+        )
+    ).one():
+        class2d_params = db.Class2DParameters(
+            session_id=message["session_id"],
+            murfey_id=_murfey_id(
+                _app_id("em-spa-class2d", message["session_id"], _db), _db
+            )[0],
+            particles_file=class2d_message["particles_file"],
+            class2d_dir=class2d_message["class2d_dir"],
+            batch_size=class2d_message["batch_size"],
+            complete=False,
+        )
+        _db.add(class2d_params)
+        _db.commit()
+        _db.close()
+        murfey_ids = _murfey_id(
+            _app_id("em-spa-class2d", message["session_id"], _db), _db, number=50
+        )
+        _murfey_class2ds(
+            murfey_ids, class2d_message["particles_file"], message["session_id"], _db
+        )
     zocalo_message = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}/job{feedback_params.next_job:03}",
+            "class2d_dir": f"{class2d_message['class2d_dir']}/job{other_options['next_job']:03}",
             "batch_is_complete": False,
             "batch_size": class2d_message["batch_size"],
-            "particle_diameter": relion_params.particle_diameter,
+            "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
-            "relion_options": dict(relion_params),
+            "relion_options": relion_options,
+            "class_uuids": _2d_class_murfey_ids(
+                class2d_message["particles_file"], message["session_id"], _db
+            ),
+            "class2d_grp_id": _db.exec(
+                select(db.Class2DParameters).where(
+                    db.Class2DParameters.particles_file
+                    == class2d_message["particles_file"]
+                    and db.Class2DParameters.session_id == message["session_id"]
+                )
+            )
+            .one()
+            .murfey_id,
         },
         "recipes": ["relion-class2d"],
     }
@@ -613,6 +672,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             select(func.count(db.Class2DParameters.particles_file)).where(
                 db.Class2DParameters.particles_file == class2d_message["particles_file"]
                 and db.Class2DParameters.session_id == message["session_id"]
+                and db.Class2DParameters.complete
             )
         ).one():
             _register_complete_2d_batch(message, _db=_db, demo=demo)
@@ -675,6 +735,18 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "mask_diameter": relion_params.mask_diameter,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "relion_options": dict(relion_params),
+                "class_uuids": _2d_class_murfey_ids(
+                    class2d_message["particles_file"], message["session_id"], _db
+                ),
+                "class2d_grp_id": _db.exec(
+                    select(db.Class2DParameters).where(
+                        db.Class2DParameters.particles_file
+                        == class2d_message["particles_file"]
+                        and db.Class2DParameters.session_id == message["session_id"]
+                    )
+                )
+                .one()
+                .murfey_id,
             },
             "recipes": ["relion-class2d"],
         }
@@ -698,6 +770,18 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "relion_options": dict(relion_params),
+                "class_uuids": _2d_class_murfey_ids(
+                    class2d_message["particles_file"], message["session_id"], _db
+                ),
+                "class2d_grp_id": _db.exec(
+                    select(db.Class2DParameters).where(
+                        db.Class2DParameters.particles_file
+                        == class2d_message["particles_file"]
+                        and db.Class2DParameters.session_id == message["session_id"]
+                    )
+                )
+                .one()
+                .murfey_id,
             },
             "recipes": ["relion-class2d"],
         }
@@ -841,6 +925,18 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "mask_diameter": relion_params.mask_diameter,
                 "do_initial_model": True,
                 "relion_options": dict(relion_params),
+                "class_uuids": _3d_class_murfey_ids(
+                    class3d_message["particles_file"], message["session_id"], _db
+                ),
+                "class2d_grp_id": _db.exec(
+                    select(db.Class3DParameters).where(
+                        db.Class3DParameters.particles_file
+                        == class3d_message["particles_file"]
+                        and db.Class3DParameters.session_id == message["session_id"]
+                    )
+                )
+                .one()
+                .murfey_id,
             },
             "recipes": ["relion-class3d"],
         }
@@ -862,6 +958,18 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "mask_diameter": relion_params.mask_diameter,
                 "initial_model_file": feedback_params.initial_model,
                 "relion_options": dict(relion_params),
+                "class_uuids": _3d_class_murfey_ids(
+                    class3d_message["particles_file"], message["session_id"], _db
+                ),
+                "class2d_grp_id": _db.exec(
+                    select(db.Class3DParameters).where(
+                        db.Class3DParameters.particles_file
+                        == class3d_message["particles_file"]
+                        and db.Class3DParameters.session_id == message["session_id"]
+                    )
+                )
+                .one()
+                .murfey_id,
             },
             "recipes": ["relion-class3d"],
         }

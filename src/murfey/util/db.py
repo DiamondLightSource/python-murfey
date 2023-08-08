@@ -221,6 +221,7 @@ class Class2DParameters(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_dir: str
     batch_size: int
+    complete: bool = True
     session: Optional[Session] = Relationship(back_populates="class2d_parameters")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class2d_parameters"
