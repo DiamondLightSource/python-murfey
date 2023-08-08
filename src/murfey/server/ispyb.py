@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import ispyb
 
@@ -18,6 +18,7 @@ from ispyb.sqlalchemy import (
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
+    ZcZocaloBuffer,
     url,
 )
 
@@ -157,6 +158,16 @@ class TransportManager:
                 exc_info=True,
             )
             return {"success": False, "return_value": None}
+
+    def do_buffer_lookup(self, app_id: int, uuid: int) -> Optional[int]:
+        with Session() as db:
+            buffer_objects = (
+                db.query(ZcZocaloBuffer)
+                .filter_by(AutoProcProgramID=app_id, UUID=uuid)
+                .all()
+            )
+            reference = buffer_objects[0].Reference if buffer_objects else None
+        return reference
 
 
 def _get_session() -> sqlalchemy.orm.Session:

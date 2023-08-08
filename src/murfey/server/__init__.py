@@ -454,6 +454,19 @@ def _register_picked_particles_use_diameter(
             )
         ).one()
         relion_options = dict(relion_params)
+        feedback_params = _db.exec(
+            select(db.SPAFeedbackParameters).where(
+                db.SPAFeedbackParameters.session_id == message["session_id"]
+            )
+        ).one()
+
+        if feedback_params.picker_murfey_id is None:
+            murfey_id = _murfey_id(message["autoproc_program_id"], _db)[0]
+            feedback_params.pciker_murfey_id = murfey_id
+            _db.add(feedback_params)
+            _db.commit()
+            _db.close()
+
         if not relion_params.particle_diameter:
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
@@ -649,6 +662,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
             "relion_options": relion_options,
+            "picker_uuid": other_options["picker_murfey_id"],
             "class_uuids": _2d_class_murfey_ids(
                 class2d_message["particles_file"], message["session_id"], _db
             ),
@@ -735,6 +749,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "mask_diameter": relion_params.mask_diameter,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "relion_options": dict(relion_params),
+                "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
                     class2d_message["particles_file"], message["session_id"], _db
                 ),
@@ -770,6 +785,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "relion_options": dict(relion_params),
+                "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
                     class2d_message["particles_file"], message["session_id"], _db
                 ),
@@ -925,6 +941,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "mask_diameter": relion_params.mask_diameter,
                 "do_initial_model": True,
                 "relion_options": dict(relion_params),
+                "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_message["particles_file"], message["session_id"], _db
                 ),
@@ -958,6 +975,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "mask_diameter": relion_params.mask_diameter,
                 "initial_model_file": feedback_params.initial_model,
                 "relion_options": dict(relion_params),
+                "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_message["particles_file"], message["session_id"], _db
                 ),

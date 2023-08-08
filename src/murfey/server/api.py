@@ -18,6 +18,7 @@ import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.websocket as ws
 from murfey.server import (
+    _murfey_id,
     _transport_object,
     get_hostname,
     get_machine_config,
@@ -37,6 +38,7 @@ from murfey.util.db import (
     ProcessingJob,
     RsyncInstance,
     Session,
+    SPAFeedbackParameters,
     SPARelionParameters,
     TiltSeries,
     TomographyProcessingParameters,
@@ -461,11 +463,14 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
-        proc_params = db.exec(
-            select(SPARelionParameters, ClientEnvironment)
+        params = db.exec(
+            select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
             .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
+            .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
             .where(ClientEnvironment.client_id == client_id)
-        ).one()[0]
+        ).one()
+        proc_params: dict | None = dict(params[0])
+        feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     if proc_params:
@@ -490,26 +495,34 @@ async def request_spa_preprocessing(
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
 
+        detached_ids = [c.id for c in collected_ids]
+
+        murfey_ids = _murfey_id(detached_ids[3], db, number=2)
+
+        feedback_params.picker_murfey_id = murfey_ids[1]
+        db.add(feedback_params)
+        db.commit()
+
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
-                "dcid": collected_ids[1].id,
-                "autoproc_program_id": collected_ids[3].id,
+                "dcid": detached_ids[1],
+                "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": proc_params.angpix,
+                "pix_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": proc_file.mc_uuid,
-                "ft_bin": proc_params.motion_corr_binning,
-                "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
-                if proc_params.gain_ref
-                else proc_params.gain_ref,
-                "downscale": proc_params.downscale,
+                "ft_bin": proc_params["motion_corr_binning"],
+                "fm_dose": proc_params["dose_per_frame"],
+                "gain_ref": str(machine_config.rsync_basepath / proc_params["gain_ref"])
+                if proc_params["gain_ref"]
+                else proc_params["gain_ref"],
+                "downscale": proc_params["downscale"],
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")

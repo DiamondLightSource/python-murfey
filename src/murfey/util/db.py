@@ -161,6 +161,9 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     class3d_parameters: Optional["Class3DParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
+    spa_feedback_parameters: Optional["SPAFeedbackParameters"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
@@ -212,7 +215,12 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     star_combination_job: int
     initial_model: str
     next_job: int
+    picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
+    picker_ispyb_id: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="spa_feedback_parameters")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(
+        back_populates="spa_feedback_parameters"
+    )
 
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
