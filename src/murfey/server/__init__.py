@@ -336,6 +336,68 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                 )
 
 
+def _murfey_id(app_id: int, _db, number: int = 1) -> List[int]:
+    murfey_ledger = [db.MurfeyLedger(app_id=app_id) for _ in range(number)]
+    for ml in murfey_ledger:
+        _db.add(ml)
+    _db.commit()
+    res = [m.id for m in murfey_ledger if m.id is not None]
+    _db.close()
+    return res
+
+
+def _murfey_class2ds(murfey_ids: List[int], particles_file: str, session_id: int, _db):
+    class2ds = [
+        db.Class2D(
+            class_number=i,
+            particles_file=particles_file,
+            session_id=session_id,
+            murfey_id=mid,
+        )
+        for i, mid in enumerate(murfey_ids)
+    ]
+    for c in class2ds:
+        _db.add(c)
+    _db.commit()
+    _db.close()
+
+
+def _murfey_class3ds(murfey_ids: List[int], particles_file: str, session_id: int, _db):
+    class3ds = [
+        db.Class3D(
+            class_number=i,
+            particles_file=particles_file,
+            session_id=session_id,
+            murfey_id=mid,
+        )
+        for i, mid in enumerate(murfey_ids)
+    ]
+    for c in class3ds:
+        _db.add(c)
+    _db.commit()
+    _db.close()
+
+
+def _app_id(recipe: str, session_id: int, _db) -> int:
+    collected_ids = _db.exec(
+        select(
+            db.DataCollectionGroup,
+            db.DataCollection,
+            db.ProcessingJob,
+            db.AutoProcProgram,
+        )
+        .where(
+            db.DataCollectionGroup.session_id == session_id
+            and db.DataCollectionGroup.tag == "spa"
+        )
+        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+        .where(db.ProcessingJob.recipe == recipe)
+    ).one()
+    return collected_ids[-1].id
+
+
 def _register_picked_particles_use_diameter(
     message: dict, _db=murfey_db, demo: bool = False
 ):
@@ -578,6 +640,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
         # If waiting then save the message
         class2d_params = db.Class2DParameters(
             session_id=message["session_id"],
+            murfey_id=_murfey_id(
+                _app_id("em-spa-class2d", message["session_id"], _db), _db
+            )[0],
             particles_file=class2d_message["particles_file"],
             class2d_dir=class2d_message["class2d_dir"],
             batch_size=class2d_message["batch_size"],
@@ -585,6 +650,12 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
         _db.add(class2d_params)
         _db.commit()
         _db.close()
+        murfey_ids = _murfey_id(
+            _app_id("em-spa-class2d", message["session_id"], _db), _db, number=50
+        )
+        _murfey_class2ds(
+            murfey_ids, class2d_message["particles_file"], message["session_id"], _db
+        )
         if demo:
             _register_class_selection(
                 {"session_id": message["session_id"], "class_selection_score": 0.5},
@@ -742,6 +813,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         # If waiting then save the message
         class3d_params = db.Class3DParameters(
             session_id=message["session_id"],
+            murfey_id=_murfey_id(
+                _app_id("em-spa-class3d", message["session_id"], _db), _db
+            )[0],
             particles_file=class3d_message["particles_file"],
             class3d_dir=class3d_message["class3d_dir"],
             batch_size=class3d_message["batch_size"],
@@ -749,6 +823,12 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         _db.add(class3d_params)
         _db.commit()
         _db.close()
+        murfey_ids = _murfey_id(
+            _app_id("em-spa-class3d", message["session_id"], _db), _db, number=4
+        )
+        _murfey_class3ds(
+            murfey_ids, class3d_message["particles_file"], message["session_id"], _db
+        )
     elif not feedback_params.initial_model:
         # For the first batch, start a container and set the database to wait
         feedback_params.star_combination_job = feedback_params.next_job + 2

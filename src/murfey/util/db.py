@@ -47,6 +47,12 @@ class Session(SQLModel, table=True):  # type: ignore
     class3d_parameters: List["Class3DParameters"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    class2ds: List["Class2D"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3ds: List["Class3D"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -132,6 +138,29 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )
+    murfey_ids: List["MurfeyLedger"] = Relationship(
+        back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
+class MurfeyLedger(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    app_id: int = Field(foreign_key="autoprocprogram.id")
+    auto_proc_program: Optional[AutoProcProgram] = Relationship(
+        back_populates="murfey_ids"
+    )
+    class2ds: Optional["Class2D"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3ds: Optional["Class3D"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class2d_parameters: Optional["Class2DParameters"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3d_parameters: Optional["Class3DParameters"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
@@ -189,17 +218,61 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
 class Class2DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
     session_id: int = Field(primary_key=True, foreign_key="session.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_dir: str
     batch_size: int
     session: Optional[Session] = Relationship(back_populates="class2d_parameters")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(
+        back_populates="class2d_parameters"
+    )
+    class2ds: List["Class2D"] = Relationship(
+        back_populates="class2d_parameters",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class Class2D(SQLModel, table=True):  # type: ignore
+    class_number: int = Field(primary_key=True)
+    particles_file: str = Field(
+        primary_key=True, foreign_key="class2dparameters.particles_file"
+    )
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
+    class2d_parameters: Optional[Class2DParameters] = Relationship(
+        back_populates="class2ds"
+    )
+    session: Optional[Session] = Relationship(back_populates="class2ds")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class2ds")
 
 
 class Class3DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
     session_id: int = Field(primary_key=True, foreign_key="session.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     batch_size: int
     session: Optional[Session] = Relationship(back_populates="class3d_parameters")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(
+        back_populates="class3d_parameters"
+    )
+    class3ds: List["Class3D"] = Relationship(
+        back_populates="class3d_parameters",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class Class3D(SQLModel, table=True):  # type: ignore
+    class_number: int = Field(primary_key=True)
+    particles_file: str = Field(
+        primary_key=True, foreign_key="class3dparameters.particles_file"
+    )
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
+    class3d_parameters: Optional[Class3DParameters] = Relationship(
+        back_populates="class3ds"
+    )
+    session: Optional[Session] = Relationship(back_populates="class3ds")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class3ds")
 
 
 def setup(url: str):
