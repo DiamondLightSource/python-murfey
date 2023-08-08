@@ -59,6 +59,9 @@ class Session(SQLModel, table=True):  # type: ignore
     particle_sizes: List["ParticleSizes"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    selection_stash: List["SelectionStash"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -124,6 +127,13 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )
+
+
+class SelectionStash(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    class_selection_score: float
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    session: Optional[Session] = Relationship(back_populates="selection_stash")
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore

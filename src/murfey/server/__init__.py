@@ -460,14 +460,38 @@ def _register_picked_particles_use_diameter(
             )
         ).one()
 
-        if feedback_params.picker_murfey_id is None:
-            murfey_id = _murfey_id(message["autoproc_program_id"], _db)[0]
-            feedback_params.pciker_murfey_id = murfey_id
+        particle_diameter = relion_params.particle_diameter
+
+        if feedback_params.picker_ispyb_id is None:
+            if demo or not _transport_object:
+                feedback_params.picker_ispyb_id = 1000
+            else:
+                assert feedback_params.picker_murfey_id is not None
+                feedback_params.pciker_ispyb_id = _transport_object.do_buffer_lookup(
+                    message["auto_proc_program_id"], feedback_params.picker_murfey_id
+                )
             _db.add(feedback_params)
             _db.commit()
             _db.close()
+            selection_stash = _db.exec(
+                select(db.SelectionStash).where(
+                    db.SelectionStash.session_id == message["session_id"]
+                )
+            ).all()
+            for s in selection_stash:
+                _register_class_selection(
+                    {
+                        "session_id": s.session_id,
+                        "class_selection_score": s.class_selection_score,
+                    },
+                    _db=_db,
+                    demo=demo,
+                )
+                _db.delete(s)
+                _db.commit()
+                _db.close()
 
-        if not relion_params.particle_diameter:
+        if not particle_diameter:
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
                 select(db.ParticleSizes.particle_size).where(
@@ -827,6 +851,17 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
             db.SPAFeedbackParameters.session_id == message["session_id"]
         )
     ).one()
+
+    if feedback_params.picker_ispyb_id is None:
+        selection_stash = db.SelectionStash(
+            session_id=message["session_id"],
+            class_selection_score=message["class_selection_score"],
+        )
+        _db.add(selection_stash)
+        _db.commit()
+        _db.close()
+        return
+
     feedback_params.class_selection_score = message.get("class_selection_score")
     feedback_params.hold_class2d = False
     next_job = feedback_params.next_job
