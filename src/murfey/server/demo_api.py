@@ -373,9 +373,14 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     ).all()
     if not stashed_files:
         return
-    proc_params = db.exec(
-        select(SPARelionParameters).where(SPARelionParameters.session_id == session_id)
+    params = db.exec(
+        select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
+        .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
+        .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
+        .where(ClientEnvironment.client_id == client_id)
     ).one()
+    proc_params = dict(params[0])
+    feedback_params = params[1]
     if not proc_params:
         log.warning(
             f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
@@ -389,28 +394,41 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
-    for f in stashed_files:
+
+    detached_ids = [c.id for c in collected_ids]
+
+    murfey_ids = _murfey_id(
+        detached_ids[3], db, number=2 * len(stashed_files), close=False
+    )
+    feedback_params.picker_murfey_id = murfey_ids[1]
+    db.add(feedback_params)
+    for i, f in enumerate(stashed_files):
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
+        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        db.add(movie)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config["feedback_queue"],
-                "dcid": collected_ids[1].id,
-                "autoproc_program_id": collected_ids[3].id,
+                "dcid": detached_ids[1],
+                "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params.angpix,
+                "pix_size": proc_params["angpix"],
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
-                "mc_uuid": f.mc_uuid,
-                "ft_bin": proc_params.motion_corr_binning,
-                "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": str(machine_config["rsync_basepath"] / proc_params.gain_ref)
-                if proc_params.gain_ref
-                else proc_params.gain_ref,
-                "downscale": proc_params.downscale,
+                "mc_uuid": murfey_ids[2 * i],
+                "ft_bin": proc_params["motion_corr_binning"],
+                "fm_dose": proc_params["dose_per_frame"],
+                "gain_ref": str(
+                    machine_config["rsync_basepath"] / proc_params["gain_ref"]
+                )
+                if proc_params["gain_ref"]
+                else proc_params["gain_ref"],
+                "downscale": proc_params["downscale"],
+                "picker_uuid": murfey_ids[2 * i + 1],
             },
         }
         log.info(f"Launching SPA preprocessing with Zoaclo message: {zocalo_message}")

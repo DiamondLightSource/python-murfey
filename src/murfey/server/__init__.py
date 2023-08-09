@@ -336,13 +336,14 @@ async def feedback_callback_async(header: dict, message: dict) -> None:
                 )
 
 
-def _murfey_id(app_id: int, _db, number: int = 1) -> List[int]:
+def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[int]:
     murfey_ledger = [db.MurfeyLedger(app_id=app_id) for _ in range(number)]
     for ml in murfey_ledger:
         _db.add(ml)
     _db.commit()
     res = [m.id for m in murfey_ledger if m.id is not None]
-    _db.close()
+    if close:
+        _db.close()
     return res
 
 

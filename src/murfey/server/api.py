@@ -288,9 +288,14 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     ).all()
     if not stashed_files:
         return
-    proc_params = db.exec(
-        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
+    params = db.exec(
+        select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
+        .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
+        .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
+        .where(ClientEnvironment.client_id == client_id)
     ).one()
+    proc_params = params[0]
+    feedback_params = params[1]
     if not proc_params:
         log.warning(
             f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
@@ -304,11 +309,20 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
-    for f in stashed_files:
+
+    murfey_ids = _murfey_id(
+        collected_ids[3].id, db, number=2 * len(stashed_files), close=False
+    )
+    feedback_params.picker_murfey_id = murfey_ids[1]
+    db.add(feedback_params)
+
+    for i, f in enumerate(stashed_files):
         mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
         if not mrcp.parent.exists():
             mrcp.parent.mkdir(parents=True)
+        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        db.add(movie)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -320,13 +334,14 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
                 "pix_size": proc_params.angpix,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
-                "mc_uuid": f.mc_uuid,
+                "mc_uuid": murfey_ids[2 * i],
                 "ft_bin": proc_params.motion_corr_binning,
                 "fm_dose": proc_params.dose_per_frame,
                 "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
                 if proc_params.gain_ref
                 else proc_params.gain_ref,
                 "downscale": proc_params.downscale,
+                "picker_uuid": murfey_ids[2 * i + 1],
             },
         }
         if _transport_object:
