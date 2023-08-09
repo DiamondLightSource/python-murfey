@@ -561,7 +561,6 @@ async def request_spa_preprocessing(
             file_path=str(proc_file.path),
             client_id=client_id,
             image_number=proc_file.image_number,
-            mc_uuid=proc_file.mc_uuid,
             mrc_out=str(mrc_out),
         )
         db.add(for_stash)

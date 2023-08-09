@@ -356,9 +356,6 @@ class SPAModularContext(_SPAContext):
                                 "pixel_size_on_image"
                             ),
                             "autoproc_program_id": None,
-                            "mc_uuid": environment.movies[
-                                file_transferred_to
-                            ].motion_correction_uuid,
                             "dose_per_frame": environment.data_collection_parameters.get(
                                 "dose_per_frame"
                             ),

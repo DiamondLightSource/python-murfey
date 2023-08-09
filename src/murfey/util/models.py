@@ -87,7 +87,6 @@ class SPAProcessFile(BaseModel):
     processing_job: Optional[int]
     data_collection_id: Optional[int]
     image_number: int
-    mc_uuid: int
     autoproc_program_id: Optional[int]
     pixel_size: Optional[float]
     dose_per_frame: Optional[float]
