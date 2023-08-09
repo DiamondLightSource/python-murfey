@@ -34,6 +34,7 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    Movie,
     PreprocessStash,
     ProcessingJob,
     RsyncInstance,
@@ -501,7 +502,10 @@ async def request_spa_preprocessing(
 
         feedback_params.picker_murfey_id = murfey_ids[1]
         db.add(feedback_params)
+        movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
+        db.add(movie)
         db.commit()
+        db.close()
 
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True)
@@ -516,7 +520,7 @@ async def request_spa_preprocessing(
                 "pix_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
-                "mc_uuid": proc_file.mc_uuid,
+                "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": str(machine_config.rsync_basepath / proc_params["gain_ref"])

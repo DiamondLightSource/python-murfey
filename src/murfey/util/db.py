@@ -174,6 +174,15 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     spa_feedback_parameters: Optional["SPAFeedbackParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
+    movies: Optional["Movie"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
+class Movie(SQLModel, table=True):  # type: ignore
+    murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    path: str
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
