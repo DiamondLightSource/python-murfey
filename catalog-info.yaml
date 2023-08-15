@@ -1,0 +1,64 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: murfey
+  title: Murfey
+  description: A client-server architecture hauling Cryo-EM data around systems and triggering processing
+spec:
+  owner: user:kif41228
+
+---
+
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: murfey-server
+  title: Murfey Server
+  description: A server allowing for the monitoring of Cryo-EM data transfer from microscope systems and triggering relevant processing
+  annotations:
+    github.com/project-slug: DiamondLightSouce/python-murfey
+  tags:
+    - python
+spec:
+  type: service
+  lifecycle: production
+  owner: user:kif41228
+  providesApis:
+    - murfey-rest
+  dependsOn:
+    - component:ispyb-api
+    - component:zocalo
+
+---
+
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: murfey-client
+  title: Murfey Client
+  description: A client for automated data transfer and Cryo-EM metadata extraction from EM systems
+  annotations:
+    github.com/project-slug: DiamondLightSouce/python-murfey
+  tags:
+    - python
+spec:
+  type: user-interface
+  lifecycle: production
+  owner: user:kif41228
+  consumesApis:
+    - murfey-rest
+
+---
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: murfey-rest
+  title: Murfey Rest API
+  description: REST API registering data collections and requesting processing
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:kif41228
+  definition:
+    $text: https://github.com/DiamondLightSource/python-murfey/blob/main/api-spec.yaml

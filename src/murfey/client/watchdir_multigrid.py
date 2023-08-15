@@ -16,9 +16,11 @@ class MultigridDirWatcher(murfey.util.Observer):
     def __init__(
         self,
         path: str | os.PathLike,
+        skip_existing_processing: bool = False,
     ):
         super().__init__()
         self._basepath = Path(path)
+        self._skip_existing_processing = skip_existing_processing
         self._seen_dirs: List[Path] = []
         self._stopping = False
         self.thread = threading.Thread(
@@ -42,6 +44,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         log.debug("MultigridDirWatcher thread stop completed")
 
     def _process(self):
+        first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
                 if d.name == "atlas":
@@ -51,18 +54,40 @@ class MultigridDirWatcher(murfey.util.Observer):
                 else:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(
-                            d, extra_directory="metadata", include_mid_path=False
+                            d,
+                            extra_directory=f"metadata_{d.name}",
+                            include_mid_path=False,
                         )
                         self._seen_dirs.append(d)
-                    if (d.parent.parent / d.name / "Images-Disc1").is_dir():
-                        d02 = d.parent.parent / d.name / "Images-Disc1"
-                    else:
+                    processing_started = bool(
+                        set(self._seen_dirs).intersection(
+                            set((d.parent.parent / d.name).glob("Images-Disc*"))
+                        )
+                    )
+                    for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
+                        if d02 not in self._seen_dirs:
+                            # if skip exisiting processing is set then do not process for any
+                            # data directories found on the first loop
+                            # this allows you to avoid triggering processing again if murfey is restarted
+                            self.notify(
+                                d02,
+                                include_mid_path=False,
+                                remove_files=True,
+                                analyse=not processing_started
+                                and not (first_loop and self._skip_existing_processing),
+                            )
+                            self._seen_dirs.append(d02)
+                            processing_started = True
+                    if not processing_started:
                         d02 = d.parent.parent / d.name
-                    if (
-                        d02.is_dir()
-                        and d02 not in self._seen_dirs
-                        and list((d.parent.parent / d.name).iterdir())
-                    ):
-                        self.notify(d02, include_mid_path=False)
-                        self._seen_dirs.append(d02)
+                        if (
+                            d02.is_dir()
+                            and d02 not in self._seen_dirs
+                            and list((d.parent.parent / d.name).iterdir())
+                        ):
+                            self.notify(d02, include_mid_path=False)
+                            self._seen_dirs.append(d02)
+
+            if first_loop:
+                first_loop = False
             time.sleep(15)

@@ -77,6 +77,7 @@ class ProcessFile(BaseModel):
     mc_binning: int = 1
     gain_ref: Optional[str] = None
     extract_downscale: int = 1
+    eer_fractionation_file: Optional[str] = None
 
 
 class SPAProcessFile(BaseModel):
@@ -188,7 +189,7 @@ class ProcessingParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: float
+        dose_per_frame: Optional[float]
         gain_ref: Optional[str]
         use_cryolo: bool
         symmetry: str
@@ -222,3 +223,11 @@ class GainReference(BaseModel):
 class SessionInfo(BaseModel):
     session_id: Optional[int]
     session_name: str = ""
+    rescale: bool = True
+
+
+class FractionationParameters(BaseModel):
+    num_frames: int
+    fractionation: int
+    dose_per_frame: float
+    fractionation_file_name: str = "eer_fractionation.txt"

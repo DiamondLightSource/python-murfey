@@ -32,6 +32,7 @@ from textual.widgets import (
     TextLog,
     Tree,
 )
+from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
 from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
@@ -41,7 +42,7 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.tui.forms import FormDependency
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
@@ -59,7 +60,7 @@ def determine_default_destination(
     extra_directory: str = "",
     include_mid_path: bool = True,
     use_suggested_path: bool = True,
-):
+) -> str:
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
     if environment.processing_only_mode and environment.source:
@@ -87,7 +88,7 @@ def determine_default_destination(
                             if environment.destination_registry.get(source_name):
                                 _default = environment.destination_registry[source_name]
                             else:
-                                suggested_path_response = requests.post(
+                                suggested_path_response = capture_post(
                                     url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
@@ -285,6 +286,9 @@ class LaunchScreen(Screen):
     def _add_directory(self, directory: str, add_destination: bool = True):
         source = Path(self._dir_tree.path).resolve() / directory
         if add_destination:
+            for s in self.app._environment.sources:
+                if source.is_relative_to(s):
+                    return
             self.app._environment.sources.append(source)
             machine_data = requests.get(
                 f"{self.app._environment.url.geturl()}/machine/"
@@ -426,7 +430,7 @@ class ProcessingForm(Screen):
                 i = Switch(value=False, classes="input", id=f"switch_{k.name}")
             else:
                 i = Input(placeholder=t, classes="input", id=f"input_{k.name}")
-                default = self._form.get(k.name)
+                default = self._form.get(k.name, str(k.default))
                 i.value = "None" if default is None else default
             self._inputs[i] = k.name
             inputs.append(i)
@@ -451,7 +455,10 @@ class ProcessingForm(Screen):
         model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
-            analyser = list(self.app.analysers.values())[0]
+            try:
+                analyser = [a for a in self.app.analysers.values() if a._context][0]
+            except IndexError:
+                return
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
@@ -641,7 +648,7 @@ class GainReference(Screen):
             cmd = [
                 "rsync",
                 str(self._dir_tree._gain_reference),
-                f"{self.app._environment.url.hostname}::{visit_path}/processing",
+                f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
@@ -668,6 +675,9 @@ class GainReference(Screen):
                 self.app._environment.data_collection_parameters[
                     "gain_ref"
                 ] = process_gain_response.json().get("gain_ref")
+                self.app._environment.data_collection_parameters[
+                    "gain_ref_superres"
+                ] = process_gain_response.json().get("gain_ref_superres")
         if self._switch_status:
             self.app.push_screen("directory-select")
         else:
@@ -717,6 +727,7 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
+            destinations = []
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
                     if d.is_dir() and d.name != "atlas":
@@ -731,6 +742,22 @@ class DestinationSelect(Screen):
                             self.app.analysers,
                             touch=True,
                         )
+                        if dest and dest in destinations:
+                            dest_path = Path(dest)
+                            name_root = ""
+                            dest_num = 0
+                            for i, st in enumerate(dest_path.name):
+                                if st.isnumeric():
+                                    dest_num = int(dest_path.name[i:])
+                                    break
+                                name_root += st
+                            if dest_num:
+                                dest = str(
+                                    dest_path.parent / f"{name_root}{dest_num+1}"
+                                )
+                            else:
+                                dest = str(dest_path.parent / f"{name_root}2")
+                        destinations.append(dest)
                         bulk.append(Label(f"Copy the source {d} to:"))
                         bulk.append(
                             Input(
@@ -749,7 +776,7 @@ class DestinationSelect(Screen):
                 )
         yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
-        if self.app._multigrid:
+        if self.app._multigrid and self.app._processing_enabled:
             for k in self._context.user_params:
                 params_bulk.append(Label(k.label))
                 val = self.app._environment.data_collection_parameters.get(
@@ -824,7 +851,7 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
 
     def on_button_pressed(self, event):
-        if self.app._multigrid:
+        if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
                 valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
             else:
@@ -845,7 +872,7 @@ class DestinationSelect(Screen):
         for k, v in self._user_params.items():
             self.app._environment.data_collection_parameters[k] = v
         if len(self._transfer_routes) > 1:
-            requests.post(
+            capture_post(
                 f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
                 json={
                     "filename": f"murfey-{datetime.now().strftime('%Y-%m-%d-%H_%M_%S')}.txt",
@@ -877,7 +904,9 @@ class MainScreen(Screen):
         info_widget = TextLog(id="info", markup=True)
         yield info_widget
         yield self.app.log_book
-        info_widget.write("[bold]Welcome to Murfey[/bold]")
+        info_widget.write(
+            f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
+        )
         self.app.processing_btn = Button(
             "Request processing",
             id="processing-btn",

@@ -23,9 +23,8 @@ from murfey.server import (
     get_hostname,
     get_machine_config,
     get_microscope,
+    templates,
 )
-from murfey.server import shutdown as _shutdown
-from murfey.server import templates
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
@@ -52,6 +51,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FractionationParameters,
     GainReference,
     ProcessFile,
     ProcessingJobParameters,
@@ -610,6 +610,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
             if proc_file.gain_ref
             else proc_file.gain_ref,
+            "fm_int_file": proc_file.eer_fractionation_file,
         },
     }
     # log.info(f"Sending Zocalo message {zocalo_message}")
@@ -675,16 +676,6 @@ def get_version(client_version: str = ""):
         result["client-needs-downgrade"] = client > server
 
     return result
-
-
-@router.get("/shutdown", include_in_schema=False)
-def shutdown():
-    """A method to stop the server. This should be removed before Murfey is
-    deployed in production. To remove it we need to figure out how to control
-    to process (eg. systemd) and who to run it as."""
-    log.info("Server shutdown request received")
-    _shutdown()
-    return {"success": True}
 
 
 @router.post("/visits/{visit_name}/suggested_path")
@@ -787,7 +778,9 @@ def register_proc(visit_name, proc_params: ProcessingJobParameters):
     proc_parameters = {
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
-        "job_parameters": proc_params.parameters,
+        "job_parameters": {
+            k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
+        },
     }
 
     if _transport_object:
@@ -818,21 +811,51 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
     executables = machine_config.external_executables
+    env = machine_config.external_environment
+    safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
         Path(machine_config.rsync_basepath)
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
+        / machine_config.gain_directory_name
     )
-    new_gain_ref = await prepare_gain(
-        camera, filepath / gain_reference_params.gain_ref.name, executables
+    new_gain_ref, new_gain_ref_superres = await prepare_gain(
+        camera,
+        filepath / safe_path_name,
+        executables,
+        env,
+        rescale=gain_reference_params.rescale,
     )
-    if new_gain_ref:
+    if new_gain_ref and new_gain_ref_superres:
         return {
-            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath))
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref_superres": new_gain_ref_superres.relative_to(
+                Path(machine_config.rsync_basepath)
+            ),
         }
     else:
-        return {"gain_ref": new_gain_ref}
+        return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
+
+
+@router.post("/visits/{visit_name}/eer_fractionation_file")
+async def write_eer_fractionation_file(
+    visit_name: str, fractionation_params: FractionationParameters
+) -> dict:
+    file_path = (
+        Path(machine_config.rsync_basepath)
+        / (machine_config.rsync_module or "data")
+        / str(datetime.datetime.now().year)
+        / secure_filename(visit_name)
+        / secure_filename(fractionation_params.fractionation_file_name)
+    )
+    if file_path.is_file():
+        return {"eer_fractionation_file": str(file_path)}
+    with open(file_path, "w") as frac_file:
+        frac_file.write(
+            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+        )
+    return {"eer_fractionation_file": str(file_path)}
 
 
 @router.post("/visits/{visit_name}/clean_state")

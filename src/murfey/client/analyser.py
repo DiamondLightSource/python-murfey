@@ -63,8 +63,23 @@ class Analyser(Observer):
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
         self._stopping = False
         self._halt_thread = False
+        self._murfey_config = (
+            get_machine_config(str(environment.url.geturl()), demo=environment.demo)
+            if environment
+            else {}
+        )
 
     def _find_extension(self, file_path: Path):
+        if (
+            required_substrings := self._murfey_config.get(
+                "data_required_substrings", {}
+            )
+            .get(self._acquisition_software, {})
+            .get(file_path.suffix)
+        ):
+            for rs in required_substrings:
+                if rs not in file_path.name:
+                    return
         if (
             file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
             and not self._extension
@@ -129,7 +144,21 @@ class Analyser(Observer):
                         self._role = "detector"
                 return True
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                if any(p in file_path.parts for p in ("Batch", "SearchMaps")):
+                    return False
                 if file_path.with_suffix(".jpg").is_file():
+                    return False
+                if (
+                    len(
+                        list(
+                            file_path.parent.glob(
+                                f"{file_path.name}*{file_path.suffix}"
+                            )
+                        )
+                    )
+                    > 1
+                ):
+                    # This covers the case of ignoring the averaged movies written out by the Falcon
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = ProcessingParametersTomo
@@ -277,9 +306,7 @@ class Analyser(Observer):
         file_name = (
             f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
         )
-        data_directories = get_machine_config(self._environment.url.geturl()).get(
-            "data_directories", {}
-        )
+        data_directories = self._murfey_config.get("data_directories", {})
         for dd in data_directories.keys():
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)

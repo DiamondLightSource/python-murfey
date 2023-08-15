@@ -20,15 +20,18 @@ class MachineConfig(BaseModel):
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
+    external_environment: Dict[str, str] = {}
     rsync_module: str = ""
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
+    gain_directory_name: str = "processing"
     feedback_queue: str = "murfey_feedback"
     superres: bool = False
     camera: str = "FALCON"
-    data_required_substrings: Dict[str, List[str]] = {}
+    data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
     allow_removal: bool = False
     modular_spa: bool = False
+    processing_enabled: bool = True
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

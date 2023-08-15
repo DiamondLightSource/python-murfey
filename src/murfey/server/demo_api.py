@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
 from sqlmodel import select
+from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.websocket as ws
@@ -49,6 +50,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FractionationParameters,
     GainReference,
     ProcessFile,
     ProcessingJobParameters,
@@ -598,6 +600,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "movie": str(proc_file.path),
             "mrc_out": str(mrc_out),
             "movie_id": proc_file.mc_uuid,
+            "fm_int_file": proc_file.eer_fractionation_file,
         },
     )
     await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
@@ -841,3 +844,24 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     db.close()
     return
+
+
+@router.post("/visits/{visit_name}/eer_fractionation_file")
+async def write_eer_fractionation_file(
+    visit_name: str, fractionation_params: FractionationParameters
+) -> dict:
+    file_path = (
+        Path(machine_config["rsync_basepath"])
+        / (machine_config["rsync_module"] or "data")
+        / str(datetime.datetime.now().year)
+        / secure_filename(visit_name)
+        / secure_filename(fractionation_params.fractionation_file_name)
+    )
+    log.info(f"EER fractionation file {file_path} creation requested")
+    if file_path.is_file():
+        return {"eer_fractionation_file": str(file_path)}
+    with open(file_path, "w") as frac_file:
+        frac_file.write(
+            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+        )
+    return {"eer_fractionation_file": str(file_path)}
