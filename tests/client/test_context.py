@@ -15,7 +15,8 @@ def test_tomography_context_initialisation_for_tomo(tmp_path):
 
 
 @patch("requests.get")
-def test_tomography_context_add_tomo_tilt(mock_get, tmp_path):
+@patch("requests.post")
+def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -53,7 +54,8 @@ def test_tomography_context_add_tomo_tilt(mock_get, tmp_path):
 
 
 @patch("requests.get")
-def test_tomography_context_add_tomo_tilt_out_of_order(mock_get, tmp_path):
+@patch("requests.post")
+def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -114,7 +116,8 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_get, tmp_path):
 
 
 @patch("requests.get")
-def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_get, tmp_path):
+@patch("requests.post")
+def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -172,7 +175,8 @@ def test_tomography_context_initialisation_for_serialem(tmp_path):
 
 
 @patch("requests.get")
-def test_tomography_context_add_serialem_tilt(mock_get, tmp_path):
+@patch("requests.post")
+def test_tomography_context_add_serialem_tilt(mock_post, mock_get, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -203,7 +207,8 @@ def test_tomography_context_add_serialem_tilt(mock_get, tmp_path):
 
 
 @patch("requests.get")
-def test_tomography_context_add_serialem_decimal_tilt(mock_get, tmp_path):
+@patch("requests.post")
+def test_tomography_context_add_serialem_decimal_tilt(mock_post, mock_get, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -234,7 +239,10 @@ def test_tomography_context_add_serialem_decimal_tilt(mock_get, tmp_path):
 
 
 @patch("requests.get")
-def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(mock_get, tmp_path):
+@patch("requests.post")
+def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
+    mock_post, mock_get, tmp_path
+):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
