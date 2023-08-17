@@ -165,7 +165,7 @@ Input {
 
 .btn-session {
     width: 100%;
-    height: 90fr;
+    height: 20%;
     background: teal;
     border: solid black;
 }
@@ -301,15 +301,7 @@ Input {
     height: 100%;
     column-span: 4;
     row-span: 3;
-    content-align: left top;
     background: blueviolet;
-}
-
-#switch-session {
-    width: 100%;
-    height: 100%;
-    column-span: 3;
-    row-span: 1;
 }
 
 #label-session {

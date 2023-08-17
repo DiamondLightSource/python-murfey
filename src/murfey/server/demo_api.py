@@ -844,7 +844,18 @@ def remove_session(client_id: int, db=murfey_db):
     client.session_id = None
     db.add(client)
     db.commit()
-    assert session_id is not None
+    if session_id is None:
+        db.close()
+        return
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    db.delete(session)
+    db.commit()
+    db.close()
+    return
+
+
+@router.delete("/sessions/{session_id}")
+def remove_session_by_id(session_id: int, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()

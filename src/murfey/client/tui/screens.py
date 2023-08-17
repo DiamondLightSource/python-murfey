@@ -364,6 +364,7 @@ class ConfirmScreen(Screen):
         params: dict | None = None,
         pressed_callback: Callable | None = None,
         button_names: dict | None = None,
+        push: str = "main",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -371,6 +372,7 @@ class ConfirmScreen(Screen):
         self._params = params or {}
         self._callback = pressed_callback
         self._button_names = button_names or {}
+        self._push = push
 
     def compose(self):
         if self._params:
@@ -396,7 +398,8 @@ class ConfirmScreen(Screen):
                     self.app.pop_screen()
                 except ScreenStackError:
                     break
-            self.app.push_screen("main")
+            if self._push:
+                self.app.push_screen(self._push)
             self.app.uninstall_screen("confirm")
         if self._callback and event.button.id == "launch":
             self._callback(params=self._params)
@@ -578,7 +581,22 @@ class SessionSelection(Screen):
             if self._sessions
             else [Button("No elements found")]
         )
-        yield VerticalScroll(*hovers, id=f"select-{self._name}")
+        deletes = (
+            [
+                Button(
+                    f"Remove {e}",
+                    id=f"btn-{self._name}-{e}-del",
+                    classes=f"btn-{self._name}",
+                )
+                for e in self._sessions
+            ]
+            if self._sessions
+            else [Button("No elements found")]
+        )
+        yield VerticalScroll(
+            *[v for pair in zip(hovers, deletes) for v in pair],
+            id=f"select-{self._name}",
+        )
         yield Button(
             "New session", id=f"btn-{self._name}-new", classes=f"btn-{self._name}"
         )
@@ -587,6 +605,22 @@ class SessionSelection(Screen):
         if event.button.id.endswith("new"):
             session_id = None
             self.app.pop_screen()
+        elif event.button.id.endswith("del"):
+            session_id = int(
+                str(event.button.label.split(":")[0]).replace("Remove ", "")
+            )
+            self.app.pop_screen()
+            self.app.install_screen(
+                ConfirmScreen(
+                    f"Remove session {session_id}",
+                    pressed_callback=partial(self._remove_session, session_id),
+                    button_names={"launch": "Yes"},
+                    push="visit-select-screen",
+                ),
+                "confirm",
+            )
+            self.app.push_screen("confirm")
+            return
         else:
             self.app._environment.murfey_session = int(
                 str(event.button.label.split(":")[0])
@@ -598,6 +632,18 @@ class SessionSelection(Screen):
             f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
         )
+
+    def _remove_session(self, session_id: int, **kwargs):
+        requests.delete(f"{self.app._environment.url.geturl()}/sessions/{session_id}")
+        exisiting_sessions = requests.get(
+            f"{self.app._environment.url.geturl()}/sessions"
+        ).json()
+        self.app.uninstall_screen("session-select-screen")
+        self.app.install_screen(
+            SessionSelection([f"{s['id']}: {s['name']}" for s in exisiting_sessions]),
+            "session-select-screen",
+        )
+        self.app.push_screen("session-select-screen")
 
 
 class VisitSelection(SwitchSelection):
