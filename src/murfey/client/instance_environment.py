@@ -54,7 +54,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
     superres: bool = True
-    murfey_session: int | None = None
+    murfey_session: Optional[int] = None
 
     class Config:
         validate_assignment: bool = True
