@@ -819,7 +819,6 @@ async def get_sessions(db=murfey_db):
 
 @router.post("/clients/{client_id}/session")
 def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
-    log.info(f"linking client {client_id} to session {sess.session_id}")
     sid = sess.session_id
     if sid is None:
         s = Session(name=sess.session_name)

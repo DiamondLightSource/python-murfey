@@ -594,7 +594,6 @@ class SessionSelection(Screen):
             session_id = self.app._environment.murfey_session
             self.app.pop_screen()
         session_name = "Client connection"
-        log.info("post ")
         requests.post(
             f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
