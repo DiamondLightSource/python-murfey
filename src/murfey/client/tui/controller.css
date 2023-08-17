@@ -166,6 +166,8 @@ Input {
 .btn-session {
     width: 100%;
     height: 20%;
+    column-span: 4;
+    row-span: 3;
     background: teal;
     border: solid black;
 }

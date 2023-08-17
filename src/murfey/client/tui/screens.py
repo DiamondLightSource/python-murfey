@@ -639,11 +639,20 @@ class SessionSelection(Screen):
             f"{self.app._environment.url.geturl()}/sessions"
         ).json()
         self.app.uninstall_screen("session-select-screen")
-        self.app.install_screen(
-            SessionSelection([f"{s['id']}: {s['name']}" for s in exisiting_sessions]),
-            "session-select-screen",
-        )
-        self.app.push_screen("session-select-screen")
+        if exisiting_sessions:
+            self.app.install_screen(
+                SessionSelection(
+                    [f"{s['id']}: {s['name']}" for s in exisiting_sessions]
+                ),
+                "session-select-screen",
+            )
+            self.app.push_screen("session-select-screen")
+        else:
+            session_name = "Client connection"
+            capture_post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+                json={"session_id": None, "session_name": session_name},
+            )
 
 
 class VisitSelection(SwitchSelection):

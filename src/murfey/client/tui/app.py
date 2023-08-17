@@ -463,8 +463,8 @@ class MurfeyTUI(App):
             self.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            requests.post(
-                f"{self._environment.url.geturl()}/client/{self._environment.client_id}/session",
+            capture_post(
+                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
 
