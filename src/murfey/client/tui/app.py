@@ -354,18 +354,6 @@ class MurfeyTUI(App):
                     json=json,
                 )
             source = Path(json["source"])
-            self._environment.listeners["data_collection_group_ids"] = {
-                context._flush_data_collections
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                context._flush_processing_job
-            }
-            self._environment.listeners["autoproc_program_ids"] = {
-                context._flush_preprocess
-            }
-            self._environment.listeners["motion_corrected_movies"] = {
-                context._check_for_alignment
-            }
             self._environment.id_tag_registry["data_collection_group"].append(
                 str(source)
             )
