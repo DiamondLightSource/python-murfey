@@ -18,6 +18,8 @@ log = logging.getLogger("murfey.client.websocket")
 
 
 class WSApp:
+    environment: MurfeyInstanceEnvironment | None = None
+
     def __init__(self, *, server: str, session_name: str, id: int | None = None):
         self.id = random.randint(0, 100) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
@@ -56,7 +58,7 @@ class WSApp:
             target=self._receive_msgs, daemon=True, name="websocket-receive-queue"
         )
         self._receiver_thread.start()
-        self.environment: MurfeyInstanceEnvironment | None = None
+        log.info("making wsapp")
 
     def __repr__(self):
         if self.alive:

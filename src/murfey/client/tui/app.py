@@ -334,7 +334,6 @@ class MurfeyTUI(App):
         )
 
     def _start_dc(self, json, from_form: bool = False):
-        log.info("star dc called")
         if self._dummy_dc:
             return
         # for multigrid the analyser sends the message straight to _start_dc by-passing user input
