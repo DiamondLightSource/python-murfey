@@ -23,6 +23,7 @@ from murfey.client.tui.screens import (
     InputResponse,
     MainScreen,
     ProcessingForm,
+    SessionSelection,
     VisitSelection,
     determine_default_destination,
 )
@@ -447,8 +448,25 @@ class MurfeyTUI(App):
             await self.reset()
 
     async def on_mount(self) -> None:
+        exisiting_sessions = requests.get(
+            f"{self._environment.url.geturl()}/sessions"
+        ).json()
         self.install_screen(VisitSelection(self.visits), "visit-select-screen")
         self.push_screen("visit-select-screen")
+        if exisiting_sessions:
+            self.install_screen(
+                SessionSelection(
+                    [f"{s['id']}: {s['name']}" for s in exisiting_sessions]
+                ),
+                "session-select-screen",
+            )
+            self.push_screen("session-select-screen")
+        else:
+            session_name = "Client connection"
+            requests.post(
+                f"{self._environment.url.geturl()}/client/{self._environment.client_id}/session",
+                json={"session_id": None, "session_name": session_name},
+            )
 
     def on_log_book_log(self, message):
         self.log_book.write(message.renderable)

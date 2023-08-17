@@ -563,6 +563,44 @@ class SwitchSelection(Screen):
         self._switch_status = event.value
 
 
+class SessionSelection(Screen):
+    def __init__(self, sessions: List[str], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sessions = sessions
+        self._name = "session"
+
+    def compose(self):
+        hovers = (
+            [
+                Button(e, id=f"btn-{self._name}-{e}", classes=f"btn-{self._name}")
+                for e in self._sessions
+            ]
+            if self._sessions
+            else [Button("No elements found")]
+        )
+        yield VerticalScroll(*hovers, id=f"select-{self._name}")
+        yield Button(
+            "New session", id=f"btn-{self._name}-new", classes=f"btn-{self._name}"
+        )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id.endswith("new"):
+            session_id = None
+            self.app.pop_screen()
+        else:
+            self.app._environment.murfey_session = int(
+                str(event.button.label.split(":")[0])
+            )
+            session_id = self.app._environment.murfey_session
+            self.app.pop_screen()
+        session_name = "Client connection"
+        log.info("post ")
+        requests.post(
+            f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+            json={"session_id": session_id, "session_name": session_name},
+        )
+
+
 class VisitSelection(SwitchSelection):
     def __init__(self, visits: List[str], *args, **kwargs):
         super().__init__(

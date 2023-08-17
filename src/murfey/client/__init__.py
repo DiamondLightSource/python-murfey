@@ -250,7 +250,6 @@ def run():
     client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
     ws = murfey.client.websocket.WSApp(
         server=args.server,
-        session_name=args.name or "Client connection",
         id=client_id["new_id"],
     )
 

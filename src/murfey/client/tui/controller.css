@@ -26,6 +26,12 @@ ConfirmScreen {
     border: hidden;
 }
 
+SessionSelection {
+    layout: grid;
+    grid-size: 4;
+    border: hidden;
+}
+
 VisitSelection {
     layout: grid;
     grid-size: 4;
@@ -157,6 +163,21 @@ Input {
     background: darkslateblue;
 }
 
+.btn-session {
+    width: 100%;
+    height: 90fr;
+    background: teal;
+    border: solid black;
+}
+
+.btn-session:hover {
+    background: purple;
+}
+
+.btn-session:focus {
+    background: darkslateblue;
+}
+
 .btn-directory {
     width: 100%;
     height: 90fr;
@@ -267,6 +288,31 @@ Input {
 }
 
 #label-visit {
+    width: 100%;
+    height: 100%;
+    column-span: 1;
+    row-span: 1;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#select-session {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    row-span: 3;
+    content-align: left top;
+    background: blueviolet;
+}
+
+#switch-session {
+    width: 100%;
+    height: 100%;
+    column-span: 3;
+    row-span: 1;
+}
+
+#label-session {
     width: 100%;
     height: 100%;
     column-span: 1;

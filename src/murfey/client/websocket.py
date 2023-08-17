@@ -9,7 +9,6 @@ import time
 import urllib.parse
 from typing import Optional
 
-import requests
 import websocket
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -20,13 +19,10 @@ log = logging.getLogger("murfey.client.websocket")
 class WSApp:
     environment: MurfeyInstanceEnvironment | None = None
 
-    def __init__(self, *, server: str, session_name: str, id: int | None = None):
+    def __init__(self, *, server: str, id: int | None = None):
         self.id = random.randint(0, 100) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
-        session_url = urllib.parse.urlparse(server)._replace(
-            path=f"/clients/{id}/session"
-        )
         url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
         self._address = url.geturl()
         self._alive = True
@@ -46,10 +42,6 @@ class WSApp:
             name="websocket-connection",
         )
         self._ws_thread.start()
-        requests.post(
-            session_url.geturl(),
-            json={"session_id": None, "session_name": session_name},
-        )
         self._feeder_thread = threading.Thread(
             target=self._send_queue_feeder, daemon=True, name="websocket-send-queue"
         )
