@@ -124,7 +124,6 @@ class WSApp:
         self._receive_queue.put(message)
 
     def _handle_msg(self, message: str):
-        # log.info(f"Received message: {message!r}")
         data = json.loads(message)
         if data.get("message") == "state-update":
             self._register_id(data["attribute"], data["value"])
