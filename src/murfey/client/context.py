@@ -1131,104 +1131,108 @@ class TomographyContext(Context):
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
-        if not metadata_file.is_file():
-            logger.debug(f"Metadata file {metadata_file} not found")
-            return OrderedDict({})
-        if metadata_file.suffix == ".xml":
-            with open(metadata_file, "r") as xml:
-                try:
-                    for_parsing = xml.read()
-                except Exception:
-                    logger.warning(f"Failed to parse file {metadata_file}")
-                    return OrderedDict({})
-                data = xmltodict.parse(for_parsing)
-            try:
-                metadata: OrderedDict = OrderedDict({})
-                metadata["experiment_type"] = "tomography"
-                metadata["voltage"] = 300
-                metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"][
-                    "Width"
-                ]
-                metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                    "Height"
-                ]
-                metadata["pixel_size_on_image"] = float(
-                    data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
-                )
-                metadata["motion_corr_binning"] = 1
-                metadata["gain_ref"] = None
-                metadata["dose_per_frame"] = (
-                    environment.data_collection_parameters.get("dose_per_frame")
-                    if environment
-                    else None
-                )
-                metadata["manual_tilt_offset"] = 0
-                metadata["source"] = str(self._basepath)
-            except KeyError:
+        try:
+            if not metadata_file.is_file():
+                logger.debug(f"Metadata file {metadata_file} not found")
                 return OrderedDict({})
-            return metadata
-        with open(metadata_file, "r") as md:
-            mdoc_data = get_global_data(md)
-            num_blocks = get_num_blocks(md)
-            md.seek(0)
-            blocks = [get_block(md) for i in range(num_blocks)]
-            mdoc_data_block = blocks[0]
-        if not mdoc_data:
-            return OrderedDict({})
-        mdoc_metadata: OrderedDict = OrderedDict({})
-        mdoc_metadata["experiment_type"] = "tomography"
-        mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
-        mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
-        mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
-        mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
-        superres_binning = int(mdoc_data_block["Binning"])
-        binning_factor = 1
-        if environment:
-            server_config = requests.get(
-                f"{str(environment.url.geturl())}/machine/"
-            ).json()
-            if (
-                server_config.get("superres")
-                and superres_binning == 1
-                and environment.superres
-            ):
-                binning_factor = 2
-            ps_from_mag = (
-                server_config.get("calibrations", {})
-                .get("magnification", {})
-                .get(mdoc_data_block["Magnification"])
-            )
-            if ps_from_mag:
-                mdoc_metadata["pixel_size_on_image"] = (
-                    float(ps_from_mag) * 1e-10 / binning_factor
+            if metadata_file.suffix == ".xml":
+                with open(metadata_file, "r") as xml:
+                    try:
+                        for_parsing = xml.read()
+                    except Exception:
+                        logger.warning(f"Failed to parse file {metadata_file}")
+                        return OrderedDict({})
+                    data = xmltodict.parse(for_parsing)
+                try:
+                    metadata: OrderedDict = OrderedDict({})
+                    metadata["experiment_type"] = "tomography"
+                    metadata["voltage"] = 300
+                    metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"][
+                        "Width"
+                    ]
+                    metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
+                        "Height"
+                    ]
+                    metadata["pixel_size_on_image"] = float(
+                        data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
+                    )
+                    metadata["motion_corr_binning"] = 1
+                    metadata["gain_ref"] = None
+                    metadata["dose_per_frame"] = (
+                        environment.data_collection_parameters.get("dose_per_frame")
+                        if environment
+                        else None
+                    )
+                    metadata["manual_tilt_offset"] = 0
+                    metadata["source"] = str(self._basepath)
+                except KeyError:
+                    return OrderedDict({})
+                return metadata
+            with open(metadata_file, "r") as md:
+                mdoc_data = get_global_data(md)
+                num_blocks = get_num_blocks(md)
+                md.seek(0)
+                blocks = [get_block(md) for i in range(num_blocks)]
+                mdoc_data_block = blocks[0]
+            if not mdoc_data:
+                return OrderedDict({})
+            mdoc_metadata: OrderedDict = OrderedDict({})
+            mdoc_metadata["experiment_type"] = "tomography"
+            mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+            mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
+            mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
+            mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
+            superres_binning = int(mdoc_data_block["Binning"])
+            binning_factor = 1
+            if environment:
+                server_config = requests.get(
+                    f"{str(environment.url.geturl())}/machine/"
+                ).json()
+                if (
+                    server_config.get("superres")
+                    and superres_binning == 1
+                    and environment.superres
+                ):
+                    binning_factor = 2
+                ps_from_mag = (
+                    server_config.get("calibrations", {})
+                    .get("magnification", {})
+                    .get(mdoc_data_block["Magnification"])
                 )
-        if mdoc_metadata.get("pixel_size_on_image") is None:
-            mdoc_metadata["pixel_size_on_image"] = (
-                float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+                if ps_from_mag:
+                    mdoc_metadata["pixel_size_on_image"] = (
+                        float(ps_from_mag) * 1e-10 / binning_factor
+                    )
+            if mdoc_metadata.get("pixel_size_on_image") is None:
+                mdoc_metadata["pixel_size_on_image"] = (
+                    float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+                )
+            mdoc_metadata["motion_corr_binning"] = binning_factor
+            mdoc_metadata["gain_ref"] = (
+                f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+                if environment
+                else None
             )
-        mdoc_metadata["motion_corr_binning"] = binning_factor
-        mdoc_metadata["gain_ref"] = (
-            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-            if environment
-            else None
-        )
-        mdoc_metadata["dose_per_frame"] = (
-            environment.data_collection_parameters.get("dose_per_frame")
-            if environment
-            else None
-        )
-        mdoc_metadata["manual_tilt_offset"] = -_midpoint(
-            [float(b["TiltAngle"]) for b in blocks]
-        )
-        mdoc_metadata["source"] = str(self._basepath)
-        mdoc_metadata[
-            "file_extension"
-        ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+            mdoc_metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                else None
+            )
+            mdoc_metadata["manual_tilt_offset"] = -_midpoint(
+                [float(b["TiltAngle"]) for b in blocks]
+            )
+            mdoc_metadata["source"] = str(self._basepath)
+            mdoc_metadata[
+                "file_extension"
+            ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
 
-        data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
-        if data_file.split(".")[-1] == "eer":
-            mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
-                metadata_file.parent / data_file
-            )
+            data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
+            if data_file.split(".")[-1] == "eer":
+                mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
+                    metadata_file.parent / data_file
+                )
+        except Exception as e:
+            logger.warning(f"Eception encountered in metadata gathering: {str(e)}")
+            return OrderedDict({})
 
         return mdoc_metadata
