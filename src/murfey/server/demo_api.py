@@ -152,7 +152,6 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
         client_env.visit = visit_name
         db.add(client_env)
         db.commit()
-        db.close()
     return client_info
 
 
@@ -166,7 +165,6 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     )
     db.add(rsync_instance)
     db.commit()
-    db.close()
     return rsyncer_info
 
 
@@ -195,7 +193,6 @@ def increment_rsync_file_count(
     rsync_instance.files_counted += 1
     db.add(rsync_instance)
     db.commit()
-    db.close()
 
 
 @router.post("/visits/{visit_name}/increment_rsync_transferred_files")
@@ -212,7 +209,6 @@ def increment_rsync_transferred_files(
     rsync_instance.files_transferred += 1
     db.add(rsync_instance)
     db.commit()
-    db.close()
 
 
 @router.post("/clients/{client_id}/spa_processing_parameters")
@@ -257,7 +253,6 @@ def register_spa_proc_params(
     db.add(params)
     db.add(feedback_params)
     db.commit()
-    db.close()
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -275,7 +270,6 @@ def register_tilt_series(
     tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
     db.add(tilt_series)
     db.commit()
-    db.close()
 
 
 @router.get("/visits_raw", response_model=List[Visit])
@@ -436,7 +430,6 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         log.info(f"Launching SPA preprocessing with Zoaclo message: {zocalo_message}")
         db.delete(f)
     db.commit()
-    db.close()
 
     return
 
@@ -507,7 +500,6 @@ async def request_spa_preprocessing(
         movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
         db.add(movie)
         db.commit()
-        db.close()
 
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True)
@@ -567,7 +559,6 @@ async def request_spa_preprocessing(
         )
         db.add(for_stash)
         db.commit()
-        db.close()
 
     return proc_file
 
@@ -705,7 +696,6 @@ def register_dc_group(
     db.add(murfey_app_2d)
     db.add(murfey_app_3d)
     db.commit()
-    db.close()
 
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
@@ -831,7 +821,6 @@ def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
     client.session_id = sid
     db.add(client)
     db.commit()
-    db.close()
     return sid
 
 
@@ -845,12 +834,10 @@ def remove_session(client_id: int, db=murfey_db):
     db.add(client)
     db.commit()
     if session_id is None:
-        db.close()
         return
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()
-    db.close()
     return
 
 
@@ -859,7 +846,6 @@ def remove_session_by_id(session_id: int, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()
-    db.close()
     return
 
 

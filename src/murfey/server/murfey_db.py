@@ -22,7 +22,10 @@ def get_murfey_db_session(
     _url = url(machine_config)
     engine = create_engine(_url)
     with Session(engine) as session:
-        yield session
+        try:
+            yield session
+        finally:
+            session.close()
 
 
 murfey_db = Depends(partial(get_murfey_db_session, get_machine_config()))
