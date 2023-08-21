@@ -162,7 +162,6 @@ class RSyncer(Observer):
                 num_files = 0
                 while True:
                     if num_files > 100:
-                        self.queue.task_done()
                         break
                     next_file = self.queue.get(block=True, timeout=0.1)
                     if next_file and not next_file.name.startswith("."):

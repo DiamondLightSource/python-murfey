@@ -178,6 +178,7 @@ class Analyser(Observer):
                     # logger.warning(
                     #     f"Context not understood for {transferred_file}, stopping analysis"
                     # )
+                    self.queue.task_done()
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
@@ -273,6 +274,7 @@ class Analyser(Observer):
                             environment=self._environment,
                         )
                     self.notify({"form": dc_metadata})
+        self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
