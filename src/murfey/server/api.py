@@ -542,6 +542,8 @@ async def request_spa_preprocessing(
                 if proc_params["gain_ref"]
                 else proc_params["gain_ref"],
                 "downscale": proc_params["downscale"],
+                "picker_uuid": murfey_ids[1],
+                "particle_diameter": proc_params["particle_diameter"],
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
