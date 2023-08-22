@@ -444,7 +444,15 @@ class MurfeyTUI(App):
         if exisiting_sessions:
             self.install_screen(
                 SessionSelection(
-                    [f"{s['id']}: {s['name']}" for s in exisiting_sessions]
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                    ],
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                        if s["clients"]
+                    ],
                 ),
                 "session-select-screen",
             )

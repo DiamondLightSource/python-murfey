@@ -567,9 +567,12 @@ class SwitchSelection(Screen):
 
 
 class SessionSelection(Screen):
-    def __init__(self, sessions: List[str], *args, **kwargs):
+    def __init__(
+        self, sessions: List[str], sessions_with_client: List[str], *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._sessions = sessions
+        self._sessions_with_client = sessions_with_client
         self._name = "session"
 
     def compose(self):
@@ -612,7 +615,9 @@ class SessionSelection(Screen):
             self.app.pop_screen()
             self.app.install_screen(
                 ConfirmScreen(
-                    f"Remove session {session_id}",
+                    f"Remove session {session_id} [WARNING: there are clients already using this session]"
+                    if str(event.button.label) in self._sessions_with_client
+                    else f"Remove session {session_id}",
                     pressed_callback=partial(self._remove_session, session_id),
                     button_names={"launch": "Yes"},
                     push="visit-select-screen",
@@ -642,7 +647,15 @@ class SessionSelection(Screen):
         if exisiting_sessions:
             self.app.install_screen(
                 SessionSelection(
-                    [f"{s['id']}: {s['name']}" for s in exisiting_sessions]
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                    ],
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                        if s["clients"]
+                    ],
                 ),
                 "session-select-screen",
             )

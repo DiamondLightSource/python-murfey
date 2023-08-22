@@ -912,7 +912,15 @@ async def get_clients(db=murfey_db):
 @router.get("/sessions")
 async def get_sessions(db=murfey_db):
     sessions = db.exec(select(Session)).all()
-    return sessions
+    clients = db.exec(select(ClientEnvironment)).all()
+    res = []
+    for sess in sessions:
+        r = {"session": sess, "clients": []}
+        for cl in clients:
+            if cl.session_id == sess.id:
+                r["clients"].append(cl)
+        res.append(r)
+    return res
 
 
 @router.post("/clients/{client_id}/session")
