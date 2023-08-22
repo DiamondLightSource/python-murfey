@@ -4,7 +4,7 @@ import asyncio
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 
 class Camera(Enum):
@@ -25,16 +25,17 @@ async def prepare_gain(
     executables: Dict[str, str],
     env: Dict[str, str],
     rescale: bool = True,
-) -> Path | None:
+) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
-        return None
+        return None, None
     if camera == Camera.FALCON:
-        return None
+        return None, None
     if gain_path.suffix == ".dm4":
         gain_out = gain_path.parent / "gain.mrc"
+        gain_out_superres = gain_path.parent / "gain_superres.mrc"
         for k, v in env.items():
             os.environ[k] = v
-        (gain_path / "gain").mkdir(exist_ok=True)
+        (gain_path.parent / "gain").mkdir(exist_ok=True)
         gain_path = _sanitise(gain_path)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
@@ -46,7 +47,7 @@ async def prepare_gain(
         )
         stdout, stderr = await dm4_proc.communicate()
         if dm4_proc.returncode:
-            return None
+            return None, None
         clip_proc = await asyncio.create_subprocess_shell(
             f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres if rescale else gain_out}",
             stdout=asyncio.subprocess.PIPE,
@@ -54,7 +55,7 @@ async def prepare_gain(
         )
         stdout, stderr = await clip_proc.communicate()
         if clip_proc.returncode:
-            return None
+            return None, None
         if rescale:
             newstack_proc = await asyncio.create_subprocess_shell(
                 f"{executables['newstack']} -bin 2 {gain_path_superres} {gain_out}",
@@ -63,6 +64,8 @@ async def prepare_gain(
             )
             stdout, stderr = await newstack_proc.communicate()
             if newstack_proc.returncode:
-                return None
-        return gain_out
-    return None
+                return None, None
+        if rescale:
+            gain_out_superres.symlink_to(gain_path_superres)
+        return gain_out, gain_out_superres if rescale else gain_out
+    return None, None

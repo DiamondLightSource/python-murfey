@@ -86,6 +86,7 @@ class ProcessFile(BaseModel):
     dose_per_frame: float
     mc_binning: int = 1
     gain_ref: Optional[str] = None
+    eer_fractionation_file: Optional[str] = None
 
 
 class TiltSeries(BaseModel):
@@ -175,7 +176,7 @@ class DCParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: float
+        dose_per_frame: Optional[float]
         gain_ref: Optional[str]
         use_cryolo: bool
         symmetry: str
@@ -211,3 +212,10 @@ class MillingParameters(BaseModel):
     lamella_number: int
     images: List[str]
     raw_directory: str
+
+
+class FractionationParameters(BaseModel):
+    num_frames: int
+    fractionation: int
+    dose_per_frame: float
+    fractionation_file_name: str = "eer_fractionation.txt"

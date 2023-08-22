@@ -10,15 +10,23 @@ import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+
+def _get_xml_list_index(key: str, xml_list: list) -> int:
+    for i, elem in enumerate(xml_list):
+        if elem["a:Key"] == key:
+            return i
+    raise ValueError(f"Key not found in XML list: {key}")
 
 
 class SPAContext(Context):
     user_params = [
         ProcessingParameter(
-            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+            "dose_per_frame",
+            "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
         ),
         ProcessingParameter(
             "estimate_particle_diameter",
@@ -40,6 +48,7 @@ class SPAContext(Context):
             "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
         ),
         ProcessingParameter("gain_ref", "Gain Reference"),
+        ProcessingParameter("gain_ref_superres", "Unbinned Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -65,6 +74,7 @@ class SPAContext(Context):
         logger.info(f"registering data collection with data {data}")
         environment.id_tag_registry["data_collection"].append(tag)
         image_directory = str(environment.default_destinations[Path(tag)])
+        logger.info(f"Image directory for data collection is {image_directory}")
         json = {
             "voltage": data["voltage"],
             "pixel_size_on_image": data["pixel_size_on_image"],
@@ -123,7 +133,9 @@ class SPAContext(Context):
             "parameters": {
                 "acquisition_software": parameters["acquisition_software"],
                 "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_ref"],
+                "motioncor_gainreference": parameters["gain_ref_superres"]
+                if parameters.get("motion_corr_binning") == 2
+                else parameters["gain_ref"],
                 "motioncor_doseperframe": parameters["dose_per_frame"],
                 "eer_grouping": parameters["eer_grouping"],
                 "import_images": import_images,
@@ -139,7 +151,7 @@ class SPAContext(Context):
         }
         if parameters["particle_diameter"]:
             msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
+        capture_post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
         self,
@@ -150,7 +162,7 @@ class SPAContext(Context):
     ):
         environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
-        requests.post(url, json=data)
+        capture_post(url, json=data)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -170,6 +182,7 @@ class SPAContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         magnification = 0
+        num_fractions = 1
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
@@ -206,11 +219,27 @@ class SPAContext(Context):
                 "TemMagnification"
             ]["NominalMagnification"]
             metadata["magnification"] = magnification
-            metadata["total_exposed_dose"] = data["MicroscopeImage"]["CustomData"][
-                "a:KeyValueOfstringanyType"
-            ][10]["a:Value"]["#text"] * (
-                1e-20
-            )  # convert e / m^2 to e / A^2
+            try:
+                dose_index = _get_xml_list_index(
+                    "Dose",
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"],
+                )
+                metadata["total_exposed_dose"] = round(
+                    float(
+                        data["MicroscopeImage"]["CustomData"][
+                            "a:KeyValueOfstringanyType"
+                        ][dose_index]["a:Value"]["#text"]
+                    )
+                    * (1e-20),
+                    2,
+                )  # convert e / m^2 to e / A^2
+            except ValueError:
+                metadata["total_exposed_dose"] = 1
+            num_fractions = int(
+                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "CameraSpecificInput"
+                ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
+            )
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
@@ -253,10 +282,15 @@ class SPAContext(Context):
                 ps_from_mag = (
                     server_config.get("calibrations", {})
                     .get("magnification", {})
-                    .get(int(magnification))
+                    .get(magnification)
                 )
                 if ps_from_mag:
                     metadata["pixel_size_on_image"] = float(ps_from_mag) * 1e-10
+                    # this is a bit of a hack to cover the case when the data is binned K3
+                    # then the pixel size from the magnification table will be correct but the binning_factor will be 2
+                    # this is divided out later so multiply it in here to cancel
+                    if server_config.get("superres") and not environment.superres:
+                        metadata["pixel_size_on_image"] *= binning_factor
         metadata["pixel_size_on_image"] = (
             metadata["pixel_size_on_image"] / binning_factor
         )
@@ -266,11 +300,25 @@ class SPAContext(Context):
             if environment
             else None
         )
-        metadata["dose_per_frame"] = (
-            environment.data_collection_parameters.get("dose_per_frame")
+        metadata["gain_ref_superres"] = (
+            f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
             if environment
             else None
         )
+        if metadata.get("total_exposed_dose"):
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                and environment.data_collection_parameters.get("dose_per_frame")
+                not in (None, "None")
+                else round(metadata["total_exposed_dose"] / num_fractions, 3)
+            )
+        else:
+            metadata["dose_per_frame"] = (
+                environment.data_collection_parameters.get("dose_per_frame")
+                if environment
+                else None
+            )
 
         metadata["use_cryolo"] = (
             environment.data_collection_parameters.get("use_cryolo")
@@ -318,9 +366,5 @@ class SPAContext(Context):
             if environment
             else None
         ) or True
-
-        for k, v in metadata.items():
-            if v == "None":
-                metadata.pop(k)
 
         return metadata

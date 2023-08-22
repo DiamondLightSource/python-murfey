@@ -19,10 +19,11 @@ class MachineConfig(BaseModel):
     create_directories: List[str] = ["atlas"]
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
+    gain_directory_name: str = "processing"
     feedback_queue: str = "murfey_feedback"
     superres: bool = False
     camera: str = "FALCON"
-    data_required_substrings: Dict[str, List[str]] = {}
+    data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
     allow_removal: bool = False
     processing_enabled: bool = True
 
