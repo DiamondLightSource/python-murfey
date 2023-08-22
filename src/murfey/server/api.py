@@ -951,10 +951,12 @@ def remove_session(client_id: int, db=murfey_db):
     db.add(client)
     db.commit()
     if session_id is None:
-        db.close()
+        return
+    if db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+    ).all():
         return
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()
-    db.close()
     return
