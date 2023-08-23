@@ -589,7 +589,7 @@ async def make_gif(year, visit_name, gif_params: MillingParameters):
         / "processed"
     )
     output_dir.mkdir(exist_ok=True)
-    output_dir = output_dir / gif_params.raw_directory
+    output_dir = output_dir / secure_filename(gif_params.raw_directory)
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
     image_full_paths = [
