@@ -702,10 +702,14 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
+            machine_config = get_machine_config()
             destinations = []
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
-                    if d.is_dir() and d.name != "atlas":
+                    if (
+                        d.is_dir()
+                        and d.name not in machine_config["create_directories"]
+                    ):
                         machine_data = requests.get(
                             f"{self.app._environment.url.geturl()}/machine/"
                         ).json()
