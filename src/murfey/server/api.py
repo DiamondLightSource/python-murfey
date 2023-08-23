@@ -118,7 +118,7 @@ def get_mic():
 
 @router.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
-    microscope = get_microscope(machine_config=machine_config)
+    microscope = machine_config.machine_override or get_microscope()
     visits = murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
     if visits:
