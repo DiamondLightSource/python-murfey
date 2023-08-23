@@ -925,7 +925,7 @@ class TomographyContext(Context):
                     metadata_file.parent / data_file
                 )
         except Exception as e:
-            logger.warning(f"Eception encountered in metadata gathering: {str(e)}")
+            logger.warning(f"Exception encountered in metadata gathering: {str(e)}")
             return OrderedDict({})
 
         return mdoc_metadata
