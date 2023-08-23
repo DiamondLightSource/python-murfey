@@ -584,7 +584,7 @@ async def make_gif(year, visit_name, gif_params: MillingParameters):
     output_dir = (
         Path(machine_config.rsync_basepath)
         / (machine_config.rsync_module or "data")
-        / year
+        / secure_filename(year)
         / secure_filename(visit_name)
         / "processed"
     )
