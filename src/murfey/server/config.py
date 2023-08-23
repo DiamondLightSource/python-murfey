@@ -16,6 +16,7 @@ class MachineConfig(BaseModel):
     external_executables: Dict[str, str] = {}
     external_environment: Dict[str, str] = {}
     rsync_module: str = ""
+    create_directories: List[str] = ["atlas"]
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"

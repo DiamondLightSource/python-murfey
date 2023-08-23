@@ -6,7 +6,9 @@ import threading
 from pathlib import Path
 from typing import Type
 
-from murfey.client.context import Context, SPAContext, TomographyContext
+from murfey.client.context import Context
+from murfey.client.contexts.spa import SPAContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import FormDependency

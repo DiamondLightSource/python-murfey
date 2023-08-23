@@ -28,6 +28,27 @@ class Visit(BaseModel):
         )
 
 
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
+class BLSampleParameters(BaseModel):
+    sample_group_id: int
+
+
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
 class ContextInfo(BaseModel):
     experiment_type: str
     acquisition_software: str
@@ -187,9 +208,14 @@ class GainReference(BaseModel):
     rescale: bool = True
 
 
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
+
+
 class FractionationParameters(BaseModel):
     num_frames: int
     fractionation: int
     dose_per_frame: float
     fractionation_file_name: str = "eer_fractionation.txt"
-
