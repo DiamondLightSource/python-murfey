@@ -26,6 +26,7 @@ class MachineConfig(BaseModel):
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
     allow_removal: bool = False
     processing_enabled: bool = True
+    machine_override: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

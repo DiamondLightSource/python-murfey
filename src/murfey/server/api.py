@@ -106,7 +106,6 @@ def connections_check():
 def machine_info():
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
-        print(from_file(settings.murfey_machine_configuration, microscope))
         return from_file(settings.murfey_machine_configuration, microscope)
     return {}
 
@@ -119,7 +118,7 @@ def get_mic():
 
 @router.get("/visits/")
 def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
-    microscope = get_microscope()
+    microscope = get_microscope(machine_config=machine_config)
     visits = murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
     if visits:
@@ -155,7 +154,7 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
 
 @router.get("/visits_raw", response_model=List[Visit])
 def get_current_visits(db=murfey.server.ispyb.DB):
-    microscope = get_microscope()
+    microscope = get_microscope(machine_config=machine_config)
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
@@ -210,7 +209,7 @@ def register_sample_image(
 
 @router.get("/visits/{visit_name}")
 def visit_info(request: Request, visit_name: str, db=murfey.server.ispyb.DB):
-    microscope = get_microscope()
+    microscope = get_microscope(machine_config=machine_config)
     query = (
         db.query(BLSession)
         .join(Proposal)
@@ -326,7 +325,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "pix_size": (proc_file.pixel_size) * 10**10,
             "output_image": str(ctf_out),
             "image_number": proc_file.image_number,
-            "microscope": get_microscope(),
+            "microscope": get_microscope(machine_config=machine_config),
             "mc_uuid": proc_file.mc_uuid,
             "ft_bin": proc_file.mc_binning,
             "fm_dose": proc_file.dose_per_frame,
@@ -409,7 +408,7 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     check_path = (
         machine_config.rsync_basepath / base_path
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / base_path
+        else Path(f"/dls/{get_microscope(machine_config=machine_config)}") / base_path
     )
     check_path_name = check_path.name
     while check_path.exists():
@@ -425,10 +424,12 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
-    log.info(f"Registering data collection group on microscope {get_microscope()}")
+    log.info(
+        f"Registering data collection group on microscope {get_microscope(machine_config=machine_config)}"
+    )
     dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),
+            microscope=get_microscope(machine_config=machine_config),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
@@ -452,11 +453,13 @@ def start_dc(visit_name, dc_params: DCParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
-    log.info(f"Starting data collection on microscope {get_microscope()}")
+    log.info(
+        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)}"
+    )
     dc_parameters = {
         "visit": visit_name,
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(),
+            microscope=get_microscope(machine_config=machine_config),
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,
