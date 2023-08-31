@@ -205,6 +205,7 @@ class ProcessingJobParameters(BaseModel):
     tag: str
     recipe: str
     parameters: Dict[str, Any] = {}
+    experiment_type: str = "spa"
 
 
 class RegistrationMessage(BaseModel):
