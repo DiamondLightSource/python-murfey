@@ -130,9 +130,9 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(primary_key=True, default=None)
+    id: Optional[int] = Field(default=None, primary_key=True)
     class_selection_score: float
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(foreign_key="processingjob.id")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="selection_stash"
     )
