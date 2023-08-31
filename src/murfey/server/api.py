@@ -774,9 +774,13 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     return dc_params
 
 
-@router.post("/visits/{visit_name}/register_processing_job")
-def register_proc(visit_name, proc_params: ProcessingJobParameters):
+@router.post("/visits/{visit_name}/{client_id}/register_processing_job")
+def register_proc(
+    visit_name: str, client_id: int, proc_params: ProcessingJobParameters
+):
     proc_parameters = {
+        "client_id": client_id,
+        "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
         "job_parameters": {

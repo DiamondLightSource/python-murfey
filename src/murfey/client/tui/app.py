@@ -380,6 +380,40 @@ class MurfeyTUI(App):
                 )
                 if not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
+                data = {
+                    "voltage": json["voltage"],
+                    "pixel_size_on_image": json["pixel_size_on_image"],
+                    "experiment_type": json["experiment_type"],
+                    "image_size_x": json["image_size_x"],
+                    "image_size_y": json["image_size_y"],
+                    "file_extension": json["file_extension"],
+                    "acquisition_software": json["acquisition_software"],
+                    "image_directory": str(
+                        self._environment.default_destinations[source]
+                    ),
+                    "tag": str(source),
+                    "source": str(source),
+                    "magnification": json["magnification"],
+                    "total_exposed_dose": json.get("total_exposed_dose"),
+                    "c2aperture": json.get("c2aperture"),
+                    "exposure_time": json.get("exposure_time"),
+                    "slit_width": json.get("slit_width"),
+                    "phase_plate": json.get("phase_plate", False),
+                }
+                capture_post(
+                    f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                    json=data,
+                )
+                for recipe in (
+                    "em-spa-preprocess",
+                    "em-spa-extract",
+                    "em-spa-class2d",
+                    "em-spa-class3d",
+                ):
+                    capture_post(
+                        f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                        json={"tag": str(source), "recipe": recipe},
+                    )
                 capture_post(
                     f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/{str(source)}/flush_spa_processing"
                 )
