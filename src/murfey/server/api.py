@@ -253,24 +253,41 @@ def register_tomo_proc_params(
 def register_spa_proc_params(
     client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
-    params = SPARelionParameters(
-        client_id=client_id,
-        angpix=proc_params.pixel_size_on_image,
-        dose_per_frame=proc_params.dose_per_frame,
-        gain_ref=proc_params.gain_ref,
-        votage=proc_params.voltage,
-        motion_corr_binning=proc_params.motion_corr_binning,
-        eer_grouping=proc_params.eer_grouping,
-        symmetry=proc_params.symmetry,
-        particle_diameter=proc_params.particle_diameter,
-        downscale=proc_params.downscale,
-        boxsize=proc_params.boxsize,
-        small_boxsize=proc_params.small_boxsize,
-        mask_diameter=proc_params.mask_diameter,
-    )
+    try:
+        client = db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        ).one()
+        session_id = client.session_id
+        params = SPARelionParameters(
+            session_id=session_id,
+            angpix=proc_params.pixel_size_on_image,
+            dose_per_frame=proc_params.dose_per_frame,
+            gain_ref=proc_params.gain_ref,
+            voltage=proc_params.voltage,
+            motion_corr_binning=proc_params.motion_corr_binning,
+            eer_grouping=proc_params.eer_grouping,
+            symmetry=proc_params.symmetry,
+            particle_diameter=proc_params.particle_diameter,
+            downscale=proc_params.downscale,
+            boxsize=proc_params.boxsize,
+            small_boxsize=proc_params.small_boxsize,
+            mask_diameter=proc_params.mask_diameter,
+        )
+        feedback_params = SPAFeedbackParameters(
+            session_id=session_id,
+            estimate_particle_diameter=proc_params.particle_diameter is None,
+            hold_class2d=False,
+            hold_class3d=False,
+            class_selection_score=0,
+            star_combination_job=0,
+            initial_model="",
+            next_job=0,
+        )
+    except Exception as e:
+        log.warning(f"SPA processing parameters registration failed: {e}")
     db.add(params)
+    db.add(feedback_params)
     db.commit()
-    db.close()
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -283,6 +300,13 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
 
 @router.post("/visits/{visit_name}/{client_id}/{tag}flush_spa_processing")
 def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
     stashed_files = db.exec(
         select(PreprocessStash).where(PreprocessStash.client_id == client_id)
     ).all()
@@ -290,7 +314,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
         return
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.client_id == client_id)
+        .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
@@ -314,8 +338,9 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
     murfey_ids = _murfey_id(
         collected_ids[3].id, db, number=2 * len(stashed_files), close=False
     )
-    feedback_params.picker_murfey_id = murfey_ids[1]
-    db.add(feedback_params)
+    if feedback_params.picker_murfey_id is None:
+        feedback_params.picker_murfey_id = murfey_ids[1]
+        db.add(feedback_params)
 
     for i, f in enumerate(stashed_files):
         mrcp = Path(f.mrc_out)
@@ -353,7 +378,6 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
                 f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
             )
     db.commit()
-    db.close()
     return
 
 
@@ -512,10 +536,11 @@ async def request_spa_preprocessing(
 
         detached_ids = [c.id for c in collected_ids]
 
-        murfey_ids = _murfey_id(detached_ids[3], db, number=2)
+        murfey_ids = _murfey_id(detached_ids[3], db, number=2, close=False)
 
-        feedback_params.picker_murfey_id = murfey_ids[1]
-        db.add(feedback_params)
+        if feedback_params.picker_murfey_id is None:
+            feedback_params.picker_murfey_id = murfey_ids[1]
+            db.add(feedback_params)
         movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
         db.add(movie)
         db.commit()
