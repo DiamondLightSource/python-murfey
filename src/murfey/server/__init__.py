@@ -6,7 +6,7 @@ import os
 from functools import partial, singledispatch
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 import numpy as np
 import uvicorn
@@ -36,6 +36,7 @@ try:
 except AttributeError:
     pass
 import murfey.util.db as db
+from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
 try:
@@ -389,6 +390,14 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
+def _app_id(pj_id: int, _db) -> int:
+    return (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pj_id))
+        .one()
+        .id
+    )
+
+
 def _pj_id(app_id: int, _db, recipe: str = "") -> int:
     if recipe:
         dc_id = (
@@ -418,6 +427,21 @@ def _pj_id(app_id: int, _db, recipe: str = "") -> int:
     return pj_id
 
 
+def _get_spa_params(
+    app_id: int, _db
+) -> Tuple[db.SPARelionParameters, db.SPAFeedbackParameters]:
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-preprocess")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(db.SPAFeedbackParameters.pj_id == pj_id)
+    ).one()
+    _db.expunge(relion_params)
+    _db.expunge(feedback_params)
+    return relion_params, feedback_params
+
+
 def _register_picked_particles_use_diameter(
     message: dict, _db=murfey_db, demo: bool = False
 ):
@@ -430,7 +454,7 @@ def _register_picked_particles_use_diameter(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
         extract_file=params_to_forward["extract_file"],
-        coord_list_file=params_to_forward["coords_list_file"],
+        coord_list_file=params_to_forward["coord_list_file"],
         ctf_image=params_to_forward["ctf_values"]["CtfImage"],
         ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
         ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -445,8 +469,9 @@ def _register_picked_particles_use_diameter(
     picking_db_len = _db.exec(
         select(func.count(db.ParticleSizes.id)).where(db.ParticleSizes.pj_id == pj_id)
     ).one()
-    if picking_db_len > 10000:
+    if picking_db_len > default_spa_parameters.nr_picks_before_diameter:
         # If there are enough particles to get a diameter
+        machine_config = get_machine_config()
         relion_params = _db.exec(
             select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
         ).one()
@@ -465,7 +490,7 @@ def _register_picked_particles_use_diameter(
             else:
                 assert feedback_params.picker_murfey_id is not None
                 feedback_params.pciker_ispyb_id = _transport_object.do_buffer_lookup(
-                    message["auto_proc_program_id"], feedback_params.picker_murfey_id
+                    message["program_id"], feedback_params.picker_murfey_id
                 )
             _db.add(feedback_params)
             _db.commit()
@@ -504,6 +529,7 @@ def _register_picked_particles_use_diameter(
             ).all()
             for saved_message in ctf_db:
                 # Send on all saved messages to extraction
+                _db.expunge(saved_message)
                 zocalo_message = {
                     "parameters": {
                         "micrographs_file": saved_message.micrographs_file,
@@ -518,7 +544,16 @@ def _register_picked_particles_use_diameter(
                         "defocus_angle": saved_message.defocus_angle,
                         "particle_diameter": particle_diameter,
                         "downscale": relion_options["downscale"],
-                        "relion_options": relion_options,
+                        "fm_dose": relion_options["dose_per_frame"],
+                        "kv": relion_options["voltage"],
+                        "gain_ref": relion_options["gain_ref"],
+                        "feedback_queue": machine_config.feedback_queue,
+                        "session_id": message["session_id"],
+                        "autoproc_program_id": _app_id(
+                            _pj_id(message["program_id"], _db, recipe="em-spa-extract"),
+                            _db,
+                        ),
+                        "batch_size": default_spa_parameters.batch_size_2d,
                     },
                     "recipes": ["em-spa-extract"],
                 }
@@ -532,7 +567,7 @@ def _register_picked_particles_use_diameter(
             zocalo_message = {
                 "parameters": {
                     "micrographs_file": params_to_forward["micrographs_file"],
-                    "coord_list_file": params_to_forward["coords_list_file"],
+                    "coord_list_file": params_to_forward["coord_list_file"],
                     "output_file": params_to_forward["extract_file"],
                     "pix_size": relion_options["angpix"],
                     "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
@@ -547,7 +582,15 @@ def _register_picked_particles_use_diameter(
                     "defocus_angle": params_to_forward["ctf_values"]["DefocusAngle"],
                     "particle_diameter": particle_diameter,
                     "downscale": relion_options["downscale"],
-                    "relion_options": relion_options,
+                    "fm_dose": relion_options["dose_per_frame"],
+                    "kv": relion_options["voltage"],
+                    "gain_ref": relion_options["gain_ref"],
+                    "feedback_queue": machine_config.feedback_queue,
+                    "session_id": message["session_id"],
+                    "autoproc_program_id": _app_id(
+                        _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+                    ),
+                    "batch_size": default_spa_parameters.batch_size_2d,
                 },
                 "recipes": ["em-spa-extract"],
             }
@@ -571,7 +614,7 @@ def _register_picked_particles_use_diameter(
 
     else:
         # If not enough particles then save the new sizes
-        particle_list = message.get("particle_sizes_list")
+        particle_list = message.get("particle_diameters")
         assert isinstance(particle_list, list)
         for particle in particle_list:
             new_particle = db.ParticleSizes(pj_id=pj_id, particle_size=particle)
@@ -633,6 +676,83 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
 
 
+def _release_2d_hold(message: dict, _db=murfey_db):
+    feedback_params, relion_params = _get_spa_params(message["program_id"], _db)
+    if not feedback_params.star_combination_job:
+        feedback_params.star_combination_job = feedback_params.next_job + (
+            3 if default_spa_parameters.do_icebreaker_jobs else 2
+        )
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
+    if _db.exec(
+        select(func.count(db.Class2DParameters.particles_file))
+        .where(db.Class2DParameters.pj_id == pj_id)
+        .where(db.Class2DParameters.complete)
+    ).one():
+        first_class2d = _db.exec(
+            select(db.Class2DParameters)
+            .where(db.Class2DParameters.pj_id == pj_id)
+            .where(db.Class2DParameters.complete)
+        ).first()
+        machine_config = get_machine_config()
+        zocalo_message = {
+            "parameters": {
+                "particles_file": first_class2d.particles_file,
+                "class2d_dir": message["job_dir"],
+                "batch_is_complete": True,
+                "batch_size": first_class2d.batch_size,
+                "particle_diameter": relion_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoproc_program_id": message["program_id"],
+                "pix_size": relion_params.angpix,
+                "fm_dose": relion_params.dose_per_frame,
+                "kv": relion_params.voltage,
+                "gain_ref": relion_params.gain_ref,
+                "nr_iter": default_spa_parameters.nr_iter_2d,
+                "batch_size": default_spa_parameters.batch_size_2d,
+                "nr_classes": default_spa_parameters.nr_classes_2d,
+                "downscale": default_spa_parameters.downscale,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+                "mask_diameter": 0,
+                "picker_id": feedback_params.picker_ispyb_id,
+                "class_uuids": _2d_class_murfey_ids(
+                    first_class2d.particles_file, message["program_id"], _db
+                ),
+                "class2d_grp_uuid": _db.exec(
+                    select(db.Class2DParameters)
+                    .where(
+                        db.Class2DParameters.particles_file
+                        == first_class2d.particles_file
+                    )
+                    .where(db.Class2DParameters.pj_id == pj_id)
+                )
+                .one()
+                .murfey_id,
+                "session_id": message["session_id"],
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-class2d"],
+        }
+        feedback_params.next_job += (
+            4 if default_spa_parameters.do_icebreaker_jobs else 3
+        )
+        _db.add(feedback_params)
+        _db.delete(first_class2d)
+        _db.commit()
+        _db.close()
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+    else:
+        feedback_params.hold_class2d = False
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
+
+
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
@@ -684,7 +804,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             "relion_options": relion_options,
             "picker_uuid": other_options["picker_murfey_id"],
             "class_uuids": _2d_class_murfey_ids(
-                class2d_message["particles_file"], message["program_id"], _db
+                class2d_message["particles_file"], _app_id(pj_id, _db), _db
             ),
             "class2d_grp_id": _db.exec(
                 select(db.Class2DParameters).where(
@@ -769,7 +889,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], message["program_id"], _db
+                    class2d_message["particles_file"], _app_id(pj_id, _db), _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class2DParameters).where(
@@ -807,7 +927,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], message["program_id"], _db
+                    class2d_message["particles_file"], _app_id(pj_id, _db), _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class2DParameters).where(
