@@ -308,34 +308,6 @@ def _set_up_transport(transport_type):
     _transport_object = TransportManager(transport_type)
 
 
-async def feedback_callback_async(header: dict, message: dict) -> None:
-    logger.info(f"feedback_callback_async called with {header}, {message}")
-    if message["register"] == "motion_corrected":
-        if murfey.server.websocket.manager:
-            if global_state.get("motion_corrected_movies") and isinstance(
-                global_state["motion_corrected_movies"], dict
-            ):
-                await global_state.aupdate(
-                    "motion_corrected_movies",
-                    {
-                        message.get("movie"): [
-                            message.get("mrc_out"),
-                            message.get("movie_id"),
-                        ],
-                    },
-                )
-            else:
-                await global_state.aupdate(
-                    "motion_corrected_movies",
-                    {
-                        message.get("movie"): [
-                            message.get("mrc_out"),
-                            message.get("movie_id"),
-                        ]
-                    },
-                )
-
-
 def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[int]:
     murfey_ledger = [db.MurfeyLedger(app_id=app_id) for _ in range(number)]
     for ml in murfey_ledger:
@@ -347,12 +319,17 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
     return res
 
 
-def _murfey_class2ds(murfey_ids: List[int], particles_file: str, session_id: int, _db):
+def _murfey_class2ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
     class2ds = [
         db.Class2D(
             class_number=i,
             particles_file=particles_file,
-            session_id=session_id,
+            pj_id=pj_id,
             murfey_id=mid,
         )
         for i, mid in enumerate(murfey_ids)
@@ -363,12 +340,17 @@ def _murfey_class2ds(murfey_ids: List[int], particles_file: str, session_id: int
     _db.close()
 
 
-def _murfey_class3ds(murfey_ids: List[int], particles_file: str, session_id: int, _db):
+def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
     class3ds = [
         db.Class3D(
             class_number=i,
             particles_file=particles_file,
-            session_id=session_id,
+            pj_id=pj_id,
             murfey_id=mid,
         )
         for i, mid in enumerate(murfey_ids)
@@ -379,44 +361,61 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, session_id: int
     _db.close()
 
 
-def _2d_class_murfey_ids(particles_file: str, session_id: int, _db) -> Dict[str, int]:
+def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
     classes = _db.exec(
         select(db.Class2D).where(
-            db.Class2D.particles_file == particles_file
-            and db.Class2D.session_id == session_id
+            db.Class2D.particles_file == particles_file and db.Class2D.pj_id == pj_id
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _3d_class_murfey_ids(particles_file: str, session_id: int, _db) -> Dict[str, int]:
+def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
     classes = _db.exec(
         select(db.Class3D).where(
-            db.Class3D.particles_file == particles_file
-            and db.Class3D.session_id == session_id
+            db.Class3D.particles_file == particles_file and db.Class3D.pj_id == pj_id
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _app_id(recipe: str, session_id: int, _db) -> int:
-    collected_ids = _db.exec(
-        select(
-            db.DataCollectionGroup,
-            db.DataCollection,
-            db.ProcessingJob,
-            db.AutoProcProgram,
+def _pj_id(app_id: int, _db, recipe: str = "") -> int:
+    if recipe:
+        dc_id = (
+            _db.exec(
+                select(db.AutoProcProgram, db.ProcessingJob).where(
+                    db.AutoProcProgram.id == app_id
+                )
+            )
+            .one()[1]
+            .dc_id
         )
-        .where(
-            db.DataCollectionGroup.session_id == session_id
-            and db.DataCollectionGroup.tag == "spa"
+        pj_id = (
+            _db.exec(
+                select(db.ProcessingJob)
+                .where(db.ProcessingJob.dc_id == dc_id)
+                .where(db.ProcessingJob.recipe == recipe)
+            )
+            .one()
+            .id
         )
-        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(db.ProcessingJob.recipe == recipe)
-    ).one()
-    return collected_ids[-1].id
+    else:
+        pj_id = (
+            _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+            .one()
+            .pj_id
+        )
+    return pj_id
 
 
 def _register_picked_particles_use_diameter(
@@ -426,8 +425,9 @@ def _register_picked_particles_use_diameter(
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
+    pj_id = _pj_id(message["program_id"], _db)
     ctf_params = db.CtfParameters(
-        session_id=message["session_id"],
+        pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
         extract_file=params_to_forward["extract_file"],
         coord_list_file=params_to_forward["coords_list_file"],
@@ -443,21 +443,17 @@ def _register_picked_particles_use_diameter(
     _db.close()
 
     picking_db_len = _db.exec(
-        select(func.count(db.ParticleSizes.id)).where(
-            db.ParticleSizes.session_id == message["session_id"]
-        )
+        select(func.count(db.ParticleSizes.id)).where(db.ParticleSizes.pj_id == pj_id)
     ).one()
     if picking_db_len > 10000:
         # If there are enough particles to get a diameter
         relion_params = _db.exec(
-            select(db.SPARelionParameters).where(
-                db.SPARelionParameters.session_id == message["session_id"]
-            )
+            select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
         ).one()
         relion_options = dict(relion_params)
         feedback_params = _db.exec(
             select(db.SPAFeedbackParameters).where(
-                db.SPAFeedbackParameters.session_id == message["session_id"]
+                db.SPAFeedbackParameters.pj_id == pj_id
             )
         ).one()
 
@@ -475,9 +471,7 @@ def _register_picked_particles_use_diameter(
             _db.commit()
             _db.close()
             selection_stash = _db.exec(
-                select(db.SelectionStash).where(
-                    db.SelectionStash.session_id == message["session_id"]
-                )
+                select(db.SelectionStash).where(db.SelectionStash.pj_id == pj_id)
             ).all()
             for s in selection_stash:
                 _register_class_selection(
@@ -496,7 +490,7 @@ def _register_picked_particles_use_diameter(
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
                 select(db.ParticleSizes.particle_size).where(
-                    db.ParticleSizes.session_id == message["session_id"]
+                    db.ParticleSizes.pj_id == pj_id
                 )
             ).all()
             particle_diameter = np.quantile(list(picking_db), 0.75)
@@ -506,9 +500,7 @@ def _register_picked_particles_use_diameter(
             _db.close()
 
             ctf_db = _db.exec(
-                select(db.CtfParameters).where(
-                    db.CtfParameters.session_id == message["session_id"]
-                )
+                select(db.CtfParameters).where(db.CtfParameters.pj_id == pj_id)
             ).all()
             for saved_message in ctf_db:
                 # Send on all saved messages to extraction
@@ -578,20 +570,20 @@ def _register_picked_particles_use_diameter(
         particle_list = message.get("particle_sizes_list")
         assert isinstance(particle_list, list)
         for particle in particle_list:
-            new_particle = db.ParticleSizes(
-                session_id=message["session_id"], particle_size=particle
-            )
+            new_particle = db.ParticleSizes(pj_id=pj_id, particle_size=particle)
             _db.add(new_particle)
             _db.commit()
             _db.close()
 
 
-def _register_picked_particles_use_boxsize(message: dict):
+def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     """Received picked particles from the autopick service"""
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
+    pj_id = _pj_id(message["program_id"], _db)
     ctf_params = db.CtfParameters(
+        pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
         coord_list_file=params_to_forward["coords_list_file"],
         ctf_image=params_to_forward["ctf_values"]["CtfImage"],
@@ -639,14 +631,17 @@ def _register_picked_particles_use_boxsize(message: dict):
 
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
+    # the general parameters are stored using the preprocessing auto proc program ID
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
-            db.SPARelionParameters.session_id == message["session_id"]
+            db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.session_id == message["session_id"]
+            db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     relion_options = dict(relion_params)
@@ -656,14 +651,12 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
     if not _db.exec(
         select(func.count(db.Class2DParameters.particles_file)).where(
             db.Class2DParameters.particles_file == class2d_message["particles_file"]
-            and db.Class2DParameters.session_id == message["session_id"]
+            and db.Class2DParameters.pj_id == pj_id
         )
     ).one():
         class2d_params = db.Class2DParameters(
-            session_id=message["session_id"],
-            murfey_id=_murfey_id(
-                _app_id("em-spa-class2d", message["session_id"], _db), _db
-            )[0],
+            pj_id=pj_id,
+            murfey_id=_murfey_id(message["program_id"], _db)[0],
             particles_file=class2d_message["particles_file"],
             class2d_dir=class2d_message["class2d_dir"],
             batch_size=class2d_message["batch_size"],
@@ -672,11 +665,9 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _db.add(class2d_params)
         _db.commit()
         _db.close()
-        murfey_ids = _murfey_id(
-            _app_id("em-spa-class2d", message["session_id"], _db), _db, number=50
-        )
+        murfey_ids = _murfey_id(message["program_id"], _db, number=50)
         _murfey_class2ds(
-            murfey_ids, class2d_message["particles_file"], message["session_id"], _db
+            murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
     zocalo_message = {
         "parameters": {
@@ -689,19 +680,19 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             "relion_options": relion_options,
             "picker_uuid": other_options["picker_murfey_id"],
             "class_uuids": _2d_class_murfey_ids(
-                class2d_message["particles_file"], message["session_id"], _db
+                class2d_message["particles_file"], message["program_id"], _db
             ),
             "class2d_grp_id": _db.exec(
                 select(db.Class2DParameters).where(
                     db.Class2DParameters.particles_file
                     == class2d_message["particles_file"]
-                    and db.Class2DParameters.session_id == message["session_id"]
+                    and db.Class2DParameters.pj_id == pj_id
                 )
             )
             .one()
             .murfey_id,
         },
-        "recipes": ["relion-class2d"],
+        "recipes": ["em-spa-class2d"],
     }
     if _transport_object:
         _transport_object.send("processing_recipe", zocalo_message)
@@ -710,7 +701,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         if not _db.exec(
             select(func.count(db.Class2DParameters.particles_file)).where(
                 db.Class2DParameters.particles_file == class2d_message["particles_file"]
-                and db.Class2DParameters.session_id == message["session_id"]
+                and db.Class2DParameters.pj_id == pj_id
                 and db.Class2DParameters.complete
             )
         ).one():
@@ -725,23 +716,23 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
     """Received full batch from particle selection service"""
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
-            db.SPARelionParameters.session_id == message["session_id"]
+            db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.session_id == message["session_id"]
+            db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     if feedback_params.hold_class2d:
         # If waiting then save the message
         class2d_params = db.Class2DParameters(
-            session_id=message["session_id"],
-            murfey_id=_murfey_id(
-                _app_id("em-spa-class2d", message["session_id"], _db), _db
-            )[0],
+            pj_id=pj_id,
+            murfey_id=_murfey_id(message["program_id"], _db)[0],
             particles_file=class2d_message["particles_file"],
             class2d_dir=class2d_message["class2d_dir"],
             batch_size=class2d_message["batch_size"],
@@ -749,11 +740,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
         _db.add(class2d_params)
         _db.commit()
         _db.close()
-        murfey_ids = _murfey_id(
-            _app_id("em-spa-class2d", message["session_id"], _db), _db, number=50
-        )
+        murfey_ids = _murfey_id(message["program_id"], _db, number=50)
         _murfey_class2ds(
-            murfey_ids, class2d_message["particles_file"], message["session_id"], _db
+            murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
         if demo:
             _register_class_selection(
@@ -776,19 +765,19 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], message["session_id"], _db
+                    class2d_message["particles_file"], message["program_id"], _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class2DParameters).where(
                         db.Class2DParameters.particles_file
                         == class2d_message["particles_file"]
-                        and db.Class2DParameters.session_id == message["session_id"]
+                        and db.Class2DParameters.pj_id == pj_id
                     )
                 )
                 .one()
                 .murfey_id,
             },
-            "recipes": ["relion-class2d"],
+            "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
@@ -812,19 +801,19 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], message["session_id"], _db
+                    class2d_message["particles_file"], message["program_id"], _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class2DParameters).where(
                         db.Class2DParameters.particles_file
                         == class2d_message["particles_file"]
-                        and db.Class2DParameters.session_id == message["session_id"]
+                        and db.Class2DParameters.pj_id == pj_id
                     )
                 )
                 .one()
                 .murfey_id,
             },
-            "recipes": ["relion-class2d"],
+            "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
@@ -836,26 +825,26 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
 
 def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     """Received selection score from class selection service"""
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
-            db.SPARelionParameters.session_id == message["session_id"]
+            db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
     class2d_db = _db.exec(
-        select(db.Class2DParameters).where(
-            db.Class2DParameters.session_id == message["session_id"]
-        )
+        select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
     ).all()
     # Add the class selection score to the database
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.session_id == message["session_id"]
+            db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
 
     if feedback_params.picker_ispyb_id is None:
         selection_stash = db.SelectionStash(
-            session_id=message["session_id"],
+            pj_id=pj_id,
             class_selection_score=message["class_selection_score"],
         )
         _db.add(selection_stash)
@@ -880,7 +869,7 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "relion_options": dict(relion_params),
             },
-            "recipes": ["relion-class2d"],
+            "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
@@ -934,24 +923,24 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
     assert isinstance(class3d_message, dict)
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class3d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
-            db.SPARelionParameters.session_id == message["session_id"]
+            db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.session_id == message["session_id"]
+            db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
         class3d_params = db.Class3DParameters(
-            session_id=message["session_id"],
-            murfey_id=_murfey_id(
-                _app_id("em-spa-class3d", message["session_id"], _db), _db
-            )[0],
+            pj_id=pj_id,
+            murfey_id=_murfey_id(message["program_id"], _db)[0],
             particles_file=class3d_message["particles_file"],
             class3d_dir=class3d_message["class3d_dir"],
             batch_size=class3d_message["batch_size"],
@@ -959,11 +948,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         _db.add(class3d_params)
         _db.commit()
         _db.close()
-        murfey_ids = _murfey_id(
-            _app_id("em-spa-class3d", message["session_id"], _db), _db, number=4
-        )
+        murfey_ids = _murfey_id(message["program_id"], _db, number=4)
         _murfey_class3ds(
-            murfey_ids, class3d_message["particles_file"], message["session_id"], _db
+            murfey_ids, class3d_message["particles_file"], message["program_id"], _db
         )
     elif not feedback_params.initial_model:
         # For the first batch, start a container and set the database to wait
@@ -979,19 +966,19 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _3d_class_murfey_ids(
-                    class3d_message["particles_file"], message["session_id"], _db
+                    class3d_message["particles_file"], message["program_id"], _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class3DParameters).where(
                         db.Class3DParameters.particles_file
                         == class3d_message["particles_file"]
-                        and db.Class3DParameters.session_id == message["session_id"]
+                        and db.Class3DParameters.pj_id == pj_id
                     )
                 )
                 .one()
                 .murfey_id,
             },
-            "recipes": ["relion-class3d"],
+            "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
@@ -1013,19 +1000,19 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "relion_options": dict(relion_params),
                 "picker_uuid": feedback_params.picker_murfey_id,
                 "class_uuids": _3d_class_murfey_ids(
-                    class3d_message["particles_file"], message["session_id"], _db
+                    class3d_message["particles_file"], message["program_id"], _db
                 ),
                 "class2d_grp_id": _db.exec(
                     select(db.Class3DParameters).where(
                         db.Class3DParameters.particles_file
                         == class3d_message["particles_file"]
-                        and db.Class3DParameters.session_id == message["session_id"]
+                        and db.Class3DParameters.pj_id == pj_id
                     )
                 )
                 .one()
                 .murfey_id,
             },
-            "recipes": ["relion-class3d"],
+            "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
@@ -1037,20 +1024,20 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
 
 def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     """Received initial model from 3d classification service"""
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db)
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
-            db.SPARelionParameters.session_id == message["session_id"]
+            db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
     class3d_db = _db.exec(
-        select(db.Class3DParameters).where(
-            db.Class3DParameters.session_id == message["session_id"]
-        )
+        select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
     ).all()
     # Add the initial model file to the database
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.session_id == message["session_id"]
+            db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     feedback_params.initial_model = message.get("initial_model")
@@ -1067,7 +1054,7 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
                 "initial_model_file": feedback_params.initial_model,
                 "relion_options": dict(relion_params),
             },
-            "recipes": ["relion-class3d"],
+            "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)

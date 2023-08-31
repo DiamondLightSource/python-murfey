@@ -281,17 +281,26 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
-@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
+@router.post("/visits/{visit_name}/{client_id}/{tag}flush_spa_processing")
+def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db):
     stashed_files = db.exec(
         select(PreprocessStash).where(PreprocessStash.client_id == client_id)
     ).all()
     if not stashed_files:
         return
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.client_id == client_id)
+        .where(DataCollectionGroup.tag == tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-spa-preprocess")
+    ).one()
     params = db.exec(
         select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-        .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
-        .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
+        .where(SPARelionParameters.pj_id == collected_ids[3].id)
+        .where(SPAFeedbackParameters.pj_id == collected_ids[3].id)
         .where(ClientEnvironment.client_id == client_id)
     ).one()
     proc_params = params[0]
@@ -301,14 +310,6 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
             f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
         )
         return
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.client_id == client_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-spa-preprocess")
-    ).one()
 
     murfey_ids = _murfey_id(
         collected_ids[3].id, db, number=2 * len(stashed_files), close=False
@@ -479,17 +480,6 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
-        params = db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-            .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
-            .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
-            .where(ClientEnvironment.client_id == client_id)
-        ).one()
-        proc_params: dict | None = dict(params[0])
-        feedback_params = params[1]
-    except sqlalchemy.exc.NoResultFound:
-        proc_params = None
-    if proc_params:
         session_id = (
             db.exec(
                 select(ClientEnvironment).where(
@@ -501,15 +491,24 @@ async def request_spa_preprocessing(
         )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-            .where(
-                DataCollectionGroup.session_id == session_id
-                and DataCollectionGroup.tag == "spa"
-            )
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == SPAProcessFile.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
+        params = db.exec(
+            select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
+            .where(SPARelionParameters.pj_id == collected_ids[3].id)
+            .where(SPAFeedbackParameters.pj_id == collected_ids[3].id)
+            .where(ClientEnvironment.client_id == client_id)
+        ).one()
+        proc_params: dict | None = dict(params[0])
+        feedback_params = params[1]
+    except sqlalchemy.exc.NoResultFound:
+        proc_params = None
+    if proc_params:
 
         detached_ids = [c.id for c in collected_ids]
 

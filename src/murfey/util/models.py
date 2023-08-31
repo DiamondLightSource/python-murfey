@@ -94,6 +94,7 @@ class SPAProcessFile(BaseModel):
     mc_binning: Optional[int] = 1
     gain_ref: Optional[str] = None
     extract_downscale: bool = True
+    source: str = ""
 
 
 class TiltSeriesInfo(BaseModel):

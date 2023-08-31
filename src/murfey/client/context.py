@@ -441,6 +441,7 @@ class SPAModularContext(_SPAContext):
                             "downscale": environment.data_collection_parameters.get(
                                 "downscale"
                             ),
+                            "tag": str(source),
                         }
                         requests.post(
                             preproc_url,

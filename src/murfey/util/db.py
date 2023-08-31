@@ -32,34 +32,7 @@ class Session(SQLModel, table=True):  # type: ignore
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    spa_parameters: List["SPARelionParameters"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    ctf_parameters: List["CtfParameters"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    class2d_parameters: List["Class2DParameters"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    class3d_parameters: List["Class3DParameters"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    class2ds: List["Class2D"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    class3ds: List["Class3D"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    particle_sizes: List["ParticleSizes"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    selection_stash: List["SelectionStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -113,7 +86,35 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     data_collection: Optional[DataCollection] = Relationship(
         back_populates="processing_jobs"
     )
+
     auto_proc_programs: List["AutoProcProgram"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    selection_stash: List["SelectionStash"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    particle_sizes: List["ParticleSizes"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    spa_parameters: List["SPARelionParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    ctf_parameters: List["CtfParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class2d_parameters: List["Class2DParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3d_parameters: List["Class3DParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class2ds: List["Class2D"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    class3ds: List["Class3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -131,12 +132,14 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
 class SelectionStash(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     class_selection_score: float
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
-    session: Optional[Session] = Relationship(back_populates="selection_stash")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="selection_stash"
+    )
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     pixel_size: float
     manual_tilt_offset: int
 
@@ -186,7 +189,7 @@ class Movie(SQLModel, table=True):  # type: ignore
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="session.id")
+    pj_id: int = Field(foreign_key="processingjob.id")
     micrographs_file: str
     coord_list_file: str
     extract_file: str
@@ -196,18 +199,22 @@ class CtfParameters(SQLModel, table=True):  # type: ignore
     defocus_u: float
     defocus_v: float
     defocus_angle: float
-    session: Optional[Session] = Relationship(back_populates="ctf_parameters")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="ctf_parameters"
+    )
 
 
 class ParticleSizes(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="session.id")
+    pj_id: int = Field(foreign_key="processingjob.id")
     particle_size: float
-    session: Optional[Session] = Relationship(back_populates="particle_sizes")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="particle_sizes"
+    )
 
 
 class SPARelionParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     angpix: float
     dose_per_frame: float
     gain_ref: Optional[str]
@@ -221,11 +228,13 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     boxsize: Optional[int] = 256
     small_boxsize: Optional[int] = 64
     mask_diameter: Optional[float] = 190
-    session: Optional[Session] = Relationship(back_populates="spa_parameters")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="spa_parameters"
+    )
 
 
 class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
     hold_class3d: bool = False
@@ -235,7 +244,9 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     next_job: int
     picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
     picker_ispyb_id: Optional[int] = None
-    session: Optional[Session] = Relationship(back_populates="spa_feedback_parameters")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="spa_feedback_parameters"
+    )
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="spa_feedback_parameters"
     )
@@ -243,12 +254,14 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_dir: str
     batch_size: int
     complete: bool = True
-    session: Optional[Session] = Relationship(back_populates="class2d_parameters")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="class2d_parameters"
+    )
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class2d_parameters"
     )
@@ -263,22 +276,24 @@ class Class2D(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(
         primary_key=True, foreign_key="class2dparameters.particles_file"
     )
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_parameters: Optional[Class2DParameters] = Relationship(
         back_populates="class2ds"
     )
-    session: Optional[Session] = Relationship(back_populates="class2ds")
+    processing_job: Optional[ProcessingJob] = Relationship(back_populates="class2ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class2ds")
 
 
 class Class3DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True, unique=True)
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     batch_size: int
-    session: Optional[Session] = Relationship(back_populates="class3d_parameters")
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="class3d_parameters"
+    )
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class3d_parameters"
     )
@@ -293,12 +308,12 @@ class Class3D(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(
         primary_key=True, foreign_key="class3dparameters.particles_file"
     )
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_parameters: Optional[Class3DParameters] = Relationship(
         back_populates="class3ds"
     )
-    session: Optional[Session] = Relationship(back_populates="class3ds")
+    processing_job: Optional[ProcessingJob] = Relationship(back_populates="class3ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class3ds")
 
 
