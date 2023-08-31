@@ -523,7 +523,9 @@ def _register_picked_particles_use_diameter(
                     "recipes": ["em-spa-extract"],
                 }
                 if _transport_object:
-                    _transport_object.send("processing_recipe", zocalo_message)
+                    _transport_object.send(
+                        "processing_recipe", zocalo_message, new_connection=True
+                    )
         else:
             # If the diameter is known then just send the new message
             particle_diameter = relion_params.particle_diameter
@@ -550,7 +552,9 @@ def _register_picked_particles_use_diameter(
                 "recipes": ["em-spa-extract"],
             }
             if _transport_object:
-                _transport_object.send("processing_recipe", zocalo_message)
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
             if demo:
                 _register_incomplete_2d_batch(
                     {
@@ -626,7 +630,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
         "recipes": ["em-spa-extract"],
     }
     if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
+        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
 
 
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
@@ -695,7 +699,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         "recipes": ["em-spa-class2d"],
     }
     if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
+        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     if demo:
         logger.info("Incomplete 2D batch registered in demo mode")
         if not _db.exec(
@@ -780,7 +784,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         feedback_params.hold_class2d = True
         feedback_params.next_job += 3
         _db.add(feedback_params)
@@ -816,7 +822,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         feedback_params.next_job += 2
         _db.add(feedback_params)
         _db.commit()
@@ -872,7 +880,9 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         if demo:
             particles_file = saved_message.particles_file
             logger.info("Complete 2D classification registered in demo mode")
@@ -981,7 +991,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         feedback_params.hold_class3d = True
         feedback_params.next_job += 2
         _db.add(feedback_params)
@@ -1015,7 +1027,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         feedback_params.next_job += 1
         _db.add(feedback_params)
         _db.commit()
@@ -1057,7 +1071,9 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
         feedback_params.next_job += 1
         _db.delete(saved_message)
     _db.add(feedback_params)
