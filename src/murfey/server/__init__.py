@@ -684,14 +684,12 @@ def _release_2d_hold(message: dict, _db=murfey_db):
         )
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     if _db.exec(
-        select(func.count(db.Class2DParameters.particles_file))
-        .where(db.Class2DParameters.pj_id == pj_id)
-        .where(db.Class2DParameters.complete)
+        select(func.count(db.Class2DParameters.particles_file)).where(
+            db.Class2DParameters.pj_id == pj_id
+        )
     ).one():
         first_class2d = _db.exec(
-            select(db.Class2DParameters)
-            .where(db.Class2DParameters.pj_id == pj_id)
-            .where(db.Class2DParameters.complete)
+            select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
         ).first()
         machine_config = get_machine_config()
         zocalo_message = {
@@ -735,9 +733,10 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             },
             "recipes": ["em-spa-class2d"],
         }
-        feedback_params.next_job += (
-            4 if default_spa_parameters.do_icebreaker_jobs else 3
-        )
+        if first_class2d.complete:
+            feedback_params.next_job += (
+                4 if default_spa_parameters.do_icebreaker_jobs else 3
+            )
         _db.add(feedback_params)
         _db.delete(first_class2d)
         _db.commit()
