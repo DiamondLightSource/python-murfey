@@ -370,6 +370,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
                 "downscale": proc_params.downscale,
                 "picker_uuid": murfey_ids[2 * i + 1],
                 "session_id": session_id,
+                "particle_diameter": proc_params.particle_diameter or 0,
             },
         }
         if _transport_object:
@@ -571,7 +572,7 @@ async def request_spa_preprocessing(
                 "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
-                "particle_diameter": proc_params["particle_diameter"],
+                "particle_diameter": proc_params["particle_diameter"] or 0,
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")

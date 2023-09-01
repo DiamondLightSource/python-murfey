@@ -291,6 +291,7 @@ class Class3DParameters(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     batch_size: int
+    run: bool = True
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="class3d_parameters"
     )

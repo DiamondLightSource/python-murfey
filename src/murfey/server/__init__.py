@@ -752,6 +752,78 @@ def _release_2d_hold(message: dict, _db=murfey_db):
         _db.close()
 
 
+def _release_3d_hold(message: dict, _db=murfey_db):
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class3d")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    class3d_params = _db.exec(
+        select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
+    ).one()
+    feedback_params.hold_class3d = False
+    if class3d_params.run:
+        machine_config = get_machine_config()
+        zocalo_message = {
+            "parameters": {
+                "particles_file": class3d_params.particles_file,
+                "class3d_dir": class3d_params.class3d_dir,
+                "batch_size": class3d_params.batch_size,
+                "particle_diameter": relion_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "do_initial_model": True,
+                "picker_id": feedback_params.picker_ispyb_id,
+                "class_uuids": _3d_class_murfey_ids(
+                    class3d_params.particles_file, _app_id(pj_id, _db), _db
+                ),
+                "class3d_grp_uuid": _db.exec(
+                    select(db.Class3DParameters)
+                    .where(
+                        db.Class3DParameters.particles_file
+                        == class3d_params.particles_file
+                    )
+                    .where(db.Class3DParameters.pj_id == pj_id)
+                )
+                .one()
+                .murfey_id,
+                "pix_size": relion_params.angpix,
+                "fm_dose": relion_params.dose_per_frame,
+                "kv": relion_params.voltage,
+                "gain_ref": relion_params.gain_ref,
+                "nr_iter": default_spa_parameters.nr_iter_3d,
+                "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
+                "batch_size": default_spa_parameters.batch_size_2d,
+                "nr_classes": default_spa_parameters.nr_classes_3d,
+                "downscale": default_spa_parameters.downscale,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+                "mask_diameter": 0,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-class3d"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        class3d_params.run = False
+        _db.add(class3d_params)
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
+
+
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
