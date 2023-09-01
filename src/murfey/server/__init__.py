@@ -800,6 +800,8 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
+        if feedback_params.picker_ispyb_id is None:
+            return
     zocalo_message = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
@@ -877,7 +879,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
     ).one()
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
-    if feedback_params.hold_class2d:
+    if feedback_params.hold_class2d or feedback_params.picker_ispyb_id is None:
         # If waiting then save the message
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
@@ -1068,9 +1070,83 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
         _db.close()
 
 
+def _flush_class2d(
+    session_id: int,
+    app_id: int,
+    _db,
+    relion_params: db.SPARelionParameters | None = None,
+    feedback_params: db.SPAFeedbackParameters | None = None,
+):
+    machine_config = get_machine_config()
+    if not relion_params or feedback_params:
+        pj_id_params = _pj_id(app_id, _db, recipe="em-spa-preprocess")
+    if not relion_params:
+        relion_params = _db.exec(
+            select(db.SPARelionParameters).where(
+                db.SPARelionParameters.pj_id == pj_id_params
+            )
+        ).one()
+        _db.expunge(relion_params)
+    if not feedback_params:
+        feedback_params = _db.exec(
+            select(db.SPAFeedbackParameters).where(
+                db.SPAFeedbackParameters.pj_id == pj_id_params
+            )
+        ).one()
+        _db.expunge(feedback_params)
+    if not relion_params or not feedback_params:
+        return
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-class2d")
+    class2d_db = _db.exec(
+        select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
+    ).all()
+    for saved_message in class2d_db:
+        # Send all held Class2D messages on with the selection score added
+        _db.expunge(saved_message)
+        zocalo_message = {
+            "parameters": {
+                "particles_file": saved_message.particles_file,
+                "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
+                "batch_is_complete": True,
+                "batch_size": saved_message.batch_size,
+                "particle_diameter": relion_params.particle_diameter,
+                "mask_diameter": relion_params.mask_diameter,
+                "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": feedback_params.class_selection_score,
+                "relion_options": dict(relion_params),
+                "picker_id": feedback_params.picker_ispyb_id,
+                "class_uuids": _2d_class_murfey_ids(
+                    saved_message.particles_file, _app_id(pj_id, _db), _db
+                ),
+                "class2d_grp_id": saved_message.murfey_id,
+                "pix_size": relion_params.angpix,
+                "fm_dose": relion_params.dose_per_frame,
+                "kv": relion_params.voltage,
+                "gain_ref": relion_params.gain_ref,
+                "nr_iter": default_spa_parameters.nr_iter_2d,
+                "batch_size": default_spa_parameters.batch_size_2d,
+                "nr_classes": default_spa_parameters.nr_classes_2d,
+                "downscale": default_spa_parameters.downscale,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+                "mask_diameter": 0,
+                "session_id": session_id,
+                "autoproc_program_id": _app_id(pj_id, _db),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-class2d"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        feedback_params.next_job += 2
+    _db.add(feedback_params)
+    _db.commit()
+
+
 def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     """Received selection score from class selection service"""
-    machine_config = get_machine_config()
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
@@ -1102,49 +1178,10 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     feedback_params.class_selection_score = message.get("class_selection_score")
     feedback_params.hold_class2d = False
     next_job = feedback_params.next_job
-    for saved_message in class2d_db:
-        # Send all held Class2D messages on with the selection score added
-        _db.expunge(saved_message)
-        zocalo_message = {
-            "parameters": {
-                "particles_file": saved_message.particles_file,
-                "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
-                "batch_is_complete": True,
-                "batch_size": saved_message.batch_size,
-                "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
-                "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
-                "relion_options": dict(relion_params),
-                "picker_id": feedback_params.picker_ispyb_id,
-                "class_uuids": _2d_class_murfey_ids(
-                    saved_message.particles_file, _app_id(pj_id, _db), _db
-                ),
-                "class2d_grp_id": saved_message.murfey_id,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
-                "nr_iter": default_spa_parameters.nr_iter_2d,
-                "batch_size": default_spa_parameters.batch_size_2d,
-                "nr_classes": default_spa_parameters.nr_classes_2d,
-                "downscale": default_spa_parameters.downscale,
-                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
-                "session_id": message["session_id"],
-                "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
-                ),
-                "feedback_queue": machine_config.feedback_queue,
-            },
-            "recipes": ["em-spa-class2d"],
-        }
-        if _transport_object:
-            _transport_object.send(
-                "processing_recipe", zocalo_message, new_connection=True
-            )
-        if demo:
+    if demo:
+        for saved_message in class2d_db:
+            # Send all held Class2D messages on with the selection score added
+            _db.expunge(saved_message)
             particles_file = saved_message.particles_file
             logger.info("Complete 2D classification registered in demo mode")
             _register_3d_batch(
@@ -1180,9 +1217,17 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
                 _db=_db,
                 demo=demo,
             )
-        next_job += 2
-    feedback_params.next_job = next_job
-    _db.close()
+            next_job += 2
+        feedback_params.next_job = next_job
+        _db.close()
+    else:
+        _flush_class2d(
+            message["session_id"],
+            message["program_id"],
+            _db,
+            relion_params=relion_params,
+            feedback_params=feedback_params,
+        )
     _db.add(feedback_params)
     for sm in class2d_db:
         _db.delete(sm)
