@@ -696,7 +696,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             "parameters": {
                 "particles_file": first_class2d.particles_file,
                 "class2d_dir": message["job_dir"],
-                "batch_is_complete": True,
+                "batch_is_complete": first_class2d.complete,
                 "batch_size": first_class2d.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter,
