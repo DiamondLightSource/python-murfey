@@ -1326,45 +1326,49 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
+        class3d_params = _db.exec(
+            select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
+        ).one()
+        class3d_params.run = True
+        class3d_params.batch_size = class3d_message["batch_size"]
+        _db.add(class3d_params)
+        _db.commit()
+        _db.close()
+    elif not feedback_params.initial_model:
+        # For the first batch, start a container and set the database to wait
+        class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+        class_uuids = _murfey_id(message["program_id"], _db, number=4)
+        class3d_dir = (
+            f"{class3d_message['class3d_dir']}{(feedback_params.next_job-1):03}"
+        )
         class3d_params = db.Class3DParameters(
             pj_id=pj_id,
-            murfey_id=_murfey_id(message["program_id"], _db)[0],
+            murfey_id=class3d_grp_uuid,
             particles_file=class3d_message["particles_file"],
-            class3d_dir=class3d_message["class3d_dir"],
+            class3d_dir=class3d_dir,
             batch_size=class3d_message["batch_size"],
         )
         _db.add(class3d_params)
         _db.commit()
         _db.close()
-        murfey_ids = _murfey_id(message["program_id"], _db, number=4)
         _murfey_class3ds(
-            murfey_ids, class3d_message["particles_file"], message["program_id"], _db
+            class_uuids, class3d_message["particles_file"], message["program_id"], _db
         )
-    elif not feedback_params.initial_model:
-        # For the first batch, start a container and set the database to wait
+
         feedback_params.star_combination_job = feedback_params.next_job + 2
         feedback_params.hold_class3d = True
         feedback_params.next_job += 2
         zocalo_message = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
-                "class3d_dir": f"{class3d_message['class3d_dir']}{(feedback_params.next_job-1):03}",
+                "class3d_dir": class3d_dir,
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter,
                 "do_initial_model": True,
                 "picker_id": feedback_params.picker_ispyb_id,
-                "class_uuids": {
-                    i + 1: m
-                    for i, m in enumerate(
-                        _murfey_id(
-                            _app_id(pj_id, _db),
-                            _db,
-                            number=default_spa_parameters.nr_classes_3d,
-                        )
-                    )
-                },
-                "class3d_grp_uuid": _murfey_id(_app_id(pj_id, _db), _db)[0],
+                "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
+                "class3d_grp_uuid": class3d_grp_uuid,
                 "pix_size": relion_params.angpix,
                 "fm_dose": relion_params.dose_per_frame,
                 "kv": relion_params.voltage,
@@ -1396,27 +1400,23 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         _db.close()
     else:
         # Send all other messages on to a container
+        class3d_params = _db.exec(
+            select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
+        ).one()
         zocalo_message = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
-                "class3d_dir": f"{class3d_message['class3d_dir']}{feedback_params.next_job:03}",
+                "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter,
                 "initial_model_file": feedback_params.initial_model,
                 "relion_options": dict(relion_params),
                 "picker_id": feedback_params.picker_ispyb_id,
-                "class_uuids": {
-                    i + 1: m
-                    for i, m in enumerate(
-                        _murfey_id(
-                            _app_id(pj_id, _db),
-                            _db,
-                            number=default_spa_parameters.nr_classes_3d,
-                        )
-                    )
-                },
-                "class3d_grp_uuid": _murfey_id(_app_id(pj_id, _db), _db)[0],
+                "class_uuids": _3d_class_murfey_ids(
+                    class3d_params.particles_file, _app_id(pj_id, _db), _db
+                ),
+                "class3d_grp_uuid": class3d_params.murfey_id,
                 "pix_size": relion_params.angpix,
                 "fm_dose": relion_params.dose_per_frame,
                 "kv": relion_params.voltage,
@@ -1449,17 +1449,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
 
 def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     """Received initial model from 3d classification service"""
-    machine_config = get_machine_config()
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db)
-    relion_params = _db.exec(
-        select(db.SPARelionParameters).where(
-            db.SPARelionParameters.pj_id == pj_id_params
-        )
-    ).one()
-    class3d_db = _db.exec(
-        select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
-    ).all()
     # Add the initial model file to the database
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
@@ -1467,48 +1457,6 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
         )
     ).one()
     feedback_params.initial_model = message.get("initial_model")
-    feedback_params.hold_class3d = False
-    for saved_message in class3d_db:
-        # Send all held Class3D messages with the initial model added
-        zocalo_message = {
-            "parameters": {
-                "particles_file": saved_message.particles_file,
-                "class3d_dir": f"{saved_message.class3d_dir}{feedback_params.next_job:03}",
-                "batch_size": saved_message.batch_size,
-                "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
-                "initial_model_file": feedback_params.initial_model,
-                "picker_id": feedback_params.picker_ispyb_id,
-                "class_uuids": _3d_class_murfey_ids(
-                    saved_message.particles_file, message["program_id"], _db
-                ),
-                "class3d_grp_uuid": saved_message.murfey_id,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
-                "nr_iter": default_spa_parameters.nr_iter_3d,
-                "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
-                "batch_size": default_spa_parameters.batch_size_2d,
-                "nr_classes": default_spa_parameters.nr_classes_3d,
-                "downscale": default_spa_parameters.downscale,
-                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
-                "session_id": message["session_id"],
-                "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
-                ),
-                "feedback_queue": machine_config.feedback_queue,
-            },
-            "recipes": ["em-spa-class3d"],
-        }
-        if _transport_object:
-            _transport_object.send(
-                "processing_recipe", zocalo_message, new_connection=True
-            )
-        feedback_params.next_job += 1
-        _db.delete(saved_message)
     _db.add(feedback_params)
     _db.commit()
     _db.close()
@@ -1757,6 +1705,10 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "done_3d_batch":
+            _release_3d_hold(message)
+            if _transport_object:
+                _transport_object.transport.ack(header)
         elif message["register"] == "run_class3d":
             _register_3d_batch(message)
             if _transport_object:
