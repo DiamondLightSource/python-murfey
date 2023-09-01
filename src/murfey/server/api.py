@@ -354,6 +354,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
                 "dcid": collected_ids[1].id,
+                "kv": proc_params.voltage,
                 "autoproc_program_id": collected_ids[3].id,
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
@@ -368,6 +369,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
                 else proc_params.gain_ref,
                 "downscale": proc_params.downscale,
                 "picker_uuid": murfey_ids[2 * i + 1],
+                "session_id": session_id,
             },
         }
         if _transport_object:
@@ -553,6 +555,7 @@ async def request_spa_preprocessing(
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
                 "dcid": detached_ids[1],
+                "kv": proc_params["voltage"],
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
@@ -567,6 +570,7 @@ async def request_spa_preprocessing(
                 else proc_params["gain_ref"],
                 "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[1],
+                "session_id": session_id,
                 "particle_diameter": proc_params["particle_diameter"],
             },
         }
