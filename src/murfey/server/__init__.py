@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+from dataclasses import dataclass
 from functools import partial, singledispatch
 from pathlib import Path
 from threading import Thread
@@ -13,6 +14,7 @@ import uvicorn
 import workflows
 import zocalo.configuration
 from fastapi.templating import Jinja2Templates
+from importlib_metadata import entry_points
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
     Base,
@@ -21,6 +23,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     ProcessingJob,
     ProcessingJobParameter,
 )
+from pydantic import BaseModel, Field, ValidationError, root_validator
 from rich.logging import RichHandler
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,7 +31,12 @@ from sqlmodel import select
 
 import murfey
 import murfey.server.websocket
-from murfey.server.config import get_hostname, get_machine_config, get_microscope
+from murfey.server.config import (
+    MachineConfig,
+    get_hostname,
+    get_machine_config,
+    get_microscope,
+)
 from murfey.server.murfey_db import murfey_db
 
 try:
@@ -145,6 +153,74 @@ class LogFilter(logging.Filter):
             if "." not in logger_name:
                 return False
             logger_name = logger_name.rsplit(".", maxsplit=1)[0]
+
+
+class BaseFeedbackMessageForm(BaseModel):
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
+
+    command: str = Field(..., min_length=1, alias="register")
+    possible_forms: Dict[str, BaseModel]
+
+    @root_validator
+    def apply_specific_form(cls, values: dict):
+        SpecificForm = values["possible_forms"].get("command")
+        if SpecificForm:
+            SpecificForm(
+                **{k: v for k, v in values.items() if k not in list(cls.__fields__)}
+            )
+        return values
+
+
+@dataclass
+class MurfeyFeedbackEngine:
+    transport_manager: TransportManager | None
+    machine_config: MachineConfig
+    feedback: bool = True
+
+    def __post_init__(self):
+        self.message_forms = {
+            e.name: e.value for e in entry_points(group="murfey.feedback.message_forms")
+        }
+        self.message_handlers = {
+            e.name: e.value
+            for e in entry_points(group="murfey.feedback.message_handlers")
+        }
+        if self.transport_manager:
+            feedback_queue = self.machine_config.feedback_queue or (
+                self.transport_object.transport._subscribe_temporary(
+                    channel_hint="", callback=None, sub_id=None
+                )
+            )
+            self.transport_manager._connection_callback = partial(
+                self.transport_manager.transport.subscribe,
+                feedback_queue,
+                self.handle_message,
+                acknowledgement=True,
+            )
+            self.transport_manager.transport.subscribe(
+                feedback_queue, self.handle_message, acknowledgement=True
+            )
+
+    def handle_message(self, header: dict, message: dict):
+        try:
+            validated_message = BaseFeedbackMessageForm(
+                **message, possible_forms=self.message_forms
+            )
+        except ValidationError:
+            logger.warning(f"Feedback message failed validation: {message}")
+            return
+        try:
+            self.message_handlers[validated_message](message, db_session=murfey_db)
+            if self.transport_manager:
+                self.transport_manager.transport.ack(header)
+        except Exception:
+            logger.warning(
+                f"Could not handle murfey feedback message: {message}", exc_info=True
+            )
+            if self.transport_manager:
+                self.transport_manager.transport.nack(header)
 
 
 def run():
