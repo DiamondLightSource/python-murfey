@@ -25,7 +25,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from pydantic import BaseModel, Field, ValidationError, root_validator
 from rich.logging import RichHandler
-from sqlalchemy import func
+from sqlalchemy import Session, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
@@ -177,6 +177,7 @@ class BaseFeedbackMessageForm(BaseModel):
 class MurfeyFeedbackEngine:
     transport_manager: TransportManager | None
     machine_config: MachineConfig
+    murfey_db_session: Session
     feedback: bool = True
 
     def __post_init__(self):
@@ -203,6 +204,10 @@ class MurfeyFeedbackEngine:
                 feedback_queue, self.handle_message, acknowledgement=True
             )
 
+    def send(self, queue: str, message: dict, new_connection: bool = True):
+        if self.transport_manager:
+            self.transport_manager.send(queue, message, new_connection=new_connection)
+
     def handle_message(self, header: dict, message: dict):
         try:
             validated_message = BaseFeedbackMessageForm(
@@ -212,7 +217,16 @@ class MurfeyFeedbackEngine:
             logger.warning(f"Feedback message failed validation: {message}")
             return
         try:
-            self.message_handlers[validated_message](message, db_session=murfey_db)
+            specific_form = self.message_forms.get(validated_message.command)
+            if specific_form:
+                self.message_handlers[validated_message.command](
+                    specific_form(message), feedback_engine=self
+                )
+            else:
+                self.message_handlers[validated_message.command](
+                    message, feedback_engine=self
+                )
+            self.murfey_db_session.close()
             if self.transport_manager:
                 self.transport_manager.transport.ack(header)
         except Exception:
