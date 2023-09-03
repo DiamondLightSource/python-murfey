@@ -11,6 +11,7 @@ import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
+from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
@@ -253,13 +254,31 @@ def register_tomo_proc_params(
 def register_spa_proc_params(
     client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
+    zocalo_message = {
+        "register": "spa_processing_parameters",
+        **dict(proc_params),
+        "client_id": client_id,
+    }
+    if _transport_object:
+        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+    """
     try:
         client = db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
         ).one()
         session_id = client.session_id
+        collected_ids = db.exec(
+            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_params.tag)
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-spa-preprocess")
+        ).one()
+        session_id = client.session_id
         params = SPARelionParameters(
-            session_id=session_id,
+            pj_id=collected_ids[2].id,
             angpix=proc_params.pixel_size_on_image,
             dose_per_frame=proc_params.dose_per_frame,
             gain_ref=proc_params.gain_ref,
@@ -274,7 +293,7 @@ def register_spa_proc_params(
             mask_diameter=proc_params.mask_diameter,
         )
         feedback_params = SPAFeedbackParameters(
-            session_id=session_id,
+            pj_id=collected_ids[2].id,
             estimate_particle_diameter=proc_params.particle_diameter is None,
             hold_class2d=False,
             hold_class3d=False,
@@ -288,6 +307,7 @@ def register_spa_proc_params(
     db.add(params)
     db.add(feedback_params)
     db.commit()
+    """
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -298,8 +318,21 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
-@router.post("/visits/{visit_name}/{client_id}/{tag}flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db):
+class Tag(BaseModel):
+    tag: str
+
+
+@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
+def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
+    zocalo_message = {
+        "register": "flush_spa_preprocess",
+        "client_id": client_id,
+        "tag": tag.tag,
+    }
+    if _transport_object:
+        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+    return
+
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -315,7 +348,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: str, db=murfey_db
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == tag)
+        .where(DataCollectionGroup.tag == tag.tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -519,17 +552,16 @@ async def request_spa_preprocessing(
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == SPAProcessFile.tag)
+            .where(DataCollectionGroup.tag == proc_file.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
         params = db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-            .where(SPARelionParameters.pj_id == collected_ids[3].id)
-            .where(SPAFeedbackParameters.pj_id == collected_ids[3].id)
-            .where(ClientEnvironment.client_id == client_id)
+            select(SPARelionParameters, SPAFeedbackParameters)
+            .where(SPARelionParameters.pj_id == collected_ids[2].id)
+            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
         proc_params: dict | None = dict(params[0])
         feedback_params = params[1]

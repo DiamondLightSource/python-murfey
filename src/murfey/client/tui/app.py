@@ -373,13 +373,6 @@ class MurfeyTUI(App):
             }
             capture_post(url, json=dcg_data)
             if from_form:
-                log.info(f"Posting SPA processing parameters: {json}")
-                response = capture_post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
-                    json={k: None if v == "None" else v for k, v in json.items()},
-                )
-                if not str(response.status_code).startswith("2"):
-                    log.warning(f"{response.reason}")
                 data = {
                     "voltage": json["voltage"],
                     "pixel_size_on_image": json["pixel_size_on_image"],
@@ -401,7 +394,7 @@ class MurfeyTUI(App):
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
                     json=data,
                 )
                 for recipe in (
@@ -411,11 +404,22 @@ class MurfeyTUI(App):
                     "em-spa-class3d",
                 ):
                     capture_post(
-                        f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                        f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
                         json={"tag": str(source), "recipe": recipe},
                     )
+                log.info(f"Posting SPA processing parameters: {json}")
+                response = capture_post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    json={
+                        **{k: None if v == "None" else v for k, v in json.items()},
+                        "tag": str(source),
+                    },
+                )
+                if not str(response.status_code).startswith("2"):
+                    log.warning(f"{response.reason}")
                 capture_post(
-                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/{str(source)}/flush_spa_processing"
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing",
+                    json={"tag": str(source)},
                 )
             source = Path(json["source"])
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"

@@ -81,6 +81,7 @@ class ProcessFile(BaseModel):
 
 
 class SPAProcessFile(BaseModel):
+    tag: str
     path: str
     description: str
     size: int
@@ -164,6 +165,7 @@ class ProcessingParametersTomo(BaseModel):
 
 
 class ProcessingParametersSPA(BaseModel):
+    tag: str
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
