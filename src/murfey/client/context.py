@@ -919,7 +919,10 @@ class TomographyContext(Context):
                     self._tilt_series[tilt_series].append(file_path)
 
         tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt"
-        tilt_data = {"movie_path": str(file_path), "tilt_series_tag": tilt_series}
+        tilt_data = {
+            "movie_path": str(file_transferred_to),
+            "tilt_series_tag": tilt_series,
+        }
         capture_post(tilt_url, json=tilt_data)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
@@ -1222,6 +1225,9 @@ class TomographyContext(Context):
                             _file_transferred_to(environment, source, transferred_file),
                             environment=environment,
                         )
+        if completed_tilts and environment:
+            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+            capture_post(complete_url, json=completed_tilts)
         return completed_tilts
 
     def post_first_transfer(

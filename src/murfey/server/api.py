@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
@@ -310,6 +310,28 @@ def register_tilt_series(
     )
     tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
     db.add(tilt_series)
+    db.commit()
+
+
+@router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
+def register_completed_tilt_series(
+    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(TiltSeries.session_id == session_id)
+    ).all()
+    for ts in tilt_series_db:
+        ts.complete = True
+        db.add(ts)
     db.commit()
 
 

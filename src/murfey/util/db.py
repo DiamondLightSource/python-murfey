@@ -35,6 +35,11 @@ class Session(SQLModel, table=True):  # type: ignore
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    tomography_processing_parameters: List[
+        "TomographyProcessingParameters"
+    ] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -141,6 +146,9 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     session_id: int = Field(primary_key=True, foreign_key="session.id")
     pixel_size: float
     manual_tilt_offset: int
+    session: Optional[Session] = Relationship(
+        back_populates="tomography_processing_parameters"
+    )
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore

@@ -71,8 +71,12 @@ class JobIDs(NamedTuple):
 
 
 def check_tilt_series_mc(tag: str) -> bool:
-    results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
-    return all(r[0].motion_corrected for r in results) and results[0][1].completed
+    results = murfey_db.exec(
+        select(db.Tilt, db.TiltSeries)
+        .where(db.Tilt.tilt_series_tag == tag)
+        .where(db.TiltSeries.tag == db.Tilt.tilt_series_tag)
+    ).all()
+    return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
 def get_all_tilts(tag: str) -> List[str]:
@@ -84,7 +88,7 @@ def get_job_ids(tag: str) -> JobIDs:
     results = murfey_db.exec(
         select(db.TiltSeries, db.AutoProcProgram, db.ProcessingJob, db.DataCollection)
         .where(db.TiltSeries.tag == tag)
-        .where(db.AutoProcProgram.id == db.TiltSeries.auto_proc_program_id)
+        .where(db.DataCollection.tag == db.TiltSeries.tag)
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
     )
@@ -97,9 +101,13 @@ def get_job_ids(tag: str) -> JobIDs:
 
 
 def get_tomo_proc_params(client_id: int, *args) -> db.TomographyProcessingParameters:
+    client = murfey_db.exec(
+        select(db.ClientEnvironment).where(db.ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
-            db.TomographyProcessingParameters.client_id == client_id
+            db.TomographyProcessingParameters.session_id == session_id
         )
     )
     return results[0]

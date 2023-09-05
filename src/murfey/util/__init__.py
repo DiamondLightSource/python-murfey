@@ -30,7 +30,7 @@ def _get_visit_list(api_base: ParseResult):
     return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
-def capture_post(url: str, json: dict = {}) -> requests.Response:
+def capture_post(url: str, json: dict | list = {}) -> requests.Response:
     response = requests.post(url, json=json)
     if response.status_code != 200:
         logger.warning(
