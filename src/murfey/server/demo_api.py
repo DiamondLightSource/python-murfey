@@ -269,7 +269,9 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
 ):
-    tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
+    tilt_series = TiltSeries(
+        client_id=tilt_series_info.client_id, tag=tilt_series_info.tag
+    )
     db.add(tilt_series)
     db.commit()
 
@@ -277,7 +279,7 @@ def register_tilt_series(
 @router.post("/visits/{visit_name}/tilt")
 def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
     tilt = Tilt(
-        movie_path=TiltInfo.movie_path, tilt_series_tag=TiltInfo.tilt_series_tag
+        movie_path=tilt_info.movie_path, tilt_series_tag=tilt_info.tilt_series_tag
     )
     db.add(tilt)
     db.commit()
