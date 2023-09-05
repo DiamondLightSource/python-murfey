@@ -98,6 +98,11 @@ class SPAProcessFile(BaseModel):
     source: str = ""
 
 
+class TiltInfo(BaseModel):
+    tilt_series_tag: str
+    movie_path: str
+
+
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str

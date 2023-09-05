@@ -41,6 +41,7 @@ from murfey.util.db import (
     Session,
     SPAFeedbackParameters,
     SPARelionParameters,
+    Tilt,
     TiltSeries,
     TomographyProcessingParameters,
 )
@@ -64,6 +65,7 @@ from murfey.util.models import (
     SPAProcessFile,
     SPAProcessingParameters,
     SuggestedPathParameters,
+    TiltInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
@@ -299,6 +301,16 @@ def register_tilt_series(
 ):
     tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
     db.add(tilt_series)
+    db.commit()
+    db.close()
+
+
+@router.post("/visits/{visit_name}/tilt")
+def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
+    tilt = Tilt(
+        movie_path=TiltInfo.movie_path, tilt_series_tag=TiltInfo.tilt_series_tag
+    )
+    db.add(tilt)
     db.commit()
     db.close()
 

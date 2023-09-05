@@ -21,7 +21,7 @@ import murfey.server.websocket as ws
 from murfey.server import (
     _murfey_id,
     _register_picked_particles_use_diameter,
-    feedback_callback_async,
+    feedback_callback,
     get_hostname,
     get_microscope,
 )
@@ -41,6 +41,7 @@ from murfey.util.db import (
     Session,
     SPAFeedbackParameters,
     SPARelionParameters,
+    Tilt,
     TiltSeries,
 )
 from murfey.util.models import (
@@ -61,6 +62,7 @@ from murfey.util.models import (
     SPAProcessFile,
     SPAProcessingParameters,
     SuggestedPathParameters,
+    TiltInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
@@ -270,6 +272,16 @@ def register_tilt_series(
     tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
     db.add(tilt_series)
     db.commit()
+
+
+@router.post("/visits/{visit_name}/tilt")
+def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
+    tilt = Tilt(
+        movie_path=TiltInfo.movie_path, tilt_series_tag=TiltInfo.tilt_series_tag
+    )
+    db.add(tilt)
+    db.commit()
+    db.close()
 
 
 @router.get("/visits_raw", response_model=List[Visit])
@@ -585,7 +597,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     if not mrc_out.parent.exists():
         mrc_out.parent.mkdir(parents=True)
-    await feedback_callback_async(
+    feedback_callback(
         {},
         {
             "register": "motion_corrected",

@@ -834,7 +834,7 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
-            ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_tilt_series"
+            ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
             ts_data = {"client_id": environment.client_id, "tag": tilt_series}
             requests.post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
@@ -917,6 +917,10 @@ class TomographyContext(Context):
                         break
                 else:
                     self._tilt_series[tilt_series].append(file_path)
+
+        tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt"
+        tilt_data = {"movie_path": file_path, "tilt_series_tag": tilt_series}
+        capture_post(tilt_url, json=tilt_data)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             eer_fractionation_file = None
