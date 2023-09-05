@@ -354,6 +354,15 @@ class MurfeyTUI(App):
                     json=json,
                 )
             source = Path(json["source"])
+            self._environment.listeners["data_collection_group_ids"] = {
+                context._flush_data_collections
+            }
+            self._environment.listeners["data_collection_ids"] = {
+                context._flush_processing_job
+            }
+            self._environment.listeners["autoproc_program_ids"] = {
+                context._flush_preprocess
+            }
             self._environment.id_tag_registry["data_collection_group"].append(
                 str(source)
             )
@@ -421,29 +430,32 @@ class MurfeyTUI(App):
                     f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing",
                     json={"tag": str(source)},
                 )
-            source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
-            self._environment.listeners["data_collection_group_ids"] = {
-                partial(
-                    context._register_data_collection,
-                    url=url,
-                    data=json,
-                    environment=self._environment,
-                )
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                partial(
-                    context._register_processing_job,
-                    parameters=json,
-                    environment=self._environment,
-                )
-            }
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
-            self._environment.listeners["processing_job_ids"] = {
-                partial(
-                    context._launch_spa_pipeline, url=url, environment=self._environment
-                )
-            }
+            if isinstance(context, SPAContext):
+                source = Path(json["source"])
+                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
+                self._environment.listeners["data_collection_group_ids"] = {
+                    partial(
+                        context._register_data_collection,
+                        url=url,
+                        data=json,
+                        environment=self._environment,
+                    )
+                }
+                self._environment.listeners["data_collection_ids"] = {
+                    partial(
+                        context._register_processing_job,
+                        parameters=json,
+                        environment=self._environment,
+                    )
+                }
+                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
+                self._environment.listeners["processing_job_ids"] = {
+                    partial(
+                        context._launch_spa_pipeline,
+                        url=url,
+                        environment=self._environment,
+                    )
+                }
 
     def _set_request_destination(self, response: str):
         if response == "y":

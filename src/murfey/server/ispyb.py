@@ -182,6 +182,7 @@ class TransportManager:
                 .all()
             )
             reference = buffer_objects[0].Reference if buffer_objects else None
+        log.info(f"Buffer lookup {uuid} returned {reference}")
         return reference
 
 

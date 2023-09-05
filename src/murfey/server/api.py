@@ -190,6 +190,7 @@ def get_rsyncers_for_client(client_id: int, db=murfey_db):
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
+    return
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
@@ -207,6 +208,7 @@ def increment_rsync_file_count(
 def increment_rsync_transferred_files(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
+    return
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
@@ -240,10 +242,14 @@ def get_tomo_proc_params(client_id: int, db=murfey_db) -> List[dict]:
 def register_tomo_proc_params(
     client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
     params = TomographyProcessingParameters(
-        client_id=client_id,
+        session_id=session_id,
         pixel_size=proc_params.pixel_size_on_image,
-        manual_tilt_offest=proc_params.manual_tilt_offset,
+        manual_tilt_offset=proc_params.manual_tilt_offset,
     )
     db.add(params)
     db.commit()
@@ -261,53 +267,6 @@ def register_spa_proc_params(
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
-    """
-    try:
-        client = db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        ).one()
-        session_id = client.session_id
-        collected_ids = db.exec(
-            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-            .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == proc_params.tag)
-            .where(DataCollection.dcg_id == DataCollectionGroup.id)
-            .where(ProcessingJob.dc_id == DataCollection.id)
-            .where(AutoProcProgram.pj_id == ProcessingJob.id)
-            .where(ProcessingJob.recipe == "em-spa-preprocess")
-        ).one()
-        session_id = client.session_id
-        params = SPARelionParameters(
-            pj_id=collected_ids[2].id,
-            angpix=proc_params.pixel_size_on_image,
-            dose_per_frame=proc_params.dose_per_frame,
-            gain_ref=proc_params.gain_ref,
-            voltage=proc_params.voltage,
-            motion_corr_binning=proc_params.motion_corr_binning,
-            eer_grouping=proc_params.eer_grouping,
-            symmetry=proc_params.symmetry,
-            particle_diameter=proc_params.particle_diameter,
-            downscale=proc_params.downscale,
-            boxsize=proc_params.boxsize,
-            small_boxsize=proc_params.small_boxsize,
-            mask_diameter=proc_params.mask_diameter,
-        )
-        feedback_params = SPAFeedbackParameters(
-            pj_id=collected_ids[2].id,
-            estimate_particle_diameter=proc_params.particle_diameter is None,
-            hold_class2d=False,
-            hold_class3d=False,
-            class_selection_score=0,
-            star_combination_job=0,
-            initial_model="",
-            next_job=0,
-        )
-    except Exception as e:
-        log.warning(f"SPA processing parameters registration failed: {e}")
-    db.add(params)
-    db.add(feedback_params)
-    db.commit()
-    """
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -331,89 +290,6 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
-    return
-
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
-    stashed_files = db.exec(
-        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
-    ).all()
-    if not stashed_files:
-        return
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == tag.tag)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-spa-preprocess")
-    ).one()
-    params = db.exec(
-        select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-        .where(SPARelionParameters.pj_id == collected_ids[3].id)
-        .where(SPAFeedbackParameters.pj_id == collected_ids[3].id)
-        .where(ClientEnvironment.client_id == client_id)
-    ).one()
-    proc_params = params[0]
-    feedback_params = params[1]
-    if not proc_params:
-        log.warning(
-            f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
-        )
-        return
-
-    murfey_ids = _murfey_id(
-        collected_ids[3].id, db, number=2 * len(stashed_files), close=False
-    )
-    if feedback_params.picker_murfey_id is None:
-        feedback_params.picker_murfey_id = murfey_ids[1]
-        db.add(feedback_params)
-
-    for i, f in enumerate(stashed_files):
-        mrcp = Path(f.mrc_out)
-        ppath = Path(f.file_path)
-        if not mrcp.parent.exists():
-            mrcp.parent.mkdir(parents=True)
-        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
-        db.add(movie)
-        zocalo_message = {
-            "recipes": ["em-spa-preprocess"],
-            "parameters": {
-                "feedback_queue": machine_config.feedback_queue,
-                "dcid": collected_ids[1].id,
-                "kv": proc_params.voltage,
-                "autoproc_program_id": collected_ids[3].id,
-                "movie": f.file_path,
-                "mrc_out": f.mrc_out,
-                "pix_size": proc_params.angpix,
-                "image_number": f.image_number,
-                "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[2 * i],
-                "ft_bin": proc_params.motion_corr_binning,
-                "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
-                if proc_params.gain_ref
-                else proc_params.gain_ref,
-                "downscale": proc_params.downscale,
-                "picker_uuid": murfey_ids[2 * i + 1],
-                "session_id": session_id,
-                "particle_diameter": proc_params.particle_diameter or 0,
-            },
-        }
-        if _transport_object:
-            _transport_object.send("processing_recipe", zocalo_message)
-            db.delete(f)
-        else:
-            log.error(
-                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
-            )
-    db.commit()
     return
 
 

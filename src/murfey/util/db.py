@@ -139,7 +139,7 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     pixel_size: float
     manual_tilt_offset: int
 

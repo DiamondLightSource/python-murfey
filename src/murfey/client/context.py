@@ -135,7 +135,7 @@ class _SPAContext(Context):
             default=True,
         ),
         ProcessingParameter(
-            "particle_diameter", "Particle Diameter (Angstroms)", default=0
+            "particle_diameter", "Particle Diameter (Angstroms)", default=None
         ),
         ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
@@ -529,7 +529,7 @@ class SPAContext(_SPAContext):
         logger.info(f"registering processing job with parameters: {parameters}")
         parameters = parameters or {}
         environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
         machine_config = get_machine_config(
             str(environment.url.geturl()), demo=environment.demo
         )
@@ -886,7 +886,7 @@ class TomographyContext(Context):
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         capture_post(url, json=data)
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
                     if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
                             (

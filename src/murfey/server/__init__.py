@@ -55,7 +55,7 @@ _transport_object: TransportManager | None = None
 
 _url = url(get_machine_config())
 engine = create_engine(_url)
-murfey_db = Session(engine)
+murfey_db = Session(engine, expire_on_commit=False)
 
 
 class ExtendedRecord(NamedTuple):
@@ -499,6 +499,8 @@ def _register_picked_particles_use_diameter(
                 feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
                     message["program_id"], feedback_params.picker_murfey_id
                 )
+                if feedback_params.picker_ispyb_id is not None:
+                    _flush_class2d(message["session_id"], message["program_id"], _db)
             _db.add(feedback_params)
             _db.commit()
             selection_stash = _db.exec(
@@ -636,7 +638,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     ctf_params = db.CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
-        coord_list_file=params_to_forward["coords_list_file"],
+        coord_list_file=params_to_forward["coord_list_file"],
         ctf_image=params_to_forward["ctf_values"]["CtfImage"],
         ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
         ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -849,6 +851,9 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
     other_options = dict(feedback_params)
+    if other_options["picker_ispyb_id"] is None:
+        logger.info("No ISPyB particle picker ID yet")
+        return
     _db.add(feedback_params)
     _db.commit()
     _db.expunge(feedback_params)
@@ -873,9 +878,6 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
-    if other_options["picker_ispyb_id"] is None:
-        logger.info("No ISPyB particle picker ID yet")
-        return
     zocalo_message = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
@@ -1111,7 +1113,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
-                "class2d_grp_id": class2d_grp_uuid,
+                "class2d_grp_uuid": class2d_grp_uuid,
                 "pix_size": relion_params.angpix,
                 "fm_dose": relion_params.dose_per_frame,
                 "kv": relion_params.voltage,
@@ -1212,6 +1214,7 @@ def _flush_class2d(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.next_job += 2
+        _db.delete(saved_message)
     _db.add(feedback_params)
     _db.commit()
 
@@ -1318,11 +1321,13 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             db.SPARelionParameters.pj_id == pj_id_params
         )
     ).one()
+    relion_options = dict(relion_params)
     feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(
             db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
+    other_options = dict(feedback_params)
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
@@ -1336,6 +1341,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         _db.close()
     elif not feedback_params.initial_model:
         # For the first batch, start a container and set the database to wait
+        next_job = feedback_params.next_job
         class3d_dir = (
             f"{class3d_message['class3d_dir']}{(feedback_params.next_job-1):03}"
         )
@@ -1354,24 +1360,25 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             class_uuids, class3d_message["particles_file"], message["program_id"], _db
         )
 
-        feedback_params.star_combination_job = feedback_params.next_job + 2
+        feedback_params.star_combination_job = next_job + 2
         feedback_params.hold_class3d = True
-        feedback_params.next_job += 2
+        next_job += 2
+        feedback_params.next_job = next_job
         zocalo_message = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
                 "class3d_dir": class3d_dir,
                 "batch_size": class3d_message["batch_size"],
-                "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "particle_diameter": relion_options["particle_diameter"],
+                "mask_diameter": relion_options["mask_diameter"],
                 "do_initial_model": True,
-                "picker_id": feedback_params.picker_ispyb_id,
+                "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
                 "class3d_grp_uuid": class3d_grp_uuid,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
+                "pix_size": relion_options["angpix"],
+                "fm_dose": relion_options["dose_per_frame"],
                 "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
+                "gain_ref": relion_options["gain_ref"],
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
@@ -1391,8 +1398,6 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.hold_class3d = True
-        feedback_params.next_job += 2
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -1406,19 +1411,18 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "particles_file": class3d_message["particles_file"],
                 "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_message["batch_size"],
-                "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
-                "initial_model_file": feedback_params.initial_model,
-                "relion_options": dict(relion_params),
-                "picker_id": feedback_params.picker_ispyb_id,
+                "particle_diameter": relion_options["particle_diameter"],
+                "mask_diameter": relion_options["mask_diameter"],
+                "initial_model_file": other_options["initial_model"],
+                "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
                 "class3d_grp_uuid": class3d_params.murfey_id,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
+                "pix_size": relion_options["angpix"],
+                "fm_dose": relion_options["dose_per_frame"],
+                "kv": relion_options["voltage"],
+                "gain_ref": relion_options["gain_ref"],
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
@@ -1599,6 +1603,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "processing_job":
+            logger.info("registering processing job")
             assert isinstance(global_state["data_collection_ids"], dict)
             _dcid = global_state["data_collection_ids"][message["tag"]]
             record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
@@ -1808,7 +1813,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )
             feedback_params = db.SPAFeedbackParameters(
                 pj_id=collected_ids[2].id,
-                estimate_particle_diameter=message["particle_diameter"] is None,
+                estimate_particle_diameter=not bool(message["particle_diameter"]),
                 hold_class2d=False,
                 hold_class3d=False,
                 class_selection_score=0,
@@ -1820,9 +1825,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(feedback_params)
             murfey_db.commit()
             logger.info(
-                f"SPA processing parameters registered for processing job {collected_ids[2].id}"
+                f"SPA processing parameters registered for processing job {collected_ids[2].id}, particle_diameter={message['particle_diameter']}"
             )
             murfey_db.close()
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         elif message["register"] == "picked_particles":
             feedback_params = murfey_db.exec(
                 select(db.SPAFeedbackParameters).where(
@@ -1861,6 +1869,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             _release_3d_hold(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
+            return None
         elif message["register"] == "run_class3d":
             _register_3d_batch(message)
             if _transport_object:
