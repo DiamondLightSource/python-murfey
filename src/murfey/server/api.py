@@ -304,7 +304,6 @@ def register_tilt_series(
     )
     db.add(tilt_series)
     db.commit()
-    db.close()
 
 
 @router.post("/visits/{visit_name}/tilt")
@@ -314,7 +313,6 @@ def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
     )
     db.add(tilt)
     db.commit()
-    db.close()
 
 
 @router.get("/visits_raw", response_model=List[Visit])
