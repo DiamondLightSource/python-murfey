@@ -836,7 +836,7 @@ class TomographyContext(Context):
             self._tilt_series[tilt_series] = [file_path]
             ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
             ts_data = {"client_id": environment.client_id, "tag": tilt_series}
-            requests.post(ts_url, json=ts_data)
+            capture_post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
             try:

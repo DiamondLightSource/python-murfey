@@ -40,7 +40,6 @@ class Session(SQLModel, table=True):  # type: ignore
 class TiltSeries(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     session_id: int = Field(foreign_key="session.id")
-    auto_proc_program_id: int = Field(foreign_key="autoprocprogram.id")
     complete: bool = False
     processing_requested: bool = False
     session: Optional[Session] = Relationship(back_populates="tilt_series")

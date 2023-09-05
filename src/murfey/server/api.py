@@ -299,9 +299,16 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
 ):
-    tilt_series = TiltSeries(
-        client_id=tilt_series_info.client_id, tag=tilt_series_info.tag
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(
+                ClientEnvironment.client_id == tilt_series_info.client_id
+            )
+        )
+        .one()
+        .session_id
     )
+    tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
     db.add(tilt_series)
     db.commit()
 
