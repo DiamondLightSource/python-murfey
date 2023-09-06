@@ -70,6 +70,13 @@ class JobIDs(NamedTuple):
     client_id: int
 
 
+def get_angle(tilt_file_name: str) -> float:
+    for p in Path(tilt_file_name).name.split("_"):
+        if "." in p:
+            return float(p)
+    raise ValueError(f"Tilt angle not found for file {tilt_file_name}")
+
+
 def check_tilt_series_mc(tag: str) -> bool:
     results = murfey_db.exec(
         select(db.Tilt, db.TiltSeries)
@@ -86,17 +93,24 @@ def get_all_tilts(tag: str) -> List[str]:
 
 def get_job_ids(tag: str) -> JobIDs:
     results = murfey_db.exec(
-        select(db.TiltSeries, db.AutoProcProgram, db.ProcessingJob, db.DataCollection)
+        select(
+            db.TiltSeries,
+            db.AutoProcProgram,
+            db.ProcessingJob,
+            db.DataCollection,
+            db.ClientEnvironment,
+        )
         .where(db.TiltSeries.tag == tag)
         .where(db.DataCollection.tag == db.TiltSeries.tag)
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-    )
+        .where(db.ClientEnvironment.session_id == db.TiltSeries.session_id)
+    ).all()
     return JobIDs(
-        dcid=results[0][-1].id,
-        pid=results[0][-2].id,
-        appid=results[0][-3].id,
-        client_id=results[0][0].client_id,
+        dcid=results[0][3].id,
+        pid=results[0][2].id,
+        appid=results[0][1].id,
+        client_id=results[0][4].client_id,
     )
 
 
@@ -109,8 +123,8 @@ def get_tomo_proc_params(client_id: int, *args) -> db.TomographyProcessingParame
         select(db.TomographyProcessingParameters).where(
             db.TomographyProcessingParameters.session_id == session_id
         )
-    )
-    return results[0]
+    ).one()
+    return results
 
 
 def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
@@ -1498,7 +1512,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
                     "parameters": {
-                        "input_file_list": str(tilts),
+                        "input_file_list": str([[t, str(get_angle(t))] for t in tilts]),
                         "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
                         "dcid": ids.dcid,
                         "appid": ids.appid,
@@ -1511,7 +1525,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                     logger.info(
                         f"Sending Zocalo message for processing: {zocalo_message}"
                     )
-                    _transport_object.send("processing_recipe", zocalo_message)
+                    _transport_object.send(
+                        "processing_recipe", zocalo_message, new_connection=True
+                    )
 
             if _transport_object:
                 _transport_object.transport.ack(header)

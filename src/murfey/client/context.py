@@ -744,6 +744,7 @@ class TomographyContext(Context):
                     "pixel_size": environment.data_collection_parameters[
                         "pixel_size_on_image"
                     ],
+                    "voltage": environment.data_collection_parameters["voltage"],
                     "autoproc_program_id": app_id,
                     "mc_uuid": incomplete_process_file.mc_uuid,
                     "dose_per_frame": environment.data_collection_parameters.get(
@@ -963,6 +964,7 @@ class TomographyContext(Context):
                 "dose_per_frame": environment.data_collection_parameters.get(
                     "dose_per_frame"
                 ),
+                "voltage": environment.data_collection_parameters["voltage"],
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),

@@ -66,6 +66,7 @@ class ProcessFile(BaseModel):
     path: str
     description: str
     size: int
+    voltage: float
     timestamp: float
     processing_job: Optional[int]
     data_collection_id: Optional[int]

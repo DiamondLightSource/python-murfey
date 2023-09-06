@@ -499,7 +499,7 @@ async def request_spa_preprocessing(
         db.close()
 
         if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True)
+            mrc_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -568,9 +568,9 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / str(ppath.stem + "_ctf.mrc")
     )
     if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True)
+        mrc_out.parent.mkdir(parents=True, exist_ok=True)
     if not ctf_out.parent.exists():
-        ctf_out.parent.mkdir(parents=True)
+        ctf_out.parent.mkdir(parents=True, exist_ok=True)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -583,6 +583,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "pix_size": (proc_file.pixel_size) * 10**10,
             "output_image": str(ctf_out),
             "image_number": proc_file.image_number,
+            "kv": int(proc_file.voltage),
             "microscope": get_microscope(),
             "mc_uuid": proc_file.mc_uuid,
             "ft_bin": proc_file.mc_binning,
