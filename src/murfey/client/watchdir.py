@@ -100,6 +100,7 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
+            files_for_transfer = []
             for x in sorted(
                 self._file_candidates,
                 key=lambda _x: self._file_candidates[_x].modification_time,
@@ -147,7 +148,8 @@ class DirWatcher(murfey.util.Observer):
                                             top_level_dir.stat().st_ctime,
                                         )
                             else:
-                                self._notify_for_transfer(x)
+                                if self._notify_for_transfer(x):
+                                    files_for_transfer.append(Path(x))
                             continue
                     except Exception as e:
                         log.error(f"Exception encountered: {e}", exc_info=True)
@@ -158,11 +160,12 @@ class DirWatcher(murfey.util.Observer):
                         f"Found file {Path(x).name!r} for potential future transfer"
                     )
 
+            self.notify(files_for_transfer, secondary=True)
             self._lastscan = filelist
         except Exception as e:
             log.error(f"Exception encountered: {e}")
 
-    def _notify_for_transfer(self, file_candidate: str):
+    def _notify_for_transfer(self, file_candidate: str) -> bool:
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
         if self._statusbar:
             # log.info("Increasing number to be transferred")
@@ -172,11 +175,13 @@ class DirWatcher(murfey.util.Observer):
                     self._statusbar.transferred[1] + 1,
                 ]
 
-        if not Path(file_candidate).name.startswith(".") and not Path(
+        transfer_check = not Path(file_candidate).name.startswith(".") and not Path(
             file_candidate
-        ).name.endswith("downloading"):
+        ).name.endswith("downloading")
+        if not transfer_check:
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
+        return transfer_check
 
     def _scan_directory(
         self, path: str = "", modification_time: float | None = None

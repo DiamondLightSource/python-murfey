@@ -192,7 +192,6 @@ def get_rsyncers_for_client(client_id: int, db=murfey_db):
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    return
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
@@ -200,7 +199,7 @@ def increment_rsync_file_count(
             RsyncInstance.client_id == rsyncer_info.client_id,
         )
     ).one()
-    rsync_instance.files_counted += 1
+    rsync_instance.files_counted += rsyncer_info.increment_count
     db.add(rsync_instance)
     db.commit()
     db.close()
@@ -210,7 +209,6 @@ def increment_rsync_file_count(
 def increment_rsync_transferred_files(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    return
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
@@ -218,7 +216,7 @@ def increment_rsync_transferred_files(
             RsyncInstance.client_id == rsyncer_info.client_id,
         )
     ).one()
-    rsync_instance.files_transferred += 1
+    rsync_instance.files_transferred += rsyncer_info.increment_count
     db.add(rsync_instance)
     db.commit()
     db.close()

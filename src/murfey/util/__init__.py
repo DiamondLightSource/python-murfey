@@ -53,14 +53,21 @@ class Observer:
 
     def __init__(self):
         self._listeners: list[Callable[..., Awaitable[None] | None]] = []
+        self._secondary_listeners: list[Callable[..., Awaitable[None] | None]] = []
         super().__init__()
 
-    def subscribe(self, fn: Callable[..., Awaitable[None] | None]):
-        self._listeners.append(fn)
+    def subscribe(
+        self, fn: Callable[..., Awaitable[None] | None], secondary: bool = False
+    ):
+        if secondary:
+            self._secondary_listeners.append(fn)
+        else:
+            self._listeners.append(fn)
 
-    async def anotify(self, *args, **kwargs) -> None:
+    async def anotify(self, *args, secondary: bool = False, **kwargs) -> None:
         awaitables: list[Awaitable] = []
-        for notify_function in self._listeners:
+        listeners = self._secondary_listeners if secondary else self._listeners
+        for notify_function in listeners:
             result = notify_function(*args, **kwargs)
             if result is not None and inspect.isawaitable(result):
                 awaitables.append(result)
@@ -72,9 +79,10 @@ class Observer:
         for awaitable in asyncio.as_completed(awaitables):
             await awaitable
 
-    def notify(self, *args, **kwargs) -> None:
+    def notify(self, *args, secondary: bool = False, **kwargs) -> None:
         awaitables: list[Awaitable] = []
-        for notify_function in self._listeners:
+        listeners = self._secondary_listeners if secondary else self._listeners
+        for notify_function in listeners:
             result = notify_function(*args, **kwargs)
             if result is not None and inspect.isawaitable(result):
                 awaitables.append(result)

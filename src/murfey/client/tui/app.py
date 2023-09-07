@@ -212,7 +212,8 @@ class MurfeyTUI(App):
                 self._increment_transferred_files,
                 destination=destination,
                 source=str(source),
-            )
+            ),
+            secondary=True,
         )
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/rsyncer"
         rsyncer_data = {
@@ -262,29 +263,37 @@ class MurfeyTUI(App):
                         self._increment_file_count,
                         destination=destination,
                         source=str(source),
-                    )
+                    ),
+                    secondary=True,
                 )
                 self._environment.watchers[source].start()
 
-    def _increment_file_count(self, observed_file: Path, source: str, destination: str):
+    def _increment_file_count(
+        self, observed_files: List[Path], source: str, destination: str
+    ):
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
+            "increment_count": len(observed_files),
         }
         requests.post(url, json=data)
 
     def _increment_transferred_files(
-        self, update: RSyncerUpdate, source: str, destination: str
+        self, updates: List[RSyncerUpdate], source: str, destination: str
     ):
-        if update.outcome is not TransferResult.SUCCESS:
+        checked_updates = [
+            update for update in updates if update.outcome is TransferResult.SUCCESS
+        ]
+        if not checked_updates:
             return
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files"
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
+            "increment_count": len(checked_updates),
         }
         requests.post(url, json=data)
 
