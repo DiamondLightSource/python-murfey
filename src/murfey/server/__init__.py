@@ -1238,7 +1238,9 @@ def _flush_class2d(
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += 2
+        feedback_params.next_job += (
+            3 if default_spa_parameters.do_icebreaker_jobs else 2
+        )
         _db.delete(saved_message)
     _db.add(feedback_params)
     _db.commit()
@@ -1316,7 +1318,7 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
                 _db=_db,
                 demo=demo,
             )
-            next_job += 2
+            next_job += 3 if default_spa_parameters.do_icebreaker_jobs else 2
         feedback_params.next_job = next_job
         _db.close()
     else:
@@ -1368,7 +1370,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         # For the first batch, start a container and set the database to wait
         next_job = feedback_params.next_job
         class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job-1):03}"
+            f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
         )
         class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
         class_uuids = _murfey_id(message["program_id"], _db, number=4)
