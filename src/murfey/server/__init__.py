@@ -53,9 +53,12 @@ templates = Jinja2Templates(directory=template_files)
 _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
 
-_url = url(get_machine_config())
-engine = create_engine(_url)
-murfey_db = Session(engine, expire_on_commit=False)
+try:
+    _url = url(get_machine_config())
+    engine = create_engine(_url)
+    murfey_db = Session(engine, expire_on_commit=False)
+except Exception:
+    murfey_db = None
 
 
 class ExtendedRecord(NamedTuple):
