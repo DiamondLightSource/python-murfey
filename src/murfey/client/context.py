@@ -1350,4 +1350,6 @@ class TomographyContext(Context):
                 metadata_file.parent / data_file
             )
 
+        mdoc_metadata["tag"] = metadata_file.stem
+
         return mdoc_metadata

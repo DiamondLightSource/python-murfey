@@ -163,7 +163,7 @@ class ProcessingParametersTomo(BaseModel):
     motion_corr_binning: int
     manual_tilt_offset: float
     file_extension: str
-    acquisition_software: str
+    tag: str
 
     class Base(BaseModel):
         dose_per_frame: float

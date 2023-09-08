@@ -1860,6 +1860,38 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "tomography_processing_parameters":
+            client = murfey_db.exec(
+                select(db.ClientEnvironment).where(
+                    db.ClientEnvironment.client_id == message["client_id"]
+                )
+            ).one()
+            session_id = client.session_id
+            collected_ids = murfey_db.exec(
+                select(
+                    db.DataCollectionGroup,
+                    db.DataCollection,
+                    db.ProcessingJob,
+                    db.AutoProcProgram,
+                )
+                .where(db.DataCollectionGroup.session_id == session_id)
+                .where(db.DataCollectionGroup.tag == message["tag"])
+                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+            ).one()
+            params = db.TomographyProcessingParameters(
+                pj_id=collected_ids[2].id,
+                pixel_size=message["pixel_size_on_image"],
+                manual_tilt_offset=message["manual_tilt_offset"],
+            )
+            murfey_db.add(params)
+            murfey_db.commit()
+            murfey_db.close()
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         elif message["register"] == "picked_particles":
             feedback_params = murfey_db.exec(
                 select(db.SPAFeedbackParameters).where(

@@ -238,30 +238,25 @@ def get_tomo_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
-@router.post("/clients/{client_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
-):
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
-    params = TomographyProcessingParameters(
-        session_id=session_id,
-        pixel_size=proc_params.pixel_size_on_image,
-        manual_tilt_offset=proc_params.manual_tilt_offset,
-    )
-    db.add(params)
-    db.commit()
-    db.close()
-
-
 @router.post("/clients/{client_id}/spa_processing_parameters")
 def register_spa_proc_params(
     client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
     zocalo_message = {
         "register": "spa_processing_parameters",
+        **dict(proc_params),
+        "client_id": client_id,
+    }
+    if _transport_object:
+        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    zocalo_message = {
+        "register": "tomography_processing_parameters",
         **dict(proc_params),
         "client_id": client_id,
     }
