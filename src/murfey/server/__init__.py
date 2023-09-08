@@ -117,14 +117,10 @@ def get_job_ids(tag: str) -> JobIDs:
     )
 
 
-def get_tomo_proc_params(client_id: int, *args) -> db.TomographyProcessingParameters:
-    client = murfey_db.exec(
-        select(db.ClientEnvironment).where(db.ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
+def get_tomo_proc_params(pj_id: int, *args) -> db.TomographyProcessingParameters:
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
-            db.TomographyProcessingParameters.session_id == session_id
+            db.TomographyProcessingParameters.pj_id == pj_id
         )
     ).one()
     return results
@@ -1506,7 +1502,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if check_tilt_series_mc(relevant_tilt.tilt_series_tag):
                 tilts = get_all_tilts(relevant_tilt.tilt_series_tag)
                 ids = get_job_ids(relevant_tilt.tilt_series_tag)
-                params = get_tomo_proc_params(ids.client_id)
+                params = get_tomo_proc_params(ids.pid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
                     / "align_output"
@@ -1638,15 +1634,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
             run_parameters = message.get("parameters", {})
             assert isinstance(run_parameters, dict)
-            if not message["experiment_type"] == "spa":
-                murfey_processing = db.TomographyProcessingParameters(
-                    client_id=message["client_id"],
-                    pixel_size=run_parameters["angpix"],
-                    manual_tilt_offset=run_parameters["manual_tilt_offset"],
-                )
-                murfey_db.add(murfey_processing)
-                murfey_db.commit()
-                murfey_db.close()
             if message.get("job_parameters"):
                 job_parameters = [
                     ProcessingJobParameter(parameterKey=k, parameterValue=v)
