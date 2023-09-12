@@ -403,7 +403,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     if not proc_params:
         visit_name = visit_name.replace("\r\n", "").replace("\n", "")
         log.warning(
-            f"No SPA processing parameters found for client {client_id} on visit {sanitise(visit_name)}"
+            f"No SPA processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
         )
         return
     collected_ids = db.exec(
