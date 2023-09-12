@@ -1848,7 +1848,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).one()
             params = db.SPARelionParameters(
                 pj_id=collected_ids[2].id,
-                angpix=message["pixel_size_on_image"],
+                angpix=message["pixel_size_on_image"] * 1e10,
                 dose_per_frame=message["dose_per_frame"],
                 gain_ref=message["gain_ref"],
                 voltage=message["voltage"],

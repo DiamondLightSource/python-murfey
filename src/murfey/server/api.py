@@ -569,7 +569,7 @@ async def request_spa_preprocessing(
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": proc_params["angpix"] * 1e10,
+                "pix_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
