@@ -611,6 +611,9 @@ class MurfeyTUI(App):
         requests.delete(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
         )
+        requests.post(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
+        )
         self.exit()
         exit()
 

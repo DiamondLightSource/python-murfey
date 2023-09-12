@@ -10,6 +10,7 @@ import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import BLSession, Proposal
 from pydantic import BaseModel
 from sqlmodel import col, select
@@ -922,6 +923,34 @@ def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
     db.commit()
     db.close()
     return sid
+
+
+@router.post("/clients/{client_id}/successful_processing")
+def register_processing_success_in_ispyb(
+    client_id: int, db=murfey.server.ispyb.DB, murfey_db=murfey_db
+):
+    session_id = (
+        murfey_db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+    ).all()
+    appids = [c[3].id for c in collected_ids]
+    if _transport_object:
+        apps = db.query(ISPyBAutoProcProgram).filter(
+            ISPyBAutoProcProgram.autoProcProgram.in_(appids)
+        )
+        for updated in apps:
+            updated.processingStatus = True
+            _transport_object.do_update_processing_status(updated)
 
 
 @router.delete("/clients/{client_id}/session")
