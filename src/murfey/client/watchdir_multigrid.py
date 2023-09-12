@@ -16,6 +16,7 @@ class MultigridDirWatcher(murfey.util.Observer):
     def __init__(
         self,
         path: str | os.PathLike,
+        machine_config: dict,
         skip_existing_processing: bool = False,
     ):
         super().__init__()
@@ -23,6 +24,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         self._skip_existing_processing = skip_existing_processing
         self._seen_dirs: List[Path] = []
         self._stopping = False
+        self._machine_config = machine_config
         self.thread = threading.Thread(
             name=f"MultigridDirWatcher {self._basepath}",
             target=self._process,
@@ -47,8 +49,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                machine_config = murfey.util.get_machine_config()
-                if d.name in machine_config["create_directories"]:
+                if d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(d, include_mid_path=False, use_suggested_path=False)
                         self._seen_dirs.append(d)

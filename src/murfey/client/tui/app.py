@@ -105,7 +105,11 @@ class MurfeyTUI(App):
     ):
         log.info(f"Launching multigrid watcher for source {source}")
         self._multigrid_watcher = MultigridDirWatcher(
-            source, skip_existing_processing=self._skip_existing_processing
+            source,
+            get_machine_config(
+                str(self._environment.url.geturl()), demo=self._environment.demo
+            ),
+            skip_existing_processing=self._skip_existing_processing,
         )
         self._multigrid_watcher.subscribe(
             partial(

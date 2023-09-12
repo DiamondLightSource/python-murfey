@@ -843,7 +843,7 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
-            machine_config = get_machine_config()
+            machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             destinations = []
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
