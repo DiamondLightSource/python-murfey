@@ -24,6 +24,7 @@ from murfey.server import (
     feedback_callback,
     get_hostname,
     get_microscope,
+    sanitise,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
@@ -125,6 +126,7 @@ def get_mic():
 def get_mic_image():
     if machine_config.get("image_path"):
         return FileResponse(machine_config["image_path"])
+    return None
 
 
 @router.get("/visits/")
@@ -401,7 +403,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     if not proc_params:
         visit_name = visit_name.replace("\r\n", "").replace("\n", "")
         log.warning(
-            f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
+            f"No SPA processing parameters found for client {client_id} on visit {sanitise(visit_name)}"
         )
         return
     collected_ids = db.exec(

@@ -9,6 +9,7 @@ from typing import Any, Dict, Generic, TypeVar
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import select
 
+from murfey.server import sanitise
 from murfey.server.murfey_db import get_murfey_db_session
 from murfey.util.db import ClientEnvironment
 from murfey.util.state import State, global_state
@@ -127,7 +128,6 @@ async def close_ws_connection(client_id: int):
     murfey_db.add(client_env)
     murfey_db.commit()
     murfey_db.close()
-    assert isinstance(client_id, int)
-    log.info(f"Disconnecting {client_id}")
+    log.info(f"Disconnecting {sanitise(str(client_id))}")
     manager.disconnect(manager.active_connections[client_id], client_id)
     await manager.broadcast(f"Client #{client_id} disconnected")
