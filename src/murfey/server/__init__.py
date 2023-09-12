@@ -74,6 +74,10 @@ class JobIDs(NamedTuple):
     client_id: int
 
 
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
+
+
 def get_angle(tilt_file_name: str) -> float:
     for p in Path(tilt_file_name).name.split("_"):
         if "." in p:
@@ -751,7 +755,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 "batch_is_complete": first_class2d.complete,
                 "batch_size": first_class2d.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "autoproc_program_id": message["program_id"],
@@ -764,7 +768,6 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _2d_class_murfey_ids(
                     first_class2d.particles_file, message["program_id"], _db
@@ -828,7 +831,7 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_params.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "mask_diameter": relion_params.mask_diameter or 0,
                 "do_initial_model": True,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _3d_class_murfey_ids(
@@ -854,7 +857,6 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
@@ -1083,7 +1085,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
@@ -1098,7 +1100,6 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
@@ -1154,7 +1155,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -1170,7 +1171,6 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
@@ -1231,7 +1231,7 @@ def _flush_class2d(
                 "batch_is_complete": True,
                 "batch_size": saved_message.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
-                "mask_diameter": relion_params.mask_diameter,
+                "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -1248,7 +1248,6 @@ def _flush_class2d(
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": session_id,
                 "autoproc_program_id": _app_id(pj_id, _db),
                 "feedback_queue": machine_config.feedback_queue,
@@ -1418,7 +1417,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "class3d_dir": class3d_dir,
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_options["particle_diameter"],
-                "mask_diameter": relion_options["mask_diameter"],
+                "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": True,
                 "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
@@ -1433,7 +1432,6 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
@@ -1460,7 +1458,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_options["particle_diameter"],
-                "mask_diameter": relion_options["mask_diameter"],
+                "mask_diameter": relion_options["mask_diameter"] or 0,
                 "initial_model_file": other_options["initial_model"],
                 "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": _3d_class_murfey_ids(
@@ -1477,7 +1475,6 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
@@ -1875,7 +1872,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(feedback_params)
             murfey_db.commit()
             logger.info(
-                f"SPA processing parameters registered for processing job {collected_ids[2].id}, particle_diameter={message['particle_diameter']}"
+                f"SPA processing parameters registered for processing job {collected_ids[2].id}, particle_diameter={sanitise(str(message['particle_diameter']))}"
             )
             murfey_db.close()
             if _transport_object:

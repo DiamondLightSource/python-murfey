@@ -127,6 +127,7 @@ async def close_ws_connection(client_id: int):
     murfey_db.add(client_env)
     murfey_db.commit()
     murfey_db.close()
-    log.info("Disconnecting", client_id)
+    assert isinstance(client_id, int)
+    log.info(f"Disconnecting {client_id}")
     manager.disconnect(manager.active_connections[client_id], client_id)
     await manager.broadcast(f"Client #{client_id} disconnected")

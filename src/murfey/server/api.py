@@ -92,6 +92,11 @@ machine_config = get_machine_config()
 
 router = APIRouter()
 
+
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
+
+
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -456,9 +461,6 @@ def visit_info(request: Request, visit_name: str, db=murfey.server.ispyb.DB):
 
 @router.post("/visits/{visit_name}/context")
 async def register_context(context_info: ContextInfo):
-    log.info(
-        f"Context {context_info.experiment_type}:{context_info.acquisition_software} registered"
-    )
     await ws.manager.broadcast(f"Context registered: {context_info}")
     await ws.manager.set_state("experiment_type", context_info.experiment_type)
     await ws.manager.set_state(
@@ -496,9 +498,9 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
 async def request_spa_preprocessing(
     visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
-    visit_idx = Path(proc_file.path).parts.index(visit_name)
-    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
+    visit_idx = Path(secure_filename(proc_file.path)).parts.index(visit_name)
+    core = Path(*Path(secure_filename(proc_file.path)).parts[: visit_idx + 1])
+    ppath = Path(secure_filename(proc_file.path))
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
@@ -559,7 +561,7 @@ async def request_spa_preprocessing(
         db.close()
 
         if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True, exist_ok=True)
+            Path(secure_filename(mrc_out)).parent.mkdir(parents=True, exist_ok=True)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -589,7 +591,7 @@ async def request_spa_preprocessing(
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             log.error(
-                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
             )
             return proc_file
 
@@ -628,9 +630,9 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / str(ppath.stem + "_ctf.mrc")
     )
     if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True, exist_ok=True)
+        Path(secure_filename(mrc_out)).parent.mkdir(parents=True, exist_ok=True)
     if not ctf_out.parent.exists():
-        ctf_out.parent.mkdir(parents=True, exist_ok=True)
+        Path(secure_filename(ctf_out)).parent.mkdir(parents=True, exist_ok=True)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -648,7 +650,6 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "mc_uuid": proc_file.mc_uuid,
             "ft_bin": proc_file.mc_binning,
             "fm_dose": proc_file.dose_per_frame,
-            "kv": proc_file.voltage,
             "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
             if proc_file.gain_ref
             else proc_file.gain_ref,
@@ -689,11 +690,10 @@ async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails
         },
     }
     if _transport_object:
-        log.info(f"Sending Zocalo message {zocalo_message}")
         _transport_object.send("processing_recipe", zocalo_message)
     else:
         log.error(
-            f"Processing was requested for tilt series {tilt_series.name} but no Zocalo transport object was found"
+            f"Processing was requested for tilt series {sanitise(tilt_series.name)} but no Zocalo transport object was found"
         )
         return tilt_series
     await ws.manager.broadcast(
@@ -808,9 +808,6 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     }
 
     if _transport_object:
-        log.debug(
-            f"Send registration message to {machine_config.feedback_queue}: {dc_parameters}"
-        )
         _transport_object.send(
             machine_config.feedback_queue,
             {"register": "data_collection", **dc_parameters},
@@ -833,9 +830,6 @@ def register_proc(
     }
 
     if _transport_object:
-        log.info(
-            f"Send processing registration message to {machine_config.feedback_queue}: {proc_parameters}"
-        )
         _transport_object.send(
             machine_config.feedback_queue,
             {"register": "processing_job", **proc_parameters},

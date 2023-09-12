@@ -252,6 +252,7 @@ def register_spa_proc_params(
         )
     except Exception as e:
         log.warning(f"registration failed: {e}")
+        return
     db.add(params)
     db.add(feedback_params)
     db.commit()
@@ -398,6 +399,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     proc_params = dict(params[0])
     feedback_params = params[1]
     if not proc_params:
+        visit_name = visit_name.replace("\r\n", "").replace("\n", "")
         log.warning(
             f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
         )
@@ -458,9 +460,9 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
 async def request_spa_preprocessing(
     visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
-    visit_idx = Path(proc_file.path).parts.index(visit_name)
-    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
+    visit_idx = Path(secure_filename(proc_file.path)).parts.index(visit_name)
+    core = Path(*Path(secure_filename(proc_file.path)).parts[: visit_idx + 1])
+    ppath = Path(secure_filename(proc_file.path))
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
@@ -522,32 +524,32 @@ async def request_spa_preprocessing(
         db.commit()
 
         if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True)
-        zocalo_message = {
-            "recipes": ["em-spa-preprocess"],
-            "parameters": {
-                "feedback_queue": machine_config["feedback_queue"],
-                "dcid": detached_ids[1],
-                "autoproc_program_id": detached_ids[3],
-                "movie": proc_file.path,
-                "mrc_out": str(mrc_out),
-                "pix_size": proc_params["angpix"],
-                "image_number": proc_file.image_number,
-                "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[0],
-                "ft_bin": proc_params["motion_corr_binning"],
-                "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(
-                    machine_config["rsync_basepath"] / proc_params["gain_ref"]
-                )
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
-                "downscale": proc_params["downscale"],
-                "picker_uuid": murfey_ids[1],
-                "particle_diameter": proc_params["particle_diameter"],
-            },
-        }
-        log.info(f"Sending Zocalo message {zocalo_message}")
+            Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
+        # zocalo_message = {
+        #     "recipes": ["em-spa-preprocess"],
+        #     "parameters": {
+        #         "feedback_queue": machine_config["feedback_queue"],
+        #         "dcid": detached_ids[1],
+        #         "autoproc_program_id": detached_ids[3],
+        #         "movie": proc_file.path,
+        #         "mrc_out": str(mrc_out),
+        #         "pix_size": proc_params["angpix"],
+        #         "image_number": proc_file.image_number,
+        #         "microscope": get_microscope(),
+        #         "mc_uuid": murfey_ids[0],
+        #         "ft_bin": proc_params["motion_corr_binning"],
+        #         "fm_dose": proc_params["dose_per_frame"],
+        #         "gain_ref": str(
+        #             machine_config["rsync_basepath"] / proc_params["gain_ref"]
+        #         )
+        #         if proc_params["gain_ref"]
+        #         else proc_params["gain_ref"],
+        #         "downscale": proc_params["downscale"],
+        #         "picker_uuid": murfey_ids[1],
+        #         "particle_diameter": proc_params["particle_diameter"],
+        #     },
+        # }
+        log.info("Sending Zocalo message")
         _register_picked_particles_use_diameter(
             {
                 "session_id": session_id,
