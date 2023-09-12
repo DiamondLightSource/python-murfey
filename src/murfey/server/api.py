@@ -193,7 +193,7 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
-@router.get("/clients/{client_id}/rsyncers")
+@router.get("/clients/{client_id}/rsyncers", response_model=List[RsyncInstance])
 def get_rsyncers_for_client(client_id: int, db=murfey_db):
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)

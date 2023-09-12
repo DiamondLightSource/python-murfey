@@ -535,8 +535,8 @@ class MurfeyTUI(App):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following:\n {sources} \n"
             rsync_instances = requests.get(
-                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/rsyncer"
-            )
+                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/rsyncers"
+            ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
                 ConfirmScreen(
