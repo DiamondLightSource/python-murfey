@@ -77,7 +77,6 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     tag: str = Field(primary_key=True)
-    dcg_tag: str
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
@@ -158,11 +157,11 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     pixel_size: float
     manual_tilt_offset: int
-    processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="spa_parameters"
+    session: Optional[Session] = Relationship(
+        back_populates="tomography_processing_parameters"
     )
 
 
