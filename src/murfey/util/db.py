@@ -14,6 +14,9 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     preprocess_stashes: List["PreprocessStash"] = Relationship(
         back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
     )
+    preprocess_tomo_stashes: List["TomographyPreprocessStash"] = Relationship(
+        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class RsyncInstance(SQLModel, table=True):  # type: ignore
@@ -63,7 +66,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
-    tag: str
+    tag: str = Field(primary_key=True)
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
@@ -73,7 +76,8 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    tag: str
+    tag: str = Field(primary_key=True)
+    dcg_tag: str
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
@@ -133,6 +137,17 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     )
 
 
+class TomographyPreprocessStash(SQLModel, table=True):  # type: ignore
+    tag: str
+    file_path: str = Field(primary_key=True)
+    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    image_number: int
+    mrc_out: str
+    client: Optional[ClientEnvironment] = Relationship(
+        back_populates="preprocess_tomo_stashes"
+    )
+
+
 class SelectionStash(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
     class_selection_score: float
@@ -143,11 +158,11 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     pixel_size: float
     manual_tilt_offset: int
-    session: Optional[Session] = Relationship(
-        back_populates="tomography_processing_parameters"
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="spa_parameters"
     )
 
 
