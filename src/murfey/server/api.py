@@ -313,6 +313,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         mrc_out.parent.mkdir(parents=True)
     if not ctf_out.parent.exists():
         ctf_out.parent.mkdir(parents=True)
+    microscope = get_microscope(machine_config=machine_config)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -325,7 +326,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
             "pix_size": (proc_file.pixel_size) * 10**10,
             "output_image": str(ctf_out),
             "image_number": proc_file.image_number,
-            "microscope": get_microscope(machine_config=machine_config),
+            "microscope": microscope,
             "mc_uuid": proc_file.mc_uuid,
             "ft_bin": proc_file.mc_binning,
             "fm_dose": proc_file.dose_per_frame,
@@ -424,12 +425,11 @@ def register_dc_group(visit_name, dcg_params: DCGroupParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
-    log.info(
-        f"Registering data collection group on microscope {get_microscope(machine_config=machine_config)}"
-    )
+    microscope = get_microscope(machine_config=machine_config)
+    log.info(f"Registering data collection group on microscope {microscope}")
     dcg_parameters = {
         "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(machine_config=machine_config),
+            microscope=microscope,
             proposal_code=ispyb_proposal_code,
             proposal_number=ispyb_proposal_number,
             visit_number=ispyb_visit_number,

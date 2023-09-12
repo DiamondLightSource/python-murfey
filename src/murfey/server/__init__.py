@@ -209,8 +209,7 @@ def shutdown():
         _running_server.force_exit = True
 
 
-@lru_cache()
-def get_microscope(machine_config: MachineConfig | None = None):
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
     try:
         hostname = get_hostname()
         microscope_from_hostname = hostname.split(".")[0]

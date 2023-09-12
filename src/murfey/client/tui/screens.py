@@ -63,8 +63,9 @@ def determine_default_destination(
 ) -> str:
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
-    if environment.processing_only_mode and environment.source:
-        _default = str(environment.source.resolve()) or str(Path.cwd())
+    if environment.processing_only_mode and environment.sources:
+        log.info(f"Processing only mode with sources {environment.sources}")
+        _default = str(environment.sources[0].resolve()) or str(Path.cwd())
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"].keys():
             if source.resolve() == Path(data_dir):
@@ -262,7 +263,10 @@ class LaunchScreen(Screen):
         text_log.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
-            if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
+            if (
+                Path(self._dir_tree._selected_path).resolve().is_relative_to(d)
+                or self.app._environment.processing_only_mode
+            ):
                 btn_disabled = False
                 break
         self._launch_btn = Button("Launch", id="launch", disabled=btn_disabled)
@@ -328,7 +332,9 @@ class LaunchScreen(Screen):
                 )
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default, visit_path=visit_path)
+                    self.app._start_rsyncer(
+                        Path(_default), _default, visit_path=visit_path
+                    )
                 transfer_routes[s] = _default
             self.app.install_screen(
                 DestinationSelect(
