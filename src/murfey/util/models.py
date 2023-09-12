@@ -84,6 +84,7 @@ class ProcessFile(BaseModel):
     autoproc_program_id: int
     pixel_size: float
     dose_per_frame: float
+    voltage: int = 300
     mc_binning: int = 1
     gain_ref: Optional[str] = None
     eer_fractionation_file: Optional[str] = None
