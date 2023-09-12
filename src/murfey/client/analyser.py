@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Type
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import SPAContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
-from murfey.util.models import DCParametersSPA, DCParametersTomo
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -52,8 +52,8 @@ class Analyser(Observer):
         self._batch_store: dict = {}
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
-        self.parameters_model: Type[DCParametersSPA] | Type[
-            DCParametersTomo
+        self.parameters_model: Type[ProcessingParametersSPA] | Type[
+            ProcessingParametersTomo
         ] | None = None
 
         self.queue: queue.Queue = queue.Queue()
@@ -96,8 +96,23 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    self._context = SPAContext("epu", self._basepath)
-                self.parameters_model = DCParametersSPA
+                    if self._environment:
+                        try:
+                            cfg = get_machine_config(
+                                str(self._environment.url.geturl()),
+                                demo=self._environment.demo,
+                            )
+                        except Exception as e:
+                            logger.warning(f"exception encountered: {e}")
+                            cfg = {}
+                    else:
+                        cfg = {}
+                    self._context = (
+                        SPAModularContext("epu", self._basepath)
+                        if cfg.get("modular_spa")
+                        else SPAContext("epu", self._basepath)
+                    )
+                self.parameters_model = ProcessingParametersSPA
                 if not self._role:
                     self._role = "detector"
                 return True
@@ -110,7 +125,7 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
-                    self.parameters_model = DCParametersTomo
+                    self.parameters_model = ProcessingParametersTomo
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -143,7 +158,7 @@ class Analyser(Observer):
                     # This covers the case of ignoring the averaged movies written out by the Falcon
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = DCParametersTomo
+                self.parameters_model = ProcessingParametersTomo
                 if not self._role:
                     if "Frames" in file_path.parts:
                         self._role = "detector"
@@ -219,6 +234,7 @@ class Analyser(Observer):
                                     "form": dc_metadata,
                                     "dependencies": spa_form_dependencies
                                     if isinstance(self._context, SPAContext)
+                                    or isinstance(self._context, SPAModularContext)
                                     else {},
                                 }
                             )
@@ -258,6 +274,7 @@ class Analyser(Observer):
                                     "form": dc_metadata,
                                     "dependencies": spa_form_dependencies
                                     if isinstance(self._context, SPAContext)
+                                    or isinstance(self._context, SPAModularContext)
                                     else {},
                                 }
                             )
@@ -276,6 +293,10 @@ class Analyser(Observer):
                             environment=self._environment,
                         )
                     self.notify({"form": dc_metadata})
+            elif isinstance(self._context, SPAModularContext):
+                self._context.post_transfer(
+                    transferred_file, role=self._role, environment=self._environment
+                )
         self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:

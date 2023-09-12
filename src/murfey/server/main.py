@@ -4,6 +4,7 @@ import logging
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseSettings
 
@@ -30,6 +31,15 @@ class Settings(BaseSettings):
 settings = Settings()
 
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 

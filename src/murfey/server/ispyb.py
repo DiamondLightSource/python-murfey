@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 import ispyb
 
@@ -23,6 +23,7 @@ from ispyb.sqlalchemy import (
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
+    ZcZocaloBuffer,
     url,
 )
 
@@ -35,8 +36,20 @@ Session = sqlalchemy.orm.sessionmaker(
 )
 
 
+def _send_using_new_connection(transport_type: str, queue: str, message: dict) -> None:
+    transport = workflows.transport.lookup(transport_type)()
+    transport.connect()
+    send_call = transport.send(queue, message)
+    # send_call may be a concurrent.futures.Future object
+    if send_call:
+        send_call.result()
+    transport.disconnect()
+    return None
+
+
 class TransportManager:
     def __init__(self, transport_type):
+        self._transport_type = transport_type
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
@@ -63,7 +76,7 @@ class TransportManager:
             )
         return False
 
-    def send(self, queue: str, message: dict):
+    def send(self, queue: str, message: dict, new_connection: bool = False):
         if self.transport:
             if not self.transport.is_connected():
                 try:
@@ -75,7 +88,10 @@ class TransportManager:
                 self.transport.connect()
                 if self._connection_callback:
                     self._connection_callback()
-            self.transport.send(queue, message)
+            if new_connection:
+                _send_using_new_connection(self._transport_type, queue, message)
+            else:
+                self.transport.send(queue, message)
 
     def do_insert_data_collection(self, record: DataCollection, message=None, **kwargs):
         comment = (
@@ -230,6 +246,17 @@ class TransportManager:
                 exc_info=True,
             )
             return {"success": False, "return_value": None}
+
+    def do_buffer_lookup(self, app_id: int, uuid: int) -> Optional[int]:
+        with Session() as db:
+            buffer_objects = (
+                db.query(ZcZocaloBuffer)
+                .filter_by(AutoProcProgramID=app_id, UUID=uuid)
+                .all()
+            )
+            reference = buffer_objects[0].Reference if buffer_objects else None
+        log.info(f"Buffer lookup {uuid} returned {reference}")
+        return reference
 
 
 def _get_session() -> sqlalchemy.orm.Session:

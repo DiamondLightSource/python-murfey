@@ -27,6 +27,7 @@ global_env_lock = RLock()
 
 class MurfeyInstanceEnvironment(BaseModel):
     url: ParseResult
+    client_id: int
     software_versions: Dict[str, str] = {}
     sources: List[Path] = []
     default_destinations: Dict[Path, str] = {}
@@ -53,29 +54,11 @@ class MurfeyInstanceEnvironment(BaseModel):
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
     superres: bool = True
+    murfey_session: Optional[int] = None
 
     class Config:
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
-
-    def clear(self):
-        self.sources = []
-        self.default_destinations = {}
-        for w in self.watchers.values():
-            w.stop()
-        self.watchers = {}
-        self.data_collection_group_ids = {}
-        self.data_collection_ids = {}
-        self.processing_job_ids = {}
-        self.autoproc_program_ids = {}
-        self.data_collection_parameters = {}
-        self.movies = {}
-        self.motion_corrected_movies = {}
-        self.listeners = {}
-        self.movie_tilt_pair = {}
-        self.tilt_angles = {}
-        self.visit = ""
-        self.gain_ref = None
 
     @validator("data_collection_group_ids")
     def dcg_callback(cls, v, values):
@@ -114,67 +97,21 @@ class MurfeyInstanceEnvironment(BaseModel):
                         l(k, v[k]["em-tomo-preprocess"])
         return v
 
-    @validator("motion_corrected_movies")
-    def motion_corrected_callback(cls, v, values):
-        _url = f"{str(values['url'].geturl())}/visits/{values['visit']}/align"
-        for l in values.get("listeners", {}).get("motion_corrected_movies", []):
-            if values.get("motion_corrected_movies"):
-                for k in set(values["motion_corrected_movies"].keys()) ^ set(
-                    v.keys()
-                ):  # k is a path (key), v[k] is the value matching the key
-                    tilt = values["movie_tilt_pair"][k]
-                    file_tilt_list = []
-                    for movie, angle in values["tilt_angles"][tilt]:
-                        if movie in v:  # values["motion_corrected_movies"]:
-                            file_tilt_list.append(
-                                [
-                                    str(v[Path(movie)][0]),
-                                    angle,
-                                    str(v[Path(movie)][1]),
-                                ]
-                            )
-                    l(
-                        k,
-                        v[k][0],
-                        _url,
-                        values["processing_job_ids"][k]["em-tomo-align"],
-                        values["autoproc_program_ids"][k]["em-tomo-align"],
-                        v[k][1],
-                        file_tilt_list,
-                        values["data_collection_parameters"]["manual_tilt_offset"],
-                        values["data_collection_parameters"]["pixel_size_on_image"],
-                    )
-            else:
-                for k in v.keys():
-                    try:
-                        # possible race condition here where values accessing by [k] sometimes aren't ready when we
-                        # try to access them - it throws a key error for a value which has just been set.
-                        tilt = values["movie_tilt_pair"][k]
-                        file_tilt_list = []
-                        for movie, angle in values["tilt_angles"][tilt]:
-                            # file_tilt_list.append([str(movie), angle])
-                            if Path(movie) in v:
-                                file_tilt_list.append(
-                                    [
-                                        str(v[Path(movie)][0]),
-                                        angle,
-                                        str(v[Path(movie)][1]),
-                                    ]
-                                )  # or v(k)
-                        l(
-                            k,
-                            v[k][0],
-                            _url,
-                            values["data_collection_ids"][tilt],
-                            values["processing_job_ids"][tilt]["em-tomo-align"],
-                            values["autoproc_program_ids"][tilt]["em-tomo-align"],
-                            v[k][1],
-                            file_tilt_list,
-                            values["data_collection_parameters"]["manual_tilt_offset"],
-                            values["data_collection_parameters"]["pixel_size_on_image"],
-                        )
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        logger.warning(f"ERROR {e}")
-        return v
+    def clear(self):
+        self.sources = []
+        self.default_destinations = {}
+        for w in self.watchers.values():
+            w.stop()
+        self.watchers = {}
+        self.data_collection_group_ids = {}
+        self.data_collection_ids = {}
+        self.processing_job_ids = {}
+        self.autoproc_program_ids = {}
+        self.data_collection_parameters = {}
+        self.movies = {}
+        self.motion_corrected_movies = {}
+        self.listeners = {}
+        self.movie_tilt_pair = {}
+        self.tilt_angles = {}
+        self.visit = ""
+        self.gain_ref = None

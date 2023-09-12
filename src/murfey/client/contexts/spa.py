@@ -9,10 +9,42 @@ import requests
 import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
-from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config
+from murfey.client.instance_environment import (
+    MovieID,
+    MovieTracker,
+    MurfeyID,
+    MurfeyInstanceEnvironment,
+)
+from murfey.util import get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+):
+    machine_config = get_machine_config(
+        str(environment.url.geturl()), demo=environment.demo
+    )
+    if environment.visit in environment.default_destinations[source]:
+        return (
+            Path(machine_config.get("rsync_basepath", ""))
+            / Path(environment.default_destinations[source])
+            / file_path.name
+        )
+    return (
+        Path(machine_config.get("rsync_basepath", ""))
+        / Path(environment.default_destinations[source])
+        / environment.visit
+        / file_path.name
+    )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            return s
+    return None
 
 
 def _get_xml_list_index(key: str, xml_list: list) -> int:
@@ -22,7 +54,7 @@ def _get_xml_list_index(key: str, xml_list: list) -> int:
     raise ValueError(f"Key not found in XML list: {key}")
 
 
-class SPAContext(Context):
+class _SPAContext(Context):
     user_params = [
         ProcessingParameter(
             "dose_per_frame",
@@ -34,7 +66,7 @@ class SPAContext(Context):
             default=True,
         ),
         ProcessingParameter(
-            "particle_diameter", "Particle Diameter (Angstroms)", default=0
+            "particle_diameter", "Particle Diameter (Angstroms)", default=None
         ),
         ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
@@ -64,109 +96,10 @@ class SPAContext(Context):
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
 
-    def _register_data_collection(
-        self,
-        tag: str,
-        url: str,
-        data: dict,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        logger.info(f"registering data collection with data {data}")
-        environment.id_tag_registry["data_collection"].append(tag)
-        image_directory = str(environment.default_destinations[Path(tag)])
-        logger.info(f"Image directory for data collection is {image_directory}")
-        json = {
-            "voltage": data["voltage"],
-            "pixel_size_on_image": data["pixel_size_on_image"],
-            "experiment_type": data["experiment_type"],
-            "image_size_x": data["image_size_x"],
-            "image_size_y": data["image_size_y"],
-            "file_extension": data["file_extension"],
-            "acquisition_software": data["acquisition_software"],
-            "image_directory": image_directory,
-            "tag": tag,
-            "source": tag,
-            "magnification": data["magnification"],
-            "total_exposed_dose": data.get("total_exposed_dose"),
-            "c2aperture": data.get("c2aperture"),
-            "exposure_time": data.get("exposure_time"),
-            "slit_width": data.get("slit_width"),
-            "phase_plate": data.get("phase_plate", False),
-        }
-        requests.post(url, json=json)
-
-    def post_transfer(
-        self,
-        transferred_file: Path,
-        role: str = "",
-        environment: MurfeyInstanceEnvironment | None = None,
-        **kwargs,
-    ):
-        return
-
-    def _register_processing_job(
-        self,
-        tag: str,
-        environment: MurfeyInstanceEnvironment,
-        parameters: Dict[str, Any] | None = None,
-    ):
-        logger.info(f"registering processing job with parameters: {parameters}")
-        parameters = parameters or {}
-        environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
-        machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
-        )
-        image_directory = str(
-            Path(machine_config.get("rsync_basepath", "."))
-            / environment.default_destinations[Path(tag)]
-        )
-        if self._acquisition_software == "epu":
-            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
-        else:
-            import_images = (
-                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
-            )
-        msg: Dict[str, Any] = {
-            "tag": tag,
-            "recipe": "ispyb-relion",
-            "parameters": {
-                "acquisition_software": parameters["acquisition_software"],
-                "voltage": parameters["voltage"],
-                "motioncor_gainreference": parameters["gain_ref_superres"]
-                if parameters.get("motion_corr_binning") == 2
-                else parameters["gain_ref"],
-                "motioncor_doseperframe": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_grouping"],
-                "import_images": import_images,
-                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
-                "symmetry": parameters["symmetry"],
-                "extract_boxsize": parameters["boxsize"],
-                "extract_downscale": parameters["downscale"],
-                "extract_small_boxsize": parameters["small_boxsize"],
-                "mask_diameter": parameters["mask_diameter"],
-                "autopick_do_cryolo": parameters["use_cryolo"],
-                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
-            },
-        }
-        if parameters["particle_diameter"]:
-            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        capture_post(proc_url, json=msg)
-
-    def _launch_spa_pipeline(
-        self,
-        tag: str,
-        jobid: int,
-        environment: MurfeyInstanceEnvironment,
-        url: str = "",
-    ):
-        environment.id_tag_registry["auto_proc_program"].append(tag)
-        data = {"job_id": jobid}
-        capture_post(url, json=data)
-
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
     ):
+        logger.info(f"trying to gather metadata on {metadata_file}")
         if metadata_file.suffix != ".xml":
             raise ValueError(
                 f"SPA gather_metadata method expected xml file not {metadata_file.name}"
@@ -366,5 +299,212 @@ class SPAContext(Context):
             if environment
             else None
         ) or True
-
         return metadata
+
+
+class SPAModularContext(_SPAContext):
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
+        if role == "detector" and "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "epu":
+                    if environment:
+                        machine_config = get_machine_config(
+                            str(environment.url.geturl()), demo=environment.demo
+                        )
+                    else:
+                        machine_config = {}
+                    required_strings = machine_config.get(
+                        "data_required_substrings", {}
+                    ).get("epu", ["fractions"])
+
+                    if not environment:
+                        logger.warning("No environment passed in")
+                        return
+                    source = _get_source(transferred_file, environment)
+                    if not source:
+                        logger.warning(f"No source found for file {transferred_file}")
+                        return
+
+                    for r in required_strings:
+                        if r not in transferred_file.name.lower():
+                            return
+
+                    if environment:
+                        file_transferred_to = _file_transferred_to(
+                            environment, source, transferred_file
+                        )
+                        environment.movies[file_transferred_to] = MovieTracker(
+                            movie_number=next(MovieID),
+                            motion_correction_uuid=next(MurfeyID),
+                        )
+
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
+                        preproc_data = {
+                            "path": str(file_transferred_to),
+                            "description": "",
+                            "size": transferred_file.stat().st_size,
+                            "timestamp": transferred_file.stat().st_ctime,
+                            "processing_job": None,
+                            "data_collection_id": None,
+                            "image_number": environment.movies[
+                                file_transferred_to
+                            ].movie_number,
+                            "pixel_size": environment.data_collection_parameters.get(
+                                "pixel_size_on_image"
+                            ),
+                            "autoproc_program_id": None,
+                            "dose_per_frame": environment.data_collection_parameters.get(
+                                "dose_per_frame"
+                            ),
+                            "mc_binning": environment.data_collection_parameters.get(
+                                "motion_corr_binning", 1
+                            ),
+                            "gain_ref": environment.data_collection_parameters.get(
+                                "gain_ref"
+                            ),
+                            "downscale": environment.data_collection_parameters.get(
+                                "downscale"
+                            ),
+                            "tag": str(source),
+                        }
+                        requests.post(
+                            preproc_url,
+                            json={
+                                k: None if v == "None" else v
+                                for k, v in preproc_data.items()
+                            },
+                        )
+
+        return
+
+    def _register_data_collection(
+        self,
+        tag: str,
+        url: str,
+        data: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        return
+
+    def _register_processing_job(
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
+    ):
+        return
+
+    def _launch_spa_pipeline(
+        self,
+        tag: str,
+        jobid: int,
+        environment: MurfeyInstanceEnvironment,
+        url: str = "",
+    ):
+        return
+
+
+class SPAContext(_SPAContext):
+    def _register_data_collection(
+        self,
+        tag: str,
+        url: str,
+        data: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        logger.info(f"registering data collection with data {data}")
+        environment.id_tag_registry["data_collection"].append(tag)
+        image_directory = str(environment.default_destinations[Path(tag)])
+        json = {
+            "voltage": data["voltage"],
+            "pixel_size_on_image": data["pixel_size_on_image"],
+            "experiment_type": data["experiment_type"],
+            "image_size_x": data["image_size_x"],
+            "image_size_y": data["image_size_y"],
+            "file_extension": data["file_extension"],
+            "acquisition_software": data["acquisition_software"],
+            "image_directory": image_directory,
+            "tag": tag,
+            "source": tag,
+            "magnification": data["magnification"],
+            "total_exposed_dose": data.get("total_exposed_dose"),
+            "c2aperture": data.get("c2aperture"),
+            "exposure_time": data.get("exposure_time"),
+            "slit_width": data.get("slit_width"),
+            "phase_plate": data.get("phase_plate", False),
+        }
+        requests.post(url, json=json)
+
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        role: str = "",
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        return
+
+    def _register_processing_job(
+        self,
+        tag: str,
+        environment: MurfeyInstanceEnvironment,
+        parameters: Dict[str, Any] | None = None,
+    ):
+        logger.info(f"registering processing job with parameters: {parameters}")
+        parameters = parameters or {}
+        environment.id_tag_registry["processing_job"].append(tag)
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
+        machine_config = get_machine_config(
+            str(environment.url.geturl()), demo=environment.demo
+        )
+        image_directory = str(
+            Path(machine_config.get("rsync_basepath", "."))
+            / environment.default_destinations[Path(tag)]
+        )
+        if self._acquisition_software == "epu":
+            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
+        else:
+            import_images = (
+                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
+            )
+        msg: Dict[str, Any] = {
+            "tag": tag,
+            "recipe": "ispyb-relion",
+            "parameters": {
+                "acquisition_software": parameters["acquisition_software"],
+                "voltage": parameters["voltage"],
+                "gain_ref": parameters["gain_ref"],
+                "dose_per_frame": parameters["dose_per_frame"],
+                "eer_grouping": parameters["eer_grouping"],
+                "import_images": import_images,
+                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
+                "symmetry": parameters["symmetry"],
+                "boxsize": parameters["boxsize"],
+                "downscale": parameters["downscale"],
+                "small_boxsize": parameters["small_boxsize"],
+                "mask_diameter": parameters["mask_diameter"],
+                "use_cryolo": parameters["use_cryolo"],
+                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
+            },
+        }
+        if parameters["particle_diameter"]:
+            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
+        requests.post(proc_url, json=msg)
+
+    def _launch_spa_pipeline(
+        self,
+        tag: str,
+        jobid: int,
+        environment: MurfeyInstanceEnvironment,
+        url: str = "",
+    ):
+        environment.id_tag_registry["auto_proc_program"].append(tag)
+        data = {"job_id": jobid}
+        requests.post(url, json=data)

@@ -3,6 +3,7 @@ from __future__ import annotations
 # import contextlib
 import logging
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
 
@@ -34,7 +35,7 @@ from textual.widgets import (
 from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.contexts.spa import SPAContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
@@ -43,7 +44,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config
-from murfey.util.models import DCParametersSPA, DCParametersTomo
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -310,7 +311,13 @@ class LaunchScreen(Screen):
             log.info("switching context to tomo")
             self._context = TomographyContext
         elif event.option.prompt == "SPA":
-            self._context = SPAContext
+            cfg = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if cfg.get("modular_spa"):
+                self._context = SPAContext
+            else:
+                self._context = SPAModularContext
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
@@ -364,6 +371,7 @@ class ConfirmScreen(Screen):
         params: dict | None = None,
         pressed_callback: Callable | None = None,
         button_names: dict | None = None,
+        push: str = "main",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -371,6 +379,7 @@ class ConfirmScreen(Screen):
         self._params = params or {}
         self._callback = pressed_callback
         self._button_names = button_names or {}
+        self._push = push
 
     def compose(self):
         if self._params:
@@ -396,7 +405,8 @@ class ConfirmScreen(Screen):
                     self.app.pop_screen()
                 except ScreenStackError:
                     break
-            self.app.push_screen("main")
+            if self._push:
+                self.app.push_screen(self._push)
             self.app.uninstall_screen("confirm")
         if self._callback and event.button.id == "launch":
             self._callback(params=self._params)
@@ -449,7 +459,11 @@ class ProcessingForm(Screen):
             self._vert = VerticalScroll(*inputs, confirm_btn, id="input-form")
         yield self._vert
 
-    def _write_params(self, params: dict | None = None):
+    def _write_params(
+        self,
+        params: dict | None = None,
+        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
+    ):
         if params:
             try:
                 analyser = [a for a in self.app.analysers.values() if a._context][0]
@@ -458,6 +472,19 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
+            if model == ProcessingParametersTomo:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    json=params,
+                )
+            elif model == ProcessingParametersSPA:
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    json=params,
+                )
+                requests.post(
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing"
+                )
 
     def on_switch_changed(self, event):
         if event.switch.id == "superres":
@@ -495,6 +522,7 @@ class ProcessingForm(Screen):
         self._form[k] = event.value
 
     def on_button_pressed(self, event):
+        model = None
         if self.app.analysers.get(Path(self._form.get("source", ""))):
             if model := self.app.analysers[Path(self._form["source"])].parameters_model:
                 valid = validate_form(self._form, model)
@@ -505,7 +533,7 @@ class ProcessingForm(Screen):
                 ConfirmScreen(
                     "Launch processing?",
                     params=self._form,
-                    pressed_callback=self._write_params,
+                    pressed_callback=partial(self._write_params, model=model),
                 ),
                 "confirm",
             )
@@ -545,6 +573,108 @@ class SwitchSelection(Screen):
         self._switch_status = event.value
 
 
+class SessionSelection(Screen):
+    def __init__(
+        self, sessions: List[str], sessions_with_client: List[str], *args, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._sessions = sessions
+        self._sessions_with_client = sessions_with_client
+        self._name = "session"
+
+    def compose(self):
+        hovers = (
+            [
+                Button(e, id=f"btn-{self._name}-{e}", classes=f"btn-{self._name}")
+                for e in self._sessions
+            ]
+            if self._sessions
+            else [Button("No elements found")]
+        )
+        deletes = (
+            [
+                Button(
+                    f"Remove {e}",
+                    id=f"btn-{self._name}-{e}-del",
+                    classes=f"btn-{self._name}",
+                )
+                for e in self._sessions
+            ]
+            if self._sessions
+            else [Button("No elements found")]
+        )
+        yield VerticalScroll(
+            *[v for pair in zip(hovers, deletes) for v in pair],
+            id=f"select-{self._name}",
+        )
+        yield Button(
+            "New session", id=f"btn-{self._name}-new", classes=f"btn-{self._name}"
+        )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id.endswith("new"):
+            session_id = None
+            self.app.pop_screen()
+        elif event.button.id.endswith("del"):
+            session_id = int(
+                str(event.button.label.split(":")[0]).replace("Remove ", "")
+            )
+            self.app.pop_screen()
+            self.app.install_screen(
+                ConfirmScreen(
+                    f"Remove session {session_id} [WARNING: there are clients already using this session]"
+                    if str(event.button.label) in self._sessions_with_client
+                    else f"Remove session {session_id}",
+                    pressed_callback=partial(self._remove_session, session_id),
+                    button_names={"launch": "Yes"},
+                    push="visit-select-screen",
+                ),
+                "confirm",
+            )
+            self.app.push_screen("confirm")
+            return
+        else:
+            self.app._environment.murfey_session = int(
+                str(event.button.label.split(":")[0])
+            )
+            session_id = self.app._environment.murfey_session
+            self.app.pop_screen()
+        session_name = "Client connection"
+        requests.post(
+            f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+            json={"session_id": session_id, "session_name": session_name},
+        )
+
+    def _remove_session(self, session_id: int, **kwargs):
+        requests.delete(f"{self.app._environment.url.geturl()}/sessions/{session_id}")
+        exisiting_sessions = requests.get(
+            f"{self.app._environment.url.geturl()}/sessions"
+        ).json()
+        self.app.uninstall_screen("session-select-screen")
+        if exisiting_sessions:
+            self.app.install_screen(
+                SessionSelection(
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                    ],
+                    [
+                        f"{s['session']['id']}: {s['session']['name']}"
+                        for s in exisiting_sessions
+                        if s["clients"]
+                    ],
+                ),
+                "session-select-screen",
+            )
+            self.app.push_screen("session-select-screen")
+        else:
+            session_name = "Client connection"
+            capture_post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+                json={"session_id": None, "session_name": session_name},
+            )
+
+
 class VisitSelection(SwitchSelection):
     def __init__(self, visits: List[str], *args, **kwargs):
         super().__init__(
@@ -559,6 +689,11 @@ class VisitSelection(SwitchSelection):
         text = str(event.button.label)
         self.app._visit = text
         self.app._environment.visit = text
+        response = requests.post(
+            f"{self.app._environment.url.geturl()}/visits/{text}",
+            json={"id": self.app._environment.client_id},
+        )
+        log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()
@@ -692,7 +827,7 @@ class DestinationSelect(Screen):
     def __init__(
         self,
         transfer_routes: Dict[Path, str],
-        context: Type[SPAContext] | Type[TomographyContext],
+        context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
         **kwargs,
@@ -838,9 +973,9 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
-                valid = validate_form(self._user_params, DCParametersTomo.Base)
+                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
             else:
-                valid = validate_form(self._user_params, DCParametersSPA.Base)
+                valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:
                 return
         for s, d in self._transfer_routes.items():

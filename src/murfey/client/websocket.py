@@ -17,9 +17,11 @@ log = logging.getLogger("murfey.client.websocket")
 
 
 class WSApp:
-    def __init__(self, *, server: str):
-        id = random.randint(0, 100)
-        log.info(f"Opening websocket connection for Client {id}")
+    environment: MurfeyInstanceEnvironment | None = None
+
+    def __init__(self, *, server: str, id: int | None = None):
+        self.id = random.randint(0, 100) if id is None else id
+        log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
         url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
         self._address = url.geturl()
@@ -48,7 +50,7 @@ class WSApp:
             target=self._receive_msgs, daemon=True, name="websocket-receive-queue"
         )
         self._receiver_thread.start()
-        self.environment: MurfeyInstanceEnvironment | None = None
+        log.info("making wsapp")
 
     def __repr__(self):
         if self.alive:
@@ -122,7 +124,6 @@ class WSApp:
         self._receive_queue.put(message)
 
     def _handle_msg(self, message: str):
-        # log.info(f"Received message: {message!r}")
         data = json.loads(message)
         if data.get("message") == "state-update":
             self._register_id(data["attribute"], data["value"])

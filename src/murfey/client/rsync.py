@@ -208,6 +208,7 @@ class RSyncer(Observer):
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
 
+        updates = []
         for f in set(relative_filenames):
             self._files_transferred += 1
             update = RSyncerUpdate(
@@ -219,6 +220,9 @@ class RSyncer(Observer):
                 base_path=self._basepath,
             )
             self.notify(update)
+            updates.append(update)
+        self.notify(updates, secondary=True)
+
         return True
 
     def _transfer(self, files: list[Path]) -> bool:

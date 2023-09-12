@@ -54,6 +54,18 @@ class ContextInfo(BaseModel):
     acquisition_software: str
 
 
+class ClientInfo(BaseModel):
+    id: int
+
+
+class RsyncerInfo(BaseModel):
+    source: str
+    destination: str
+    client_id: int
+    transferring: bool = True
+    increment_count: int = 1
+
+
 class ClearanceKeys(BaseModel):
     data_collection_group: List[str]
     data_collection: List[str]
@@ -77,20 +89,49 @@ class ProcessFile(BaseModel):
     description: str
     size: int
     timestamp: float
-    processing_job: int
-    data_collection_id: int
+    processing_job: Optional[int]
+    data_collection_id: Optional[int]
     image_number: int
     mc_uuid: int
-    autoproc_program_id: int
+    autoproc_program_id: Optional[int]
     pixel_size: float
     dose_per_frame: float
-    voltage: int = 300
+    voltage: float = 300
     mc_binning: int = 1
     gain_ref: Optional[str] = None
+    extract_downscale: int = 1
     eer_fractionation_file: Optional[str] = None
 
 
-class TiltSeries(BaseModel):
+class SPAProcessFile(BaseModel):
+    tag: str
+    path: str
+    description: str
+    size: int
+    timestamp: float
+    processing_job: Optional[int]
+    data_collection_id: Optional[int]
+    image_number: int
+    autoproc_program_id: Optional[int]
+    pixel_size: Optional[float]
+    dose_per_frame: Optional[float]
+    mc_binning: Optional[int] = 1
+    gain_ref: Optional[str] = None
+    extract_downscale: bool = True
+    source: str = ""
+
+
+class TiltInfo(BaseModel):
+    tilt_series_tag: str
+    movie_path: str
+
+
+class TiltSeriesInfo(BaseModel):
+    client_id: int
+    tag: str
+
+
+class TiltSeriesProcessingDetails(BaseModel):
     name: str
     file_tilt_list: str
     dcid: int
@@ -132,7 +173,7 @@ class DCParameters(BaseModel):
     phase_plate: bool = False
 
 
-class DCParametersTomo(BaseModel):
+class ProcessingParametersTomo(BaseModel):
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -151,7 +192,8 @@ class DCParametersTomo(BaseModel):
         manual_tilt_offset: float
 
 
-class DCParametersSPA(BaseModel):
+class ProcessingParametersSPA(BaseModel):
+    tag: str
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -169,6 +211,7 @@ class DCParametersSPA(BaseModel):
     downscale: bool
     small_boxsize: Optional[int]
     eer_grouping: int
+    particle_diameter: Optional[float]
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
     c2aperture: Optional[float] = None
@@ -192,6 +235,7 @@ class ProcessingJobParameters(BaseModel):
     tag: str
     recipe: str
     parameters: Dict[str, Any] = {}
+    experiment_type: str = "spa"
 
 
 class RegistrationMessage(BaseModel):
@@ -206,6 +250,11 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+
+
+class SessionInfo(BaseModel):
+    session_id: Optional[int]
+    session_name: str = ""
     rescale: bool = True
 
 
