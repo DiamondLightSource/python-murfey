@@ -70,7 +70,7 @@ class ProcessFile(BaseModel):
     voltage: float
     timestamp: float
     processing_job: Optional[int]
-    data_collection_id: Optional[int]
+    tag: str
     image_number: int
     mc_uuid: int
     autoproc_program_id: Optional[int]

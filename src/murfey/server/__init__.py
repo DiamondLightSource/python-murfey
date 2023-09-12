@@ -1571,10 +1571,15 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.close()
             return None
         elif message["register"] == "data_collection":
-            dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
-                message["source"]
-            )
-            if dcgid is None:
+            dcg = murfey_db.exec(
+                select(db.DataCollectionGroup).where(
+                    db.DataCollectionGroup.tag == message["source"]
+                )
+            ).all()
+            if dcg:
+                dcgid = dcg.id
+                # flush_data_collections(message["source"], murfey_db)
+            else:
                 raise ValueError(
                     f"No data collection group ID was found for image directory {message['image_directory']}"
                 )
@@ -1606,6 +1611,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 id=dcid,
                 client=message["client_id"],
                 tag=message.get("tag"),
+                dcg_tag=message["source"],
                 dcg_id=dcgid,
             )
             murfey_db.add(murfey_dc)

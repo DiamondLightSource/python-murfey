@@ -43,6 +43,7 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
+    TomographyPreprocessStash,
     TomographyProcessingParameters,
 )
 from murfey.util.models import (
@@ -540,8 +541,10 @@ async def request_spa_preprocessing(
     return proc_file
 
 
-@router.post("/visits/{visit_name}/tomography_preprocess")
-async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+@router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
+async def request_tomography_preprocessing(
+    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+):
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
@@ -560,41 +563,66 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / "CTF"
         / str(ppath.stem + "_ctf.mrc")
     )
-    if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True, exist_ok=True)
-    if not ctf_out.parent.exists():
-        ctf_out.parent.mkdir(parents=True, exist_ok=True)
-    zocalo_message = {
-        "recipes": ["em-tomo-preprocess"],
-        "parameters": {
-            "feedback_queue": machine_config.feedback_queue,
-            "dcid": proc_file.data_collection_id,
-            # "timestamp": datetime.datetime.now(),
-            "autoproc_program_id": proc_file.autoproc_program_id,
-            "movie": proc_file.path,
-            "mrc_out": str(mrc_out),
-            "pix_size": (proc_file.pixel_size) * 10**10,
-            "output_image": str(ctf_out),
-            "image_number": proc_file.image_number,
-            "kv": int(proc_file.voltage),
-            "microscope": get_microscope(),
-            "mc_uuid": proc_file.mc_uuid,
-            "ft_bin": proc_file.mc_binning,
-            "fm_dose": proc_file.dose_per_frame,
-            "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
-            if proc_file.gain_ref
-            else proc_file.gain_ref,
-            "fm_int_file": proc_file.eer_fractionation_file,
-        },
-    }
-    # log.info(f"Sending Zocalo message {zocalo_message}")
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
-    else:
-        log.error(
-            f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
         )
-        return proc_file
+        .one()
+        .session_id
+    )
+    data_collection = db.exec(
+        select(DataCollectionGroup, DataCollection)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.tag == proc_file.tag)
+    ).all()
+    if data_collection:
+        dcid = data_collection[0][1].id
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True, exist_ok=True)
+        if not ctf_out.parent.exists():
+            ctf_out.parent.mkdir(parents=True, exist_ok=True)
+        zocalo_message = {
+            "recipes": ["em-tomo-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config.feedback_queue,
+                "dcid": dcid,
+                # "timestamp": datetime.datetime.now(),
+                "autoproc_program_id": proc_file.autoproc_program_id,
+                "movie": proc_file.path,
+                "mrc_out": str(mrc_out),
+                "pix_size": (proc_file.pixel_size) * 10**10,
+                "output_image": str(ctf_out),
+                "image_number": proc_file.image_number,
+                "kv": int(proc_file.voltage),
+                "microscope": get_microscope(),
+                "mc_uuid": proc_file.mc_uuid,
+                "ft_bin": proc_file.mc_binning,
+                "fm_dose": proc_file.dose_per_frame,
+                "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
+                if proc_file.gain_ref
+                else proc_file.gain_ref,
+                "fm_int_file": proc_file.eer_fractionation_file,
+            },
+        }
+        # log.info(f"Sending Zocalo message {zocalo_message}")
+        if _transport_object:
+            _transport_object.send("processing_recipe", zocalo_message)
+        else:
+            log.error(
+                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+            )
+            return proc_file
+    else:
+        for_stash = TomographyPreprocessStash(
+            file_path=str(proc_file.path),
+            client_id=client_id,
+            image_number=proc_file.image_number,
+            mrc_out=str(mrc_out),
+            tag=proc_file.tag,
+        )
+        db.add(for_stash)
+        db.commit()
+        db.close()
     # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
 

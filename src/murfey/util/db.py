@@ -133,6 +133,10 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     )
 
 
+class TomographyPreprocessStash(PreprocessStash):  # type: ignore
+    tag: str
+
+
 class SelectionStash(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
     class_selection_score: float
@@ -143,11 +147,11 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     pixel_size: float
     manual_tilt_offset: int
-    session: Optional[Session] = Relationship(
-        back_populates="tomography_processing_parameters"
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="spa_parameters"
     )
 
 
