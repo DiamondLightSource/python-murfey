@@ -51,7 +51,6 @@ class ConnectionManager(Generic[T]):
 
     async def broadcast(self, message: str):
         for connection in self.active_connections:
-            log.info(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
     async def _broadcast_state_update(
