@@ -35,7 +35,8 @@ from textual.widgets import (
 from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
@@ -63,8 +64,9 @@ def determine_default_destination(
 ) -> str:
     machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
     _default = ""
-    if environment.processing_only_mode and environment.source:
-        _default = str(environment.source.resolve()) or str(Path.cwd())
+    if environment.processing_only_mode and environment.sources:
+        log.info(f"Processing only mode with sources {environment.sources}")
+        _default = str(environment.sources[0].resolve()) or str(Path.cwd())
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"].keys():
             if source.resolve() == Path(data_dir):
@@ -262,7 +264,10 @@ class LaunchScreen(Screen):
         text_log.write("Selected directories:\n")
         btn_disabled = True
         for d in machine_data.get("data_directories", {}).keys():
-            if Path(self._dir_tree._selected_path).resolve().is_relative_to(d):
+            if (
+                Path(self._dir_tree._selected_path).resolve().is_relative_to(d)
+                or self.app._environment.processing_only_mode
+            ):
                 btn_disabled = False
                 break
         self._launch_btn = Button("Launch", id="launch", disabled=btn_disabled)
@@ -334,7 +339,9 @@ class LaunchScreen(Screen):
                 )
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:
-                    self.app._start_rsyncer(_default, visit_path=visit_path)
+                    self.app._start_rsyncer(
+                        Path(_default), _default, visit_path=visit_path
+                    )
                 transfer_routes[s] = _default
             self.app.install_screen(
                 DestinationSelect(
@@ -804,7 +811,11 @@ class DirectorySelection(SwitchSelection):
         self.app._multigrid = self._switch_status
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
-        (visit_dir / "atlas").mkdir(exist_ok=True)
+        machine_config = get_machine_config(
+            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        )
+        for dir in machine_config["create_directories"]:
+            (visit_dir / dir).mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
         )
@@ -832,10 +843,14 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
+            machine_config = get_machine_config()
             destinations = []
             for s in self._transfer_routes.keys():
                 for d in s.glob("*"):
-                    if d.is_dir() and d.name != "atlas":
+                    if (
+                        d.is_dir()
+                        and d.name not in machine_config["create_directories"]
+                    ):
                         machine_data = requests.get(
                             f"{self.app._environment.url.geturl()}/machine/"
                         ).json()

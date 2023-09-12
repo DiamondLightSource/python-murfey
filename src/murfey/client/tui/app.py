@@ -15,7 +15,8 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
-from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (

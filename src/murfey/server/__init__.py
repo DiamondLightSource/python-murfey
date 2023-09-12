@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from functools import partial, singledispatch
+import socket
+from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NamedTuple, Tuple
@@ -28,7 +29,7 @@ from sqlmodel import Session, create_engine, select
 
 import murfey
 import murfey.server.websocket
-from murfey.server.config import get_hostname, get_machine_config, get_microscope
+from murfey.server.config import MachineConfig, get_machine_config
 from murfey.server.murfey_db import url  # murfey_db
 
 try:
@@ -274,6 +275,26 @@ def shutdown():
     if _running_server:
         _running_server.should_exit = True
         _running_server.force_exit = True
+
+
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
+    try:
+        hostname = get_hostname()
+        microscope_from_hostname = hostname.split(".")[0]
+    except OSError:
+        microscope_from_hostname = "Unknown"
+    if machine_config:
+        microscope_name = machine_config.machine_override or os.getenv(
+            "BEAMLINE", microscope_from_hostname
+        )
+    else:
+        microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
+    return microscope_name
+
+
+@lru_cache()
+def get_hostname():
+    return socket.gethostname()
 
 
 def _set_up_logging(quiet: bool, verbosity: int):

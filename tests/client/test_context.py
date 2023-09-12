@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import urlparse
 
-from murfey.client.context import TomographyContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 

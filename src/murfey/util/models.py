@@ -28,6 +28,27 @@ class Visit(BaseModel):
         )
 
 
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
+class BLSampleParameters(BaseModel):
+    sample_group_id: int
+
+
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
 class ContextInfo(BaseModel):
     experiment_type: str
     acquisition_software: str
@@ -67,7 +88,6 @@ class ProcessFile(BaseModel):
     path: str
     description: str
     size: int
-    voltage: float
     timestamp: float
     processing_job: Optional[int]
     data_collection_id: Optional[int]
@@ -76,6 +96,7 @@ class ProcessFile(BaseModel):
     autoproc_program_id: Optional[int]
     pixel_size: float
     dose_per_frame: float
+    voltage: float = 300
     mc_binning: int = 1
     gain_ref: Optional[str] = None
     extract_downscale: int = 1
@@ -235,6 +256,12 @@ class SessionInfo(BaseModel):
     session_id: Optional[int]
     session_name: str = ""
     rescale: bool = True
+
+
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
 
 
 class FractionationParameters(BaseModel):

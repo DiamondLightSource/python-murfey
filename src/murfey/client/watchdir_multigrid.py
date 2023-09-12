@@ -47,7 +47,8 @@ class MultigridDirWatcher(murfey.util.Observer):
         first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.name == "atlas":
+                machine_config = murfey.util.get_machine_config()
+                if d.name in machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(d, include_mid_path=False, use_suggested_path=False)
                         self._seen_dirs.append(d)
