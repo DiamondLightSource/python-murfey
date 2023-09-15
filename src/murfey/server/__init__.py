@@ -1736,7 +1736,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
             ).all()
             if not stashed_files:
-                return
+                if _transport_object:
+                    _transport_object.transport.ack(header)
+                return None
             machine_config = get_machine_config()
             collected_ids = murfey_db.exec(
                 select(
@@ -1763,7 +1765,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 logger.warning(
                     f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
                 )
-                return
+                if _transport_object:
+                    _transport_object.transport.nack(header)
+                return None
 
             murfey_ids = _murfey_id(
                 collected_ids[3].id,
