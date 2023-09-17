@@ -349,8 +349,6 @@ class SPAModularContext(_SPAContext):
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
-                            "size": transferred_file.stat().st_size,
-                            "timestamp": transferred_file.stat().st_ctime,
                             "processing_job": None,
                             "data_collection_id": None,
                             "image_number": environment.movies[
