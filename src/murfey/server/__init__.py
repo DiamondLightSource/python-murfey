@@ -1229,6 +1229,10 @@ def _flush_class2d(
     class2d_db = _db.exec(
         select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
     ).all()
+    if not feedback_params.next_job:
+        feedback_params.next_job = (
+            10 if default_spa_parameters.do_icebreaker_jobs else 7
+        )
     if not feedback_params.star_combination_job:
         feedback_params.star_combination_job = feedback_params.next_job + (
             3 if default_spa_parameters.do_icebreaker_jobs else 2
