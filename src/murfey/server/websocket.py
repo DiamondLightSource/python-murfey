@@ -24,7 +24,6 @@ class ConnectionManager(Generic[T]):
         self.active_connections: Dict[int, WebSocket] = {}
         self._state = state
         self._state.subscribe(self._broadcast_state_update)
-        self._engine = create_engine(url())
 
     async def connect(self, websocket: WebSocket, client_id: int):
         await websocket.accept()
@@ -33,15 +32,17 @@ class ConnectionManager(Generic[T]):
         await websocket.send_json({"message": "state-full", "state": self._state.data})
 
     def _register_new_client(self, client_id: int):
+        engine = create_engine(url())
         new_client = ClientEnvironment(client_id=client_id, connected=True)
         murfey_db = next(get_murfey_db_session())
-        with Session(self._engine) as murfey_db:
+        with Session(engine) as murfey_db:
             murfey_db.add(new_client)
             murfey_db.commit()
 
     def disconnect(self, websocket: WebSocket, client_id: int):
+        engine = create_engine(url())
         self.active_connections.pop(client_id)
-        with Session(self._engine) as murfey_db:
+        with Session(engine) as murfey_db:
             client_env = murfey_db.exec(
                 select(ClientEnvironment).where(
                     ClientEnvironment.client_id == client_id
