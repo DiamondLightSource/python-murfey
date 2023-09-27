@@ -901,6 +901,10 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
     other_options = dict(feedback_params)
     if other_options["picker_ispyb_id"] is None:
         logger.info("No ISPyB particle picker ID yet")
+        feedback_params.hold_class2d = False
+        _db.add(feedback_params)
+        _db.commit()
+        _db.expunge(feedback_params)
         return
     _db.add(feedback_params)
     _db.commit()
@@ -1048,9 +1052,13 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
-        feedback_params.star_combination_job = feedback_params.next_job + (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
+        feedback_params.next_job = (
+            10 if default_spa_parameters.do_icebreaker_jobs else 7
         )
+        if not feedback_params.star_combination_job:
+            feedback_params.star_combination_job = feedback_params.next_job + (
+                3 if default_spa_parameters.do_icebreaker_jobs else 2
+            )
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -1221,6 +1229,14 @@ def _flush_class2d(
     class2d_db = _db.exec(
         select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
     ).all()
+    if not feedback_params.next_job:
+        feedback_params.next_job = (
+            10 if default_spa_parameters.do_icebreaker_jobs else 7
+        )
+    if not feedback_params.star_combination_job:
+        feedback_params.star_combination_job = feedback_params.next_job + (
+            3 if default_spa_parameters.do_icebreaker_jobs else 2
+        )
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
         _db.expunge(saved_message)

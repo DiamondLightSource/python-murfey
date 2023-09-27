@@ -498,9 +498,10 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
 async def request_spa_preprocessing(
     visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
-    visit_idx = Path(secure_filename(proc_file.path)).parts.index(visit_name)
-    core = Path(*Path(secure_filename(proc_file.path)).parts[: visit_idx + 1])
-    ppath = Path(secure_filename(proc_file.path))
+    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
+    visit_idx = parts.index(visit_name)
+    core = Path("/") / Path(*parts[: visit_idx + 1])
+    ppath = Path("/") / Path(*parts)
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
@@ -561,7 +562,9 @@ async def request_spa_preprocessing(
         db.close()
 
         if not mrc_out.parent.exists():
-            Path(secure_filename(mrc_out)).parent.mkdir(parents=True, exist_ok=True)
+            Path(secure_filename(str(mrc_out))).parent.mkdir(
+                parents=True, exist_ok=True
+            )
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
