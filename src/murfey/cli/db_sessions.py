@@ -23,7 +23,7 @@ def run():
         for sess_id in args.sessions_to_remove:
             sess = murfey_db.exec(
                 select(MurfeySession).where(MurfeySession.id == sess_id)
-            )
+            ).one()
             murfey_db.delete(sess)
         murfey_db.commit()
     else:
