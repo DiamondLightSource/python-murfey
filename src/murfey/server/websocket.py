@@ -18,14 +18,13 @@ T = TypeVar("T")
 ws = APIRouter(prefix="/ws", tags=["websocket"])
 log = logging.getLogger("murfey.server.websocket")
 
-engine = create_engine(url())
-
 
 class ConnectionManager(Generic[T]):
     def __init__(self, state: State[T]):
         self.active_connections: Dict[int, WebSocket] = {}
         self._state = state
         self._state.subscribe(self._broadcast_state_update)
+        self._engine = create_engine(url())
 
     async def connect(self, websocket: WebSocket, client_id: int):
         await websocket.accept()
@@ -33,17 +32,16 @@ class ConnectionManager(Generic[T]):
         self._register_new_client(client_id)
         await websocket.send_json({"message": "state-full", "state": self._state.data})
 
-    @staticmethod
-    def _register_new_client(client_id: int):
+    def _register_new_client(self, client_id: int):
         new_client = ClientEnvironment(client_id=client_id, connected=True)
         murfey_db = next(get_murfey_db_session())
-        with Session(engine) as murfey_db:
+        with Session(self._engine) as murfey_db:
             murfey_db.add(new_client)
             murfey_db.commit()
 
     def disconnect(self, websocket: WebSocket, client_id: int):
         self.active_connections.pop(client_id)
-        with Session(engine) as murfey_db:
+        with Session(self._engine) as murfey_db:
             client_env = murfey_db.exec(
                 select(ClientEnvironment).where(
                     ClientEnvironment.client_id == client_id
@@ -122,6 +120,7 @@ async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
 
 @ws.delete("/test/{client_id}")
 async def close_ws_connection(client_id: int):
+    engine = create_engine(url())
     murfey_db = next(get_murfey_db_session())
     with Session(engine) as murfey_db:
         client_env = murfey_db.exec(
