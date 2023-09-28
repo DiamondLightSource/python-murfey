@@ -502,7 +502,7 @@ async def request_spa_preprocessing(
     visit_idx = parts.index(visit_name)
     core = Path("/") / Path(*parts[: visit_idx + 1])
     ppath = Path("/") / Path(*parts)
-    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    sub_dataset = ppath.relative_to(core).parts[0]
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
             movies_path_index = i
