@@ -27,18 +27,16 @@ def _file_transferred_to(
         str(environment.url.geturl()), demo=environment.demo
     )
     if environment.visit in environment.default_destinations[source]:
-        visit_idx = file_path.parts.index(environment.visit)
-        end_of_path = "/".join(file_path.parts[visit_idx + 1 :])
         return (
             Path(machine_config.get("rsync_basepath", ""))
             / Path(environment.default_destinations[source])
-            / end_of_path
+            / file_path.relative_to(source)
         )
     return (
         Path(machine_config.get("rsync_basepath", ""))
         / Path(environment.default_destinations[source])
         / environment.visit
-        / file_path.name
+        / file_path.relative_to(source)
     )
 
 
