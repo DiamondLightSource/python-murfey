@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.ispyb
+import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 from murfey.server import (
     _murfey_id,
@@ -195,6 +196,8 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
     return rsyncer_info
 
 
@@ -221,6 +224,9 @@ def increment_rsync_file_count(
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
 
 
 @router.post("/visits/{visit_name}/increment_rsync_transferred_files")
@@ -238,6 +244,9 @@ def increment_rsync_transferred_files(
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
 
 
 @router.get("/demo/visits_raw", response_model=List[Visit])
