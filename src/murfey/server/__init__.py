@@ -28,6 +28,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, create_engine, select
 
 import murfey
+import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.server.config import MachineConfig, get_machine_config
 from murfey.server.murfey_db import url  # murfey_db
@@ -658,6 +659,7 @@ def _register_picked_particles_use_diameter(
                 _register_incomplete_2d_batch(
                     {
                         "session_id": message["session_id"],
+                        "program_id": message["program_id"],
                         "class2d_message": {
                             "particles_file": "Select/job009/particles_split_1.star",
                             "class2d_dir": "Class2D",
@@ -1698,6 +1700,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if pid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
+            prom.preprocessed_movies.labels(processing_job=pid)
             if global_state.get("processing_job_ids"):
                 global_state["processing_job_ids"] = {
                     **global_state["processing_job_ids"],  # type: ignore
@@ -1911,6 +1914,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _register_picked_particles_use_diameter(message)
             else:
                 _register_picked_particles_use_boxsize(message)
+            prom.preprocessed_movies.labels(
+                processing_job=_pj_id(message["program_id"], murfey_db)
+            ).inc()
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
