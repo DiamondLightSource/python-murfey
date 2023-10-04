@@ -742,6 +742,10 @@ class GainReference(Screen):
         yield self._dir_tree
         self._launch_btn = Button("Launch", id="launch")
         self.watch(self._dir_tree, "valid_selection", self._check_valid_selection)
+        yield Button(
+            f"Suggested gain reference: {self._gain_reference.parent / self._gain_reference.name}",
+            id="suggested-gain-ref",
+        )
         yield self._launch_btn
         yield Button("No gain", id="skip-gain")
 
@@ -756,6 +760,8 @@ class GainReference(Screen):
         if event.button.id == "skip-gain":
             self.app.pop_screen()
         else:
+            if event.button.id == "suggested-gain-ref":
+                self._dir_tree._gain_reference = self._gain_reference
             visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
             cmd = [
                 "rsync",
