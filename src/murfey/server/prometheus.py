@@ -14,3 +14,5 @@ preprocessed_movies = Counter(
     "Number of movies that have been preprocessed",
     ["processing_job"],
 )
+
+exposure_time = Gauge("exposure_time", "Exposure time for a single movie")

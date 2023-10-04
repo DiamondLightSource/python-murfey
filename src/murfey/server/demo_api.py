@@ -771,6 +771,7 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
         }
     else:
         global_state["data_collection_ids"] = {dc_params.tag: 1}
+    prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 
