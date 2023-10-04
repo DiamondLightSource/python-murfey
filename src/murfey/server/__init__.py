@@ -792,7 +792,8 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 4 if default_spa_parameters.do_icebreaker_jobs else 3
             )
         _db.add(feedback_params)
-        _db.delete(first_class2d)
+        if first_class2d.complete:
+            _db.delete(first_class2d)
         _db.commit()
         _db.close()
         if _transport_object:
