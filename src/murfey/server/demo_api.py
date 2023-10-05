@@ -895,6 +895,24 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+    ).all()
+    for ri in rsync_instances:
+        prom.seen_files.remove(ri.source)
+        prom.transferred_files.remove(ri.source)
+        prom.transferred_files_bytes.remove(ri.source)
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
+            prom.preprocessed_movies.remove(c[2].id)
+        except KeyError:
+            continue
     if db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
     ).all():
