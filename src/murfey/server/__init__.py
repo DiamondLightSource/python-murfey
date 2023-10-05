@@ -1872,7 +1872,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     murfey_db.delete(f)
                 else:
                     logger.error(
-                        f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+                        f"Pre-processing was requested for {ppath.name} but no Zocalo transport object was found"
                     )
             murfey_db.commit()
             murfey_db.close()
