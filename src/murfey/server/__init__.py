@@ -1897,38 +1897,48 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
                 .where(db.ProcessingJob.recipe == "em-spa-preprocess")
             ).one()
-            params = db.SPARelionParameters(
-                pj_id=collected_ids[2].id,
-                angpix=float(message["pixel_size_on_image"]) * 1e10,
-                dose_per_frame=message["dose_per_frame"],
-                gain_ref=message["gain_ref"],
-                voltage=message["voltage"],
-                motion_corr_binning=message["motion_corr_binning"],
-                eer_grouping=message["eer_grouping"],
-                symmetry=message["symmetry"],
-                particle_diameter=message["particle_diameter"],
-                downscale=message["downscale"],
-                boxsize=message["boxsize"],
-                small_boxsize=message["small_boxsize"],
-                mask_diameter=message["mask_diameter"],
-            )
-            feedback_params = db.SPAFeedbackParameters(
-                pj_id=collected_ids[2].id,
-                estimate_particle_diameter=not bool(message["particle_diameter"]),
-                hold_class2d=False,
-                hold_class3d=False,
-                class_selection_score=0,
-                star_combination_job=0,
-                initial_model="",
-                next_job=0,
-            )
-            murfey_db.add(params)
-            murfey_db.add(feedback_params)
-            murfey_db.commit()
-            logger.info(
-                f"SPA processing parameters registered for processing job {collected_ids[2].id}, particle_diameter={sanitise(str(message['particle_diameter']))}"
-            )
-            murfey_db.close()
+            pj_id = collected_ids[2].id
+            if not murfey_db.exec(
+                select(db.SPARelionParameters).where(
+                    db.SPARelionParameters.pj_id == pj_id
+                )
+            ).all():
+                params = db.SPARelionParameters(
+                    pj_id=pj_id,
+                    angpix=float(message["pixel_size_on_image"]) * 1e10,
+                    dose_per_frame=message["dose_per_frame"],
+                    gain_ref=message["gain_ref"],
+                    voltage=message["voltage"],
+                    motion_corr_binning=message["motion_corr_binning"],
+                    eer_grouping=message["eer_grouping"],
+                    symmetry=message["symmetry"],
+                    particle_diameter=message["particle_diameter"],
+                    downscale=message["downscale"],
+                    boxsize=message["boxsize"],
+                    small_boxsize=message["small_boxsize"],
+                    mask_diameter=message["mask_diameter"],
+                )
+                feedback_params = db.SPAFeedbackParameters(
+                    pj_id=pj_id,
+                    estimate_particle_diameter=not bool(message["particle_diameter"]),
+                    hold_class2d=False,
+                    hold_class3d=False,
+                    class_selection_score=0,
+                    star_combination_job=0,
+                    initial_model="",
+                    next_job=0,
+                )
+                murfey_db.add(params)
+                murfey_db.add(feedback_params)
+                murfey_db.commit()
+                logger.info(
+                    f"SPA processing parameters registered for processing job {pj_id}, particle_diameter={sanitise(str(message['particle_diameter']))}"
+                )
+                murfey_db.close()
+            else:
+                logger.info(
+                    f"SPA processing parameters already exist for processing job ID {pj_id}"
+                )
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
