@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import socket
+from datetime import datetime
 from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
@@ -794,7 +795,8 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 4 if default_spa_parameters.do_icebreaker_jobs else 3
             )
         _db.add(feedback_params)
-        _db.delete(first_class2d)
+        if first_class2d.complete:
+            _db.delete(first_class2d)
         _db.commit()
         _db.close()
         if _transport_object:
@@ -1576,12 +1578,32 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection_group":
-            record = DataCollectionGroup(
-                sessionId=message["session_id"],
-                experimentType=message["experiment_type"],
-                experimentTypeId=message["experiment_type_id"],
-            )
-            dcgid = _register(record, header)
+            client = murfey_db.exec(
+                select(db.ClientEnvironment).where(
+                    db.ClientEnvironment.client_id == message["client_id"]
+                )
+            ).one()
+            if dcg_murfey := murfey_db.exec(
+                select(db.DataCollectionGroup)
+                .where(db.DataCollectionGroup.session_id == client.session_id)
+                .where(db.DataCollectionGroup.tag == message.get("tag"))
+            ).all():
+                dcgid = dcg_murfey[0].id
+            else:
+                record = DataCollectionGroup(
+                    sessionId=message["session_id"],
+                    experimentType=message["experiment_type"],
+                    experimentTypeId=message["experiment_type_id"],
+                )
+                dcgid = _register(record, header)
+                murfey_dcg = db.DataCollectionGroup(
+                    id=dcgid,
+                    session_id=client.session_id,
+                    tag=message.get("tag"),
+                )
+                murfey_db.add(murfey_dcg)
+                murfey_db.commit()
+                murfey_db.close()
             if _transport_object:
                 if dcgid is None:
                     _transport_object.transport.nack(header)
@@ -1598,19 +1620,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
-            murfey_dcg = db.DataCollectionGroup(
-                id=dcgid,
-                session_id=client.session_id,
-                tag=message.get("tag"),
-            )
-            murfey_db.add(murfey_dcg)
-            murfey_db.commit()
-            murfey_db.close()
             return None
         elif message["register"] == "data_collection":
             dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
@@ -1620,39 +1629,46 @@ def feedback_callback(header: dict, message: dict) -> None:
                 raise ValueError(
                     f"No data collection group ID was found for image directory {message['image_directory']}"
                 )
-            record = DataCollection(
-                SESSIONID=message["session_id"],
-                experimenttype=message["experiment_type"],
-                imageDirectory=message["image_directory"],
-                imageSuffix=message["image_suffix"],
-                voltage=message["voltage"],
-                dataCollectionGroupId=dcgid,
-                pixelSizeOnImage=message["pixel_size"],
-                imageSizeX=message["image_size_x"],
-                imageSizeY=message["image_size_y"],
-                slitGapHorizontal=message.get("slit_width"),
-                magnification=message.get("magnification"),
-                exposureTime=message.get("exposure_time"),
-                totalExposedDose=message.get("total_exposed_dose"),
-                c2aperture=message.get("c2aperture"),
-                phasePlate=int(message.get("phase_plate", 0)),
-            )
-            dcid = _register(
-                record,
-                header,
-                tag=message.get("tag")
-                if message["experiment_type"] == "tomography"
-                else "",
-            )
-            murfey_dc = db.DataCollection(
-                id=dcid,
-                client=message["client_id"],
-                tag=message.get("tag"),
-                dcg_id=dcgid,
-            )
-            murfey_db.add(murfey_dc)
-            murfey_db.commit()
-            murfey_db.close()
+            if dc_murfey := murfey_db.exec(
+                select(db.DataCollection)
+                .where(db.DataCollection.tag == message.get("tag"))
+                .where(db.DataCollection.dcg_id == dcgid)
+            ).all():
+                dcid = dc_murfey[0].id
+            else:
+                record = DataCollection(
+                    SESSIONID=message["session_id"],
+                    experimenttype=message["experiment_type"],
+                    imageDirectory=message["image_directory"],
+                    imageSuffix=message["image_suffix"],
+                    voltage=message["voltage"],
+                    dataCollectionGroupId=dcgid,
+                    pixelSizeOnImage=message["pixel_size"],
+                    imageSizeX=message["image_size_x"],
+                    imageSizeY=message["image_size_y"],
+                    slitGapHorizontal=message.get("slit_width"),
+                    magnification=message.get("magnification"),
+                    exposureTime=message.get("exposure_time"),
+                    totalExposedDose=message.get("total_exposed_dose"),
+                    c2aperture=message.get("c2aperture"),
+                    phasePlate=int(message.get("phase_plate", 0)),
+                )
+                dcid = _register(
+                    record,
+                    header,
+                    tag=message.get("tag")
+                    if message["experiment_type"] == "tomography"
+                    else "",
+                )
+                murfey_dc = db.DataCollection(
+                    id=dcid,
+                    client=message["client_id"],
+                    tag=message.get("tag"),
+                    dcg_id=dcgid,
+                )
+                murfey_db.add(murfey_dc)
+                murfey_db.commit()
+                murfey_db.close()
             if dcid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
@@ -1673,30 +1689,39 @@ def feedback_callback(header: dict, message: dict) -> None:
             logger.info("registering processing job")
             assert isinstance(global_state["data_collection_ids"], dict)
             _dcid = global_state["data_collection_ids"][message["tag"]]
-            record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
-            run_parameters = message.get("parameters", {})
-            assert isinstance(run_parameters, dict)
-            if not message["experiment_type"] == "spa":
-                murfey_processing = db.TomographyProcessingParameters(
-                    client_id=message["client_id"],
-                    pixel_size=run_parameters["angpix"],
-                    manual_tilt_offset=run_parameters["manual_tilt_offset"],
+            if pj_murfey := murfey_db.exec(
+                select(db.ProcessingJob)
+                .where(db.ProcessingJob.recipe == message["recipe"])
+                .where(db.DataCollection.dc_id == _dcid)
+            ).all():
+                pid = pj_murfey[0].id
+            else:
+                record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
+                run_parameters = message.get("parameters", {})
+                assert isinstance(run_parameters, dict)
+                if not message["experiment_type"] == "spa":
+                    murfey_processing = db.TomographyProcessingParameters(
+                        client_id=message["client_id"],
+                        pixel_size=run_parameters["angpix"],
+                        manual_tilt_offset=run_parameters["manual_tilt_offset"],
+                    )
+                    murfey_db.add(murfey_processing)
+                    murfey_db.commit()
+                    murfey_db.close()
+                if message.get("job_parameters"):
+                    job_parameters = [
+                        ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                        for k, v in message["job_parameters"].items()
+                    ]
+                    pid = _register(ExtendedRecord(record, job_parameters), header)
+                else:
+                    pid = _register(record, header)
+                murfey_pj = db.ProcessingJob(
+                    id=pid, recipe=message["recipe"], dc_id=_dcid
                 )
-                murfey_db.add(murfey_processing)
+                murfey_db.add(murfey_pj)
                 murfey_db.commit()
                 murfey_db.close()
-            if message.get("job_parameters"):
-                job_parameters = [
-                    ProcessingJobParameter(parameterKey=k, parameterValue=v)
-                    for k, v in message["job_parameters"].items()
-                ]
-                pid = _register(ExtendedRecord(record, job_parameters), header)
-            else:
-                pid = _register(record, header)
-            murfey_pj = db.ProcessingJob(id=pid, recipe=message["recipe"], dc_id=_dcid)
-            murfey_db.add(murfey_pj)
-            murfey_db.commit()
-            murfey_db.close()
             if pid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
@@ -1716,15 +1741,22 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if _transport_object:
                     _transport_object.transport.ack(header)
                 return None
-            record = AutoProcProgram(processingJobId=pid)
-            appid = _register(record, header)
-            if appid is None and _transport_object:
-                _transport_object.transport.nack(header)
-                return None
-            murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
-            murfey_db.add(murfey_app)
-            murfey_db.commit()
-            murfey_db.close()
+            if app_murfey := murfey_db.exec(
+                select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
+            ).all():
+                appid = app_murfey[0].id
+            else:
+                record = AutoProcProgram(
+                    processingJobId=pid, processingStartTime=datetime.now()
+                )
+                appid = _register(record, header)
+                if appid is None and _transport_object:
+                    _transport_object.transport.nack(header)
+                    return None
+                murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
+                murfey_db.add(murfey_app)
+                murfey_db.commit()
+                murfey_db.close()
             if global_state.get("autoproc_program_ids"):
                 assert isinstance(global_state["autoproc_program_ids"], dict)
                 global_state["autoproc_program_ids"] = {
@@ -1955,6 +1987,14 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "done_particle_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "done_class_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
@@ -1962,6 +2002,9 @@ def feedback_callback(header: dict, message: dict) -> None:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True
         )
+        if _transport_object:
+            _transport_object.transport.nack(header, requeue=False)
+    return None
 
 
 @singledispatch
