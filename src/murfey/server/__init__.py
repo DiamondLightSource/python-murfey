@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import socket
+from datetime import datetime
 from functools import lru_cache, partial, singledispatch
 from pathlib import Path
 from threading import Thread
@@ -1714,7 +1715,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if _transport_object:
                     _transport_object.transport.ack(header)
                 return None
-            record = AutoProcProgram(processingJobId=pid)
+            record = AutoProcProgram(
+                processingJobId=pid, processingStartTime=datetime.now()
+            )
             appid = _register(record, header)
             if appid is None and _transport_object:
                 _transport_object.transport.nack(header)
