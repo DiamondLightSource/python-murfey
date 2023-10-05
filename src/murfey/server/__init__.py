@@ -1965,6 +1965,9 @@ def feedback_callback(header: dict, message: dict) -> None:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True
         )
+        if _transport_object:
+            _transport_object.transport.nack(header, requeue=False)
+    return None
 
 
 @singledispatch
