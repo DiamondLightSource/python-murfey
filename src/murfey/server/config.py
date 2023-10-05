@@ -34,6 +34,7 @@ class MachineConfig(BaseModel):
     modular_spa: bool = False
     processing_enabled: bool = True
     machine_override: str = ""
+    processed_extra_directory: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

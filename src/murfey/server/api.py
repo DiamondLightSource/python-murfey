@@ -503,6 +503,7 @@ async def request_spa_preprocessing(
     core = Path("/") / Path(*parts[: visit_idx + 1])
     ppath = Path("/") / Path(*parts)
     sub_dataset = ppath.relative_to(core).parts[0]
+    extra_path = machine_config.processed_extra_directory
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
             movies_path_index = i
@@ -513,6 +514,7 @@ async def request_spa_preprocessing(
         core
         / machine_config.processed_directory_name
         / sub_dataset
+        / extra_path
         / "MotionCorr"
         / "job002"
         / "Movies"
