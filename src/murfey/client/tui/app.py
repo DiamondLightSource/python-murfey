@@ -300,6 +300,7 @@ class MurfeyTUI(App):
             "destination": destination,
             "client_id": self._environment.client_id,
             "increment_count": len(checked_updates),
+            "bytes": sum(f.file_size for f in checked_updates),
         }
         requests.post(url, json=data)
 

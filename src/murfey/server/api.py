@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.ispyb
+import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 from murfey.server import (
     _murfey_id,
@@ -195,6 +196,8 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
     return rsyncer_info
 
 
@@ -221,6 +224,9 @@ def increment_rsync_file_count(
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
 
 
 @router.post("/visits/{visit_name}/increment_rsync_transferred_files")
@@ -238,6 +244,9 @@ def increment_rsync_transferred_files(
     db.add(rsync_instance)
     db.commit()
     db.close()
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
 
 
 @router.get("/demo/visits_raw", response_model=List[Visit])
@@ -817,6 +826,7 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
             machine_config.feedback_queue,
             {"register": "data_collection", **dc_parameters},
         )
+    prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 
@@ -1058,6 +1068,24 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+    ).all()
+    for ri in rsync_instances:
+        prom.seen_files.remove(ri.source)
+        prom.transferred_files.remove(ri.source)
+        prom.transferred_files_bytes.remove(ri.source)
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
+            prom.preprocessed_movies.remove(c[2].id)
+        except KeyError:
+            continue
     if db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
     ).all():

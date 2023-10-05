@@ -221,7 +221,9 @@ class RSyncer(Observer):
             )
             self.notify(update)
             updates.append(update)
-        self.notify(updates, secondary=True)
+            time.sleep(0.1)
+            self.notify([update], secondary=True)
+        # self.notify(updates, secondary=True)
 
         return True
 
