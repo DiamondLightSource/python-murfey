@@ -1950,6 +1950,14 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "done_particle_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "done_class_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
