@@ -198,6 +198,10 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.close()
     prom.seen_files.labels(rsync_source=rsyncer_info.source)
     prom.transferred_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
     return rsyncer_info
 
 
@@ -246,6 +250,9 @@ def increment_rsync_transferred_files(
     db.close()
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
+    )
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.bytes
     )
 
 
