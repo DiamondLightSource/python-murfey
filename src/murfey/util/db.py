@@ -63,7 +63,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
-    tag: str
+    tag: str = Field(primary_key=True)
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
@@ -73,7 +73,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    tag: str
+    tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"

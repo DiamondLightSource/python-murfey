@@ -6,7 +6,7 @@ import queue
 import threading
 import time
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import List, NamedTuple, Optional
 
 import murfey.util
 from murfey.client.tui.status_bar import StatusBar
@@ -101,10 +101,18 @@ class DirWatcher(murfey.util.Observer):
                     )
 
             files_for_transfer = []
-            for x in sorted(
+            time_ordered_file_candidates = sorted(
                 self._file_candidates,
                 key=lambda _x: self._file_candidates[_x].modification_time,
-            ):
+            )
+            ordered_file_candidates: List[str] = []
+            for x in time_ordered_file_candidates:
+                if x.endswith(".mdoc"):
+                    ordered_file_candidates.insert(0, x)
+                else:
+                    ordered_file_candidates.append(x)
+
+            for x in ordered_file_candidates:
                 if x not in filelist:
                     log.info(f"Previously seen file {x!r} has disappeared")
                     del self._file_candidates[x]
@@ -178,7 +186,7 @@ class DirWatcher(murfey.util.Observer):
         transfer_check = not Path(file_candidate).name.startswith(".") and not Path(
             file_candidate
         ).name.endswith("downloading")
-        if not transfer_check:
+        if transfer_check:
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
         return transfer_check

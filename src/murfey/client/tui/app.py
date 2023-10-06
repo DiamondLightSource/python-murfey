@@ -15,7 +15,8 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
-from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
@@ -103,8 +104,13 @@ class MurfeyTUI(App):
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
         log.info(f"Launching multigrid watcher for source {source}")
+        machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
         self._multigrid_watcher = MultigridDirWatcher(
-            source, skip_existing_processing=self._skip_existing_processing
+            source,
+            machine_config,
+            skip_existing_processing=self._skip_existing_processing,
         )
         self._multigrid_watcher.subscribe(
             partial(
@@ -294,6 +300,7 @@ class MurfeyTUI(App):
             "destination": destination,
             "client_id": self._environment.client_id,
             "increment_count": len(checked_updates),
+            "bytes": sum(f.file_size for f in checked_updates),
         }
         requests.post(url, json=data)
 
@@ -532,7 +539,11 @@ class MurfeyTUI(App):
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
-            prompt = f"Remove files from the following:\n {sources}"
+            prompt = f"Remove files from the following:\n {sources} \n"
+            rsync_instances = requests.get(
+                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/rsyncers"
+            ).json()
+            prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
                 ConfirmScreen(
                     prompt,
@@ -606,6 +617,9 @@ class MurfeyTUI(App):
                 log.info(f"rsyncer {rp} rerun with removal")
         requests.delete(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+        )
+        requests.post(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
         )
         self.exit()
         exit()

@@ -51,7 +51,6 @@ class ConnectionManager(Generic[T]):
 
     async def broadcast(self, message: str):
         for connection in self.active_connections:
-            log.info(f"Sending '{message}'")
             await self.active_connections[connection].send_text(message)
 
     async def _broadcast_state_update(
@@ -128,6 +127,7 @@ async def close_ws_connection(client_id: int):
     murfey_db.add(client_env)
     murfey_db.commit()
     murfey_db.close()
-    log.info("Disconnecting", client_id)
+    client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
+    log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(manager.active_connections[client_id], client_id)
     await manager.broadcast(f"Client #{client_id} disconnected")
