@@ -1692,7 +1692,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
                 .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.DataCollection.dc_id == _dcid)
+                .where(db.DataCollection.id == _dcid)
             ).all():
                 pid = pj_murfey[0].id
             else:
