@@ -1429,7 +1429,6 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             class_uuids, class3d_message["particles_file"], message["program_id"], _db
         )
 
-        feedback_params.star_combination_job = next_job + 2
         feedback_params.hold_class3d = True
         next_job += 2
         feedback_params.next_job = next_job
