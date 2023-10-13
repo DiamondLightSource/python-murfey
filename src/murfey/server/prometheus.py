@@ -4,9 +4,15 @@ seen_files = Gauge("acquired_files", "Number of files produced", ["rsync_source"
 transferred_files = Gauge(
     "transferred_files", "Number of files transferred", ["rsync_source"]
 )
+transferred_data_files = Gauge(
+    "transferred_data_files", "Number of data files transferred", ["rsync_source"]
+)
 
 transferred_files_bytes = Gauge(
     "transferred_files_bytes", "Size of files transferred", ["rsync_source"]
+)
+transferred_data_files_bytes = Gauge(
+    "transferred_data_files_bytes", "Size of data files transferred", ["rsync_source"]
 )
 
 preprocessed_movies = Counter(

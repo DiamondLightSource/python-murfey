@@ -188,6 +188,9 @@ class MurfeyTUI(App):
                     log.warning(
                         f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
                     )
+        machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
         self.rsync_processes[source] = RSyncer(
             source,
             basepath_remote=Path(destination),
@@ -196,6 +199,12 @@ class MurfeyTUI(App):
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
             remove_files=remove_files,
+            required_substrings_for_removal=[
+                s
+                for val in machine_config["data_required_substrings"].values()
+                for ds in val.values()
+                for s in ds
+            ],
         )
 
         def rsync_result(update: RSyncerUpdate):
