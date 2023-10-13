@@ -199,6 +199,8 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     prom.seen_files.labels(rsync_source=rsyncer_info.source)
     prom.transferred_files.labels(rsync_source=rsyncer_info.source)
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source)
     prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
@@ -253,6 +255,12 @@ def increment_rsync_transferred_files(
     )
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.bytes
+    )
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_data_count
+    )
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.data_bytes
     )
 
 

@@ -296,13 +296,26 @@ class MurfeyTUI(App):
         requests.post(url, json=data)
 
     def _increment_transferred_files(
-        self, updates: List[RSyncerUpdate], source: str, destination: str
+        self,
+        updates: List[RSyncerUpdate],
+        source: str,
+        destination: str,
+        data_updates: List[RSyncerUpdate] | None = None,
     ):
         checked_updates = [
             update for update in updates if update.outcome is TransferResult.SUCCESS
         ]
         if not checked_updates:
             return
+        checked_data_updates = (
+            [
+                update
+                for update in data_updates
+                if update.outcome is TransferResult.SUCCESS
+            ]
+            if data_updates
+            else []
+        )
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files"
         data = {
             "source": source,
@@ -310,6 +323,8 @@ class MurfeyTUI(App):
             "client_id": self._environment.client_id,
             "increment_count": len(checked_updates),
             "bytes": sum(f.file_size for f in checked_updates),
+            "increment_data_count": len(checked_data_updates),
+            "data_bytes": sum(f.file_size for f in checked_data_updates),
         }
         requests.post(url, json=data)
 

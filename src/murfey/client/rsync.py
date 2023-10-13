@@ -61,6 +61,7 @@ class RSyncer(Observer):
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal or []
+        self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._local = local
         self._server_url = server_url
         if local:
@@ -238,6 +239,7 @@ class RSyncer(Observer):
         next_file: RSyncerUpdate | None = None
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []
+        successful_data_updates: list[RSyncerUpdate] = []
 
         def parse_stdout(line: str):
             nonlocal next_file
@@ -264,6 +266,16 @@ class RSyncer(Observer):
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
                 successful_updates.append(next_file._replace(file_size=size_bytes))
+                if (
+                    any(
+                        substring in next_file.file_path.name
+                        for substring in self._required_substrings_for_removal
+                    )
+                    and next_file.file_path.suffix in self._data_suffixes
+                ):
+                    successful_data_updates.append(
+                        next_file._replace(file_size=size_bytes)
+                    )
                 next_file = None
                 return
             if line.startswith(("building file list", "created directory", "sending")):
@@ -307,6 +319,15 @@ class RSyncer(Observer):
                     transfer_success.add(update.file_path)
                     self.notify(update)
                     successful_updates.append(update)
+                    if next_file:
+                        if (
+                            any(
+                                substring in next_file.file_path.name
+                                for substring in self._required_substrings_for_removal
+                            )
+                            and next_file.file_path.suffix in self._data_suffixes
+                        ):
+                            successful_data_updates.append(update)
                 else:
                     # This marks the start of a transfer, wait for the progress line
                     next_file = update
@@ -326,21 +347,18 @@ class RSyncer(Observer):
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
         if self._remove_files:
             if self._required_substrings_for_removal:
-                rsync_stdin_remove = b"\n".join(
-                    os.fsencode(f)
+                removal_names = {
+                    f
                     for f in relative_filenames
                     if any(
                         substring in f.name
                         for substring in self._required_substrings_for_removal
                     )
-                )
+                    and f.suffix in self._data_suffixes
+                }
+                rsync_stdin_remove = b"\n".join(os.fsencode(f) for f in removal_names)
                 rsync_stdin = b"\n".join(
-                    os.fsencode(f)
-                    for f in relative_filenames
-                    if not any(
-                        substring in f.name
-                        for substring in self._required_substrings_for_removal
-                    )
+                    os.fsencode(f) for f in set(relative_filenames) - removal_names
                 )
             else:
                 rsync_stdin_remove = b"\n".join(
@@ -390,7 +408,9 @@ class RSyncer(Observer):
             if success:
                 success = result.returncode == 0
 
-        self.notify(successful_updates, secondary=True)
+        self.notify(
+            successful_updates, secondary=True, data_updates=successful_data_updates
+        )
 
         for f in set(relative_filenames) - transfer_success:
             self._files_transferred += 1
