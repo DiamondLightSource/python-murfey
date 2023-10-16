@@ -92,6 +92,16 @@ class MurfeyTUI(App):
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
         self._skip_existing_processing = skip_existing_processing
+        self._machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
+        self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
+        self._data_substrings = [
+            s
+            for val in self._machine_config["data_required_substrings"].values()
+            for ds in val.values()
+            for s in ds
+        ]
         self.install_screen(MainScreen(), "main")
 
     @property
@@ -278,11 +288,20 @@ class MurfeyTUI(App):
         self, observed_files: List[Path], source: str, destination: str
     ):
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
+        num_data_files = len(
+            [
+                f
+                for f in observed_files
+                if f.suffix in self._data_suffixes
+                and any(substring in f.name for substring in self._data_substrings)
+            ]
+        )
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
             "increment_count": len(observed_files),
+            "increment_data_count": num_data_files,
         }
         requests.post(url, json=data)
 
@@ -295,12 +314,22 @@ class MurfeyTUI(App):
         if not checked_updates:
             return
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files"
+        data_files = [
+            u
+            for u in updates
+            if u.file_path.suffix in self._data_suffixes
+            and any(
+                substring in u.file_path.name for substring in self._data_substrings
+            )
+        ]
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
             "increment_count": len(checked_updates),
             "bytes": sum(f.file_size for f in checked_updates),
+            "increment_data_count": len(data_files),
+            "data_bytes": sum(f.file_size for f in data_files),
         }
         requests.post(url, json=data)
 

@@ -65,6 +65,8 @@ class RsyncerInfo(BaseModel):
     transferring: bool = True
     increment_count: int = 1
     bytes: int = 0
+    increment_data_count: int = 0
+    data_bytes: int = 0
 
 
 class ClearanceKeys(BaseModel):
