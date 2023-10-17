@@ -1404,7 +1404,6 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             class_uuids, class3d_message["particles_file"], message["program_id"], _db
         )
 
-        feedback_params.star_combination_job = next_job + 2
         feedback_params.hold_class3d = True
         next_job += 2
         feedback_params.next_job = next_job
@@ -1685,7 +1684,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
                 .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.DataCollection.dc_id == _dcid)
+                .where(db.DataCollection.id == _dcid)
             ).all():
                 pid = pj_murfey[0].id
             else:

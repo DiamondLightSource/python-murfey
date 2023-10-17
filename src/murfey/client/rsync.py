@@ -237,6 +237,7 @@ class RSyncer(Observer):
 
         next_file: RSyncerUpdate | None = None
         transfer_success: set[Path] = set()
+        successful_updates: list[RSyncerUpdate] = []
 
         def parse_stdout(line: str):
             nonlocal next_file
@@ -262,6 +263,7 @@ class RSyncer(Observer):
                 transfer_success.add(next_file.file_path)
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
+                successful_updates.append(next_file._replace(file_size=size_bytes))
                 next_file = None
                 return
             if line.startswith(("building file list", "created directory", "sending")):
@@ -304,6 +306,7 @@ class RSyncer(Observer):
                     # No transfer happening
                     transfer_success.add(update.file_path)
                     self.notify(update)
+                    successful_updates.append(update)
                 else:
                     # This marks the start of a transfer, wait for the progress line
                     next_file = update
@@ -386,6 +389,8 @@ class RSyncer(Observer):
 
             if success:
                 success = result.returncode == 0
+
+        self.notify(successful_updates, secondary=True)
 
         for f in set(relative_filenames) - transfer_success:
             self._files_transferred += 1

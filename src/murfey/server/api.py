@@ -198,7 +198,17 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.commit()
     db.close()
     prom.seen_files.labels(rsync_source=rsyncer_info.source)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source)
     prom.transferred_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
     return rsyncer_info
 
 
@@ -228,6 +238,9 @@ def increment_rsync_file_count(
     prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
     )
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_data_count
+    )
 
 
 @router.post("/visits/{visit_name}/increment_rsync_transferred_files")
@@ -247,6 +260,15 @@ def increment_rsync_transferred_files(
     db.close()
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
+    )
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.bytes
+    )
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_data_count
+    )
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.data_bytes
     )
 
 
@@ -1098,6 +1120,9 @@ def remove_session(client_id: int, db=murfey_db):
         prom.seen_files.remove(ri.source)
         prom.transferred_files.remove(ri.source)
         prom.transferred_files_bytes.remove(ri.source)
+        prom.seen_data_files.remove(ri.source)
+        prom.transferred_data_files.remove(ri.source)
+        prom.transferred_data_files_bytes.remove(ri.source)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
