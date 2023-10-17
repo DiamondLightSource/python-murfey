@@ -506,7 +506,7 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
-        tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt"
+        tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
         tilt_data = {
             "movie_path": str(file_transferred_to),
             "tilt_series_tag": tilt_series,
@@ -930,6 +930,10 @@ class TomographyContext(Context):
                 [float(b["TiltAngle"]) for b in blocks]
             )
             mdoc_metadata["source"] = str(self._basepath)
+            mdoc_metadata["tag"] = str(self._basepath)
+            mdoc_metadata["tilt_series_tag"] = metadata_file.stem
+            mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
+            mdoc_metadata["slit_width"] = float(mdoc_data_block["FilterSlitAndLoss"][0])
             mdoc_metadata[
                 "file_extension"
             ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"

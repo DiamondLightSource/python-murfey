@@ -173,6 +173,7 @@ class DCParameters(BaseModel):
     exposure_time: Optional[float] = None
     slit_width: Optional[float] = None
     phase_plate: bool = False
+    data_collection_tag: str = ""
 
 
 class ProcessingParametersTomo(BaseModel):
@@ -187,6 +188,7 @@ class ProcessingParametersTomo(BaseModel):
     manual_tilt_offset: float
     file_extension: str
     tag: str
+    tilt_series_tag: str
 
     class Base(BaseModel):
         dose_per_frame: float

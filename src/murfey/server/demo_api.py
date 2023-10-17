@@ -4,6 +4,7 @@ import datetime
 import logging
 import random
 from functools import lru_cache
+from itertools import count
 from pathlib import Path
 from typing import List
 
@@ -13,7 +14,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
-from sqlmodel import select
+from sqlalchemy import func
+from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
@@ -45,6 +47,8 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
+    TomographyPreprocessingParameters,
+    TomographyProcessingParameters,
 )
 from murfey.util.models import (
     ClientInfo,
@@ -58,6 +62,7 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
+    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     SessionInfo,
@@ -76,6 +81,9 @@ log = logging.getLogger("murfey.server.demo_api")
 tags_metadata = [murfey.server.bootstrap.tag]
 
 router = APIRouter()
+
+
+global_counter = count()
 
 
 class Settings(BaseSettings):
@@ -288,6 +296,56 @@ def register_spa_proc_params(
     db.commit()
 
 
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    if not db.exec(
+        select(func.count(TomographyPreprocessingParameters.dcg_id)).where(
+            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        )
+    ).one():
+        params = TomographyPreprocessingParameters(
+            dcg_id=collected_ids[0].id,
+            pixel_size=proc_params.pixel_size_on_image,
+            # manual_tilt_offset=proc_params.manual_tilt_offset,
+        )
+        db.add(params)
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
+
+
 @router.get("/clients/{client_id}/spa_processing_parameters")
 def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     params = db.exec(
@@ -314,11 +372,47 @@ def register_tilt_series(
     db.commit()
 
 
-@router.post("/visits/{visit_name}/tilt")
-def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
-    tilt = Tilt(
-        movie_path=tilt_info.movie_path, tilt_series_tag=tilt_info.tilt_series_tag
+@router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
+def register_completed_tilt_series(
+    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
     )
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(TiltSeries.session_id == session_id)
+    ).all()
+    for ts in tilt_series_db:
+        ts.complete = True
+        db.add(ts)
+    db.commit()
+
+
+@router.post("/visits/{visit_name}/{client_id}/tilt")
+def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_id = (
+        db.exec(
+            select(TiltSeries)
+            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+            .where(TiltSeries.session_id == session_id)
+        )
+        .one()
+        .id
+    )
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
     db.add(tilt)
     db.commit()
 
@@ -720,33 +814,34 @@ def register_dc_group(
     db.add(murfey_dcg)
     db.commit()
 
-    murfey_dc = DataCollection(
-        id=1,
-        tag=dcg_params.tag,
-        dcg_id=1,
-    )
-    db.add(murfey_dc)
-    db.commit()
+    if dcg_params.experiment_type == "single particle":
+        murfey_dc = DataCollection(
+            id=1,
+            tag=dcg_params.tag,
+            dcg_id=1,
+        )
+        db.add(murfey_dc)
+        db.commit()
 
-    murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
-    murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
-    murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
-    murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
-    db.add(murfey_pj_pre)
-    db.add(murfey_pj_ext)
-    db.add(murfey_pj_2d)
-    db.add(murfey_pj_3d)
-    db.commit()
+        murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
+        murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
+        murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
+        murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
+        db.add(murfey_pj_pre)
+        db.add(murfey_pj_ext)
+        db.add(murfey_pj_2d)
+        db.add(murfey_pj_3d)
+        db.commit()
 
-    murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
-    murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
-    murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
-    murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
-    db.add(murfey_app_pre)
-    db.add(murfey_app_ext)
-    db.add(murfey_app_2d)
-    db.add(murfey_app_3d)
-    db.commit()
+        murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
+        murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
+        murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
+        murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
+        db.add(murfey_app_pre)
+        db.add(murfey_app_ext)
+        db.add(murfey_app_2d)
+        db.add(murfey_app_3d)
+        db.commit()
 
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
@@ -761,7 +856,40 @@ def register_dc_group(
 
 
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
-def start_dc(visit_name, client_id: int, dc_params: DCParameters):
+def start_dc(visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db):
+    log.info("Starting data collection")
+    dcg = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.tag == dc_params.tag)
+    ).one()
+    dc_id = next(global_counter)
+    murfey_dc = DataCollection(
+        id=dc_id,
+        client=client_id,
+        tag=dc_params.data_collection_tag or dc_params.tag,
+        dcg_id=dcg.id,
+    )
+    db.add(murfey_dc)
+    db.commit()
+    pj_id_preproc = next(global_counter)
+    pj_id_align = next(global_counter)
+    murfey_pj = ProcessingJob(
+        id=pj_id_preproc,
+        recipe="em-tomo-preprocess",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_pj = ProcessingJob(
+        id=pj_id_align,
+        recipe="em-tomo-align",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_app = AutoProcProgram(id=pj_id_preproc, pj_id=pj_id_preproc)
+    db.add(murfey_app)
+    murfey_app = AutoProcProgram(id=pj_id_align, pj_id=pj_id_align)
+    db.add(murfey_app)
+    db.commit()
+    db.close()
     if global_state.get("data_collection_ids") and isinstance(
         global_state["data_collection_ids"], dict
     ):

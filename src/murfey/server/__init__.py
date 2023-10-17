@@ -1691,7 +1691,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
                 run_parameters = message.get("parameters", {})
                 assert isinstance(run_parameters, dict)
-                if not message["experiment_type"] == "spa":
+                if not message["experiment_type"] in ("spa", "single particle"):
                     murfey_processing = db.TomographyProcessingParameters(
                         client_id=message["client_id"],
                         pixel_size=run_parameters["angpix"],

@@ -35,15 +35,11 @@ class Session(SQLModel, table=True):  # type: ignore
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    tomography_processing_parameters: List[
-        "TomographyProcessingParameters"
-    ] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
-    tag: str = Field(primary_key=True)
+    id: int = Field(primary_key=True)
+    tag: str
     session_id: int = Field(foreign_key="session.id")
     complete: bool = False
     processing_requested: bool = False
@@ -54,8 +50,9 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
-    movie_path: str = Field(primary_key=True)
-    tilt_series_tag: str = Field(foreign_key="tiltseries.tag")
+    id: int = Field(primary_key=True)
+    movie_path: str
+    tilt_series_id: int = Field(foreign_key="tiltseries.id")
     motion_corrected: bool = False
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 
@@ -66,6 +63,12 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    tomography_preprocessing_parameters: List[
+        "TomographyPreprocessingParameters"
+    ] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -104,6 +107,11 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    tomography_processing_parameters: List[
+        "TomographyProcessingParameters"
+    ] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
     ctf_parameters: List["CtfParameters"] = Relationship(
@@ -146,12 +154,19 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
     )
 
 
+class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
+    dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
+    pixel_size: float
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="tomography_preprocessing_parameters"
+    )
+
+
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
-    pixel_size: float
     manual_tilt_offset: int
     processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="spa_parameters"
+        back_populates="tomography_processing_parameters"
     )
 
 
