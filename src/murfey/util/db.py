@@ -158,6 +158,9 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
     dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
     pixel_size: float
+    dose_per_frame: float
+    motion_corr_binning: int = 1
+    gain_ref: str | None = None
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="tomography_preprocessing_parameters"
     )

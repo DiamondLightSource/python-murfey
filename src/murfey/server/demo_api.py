@@ -330,6 +330,9 @@ def register_tomo_proc_params(
         params = TomographyPreprocessingParameters(
             dcg_id=collected_ids[0].id,
             pixel_size=proc_params.pixel_size_on_image,
+            dose_per_frame=proc_params.dose_per_frame,
+            gain_ref=proc_params.gain_ref,
+            motion_corr_binning=proc_params.motion_corr_binning,
             # manual_tilt_offset=proc_params.manual_tilt_offset,
         )
         db.add(params)
@@ -705,10 +708,84 @@ async def request_spa_preprocessing(
     return proc_file
 
 
+@router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
+def flush_tomography_processing(visit_name: str, client_id: int, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    stashed_files = db.exec(
+        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
+    ).all()
+    if not stashed_files:
+        return
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    proc_params = db.exec(
+        select(TomographyPreprocessingParameters).where(
+            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        )
+    ).one()
+    if not proc_params:
+        visit_name = visit_name.replace("\r\n", "").replace("\n", "")
+        log.warning(
+            f"No tomography processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
+        )
+        return
+
+    detached_ids = [c.id for c in collected_ids]
+
+    murfey_ids = _murfey_id(
+        detached_ids[3], db, number=2 * len(stashed_files), close=False
+    )
+    for i, f in enumerate(stashed_files):
+        p = Path(f.mrc_out)
+        if not p.parent.exists():
+            p.parent.mkdir(parents=True)
+        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        db.add(movie)
+        zocalo_message = {
+            "recipes": ["em-tomo-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config["feedback_queue"],
+                "dcid": detached_ids[1],
+                "autoproc_program_id": detached_ids[3],
+                "movie": f.file_path,
+                "mrc_out": f.mrc_out,
+                "pix_size": proc_params.pixel_size,
+                "image_number": f.image_number,
+                "microscope": get_microscope(),
+                "mc_uuid": murfey_ids[2 * i],
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": str(machine_config["rsync_basepath"] / proc_params.gain_ref)
+                if proc_params.gain_ref
+                else proc_params.gain_ref,
+            },
+        }
+        log.info(
+            f"Launching tomography preprocessing with Zoaclo message: {zocalo_message}"
+        )
+        db.delete(f)
+    db.commit()
+
+    return
+
+
 @router.post("/visits/{visit_name}/tomography_preprocess")
 async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
     if not Path(proc_file.path).exists():
         log.warning(f"{proc_file.path} has not been transferred before preprocessing")
+    log.info(f"Tomo preprocesing requested for {proc_file.path}")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path(proc_file.path)
