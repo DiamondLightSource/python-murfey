@@ -258,6 +258,7 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
+    rerun_class2d: bool = False
     hold_class3d: bool = False
     class_selection_score: float
     star_combination_job: int
@@ -286,10 +287,6 @@ class Class2DParameters(SQLModel, table=True):  # type: ignore
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class2d_parameters"
     )
-    # class2ds: List["Class2D"] = Relationship(
-    #    back_populates="class2d_parameters",
-    #    sa_relationship_kwargs={"cascade": "delete"},
-    # )
 
 
 class Class2D(SQLModel, table=True):  # type: ignore
@@ -299,9 +296,6 @@ class Class2D(SQLModel, table=True):  # type: ignore
     )
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
-    # class2d_parameters: Optional[Class2DParameters] = Relationship(
-    #    back_populates="class2ds"
-    # )
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="class2ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class2ds")
 

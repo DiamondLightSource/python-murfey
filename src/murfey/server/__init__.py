@@ -742,11 +742,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             3 if default_spa_parameters.do_icebreaker_jobs else 2
         )
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
-    if _db.exec(
-        select(func.count(db.Class2DParameters.particles_file)).where(
-            db.Class2DParameters.pj_id == pj_id
-        )
-    ).one():
+    if feedback_params.rerun_class2d:
         first_class2d = _db.exec(
             select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
         ).first()
@@ -794,6 +790,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             feedback_params.next_job += (
                 4 if default_spa_parameters.do_icebreaker_jobs else 3
             )
+        feedback_params.rerun_class2d = False
         _db.add(feedback_params)
         if first_class2d.complete:
             _db.delete(first_class2d)
@@ -898,6 +895,10 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         )
     ).one()
     if feedback_params.hold_class2d:
+        feedback_params.rerun_class2d = True
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
         return
     feedback_params.next_job = 10 if default_spa_parameters.do_icebreaker_jobs else 7
     feedback_params.hold_class2d = True
@@ -1013,6 +1014,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
     if feedback_params.hold_class2d or feedback_params.picker_ispyb_id is None:
+        feedback_params.rerun_class2d = True
+        _db.add(feedback_params)
+        _db.commit()
         # If waiting then save the message
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
