@@ -302,9 +302,7 @@ class Analyser(Observer):
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
             return data_file.with_suffix(".xml")
-        file_name = (
-            f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
-        )
+        file_name = f"{'_'.join(p for p in data_file.stem.split('_')[:-1])}.xml"
         data_directories = self._murfey_config.get("data_directories", {})
         for dd in data_directories.keys():
             if str(data_file).startswith(dd):
