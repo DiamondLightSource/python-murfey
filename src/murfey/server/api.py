@@ -915,7 +915,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             ),
         }
     else:
-        return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
+        return {"gain_ref": str(filepath / safe_path_name), "gain_ref_superres": None}
 
 
 @router.post("/visits/{visit_name}/eer_fractionation_file")

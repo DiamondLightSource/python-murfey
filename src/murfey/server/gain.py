@@ -33,6 +33,8 @@ async def prepare_gain(
     if gain_path.suffix == ".dm4":
         gain_out = gain_path.parent / "gain.mrc"
         gain_out_superres = gain_path.parent / "gain_superres.mrc"
+        if gain_out.is_file():
+            return gain_out, gain_out_superres if rescale else gain_out
         for k, v in env.items():
             os.environ[k] = v
         (gain_path.parent / "gain").mkdir(exist_ok=True)
