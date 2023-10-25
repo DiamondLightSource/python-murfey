@@ -833,7 +833,8 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "batch_size": class3d_params.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
-                "do_initial_model": True,
+                "do_initial_model": False if feedback_params.initial_model else True,
+                "initial_model_file": feedback_params.initial_model,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
@@ -1408,6 +1409,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
         ).one()
         class3d_params.run = True
+        class3d_params.particles_file = class3d_message["particles_file"]
         class3d_params.batch_size = class3d_message["batch_size"]
         _db.add(class3d_params)
         _db.commit()
@@ -1484,6 +1486,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
+                "do_initial_model": False,
                 "initial_model_file": other_options["initial_model"],
                 "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": _3d_class_murfey_ids(
