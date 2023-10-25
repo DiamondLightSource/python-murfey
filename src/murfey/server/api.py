@@ -1062,7 +1062,7 @@ def register_processing_success_in_ispyb(
         .one()
         .session_id
     )
-    collected_ids = db.exec(
+    collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)

@@ -643,11 +643,11 @@ class MurfeyTUI(App):
                     removal_rp.queue.put(f)
                 removal_rp.stop()
                 log.info(f"rsyncer {rp} rerun with removal")
-        requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
-        )
         requests.post(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
+        )
+        requests.delete(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
         )
         self.exit()
         exit()
