@@ -228,16 +228,24 @@ class _SPAContext(Context):
             metadata["pixel_size_on_image"] / binning_factor
         )
         metadata["motion_corr_binning"] = binning_factor
-        metadata["gain_ref"] = (
-            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-            if environment
-            else None
-        )
-        metadata["gain_ref_superres"] = (
-            f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
-            if environment
-            else None
-        )
+        if environment:
+            metadata["gain_ref"] = (
+                environment.data_collection_parameters.get("gain_ref")
+                if environment
+                and environment.data_collection_parameters.get("gain_ref")
+                not in (None, "None")
+                else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            )
+            metadata["gain_ref_superres"] = (
+                environment.data_collection_parameters.get("gain_ref_superres")
+                if environment
+                and environment.data_collection_parameters.get("gain_ref_superres")
+                not in (None, "None")
+                else f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
+            )
+        else:
+            metadata["gain_ref"] = None
+            metadata["gain_ref_superres"] = None
         if metadata.get("total_exposed_dose"):
             metadata["dose_per_frame"] = (
                 environment.data_collection_parameters.get("dose_per_frame")
