@@ -355,6 +355,26 @@ class SPAModularContext(_SPAContext):
                             motion_correction_uuid=next(MurfeyID),
                         )
 
+                        eer_fractionation_file = None
+                        if environment.data_collection_parameters.get("num_eer_frames"):
+                            response = requests.post(
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                                json={
+                                    "num_frames": environment.data_collection_parameters[
+                                        "num_eer_frames"
+                                    ],
+                                    "fractionation": environment.data_collection_parameters[
+                                        "eer_fractionation"
+                                    ],
+                                    "dose_per_frame": environment.data_collection_parameters[
+                                        "dose_per_frame"
+                                    ],
+                                },
+                            )
+                            eer_fractionation_file = response.json()[
+                                "eer_fractionation_file"
+                            ]
+
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
@@ -377,9 +397,10 @@ class SPAModularContext(_SPAContext):
                             "gain_ref": environment.data_collection_parameters.get(
                                 "gain_ref"
                             ),
-                            "downscale": environment.data_collection_parameters.get(
+                            "extract_downscale": environment.data_collection_parameters.get(
                                 "downscale"
                             ),
+                            "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
                         }
                         requests.post(
