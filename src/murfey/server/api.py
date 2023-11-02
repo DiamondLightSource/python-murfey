@@ -61,6 +61,7 @@ from murfey.util.models import (
     BLSubSampleParameters,
     ClearanceKeys,
     ClientInfo,
+    CompletedTiltSeries,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -362,7 +363,10 @@ def register_tilt_series(
 
 @router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
 def register_completed_tilt_series(
-    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+    visit_name: str,
+    client_id: int,
+    completed_tilt_series: CompletedTiltSeries,
+    db=murfey_db,
 ):
     session_id = (
         db.exec(
@@ -373,7 +377,7 @@ def register_completed_tilt_series(
     )
     tilt_series_db = db.exec(
         select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
         .where(TiltSeries.session_id == session_id)
     ).all()
     for ts in tilt_series_db:

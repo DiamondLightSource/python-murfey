@@ -133,6 +133,10 @@ class TiltSeriesInfo(BaseModel):
     tag: str
 
 
+class CompletedTiltSeries(BaseModel):
+    tilt_series: List[str]
+
+
 class TiltSeriesProcessingDetails(BaseModel):
     name: str
     file_tilt_list: str
