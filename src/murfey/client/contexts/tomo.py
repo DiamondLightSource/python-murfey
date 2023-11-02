@@ -425,7 +425,7 @@ class TomographyContext(Context):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
@@ -470,7 +470,7 @@ class TomographyContext(Context):
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         capture_post(url, json=data)
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
                     if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
                             (
