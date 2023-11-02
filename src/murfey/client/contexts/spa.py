@@ -320,9 +320,11 @@ class SPAModularContext(_SPAContext):
                         )
                     else:
                         machine_config = {}
-                    required_strings = machine_config.get(
-                        "data_required_substrings", {}
-                    ).get("epu", ["fractions"])
+                    required_strings = (
+                        machine_config.get("data_required_substrings", {})
+                        .get("epu", {})
+                        .get(transferred_file.suffix, ["fractions"])
+                    )
 
                     if not environment:
                         logger.warning("No environment passed in")

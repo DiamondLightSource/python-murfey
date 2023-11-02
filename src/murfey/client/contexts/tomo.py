@@ -366,9 +366,8 @@ class TomographyContext(Context):
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
-        for r in required_strings:
-            if r not in file_path.name.lower():
-                return []
+        if not any(r in file_path.name for r in required_strings):
+            return []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
@@ -697,9 +696,8 @@ class TomographyContext(Context):
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
-        for r in required_strings:
-            if r not in file_path.name.lower():
-                return []
+        if not any(r in file_path.name for r in required_strings):
+            return []
         if environment:
             if tomo_version := environment.software_versions.get("tomo"):
                 tilt_info_extraction = tomo_tilt_info.get(tomo_version)
@@ -776,7 +774,7 @@ class TomographyContext(Context):
                     required_strings = (
                         machine_config.get("data_required_substrings", {})
                         .get("tomo", {})
-                        .get(transferred_file.suffix)
+                        .get(transferred_file.suffix, ["fractions"])
                     )
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
