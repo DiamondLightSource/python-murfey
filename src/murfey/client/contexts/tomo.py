@@ -366,7 +366,7 @@ class TomographyContext(Context):
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
-        if not any(r in file_path.name for r in required_strings):
+        if required_strings and not any(r in file_path.name for r in required_strings):
             return []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
@@ -780,8 +780,8 @@ class TomographyContext(Context):
                         transferred_file,
                         environment=environment,
                         required_position_files=kwargs.get("required_position_files"),
-                        required_strings=required_strings
-                        or kwargs.get("required_strings"),
+                        required_strings=kwargs.get("required_strings")
+                        or required_strings,
                     )
                 elif self._acquisition_software == "serialem":
                     completed_tilts = self._add_serialem_tilt(
