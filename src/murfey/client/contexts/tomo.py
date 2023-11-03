@@ -480,22 +480,41 @@ class TomographyContext(Context):
                         self._processing_job_stash[tilt_series] = [
                             (
                                 proc_url,
-                                {"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                                {
+                                    "tag": tilt_series,
+                                    "recipe": "em-tomo-preprocess",
+                                    "experiment_type": "tomography",
+                                },
                             )
                         ]
                         self._processing_job_stash[tilt_series].append(
-                            (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
+                            (
+                                proc_url,
+                                {
+                                    "tag": tilt_series,
+                                    "recipe": "em-tomo-align",
+                                    "experiment_type": "tomography",
+                                },
+                            )
                         )
                     else:
                         if self._processing_job_stash.get(tilt_series):
                             self._flush_processing_job(tilt_series)
                         capture_post(
                             proc_url,
-                            json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                            json={
+                                "tag": tilt_series,
+                                "recipe": "em-tomo-preprocess",
+                                "experiment_type": "tomography",
+                            },
                         )
                         capture_post(
                             proc_url,
-                            json={"tag": tilt_series, "recipe": "em-tomo-align"},
+                            json={
+                                "tag": tilt_series,
+                                "recipe": "em-tomo-align",
+                                "experiment_type": "tomography",
+                            },
                         )
             except Exception as e:
                 logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
