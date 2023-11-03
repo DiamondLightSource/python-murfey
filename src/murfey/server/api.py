@@ -865,10 +865,17 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
 
 @router.post("/visits/{visit_name}/{client_id}/register_processing_job")
 def register_proc(
-    visit_name: str, client_id: int, proc_params: ProcessingJobParameters
+    visit_name: str, client_id: int, proc_params: ProcessingJobParameters, db=murfey_db
 ):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
     proc_parameters = {
-        "client_id": client_id,
+        "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
