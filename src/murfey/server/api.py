@@ -296,6 +296,13 @@ def register_tomo_proc_params(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
     session_id = client.session_id
+    if db.exec(
+        select(TomographyProcessingParameters)
+        .where(TomographyProcessingParameters.session_id == session_id)
+        .all()
+    ):
+        db.close()
+        return
     params = TomographyProcessingParameters(
         session_id=session_id,
         pixel_size=proc_params.pixel_size_on_image,

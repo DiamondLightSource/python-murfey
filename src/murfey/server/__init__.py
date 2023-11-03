@@ -1698,22 +1698,13 @@ def feedback_callback(header: dict, message: dict) -> None:
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
                 .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.DataCollection.id == _dcid)
+                .where(db.ProcessingJob.dc_id == _dcid)
             ).all():
                 pid = pj_murfey[0].id
             else:
                 record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
                 run_parameters = message.get("parameters", {})
                 assert isinstance(run_parameters, dict)
-                if not message["experiment_type"] == "spa":
-                    murfey_processing = db.TomographyProcessingParameters(
-                        client_id=message["client_id"],
-                        pixel_size=run_parameters["angpix"],
-                        manual_tilt_offset=run_parameters["manual_tilt_offset"],
-                    )
-                    murfey_db.add(murfey_processing)
-                    murfey_db.commit()
-                    murfey_db.close()
                 if message.get("job_parameters"):
                     job_parameters = [
                         ProcessingJobParameter(parameterKey=k, parameterValue=v)
