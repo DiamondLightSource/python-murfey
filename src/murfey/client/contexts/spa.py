@@ -331,7 +331,7 @@ class SPAModularContext(_SPAContext):
                     required_strings = (
                         machine_config.get("data_required_substrings", {})
                         .get("epu", {})
-                        .get(f".{transferred_file.suffix}", ["fractions"])
+                        .get(transferred_file.suffix, ["fractions"])
                     )
 
                     if not environment:

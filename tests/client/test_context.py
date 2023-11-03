@@ -28,6 +28,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert context._tilt_series == {
@@ -40,6 +41,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert not context._completed_tilt_series
@@ -47,6 +49,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert len(context._tilt_series.values()) == 2
@@ -67,6 +70,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert context._tilt_series == {
@@ -79,6 +83,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert not context._completed_tilt_series
@@ -86,6 +91,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_2_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert len(context._tilt_series.values()) == 2
@@ -94,6 +100,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert len(context._tilt_series.values()) == 2
@@ -102,6 +109,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_3_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert len(context._tilt_series.values()) == 3
@@ -110,6 +118,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         tmp_path / "Position_3_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert context._completed_tilt_series == ["Position_1", "Position_2", "Position_3"]
@@ -129,6 +138,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert context._tilt_series == {
@@ -141,6 +151,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert not context._completed_tilt_series
@@ -148,6 +159,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert len(context._tilt_series.values()) == 2
@@ -156,12 +168,14 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         tmp_path / "Position_2_[-30.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     new_series = context.post_transfer(
         tmp_path / "Position_1_[60.0]_fractions.tiff",
         role="detector",
         required_position_files=[],
+        required_strings=["fractions"],
         environment=env,
     )
     assert context._completed_tilt_series == ["Position_2", "Position_1"]
@@ -255,6 +269,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
         Path(__file__).parent.parent / "util" / "test_1.mdoc",
         role="detector",
         environment=env,
+        required_strings=["fractions"],
     )
     assert len(context._tilt_series_sizes) == 1
     assert context._tilt_series_sizes == {"test_1": 11}
@@ -264,6 +279,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
         tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff",
         role="detector",
         environment=env,
+        required_strings=["fractions"],
     )
     assert context._tilt_series == {
         "test_1": [tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff"]
@@ -274,6 +290,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
             tmp_path / f"test_1_[{t:.1f}]_fractions.tiff",
             role="detector",
             environment=env,
+            required_strings=["fractions"],
         )
     assert len(context._tilt_series["test_1"]) == 11
     assert context._completed_tilt_series == ["test_1"]

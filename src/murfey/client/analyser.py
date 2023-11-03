@@ -74,9 +74,9 @@ class Analyser(Observer):
             .get(self._acquisition_software, {})
             .get(file_path.suffix)
         ):
-            for rs in required_substrings:
-                if rs not in file_path.name:
-                    return
+            if not any(r in file_path.name for r in required_substrings):
+                return []
+
         if (
             file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
             and not self._extension
