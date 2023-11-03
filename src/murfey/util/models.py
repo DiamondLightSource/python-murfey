@@ -119,6 +119,7 @@ class SPAProcessFile(BaseModel):
     mc_binning: Optional[int] = 1
     gain_ref: Optional[str] = None
     extract_downscale: bool = True
+    eer_fractionation_file: Optional[str] = None
     source: str = ""
 
 
@@ -130,6 +131,10 @@ class TiltInfo(BaseModel):
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
+
+
+class CompletedTiltSeries(BaseModel):
+    tilt_series: List[str]
 
 
 class TiltSeriesProcessingDetails(BaseModel):

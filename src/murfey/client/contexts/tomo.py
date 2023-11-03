@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
+from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -420,11 +421,16 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
+            tilt_series_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
+            requests.post(
+                tilt_series_endpoint,
+                json={"client_id": environment.client_id, "tag": tilt_series},
+            )
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
@@ -469,7 +475,7 @@ class TomographyContext(Context):
                         self._data_collection_stash.append((url, environment, data))
                     else:
                         capture_post(url, json=data)
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
                     if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
                             (
@@ -500,6 +506,23 @@ class TomographyContext(Context):
                         break
                 else:
                     self._tilt_series[tilt_series].append(file_path)
+
+        if environment:
+            movie_path_source = _get_source(file_path, environment)
+            if movie_path_source:
+                tilt_endpoint = (
+                    f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt"
+                )
+                movie_path = _file_transferred_to(
+                    environment, movie_path_source, file_path
+                )
+                requests.post(
+                    tilt_endpoint,
+                    json={
+                        "tilt_series_tag": tilt_series,
+                        "movie_path": str(movie_path),
+                    },
+                )
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             eer_fractionation_file = None
@@ -684,6 +707,12 @@ class TomographyContext(Context):
             logger.info(
                 f"The following tilt series are considered complete: {newly_completed_series}"
             )
+            if environment:
+                completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/completed_tilt_series"
+                requests.post(
+                    completed_tilt_endpoint,
+                    json={"tilt_series": newly_completed_series},
+                )
         return newly_completed_series
 
     def _add_tomo_tilt(
