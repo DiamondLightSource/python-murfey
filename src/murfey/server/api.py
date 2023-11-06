@@ -297,10 +297,10 @@ def register_tomo_proc_params(
     ).one()
     session_id = client.session_id
     if db.exec(
-        select(TomographyProcessingParameters)
-        .where(TomographyProcessingParameters.session_id == session_id)
-        .all()
-    ):
+        select(TomographyProcessingParameters).where(
+            TomographyProcessingParameters.session_id == session_id
+        )
+    ).all():
         db.close()
         return
     params = TomographyProcessingParameters(
@@ -669,6 +669,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
+    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
     ctf_out = (
         core
         / machine_config.processed_directory_name
@@ -676,10 +677,11 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / "CTF"
         / str(ppath.stem + "_ctf.mrc")
     )
+    ctf_out = Path("/".join(secure_filename(p) for p in ctf_out.parts))
     if not mrc_out.parent.exists():
-        Path(secure_filename(mrc_out)).parent.mkdir(parents=True, exist_ok=True)
+        mrc_out.parent.mkdir(parents=True, exist_ok=True)
     if not ctf_out.parent.exists():
-        Path(secure_filename(ctf_out)).parent.mkdir(parents=True, exist_ok=True)
+        ctf_out.parent.mkdir(parents=True, exist_ok=True)
     zocalo_message = {
         "recipes": ["em-tomo-preprocess"],
         "parameters": {
@@ -859,7 +861,8 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
             machine_config.feedback_queue,
             {"register": "data_collection", **dc_parameters},
         )
-    prom.exposure_time.set(dc_params.exposure_time)
+    if dc_params.exposure_time:
+        prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 

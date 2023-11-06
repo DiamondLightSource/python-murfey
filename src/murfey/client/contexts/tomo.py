@@ -727,7 +727,7 @@ class TomographyContext(Context):
                 f"The following tilt series are considered complete: {newly_completed_series}"
             )
             if environment:
-                completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/completed_tilt_series"
+                completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
                 requests.post(
                     completed_tilt_endpoint,
                     json={"tilt_series": newly_completed_series},
