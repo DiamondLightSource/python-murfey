@@ -97,8 +97,30 @@ def check_tilt_series_mc(tag: str) -> bool:
 
 
 def get_all_tilts(tag: str) -> List[str]:
+    machine_config = get_machine_config()
     results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
-    return [r.movie_path for r in results]
+
+    def _mc_path(mov_path: Path) -> str:
+        for p in mov_path.parts:
+            if "-" in p and p.startswith(("bi", "nr", "nt", "cm", "sw")):
+                visit_name = p
+                break
+        else:
+            raise ValueError(f"No visit found in {mov_path}")
+        visit_idx = Path(mov_path).parts.index(visit_name)
+        core = Path(*Path(mov_path).parts[: visit_idx + 1])
+        ppath = Path(mov_path)
+        sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+        mrc_out = (
+            core
+            / machine_config.processed_directory_name
+            / sub_dataset
+            / "MotionCorr"
+            / str(ppath.stem + "_motion_corrected.mrc")
+        )
+        return str(mrc_out)
+
+    return [_mc_path(Path(r)) for r in results]
 
 
 def get_job_ids(tag: str) -> JobIDs:
