@@ -342,9 +342,10 @@ class SPAModularContext(_SPAContext):
                         logger.warning(f"No source found for file {transferred_file}")
                         return
 
-                    for r in required_strings:
-                        if r not in transferred_file.name.lower():
-                            return
+                    if required_strings and not any(
+                        r in transferred_file.name for r in required_strings
+                    ):
+                        return
 
                     if environment:
                         file_transferred_to = _file_transferred_to(

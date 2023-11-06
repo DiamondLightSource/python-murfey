@@ -120,7 +120,7 @@ def get_all_tilts(tag: str) -> List[str]:
         )
         return str(mrc_out)
 
-    return [_mc_path(Path(r)) for r in results]
+    return [_mc_path(Path(r.movie_path)) for r in results]
 
 
 def get_job_ids(tag: str) -> JobIDs:
@@ -1655,7 +1655,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )
             if dcgid is None:
                 raise ValueError(
-                    f"No data collection group ID was found for image directory {message['image_directory']}"
+                    f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
                 )
             if dc_murfey := murfey_db.exec(
                 select(db.DataCollection)
