@@ -25,7 +25,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import PendingRollbackError, SQLAlchemyError
 from sqlmodel import Session, create_engine, select
 
 import murfey
@@ -2020,6 +2020,9 @@ def feedback_callback(header: dict, message: dict) -> None:
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
+    except PendingRollbackError:
+        murfey_db.rollback()
+        murfey_db.close()
     except Exception:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True
