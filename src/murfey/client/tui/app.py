@@ -611,6 +611,13 @@ class MurfeyTUI(App):
         self.exit()
         exit()
 
+    def clean_up_quit(self) -> None:
+        requests.delete(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+        )
+        self.exit()
+        exit()
+
     async def action_clear(self) -> None:
         machine_config = get_machine_config(
             str(self._environment.url.geturl()), demo=self._environment.demo
