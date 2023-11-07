@@ -128,6 +128,7 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 
 class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
+    tag: str = Field(primary_key=True)
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     image_number: int
     mrc_out: str

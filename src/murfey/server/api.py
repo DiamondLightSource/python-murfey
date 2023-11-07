@@ -645,6 +645,7 @@ async def request_spa_preprocessing(
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
+            tag=proc_file.tag,
             client_id=client_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),

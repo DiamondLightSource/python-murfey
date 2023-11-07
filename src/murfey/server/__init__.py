@@ -1803,9 +1803,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .session_id
             )
             stashed_files = murfey_db.exec(
-                select(db.PreprocessStash).where(
-                    db.PreprocessStash.client_id == message["client_id"]
-                )
+                select(db.PreprocessStash)
+                .where(db.PreprocessStash.client_id == message["client_id"])
+                .where(db.PreprocessStash.tag == message["tag"])
             ).all()
             if not stashed_files:
                 if _transport_object:
