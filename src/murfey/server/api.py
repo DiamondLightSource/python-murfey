@@ -631,6 +631,7 @@ async def request_spa_preprocessing(
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
                 "particle_diameter": proc_params["particle_diameter"] or 0,
+                "fm_int_file": proc_file.eer_fractionation_file,
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
