@@ -7,7 +7,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple
+from typing import List, NamedTuple
 from urllib.parse import ParseResult
 
 import procrunner
@@ -53,12 +53,14 @@ class RSyncer(Observer):
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
         remove_files: bool = False,
+        required_substrings_for_removal: List[str] = [],
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
         self._basepath_remote = basepath_remote
         self._do_transfer = do_transfer
         self._remove_files = remove_files
+        self._required_substrings_for_removal = required_substrings_for_removal
         self._local = local
         self._server_url = server_url
         if local:
@@ -162,7 +164,6 @@ class RSyncer(Observer):
                 num_files = 0
                 while True:
                     if num_files > 100:
-                        self.queue.task_done()
                         break
                     next_file = self.queue.get(block=True, timeout=0.1)
                     if next_file and not next_file.name.startswith("."):
@@ -209,6 +210,7 @@ class RSyncer(Observer):
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
 
+        updates = []
         for f in set(relative_filenames):
             self._files_transferred += 1
             update = RSyncerUpdate(
@@ -220,6 +222,11 @@ class RSyncer(Observer):
                 base_path=self._basepath,
             )
             self.notify(update)
+            updates.append(update)
+            time.sleep(0.1)
+            self.notify([update], secondary=True)
+        # self.notify(updates, secondary=True)
+
         return True
 
     def _transfer(self, files: list[Path]) -> bool:
@@ -230,6 +237,7 @@ class RSyncer(Observer):
 
         next_file: RSyncerUpdate | None = None
         transfer_success: set[Path] = set()
+        successful_updates: list[RSyncerUpdate] = []
 
         def parse_stdout(line: str):
             nonlocal next_file
@@ -255,6 +263,7 @@ class RSyncer(Observer):
                 transfer_success.add(next_file.file_path)
                 size_bytes = int(xfer_line.split()[0].replace(",", ""))
                 self.notify(next_file._replace(file_size=size_bytes))
+                successful_updates.append(next_file._replace(file_size=size_bytes))
                 next_file = None
                 return
             if line.startswith(("building file list", "created directory", "sending")):
@@ -297,6 +306,7 @@ class RSyncer(Observer):
                     # No transfer happening
                     transfer_success.add(update.file_path)
                     self.notify(update)
+                    successful_updates.append(update)
                 else:
                     # This marks the start of a transfer, wait for the progress line
                     next_file = update
@@ -314,7 +324,32 @@ class RSyncer(Observer):
                 relative_filenames.append(f.relative_to(self._basepath))
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
-        rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
+        if self._remove_files:
+            if self._required_substrings_for_removal:
+                rsync_stdin_remove = b"\n".join(
+                    os.fsencode(f)
+                    for f in relative_filenames
+                    if any(
+                        substring in f.name
+                        for substring in self._required_substrings_for_removal
+                    )
+                )
+                rsync_stdin = b"\n".join(
+                    os.fsencode(f)
+                    for f in relative_filenames
+                    if not any(
+                        substring in f.name
+                        for substring in self._required_substrings_for_removal
+                    )
+                )
+            else:
+                rsync_stdin_remove = b"\n".join(
+                    os.fsencode(f) for f in relative_filenames
+                )
+                rsync_stdin = b""
+        else:
+            rsync_stdin_remove = b""
+            rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
         rsync_cmd = [
             "rsync",
             "-iiv",
@@ -324,20 +359,38 @@ class RSyncer(Observer):
             "--files-from=-",
             "-p",  # preserve permissions
         ]
-        if self._remove_files:
-            rsync_cmd.append("--remove-source-files")
+
         rsync_cmd.extend([".", self._remote])
 
-        result = procrunner.run(
-            rsync_cmd,
-            callback_stdout=parse_stdout,
-            callback_stderr=parse_stderr,
-            working_directory=str(self._basepath),
-            stdin=rsync_stdin,
-            print_stdout=False,
-            print_stderr=False,
-        )
-        success = result.returncode == 0
+        success = True
+        if rsync_stdin:
+            result = procrunner.run(
+                rsync_cmd,
+                callback_stdout=parse_stdout,
+                callback_stderr=parse_stderr,
+                working_directory=str(self._basepath),
+                stdin=rsync_stdin,
+                print_stdout=False,
+                print_stderr=False,
+            )
+            success = result.returncode == 0
+
+        if rsync_stdin_remove:
+            rsync_cmd.insert(-2, "--remove-source-files")
+            result = procrunner.run(
+                rsync_cmd,
+                callback_stdout=parse_stdout,
+                callback_stderr=parse_stderr,
+                working_directory=str(self._basepath),
+                stdin=rsync_stdin_remove,
+                print_stdout=False,
+                print_stderr=False,
+            )
+
+            if success:
+                success = result.returncode == 0
+
+        self.notify(successful_updates, secondary=True)
 
         for f in set(relative_filenames) - transfer_success:
             self._files_transferred += 1

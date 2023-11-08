@@ -4,6 +4,7 @@ import datetime
 import logging
 import random
 from functools import lru_cache
+from itertools import count
 from pathlib import Path
 from typing import List
 
@@ -13,17 +14,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from pydantic import BaseSettings
-from sqlmodel import select
+from sqlalchemy import func
+from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
+import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 from murfey.server import (
     _murfey_id,
     _register_picked_particles_use_diameter,
-    feedback_callback_async,
+    feedback_callback,
     get_hostname,
     get_microscope,
+    sanitise,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
@@ -41,7 +45,10 @@ from murfey.util.db import (
     Session,
     SPAFeedbackParameters,
     SPARelionParameters,
+    Tilt,
     TiltSeries,
+    TomographyPreprocessingParameters,
+    TomographyProcessingParameters,
 )
 from murfey.util.models import (
     ClientInfo,
@@ -55,12 +62,14 @@ from murfey.util.models import (
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
+    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     SessionInfo,
     SPAProcessFile,
     SPAProcessingParameters,
     SuggestedPathParameters,
+    TiltInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
@@ -72,6 +81,9 @@ log = logging.getLogger("murfey.server.demo_api")
 tags_metadata = [murfey.server.bootstrap.tag]
 
 router = APIRouter()
+
+
+global_counter = count()
 
 
 class Settings(BaseSettings):
@@ -123,6 +135,7 @@ def get_mic():
 def get_mic_image():
     if machine_config.get("image_path"):
         return FileResponse(machine_config["image_path"])
+    return None
 
 
 @router.get("/visits/")
@@ -165,6 +178,11 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     )
     db.add(rsync_instance)
     db.commit()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
     return rsyncer_info
 
 
@@ -193,6 +211,9 @@ def increment_rsync_file_count(
     rsync_instance.files_counted += 1
     db.add(rsync_instance)
     db.commit()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
 
 
 @router.post("/visits/{visit_name}/increment_rsync_transferred_files")
@@ -209,6 +230,12 @@ def increment_rsync_transferred_files(
     rsync_instance.files_transferred += 1
     db.add(rsync_instance)
     db.commit()
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_count
+    )
+    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.bytes
+    )
 
 
 @router.post("/clients/{client_id}/spa_processing_parameters")
@@ -223,8 +250,21 @@ def register_spa_proc_params(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
         ).one()
         session_id = client.session_id
+        collected_ids = db.exec(
+            select(
+                DataCollectionGroup,
+                DataCollection,
+                ProcessingJob,
+                AutoProcProgram,
+            )
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-spa-preprocess")
+        ).one()
         params = SPARelionParameters(
-            session_id=session_id,
+            pj_id=collected_ids[2].id,
             angpix=proc_params.pixel_size_on_image,
             dose_per_frame=proc_params.dose_per_frame,
             gain_ref=proc_params.gain_ref,
@@ -239,7 +279,7 @@ def register_spa_proc_params(
             mask_diameter=proc_params.mask_diameter,
         )
         feedback_params = SPAFeedbackParameters(
-            session_id=session_id,
+            pj_id=collected_ids[2].id,
             estimate_particle_diameter=proc_params.particle_diameter is None,
             hold_class2d=False,
             hold_class3d=False,
@@ -250,9 +290,60 @@ def register_spa_proc_params(
         )
     except Exception as e:
         log.warning(f"registration failed: {e}")
+        return
     db.add(params)
     db.add(feedback_params)
     db.commit()
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    if not db.exec(
+        select(func.count(TomographyPreprocessingParameters.dcg_id)).where(
+            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        )
+    ).one():
+        params = TomographyPreprocessingParameters(
+            dcg_id=collected_ids[0].id,
+            pixel_size=proc_params.pixel_size_on_image,
+            # manual_tilt_offset=proc_params.manual_tilt_offset,
+        )
+        db.add(params)
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -267,8 +358,62 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
 ):
-    tilt_series = TiltSeries(client_id=TiltSeriesInfo.client_id, tag=TiltSeriesInfo.tag)
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(
+                ClientEnvironment.client_id == tilt_series_info.client_id
+            )
+        )
+        .one()
+        .session_id
+    )
+    tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
     db.add(tilt_series)
+    db.commit()
+
+
+@router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
+def register_completed_tilt_series(
+    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(TiltSeries.session_id == session_id)
+    ).all()
+    for ts in tilt_series_db:
+        ts.complete = True
+        db.add(ts)
+    db.commit()
+
+
+@router.post("/visits/{visit_name}/{client_id}/tilt")
+def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_id = (
+        db.exec(
+            select(TiltSeries)
+            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+            .where(TiltSeries.session_id == session_id)
+        )
+        .one()
+        .id
+    )
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
+    db.add(tilt)
     db.commit()
 
 
@@ -369,19 +514,6 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     ).all()
     if not stashed_files:
         return
-    params = db.exec(
-        select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-        .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
-        .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
-        .where(ClientEnvironment.client_id == client_id)
-    ).one()
-    proc_params = dict(params[0])
-    feedback_params = params[1]
-    if not proc_params:
-        log.warning(
-            f"No SPA processing parameters found for client {client_id} on visit {visit_name}"
-        )
-        return
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -390,6 +522,19 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
+    params = db.exec(
+        select(SPARelionParameters, SPAFeedbackParameters)
+        .where(SPARelionParameters.pj_id == collected_ids[2].id)
+        .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+    ).one()
+    proc_params = dict(params[0])
+    feedback_params = params[1]
+    if not proc_params:
+        visit_name = visit_name.replace("\r\n", "").replace("\n", "")
+        log.warning(
+            f"No SPA processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
+        )
+        return
 
     detached_ids = [c.id for c in collected_ids]
 
@@ -438,10 +583,11 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
 async def request_spa_preprocessing(
     visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
-    visit_idx = Path(proc_file.path).parts.index(visit_name)
-    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
-    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
+    visit_idx = parts.index(visit_name)
+    core = Path("/") / Path(*parts[: visit_idx + 1])
+    ppath = Path("/") / Path(*parts)
+    sub_dataset = ppath.relative_to(core).parts[0]
     for i, p in enumerate(ppath.parts):
         if p.startswith("raw"):
             movies_path_index = i
@@ -459,11 +605,28 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
+        session_id = (
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.client_id == client_id
+                )
+            )
+            .one()
+            .session_id
+        )
+        collected_ids = db.exec(
+            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_file.tag)
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-spa-preprocess")
+        ).one()
         params = db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters, ClientEnvironment)
-            .where(SPARelionParameters.session_id == ClientEnvironment.session_id)
-            .where(SPAFeedbackParameters.session_id == ClientEnvironment.session_id)
-            .where(ClientEnvironment.client_id == client_id)
+            select(SPARelionParameters, SPAFeedbackParameters)
+            .where(SPARelionParameters.pj_id == collected_ids[2].id)
+            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
         proc_params: dict | None = dict(params[0])
         feedback_params = params[1]
@@ -502,38 +665,14 @@ async def request_spa_preprocessing(
         db.commit()
 
         if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True)
-        zocalo_message = {
-            "recipes": ["em-spa-preprocess"],
-            "parameters": {
-                "feedback_queue": machine_config["feedback_queue"],
-                "dcid": detached_ids[1],
-                "autoproc_program_id": detached_ids[3],
-                "movie": proc_file.path,
-                "mrc_out": str(mrc_out),
-                "pix_size": proc_params["angpix"],
-                "image_number": proc_file.image_number,
-                "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[0],
-                "ft_bin": proc_params["motion_corr_binning"],
-                "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(
-                    machine_config["rsync_basepath"] / proc_params["gain_ref"]
-                )
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
-                "downscale": proc_params["downscale"],
-                "picker_uuid": murfey_ids[1],
-                "particle_diameter": proc_params["particle_diameter"],
-            },
-        }
-        log.info(f"Sending Zocalo message {zocalo_message}")
+            Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
+        log.info("Sending Zocalo message")
         _register_picked_particles_use_diameter(
             {
                 "session_id": session_id,
                 "extraction_parameters": {
                     "micrographs_file": "MotionCorr/job002/micrographs.star",
-                    "coords_list_file": "AutoPick/job007/coords.star",
+                    "coord_list_file": "AutoPick/job007/coords.star",
                     "extract_file": "Extract/job008/particles.star",
                     "ctf_values": {
                         "CtfMaxResolution": 4,
@@ -544,16 +683,18 @@ async def request_spa_preprocessing(
                         "CtfImage": "CtfFind/job006/ctf.mrc",
                     },
                 },
-                "particle_sizes_list": [random.randint(20, 30) for i in range(400)],
-                "auto_proc_program_id": 1,
+                "particle_diameters": [random.randint(20, 30) for i in range(400)],
+                "program_id": 1,
             },
             _db=db,
             demo=True,
         )
+        prom.preprocessed_movies.labels(processing_job=1).inc()
 
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
+            tag=proc_file.tag,
             client_id=client_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
@@ -585,7 +726,7 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
     )
     if not mrc_out.parent.exists():
         mrc_out.parent.mkdir(parents=True)
-    await feedback_callback_async(
+    feedback_callback(
         {},
         {
             "register": "motion_corrected",
@@ -674,29 +815,34 @@ def register_dc_group(
     db.add(murfey_dcg)
     db.commit()
 
-    murfey_dc = DataCollection(
-        id=1,
-        tag=dcg_params.tag,
-        dcg_id=1,
-    )
-    db.add(murfey_dc)
-    db.commit()
+    if dcg_params.experiment_type == "single particle":
+        murfey_dc = DataCollection(
+            id=1,
+            tag=dcg_params.tag,
+            dcg_id=1,
+        )
+        db.add(murfey_dc)
+        db.commit()
 
-    murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
-    murfey_pj_2d = ProcessingJob(id=2, recipe="em-spa-class2d", dc_id=1)
-    murfey_pj_3d = ProcessingJob(id=3, recipe="em-spa-class3d", dc_id=1)
-    db.add(murfey_pj_pre)
-    db.add(murfey_pj_2d)
-    db.add(murfey_pj_3d)
-    db.commit()
+        murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
+        murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
+        murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
+        murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
+        db.add(murfey_pj_pre)
+        db.add(murfey_pj_ext)
+        db.add(murfey_pj_2d)
+        db.add(murfey_pj_3d)
+        db.commit()
 
-    murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
-    murfey_app_2d = AutoProcProgram(id=2, pj_id=2)
-    murfey_app_3d = AutoProcProgram(id=3, pj_id=3)
-    db.add(murfey_app_pre)
-    db.add(murfey_app_2d)
-    db.add(murfey_app_3d)
-    db.commit()
+        murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
+        murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
+        murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
+        murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
+        db.add(murfey_app_pre)
+        db.add(murfey_app_ext)
+        db.add(murfey_app_2d)
+        db.add(murfey_app_3d)
+        db.commit()
 
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
@@ -710,8 +856,41 @@ def register_dc_group(
     return dcg_params
 
 
-@router.post("/visits/{visit_name}/start_data_collection")
-def start_dc(visit_name, dc_params: DCParameters):
+@router.post("/visits/{visit_name}/{client_id}/start_data_collection")
+def start_dc(visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db):
+    log.info("Starting data collection")
+    dcg = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.tag == dc_params.tag)
+    ).one()
+    dc_id = next(global_counter)
+    murfey_dc = DataCollection(
+        id=dc_id,
+        client=client_id,
+        tag=dc_params.data_collection_tag or dc_params.tag,
+        dcg_id=dcg.id,
+    )
+    db.add(murfey_dc)
+    db.commit()
+    pj_id_preproc = next(global_counter)
+    pj_id_align = next(global_counter)
+    murfey_pj = ProcessingJob(
+        id=pj_id_preproc,
+        recipe="em-tomo-preprocess",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_pj = ProcessingJob(
+        id=pj_id_align,
+        recipe="em-tomo-align",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_app = AutoProcProgram(id=pj_id_preproc, pj_id=pj_id_preproc)
+    db.add(murfey_app)
+    murfey_app = AutoProcProgram(id=pj_id_align, pj_id=pj_id_align)
+    db.add(murfey_app)
+    db.commit()
+    db.close()
     if global_state.get("data_collection_ids") and isinstance(
         global_state["data_collection_ids"], dict
     ):
@@ -721,11 +900,12 @@ def start_dc(visit_name, dc_params: DCParameters):
         }
     else:
         global_state["data_collection_ids"] = {dc_params.tag: 1}
+    prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 
-@router.post("/visits/{visit_name}/register_processing_job")
-def register_proc(visit_name, proc_params: ProcessingJobParameters):
+@router.post("/visits/{visit_name}/{client_id}/register_processing_job")
+def register_proc(visit_name, client_id: int, proc_params: ProcessingJobParameters):
     log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
@@ -844,6 +1024,24 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+    ).all()
+    for ri in rsync_instances:
+        prom.seen_files.remove(ri.source)
+        prom.transferred_files.remove(ri.source)
+        prom.transferred_files_bytes.remove(ri.source)
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
+            prom.preprocessed_movies.remove(c[2].id)
+        except KeyError:
+            continue
     if db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
     ).all():

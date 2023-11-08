@@ -6,7 +6,7 @@ import queue
 import threading
 import time
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import List, NamedTuple, Optional
 
 import murfey.util
 from murfey.client.tui.status_bar import StatusBar
@@ -100,10 +100,19 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
-            for x in sorted(
+            files_for_transfer = []
+            time_ordered_file_candidates = sorted(
                 self._file_candidates,
                 key=lambda _x: self._file_candidates[_x].modification_time,
-            ):
+            )
+            ordered_file_candidates: List[str] = []
+            for x in time_ordered_file_candidates:
+                if x.endswith(".mdoc"):
+                    ordered_file_candidates.insert(0, x)
+                else:
+                    ordered_file_candidates.append(x)
+
+            for x in ordered_file_candidates:
                 if x not in filelist:
                     log.info(f"Previously seen file {x!r} has disappeared")
                     del self._file_candidates[x]
@@ -147,7 +156,8 @@ class DirWatcher(murfey.util.Observer):
                                             top_level_dir.stat().st_ctime,
                                         )
                             else:
-                                self._notify_for_transfer(x)
+                                if self._notify_for_transfer(x):
+                                    files_for_transfer.append(Path(x))
                             continue
                     except Exception as e:
                         log.error(f"Exception encountered: {e}", exc_info=True)
@@ -158,11 +168,12 @@ class DirWatcher(murfey.util.Observer):
                         f"Found file {Path(x).name!r} for potential future transfer"
                     )
 
+            self.notify(files_for_transfer, secondary=True)
             self._lastscan = filelist
         except Exception as e:
             log.error(f"Exception encountered: {e}")
 
-    def _notify_for_transfer(self, file_candidate: str):
+    def _notify_for_transfer(self, file_candidate: str) -> bool:
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
         if self._statusbar:
             # log.info("Increasing number to be transferred")
@@ -172,11 +183,13 @@ class DirWatcher(murfey.util.Observer):
                     self._statusbar.transferred[1] + 1,
                 ]
 
-        if not Path(file_candidate).name.startswith(".") and not Path(
+        transfer_check = not Path(file_candidate).name.startswith(".") and not Path(
             file_candidate
-        ).name.endswith("downloading"):
+        ).name.endswith("downloading")
+        if transfer_check:
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
+        return transfer_check
 
     def _scan_directory(
         self, path: str = "", modification_time: float | None = None

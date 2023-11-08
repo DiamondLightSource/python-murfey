@@ -7,7 +7,7 @@ from threading import RLock
 from typing import Callable, Dict, List, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from murfey.client.watchdir import DirWatcher
 
@@ -59,6 +59,43 @@ class MurfeyInstanceEnvironment(BaseModel):
     class Config:
         validate_assignment: bool = True
         arbitrary_types_allowed: bool = True
+
+    @validator("data_collection_group_ids")
+    def dcg_callback(cls, v, values):
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("data_collection_group_ids", []):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["data_collection"]:
+                        l(k)
+        return v
+
+    @validator("data_collection_ids")
+    def dc_callback(cls, v, values):
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("data_collection_ids", []):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["processing_job"]:
+                        l(k)
+        return v
+
+    @validator("processing_job_ids")
+    def job_callback(cls, v, values):
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("processing_job_ids", []):
+                for k in v.keys():
+                    if k not in values["id_tag_registry"]["auto_proc_program"]:
+                        l(k, v[k]["ispyb-relion"])
+        return v
+
+    @validator("autoproc_program_ids")
+    def app_callback(cls, v, values):
+        # logger.info(f"autoproc program ids validator: {v}")
+        with global_env_lock:
+            for l in values.get("listeners", {}).get("autoproc_program_ids", []):
+                for k in v.keys():
+                    if v[k].get("em-tomo-preprocess"):
+                        l(k, v[k]["em-tomo-preprocess"])
+        return v
 
     def clear(self):
         self.sources = []

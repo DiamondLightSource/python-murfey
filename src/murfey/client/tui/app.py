@@ -15,7 +15,8 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
-from murfey.client.context import SPAContext, SPAModularContext, TomographyContext
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
@@ -91,6 +92,16 @@ class MurfeyTUI(App):
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
         self._skip_existing_processing = skip_existing_processing
+        self._machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
+        self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
+        self._data_substrings = [
+            s
+            for val in self._machine_config["data_required_substrings"].values()
+            for ds in val.values()
+            for s in ds
+        ]
         self.install_screen(MainScreen(), "main")
 
     @property
@@ -103,8 +114,13 @@ class MurfeyTUI(App):
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
         log.info(f"Launching multigrid watcher for source {source}")
+        machine_config = get_machine_config(
+            str(self._environment.url.geturl()), demo=self._environment.demo
+        )
         self._multigrid_watcher = MultigridDirWatcher(
-            source, skip_existing_processing=self._skip_existing_processing
+            source,
+            machine_config,
+            skip_existing_processing=self._skip_existing_processing,
         )
         self._multigrid_watcher.subscribe(
             partial(
@@ -212,7 +228,8 @@ class MurfeyTUI(App):
                 self._increment_transferred_files,
                 destination=destination,
                 source=str(source),
-            )
+            ),
+            secondary=True,
         )
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/rsyncer"
         rsyncer_data = {
@@ -262,29 +279,57 @@ class MurfeyTUI(App):
                         self._increment_file_count,
                         destination=destination,
                         source=str(source),
-                    )
+                    ),
+                    secondary=True,
                 )
                 self._environment.watchers[source].start()
 
-    def _increment_file_count(self, observed_file: Path, source: str, destination: str):
+    def _increment_file_count(
+        self, observed_files: List[Path], source: str, destination: str
+    ):
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
+        num_data_files = len(
+            [
+                f
+                for f in observed_files
+                if f.suffix in self._data_suffixes
+                and any(substring in f.name for substring in self._data_substrings)
+            ]
+        )
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
+            "increment_count": len(observed_files),
+            "increment_data_count": num_data_files,
         }
         requests.post(url, json=data)
 
     def _increment_transferred_files(
-        self, update: RSyncerUpdate, source: str, destination: str
+        self, updates: List[RSyncerUpdate], source: str, destination: str
     ):
-        if update.outcome is not TransferResult.SUCCESS:
+        checked_updates = [
+            update for update in updates if update.outcome is TransferResult.SUCCESS
+        ]
+        if not checked_updates:
             return
         url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files"
+        data_files = [
+            u
+            for u in updates
+            if u.file_path.suffix in self._data_suffixes
+            and any(
+                substring in u.file_path.name for substring in self._data_substrings
+            )
+        ]
         data = {
             "source": source,
             "destination": destination,
             "client_id": self._environment.client_id,
+            "increment_count": len(checked_updates),
+            "bytes": sum(f.file_size for f in checked_updates),
+            "increment_data_count": len(data_files),
+            "data_bytes": sum(f.file_size for f in data_files),
         }
         requests.post(url, json=data)
 
@@ -348,22 +393,46 @@ class MurfeyTUI(App):
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
-            if from_form:
-                requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
-                    json=json,
-                )
             source = Path(json["source"])
-            self._environment.id_tag_registry["data_collection_group"].append(
-                str(source)
-            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
                 "tag": str(source),
             }
-            requests.post(url, json=dcg_data)
+            capture_post(url, json=dcg_data)
+            data = {
+                "voltage": json["voltage"],
+                "pixel_size_on_image": json["pixel_size_on_image"],
+                "experiment_type": json["experiment_type"],
+                "image_size_x": json["image_size_x"],
+                "image_size_y": json["image_size_y"],
+                "file_extension": json["file_extension"],
+                "acquisition_software": json["acquisition_software"],
+                "image_directory": str(self._environment.default_destinations[source]),
+                "tag": json["tag"],
+                "data_collection_tag": json["tilt_series_tag"],
+                "source": str(source),
+                "magnification": json["magnification"],
+                "total_exposed_dose": json.get("total_exposed_dose"),
+                "c2aperture": json.get("c2aperture"),
+                "exposure_time": json.get("exposure_time"),
+                "slit_width": json.get("slit_width"),
+                "phase_plate": json.get("phase_plate", False),
+            }
+            capture_post(
+                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                json=data,
+            )
+            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                capture_post(
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                    json={"tag": str(source), "recipe": recipe},
+                )
+            requests.post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                json=json,
+            )
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
@@ -373,13 +442,6 @@ class MurfeyTUI(App):
             }
             capture_post(url, json=dcg_data)
             if from_form:
-                log.info(f"Posting SPA processing parameters: {json}")
-                response = capture_post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
-                    json={k: None if v == "None" else v for k, v in json.items()},
-                )
-                if not str(response.status_code).startswith("2"):
-                    log.warning(f"{response.reason}")
                 data = {
                     "voltage": json["voltage"],
                     "pixel_size_on_image": json["pixel_size_on_image"],
@@ -401,7 +463,7 @@ class MurfeyTUI(App):
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
                     json=data,
                 )
                 for recipe in (
@@ -411,35 +473,49 @@ class MurfeyTUI(App):
                     "em-spa-class3d",
                 ):
                     capture_post(
-                        f"{str(self._url.geturl())}/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                        f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
                         json={"tag": str(source), "recipe": recipe},
                     )
+                log.info(f"Posting SPA processing parameters: {json}")
+                response = capture_post(
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    json={
+                        **{k: None if v == "None" else v for k, v in json.items()},
+                        "tag": str(source),
+                    },
+                )
+                if not str(response.status_code).startswith("2"):
+                    log.warning(f"{response.reason}")
                 capture_post(
-                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/{str(source)}/flush_spa_processing"
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing",
+                    json={"tag": str(source)},
                 )
-            source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
-            self._environment.listeners["data_collection_group_ids"] = {
-                partial(
-                    context._register_data_collection,
-                    url=url,
-                    data=json,
-                    environment=self._environment,
-                )
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                partial(
-                    context._register_processing_job,
-                    parameters=json,
-                    environment=self._environment,
-                )
-            }
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
-            self._environment.listeners["processing_job_ids"] = {
-                partial(
-                    context._launch_spa_pipeline, url=url, environment=self._environment
-                )
-            }
+            if isinstance(context, SPAContext):
+                source = Path(json["source"])
+                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
+                self._environment.listeners["data_collection_group_ids"] = {
+                    partial(
+                        context._register_data_collection,
+                        url=url,
+                        data=json,
+                        environment=self._environment,
+                    )
+                }
+                self._environment.listeners["data_collection_ids"] = {
+                    partial(
+                        context._register_processing_job,
+                        parameters=json,
+                        environment=self._environment,
+                    )
+                }
+                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
+                self._environment.listeners["processing_job_ids"] = {
+                    partial(
+                        context._launch_spa_pipeline,
+                        url=url,
+                        environment=self._environment,
+                    )
+                }
 
     def _set_request_destination(self, response: str):
         if response == "y":
@@ -507,7 +583,11 @@ class MurfeyTUI(App):
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
-            prompt = f"Remove files from the following:\n {sources}"
+            prompt = f"Remove files from the following:\n {sources} \n"
+            rsync_instances = requests.get(
+                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/rsyncers"
+            ).json()
+            prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
                 ConfirmScreen(
                     prompt,
@@ -547,6 +627,13 @@ class MurfeyTUI(App):
         self.exit()
         exit()
 
+    def clean_up_quit(self) -> None:
+        requests.delete(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+        )
+        self.exit()
+        exit()
+
     async def action_clear(self) -> None:
         machine_config = get_machine_config(
             str(self._environment.url.geturl()), demo=self._environment.demo
@@ -579,6 +666,9 @@ class MurfeyTUI(App):
                     removal_rp.queue.put(f)
                 removal_rp.stop()
                 log.info(f"rsyncer {rp} rerun with removal")
+        requests.post(
+            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
+        )
         requests.delete(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
         )

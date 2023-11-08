@@ -6,12 +6,9 @@ import threading
 from pathlib import Path
 from typing import Type
 
-from murfey.client.context import (
-    Context,
-    SPAContext,
-    SPAModularContext,
-    TomographyContext,
-)
+from murfey.client.context import Context
+from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate
 from murfey.client.tui.forms import FormDependency
@@ -77,9 +74,9 @@ class Analyser(Observer):
             .get(self._acquisition_software, {})
             .get(file_path.suffix)
         ):
-            for rs in required_substrings:
-                if rs not in file_path.name:
-                    return
+            if not any(r in file_path.name for r in required_substrings):
+                return []
+
         if (
             file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
             and not self._extension
@@ -198,6 +195,7 @@ class Analyser(Observer):
                     # logger.warning(
                     #     f"Context not understood for {transferred_file}, stopping analysis"
                     # )
+                    self.queue.task_done()
                     continue
                 elif self._extension:
                     logger.info(f"Context found successfully: {self._role}")
@@ -299,13 +297,12 @@ class Analyser(Observer):
                 self._context.post_transfer(
                     transferred_file, role=self._role, environment=self._environment
                 )
+        self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
             return data_file.with_suffix(".xml")
-        file_name = (
-            f"{data_file.stem.replace('_fractions', '').replace('_Fractions', '')}.xml"
-        )
+        file_name = f"{'_'.join(p for p in data_file.stem.split('_')[:-1])}.xml"
         data_directories = self._murfey_config.get("data_directories", {})
         for dd in data_directories.keys():
             if str(data_file).startswith(dd):

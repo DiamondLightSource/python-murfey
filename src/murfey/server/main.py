@@ -6,6 +6,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import make_asgi_app
 from pydantic import BaseSettings
 
 import murfey.server
@@ -31,6 +32,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 app.add_middleware(
     CORSMiddleware,

@@ -109,6 +109,22 @@ Input {
     background: purple;
 }
 
+#suggested-gain-ref {
+    width: 100%;
+    height: 90fr;
+    column-span: 2;
+    background: deeppink;
+    border: solid black;
+}
+
+#suggested-gain-ref:hover {
+    background: purple;
+}
+
+#suggested-gain-ref:focus {
+    background: darkslateblue;
+}
+
 #clear {
     width: 100%;
     height: 20%;

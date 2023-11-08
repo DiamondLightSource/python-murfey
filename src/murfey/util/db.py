@@ -38,9 +38,9 @@ class Session(SQLModel, table=True):  # type: ignore
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
-    tag: str = Field(primary_key=True)
+    id: int = Field(primary_key=True)
+    tag: str
     session_id: int = Field(foreign_key="session.id")
-    auto_proc_program_id: int = Field(foreign_key="autoprocprogram.id")
     complete: bool = False
     processing_requested: bool = False
     session: Optional[Session] = Relationship(back_populates="tilt_series")
@@ -50,8 +50,9 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
-    movie_path: str = Field(primary_key=True)
-    tilt_series_tag: str = Field(foreign_key="tiltseries.tag")
+    id: int = Field(primary_key=True)
+    movie_path: str
+    tilt_series_id: int = Field(foreign_key="tiltseries.id")
     motion_corrected: bool = False
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 
@@ -59,9 +60,15 @@ class Tilt(SQLModel, table=True):  # type: ignore
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
-    tag: str
+    tag: str = Field(primary_key=True)
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    tomography_preprocessing_parameters: List[
+        "TomographyPreprocessingParameters"
+    ] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -69,7 +76,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
-    tag: str
+    tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
@@ -102,6 +109,11 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
+    tomography_processing_parameters: List[
+        "TomographyProcessingParameters"
+    ] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -121,12 +133,17 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 
 class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
+    tag: str = Field(primary_key=True)
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     image_number: int
     mrc_out: str
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )
+
+
+class TomographyPreprocessStash(PreprocessStash):  # type: ignore
+    tag: str
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
@@ -138,10 +155,20 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
     )
 
 
+class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
+    dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
+    pixel_size: float
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="tomography_preprocessing_parameters"
+    )
+
+
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
-    pixel_size: float
     manual_tilt_offset: int
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="tomography_processing_parameters"
+    )
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
@@ -237,6 +264,7 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
+    rerun_class2d: bool = False
     hold_class3d: bool = False
     class_selection_score: float
     star_combination_job: int
@@ -253,7 +281,7 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
 
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
-    particles_file: str = Field(primary_key=True, unique=True)
+    particles_file: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_dir: str
@@ -265,28 +293,21 @@ class Class2DParameters(SQLModel, table=True):  # type: ignore
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class2d_parameters"
     )
-    class2ds: List["Class2D"] = Relationship(
-        back_populates="class2d_parameters",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
 
 
 class Class2D(SQLModel, table=True):  # type: ignore
     class_number: int = Field(primary_key=True)
     particles_file: str = Field(
-        primary_key=True, foreign_key="class2dparameters.particles_file"
+        primary_key=True,
     )
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
-    class2d_parameters: Optional[Class2DParameters] = Relationship(
-        back_populates="class2ds"
-    )
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="class2ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class2ds")
 
 
 class Class3DParameters(SQLModel, table=True):  # type: ignore
-    particles_file: str = Field(primary_key=True, unique=True)
+    particles_file: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
@@ -298,22 +319,20 @@ class Class3DParameters(SQLModel, table=True):  # type: ignore
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class3d_parameters"
     )
-    class3ds: List["Class3D"] = Relationship(
-        back_populates="class3d_parameters",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
+    # class3ds: List["Class3D"] = Relationship(
+    #    back_populates="class3d_parameters",
+    #    sa_relationship_kwargs={"cascade": "delete"},
+    # )
 
 
 class Class3D(SQLModel, table=True):  # type: ignore
     class_number: int = Field(primary_key=True)
-    particles_file: str = Field(
-        primary_key=True, foreign_key="class3dparameters.particles_file"
-    )
+    particles_file: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
-    class3d_parameters: Optional[Class3DParameters] = Relationship(
-        back_populates="class3ds"
-    )
+    # class3d_parameters: Optional[Class3DParameters] = Relationship(
+    #    back_populates="class3ds"
+    # )
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="class3ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class3ds")
 

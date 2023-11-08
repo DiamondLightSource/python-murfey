@@ -65,8 +65,15 @@ class State(Mapping[str, T], Observer):
             self.data[key] = value
             self.notify(key, value, message="state-update")
 
-    def subscribe(self, fn: Callable[[str, T | None], Awaitable[None] | None]):
-        self._listeners.append(fn)
+    def subscribe(
+        self,
+        fn: Callable[[str, T | None], Awaitable[None] | None],
+        secondary: bool = False,
+    ):
+        if secondary:
+            self._secondary_listeners.append(fn)
+        else:
+            self._listeners.append(fn)
 
     def __setitem__(self, key: str, item: T):
         try:

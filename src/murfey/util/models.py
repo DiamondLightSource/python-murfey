@@ -28,6 +28,27 @@ class Visit(BaseModel):
         )
 
 
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
+class BLSampleParameters(BaseModel):
+    sample_group_id: int
+
+
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
 class ContextInfo(BaseModel):
     experiment_type: str
     acquisition_software: str
@@ -42,6 +63,10 @@ class RsyncerInfo(BaseModel):
     destination: str
     client_id: int
     transferring: bool = True
+    increment_count: int = 1
+    bytes: int = 0
+    increment_data_count: int = 0
+    data_bytes: int = 0
 
 
 class ClearanceKeys(BaseModel):
@@ -68,12 +93,14 @@ class ProcessFile(BaseModel):
     size: int
     timestamp: float
     processing_job: Optional[int]
+    tag: str
     data_collection_id: Optional[int]
     image_number: int
     mc_uuid: int
     autoproc_program_id: Optional[int]
     pixel_size: float
     dose_per_frame: float
+    voltage: float = 300
     mc_binning: int = 1
     gain_ref: Optional[str] = None
     extract_downscale: int = 1
@@ -81,10 +108,9 @@ class ProcessFile(BaseModel):
 
 
 class SPAProcessFile(BaseModel):
+    tag: str
     path: str
     description: str
-    size: int
-    timestamp: float
     processing_job: Optional[int]
     data_collection_id: Optional[int]
     image_number: int
@@ -94,12 +120,22 @@ class SPAProcessFile(BaseModel):
     mc_binning: Optional[int] = 1
     gain_ref: Optional[str] = None
     extract_downscale: bool = True
+    eer_fractionation_file: Optional[str] = None
     source: str = ""
+
+
+class TiltInfo(BaseModel):
+    tilt_series_tag: str
+    movie_path: str
 
 
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
+
+
+class CompletedTiltSeries(BaseModel):
+    tilt_series: List[str]
 
 
 class TiltSeriesProcessingDetails(BaseModel):
@@ -142,6 +178,7 @@ class DCParameters(BaseModel):
     exposure_time: Optional[float] = None
     slit_width: Optional[float] = None
     phase_plate: bool = False
+    data_collection_tag: str = ""
 
 
 class ProcessingParametersTomo(BaseModel):
@@ -155,7 +192,8 @@ class ProcessingParametersTomo(BaseModel):
     motion_corr_binning: int
     manual_tilt_offset: float
     file_extension: str
-    acquisition_software: str
+    tag: str
+    tilt_series_tag: str
 
     class Base(BaseModel):
         dose_per_frame: float
@@ -164,6 +202,7 @@ class ProcessingParametersTomo(BaseModel):
 
 
 class ProcessingParametersSPA(BaseModel):
+    tag: str
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -220,12 +259,19 @@ class ConnectionFileParameters(BaseModel):
 
 class GainReference(BaseModel):
     gain_ref: Path
+    rescale: bool = True
 
 
 class SessionInfo(BaseModel):
     session_id: Optional[int]
     session_name: str = ""
     rescale: bool = True
+
+
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
 
 
 class FractionationParameters(BaseModel):
