@@ -228,16 +228,24 @@ class _SPAContext(Context):
             metadata["pixel_size_on_image"] / binning_factor
         )
         metadata["motion_corr_binning"] = binning_factor
-        metadata["gain_ref"] = (
-            f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-            if environment
-            else None
-        )
-        metadata["gain_ref_superres"] = (
-            f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
-            if environment
-            else None
-        )
+        if environment:
+            metadata["gain_ref"] = (
+                environment.data_collection_parameters.get("gain_ref")
+                if environment
+                and environment.data_collection_parameters.get("gain_ref")
+                not in (None, "None")
+                else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+            )
+            metadata["gain_ref_superres"] = (
+                environment.data_collection_parameters.get("gain_ref_superres")
+                if environment
+                and environment.data_collection_parameters.get("gain_ref_superres")
+                not in (None, "None")
+                else f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
+            )
+        else:
+            metadata["gain_ref"] = None
+            metadata["gain_ref_superres"] = None
         if metadata.get("total_exposed_dose"):
             metadata["dose_per_frame"] = (
                 environment.data_collection_parameters.get("dose_per_frame")
@@ -320,9 +328,11 @@ class SPAModularContext(_SPAContext):
                         )
                     else:
                         machine_config = {}
-                    required_strings = machine_config.get(
-                        "data_required_substrings", {}
-                    ).get("epu", ["fractions"])
+                    required_strings = (
+                        machine_config.get("data_required_substrings", {})
+                        .get("epu", {})
+                        .get(transferred_file.suffix, ["fractions"])
+                    )
 
                     if not environment:
                         logger.warning("No environment passed in")
@@ -332,9 +342,10 @@ class SPAModularContext(_SPAContext):
                         logger.warning(f"No source found for file {transferred_file}")
                         return
 
-                    for r in required_strings:
-                        if r not in transferred_file.name.lower():
-                            return
+                    if required_strings and not any(
+                        r in transferred_file.name for r in required_strings
+                    ):
+                        return
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
@@ -344,6 +355,26 @@ class SPAModularContext(_SPAContext):
                             movie_number=next(MovieID),
                             motion_correction_uuid=next(MurfeyID),
                         )
+
+                        eer_fractionation_file = None
+                        if environment.data_collection_parameters.get("num_eer_frames"):
+                            response = requests.post(
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                                json={
+                                    "num_frames": environment.data_collection_parameters[
+                                        "num_eer_frames"
+                                    ],
+                                    "fractionation": environment.data_collection_parameters[
+                                        "eer_fractionation"
+                                    ],
+                                    "dose_per_frame": environment.data_collection_parameters[
+                                        "dose_per_frame"
+                                    ],
+                                },
+                            )
+                            eer_fractionation_file = response.json()[
+                                "eer_fractionation_file"
+                            ]
 
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
@@ -367,9 +398,10 @@ class SPAModularContext(_SPAContext):
                             "gain_ref": environment.data_collection_parameters.get(
                                 "gain_ref"
                             ),
-                            "downscale": environment.data_collection_parameters.get(
+                            "extract_downscale": environment.data_collection_parameters.get(
                                 "downscale"
                             ),
+                            "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
                         }
                         requests.post(

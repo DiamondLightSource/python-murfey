@@ -321,8 +321,7 @@ class LaunchScreen(Screen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
-            self.app.exit()
-            exit()
+            self.app.clean_up_quit()
         elif event.button.id == "add":
             self._add_directory(self._dir_tree._selected_path)
         elif event.button.id == "launch":

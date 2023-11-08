@@ -96,8 +96,30 @@ def check_tilt_series_mc(tag: str) -> bool:
 
 
 def get_all_tilts(tag: str) -> List[str]:
+    machine_config = get_machine_config()
     results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
-    return [r.movie_path for r in results]
+
+    def _mc_path(mov_path: Path) -> str:
+        for p in mov_path.parts:
+            if "-" in p and p.startswith(("bi", "nr", "nt", "cm", "sw")):
+                visit_name = p
+                break
+        else:
+            raise ValueError(f"No visit found in {mov_path}")
+        visit_idx = Path(mov_path).parts.index(visit_name)
+        core = Path(*Path(mov_path).parts[: visit_idx + 1])
+        ppath = Path(mov_path)
+        sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+        mrc_out = (
+            core
+            / machine_config.processed_directory_name
+            / sub_dataset
+            / "MotionCorr"
+            / str(ppath.stem + "_motion_corrected.mrc")
+        )
+        return str(mrc_out)
+
+    return [_mc_path(Path(r.movie_path)) for r in results]
 
 
 def get_job_ids(tag: str) -> JobIDs:
@@ -717,11 +739,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             3 if default_spa_parameters.do_icebreaker_jobs else 2
         )
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
-    if _db.exec(
-        select(func.count(db.Class2DParameters.particles_file)).where(
-            db.Class2DParameters.pj_id == pj_id
-        )
-    ).one():
+    if feedback_params.rerun_class2d:
         first_class2d = _db.exec(
             select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
         ).first()
@@ -769,6 +787,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             feedback_params.next_job += (
                 4 if default_spa_parameters.do_icebreaker_jobs else 3
             )
+        feedback_params.rerun_class2d = False
         _db.add(feedback_params)
         if first_class2d.complete:
             _db.delete(first_class2d)
@@ -811,7 +830,8 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "batch_size": class3d_params.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
-                "do_initial_model": True,
+                "do_initial_model": False if feedback_params.initial_model else True,
+                "initial_model_file": feedback_params.initial_model,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
@@ -873,6 +893,10 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         )
     ).one()
     if feedback_params.hold_class2d:
+        feedback_params.rerun_class2d = True
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
         return
     feedback_params.next_job = 10 if default_spa_parameters.do_icebreaker_jobs else 7
     feedback_params.hold_class2d = True
@@ -988,6 +1012,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
     if feedback_params.hold_class2d or feedback_params.picker_ispyb_id is None:
+        feedback_params.rerun_class2d = True
+        _db.add(feedback_params)
+        _db.commit()
         # If waiting then save the message
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
@@ -1379,6 +1406,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
         ).one()
         class3d_params.run = True
+        class3d_params.particles_file = class3d_message["particles_file"]
         class3d_params.batch_size = class3d_message["batch_size"]
         _db.add(class3d_params)
         _db.commit()
@@ -1455,6 +1483,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "batch_size": class3d_message["batch_size"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
+                "do_initial_model": False,
                 "initial_model_file": other_options["initial_model"],
                 "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": _3d_class_murfey_ids(
@@ -1619,7 +1648,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 raise ValueError(
-                    f"No data collection group ID was found for image directory {message['image_directory']}"
+                    f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
                 )
             if dc_murfey := murfey_db.exec(
                 select(db.DataCollection)
@@ -1684,22 +1713,13 @@ def feedback_callback(header: dict, message: dict) -> None:
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
                 .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.DataCollection.id == _dcid)
+                .where(db.ProcessingJob.dc_id == _dcid)
             ).all():
                 pid = pj_murfey[0].id
             else:
                 record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
                 run_parameters = message.get("parameters", {})
                 assert isinstance(run_parameters, dict)
-                if not message["experiment_type"] in ("spa", "single particle"):
-                    murfey_processing = db.TomographyProcessingParameters(
-                        client_id=message["client_id"],
-                        pixel_size=run_parameters["angpix"],
-                        manual_tilt_offset=run_parameters["manual_tilt_offset"],
-                    )
-                    murfey_db.add(murfey_processing)
-                    murfey_db.commit()
-                    murfey_db.close()
                 if message.get("job_parameters"):
                     job_parameters = [
                         ProcessingJobParameter(parameterKey=k, parameterValue=v)
@@ -1776,9 +1796,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .session_id
             )
             stashed_files = murfey_db.exec(
-                select(db.PreprocessStash).where(
-                    db.PreprocessStash.client_id == message["client_id"]
-                )
+                select(db.PreprocessStash)
+                .where(db.PreprocessStash.client_id == message["client_id"])
+                .where(db.PreprocessStash.tag == message["tag"])
             ).all()
             if not stashed_files:
                 if _transport_object:

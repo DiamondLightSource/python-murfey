@@ -62,6 +62,7 @@ from murfey.util.models import (
     BLSubSampleParameters,
     ClearanceKeys,
     ClientInfo,
+    CompletedTiltSeries,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -358,7 +359,10 @@ def register_tilt_series(
 
 @router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
 def register_completed_tilt_series(
-    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+    visit_name: str,
+    client_id: int,
+    completed_tilt_series: CompletedTiltSeries,
+    db=murfey_db,
 ):
     session_id = (
         db.exec(
@@ -369,7 +373,7 @@ def register_completed_tilt_series(
     )
     tilt_series_db = db.exec(
         select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
         .where(TiltSeries.session_id == session_id)
     ).all()
     for ts in tilt_series_db:
@@ -616,6 +620,7 @@ async def request_spa_preprocessing(
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
                 "particle_diameter": proc_params["particle_diameter"] or 0,
+                "fm_int_file": proc_file.eer_fractionation_file,
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
@@ -630,6 +635,7 @@ async def request_spa_preprocessing(
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
+            tag=proc_file.tag,
             client_id=client_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
@@ -656,6 +662,7 @@ async def request_tomography_preprocessing(
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
+    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
     ctf_out = (
         core
         / machine_config.processed_directory_name
@@ -663,6 +670,7 @@ async def request_tomography_preprocessing(
         / "CTF"
         / str(ppath.stem + "_ctf.mrc")
     )
+    ctf_out = Path("/".join(secure_filename(p) for p in ctf_out.parts))
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -678,9 +686,9 @@ async def request_tomography_preprocessing(
     if data_collection:
         dcid = data_collection[0][1].id
         if not mrc_out.parent.exists():
-            Path(secure_filename(mrc_out)).parent.mkdir(parents=True, exist_ok=True)
+            mrc_out.parent.mkdir(parents=True, exist_ok=True)
         if not ctf_out.parent.exists():
-            Path(secure_filename(ctf_out)).parent.mkdir(parents=True, exist_ok=True)
+            ctf_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
@@ -871,16 +879,24 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
             machine_config.feedback_queue,
             {"register": "data_collection", **dc_parameters},
         )
-    prom.exposure_time.set(dc_params.exposure_time)
+    if dc_params.exposure_time:
+        prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 
 @router.post("/visits/{visit_name}/{client_id}/register_processing_job")
 def register_proc(
-    visit_name: str, client_id: int, proc_params: ProcessingJobParameters
+    visit_name: str, client_id: int, proc_params: ProcessingJobParameters, db=murfey_db
 ):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
     proc_parameters = {
-        "client_id": client_id,
+        "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
         "tag": proc_params.tag,
@@ -938,7 +954,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             ),
         }
     else:
-        return {"gain_ref": new_gain_ref, "gain_ref_superres": None}
+        return {"gain_ref": str(filepath / safe_path_name), "gain_ref_superres": None}
 
 
 @router.post("/visits/{visit_name}/eer_fractionation_file")
@@ -1085,7 +1101,7 @@ def register_processing_success_in_ispyb(
         .one()
         .session_id
     )
-    collected_ids = db.exec(
+    collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)

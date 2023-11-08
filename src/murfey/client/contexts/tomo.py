@@ -367,9 +367,8 @@ class TomographyContext(Context):
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
-        for r in required_strings:
-            if r not in file_path.name.lower():
-                return []
+        if required_strings and not any(r in file_path.name for r in required_strings):
+            return []
         if not self._extract_tilt_series:
             self._extract_tilt_series = extract_tilt_series
         if not self._extract_tilt_tag:
@@ -479,22 +478,41 @@ class TomographyContext(Context):
                         self._processing_job_stash[tilt_series] = [
                             (
                                 proc_url,
-                                {"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                                {
+                                    "tag": tilt_series,
+                                    "recipe": "em-tomo-preprocess",
+                                    "experiment_type": "tomography",
+                                },
                             )
                         ]
                         self._processing_job_stash[tilt_series].append(
-                            (proc_url, {"tag": tilt_series, "recipe": "em-tomo-align"})
+                            (
+                                proc_url,
+                                {
+                                    "tag": tilt_series,
+                                    "recipe": "em-tomo-align",
+                                    "experiment_type": "tomography",
+                                },
+                            )
                         )
                     else:
                         if self._processing_job_stash.get(tilt_series):
                             self._flush_processing_job(tilt_series)
                         capture_post(
                             proc_url,
-                            json={"tag": tilt_series, "recipe": "em-tomo-preprocess"},
+                            json={
+                                "tag": tilt_series,
+                                "recipe": "em-tomo-preprocess",
+                                "experiment_type": "tomography",
+                            },
                         )
                         capture_post(
                             proc_url,
-                            json={"tag": tilt_series, "recipe": "em-tomo-align"},
+                            json={
+                                "tag": tilt_series,
+                                "recipe": "em-tomo-align",
+                                "experiment_type": "tomography",
+                            },
                         )
             except Exception as e:
                 logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
@@ -506,12 +524,13 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
-        tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
-        tilt_data = {
-            "movie_path": str(file_transferred_to),
-            "tilt_series_tag": tilt_series,
-        }
-        capture_post(tilt_url, json=tilt_data)
+        if environment:
+            tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
+            tilt_data = {
+                "movie_path": str(file_transferred_to),
+                "tilt_series_tag": tilt_series,
+            }
+            capture_post(tilt_url, json=tilt_data)
 
         if environment and environment.autoproc_program_ids.get(tilt_series):
             eer_fractionation_file = None
@@ -697,6 +716,12 @@ class TomographyContext(Context):
             logger.info(
                 f"The following tilt series are considered complete: {newly_completed_series}"
             )
+            if environment:
+                completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+                requests.post(
+                    completed_tilt_endpoint,
+                    json={"tilt_series": newly_completed_series},
+                )
         return newly_completed_series
 
     def _add_tomo_tilt(
@@ -709,9 +734,8 @@ class TomographyContext(Context):
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
-        for r in required_strings:
-            if r not in file_path.name.lower():
-                return []
+        if not any(r in file_path.name for r in required_strings):
+            return []
         if environment:
             if tomo_version := environment.software_versions.get("tomo"):
                 tilt_info_extraction = tomo_tilt_info.get(tomo_version)
@@ -788,14 +812,14 @@ class TomographyContext(Context):
                     required_strings = (
                         machine_config.get("data_required_substrings", {})
                         .get("tomo", {})
-                        .get(transferred_file.suffix)
+                        .get(transferred_file.suffix, ["fractions"])
                     )
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
                         required_position_files=kwargs.get("required_position_files"),
-                        required_strings=required_strings
-                        or kwargs.get("required_strings"),
+                        required_strings=kwargs.get("required_strings")
+                        or required_strings,
                     )
                 elif self._acquisition_software == "serialem":
                     completed_tilts = self._add_serialem_tilt(
