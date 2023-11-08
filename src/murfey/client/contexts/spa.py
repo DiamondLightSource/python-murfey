@@ -168,11 +168,14 @@ class _SPAContext(Context):
                 )  # convert e / m^2 to e / A^2
             except ValueError:
                 metadata["total_exposed_dose"] = 1
-            num_fractions = int(
-                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                    "CameraSpecificInput"
-                ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
-            )
+            try:
+                num_fractions = int(
+                    data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                        "CameraSpecificInput"
+                    ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
+                )
+            except (KeyError, IndexError):
+                pass
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
