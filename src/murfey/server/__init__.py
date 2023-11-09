@@ -584,7 +584,7 @@ def _register_picked_particles_use_diameter(
                 _register_class_selection(
                     {
                         "session_id": s.session_id,
-                        "class_selection_score": s.class_selection_score,
+                        "class_selection_score": s.class_selection_score or 0,
                     },
                     _db=_db,
                     demo=demo,
@@ -778,7 +778,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "autoproc_program_id": message["program_id"],
                 "pix_size": relion_params.angpix,
                 "fm_dose": relion_params.dose_per_frame,
@@ -1196,7 +1196,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
@@ -1282,7 +1282,7 @@ def _flush_class2d(
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _2d_class_murfey_ids(
                     saved_message.particles_file, _app_id(pj_id, _db), _db
@@ -1338,14 +1338,14 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     if feedback_params.picker_ispyb_id is None:
         selection_stash = db.SelectionStash(
             pj_id=pj_id,
-            class_selection_score=message["class_selection_score"],
+            class_selection_score=message["class_selection_score"] or 0,
         )
         _db.add(selection_stash)
         _db.commit()
         _db.close()
         return
 
-    feedback_params.class_selection_score = message.get("class_selection_score")
+    feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False
     next_job = feedback_params.next_job
     if demo:
