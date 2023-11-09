@@ -10,7 +10,7 @@ from murfey.client.context import Context
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.client.rsync import RSyncerUpdate
+from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
@@ -325,7 +325,7 @@ class Analyser(Observer):
         return base_dir / self._environment.visit / mid_dir / file_name
 
     def enqueue(self, rsyncer: RSyncerUpdate):
-        if not self._stopping:
+        if not self._stopping and rsyncer.outcome == TransferResult.SUCCESS:
             absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
 

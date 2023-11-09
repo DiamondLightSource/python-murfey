@@ -237,6 +237,8 @@ class RSyncer(Observer):
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []
 
+        files = [f for f in files if f.is_file()]
+
         def parse_stdout(line: str):
             nonlocal next_file
 
