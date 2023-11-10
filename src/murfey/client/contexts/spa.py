@@ -8,6 +8,7 @@ from typing import Any, Dict, OrderedDict
 import requests
 import xmltodict
 
+import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
     MovieID,
@@ -70,7 +71,7 @@ class _SPAContext(Context):
         ),
         ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
-        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
         ProcessingParameter(
             "mask_diameter", "Mask Diameter (2D classification)", default=190
         ),
@@ -310,6 +311,20 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
+        images_disc_index: int = 0
+        for i, p in enumerate(metadata_file.parts):
+            if p.startswith("Images-Disc"):
+                images_disc_index = i
+        if images_disc_index:
+            data_file = (
+                Path("/".join(metadata_file.parts[: images_disc_index - 2]))
+                / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
+                / metadata_file.with_suffix(".eer").name
+            )
+            if data_file.is_file():
+                metadata["num_eer_frames"] = murfey.util.eer.num_frames(
+                    metadata_file.parent.parent / metadata_file.parent.name / data_file
+                )
         return metadata
 
 
