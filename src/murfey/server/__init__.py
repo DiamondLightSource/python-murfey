@@ -401,11 +401,7 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
 def _murfey_class2ds(
     murfey_ids: List[int], particles_file: str, app_id: int, _db, close: bool = False
 ):
-    pj_id = (
-        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
-        .one()
-        .pj_id
-    )
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-class2d")
     class2ds = [
         db.Class2D(
             class_number=i,
@@ -423,11 +419,7 @@ def _murfey_class2ds(
 
 
 def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
-    pj_id = (
-        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
-        .one()
-        .pj_id
-    )
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-class3d")
     class3ds = [
         db.Class3D(
             class_number=i,
