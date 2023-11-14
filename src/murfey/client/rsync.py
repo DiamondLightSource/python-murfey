@@ -53,6 +53,7 @@ class RSyncer(Observer):
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
         remove_files: bool = False,
+        notify: bool = True,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -61,6 +62,7 @@ class RSyncer(Observer):
         self._remove_files = remove_files
         self._local = local
         self._server_url = server_url
+        self._notify = notify
         if local:
             self._remote = str(basepath_remote)
         else:
@@ -97,6 +99,7 @@ class RSyncer(Observer):
             assert isinstance(kwarguments_from_rsyncer["status_bar"], StatusBar)
         assert isinstance(kwarguments_from_rsyncer["do_transfer"], bool)
         assert isinstance(kwarguments_from_rsyncer["remove_files"], bool)
+        assert isinstance(kwarguments_from_rsyncer["notify"], bool)
         return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,
@@ -105,6 +108,7 @@ class RSyncer(Observer):
             status_bar=kwarguments_from_rsyncer["status_bar"],
             do_transfer=kwarguments_from_rsyncer["do_transfer"],
             remove_files=kwarguments_from_rsyncer["remove_files"],
+            notify=kwarguments_from_rsyncer["notify"],
         )
 
     @property
@@ -119,6 +123,10 @@ class RSyncer(Observer):
                 return "running"
             else:
                 return "ready"
+
+    def notify(self, *args, secondary: bool = False, **kwargs) -> None:
+        if self._notify:
+            super().notify(*args, secondary=secondary, **kwargs)
 
     def start(self):
         if self.thread.is_alive():

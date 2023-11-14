@@ -644,7 +644,7 @@ class MurfeyTUI(App):
                 rp.stop()
                 if self.analysers.get(k):
                     self.analysers[k].stop()
-                removal_rp = RSyncer.from_rsyncer(rp, remove_files=True)
+                removal_rp = RSyncer.from_rsyncer(rp, remove_files=True, notify=False)
                 removal_rp.start()
                 for f in k.absolute().glob("**/*"):
                     removal_rp.queue.put(f)
