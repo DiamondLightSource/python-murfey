@@ -1118,6 +1118,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
