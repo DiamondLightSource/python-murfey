@@ -92,6 +92,7 @@ class RSyncer(Observer):
             "status_bar": rsyncer._statusbar,
             "do_transfer": rsyncer._do_transfer,
             "remove_files": rsyncer._remove_files,
+            "notify": rsyncer._notify,
         }
         kwarguments_from_rsyncer.update(kwargs)
         assert isinstance(kwarguments_from_rsyncer["local"], bool)
