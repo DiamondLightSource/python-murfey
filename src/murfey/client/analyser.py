@@ -186,6 +186,8 @@ class Analyser(Observer):
                         mdoc_for_reading or transferred_file,
                         environment=self._environment,
                     )
+                    if not dc_metadata:
+                        mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if not self._context:
@@ -259,6 +261,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
+                            mdoc_for_reading = None
                             self._unseen_xml.append(transferred_file)
                         if dc_metadata:
                             self._unseen_xml = []
