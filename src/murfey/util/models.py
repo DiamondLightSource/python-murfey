@@ -127,11 +127,18 @@ class SPAProcessFile(BaseModel):
 class TiltInfo(BaseModel):
     tilt_series_tag: str
     movie_path: str
+    source: str
 
 
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
+    source: str
+
+
+class TiltSeriesGroupInfo(BaseModel):
+    tags: List[str]
+    source: str
 
 
 class CompletedTiltSeries(BaseModel):

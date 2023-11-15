@@ -13,7 +13,7 @@ import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
@@ -71,6 +71,7 @@ from murfey.util.models import (
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
+    TiltSeriesGroupInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
@@ -371,14 +372,21 @@ def register_tilt_series(
         .one()
         .session_id
     )
-    tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
+    tilt_series = TiltSeries(
+        session_id=session_id,
+        tag=tilt_series_info.tag,
+        rsync_source=tilt_series_info.source,
+    )
     db.add(tilt_series)
     db.commit()
 
 
 @router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
 def register_completed_tilt_series(
-    visit_name: str, client_id: int, tilt_series: List[str], db=murfey_db
+    visit_name: str,
+    client_id: int,
+    tilt_series_group: TiltSeriesGroupInfo,
+    db=murfey_db,
 ):
     session_id = (
         db.exec(
@@ -389,8 +397,9 @@ def register_completed_tilt_series(
     )
     tilt_series_db = db.exec(
         select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(tilt_series))
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
         .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
     ).all()
     for ts in tilt_series_db:
         ts.complete = True
@@ -412,6 +421,7 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
             select(TiltSeries)
             .where(TiltSeries.tag == tilt_info.tilt_series_tag)
             .where(TiltSeries.session_id == session_id)
+            .where(TiltSeries.rsync_source == tilt_info.source)
         )
         .one()
         .id
@@ -709,12 +719,19 @@ async def request_spa_preprocessing(
     return proc_file
 
 
+class Source(BaseModel):
+    rsync_source: str
+
+
 @router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
-def flush_tomography_processing(visit_name: str, client_id: int, db=murfey_db):
+def flush_tomography_processing(
+    visit_name: str, client_id: int, rsync_source: Source, db=murfey_db
+):
     zocalo_message = {
         "register": "flush_tomography_preprocess",
         "client_id": client_id,
         "visit_name": visit_name,
+        "data_collection_group_tag": rsync_source.rsync_source,
     }
     _flush_tomography_preprocessing(zocalo_message)
     return
@@ -851,8 +868,9 @@ def register_dc_group(
     client = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
+    dcgid = next(global_counter)
     murfey_dcg = DataCollectionGroup(
-        id=1,
+        id=dcgid,
         session_id=client.session_id,
         tag=dcg_params.tag,
     )
@@ -893,10 +911,10 @@ def register_dc_group(
     ):
         global_state["data_collection_group_ids"] = {
             **global_state["data_collection_group_ids"],
-            dcg_params.tag: 1,
+            dcg_params.tag: dcgid,
         }
     else:
-        global_state["data_collection_group_ids"] = {dcg_params.tag: 1}
+        global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
     return dcg_params
 
 

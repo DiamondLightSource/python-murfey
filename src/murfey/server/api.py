@@ -338,12 +338,19 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
     return
 
 
+class Source(BaseModel):
+    rsync_source: str
+
+
 @router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
-def flush_tomography_processing(visit_name: str, client_id: int, db=murfey_db):
+def flush_tomography_processing(
+    visit_name: str, client_id: int, rsync_source: Source, db=murfey_db
+):
     zocalo_message = {
         "register": "flush_tomography_preprocess",
         "client_id": client_id,
         "visit_name": visit_name,
+        "data_collection_group_tag": rsync_source.rsync_source,
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
@@ -363,7 +370,11 @@ def register_tilt_series(
         .one()
         .session_id
     )
-    tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
+    tilt_series = TiltSeries(
+        session_id=session_id,
+        tag=tilt_series_info.tag,
+        rsync_source=tilt_series_info.source,
+    )
     db.add(tilt_series)
     db.commit()
 

@@ -40,6 +40,7 @@ class Session(SQLModel, table=True):  # type: ignore
 class TiltSeries(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     tag: str
+    rsync_source: str
     session_id: int = Field(foreign_key="session.id")
     complete: bool = False
     processing_requested: bool = False

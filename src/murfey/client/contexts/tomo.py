@@ -422,7 +422,11 @@ class TomographyContext(Context):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
             ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
-            ts_data = {"client_id": environment.client_id, "tag": tilt_series}
+            ts_data = {
+                "client_id": environment.client_id,
+                "tag": tilt_series,
+                "source": str(file_path.parent),
+            }
             capture_post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
@@ -806,7 +810,10 @@ class TomographyContext(Context):
                         )
         if completed_tilts and environment:
             complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
-            capture_post(complete_url, json=completed_tilts)
+            capture_post(
+                complete_url,
+                json={"tags": completed_tilts, "source": str(transferred_file.parent)},
+            )
         return completed_tilts
 
     def post_first_transfer(

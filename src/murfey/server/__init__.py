@@ -1560,6 +1560,7 @@ def _flush_tomography_preprocessing(message: dict):
             db.AutoProcProgram,
         )
         .where(db.DataCollectionGroup.session_id == session_id)
+        .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
         .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
