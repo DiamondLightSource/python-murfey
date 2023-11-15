@@ -429,9 +429,13 @@ class MurfeyTUI(App):
                     f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
                     json={"tag": str(source), "recipe": recipe},
                 )
+            log.info("Registering tomograpy processing parameters")
             requests.post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
                 json=json,
+            )
+            capture_post(
+                f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.client_id}/flush_tomography_processing"
             )
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"

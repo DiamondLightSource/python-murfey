@@ -53,7 +53,6 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
-    TomographyPreprocessStash,
     TomographyProcessingParameters,
 )
 from murfey.util.models import (
@@ -333,6 +332,18 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
         "register": "flush_spa_preprocess",
         "client_id": client_id,
         "tag": tag.tag,
+    }
+    if _transport_object:
+        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+    return
+
+
+@router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
+def flush_tomography_processing(visit_name: str, client_id: int, db=murfey_db):
+    zocalo_message = {
+        "register": "flush_tomography_preprocess",
+        "client_id": client_id,
+        "visit_name": visit_name,
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
@@ -684,7 +695,18 @@ async def request_tomography_preprocessing(
         .where(DataCollection.tag == proc_file.tag)
     ).all()
     if data_collection:
+        collected_ids = db.exec(
+            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_file.tag)
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-tomo-preprocess")
+        ).one()
         dcid = data_collection[0][1].id
+        appid = collected_ids[3].id
+        murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
         if not ctf_out.parent.exists():
@@ -695,7 +717,7 @@ async def request_tomography_preprocessing(
                 "feedback_queue": machine_config.feedback_queue,
                 "dcid": dcid,
                 # "timestamp": datetime.datetime.now(),
-                "autoproc_program_id": proc_file.autoproc_program_id,
+                "autoproc_program_id": appid,
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
                 "pix_size": (proc_file.pixel_size) * 10**10,
@@ -703,7 +725,7 @@ async def request_tomography_preprocessing(
                 "image_number": proc_file.image_number,
                 "kv": int(proc_file.voltage),
                 "microscope": get_microscope(),
-                "mc_uuid": proc_file.mc_uuid,
+                "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
                 "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
@@ -712,7 +734,6 @@ async def request_tomography_preprocessing(
                 "fm_int_file": proc_file.eer_fractionation_file,
             },
         }
-        # log.info(f"Sending Zocalo message {zocalo_message}")
         if _transport_object:
             _transport_object.send("processing_recipe", zocalo_message)
         else:
@@ -721,7 +742,7 @@ async def request_tomography_preprocessing(
             )
             return proc_file
     else:
-        for_stash = TomographyPreprocessStash(
+        for_stash = PreprocessStash(
             file_path=str(proc_file.path),
             client_id=client_id,
             image_number=proc_file.image_number,

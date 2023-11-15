@@ -22,6 +22,7 @@ import murfey.server.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 from murfey.server import (
+    _flush_tomography_preprocessing,
     _murfey_id,
     _register_picked_particles_use_diameter,
     feedback_callback,
@@ -710,79 +711,19 @@ async def request_spa_preprocessing(
 
 @router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
 def flush_tomography_processing(visit_name: str, client_id: int, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
-    stashed_files = db.exec(
-        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
-    ).all()
-    if not stashed_files:
-        return
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
-    ).one()
-    proc_params = db.exec(
-        select(TomographyPreprocessingParameters).where(
-            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
-        )
-    ).one()
-    if not proc_params:
-        visit_name = visit_name.replace("\r\n", "").replace("\n", "")
-        log.warning(
-            f"No tomography processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
-        )
-        return
-
-    detached_ids = [c.id for c in collected_ids]
-
-    murfey_ids = _murfey_id(
-        detached_ids[3], db, number=2 * len(stashed_files), close=False
-    )
-    for i, f in enumerate(stashed_files):
-        p = Path(f.mrc_out)
-        if not p.parent.exists():
-            p.parent.mkdir(parents=True)
-        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
-        db.add(movie)
-        zocalo_message = {
-            "recipes": ["em-tomo-preprocess"],
-            "parameters": {
-                "feedback_queue": machine_config["feedback_queue"],
-                "dcid": detached_ids[1],
-                "autoproc_program_id": detached_ids[3],
-                "movie": f.file_path,
-                "mrc_out": f.mrc_out,
-                "pix_size": proc_params.pixel_size,
-                "image_number": f.image_number,
-                "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[2 * i],
-                "ft_bin": proc_params.motion_corr_binning,
-                "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": str(machine_config["rsync_basepath"] / proc_params.gain_ref)
-                if proc_params.gain_ref
-                else proc_params.gain_ref,
-            },
-        }
-        log.info(
-            f"Launching tomography preprocessing with Zoaclo message: {zocalo_message}"
-        )
-        db.delete(f)
-    db.commit()
-
+    zocalo_message = {
+        "register": "flush_tomography_preprocess",
+        "client_id": client_id,
+        "visit_name": visit_name,
+    }
+    _flush_tomography_preprocessing(zocalo_message)
     return
 
 
-@router.post("/visits/{visit_name}/tomography_preprocess")
-async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
+@router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
+async def request_tomography_preprocessing(
+    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+):
     if not Path(proc_file.path).exists():
         log.warning(f"{proc_file.path} has not been transferred before preprocessing")
     log.info(f"Tomo preprocesing requested for {proc_file.path}")
@@ -801,20 +742,46 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
-    if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True)
-    feedback_callback(
-        {},
-        {
-            "register": "motion_corrected",
-            "movie": str(proc_file.path),
-            "mrc_out": str(mrc_out),
-            "movie_id": proc_file.mc_uuid,
-            "fm_int_file": proc_file.eer_fractionation_file,
-        },
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
     )
-    await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
-    mrc_out.touch()
+    data_collection = db.exec(
+        select(DataCollectionGroup, DataCollection)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.id == DataCollection.dcg_id)
+        .where(DataCollection.tag == proc_file.tag)
+    ).all()
+    if data_collection:
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True)
+        feedback_callback(
+            {},
+            {
+                "register": "motion_corrected",
+                "movie": str(proc_file.path),
+                "mrc_out": str(mrc_out),
+                "movie_id": proc_file.mc_uuid,
+                "fm_int_file": proc_file.eer_fractionation_file,
+                "program_id": 1,
+            },
+        )
+        await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
+        mrc_out.touch()
+    else:
+        for_stash = PreprocessStash(
+            file_path=str(proc_file.path),
+            client_id=client_id,
+            image_number=proc_file.image_number,
+            mrc_out=str(mrc_out),
+            tag=proc_file.tag,
+        )
+        db.add(for_stash)
+        db.commit()
+        db.close()
     return proc_file
 
 

@@ -532,7 +532,7 @@ class TomographyContext(Context):
             }
             capture_post(tilt_url, json=tilt_data)
 
-        if environment and environment.autoproc_program_ids.get(tilt_series):
+        if environment:
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
@@ -547,69 +547,33 @@ class TomographyContext(Context):
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tomography_preprocess"
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
                 "size": file_path.stat().st_size,
                 "timestamp": file_path.stat().st_ctime,
-                "processing_job": environment.processing_job_ids[tilt_series][
-                    "em-tomo-preprocess"
-                ],
-                "data_collection_id": environment.data_collection_ids[tilt_series],
+                "data_collection_id": environment.data_collection_ids.get(tilt_series),
                 "image_number": environment.movies[file_transferred_to].movie_number,
-                "pixel_size": environment.data_collection_parameters[
-                    "pixel_size_on_image"
-                ],
-                "autoproc_program_id": environment.autoproc_program_ids[tilt_series][
-                    "em-tomo-preprocess"
-                ],
-                "mc_uuid": environment.movies[
-                    file_transferred_to
-                ].motion_correction_uuid,
-                "dose_per_frame": environment.data_collection_parameters.get(
-                    "dose_per_frame"
+                "pixel_size": environment.data_collection_parameters.get(
+                    "pixel_size_on_image", 0
                 ),
-                "voltage": environment.data_collection_parameters["voltage"],
+                "autoproc_program_id": environment.autoproc_program_ids.get(
+                    tilt_series, {}
+                ).get("em-tomo-preprocess"),
+                "dose_per_frame": environment.data_collection_parameters.get(
+                    "dose_per_frame", 0
+                ),
+                "voltage": environment.data_collection_parameters.get("voltage", 0),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 "eer_fractionation_file": eer_fractionation_file,
+                "tag": tilt_series,
             }
+            logger.info("Posting to tomography preprocessing")
             capture_post(preproc_url, json=preproc_data)
-        elif environment:
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            pfi = ProcessFileIncomplete(
-                dest=file_transferred_to,
-                source=source,
-                image_number=environment.movies[file_transferred_to].movie_number,
-                mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
-                tag=tilt_series,
-            )
-            if (
-                environment.autoproc_program_ids is None
-                or environment.processing_job_ids is None
-            ) or (
-                environment.autoproc_program_ids.get(tilt_series) is None
-                or environment.processing_job_ids.get(tilt_series) is None
-            ):
-                if self._preprocessing_triggers.get(tilt_series):
-                    self._preprocessing_triggers[tilt_series].append(
-                        (
-                            preproc_url,
-                            pfi,
-                            environment,
-                        )
-                    )
-                else:
-                    self._preprocessing_triggers[tilt_series] = [
-                        (
-                            preproc_url,
-                            pfi,
-                            environment,
-                        )
-                    ]
 
         if self._last_transferred_file:
             last_tilt_series = (
