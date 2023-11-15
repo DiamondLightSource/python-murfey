@@ -459,6 +459,18 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _d
     _db.close()
 
 
+def _murfey_refine(murfey_id: int, refine_dir: str, app_id: int, _db):
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-refine")
+    refine3d = db.Refine3D(
+        refine_dir=refine_dir,
+        pj_id=pj_id,
+        murfey_id=murfey_id,
+    )
+    _db.add(refine3d)
+    _db.commit()
+    _db.close()
+
+
 def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
@@ -486,6 +498,20 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
+
+
+def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
+    refined_class = _db.exec(
+        select(db.Refine3D).where(
+            db.Refine3D.refine_dir == refine_dir and db.Refine3D.pj_id == pj_id
+        )
+    ).one()
+    return refined_class.murfey_id
 
 
 def _app_id(pj_id: int, _db) -> int:
@@ -942,6 +968,58 @@ def _release_3d_hold(message: dict, _db=murfey_db):
         _db.add(class3d_params)
     else:
         feedback_params.hold_class3d = False
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
+
+
+def _release_refine_hold(message: dict, _db=murfey_db):
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    refine_params = _db.exec(
+        select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+    ).one()
+    if refine_params.run:
+        machine_config = get_machine_config()
+        zocalo_message = {
+            "parameters": {
+                "refine_job_dir": refine_params.refine_dir,
+                "class3d_dir": refine_params.class3d_dir,
+                "class_number": refine_params.class_number,
+                "pix_size": relion_params.angpix,
+                "mask_diameter": relion_params.mask_diameter or 0,
+                "nr_iter": default_spa_parameters.nr_iter_3d,
+                "picker_id": feedback_params.picker_ispyb_id,
+                "refined_class_uuid": _refine_murfey_id(
+                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                ),
+                "refined_grp_uuid": refine_params.murfey_id,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-refine"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        refine_params.run = False
+        _db.add(refine_params)
+    else:
+        feedback_params.hold_refine = False
     _db.add(feedback_params)
     _db.commit()
     _db.close()
@@ -1699,6 +1777,92 @@ def _flush_tomography_preprocessing(message: dict):
         murfey_db.commit()
 
 
+def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
+    """Received class to refine from 3D classification"""
+    machine_config = get_machine_config()
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    relion_options = dict(relion_params)
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    other_options = dict(feedback_params)
+
+    if feedback_params.hold_refine:
+        # If waiting then save the message
+        refine_params = _db.exec(
+            select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+        ).one()
+        refine_params.run = True
+        refine_params.class3d_dir = message["class3d_dir"]
+        refine_params.class_number = message["best_class"]
+        _db.add(refine_params)
+        _db.commit()
+        _db.close()
+    else:
+        # Send all other messages on to a container
+        try:
+            refine_params = _db.exec(
+                select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+            ).one()
+        except SQLAlchemyError:
+            next_job = feedback_params.next_job
+            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 1):03}"
+            refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+            refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
+
+            refine_params = db.RefineParameters(
+                pj_id=pj_id,
+                murfey_id=refined_grp_uuid,
+                refine_dir=refine_dir,
+                class3d_dir=message["class3d_dir"],
+                class_number=message["best_class"],
+            )
+            _db.add(refine_params)
+            _db.commit()
+            _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
+
+            next_job += 4
+            feedback_params.next_job = next_job
+
+        zocalo_message = {
+            "parameters": {
+                "refine_job_dir": refine_params.refine_dir,
+                "class3d_dir": message["class3d_dir"],
+                "class_number": message["best_class"],
+                "pix_size": relion_options["angpix"],
+                "mask_diameter": relion_options["mask_diameter"] or 0,
+                "nr_iter": default_spa_parameters.nr_iter_3d,
+                "picker_id": other_options["picker_ispyb_id"],
+                "refined_class_uuid": _refine_murfey_id(
+                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                ),
+                "refined_grp_uuid": refine_params.murfey_id,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-refine"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        feedback_params.hold_class3d = True
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
+
+
 def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
@@ -2246,6 +2410,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "done_3d_batch":
             _release_3d_hold(message)
+            _register_refinement(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
@@ -2264,6 +2429,17 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_class_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "done_refinement":
+            _release_refine_hold(message)
+            # _register_bfactors(message)
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "done_bfactor":
+            # _save_bfactor(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
