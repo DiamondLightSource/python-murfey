@@ -1025,6 +1025,71 @@ def _release_refine_hold(message: dict, _db=murfey_db):
     _db.close()
 
 
+def _release_bfactor_hold(message: dict, _db=murfey_db):
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    bfactor_params = _db.exec(
+        select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
+    ).one()
+    if bfactor_params.run:
+        machine_config = get_machine_config()
+        bfactor_particle_count = 1000
+        while bfactor_particle_count < bfactor_params.batch_size:
+            bfactor_run_name = f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
+            bfactor_run = _db.exec(
+                select(db.BFactors).where(
+                    db.BFactors.pj_id == pj_id
+                    and db.BFactors.bfactor_directory == bfactor_run_name
+                )
+            ).one()
+            bfactor_run.resolution = 0
+            _db.add(bfactor_run)
+            _db.commit()
+
+            bfactor_particle_count *= 2
+
+            zocalo_message = {
+                "parameters": {
+                    "bfactor_directory": bfactor_run.bfactor_directory,
+                    "class_reference": bfactor_params.class_reference,
+                    "class_number": bfactor_params.class_number,
+                    "number_of_particles": bfactor_run.number_of_particles,
+                    "batch_size": bfactor_params.batch_size,
+                    "pix_size": relion_params.angpix,
+                    "mask_file": bfactor_params.mask_file,
+                    "mask_diameter": relion_params.mask_diameter or 0,
+                    "refined_class_uuid": bfactor_params.refined_class_uuid,
+                    "session_id": message["session_id"],
+                    "autoproc_program_id": _app_id(
+                        _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                    ),
+                    "feedback_queue": machine_config.feedback_queue,
+                },
+                "recipes": ["em-spa-bfactor"],
+            }
+            if _transport_object:
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
+        bfactor_params.run = False
+        _db.add(bfactor_params)
+    else:
+        feedback_params.hold_bfactor = False
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
+
+
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
@@ -1863,6 +1928,149 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
         _db.close()
 
 
+def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
+    """Received refined class to calculate b-factor"""
+    machine_config = get_machine_config()
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    relion_options = dict(relion_params)
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+
+    # Add b-factor for refinement run
+    bfactor_run = db.BFactors(
+        pj_id=pj_id,
+        bfactor_directory=f"{message['project_dir']}/Refine3D/bfactor_{message['batch_size']}",
+        number_of_particles=message["batch_size"],
+        resolution=message["resolution"],
+    )
+    _db.add(bfactor_run)
+    _db.commit()
+
+    if feedback_params.hold_bfactors:
+        # If waiting then save the message
+        bfactor_params = _db.exec(
+            select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
+        ).one()
+        bfactor_params.run = True
+        bfactor_params.project_dir = message["project_dir"]
+        bfactor_params.batch_size = message["batch_size"]
+        bfactor_params.refined_class_uuid = message["refined_class_uuid"]
+        bfactor_params.class_reference = message["class_reference"]
+        bfactor_params.class_number = message["class_number"]
+        bfactor_params.mask_file = message["mask_file"]
+        _db.add(bfactor_params)
+        _db.commit()
+        _db.close()
+    else:
+        # All other messages should create b-factor jobs
+        try:
+            bfactor_params = _db.exec(
+                select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
+            ).one()
+        except SQLAlchemyError:
+            bfactor_params = db.BFactorParameters(
+                pj_id=pj_id,
+                project_dir=message["project_dir"],
+                batch_size=message["number_of_particles"],
+                refined_class_uuid=message["refined_class_uuid"],
+                class_reference=message["class_reference"],
+                class_number=message["class_number"],
+                mask_file=message["mask_file"],
+            )
+            _db.add(bfactor_params)
+            _db.commit()
+
+        bfactor_particle_count = 1000
+        while bfactor_particle_count < bfactor_params.batch_size:
+            bfactor_run_name = f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
+            try:
+                bfactor_run = _db.exec(
+                    select(db.BFactors).where(
+                        db.BFactors.pj_id == pj_id
+                        and db.BFactors.bfactor_directory == bfactor_run_name
+                    )
+                ).one()
+                bfactor_run.resolution = 0
+            except SQLAlchemyError:
+                bfactor_run = db.BFactors(
+                    pj_id=pj_id,
+                    bfactor_directory=bfactor_run_name,
+                    number_of_particles=bfactor_particle_count,
+                    resolution=0,
+                )
+            _db.add(bfactor_run)
+            _db.commit()
+
+            bfactor_particle_count *= 2
+
+            zocalo_message = {
+                "parameters": {
+                    "bfactor_directory": bfactor_run.bfactor_directory,
+                    "class_reference": bfactor_params.class_reference,
+                    "class_number": bfactor_params.class_number,
+                    "number_of_particles": bfactor_run.number_of_particles,
+                    "batch_size": bfactor_params.batch_size,
+                    "pix_size": relion_options["angpix"],
+                    "mask_file": bfactor_params.mask_file,
+                    "mask_diameter": relion_options["mask_diameter"] or 0,
+                    "refined_class_uuid": bfactor_params.refined_class_uuid,
+                    "session_id": message["session_id"],
+                    "autoproc_program_id": _app_id(
+                        _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                    ),
+                    "feedback_queue": machine_config.feedback_queue,
+                },
+                "recipes": ["em-spa-bfactor"],
+            }
+            if _transport_object:
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
+        feedback_params.hold_bfactors = True
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
+
+
+def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
+    """Received b-factor from refinement run"""
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    bfactor_run = _db.exec(
+        select(db.BFactors).where(
+            db.BFactors.pj_id == pj_id
+            and db.BFactors.bfactor_directory == message["bfactor_directory"]
+        )
+    ).one()
+    bfactor_run.resolution = message["resolution"]
+    _db.add(bfactor_run)
+    _db.commit()
+
+    # Find all the resolutions in the b-factors table
+    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id).all())
+    particle_counts = [bf.number_of_particles for bf in all_bfactors]
+    resolutions = [bf.resolution for bf in all_bfactors]
+    _db.close()
+
+    if all(resolutions):
+        # Calculate b-factor and add to ispyb class table
+        bfactor_fitting = np.polyfit(
+            np.log(particle_counts), 1 / np.array(resolutions) ** 2, 2
+        )
+        refined_class_uuid = message["refined_class_uuid"]
+        # Race condition on buffer lookup: bad
+        (bfactor_fitting, refined_class_uuid)
+        _release_bfactor_hold(message)
+
+
 def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
@@ -2434,12 +2642,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "done_refinement":
             _release_refine_hold(message)
-            # _register_bfactors(message)
+            _register_bfactors(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_bfactor":
-            # _save_bfactor(message)
+            _save_bfactor(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None

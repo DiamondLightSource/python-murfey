@@ -380,6 +380,24 @@ class Refine3D(SQLModel, table=True):  # type: ignore
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="refine3ds")
 
 
+class BFactorParameters(SQLModel, table=True):  # type: ignore
+    project_dir: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    batch_size: int
+    refined_class_uuid: int
+    class_reference: str
+    class_number: int
+    mask_file: str
+    run: bool = True
+
+
+class BFactors(SQLModel, table=True):  # type: ignore
+    bfactor_directory: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    number_of_particles: int
+    resolution: float
+
+
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
