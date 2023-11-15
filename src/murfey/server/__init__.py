@@ -837,7 +837,6 @@ def _release_3d_hold(message: dict, _db=murfey_db):
     class3d_params = _db.exec(
         select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
     ).one()
-    feedback_params.hold_class3d = False
     if class3d_params.run:
         machine_config = get_machine_config()
         zocalo_message = {
@@ -887,6 +886,8 @@ def _release_3d_hold(message: dict, _db=murfey_db):
             )
         class3d_params.run = False
         _db.add(class3d_params)
+    else:
+        feedback_params.hold_class3d = False
     _db.add(feedback_params)
     _db.commit()
     _db.close()
