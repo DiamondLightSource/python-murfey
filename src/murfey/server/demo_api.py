@@ -262,7 +262,7 @@ def register_spa_proc_params(
             gain_ref=proc_params.gain_ref,
             voltage=proc_params.voltage,
             motion_corr_binning=proc_params.motion_corr_binning,
-            eer_grouping=proc_params.eer_grouping,
+            eer_grouping=proc_params.eer_fractionation,
             symmetry=proc_params.symmetry,
             particle_diameter=proc_params.particle_diameter,
             downscale=proc_params.downscale,

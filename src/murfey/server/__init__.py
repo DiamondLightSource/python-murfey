@@ -1925,7 +1925,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     gain_ref=message["gain_ref"],
                     voltage=message["voltage"],
                     motion_corr_binning=message["motion_corr_binning"],
-                    eer_grouping=message["eer_grouping"],
+                    eer_grouping=message["eer_fractionation"],
                     symmetry=message["symmetry"],
                     particle_diameter=message["particle_diameter"],
                     downscale=message["downscale"],

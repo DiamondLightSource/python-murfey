@@ -827,7 +827,8 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     log.info(
-        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)}"
+        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
+        f"with basepath {machine_config.rsync_basepath} and directory {dc_params.image_directory}"
     )
     dc_parameters = {
         "visit": visit_name,

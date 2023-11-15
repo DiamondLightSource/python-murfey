@@ -295,8 +295,8 @@ class _SPAContext(Context):
             if environment
             else None
         ) or 128
-        metadata["eer_grouping"] = (
-            environment.data_collection_parameters.get("eer_grouping")
+        metadata["eer_fractionation"] = (
+            environment.data_collection_parameters.get("eer_fractionation")
             if environment
             else None
         ) or 20
@@ -530,7 +530,7 @@ class SPAContext(_SPAContext):
                 "voltage": parameters["voltage"],
                 "gain_ref": parameters["gain_ref"],
                 "dose_per_frame": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_grouping"],
+                "eer_grouping": parameters["eer_fractionation"],
                 "import_images": import_images,
                 "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
                 "symmetry": parameters["symmetry"],
