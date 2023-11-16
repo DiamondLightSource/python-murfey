@@ -2066,8 +2066,27 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
             np.log(particle_counts), 1 / np.array(resolutions) ** 2, 2
         )
         refined_class_uuid = message["refined_class_uuid"]
-        # Race condition on buffer lookup: bad
-        (bfactor_fitting, refined_class_uuid)
+
+        # Request an ispyb insert of the b-factor fitting parameters
+        if _transport_object:
+            _transport_object.send(
+                "ispyb_connector",
+                {
+                    "parameters": {
+                        "ispyb_command": "buffer",
+                        "buffer_lookup": {
+                            "particle_classification_id": refined_class_uuid,
+                        },
+                        "buffer_command": {
+                            "ispyb_command": "insert_particle_classification"
+                        },
+                        "bfactor_fit_intercept": bfactor_fitting[0],
+                        "bfactor_fit_linear": bfactor_fitting[1],
+                        "bfactor_fit_quadratic": bfactor_fitting[2],
+                    },
+                    "content": {"dummy": "dummy"},
+                },
+            )
         _release_bfactor_hold(message)
 
 
