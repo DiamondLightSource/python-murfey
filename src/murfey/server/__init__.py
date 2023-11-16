@@ -1867,11 +1867,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "mc_uuid": murfey_ids[2 * i],
                         "ft_bin": proc_params.motion_corr_binning,
                         "fm_dose": proc_params.dose_per_frame,
-                        "gain_ref": str(
-                            machine_config.rsync_basepath / proc_params.gain_ref
-                        )
-                        if proc_params.gain_ref
-                        else proc_params.gain_ref,
+                        "gain_ref": proc_params.gain_ref,
                         "downscale": proc_params.downscale,
                         "picker_uuid": murfey_ids[2 * i + 1],
                         "session_id": session_id,
@@ -1919,11 +1915,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.SPARelionParameters.pj_id == pj_id
                 )
             ).all():
+                machine_config = get_machine_config()
                 params = db.SPARelionParameters(
                     pj_id=pj_id,
                     angpix=float(message["pixel_size_on_image"]) * 1e10,
                     dose_per_frame=message["dose_per_frame"],
-                    gain_ref=message["gain_ref"],
+                    gain_ref=str(machine_config.rsync_basepath / message["gain_ref"])
+                    if message["gain_ref"]
+                    else message["gain_ref"],
                     voltage=message["voltage"],
                     motion_corr_binning=message["motion_corr_binning"],
                     eer_grouping=message["eer_fractionation"],

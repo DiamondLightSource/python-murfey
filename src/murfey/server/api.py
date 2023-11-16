@@ -626,9 +626,7 @@ async def request_spa_preprocessing(
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(machine_config.rsync_basepath / proc_params["gain_ref"])
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
+                "gain_ref": proc_params["gain_ref"],
                 "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
