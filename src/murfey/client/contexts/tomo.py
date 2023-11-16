@@ -424,7 +424,11 @@ class TomographyContext(Context):
             tilt_series_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
             requests.post(
                 tilt_series_endpoint,
-                json={"client_id": environment.client_id, "tag": tilt_series},
+                json={
+                    "client_id": environment.client_id,
+                    "tag": tilt_series,
+                    "rsync_source": str(file_path.parent),
+                },
             )
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
@@ -538,6 +542,7 @@ class TomographyContext(Context):
                     json={
                         "tilt_series_tag": tilt_series,
                         "movie_path": str(movie_path),
+                        "rsync_source": str(file_path.parent),
                     },
                 )
 
@@ -636,6 +641,7 @@ class TomographyContext(Context):
                     tilt_series,
                     required_position_files or [],
                     file_transferred_to,
+                    rsync_source=source,
                     environment=environment,
                 )
         self._last_transferred_file = file_path
@@ -646,6 +652,7 @@ class TomographyContext(Context):
         tilt_series: str,
         required_position_files: List[Path],
         file_transferred_to: Path | None,
+        rsync_source: Path,
         environment: MurfeyInstanceEnvironment | None = None,
     ):
         newly_completed_series = []
@@ -728,7 +735,10 @@ class TomographyContext(Context):
                 completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
                 requests.post(
                     completed_tilt_endpoint,
-                    json={"tilt_series": newly_completed_series},
+                    json={
+                        "tilt_series": newly_completed_series,
+                        "rsync_source": str(rsync_source),
+                    },
                 )
         return newly_completed_series
 
@@ -846,6 +856,7 @@ class TomographyContext(Context):
                             self._file_transferred_to(
                                 environment, source, transferred_file
                             ),
+                            rsync_source=transferred_file.parent,
                             environment=environment,
                         )
         return completed_tilts

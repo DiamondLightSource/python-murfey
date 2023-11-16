@@ -87,18 +87,20 @@ def get_angle(tilt_file_name: str) -> float:
     raise ValueError(f"Tilt angle not found for file {tilt_file_name}")
 
 
-def check_tilt_series_mc(tag: str) -> bool:
+def check_tilt_series_mc(tilt_series_id: int) -> bool:
     results = murfey_db.exec(
         select(db.Tilt, db.TiltSeries)
-        .where(db.Tilt.tilt_series_tag == tag)
-        .where(db.TiltSeries.tag == db.Tilt.tilt_series_tag)
+        .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
+        .where(db.TiltSeries.id == tilt_series_id)
     ).all()
     return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
-def get_all_tilts(tag: str) -> List[str]:
+def get_all_tilts(tilt_series_id: int) -> List[str]:
     machine_config = get_machine_config()
-    results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
+    results = murfey_db.exec(
+        select(db.Tilt).where(db.Tilt.tilt_series_id == tilt_series_id)
+    )
 
     def _mc_path(mov_path: Path) -> str:
         for p in mov_path.parts:
@@ -123,7 +125,7 @@ def get_all_tilts(tag: str) -> List[str]:
     return [_mc_path(Path(r.movie_path)) for r in results]
 
 
-def get_job_ids(tag: str) -> JobIDs:
+def get_job_ids(tilt_series_id: int) -> JobIDs:
     results = murfey_db.exec(
         select(
             db.TiltSeries,
@@ -132,7 +134,7 @@ def get_job_ids(tag: str) -> JobIDs:
             db.DataCollection,
             db.ClientEnvironment,
         )
-        .where(db.TiltSeries.tag == tag)
+        .where(db.TiltSeries.id == tilt_series_id)
         .where(db.DataCollection.tag == db.TiltSeries.tag)
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
@@ -1558,21 +1560,39 @@ def feedback_callback(header: dict, message: dict) -> None:
         if "environment" in message:
             message = message["payload"]
         if message["register"] == "motion_corrected":
-            relevant_tilt = murfey_db.exec(
-                select(db.Tilt).where(db.Tilt.movie_path == message.get("movie"))
+            collected_ids = murfey_db.exec(
+                select(
+                    db.DataCollectionGroup,
+                    db.DataCollection,
+                    db.ProcessingJob,
+                    db.AutoProcProgram,
+                )
+                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                .where(db.AutoProcProgram.id == message["program_id"])
             ).one()
+            session_id = collected_ids[0].session_id
+            relevant_tilt_and_series = murfey_db.exec(
+                select(db.Tilt, db.TiltSeries)
+                .where(db.Tilt.movie_path == message.get("movie"))
+                .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
+                .where(db.TiltSeries.session_id == session_id)
+            ).one()
+            relevant_tilt = relevant_tilt_and_series[0]
+            relevant_tilt_series = relevant_tilt_and_series[1]
             relevant_tilt.motion_corrected = True
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
             murfey_db.close()
-            if check_tilt_series_mc(relevant_tilt.tilt_series_tag):
-                tilts = get_all_tilts(relevant_tilt.tilt_series_tag)
-                ids = get_job_ids(relevant_tilt.tilt_series_tag)
+            if check_tilt_series_mc(relevant_tilt.tilt_seires_id):
+                tilts = get_all_tilts(relevant_tilt.tilt_series_id)
+                ids = get_job_ids(relevant_tilt.tilt_series_id)
                 params = get_tomo_proc_params(ids.client_id)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
                     / "align_output"
-                    / f"{relevant_tilt.tilt_series_tag}_stack.mrc"
+                    / f"{relevant_tilt_series.tag}_stack.mrc"
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)

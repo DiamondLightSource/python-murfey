@@ -46,7 +46,9 @@ class Session(SQLModel, table=True):  # type: ignore
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
-    tag: str = Field(primary_key=True)
+    id: int = Field(primary_key=True, unique=True)
+    tag: str
+    rsync_source: str
     session_id: int = Field(foreign_key="session.id")
     complete: bool = False
     processing_requested: bool = False
@@ -58,7 +60,7 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
 
 class Tilt(SQLModel, table=True):  # type: ignore
     movie_path: str = Field(primary_key=True)
-    tilt_series_tag: str = Field(foreign_key="tiltseries.tag")
+    tilt_series_id: int = Field(foreign_key="tiltseries.id")
     motion_corrected: bool = False
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 

@@ -363,7 +363,11 @@ def register_tilt_series(
         .one()
         .session_id
     )
-    tilt_series = TiltSeries(session_id=session_id, tag=tilt_series_info.tag)
+    tilt_series = TiltSeries(
+        session_id=session_id,
+        tag=tilt_series_info.tag,
+        rsync_source=tilt_series_info.rsync_source,
+    )
     db.add(tilt_series)
     db.commit()
 
@@ -385,6 +389,7 @@ def register_completed_tilt_series(
     tilt_series_db = db.exec(
         select(TiltSeries)
         .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
+        .where(TiltSeries.rsync_source == completed_tilt_series.rsync_source)
         .where(TiltSeries.session_id == session_id)
     ).all()
     for ts in tilt_series_db:
@@ -395,9 +400,12 @@ def register_completed_tilt_series(
 
 @router.post("/visits/{visit_name}/tilt")
 def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
-    tilt = Tilt(
-        movie_path=tilt_info.movie_path, tilt_series_tag=tilt_info.tilt_series_tag
-    )
+    tilt_series = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.tag == TiltInfo.tilt_series_tag)
+        .where(TiltSeries.rsync_source == TiltInfo.rsync_source)
+    ).one()
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
     db.add(tilt)
     db.commit()
 

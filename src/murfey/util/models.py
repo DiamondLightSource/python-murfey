@@ -126,15 +126,18 @@ class SPAProcessFile(BaseModel):
 class TiltInfo(BaseModel):
     tilt_series_tag: str
     movie_path: str
+    rsync_source: str
 
 
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
+    rsync_source: str
 
 
 class CompletedTiltSeries(BaseModel):
     tilt_series: List[str]
+    rsync_source: str
 
 
 class TiltSeriesProcessingDetails(BaseModel):
