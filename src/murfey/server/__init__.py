@@ -90,14 +90,16 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
     results = murfey_db.exec(
         select(db.Tilt, db.TiltSeries)
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
-        .where(db.TiltSeries.tilt_series_id == tilt_series_id)
+        .where(db.TiltSeries.id == tilt_series_id)
     ).all()
     return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
-def get_all_tilts(tag: str) -> List[str]:
+def get_all_tilts(tilt_series_id: str) -> List[str]:
     machine_config = get_machine_config()
-    results = murfey_db.exec(select(db.Tilt).where(db.Tilt.tilt_series_tag == tag))
+    results = murfey_db.exec(
+        select(db.Tilt).where(db.Tilt.tilt_series_id == tilt_series_id)
+    )
 
     def _mc_path(mov_path: Path) -> str:
         for p in mov_path.parts:
@@ -1611,6 +1613,21 @@ def _flush_tomography_preprocessing(message: dict):
         logger.info(
             f"Launching tomography preprocessing with Zocalo message: {zocalo_message}"
         )
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        else:
+            feedback_callback(
+                {},
+                {
+                    "register": "motion_corrected",
+                    "movie": f.file_path,
+                    "mrc_out": f.mrc_out,
+                    "movie_id": murfey_ids[2 * i],
+                    "program_id": detached_ids[3],
+                },
+            )
         murfey_db.delete(f)
     murfey_db.commit()
 
@@ -1675,6 +1692,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                     )
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
+                    )
+                else:
+                    logger.info(
+                        f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
 
             if _transport_object:

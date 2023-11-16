@@ -180,7 +180,7 @@ class TomographyContext(Context):
         self._extract_tilt_series: Callable[[Path], str] | None = None
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
-    def _flush_data_collections(self, tag: str):
+    def _flush_data_collections(self):
         logger.info(
             f"Flushing {len(self._data_collection_stash)} data collection API calls"
         )
@@ -444,8 +444,9 @@ class TomographyContext(Context):
                                 )
                             ).resolve()
                         ),
-                        "tag": tilt_series,
+                        "data_collection_tag": tilt_series,
                         "source": str(self._basepath),
+                        "tag": str(self._basepath),
                     }
                     if (
                         environment.data_collection_parameters
@@ -518,6 +519,7 @@ class TomographyContext(Context):
                                 "experiment_type": "tomography",
                             },
                         )
+
             except Exception as e:
                 logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
         else:
@@ -533,10 +535,10 @@ class TomographyContext(Context):
             tilt_data = {
                 "movie_path": str(file_transferred_to),
                 "tilt_series_tag": tilt_series,
+                "source": str(file_path.parent),
             }
             capture_post(tilt_url, json=tilt_data)
 
-        if environment:
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
@@ -625,10 +627,13 @@ class TomographyContext(Context):
         for ts, ta in self._tilt_series.items():
             if self._tilt_series_sizes.get(ts):
                 completion_test = len(ta) >= self._tilt_series_sizes[ts]
-            elif required_position_files:
-                completion_test = all(_f.is_file() for _f in required_position_files)
+                if required_position_files and completion_test:
+                    completion_test = all(
+                        _f.is_file() for _f in required_position_files
+                    )
             else:
-                completion_test = len(ta) >= tilt_series_size
+                completion_test = False
+            #     completion_test = len(ta) >= tilt_series_size
             if ts not in self._completed_tilt_series and completion_test:
                 newly_completed_series.append(ts)
                 self._completed_tilt_series.append(ts)

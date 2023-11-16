@@ -767,10 +767,13 @@ async def request_tomography_preprocessing(
         .session_id
     )
     data_collection = db.exec(
-        select(DataCollectionGroup, DataCollection)
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.id == DataCollection.dcg_id)
         .where(DataCollection.tag == proc_file.tag)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
     ).all()
     if data_collection:
         if not mrc_out.parent.exists():
@@ -783,7 +786,7 @@ async def request_tomography_preprocessing(
                 "mrc_out": str(mrc_out),
                 "movie_id": proc_file.mc_uuid,
                 "fm_int_file": proc_file.eer_fractionation_file,
-                "program_id": 1,
+                "program_id": data_collection[0][3].id,
             },
         )
         await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
@@ -920,15 +923,23 @@ def register_dc_group(
 
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
 def start_dc(visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db):
-    log.info("Starting data collection")
+    dcg_tag = dc_params.tag
+    log.info(f"Starting data collection, data collection tag {dcg_tag}")
     dcg = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.tag == dc_params.tag)
+        select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
     ).one()
+    dc_tag = dc_params.data_collection_tag or dc_params.tag
+    if db.exec(
+        select(DataCollection)
+        .where(DataCollection.tag == dc_tag)
+        .where(DataCollection.dcg_id == dcg.id)
+    ).all():
+        return
     dc_id = next(global_counter)
     murfey_dc = DataCollection(
         id=dc_id,
         client=client_id,
-        tag=dc_params.data_collection_tag or dc_params.tag,
+        tag=dc_tag,
         dcg_id=dcg.id,
     )
     db.add(murfey_dc)

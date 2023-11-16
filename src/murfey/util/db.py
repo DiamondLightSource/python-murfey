@@ -141,7 +141,6 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )
-    tag: str = ""
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
