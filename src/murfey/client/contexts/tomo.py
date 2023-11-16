@@ -672,10 +672,13 @@ class TomographyContext(Context):
         for ts, ta in self._tilt_series.items():
             if self._tilt_series_sizes.get(ts):
                 completion_test = len(ta) >= self._tilt_series_sizes[ts]
-            elif required_position_files:
-                completion_test = all(_f.is_file() for _f in required_position_files)
+                if required_position_files and completion_test:
+                    completion_test = all(
+                        _f.is_file() for _f in required_position_files
+                    )
             else:
-                completion_test = len(ta) >= tilt_series_size
+                completion_test = False
+                # completion_test = len(ta) >= tilt_series_size
             if ts not in self._completed_tilt_series and completion_test:
                 newly_completed_series.append(ts)
                 self._completed_tilt_series.append(ts)
