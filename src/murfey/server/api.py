@@ -402,8 +402,8 @@ def register_completed_tilt_series(
 def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
     tilt_series = db.exec(
         select(TiltSeries)
-        .where(TiltSeries.tag == TiltInfo.tilt_series_tag)
-        .where(TiltSeries.rsync_source == TiltInfo.rsync_source)
+        .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+        .where(TiltSeries.rsync_source == tilt_info.rsync_source)
     ).one()
     tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
     db.add(tilt)
