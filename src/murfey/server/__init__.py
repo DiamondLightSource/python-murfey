@@ -1558,7 +1558,11 @@ def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
         if "environment" in message:
+            params = message["recipe"][str(message["recipe-pointer"])].get(
+                "parameters", {}
+            )
             message = message["payload"]
+            message.update(params)
         if message["register"] == "motion_corrected":
             collected_ids = murfey_db.exec(
                 select(
@@ -1585,7 +1589,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
             murfey_db.close()
-            if check_tilt_series_mc(relevant_tilt.tilt_seires_id):
+            if check_tilt_series_mc(relevant_tilt.tilt_series_id):
                 tilts = get_all_tilts(relevant_tilt.tilt_series_id)
                 ids = get_job_ids(relevant_tilt.tilt_series_id)
                 params = get_tomo_proc_params(ids.client_id)

@@ -1104,7 +1104,7 @@ def register_processing_success_in_ispyb(
     appids = [c[3].id for c in collected_ids]
     if _transport_object:
         apps = db.query(ISPyBAutoProcProgram).filter(
-            ISPyBAutoProcProgram.autoProcProgram.in_(appids)
+            ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
         )
         for updated in apps:
             updated.processingStatus = True
@@ -1143,9 +1143,16 @@ def remove_session(client_id: int, db=murfey_db):
             prom.preprocessed_movies.remove(c[2].id)
         except KeyError:
             continue
-    if db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
-    ).all():
+    if (
+        len(
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.session_id == session_id
+                )
+            ).all()
+        )
+        > 1
+    ):
         return
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
