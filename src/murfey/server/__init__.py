@@ -92,6 +92,9 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
         .where(db.TiltSeries.id == tilt_series_id)
     ).all()
+    logger.warning(
+        f"{all(r[0].motion_corrected for r in results)}, {results[0][1].complete}"
+    )
     return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
@@ -1670,7 +1673,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
                     / "align_output"
-                    / f"{relevant_tilt.tilt_series_tag}_stack.mrc"
+                    / f"{relevant_tilt_series.tag}_stack.mrc"
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)

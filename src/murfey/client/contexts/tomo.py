@@ -149,7 +149,7 @@ class ProcessFileIncomplete(BaseModel):
 class TomographyContext(Context):
     user_params = [
         ProcessingParameter(
-            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)", default=1
         ),
         ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
         ProcessingParameter("gain_ref", "Gain Reference"),
@@ -381,6 +381,7 @@ class TomographyContext(Context):
                 float(tilt_series_num)
                 float(tilt_angle)
             except ValueError:
+                logger.error(f"whoops, {tilt_series_num}, {tilt_angle}")
                 return []
             tilt_series = _construct_tilt_series_name(
                 tilt_tag, tilt_series_num, file_path
@@ -530,6 +531,34 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
+        res = []
+        if self._last_transferred_file:
+            last_tilt_series = (
+                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
+                if extract_tilt_tag(self._last_transferred_file)
+                else extract_tilt_series(self._last_transferred_file)
+            )
+            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
+            self._last_transferred_file = file_path
+            if (
+                last_tilt_series != tilt_series
+                and last_tilt_angle != tilt_angle
+                or self._tilt_series_sizes.get(tilt_series)
+            ) or self._completed_tilt_series:
+                res = self._check_tilt_series(
+                    tilt_series,
+                    required_position_files or [],
+                    file_transferred_to,
+                    environment=environment,
+                )
+
+        if res and environment:
+            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+            capture_post(
+                complete_url,
+                json={"tags": res, "source": str(file_path.parent)},
+            )
+
         if environment:
             tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
             tilt_data = {
@@ -601,7 +630,7 @@ class TomographyContext(Context):
                     environment=environment,
                 )
         self._last_transferred_file = file_path
-        return []
+        return res
 
     def _check_tilt_series(
         self,
