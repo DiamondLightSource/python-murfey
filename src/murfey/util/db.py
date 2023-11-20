@@ -134,6 +134,7 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     image_number: int
     mrc_out: str
+    eer_fractionation_file: str
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )

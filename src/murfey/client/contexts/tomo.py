@@ -286,6 +286,7 @@ class TomographyContext(Context):
                             "dose_per_frame": environment.data_collection_parameters[
                                 "dose_per_frame"
                             ],
+                            "fractionation_file_name": "eer_fractionation_tomo.txt",
                         },
                     )
                     eer_fractionation_file = response.json()["eer_fractionation_file"]
@@ -558,6 +559,10 @@ class TomographyContext(Context):
                         "fractionation": environment.data_collection_parameters[
                             "eer_fractionation"
                         ],
+                        "dose_per_frame": environment.data_collection_parameters[
+                            "dose_per_frame"
+                        ],
+                        "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]

@@ -388,6 +388,7 @@ class SPAModularContext(_SPAContext):
                                     "dose_per_frame": environment.data_collection_parameters[
                                         "dose_per_frame"
                                     ],
+                                    "fractionation_file_name": "eer_fractionation_spa.txt",
                                 },
                             )
                             eer_fractionation_file = response.json()[

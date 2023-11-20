@@ -1897,6 +1897,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "picker_uuid": murfey_ids[2 * i + 1],
                         "session_id": session_id,
                         "particle_diameter": proc_params.particle_diameter or 0,
+                        "fm_int_file": f.eer_fractionation_file,
                     },
                 }
                 if _transport_object:

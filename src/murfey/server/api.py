@@ -658,6 +658,7 @@ async def request_spa_preprocessing(
             client_id=client_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
+            eer_fractionation_file=str(proc_file.eer_fractionation_file),
         )
         db.add(for_stash)
         db.commit()
@@ -959,6 +960,7 @@ async def write_eer_fractionation_file(
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
+        / "processing"
         / secure_filename(fractionation_params.fractionation_file_name)
     )
     if file_path.is_file():
