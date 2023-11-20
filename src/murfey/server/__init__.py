@@ -425,7 +425,7 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _d
     class3ds = [
         db.Class3D(
             class_number=i,
-            particles_file=particles_file,
+            particles_file=str(Path(particles_file).parent),
             pj_id=pj_id,
             murfey_id=mid,
         )
@@ -459,7 +459,8 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     )
     classes = _db.exec(
         select(db.Class3D).where(
-            db.Class3D.particles_file == particles_file and db.Class3D.pj_id == pj_id
+            db.Class3D.particles_file == str(Path(particles_file).parent)
+            and db.Class3D.pj_id == pj_id
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
