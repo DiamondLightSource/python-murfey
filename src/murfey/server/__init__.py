@@ -2080,9 +2080,9 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
                         "buffer_command": {
                             "ispyb_command": "insert_particle_classification"
                         },
-                        "bfactor_fit_intercept": bfactor_fitting[0],
+                        "bfactor_fit_intercept": bfactor_fitting[2],
                         "bfactor_fit_linear": bfactor_fitting[1],
-                        "bfactor_fit_quadratic": bfactor_fitting[2],
+                        "bfactor_fit_quadratic": bfactor_fitting[0],
                     },
                     "content": {"dummy": "dummy"},
                 },
