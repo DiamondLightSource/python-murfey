@@ -14,7 +14,6 @@ from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Button, Input
 
-from murfey.client import TimeRange
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -32,7 +31,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import capture_post, get_machine_config
+from murfey.util import TimeRange, capture_post, get_machine_config
 from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.tui.app")

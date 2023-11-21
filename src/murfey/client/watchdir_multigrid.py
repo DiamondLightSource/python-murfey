@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List
 
 import murfey.util
-from murfey.client import TimeRange
 
 log = logging.getLogger("murfey.client.wathdir_multigrid")
 
@@ -20,7 +19,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         path: str | os.PathLike,
         machine_config: dict,
         skip_existing_processing: bool = False,
-        time_range: TimeRange | None = None,
+        time_range: murfey.util.TimeRange | None = None,
     ):
         super().__init__()
         self._basepath = Path(path)

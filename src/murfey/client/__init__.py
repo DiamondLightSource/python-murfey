@@ -32,22 +32,6 @@ from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
 from murfey.util import _get_visit_list
 
-# from asyncio import Queue
-
-
-# from rich.prompt import Prompt
-
-
-class TimeRange:
-    def __init__(self, start_time: datetime, end_time: datetime):
-        self._start_timestamp = datetime.timestamp(start_time)
-        self._end_timestamp = datetime.timestamp(end_time)
-
-    def __contains__(self, item: datetime | float) -> bool:
-        timestamp = datetime.timestamp(item) if isinstance(item, datetime) else item
-        return timestamp > self._start_timestamp and timestamp < self._end_timestamp
-
-
 log = logging.getLogger("murfey.client")
 
 

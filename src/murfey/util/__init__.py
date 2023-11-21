@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from datetime import datetime
 from functools import lru_cache
 from queue import Queue
 from threading import Thread
@@ -37,6 +38,16 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response:
             f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
         )
     return response
+
+
+class TimeRange:
+    def __init__(self, start_time: datetime, end_time: datetime):
+        self._start_timestamp = datetime.timestamp(start_time)
+        self._end_timestamp = datetime.timestamp(end_time)
+
+    def __contains__(self, item: datetime | float) -> bool:
+        timestamp = datetime.timestamp(item) if isinstance(item, datetime) else item
+        return timestamp > self._start_timestamp and timestamp < self._end_timestamp
 
 
 class Observer:
