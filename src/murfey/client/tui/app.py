@@ -14,6 +14,7 @@ from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Button, Input
 
+from murfey.client import TimeRange
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -32,6 +33,7 @@ from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import capture_post, get_machine_config
+from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -52,7 +54,7 @@ class MurfeyTUI(App):
     def __init__(
         self,
         environment: MurfeyInstanceEnvironment | None = None,
-        visits: List[str] | None = None,
+        visits: List[Visit] | None = None,
         queues: Dict[str, Queue] | None = None,
         status_bar: StatusBar | None = None,
         dummy_dc: bool = True,
@@ -63,6 +65,7 @@ class MurfeyTUI(App):
         strict: bool = False,
         processing_enabled: bool = True,
         skip_existing_processing: bool = False,
+        visit_time_ranges: Dict[str, TimeRange] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -73,7 +76,13 @@ class MurfeyTUI(App):
         self._sources = self._environment.sources or [Path(".")]
         self._url = self._environment.url
         self._default_destinations = self._environment.default_destinations
-        self.visits = visits or []
+        self.visits = [v.name for v in visits] if visits else []
+        if visit_time_ranges is None:
+            self._visit_time_ranges = (
+                {v.name: TimeRange(v.start, v.end) for v in visits} if visits else {}
+            )
+        else:
+            self._visit_time_ranges = visit_time_ranges
         self._queues = queues or {}
         self._statusbar = status_bar or StatusBar()
         self._request_destinations = False
@@ -121,6 +130,7 @@ class MurfeyTUI(App):
             source,
             machine_config,
             skip_existing_processing=self._skip_existing_processing,
+            time_range=self._visit_time_ranges.get(self._environment.visit),
         )
         self._multigrid_watcher.subscribe(
             partial(

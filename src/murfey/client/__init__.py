@@ -38,6 +38,16 @@ from murfey.util import _get_visit_list
 # from rich.prompt import Prompt
 
 
+class TimeRange:
+    def __init__(self, start_time: datetime, end_time: datetime):
+        self._start_timestamp = datetime.timestamp(start_time)
+        self._end_timestamp = datetime.timestamp(end_time)
+
+    def __contains__(self, item: datetime | float) -> bool:
+        timestamp = datetime.timestamp(item) if isinstance(item, datetime) else item
+        return timestamp > self._start_timestamp and timestamp < self._end_timestamp
+
+
 log = logging.getLogger("murfey.client")
 
 
@@ -183,6 +193,12 @@ def run():
         default=False,
         help="Do not trigger processing for any data directories currently on disk (you may have started processing for them in a previous murfey run)",
     )
+    parser.add_argument(
+        "--relax-time-restrictions",
+        action="store_true",
+        default=False,
+        help="Do not require that time stamps of directories lie within the visit period before performing transfers",
+    )
 
     args = parser.parse_args()
 
@@ -235,7 +251,7 @@ def run():
         print("Ongoing visits:")
         ongoing_visits = _get_visit_list(murfey_url)
         pprint(ongoing_visits)
-        ongoing_visits = [v.name for v in ongoing_visits]
+        # ongoing_visits = [v.name for v in ongoing_visits]
 
     _enable_webbrowser_in_cygwin()
 
@@ -270,8 +286,6 @@ def run():
         url=murfey_url,
         client_id=ws.id,
         software_versions=machine_data.get("software_versions", {}),
-        # sources=[Path(args.source)],
-        # watchers=source_watchers,
         default_destination=args.destination
         or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
         demo=args.demo,
@@ -294,6 +308,7 @@ def run():
         strict=not args.relax,
         processing_enabled=machine_data.get("processing_enabled", True),
         skip_existing_processing=args.skip_existing_processing,
+        visit_time_ranges={} if args.relax_time_restrictions else None,
     )
     app.run()
     rich_handler.redirect = False

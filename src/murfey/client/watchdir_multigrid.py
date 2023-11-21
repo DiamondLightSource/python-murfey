@@ -4,10 +4,12 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
 import murfey.util
+from murfey.client import TimeRange
 
 log = logging.getLogger("murfey.client.wathdir_multigrid")
 
@@ -18,6 +20,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         path: str | os.PathLike,
         machine_config: dict,
         skip_existing_processing: bool = False,
+        time_range: TimeRange | None = None,
     ):
         super().__init__()
         self._basepath = Path(path)
@@ -25,6 +28,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         self._seen_dirs: List[Path] = []
         self._stopping = False
         self._machine_config = machine_config
+        self._time_range = time_range
         self.thread = threading.Thread(
             name=f"MultigridDirWatcher {self._basepath}",
             target=self._process,
@@ -45,10 +49,20 @@ class MultigridDirWatcher(murfey.util.Observer):
             self.thread.join()
         log.debug("MultigridDirWatcher thread stop completed")
 
+    def _time_stamp(self, fobj: Path) -> float:
+        if fobj.name.startswith("Supervisor"):
+            datetime_string = "-".join(fobj.name.split("_")[1:2])
+            dt = datetime.strptime(datetime_string, "%Y%m%d-%H%M%S")
+            return dt.timestamp()
+        return fobj.stat().st_ctime
+
     def _process(self):
         first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
+                if self._time_range:
+                    if self._time_stamp(d) not in self._time_range:
+                        continue
                 if d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(d, include_mid_path=False, use_suggested_path=False)
