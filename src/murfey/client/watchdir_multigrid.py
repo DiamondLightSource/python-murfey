@@ -55,6 +55,18 @@ class MultigridDirWatcher(murfey.util.Observer):
             return dt.timestamp()
         return fobj.stat().st_ctime
 
+    def _atlas_check(self, candidate_path: Path) -> bool:
+        for d in candidate_path.glob("*"):
+            if d.name not in (
+                "Atlas",
+                "EpuSession.dm",
+                "ScreeningSession.dm",
+            ) and not d.name.startswith("Sample"):
+                return False
+            if d.name.startswith("Images-Disc"):
+                return False
+        return True
+
     def _process(self):
         first_loop = True
         while not self._stopping:
@@ -65,6 +77,15 @@ class MultigridDirWatcher(murfey.util.Observer):
                 if d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(d, include_mid_path=False, use_suggested_path=False)
+                        self._seen_dirs.append(d)
+                elif self._atlas_check(d):
+                    if d.is_dir() and d not in self._seen_dirs:
+                        self.notify(
+                            d,
+                            include_mid_path=False,
+                            use_suggested_path=False,
+                            extra_directory=f"atlas/{d.name}",
+                        )
                         self._seen_dirs.append(d)
                 else:
                     if d.is_dir() and d not in self._seen_dirs:
