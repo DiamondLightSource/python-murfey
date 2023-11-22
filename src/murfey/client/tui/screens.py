@@ -26,7 +26,8 @@ from textual.widgets import (
     Header,
     Input,
     Label,
-    OptionList,
+    RadioButton,
+    RadioSet,
     Static,
     Switch,
     TextLog,
@@ -238,7 +239,16 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        self._context = SPAContext
+        cfg = get_machine_config(
+            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        )
+        self._context: Type[SPAModularContext] | Type[SPAContext] | Type[
+            TomographyContext
+        ]
+        if cfg.get("modular_spa"):
+            self._context = SPAContext
+        else:
+            self._context = SPAModularContext
 
     def compose(self):
         machine_data = requests.get(
@@ -255,9 +265,6 @@ class LaunchScreen(Screen):
         yield self._dir_tree
         text_log = TextLog(id="selected-directories")
         widgets = [text_log, Button("Clear", id="clear")]
-        if self.app._multigrid:
-            widgets.append(Label("Data collection modality:"))
-            widgets.append(OptionList("SPA", "Tomography", id="modality-select"))
         text_log_block = VerticalScroll(*widgets, id="selected-directories-vert")
         yield text_log_block
 
@@ -304,20 +311,6 @@ class LaunchScreen(Screen):
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
-
-    def on_option_list_option_selected(self, event):
-        log.info(f"option selected: {event.option}")
-        if event.option.prompt == "Tomography":
-            log.info("switching context to tomo")
-            self._context = TomographyContext
-        elif event.option.prompt == "SPA":
-            cfg = get_machine_config(
-                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
-            )
-            if cfg.get("modular_spa"):
-                self._context = SPAContext
-            else:
-                self._context = SPAModularContext
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
@@ -938,6 +931,11 @@ class DestinationSelect(Screen):
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
+        with RadioSet():
+            yield RadioButton(
+                "SPA", value=self._context in (SPAContext, SPAModularContext)
+            )
+            yield RadioButton("Tomography", value=self._context is TomographyContext)
 
     def _check_dependency(self, key: str, value: Any):
         if x := self._dependencies.get(key):
@@ -963,6 +961,27 @@ class DestinationSelect(Screen):
                 if event.switch.id == k.name:
                     self._user_params[k.name] = event.value
                     self._check_dependency(k.name, event.value)
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.index == 0:
+            cfg = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if cfg.get("modular_spa"):
+                self._context = SPAContext
+            else:
+                self._context = SPAModularContext
+        else:
+            self._context = TomographyContext
+        self.app.pop_screen()
+        self.app.uninstall_screen("destination-select-screen")
+        self.app.install_screen(
+            DestinationSelect(
+                self._transfer_routes, self._context, dependencies=spa_form_dependencies
+            ),
+            "destination-select-screen",
+        )
+        self.app.push_screen("destination-select-screen")
 
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):
