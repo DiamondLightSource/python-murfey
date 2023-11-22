@@ -188,7 +188,7 @@ class DCParameters(BaseModel):
     data_collection_tag: str = ""
 
 
-class ProcessingParametersTomo(BaseModel):
+class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -206,6 +206,12 @@ class ProcessingParametersTomo(BaseModel):
         dose_per_frame: float
         gain_ref: Optional[str]
         manual_tilt_offset: float
+
+
+class ProcessingParametersTomo(BaseModel):
+    manual_tilt_offset: int
+    tag: str
+    tilt_series_tag: str
 
 
 class ProcessingParametersSPA(BaseModel):

@@ -69,6 +69,7 @@ class ExtendedRecord(NamedTuple):
 
 
 class JobIDs(NamedTuple):
+    dcgid: int
     dcid: int
     pid: int
     appid: int
@@ -92,9 +93,6 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
         .where(db.TiltSeries.id == tilt_series_id)
     ).all()
-    logger.warning(
-        f"{all(r[0].motion_corrected for r in results)}, {results[0][1].complete}"
-    )
     return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
@@ -134,6 +132,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
             db.AutoProcProgram,
             db.ProcessingJob,
             db.DataCollection,
+            db.DataCollectionGroup,
             db.ClientEnvironment,
         )
         .where(db.TiltSeries.id == tilt_series_id)
@@ -141,13 +140,15 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
         .where(db.AutoProcProgram.id == appid)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+        .where(db.DataCollectionGroup.id == db.DataCollection.dcg_id)
         .where(db.ClientEnvironment.session_id == db.TiltSeries.session_id)
     ).all()
     return JobIDs(
+        dcgid=results[0][4].id,
         dcid=results[0][3].id,
         pid=results[0][2].id,
         appid=results[0][1].id,
-        client_id=results[0][4].client_id,
+        client_id=results[0][5].client_id,
     )
 
 
@@ -155,6 +156,15 @@ def get_tomo_proc_params(pj_id: int, *args) -> db.TomographyProcessingParameters
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
             db.TomographyProcessingParameters.pj_id == pj_id
+        )
+    ).one()
+    return results
+
+
+def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingParameters:
+    results = murfey_db.exec(
+        select(db.TomographyPreprocessingParameters).where(
+            db.TomographyPreprocessingParameters.dcg_id == dcg_id
         )
     ).one()
     return results
@@ -1670,6 +1680,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
                 params = get_tomo_proc_params(ids.pid)
+                preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
                     / "align_output"
@@ -1685,7 +1696,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
-                        "pix_size": params.pixel_size,
+                        "pix_size": preproc_params.pixel_size,
                         "manual_tilt_offset": params.manual_tilt_offset,
                     },
                 }

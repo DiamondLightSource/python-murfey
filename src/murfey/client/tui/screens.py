@@ -44,7 +44,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config
-from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -461,7 +461,7 @@ class ProcessingForm(Screen):
     def _write_params(
         self,
         params: dict | None = None,
-        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
+        model: PreprocessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
             try:
@@ -471,9 +471,9 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
-            if model == ProcessingParametersTomo:
+            if model == PreprocessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
@@ -978,7 +978,9 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
-                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
+                valid = validate_form(
+                    self._user_params, PreprocessingParametersTomo.Base
+                )
             else:
                 valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:

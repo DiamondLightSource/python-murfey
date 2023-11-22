@@ -4,7 +4,7 @@ import datetime
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import packaging.version
 import sqlalchemy
@@ -21,6 +21,7 @@ from ispyb.sqlalchemy import (
 )
 from PIL import Image
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -70,6 +71,7 @@ from murfey.util.models import (
     FractionationParameters,
     GainReference,
     MillingParameters,
+    PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
@@ -301,9 +303,9 @@ def register_spa_proc_params(
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
 
 
-@router.post("/clients/{client_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+@router.post("/clients/{client_id}/tomography_preprocessing_parameters")
+def register_tomo_preproc_params(
+    client_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
     zocalo_message = {
         "register": "tomography_processing_parameters",
@@ -312,6 +314,45 @@ def register_tomo_proc_params(
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
 
 
 @router.get("/clients/{client_id}/spa_processing_parameters")
@@ -402,6 +443,24 @@ def register_completed_tilt_series(
         ts.complete = True
         db.add(ts)
     db.commit()
+
+
+@router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
+def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
+    res = db.exec(
+        select(ClientEnvironment, TiltSeries, Tilt)
+        .where(ClientEnvironment.client_id == client_id)
+        .where(TiltSeries.tag == tilt_series_tag)
+        .where(TiltSeries.session_id == ClientEnvironment.session_id)
+        .where(Tilt.tilt_series_id == TiltSeries.id)
+    ).all()
+    tilts: Dict[str, List[str]] = {}
+    for el in res:
+        if tilts.get(el[1].rsync_source):
+            tilts[el[1].rsync_source].append(el[2].movie_path)
+        else:
+            tilts[el[1].rsync_source] = [el[2].movie_path]
+    return tilts
 
 
 @router.post("/visits/{visit_name}/tilt")

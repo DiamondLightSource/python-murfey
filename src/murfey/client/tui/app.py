@@ -431,7 +431,7 @@ class MurfeyTUI(App):
                 )
             log.info("Registering tomograpy processing parameters")
             requests.post(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                 json=json,
             )
             capture_post(

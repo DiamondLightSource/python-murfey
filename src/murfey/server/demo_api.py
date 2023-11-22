@@ -6,7 +6,7 @@ import random
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import packaging.version
 import sqlalchemy
@@ -60,6 +60,7 @@ from murfey.util.models import (
     File,
     FractionationParameters,
     GainReference,
+    PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
@@ -83,6 +84,7 @@ log = logging.getLogger("murfey.server.demo_api")
 tags_metadata = [murfey.server.bootstrap.tag]
 
 router = APIRouter()
+router.raw_count = 2
 
 
 global_counter = count()
@@ -298,16 +300,16 @@ def register_spa_proc_params(
     db.commit()
 
 
-@router.post("/clients/{client_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+@router.post("/clients/{client_id}/tomography_preprocessing_parameters")
+def register_tomo_preproc_params(
+    client_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
     client = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
     session_id = client.session_id
     log.info(
-        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+        f"Registering tomography preprocessing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
     )
     collected_ids = db.exec(
         select(
@@ -338,6 +340,45 @@ def register_tomo_proc_params(
             # manual_tilt_offset=proc_params.manual_tilt_offset,
         )
         db.add(params)
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
     if not db.exec(
         select(func.count(TomographyProcessingParameters.pj_id)).where(
             TomographyProcessingParameters.pj_id == collected_ids[2].id
@@ -405,6 +446,24 @@ def register_completed_tilt_series(
         ts.complete = True
         db.add(ts)
     db.commit()
+
+
+@router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
+def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
+    res = db.exec(
+        select(ClientEnvironment, TiltSeries, Tilt)
+        .where(ClientEnvironment.client_id == client_id)
+        .where(TiltSeries.tag == tilt_series_tag)
+        .where(TiltSeries.session_id == ClientEnvironment.session_id)
+        .where(Tilt.tilt_series_id == TiltSeries.id)
+    ).all()
+    tilts: Dict[str, List[str]] = {}
+    for el in res:
+        if tilts.get(el[1].rsync_source):
+            tilts[el[1].rsync_source].append(el[2].movie_path)
+        else:
+            tilts[el[1].rsync_source] = [el[2].movie_path]
+    return tilts
 
 
 @router.post("/visits/{visit_name}/{client_id}/tilt")
@@ -850,16 +909,18 @@ def shutdown():
 
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
-    count: int | None = None
+    count: int | None = router.raw_count
     check_path = (
         machine_config["rsync_basepath"] / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
+    check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
+    router.raw_count += 1
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 

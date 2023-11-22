@@ -553,6 +553,25 @@ class TomographyContext(Context):
                 )
 
         if res and environment:
+            for r in res:
+                associated_tilts = (
+                    requests.get(
+                        f"{str(environment.url.geturl())}/clients/{environment.client_id}/tilt_series/{r}/tilts"
+                    )
+                    .json()
+                    .get(str(file_path.parent), [])
+                )
+                manual_tilt_offset = _midpoint(
+                    [float(extract_tilt_angle(Path(t))) for t in associated_tilts]
+                )
+                capture_post(
+                    f"{str(environment.url.geturl())}/clients/{environment.client_id}/tomography_processing_parameters",
+                    json={
+                        "tag": str(file_path.parent),
+                        "tilt_series_tag": tilt_series,
+                        "manual_tilt_offset": manual_tilt_offset,
+                    },
+                )
             complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
             capture_post(
                 complete_url,
@@ -607,7 +626,6 @@ class TomographyContext(Context):
                 "eer_fractionation_file": eer_fractionation_file,
                 "tag": tilt_series,
             }
-            logger.info("Posting to tomography preprocessing")
             capture_post(preproc_url, json=preproc_data)
 
         if self._last_transferred_file:
