@@ -76,7 +76,9 @@ class RSyncer(Observer):
         # self.queue = queue.Queue[Optional[Path]]()
         self.queue: queue.Queue[Path | None] = queue.Queue()
         self.thread = threading.Thread(
-            name=f"RSync {self._basepath}:{self._remote}", target=self._process
+            name=f"RSync {self._basepath}:{self._remote}",
+            target=self._process,
+            daemon=True,
         )
         self._stopping = False
         self._halt_thread = False
@@ -167,13 +169,17 @@ class RSyncer(Observer):
                 continue
 
             files_to_transfer = [first] if not first.name.startswith(".") else []
+            stop = False
             try:
                 num_files = 0
                 while True:
                     if num_files > 100:
                         break
                     next_file = self.queue.get(block=True, timeout=0.1)
-                    if next_file and not next_file.name.startswith("."):
+                    if not next_file:
+                        stop = True
+                        break
+                    if not next_file.name.startswith("."):
                         files_to_transfer.append(next_file)
                         num_files += 1
             except queue.Empty:
@@ -205,6 +211,10 @@ class RSyncer(Observer):
                 logger.info(f"Waiting {backoff} seconds before next rsync attempt")
                 time.sleep(backoff)
 
+            if stop:
+                self.queue.task_done()
+                continue
+
         logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:
@@ -230,7 +240,7 @@ class RSyncer(Observer):
             )
             self.notify(update)
             updates.append(update)
-            time.sleep(0.1)
+            time.sleep(0.01)
             self.notify([update], secondary=True)
         # self.notify(updates, secondary=True)
 

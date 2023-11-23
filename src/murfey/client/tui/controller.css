@@ -26,6 +26,13 @@ ConfirmScreen {
     border: hidden;
 }
 
+WaitingScreen {
+    layout: grid;
+    grid_size: 4;
+    padding: 2;
+    border: hidden;
+}
+
 SessionSelection {
     layout: grid;
     grid-size: 4;
@@ -73,6 +80,18 @@ Input {
     background: deeppink;
 }
 
+#waiting-quit {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    background: teal;
+    border: solid black;
+}
+
+#waiting-quit:hover {
+    background: deeppink;
+}
+
 #add {
     width: 100%;
     height: 100%;
@@ -94,6 +113,18 @@ Input {
 }
 
 #launch:hover {
+    background: purple;
+}
+
+#waiting-launch {
+    width: 100%;
+    height: 100%;
+    column-span: 2;
+    background: teal;
+    border: solid black;
+}
+
+#waiting-launch:hover {
     background: purple;
 }
 
@@ -156,6 +187,20 @@ Input {
     height: 100%;
     column-span: 2;
     text-align: center;
+}
+
+#waiting-prompt {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    text-align: center;
+}
+
+#progress {
+    width: 100%;
+    height: 100%;
+    column-span: 4;
+    align: center middle;
 }
 
 #input-grid {

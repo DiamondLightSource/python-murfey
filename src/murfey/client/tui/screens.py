@@ -27,9 +27,10 @@ from textual.widgets import (
     Input,
     Label,
     OptionList,
+    ProgressBar,
+    RichLog,
     Static,
     Switch,
-    TextLog,
     Tree,
 )
 from werkzeug.utils import secure_filename
@@ -42,6 +43,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
+from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
@@ -128,7 +130,7 @@ class InputResponse(NamedTuple):
     model: BaseModel | None = None
 
 
-class LogBook(TextLog):
+class LogBook(RichLog):
     class Log(Message):
         def __init__(self, log_renderable):
             self.renderable = log_renderable
@@ -253,7 +255,7 @@ class LaunchScreen(Screen):
         )
 
         yield self._dir_tree
-        text_log = TextLog(id="selected-directories")
+        text_log = RichLog(id="selected-directories")
         widgets = [text_log, Button("Clear", id="clear")]
         if self.app._multigrid:
             widgets.append(Label("Data collection modality:"))
@@ -405,6 +407,7 @@ class ConfirmScreen(Screen):
                 except ScreenStackError:
                     break
             if self._push:
+                log.info(f"Pushing screen {self._push}")
                 self.app.push_screen(self._push)
             self.app.uninstall_screen("confirm")
         if self._callback and event.button.id == "launch":
@@ -1010,6 +1013,67 @@ class DestinationSelect(Screen):
         self.app.push_screen("main")
 
 
+class WaitingScreen(Screen):
+    def __init__(
+        self,
+        prompt: str,
+        num_files: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._num_files = 0
+        self._prompt = prompt
+        self._new_rsyncers: List[RSyncer] = []
+
+    def compose(self):
+        yield Static(self._prompt, id="waiting-prompt")
+        yield ProgressBar(id="progress")
+        yield Button("Start", id="waiting-launch")
+        yield Button("Back", id="waiting-quit")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "waiting-quit":
+            self.app.pop_screen()
+            self.app.uninstall_screen("waiting")
+        else:
+            sources = []
+            if self.app.rsync_processes or self.app._environment.demo:
+                for k, rp in self.app.rsync_processes.items():
+                    rp.stop()
+                    if self.app.analysers.get(k):
+                        self.app.analysers[k].stop()
+                    removal_rp = RSyncer.from_rsyncer(rp, remove_files=True)
+                    removal_rp._listeners = [self.file_copied]
+                    self._new_rsyncers.append(removal_rp)
+                    sources.append(k)
+            log.info(
+                f"Starting to remove data files {self.app._environment.demo}, {len(self.app.rsync_processes)}"
+            )
+            self.query_one(ProgressBar).update(total=self._num_files)
+            for k, removal_rp in zip(sources, self._new_rsyncers):
+                for f in k.absolute().glob("**/*"):
+                    if f.is_file():
+                        self._num_files += 1
+                        removal_rp.queue.put(f)
+                removal_rp.queue.put(None)
+            self.query_one(ProgressBar).update(total=self._num_files)
+            for removal_rp in self._new_rsyncers:
+                removal_rp.start()
+
+    def file_copied(self, *args, **kwargs):
+        self.query_one(ProgressBar).advance(1)
+        if self.query_one(ProgressBar).progress == self.query_one(ProgressBar).total:
+            requests.post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/successful_processing"
+            )
+            requests.delete(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session"
+            )
+            self.app.exit()
+            exit()
+
+
 class MainScreen(Screen):
     def compose(self):
         self.app.log_book = LogBook(id="log_book", wrap=True, max_lines=200)
@@ -1026,7 +1090,7 @@ class MainScreen(Screen):
             self.app._form_values, dependencies=self.app._form_dependencies
         )
         yield Header()
-        info_widget = TextLog(id="info", markup=True)
+        info_widget = RichLog(id="info", markup=True)
         yield info_widget
         yield self.app.log_book
         info_widget.write(

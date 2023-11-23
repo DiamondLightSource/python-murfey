@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from queue import Queue
-from typing import Dict, List, OrderedDict, TypeVar
+from typing import Awaitable, Callable, Dict, List, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
 import procrunner
@@ -26,6 +26,7 @@ from murfey.client.tui.screens import (
     ProcessingForm,
     SessionSelection,
     VisitSelection,
+    WaitingScreen,
     determine_default_destination,
 )
 from murfey.client.tui.status_bar import StatusBar
@@ -573,14 +574,10 @@ class MurfeyTUI(App):
             ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
-                ConfirmScreen(
-                    prompt,
-                    pressed_callback=self._remove_data,
-                    button_names={"launch": "Yes", "quit": "No"},
-                ),
-                "confirm",
+                WaitingScreen(prompt, sum(r["files_counted"] for r in rsync_instances)),
+                "waiting",
             )
-            self.push_screen("confirm")
+            self.push_screen("waiting")
 
     async def action_quit(self) -> None:
         log.info("quitting app")
@@ -635,21 +632,25 @@ class MurfeyTUI(App):
             )
             self.push_screen("clear-confirm")
 
-    def _remove_data(self, **kwargs):
-        log.info(
-            f"Starting to remove data files {self._environment.demo}, {len(self.rsync_processes)}"
-        )
+    def _remove_data(self, listener: Callable[..., Awaitable[None] | None], **kwargs):
+        new_rsyncers = []
         if self.rsync_processes or self._environment.demo:
             for k, rp in self.rsync_processes.items():
                 rp.stop()
                 if self.analysers.get(k):
                     self.analysers[k].stop()
                 removal_rp = RSyncer.from_rsyncer(rp, remove_files=True, notify=False)
-                removal_rp.start()
-                for f in k.absolute().glob("**/*"):
-                    removal_rp.queue.put(f)
-                removal_rp.stop()
-                log.info(f"rsyncer {rp} rerun with removal")
+                removal_rp.subscribe(listener)
+                new_rsyncers.append(removal_rp)
+        log.info(
+            f"Starting to remove data files {self._environment.demo}, {len(self.rsync_processes)}"
+        )
+        for removal_rp in new_rsyncers:
+            removal_rp.start()
+            for f in k.absolute().glob("**/*"):
+                removal_rp.queue.put(f)
+            removal_rp.stop()
+            log.info(f"rsyncer {rp} rerun with removal")
         requests.post(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
         )
