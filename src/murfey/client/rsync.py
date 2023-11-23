@@ -54,6 +54,7 @@ class RSyncer(Observer):
         do_transfer: bool = True,
         remove_files: bool = False,
         required_substrings_for_removal: List[str] = [],
+        notify: bool = True,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -63,6 +64,7 @@ class RSyncer(Observer):
         self._required_substrings_for_removal = required_substrings_for_removal
         self._local = local
         self._server_url = server_url
+        self._notify = notify
         if local:
             self._remote = str(basepath_remote)
         else:
@@ -76,7 +78,9 @@ class RSyncer(Observer):
         # self.queue = queue.Queue[Optional[Path]]()
         self.queue: queue.Queue[Path | None] = queue.Queue()
         self.thread = threading.Thread(
-            name=f"RSync {self._basepath}:{self._remote}", target=self._process
+            name=f"RSync {self._basepath}:{self._remote}",
+            target=self._process,
+            daemon=True,
         )
         self._stopping = False
         self._halt_thread = False
@@ -92,6 +96,7 @@ class RSyncer(Observer):
             "status_bar": rsyncer._statusbar,
             "do_transfer": rsyncer._do_transfer,
             "remove_files": rsyncer._remove_files,
+            "notify": rsyncer._notify,
         }
         kwarguments_from_rsyncer.update(kwargs)
         assert isinstance(kwarguments_from_rsyncer["local"], bool)
@@ -99,6 +104,7 @@ class RSyncer(Observer):
             assert isinstance(kwarguments_from_rsyncer["status_bar"], StatusBar)
         assert isinstance(kwarguments_from_rsyncer["do_transfer"], bool)
         assert isinstance(kwarguments_from_rsyncer["remove_files"], bool)
+        assert isinstance(kwarguments_from_rsyncer["notify"], bool)
         return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,
@@ -107,6 +113,7 @@ class RSyncer(Observer):
             status_bar=kwarguments_from_rsyncer["status_bar"],
             do_transfer=kwarguments_from_rsyncer["do_transfer"],
             remove_files=kwarguments_from_rsyncer["remove_files"],
+            notify=kwarguments_from_rsyncer["notify"],
         )
 
     @property
@@ -121,6 +128,10 @@ class RSyncer(Observer):
                 return "running"
             else:
                 return "ready"
+
+    def notify(self, *args, secondary: bool = False, **kwargs) -> None:
+        if self._notify:
+            super().notify(*args, secondary=secondary, **kwargs)
 
     def start(self):
         if self.thread.is_alive():
@@ -160,13 +171,17 @@ class RSyncer(Observer):
                 continue
 
             files_to_transfer = [first] if not first.name.startswith(".") else []
+            stop = False
             try:
                 num_files = 0
                 while True:
                     if num_files > 100:
                         break
                     next_file = self.queue.get(block=True, timeout=0.1)
-                    if next_file and not next_file.name.startswith("."):
+                    if not next_file:
+                        stop = True
+                        break
+                    if not next_file.name.startswith("."):
                         files_to_transfer.append(next_file)
                         num_files += 1
             except queue.Empty:
@@ -198,6 +213,10 @@ class RSyncer(Observer):
                 logger.info(f"Waiting {backoff} seconds before next rsync attempt")
                 time.sleep(backoff)
 
+            if stop:
+                self.queue.task_done()
+                continue
+
         logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:
@@ -223,7 +242,7 @@ class RSyncer(Observer):
             )
             self.notify(update)
             updates.append(update)
-            time.sleep(0.1)
+            time.sleep(0.01)
             self.notify([update], secondary=True)
         # self.notify(updates, secondary=True)
 
@@ -238,6 +257,8 @@ class RSyncer(Observer):
         next_file: RSyncerUpdate | None = None
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []
+
+        files = [f for f in files if f.is_file()]
 
         def parse_stdout(line: str):
             nonlocal next_file

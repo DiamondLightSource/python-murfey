@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import time
 from datetime import datetime
 from functools import partial, singledispatch
 from pathlib import Path
@@ -24,7 +25,8 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import PendingRollbackError, SQLAlchemyError
+from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 
 import murfey
@@ -96,7 +98,7 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
     return all(r[0].motion_corrected for r in results) and results[0][1].complete
 
 
-def get_all_tilts(tilt_series_id: str) -> List[str]:
+def get_all_tilts(tilt_series_id: int) -> List[str]:
     machine_config = get_machine_config()
     results = murfey_db.exec(
         select(db.Tilt).where(db.Tilt.tilt_series_id == tilt_series_id)
@@ -383,7 +385,23 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
     for ml in murfey_ledger:
         _db.add(ml)
     _db.commit()
-    res = [m.id for m in murfey_ledger if m.id is not None]
+    # There is a race condition between the IDs being read back from the database
+    # after the insert and the insert being synchronised so allow multiple attempts
+    attempts = 0
+    while attempts < 100:
+        try:
+            for m in murfey_ledger:
+                _db.refresh(m)
+            res = [m.id for m in murfey_ledger if m.id is not None]
+            break
+        except ObjectDeletedError:
+            pass
+        attempts += 1
+        time.sleep(0.1)
+    else:
+        raise RuntimeError(
+            "Maximum number of attempts exceeded when producing new Murfey IDs"
+        )
     if close:
         _db.close()
     return res
@@ -392,11 +410,7 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
 def _murfey_class2ds(
     murfey_ids: List[int], particles_file: str, app_id: int, _db, close: bool = False
 ):
-    pj_id = (
-        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
-        .one()
-        .pj_id
-    )
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-class2d")
     class2ds = [
         db.Class2D(
             class_number=i,
@@ -414,15 +428,11 @@ def _murfey_class2ds(
 
 
 def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
-    pj_id = (
-        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
-        .one()
-        .pj_id
-    )
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-class3d")
     class3ds = [
         db.Class3D(
             class_number=i,
-            particles_file=particles_file,
+            particles_file=str(Path(particles_file).parent),
             pj_id=pj_id,
             murfey_id=mid,
         )
@@ -456,7 +466,8 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     )
     classes = _db.exec(
         select(db.Class3D).where(
-            db.Class3D.particles_file == particles_file and db.Class3D.pj_id == pj_id
+            db.Class3D.particles_file == str(Path(particles_file).parent)
+            and db.Class3D.pj_id == pj_id
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
@@ -575,7 +586,7 @@ def _register_picked_particles_use_diameter(
                 _register_class_selection(
                     {
                         "session_id": s.session_id,
-                        "class_selection_score": s.class_selection_score,
+                        "class_selection_score": s.class_selection_score or 0,
                     },
                     _db=_db,
                     demo=demo,
@@ -769,7 +780,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "autoproc_program_id": message["program_id"],
                 "pix_size": relion_params.angpix,
                 "fm_dose": relion_params.dose_per_frame,
@@ -836,7 +847,6 @@ def _release_3d_hold(message: dict, _db=murfey_db):
     class3d_params = _db.exec(
         select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
     ).one()
-    feedback_params.hold_class3d = False
     if class3d_params.run:
         machine_config = get_machine_config()
         zocalo_message = {
@@ -886,6 +896,8 @@ def _release_3d_hold(message: dict, _db=murfey_db):
             )
         class3d_params.run = False
         _db.add(class3d_params)
+    else:
+        feedback_params.hold_class3d = False
     _db.add(feedback_params)
     _db.commit()
     _db.close()
@@ -1117,6 +1129,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
+                "autoselect_min_score": 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
@@ -1187,7 +1200,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
@@ -1273,7 +1286,7 @@ def _flush_class2d(
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
-                "autoselect_min_score": feedback_params.class_selection_score,
+                "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _2d_class_murfey_ids(
                     saved_message.particles_file, _app_id(pj_id, _db), _db
@@ -1329,14 +1342,14 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     if feedback_params.picker_ispyb_id is None:
         selection_stash = db.SelectionStash(
             pj_id=pj_id,
-            class_selection_score=message["class_selection_score"],
+            class_selection_score=message["class_selection_score"] or 0,
         )
         _db.add(selection_stash)
         _db.commit()
         _db.close()
         return
 
-    feedback_params.class_selection_score = message.get("class_selection_score")
+    feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False
     next_job = feedback_params.next_job
     if demo:
@@ -1649,7 +1662,11 @@ def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
         if "environment" in message:
+            params = message["recipe"][str(message["recipe-pointer"])].get(
+                "parameters", {}
+            )
             message = message["payload"]
+            message.update(params)
         if message["register"] == "motion_corrected":
             collected_ids = murfey_db.exec(
                 select(
@@ -2003,15 +2020,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "mc_uuid": murfey_ids[2 * i],
                         "ft_bin": proc_params.motion_corr_binning,
                         "fm_dose": proc_params.dose_per_frame,
-                        "gain_ref": str(
-                            machine_config.rsync_basepath / proc_params.gain_ref
-                        )
-                        if proc_params.gain_ref
-                        else proc_params.gain_ref,
+                        "gain_ref": proc_params.gain_ref,
                         "downscale": proc_params.downscale,
                         "picker_uuid": murfey_ids[2 * i + 1],
                         "session_id": session_id,
                         "particle_diameter": proc_params.particle_diameter or 0,
+                        "fm_int_file": f.eer_fractionation_file,
                     },
                 }
                 if _transport_object:
@@ -2055,14 +2069,17 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.SPARelionParameters.pj_id == pj_id
                 )
             ).all():
+                machine_config = get_machine_config()
                 params = db.SPARelionParameters(
                     pj_id=collected_ids[2].id,
                     angpix=0.8,  # message["pixel_size_on_image"],
                     dose_per_frame=message["dose_per_frame"],
-                    gain_ref=message["gain_ref"],
+                    gain_ref=str(machine_config.rsync_basepath / message["gain_ref"])
+                    if message["gain_ref"]
+                    else message["gain_ref"],
                     voltage=message["voltage"],
                     motion_corr_binning=message["motion_corr_binning"],
-                    eer_grouping=message["eer_grouping"],
+                    eer_grouping=message["eer_fractionation"],
                     symmetry=message["symmetry"],
                     particle_diameter=message["particle_diameter"],
                     downscale=message["downscale"],
@@ -2189,6 +2206,9 @@ def feedback_callback(header: dict, message: dict) -> None:
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
+    except PendingRollbackError:
+        murfey_db.rollback()
+        murfey_db.close()
     except Exception:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True

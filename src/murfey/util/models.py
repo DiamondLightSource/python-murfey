@@ -143,6 +143,7 @@ class TiltSeriesGroupInfo(BaseModel):
 
 class CompletedTiltSeries(BaseModel):
     tilt_series: List[str]
+    rsync_source: str
 
 
 class TiltSeriesProcessingDetails(BaseModel):
@@ -232,7 +233,7 @@ class ProcessingParametersSPA(BaseModel):
     boxsize: Optional[int]
     downscale: bool
     small_boxsize: Optional[int]
-    eer_grouping: int
+    eer_fractionation: int
     particle_diameter: Optional[float]
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
@@ -250,7 +251,7 @@ class ProcessingParametersSPA(BaseModel):
         boxsize: Optional[int]
         downscale: bool
         small_boxsize: Optional[int]
-        eer_grouping: int
+        eer_fractionation: int
 
 
 class ProcessingJobParameters(BaseModel):

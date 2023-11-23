@@ -285,6 +285,7 @@ class TomographyContext(Context):
                             "dose_per_frame": environment.data_collection_parameters[
                                 "dose_per_frame"
                             ],
+                            "fractionation_file_name": "eer_fractionation_tomo.txt",
                         },
                     )
                     eer_fractionation_file = response.json()["eer_fractionation_file"]
@@ -439,11 +440,9 @@ class TomographyContext(Context):
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
                         "image_directory": str(
-                            Path(
-                                environment.default_destinations.get(
-                                    file_path.parent, file_path.parent
-                                )
-                            ).resolve()
+                            environment.default_destinations.get(
+                                file_path.parent, file_path.parent
+                            )
                         ),
                         "data_collection_tag": tilt_series,
                         "source": str(self._basepath),
@@ -549,6 +548,7 @@ class TomographyContext(Context):
                     tilt_series,
                     required_position_files or [],
                     file_transferred_to,
+                    rsync_source=source,
                     environment=environment,
                 )
 
@@ -598,6 +598,10 @@ class TomographyContext(Context):
                         "fractionation": environment.data_collection_parameters[
                             "eer_fractionation"
                         ],
+                        "dose_per_frame": environment.data_collection_parameters[
+                            "dose_per_frame"
+                        ],
+                        "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]
@@ -645,6 +649,7 @@ class TomographyContext(Context):
                     tilt_series,
                     required_position_files or [],
                     file_transferred_to,
+                    rsync_source=source,
                     environment=environment,
                 )
         self._last_transferred_file = file_path
@@ -655,6 +660,7 @@ class TomographyContext(Context):
         tilt_series: str,
         required_position_files: List[Path],
         file_transferred_to: Path | None,
+        rsync_source: Path,
         environment: MurfeyInstanceEnvironment | None = None,
     ):
         newly_completed_series = []
@@ -672,15 +678,19 @@ class TomographyContext(Context):
             self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
         for ts, ta in self._tilt_series.items():
+            required_position_files_check = (
+                all(_f.is_file() for _f in required_position_files)
+                if required_position_files
+                else True
+            )
             if self._tilt_series_sizes.get(ts):
                 completion_test = len(ta) >= self._tilt_series_sizes[ts]
-                if required_position_files and completion_test:
-                    completion_test = all(
-                        _f.is_file() for _f in required_position_files
-                    )
+                if completion_test:
+                    completion_test = required_position_files_check
             else:
-                completion_test = False
-            #     completion_test = len(ta) >= tilt_series_size
+                completion_test = (
+                    required_position_files_check and len(ta) >= tilt_series_size
+                )
             if ts not in self._completed_tilt_series and completion_test:
                 newly_completed_series.append(ts)
                 self._completed_tilt_series.append(ts)
@@ -740,7 +750,10 @@ class TomographyContext(Context):
                 completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
                 requests.post(
                     completed_tilt_endpoint,
-                    json={"tilt_series": newly_completed_series},
+                    json={
+                        "tilt_series": newly_completed_series,
+                        "rsync_source": str(rsync_source),
+                    },
                 )
         return newly_completed_series
 
@@ -858,6 +871,7 @@ class TomographyContext(Context):
                             self._file_transferred_to(
                                 environment, source, transferred_file
                             ),
+                            rsync_source=transferred_file.parent,
                             environment=environment,
                         )
         if completed_tilts and environment:
@@ -960,7 +974,7 @@ class TomographyContext(Context):
                     )
             if mdoc_metadata.get("pixel_size_on_image") is None:
                 mdoc_metadata["pixel_size_on_image"] = (
-                    float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+                    float(mdoc_data["PixelSpacing"]) * 1e-10
                 )
             mdoc_metadata["motion_corr_binning"] = binning_factor
             mdoc_metadata["gain_ref"] = (

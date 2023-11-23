@@ -437,6 +437,7 @@ def register_completed_tilt_series(
     tilt_series_db = db.exec(
         select(TiltSeries)
         .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
+        .where(TiltSeries.rsync_source == completed_tilt_series.rsync_source)
         .where(TiltSeries.session_id == session_id)
     ).all()
     for ts in tilt_series_db:
@@ -465,9 +466,12 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
 
 @router.post("/visits/{visit_name}/tilt")
 def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
-    tilt = Tilt(
-        movie_path=tilt_info.movie_path, tilt_series_tag=tilt_info.tilt_series_tag
-    )
+    tilt_series = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+        .where(TiltSeries.rsync_source == tilt_info.rsync_source)
+    ).one()
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
     db.add(tilt)
     db.commit()
 
@@ -679,6 +683,8 @@ async def request_spa_preprocessing(
             Path(secure_filename(str(mrc_out))).parent.mkdir(
                 parents=True, exist_ok=True
             )
+        if not Path(proc_file.path).is_file():
+            return proc_file
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -694,9 +700,7 @@ async def request_spa_preprocessing(
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(machine_config.rsync_basepath / proc_params["gain_ref"])
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
+                "gain_ref": proc_params["gain_ref"],
                 "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
@@ -720,6 +724,7 @@ async def request_spa_preprocessing(
             client_id=client_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
+            eer_fractionation_file=str(proc_file.eer_fractionation_file),
         )
         db.add(for_stash)
         db.commit()
@@ -932,7 +937,8 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     log.info(
-        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)}"
+        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
+        f"with basepath {machine_config.rsync_basepath} and directory {dc_params.image_directory}"
     )
     dc_parameters = {
         "visit": visit_name,
@@ -1057,6 +1063,7 @@ async def write_eer_fractionation_file(
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
+        / "processing"
         / secure_filename(fractionation_params.fractionation_file_name)
     )
     if file_path.is_file():
@@ -1202,7 +1209,7 @@ def register_processing_success_in_ispyb(
     appids = [c[3].id for c in collected_ids]
     if _transport_object:
         apps = db.query(ISPyBAutoProcProgram).filter(
-            ISPyBAutoProcProgram.autoProcProgram.in_(appids)
+            ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
         )
         for updated in apps:
             updated.processingStatus = True
@@ -1241,9 +1248,16 @@ def remove_session(client_id: int, db=murfey_db):
             prom.preprocessed_movies.remove(c[2].id)
         except KeyError:
             continue
-    if db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
-    ).all():
+    if (
+        len(
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.session_id == session_id
+                )
+            ).all()
+        )
+        > 1
+    ):
         return
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)

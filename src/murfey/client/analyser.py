@@ -10,7 +10,7 @@ from murfey.client.context import Context
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.client.rsync import RSyncerUpdate
+from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
@@ -186,6 +186,8 @@ class Analyser(Observer):
                         mdoc_for_reading or transferred_file,
                         environment=self._environment,
                     )
+                    if not dc_metadata:
+                        mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
                     mdoc_for_reading = transferred_file
             if not self._context:
@@ -259,6 +261,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         if not dc_metadata or not self._force_mdoc_metadata:
+                            mdoc_for_reading = None
                             self._unseen_xml.append(transferred_file)
                         if dc_metadata:
                             self._unseen_xml = []
@@ -325,7 +328,7 @@ class Analyser(Observer):
         return base_dir / self._environment.visit / mid_dir / file_name
 
     def enqueue(self, rsyncer: RSyncerUpdate):
-        if not self._stopping:
+        if not self._stopping and rsyncer.outcome == TransferResult.SUCCESS:
             absolute_path = (self._basepath / rsyncer.file_path).resolve()
             self.queue.put(absolute_path)
 

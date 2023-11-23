@@ -138,6 +138,7 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
     image_number: int
     mrc_out: str
+    eer_fractionation_file: Optional[str]
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )
@@ -312,7 +313,7 @@ class Class3DParameters(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     batch_size: int
-    run: bool = True
+    run: bool = False
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="class3d_parameters"
     )

@@ -8,6 +8,7 @@ from typing import Any, Dict, OrderedDict
 import requests
 import xmltodict
 
+import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
     MovieID,
@@ -71,7 +72,7 @@ class _SPAContext(Context):
         ),
         ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
-        ProcessingParameter("eer_grouping", "EER Grouping", default=20),
+        ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
         ProcessingParameter(
             "mask_diameter", "Mask Diameter (2D classification)", default=190
         ),
@@ -169,11 +170,14 @@ class _SPAContext(Context):
                 )  # convert e / m^2 to e / A^2
             except ValueError:
                 metadata["total_exposed_dose"] = 1
-            num_fractions = int(
-                data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                    "CameraSpecificInput"
-                ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
-            )
+            try:
+                num_fractions = int(
+                    data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                        "CameraSpecificInput"
+                    ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
+                )
+            except (KeyError, IndexError):
+                pass
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
             ][3]["a:Value"]["#text"]
@@ -194,18 +198,12 @@ class _SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
-        binning_factor = int(
+        binning_factor_xml = int(
             data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
                 "Binning"
             ]["a:x"]
         )
-        if binning_factor == 2:
-            metadata["image_size_x"] = str(
-                int(metadata["image_size_x"]) * binning_factor
-            )
-            metadata["image_size_y"] = str(
-                int(metadata["image_size_y"]) * binning_factor
-            )
+        binning_factor = 1
         if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
@@ -228,7 +226,9 @@ class _SPAContext(Context):
         metadata["pixel_size_on_image"] = (
             metadata["pixel_size_on_image"] / binning_factor
         )
-        metadata["motion_corr_binning"] = binning_factor
+        metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
+        metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
+        metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
         if environment:
             metadata["gain_ref"] = (
                 environment.data_collection_parameters.get("gain_ref")
@@ -292,8 +292,8 @@ class _SPAContext(Context):
             if environment
             else None
         ) or 128
-        metadata["eer_grouping"] = (
-            environment.data_collection_parameters.get("eer_grouping")
+        metadata["eer_fractionation"] = (
+            environment.data_collection_parameters.get("eer_fractionation")
             if environment
             else None
         ) or 20
@@ -308,6 +308,20 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
+        images_disc_index: int = 0
+        for i, p in enumerate(metadata_file.parts):
+            if p.startswith("Images-Disc"):
+                images_disc_index = i
+        if images_disc_index:
+            data_file = (
+                Path("/".join(metadata_file.parts[: images_disc_index - 2]))
+                / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
+                / metadata_file.with_suffix(".eer").name
+            )
+            if data_file.is_file():
+                metadata["num_eer_frames"] = murfey.util.eer.num_frames(
+                    metadata_file.parent.parent / metadata_file.parent.name / data_file
+                )
         return metadata
 
 
@@ -371,6 +385,7 @@ class SPAModularContext(_SPAContext):
                                     "dose_per_frame": environment.data_collection_parameters[
                                         "dose_per_frame"
                                     ],
+                                    "fractionation_file_name": "eer_fractionation_spa.txt",
                                 },
                             )
                             eer_fractionation_file = response.json()[
@@ -513,7 +528,7 @@ class SPAContext(_SPAContext):
                 "voltage": parameters["voltage"],
                 "gain_ref": parameters["gain_ref"],
                 "dose_per_frame": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_grouping"],
+                "eer_grouping": parameters["eer_fractionation"],
                 "import_images": import_images,
                 "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
                 "symmetry": parameters["symmetry"],
