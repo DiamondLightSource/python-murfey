@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import socket
+import time
 from datetime import datetime
 from functools import lru_cache, partial, singledispatch
 from pathlib import Path
@@ -26,6 +27,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
 from rich.logging import RichHandler
 from sqlalchemy import func
 from sqlalchemy.exc import PendingRollbackError, SQLAlchemyError
+from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 
 import murfey
@@ -394,7 +396,23 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
     for ml in murfey_ledger:
         _db.add(ml)
     _db.commit()
-    res = [m.id for m in murfey_ledger if m.id is not None]
+    # There is a race condition between the IDs being read back from the database
+    # after the insert and the insert being synchronised so allow multiple attempts
+    attempts = 0
+    while attempts < 100:
+        try:
+            for m in murfey_ledger:
+                _db.refresh(m)
+            res = [m.id for m in murfey_ledger if m.id is not None]
+            break
+        except ObjectDeletedError:
+            pass
+        attempts += 1
+        time.sleep(0.1)
+    else:
+        raise RuntimeError(
+            "Maximum number of attempts exceeded when producing new Murfey IDs"
+        )
     if close:
         _db.close()
     return res
