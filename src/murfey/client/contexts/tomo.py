@@ -965,7 +965,7 @@ class TomographyContext(Context):
                     )
             if mdoc_metadata.get("pixel_size_on_image") is None:
                 mdoc_metadata["pixel_size_on_image"] = (
-                    float(mdoc_data["PixelSpacing"]) * 1e-10 / binning_factor
+                    float(mdoc_data["PixelSpacing"]) * 1e-10
                 )
             mdoc_metadata["motion_corr_binning"] = binning_factor
             mdoc_metadata["gain_ref"] = (

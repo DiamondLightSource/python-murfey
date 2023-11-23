@@ -197,18 +197,12 @@ class _SPAContext(Context):
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
-        binning_factor = int(
+        binning_factor_xml = int(
             data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
                 "Binning"
             ]["a:x"]
         )
-        if binning_factor == 2:
-            metadata["image_size_x"] = str(
-                int(metadata["image_size_x"]) * binning_factor
-            )
-            metadata["image_size_y"] = str(
-                int(metadata["image_size_y"]) * binning_factor
-            )
+        binning_factor = 1
         if environment:
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
@@ -231,7 +225,9 @@ class _SPAContext(Context):
         metadata["pixel_size_on_image"] = (
             metadata["pixel_size_on_image"] / binning_factor
         )
-        metadata["motion_corr_binning"] = binning_factor
+        metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
+        metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
+        metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
         if environment:
             metadata["gain_ref"] = (
                 environment.data_collection_parameters.get("gain_ref")
