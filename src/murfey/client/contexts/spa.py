@@ -315,7 +315,9 @@ class _SPAContext(Context):
             data_file = (
                 Path("/".join(metadata_file.parts[: images_disc_index - 2]))
                 / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
-                / metadata_file.with_suffix(".eer").name
+                / metadata_file.with_name(metadata_file.stem + "_EER")
+                .with_suffix(".eer")
+                .name
             )
             if data_file.is_file():
                 metadata["num_eer_frames"] = murfey.util.eer.num_frames(
