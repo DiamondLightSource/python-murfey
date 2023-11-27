@@ -26,7 +26,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy import func
-from sqlalchemy.exc import PendingRollbackError, SQLAlchemyError
+from sqlalchemy.exc import InvalidRequestError, PendingRollbackError, SQLAlchemyError
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 
@@ -405,7 +405,7 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
                 _db.refresh(m)
             res = [m.id for m in murfey_ledger if m.id is not None]
             break
-        except ObjectDeletedError:
+        except (ObjectDeletedError, InvalidRequestError):
             pass
         attempts += 1
         time.sleep(0.1)
