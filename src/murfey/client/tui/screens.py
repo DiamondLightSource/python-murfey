@@ -194,7 +194,7 @@ class _DirectoryTree(DirectoryTree):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
-        dir_entry = event.path
+        dir_entry = event.node.data.path
         if dir_entry is None:
             return
         if dir_entry.is_dir():
@@ -221,7 +221,7 @@ class _DirectoryTreeGain(DirectoryTree):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
-        dir_entry = event.path
+        dir_entry = event.node.data.path
         if dir_entry is None:
             return
         if not dir_entry.is_dir():
