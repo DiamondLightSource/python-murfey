@@ -92,7 +92,7 @@ class _SPAContext(Context):
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__(acquisition_software)
+        super().__init__("SPA", acquisition_software)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
