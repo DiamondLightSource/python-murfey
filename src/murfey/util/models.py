@@ -275,7 +275,7 @@ class MillingParameters(BaseModel):
 
 
 class FractionationParameters(BaseModel):
-    num_frames: int
+    eer_path: str
     fractionation: int
     dose_per_frame: float
     fractionation_file_name: str = "eer_fractionation.txt"

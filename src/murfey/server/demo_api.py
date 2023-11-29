@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 import murfey.server.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
+import murfey.util.eer
 from murfey.server import (
     _murfey_id,
     _register_picked_particles_use_diameter,
@@ -980,8 +981,14 @@ async def write_eer_fractionation_file(
     log.info(f"EER fractionation file {file_path} creation requested")
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
-    with open(file_path, "w") as frac_file:
-        frac_file.write(
-            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
-        )
-    return {"eer_fractionation_file": str(file_path)}
+
+    eer_file = Path(fractionation_params.eer_path)
+    if eer_file.suffix == ".eer" and eer_file.is_file():
+        num_eer_frames = murfey.util.eer.num_frames(eer_file)
+        with open(file_path, "w") as frac_file:
+            frac_file.write(
+                f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            )
+        return {"eer_fractionation_file": str(file_path)}
+    else:
+        return {"eer_fractionation_file": None}

@@ -8,7 +8,6 @@ from typing import Any, Dict, OrderedDict
 import requests
 import xmltodict
 
-import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
     MovieID,
@@ -307,22 +306,6 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
-        images_disc_index: int = 0
-        for i, p in enumerate(metadata_file.parts):
-            if p.startswith("Images-Disc"):
-                images_disc_index = i
-        if images_disc_index:
-            data_file = (
-                Path("/".join(metadata_file.parts[: images_disc_index - 2]))
-                / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
-                / metadata_file.with_name(metadata_file.stem + "_EER")
-                .with_suffix(".eer")
-                .name
-            )
-            if data_file.is_file():
-                metadata["num_eer_frames"] = murfey.util.eer.num_frames(
-                    metadata_file.parent.parent / metadata_file.parent.name / data_file
-                )
         return metadata
 
 
@@ -372,26 +355,22 @@ class SPAModularContext(_SPAContext):
                             motion_correction_uuid=next(MurfeyID),
                         )
 
-                        eer_fractionation_file = None
-                        if environment.data_collection_parameters.get("num_eer_frames"):
-                            response = requests.post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
-                                json={
-                                    "num_frames": environment.data_collection_parameters[
-                                        "num_eer_frames"
-                                    ],
-                                    "fractionation": environment.data_collection_parameters[
-                                        "eer_fractionation"
-                                    ],
-                                    "dose_per_frame": environment.data_collection_parameters[
-                                        "dose_per_frame"
-                                    ],
-                                    "fractionation_file_name": "eer_fractionation_spa.txt",
-                                },
-                            )
-                            eer_fractionation_file = response.json()[
-                                "eer_fractionation_file"
-                            ]
+                        response = requests.post(
+                            f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                            json={
+                                "eer_path": file_transferred_to,
+                                "fractionation": environment.data_collection_parameters[
+                                    "eer_fractionation"
+                                ],
+                                "dose_per_frame": environment.data_collection_parameters[
+                                    "dose_per_frame"
+                                ],
+                                "fractionation_file_name": "eer_fractionation_spa.txt",
+                            },
+                        )
+                        eer_fractionation_file = response.json()[
+                            "eer_fractionation_file"
+                        ]
 
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
