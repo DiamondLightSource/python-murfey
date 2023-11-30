@@ -355,22 +355,24 @@ class SPAModularContext(_SPAContext):
                             motion_correction_uuid=next(MurfeyID),
                         )
 
-                        response = requests.post(
-                            f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
-                            json={
-                                "eer_path": file_transferred_to,
-                                "fractionation": environment.data_collection_parameters[
-                                    "eer_fractionation"
-                                ],
-                                "dose_per_frame": environment.data_collection_parameters[
-                                    "dose_per_frame"
-                                ],
-                                "fractionation_file_name": "eer_fractionation_spa.txt",
-                            },
-                        )
-                        eer_fractionation_file = response.json()[
-                            "eer_fractionation_file"
-                        ]
+                        eer_fractionation_file = None
+                        if file_transferred_to.suffix == ".eer":
+                            response = requests.post(
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                                json={
+                                    "eer_path": file_transferred_to,
+                                    "fractionation": environment.data_collection_parameters[
+                                        "eer_fractionation"
+                                    ],
+                                    "dose_per_frame": environment.data_collection_parameters[
+                                        "dose_per_frame"
+                                    ],
+                                    "fractionation_file_name": "eer_fractionation_spa.txt",
+                                },
+                            )
+                            eer_fractionation_file = response.json()[
+                                "eer_fractionation_file"
+                            ]
 
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {

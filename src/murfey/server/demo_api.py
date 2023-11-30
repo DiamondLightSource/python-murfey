@@ -982,13 +982,20 @@ async def write_eer_fractionation_file(
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
 
-    eer_file = Path(fractionation_params.eer_path)
-    if eer_file.suffix == ".eer" and eer_file.is_file():
-        num_eer_frames = murfey.util.eer.num_frames(eer_file)
-        with open(file_path, "w") as frac_file:
-            frac_file.write(
-                f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
-            )
-        return {"eer_fractionation_file": str(file_path)}
+    if fractionation_params.num_frames:
+        num_eer_frames = fractionation_params.num_frames
+    elif (
+        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+    ):
+        num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
     else:
+        log.warning(
+            f"EER fractionation unable to find {fractionation_params.eer_path} "
+            f"or use {fractionation_params.num_frames} frames"
+        )
         return {"eer_fractionation_file": None}
+    with open(file_path, "w") as frac_file:
+        frac_file.write(
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+        )
+    return {"eer_fractionation_file": str(file_path)}
