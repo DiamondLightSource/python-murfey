@@ -21,9 +21,9 @@ import re
 import packaging.version
 import requests
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
-from murfey.server import respond_with_template
+from murfey.server import get_machine_config, respond_with_template
 
 tag = {
     "name": "bootstrap",
@@ -35,6 +35,7 @@ tag = {
 }
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
+plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
@@ -103,6 +104,12 @@ def get_pypi_file(package: str, filename: str):
         media_type=original_file.headers.get("Content-Type"),
         status_code=original_file.status_code,
     )
+
+
+@plugins.get("/{package}", response_class=FileResponse)
+def get_plugin_wheel(package: str):
+    machine_config = get_machine_config()
+    return machine_config.plugin_packages.get(package)
 
 
 @bootstrap.get("/", response_class=HTMLResponse)

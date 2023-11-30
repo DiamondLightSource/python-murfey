@@ -24,7 +24,6 @@ from pydantic import BaseModel
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
-import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws

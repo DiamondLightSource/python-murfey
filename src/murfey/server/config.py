@@ -35,6 +35,7 @@ class MachineConfig(BaseModel):
     processing_enabled: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
+    plugin_packages: Dict[str, Path] = {}
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
