@@ -360,7 +360,7 @@ class SPAModularContext(_SPAContext):
                             response = requests.post(
                                 f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
                                 json={
-                                    "eer_path": file_transferred_to,
+                                    "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
                                         "eer_fractionation"
                                     ],
