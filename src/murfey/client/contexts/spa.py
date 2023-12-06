@@ -206,8 +206,11 @@ class _SPAContext(Context):
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            if server_config.get("superres") and environment.superres:
+            if server_config.get("superres") and not environment.superres:
+                # If camera is capable of superres and collection is in superres
                 binning_factor = 2
+            elif not server_config.get("superres"):
+                binning_factor_xml = 2
             if magnification:
                 ps_from_mag = (
                     server_config.get("calibrations", {})
