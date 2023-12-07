@@ -12,7 +12,7 @@ import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -883,23 +883,38 @@ async def new_client_id(db=murfey_db):
 
 
 @router.get("/clients")
-async def get_clients(db=murfey_db):
+async def get_clients(db=murfey_db) -> List[ClientEnvironment]:
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
 
 
+class SessionClients(BaseModel):
+    session: Session
+    clients: List[ClientEnvironment]
+
+
 @router.get("/sessions")
-async def get_sessions(db=murfey_db):
+async def get_sessions(db=murfey_db) -> List[SessionClients]:
     sessions = db.exec(select(Session)).all()
     clients = db.exec(select(ClientEnvironment)).all()
     res = []
     for sess in sessions:
-        r = {"session": sess, "clients": []}
+        r = SessionClients(session=sess, clients=[])
         for cl in clients:
             if cl.session_id == sess.id:
-                r["clients"].append(cl)
+                r.clients.append(cl)
         res.append(r)
     return res
+
+
+@router.get("/session/{session_id}")
+async def get_session(session_id: int, db=murfey_db) -> SessionClients:
+    print("session requested", session_id)
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    clients = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+    ).all()
+    return SessionClients(session=session, clients=clients)
 
 
 @router.post("/clients/{client_id}/session")

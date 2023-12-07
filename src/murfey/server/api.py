@@ -1053,16 +1053,21 @@ async def get_clients(db=murfey_db):
     return clients
 
 
-@router.get("/sessions")
-async def get_sessions(db=murfey_db):
+class SessionClients(BaseModel):
+    session: Session
+    clients: List[ClientEnvironment]
+
+
+@router.get("/sessions", response_class=SessionClients)
+async def get_sessions(db=murfey_db) -> List[SessionClients]:
     sessions = db.exec(select(Session)).all()
     clients = db.exec(select(ClientEnvironment)).all()
     res = []
     for sess in sessions:
-        r = {"session": sess, "clients": []}
+        r = SessionClients(session=sess, clients=[])
         for cl in clients:
             if cl.session_id == sess.id:
-                r["clients"].append(cl)
+                r.clients.append(cl)
         res.append(r)
     return res
 
