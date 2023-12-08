@@ -226,6 +226,13 @@ class MurfeyTUI(App):
         self.rsync_processes[source].subscribe(rsync_result)
         self.rsync_processes[source].subscribe(
             partial(
+                self._increment_transferred_files_prometheus,
+                destination=destination,
+                source=str(source),
+            )
+        )
+        self.rsync_processes[source].subscribe(
+            partial(
                 self._increment_transferred_files,
                 destination=destination,
                 source=str(source),
