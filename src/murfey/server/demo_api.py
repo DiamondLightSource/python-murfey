@@ -179,8 +179,8 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
-@router.get("/clients/{client_id}/rsyncers")
-def get_rsyncers_for_client(client_id: int, db=murfey_db):
+@router.get("/clients/{client_id}/rsyncers", response_model=List[RsyncInstance])
+def get_rsyncers_for_client(client_id: int, db=murfey_db) -> List[RsyncInstance]:
     log.info("rsyncers requested")
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
@@ -188,6 +188,21 @@ def get_rsyncers_for_client(client_id: int, db=murfey_db):
     res = rsync_instances.all()
     log.info(res)
     return res
+
+
+@router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
+def get_rsyncers_for_session(session_id: int, db=murfey_db) -> List[RsyncInstance]:
+    client_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+        )
+        .all()[0]
+        .client_id
+    )
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+    )
+    return rsync_instances.all()
 
 
 @router.post("/visits/{visit_name}/increment_rsync_file_count")
