@@ -323,6 +323,61 @@ def register_spa_proc_params(
     db.commit()
 
 
+class ProcessingDetails(BaseModel):
+    data_collection_group: DataCollectionGroup
+    data_collections: List[DataCollection]
+    processing_jobs: List[ProcessingJob]
+    relion_params: SPARelionParameters
+    feedback_params: SPAFeedbackParameters
+
+
+@router.get("/sessions/{session_id}/spa_processing_parameters")
+def get_spa_proc_param_details(
+    session_id: int, db=murfey_db
+) -> List[ProcessingDetails] | None:
+    params = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            SPARelionParameters,
+            SPAFeedbackParameters,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.id == DataCollection.dcg_id)
+        .where(DataCollection.id == ProcessingJob.dc_id)
+        .where(SPARelionParameters.pj_id == ProcessingJob.id)
+        .where(SPAFeedbackParameters.pj_id == ProcessingJob.id)
+    ).all()
+    if not params:
+        return None
+    unique_dcg_indices = []
+    dcg_ids = []
+    for i, p in enumerate(params):
+        if p[0].id not in dcg_ids:
+            dcg_ids.append(p[0].id)
+            unique_dcg_indices.append(i)
+
+    def _parse(ps, i, dcg_id):
+        res = []
+        for p in ps:
+            if p[0].id == dcg_id:
+                if p[i] not in res:
+                    res.append(p[i])
+        return res
+
+    return [
+        ProcessingDetails(
+            data_collection_group=params[i][0],
+            data_collections=_parse(params, 1, d),
+            processing_jobs=_parse(params, 2, d),
+            relion_params=_parse(params, 3, d)[0],
+            feedback_params=_parse(params, 4, d)[0],
+        )
+        for i, d in zip(unique_dcg_indices, dcg_ids)
+    ]
+
+
 @router.get("/clients/{client_id}/spa_processing_parameters")
 def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     params = db.exec(
