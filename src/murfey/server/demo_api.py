@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import random
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import List
@@ -36,6 +37,7 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    MagnificationLookup,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -129,6 +131,23 @@ def get_mic_image():
     if machine_config.get("image_path"):
         return FileResponse(machine_config["image_path"])
     return None
+
+
+@router.get("/instrument_name/")
+def get_instrument_name():
+    return machine_config.get("instrument_name", "")
+
+
+@router.get("/mag_table/")
+def get_mag_table(db=murfey_db) -> List[MagnificationLookup]:
+    return db.exec(select(MagnificationLookup)).all()
+
+
+@router.post("/mag_table/")
+def add_to_mag_table(rows: List[MagnificationLookup], db=murfey_db):
+    for r in rows:
+        db.add(r)
+    db.commit()
 
 
 @router.get("/visits/")
@@ -886,6 +905,19 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             Path(machine_config["rsync_basepath"])
         )
     }
+
+
+@router.get("/possible_gain_references")
+async def get_possible_gain_references() -> List[File]:
+    return [
+        File(name="K3_example.dm4", description="", size=100e6, timestamp=time.time()),
+        File(
+            name="K3_not_the_real_thing.dm4",
+            description="",
+            size=1e3,
+            timestamp=time.time() - 2000,
+        ),
+    ]
 
 
 @router.get("/new_client_id/")

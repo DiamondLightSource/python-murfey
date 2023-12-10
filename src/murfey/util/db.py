@@ -3,6 +3,11 @@ from typing import List, Optional
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
+class MagnificationLookup(SQLModel, table=True):  # type: ignore
+    magnification: int = Field(primary_key=True)
+    pixel_size: float
+
+
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
     client_id: Optional[int] = Field(primary_key=True, unique=True)
     visit: str = Field(default="")
