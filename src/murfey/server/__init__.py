@@ -1818,7 +1818,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 global_state["autoproc_program_ids"] = {
                     **global_state["autoproc_program_ids"],
                     message.get("tag"): {
-                        **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
+                        **global_state["autoproc_program_ids"].get(message.get("tag"), {}),  # type: ignore
                         message["recipe"]: appid,
                     },
                 }
