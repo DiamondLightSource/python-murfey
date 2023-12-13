@@ -259,6 +259,12 @@ def increment_rsync_transferred_files(
     db.add(rsync_instance)
     db.commit()
     db.close()
+
+
+@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
+def increment_rsync_transferred_files_prometheus(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
     )
