@@ -722,11 +722,13 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
+    machine_config = get_machine_config()
     pj_id = _pj_id(message["program_id"], _db)
     ctf_params = db.CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
         coord_list_file=params_to_forward["coord_list_file"],
+        extract_file=params_to_forward["extract_file"],
         ctf_image=params_to_forward["ctf_values"]["CtfImage"],
         ctf_max_resolution=params_to_forward["ctf_values"]["CtfMaxResolution"],
         ctf_figure_of_merit=params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -739,30 +741,61 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     murfey_db.close()
 
     # Set particle diameter as zero and send box sizes
-    relion_params = murfey_db.exec(select(db.SPARelionParameters)).one()
-    feedback_params = murfey_db.exec(select(db.SPAFeedbackParameters)).one()
-    feedback_params.particle_diameter = 0
-    murfey_db.add(feedback_params)
-    murfey_db.commit()
-    murfey_db.close()
+    relion_params = murfey_db.exec(
+        select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
+    ).one()
+    feedback_params = murfey_db.exec(
+        select(db.SPAFeedbackParameters).where(db.SPAFeedbackParameters.pj_id == pj_id)
+    ).one()
+
+    if feedback_params.picker_ispyb_id is None and _transport_object:
+        assert feedback_params.picker_murfey_id is not None
+        feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
+            message["program_id"], feedback_params.picker_murfey_id
+        )
+        if feedback_params.picker_ispyb_id is not None:
+            _flush_class2d(message["session_id"], message["program_id"], _db)
+        _db.add(feedback_params)
+        _db.commit()
+        selection_stash = _db.exec(
+            select(db.SelectionStash).where(db.SelectionStash.pj_id == pj_id)
+        ).all()
+        for s in selection_stash:
+            _register_class_selection(
+                {
+                    "session_id": s.session_id,
+                    "class_selection_score": s.class_selection_score or 0,
+                },
+                _db=_db,
+            )
+            _db.delete(s)
 
     # Send the message to extraction with the box sizes
     zocalo_message = {
         "parameters": {
             "micrographs_file": params_to_forward["micrographs_file"],
-            "coord_list_file": params_to_forward["coords_list_file"],
+            "coord_list_file": params_to_forward["coord_list_file"],
             "output_file": params_to_forward["extract_file"],
             "pix_size": relion_params.angpix,
-            "ctf_image": params_to_forward["ctf_image"],
-            "ctf_max_resolution": params_to_forward["ctf_max_resolution"],
-            "ctf_figure_of_merit": params_to_forward["ctf_figure_of_merit"],
-            "defocus_u": params_to_forward["defocus_u"],
-            "defocus_v": params_to_forward["defocus_v"],
-            "defocus_angle": params_to_forward["defocus_angle"],
+            "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
+            "ctf_max_resolution": params_to_forward["ctf_values"]["CtfMaxResolution"],
+            "ctf_figure_of_merit": params_to_forward["ctf_values"]["CtfFigureOfMerit"],
+            "defocus_u": params_to_forward["ctf_values"]["DefocusU"],
+            "defocus_v": params_to_forward["ctf_values"]["DefocusV"],
+            "defocus_angle": params_to_forward["ctf_values"]["DefocusAngle"],
+            "particle_diameter": relion_params.particle_diameter,
             "boxsize": relion_params.boxsize,
             "small_boxsize": relion_params.small_boxsize,
             "downscale": relion_params.downscale,
-            "relion_options": dict(relion_params),
+            "fm_dose": relion_params.dose_per_frame,
+            "kv": relion_params.voltage,
+            "gain_ref": relion_params.gain_ref,
+            "feedback_queue": machine_config.feedback_queue,
+            "session_id": message["session_id"],
+            "autoproc_program_id": _app_id(
+                _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+            ),
+            "batch_size": default_spa_parameters.batch_size_2d,
         },
         "recipes": ["em-spa-extract"],
     }
