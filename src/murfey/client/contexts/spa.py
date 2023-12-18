@@ -223,10 +223,7 @@ class _SPAContext(Context):
                     # then the pixel size from the magnification table will be correct but the binning_factor will be 2
                     # this is divided out later so multiply it in here to cancel
                     if server_config.get("superres") and not environment.superres:
-                        metadata["pixel_size_on_image"] *= binning_factor
-        metadata["pixel_size_on_image"] = (
-            metadata["pixel_size_on_image"] / binning_factor
-        )
+                        metadata["pixel_size_on_image"] /= binning_factor
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
