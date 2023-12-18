@@ -405,12 +405,20 @@ def register_completed_tilt_series(
     db.commit()
 
 
-@router.post("/visits/{visit_name}/tilt")
-def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
+@router.post("/visits/{visit_name}/{client_id}/tilt")
+def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
     tilt_series = db.exec(
         select(TiltSeries)
         .where(TiltSeries.tag == tilt_info.tilt_series_tag)
         .where(TiltSeries.rsync_source == tilt_info.rsync_source)
+        .where(TiltSeries.session_id == session_id)
     ).one()
     tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
     db.add(tilt)

@@ -535,9 +535,7 @@ class TomographyContext(Context):
         if environment:
             movie_path_source = _get_source(file_path, environment)
             if movie_path_source:
-                tilt_endpoint = (
-                    f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt"
-                )
+                tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
                 movie_path = _file_transferred_to(
                     environment, movie_path_source, file_path
                 )
