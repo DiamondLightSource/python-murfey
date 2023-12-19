@@ -128,6 +128,8 @@ def _construct_tilt_series_name(
 
 
 def _midpoint(angles: List[float]) -> int:
+    if not angles:
+        return 0
     sorted_angles = sorted(angles)
     return round(
         sorted_angles[len(sorted_angles) // 2]
@@ -675,7 +677,8 @@ class TomographyContext(Context):
             else (this_tilt_series_size >= tilt_series_size)
         )
         if tilt_series_size_check and not required_position_files:
-            self._completed_tilt_series.append(tilt_series)
+            if tilt_series not in self._completed_tilt_series:
+                self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
         for ts, ta in self._tilt_series.items():
             required_position_files_check = (
