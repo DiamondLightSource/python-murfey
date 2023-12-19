@@ -295,23 +295,24 @@ class MurfeyTUI(App):
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str
     ):
-        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
-        num_data_files = len(
-            [
-                f
-                for f in observed_files
-                if f.suffix in self._data_suffixes
-                and any(substring in f.name for substring in self._data_substrings)
-            ]
-        )
-        data = {
-            "source": source,
-            "destination": destination,
-            "client_id": self._environment.client_id,
-            "increment_count": len(observed_files),
-            "increment_data_count": num_data_files,
-        }
-        requests.post(url, json=data)
+        if len(observed_files):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
+            num_data_files = len(
+                [
+                    f
+                    for f in observed_files
+                    if f.suffix in self._data_suffixes
+                    and any(substring in f.name for substring in self._data_substrings)
+                ]
+            )
+            data = {
+                "source": source,
+                "destination": destination,
+                "client_id": self._environment.client_id,
+                "increment_count": len(observed_files),
+                "increment_data_count": num_data_files,
+            }
+            requests.post(url, json=data)
 
     # Prometheus can handle higher traffic so update for every transferred file rather
     # than batching as we do for the Murfey database updates in _increment_transferred_files
