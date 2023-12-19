@@ -2067,6 +2067,9 @@ def feedback_callback(header: dict, message: dict) -> None:
     except PendingRollbackError:
         murfey_db.rollback()
         murfey_db.close()
+        logger.warning("Murfey database required a rollback")
+        if _transport_object:
+            _transport_object.transport.nack(header, requeue=True)
     except Exception:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True
