@@ -769,6 +769,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
                 _db=_db,
             )
             _db.delete(s)
+            _db.commit()
 
     # Send the message to extraction with the box sizes
     zocalo_message = {
