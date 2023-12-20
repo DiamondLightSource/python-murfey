@@ -223,11 +223,15 @@ class TransportManager:
     def do_update_processing_status(self, record: AutoProcProgram, **kwargs):
         ppid = record.autoProcProgramId
         message = record.processingMessage
-        status = record.processingStatus
+        status = (
+            "success"
+            if record.processingStatus
+            else ("none" if record.processingStatus is None else "failure")
+        )
         try:
             result = self.ispyb.mx_processing.upsert_program_ex(
                 program_id=ppid,
-                status={"success": 1, "failure": 0}.get(status),
+                status={"success": 1, "failure": 0, "none": None}.get(status),
                 time_start=record.processingStartTime,
                 time_update=record.processingEndTime,
                 message=message,

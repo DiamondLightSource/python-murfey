@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 import murfey.server.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
+import murfey.util.eer
 from murfey.server import (
     _flush_tomography_preprocessing,
     _murfey_id,
@@ -234,11 +235,23 @@ def increment_rsync_transferred_files(
     rsync_instance.files_transferred += 1
     db.add(rsync_instance)
     db.commit()
+
+
+@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
+def increment_rsync_transferred_files_prometheus(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
     )
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.bytes
+    )
+    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.increment_data_count
+    )
+    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
+        rsyncer_info.data_bytes
     )
 
 
@@ -1208,8 +1221,21 @@ async def write_eer_fractionation_file(
     log.info(f"EER fractionation file {file_path} creation requested")
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
+
+    if fractionation_params.num_frames:
+        num_eer_frames = fractionation_params.num_frames
+    elif (
+        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+    ):
+        num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
+    else:
+        log.warning(
+            f"EER fractionation unable to find {fractionation_params.eer_path} "
+            f"or use {fractionation_params.num_frames} frames"
+        )
+        return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
         frac_file.write(
-            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}

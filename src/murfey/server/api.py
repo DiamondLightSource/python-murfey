@@ -29,6 +29,7 @@ import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
+import murfey.util.eer
 from murfey.server import (
     _murfey_id,
     _transport_object,
@@ -260,6 +261,12 @@ def increment_rsync_transferred_files(
     db.add(rsync_instance)
     db.commit()
     db.close()
+
+
+@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
+def increment_rsync_transferred_files_prometheus(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
         rsyncer_info.increment_count
     )
@@ -464,14 +471,26 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
     return tilts
 
 
-@router.post("/visits/{visit_name}/tilt")
-def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
-    tilt_series = db.exec(
-        select(TiltSeries)
-        .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-        .where(TiltSeries.rsync_source == tilt_info.rsync_source)
-    ).one()
-    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
+@router.post("/visits/{visit_name}/{client_id}/tilt")
+def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_id = (
+        db.exec(
+            select(TiltSeries)
+            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+            .where(TiltSeries.session_id == session_id)
+            .where(TiltSeries.rsync_source == tilt_info.source)
+        )
+        .one()
+        .id
+    )
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
     db.add(tilt)
     db.commit()
 
@@ -1068,9 +1087,22 @@ async def write_eer_fractionation_file(
     )
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
+
+    if fractionation_params.num_frames:
+        num_eer_frames = fractionation_params.num_frames
+    elif (
+        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+    ):
+        num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
+    else:
+        log.warning(
+            f"EER fractionation unable to find {fractionation_params.eer_path} "
+            f"or use {fractionation_params.num_frames} frames"
+        )
+        return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
         frac_file.write(
-            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}
 

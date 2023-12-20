@@ -8,7 +8,6 @@ from typing import Any, Dict, OrderedDict
 import requests
 import xmltodict
 
-import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
     MovieID,
@@ -208,8 +207,11 @@ class _SPAContext(Context):
             server_config = requests.get(
                 f"{str(environment.url.geturl())}/machine/"
             ).json()
-            if server_config.get("superres") and environment.superres:
+            if server_config.get("superres") and not environment.superres:
+                # If camera is capable of superres and collection is in superres
                 binning_factor = 2
+            elif not server_config.get("superres"):
+                binning_factor_xml = 2
             if magnification:
                 ps_from_mag = (
                     server_config.get("calibrations", {})
@@ -222,10 +224,9 @@ class _SPAContext(Context):
                     # then the pixel size from the magnification table will be correct but the binning_factor will be 2
                     # this is divided out later so multiply it in here to cancel
                     if server_config.get("superres") and not environment.superres:
-                        metadata["pixel_size_on_image"] *= binning_factor
-        metadata["pixel_size_on_image"] = (
-            metadata["pixel_size_on_image"] / binning_factor
-        )
+                        metadata["pixel_size_on_image"] /= (
+                            1 if binning_factor_xml == 2 else 2
+                        )
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
@@ -308,20 +309,6 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
-        images_disc_index: int = 0
-        for i, p in enumerate(metadata_file.parts):
-            if p.startswith("Images-Disc"):
-                images_disc_index = i
-        if images_disc_index:
-            data_file = (
-                Path("/".join(metadata_file.parts[: images_disc_index - 2]))
-                / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
-                / metadata_file.with_suffix(".eer").name
-            )
-            if data_file.is_file():
-                metadata["num_eer_frames"] = murfey.util.eer.num_frames(
-                    metadata_file.parent.parent / metadata_file.parent.name / data_file
-                )
         return metadata
 
 
@@ -372,13 +359,11 @@ class SPAModularContext(_SPAContext):
                         )
 
                         eer_fractionation_file = None
-                        if environment.data_collection_parameters.get("num_eer_frames"):
+                        if file_transferred_to.suffix == ".eer":
                             response = requests.post(
                                 f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
                                 json={
-                                    "num_frames": environment.data_collection_parameters[
-                                        "num_eer_frames"
-                                    ],
+                                    "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
                                         "eer_fractionation"
                                     ],

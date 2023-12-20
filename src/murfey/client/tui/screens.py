@@ -195,11 +195,11 @@ class _DirectoryTree(DirectoryTree):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
-        dir_entry = event.node.data
+        dir_entry = event.node.data.path
         if dir_entry is None:
             return
-        if dir_entry.is_dir:
-            self._selected_path = dir_entry.path
+        if dir_entry.is_dir():
+            self._selected_path = dir_entry
             if not self._data_directories:
                 self.valid_selection = True
                 return
@@ -222,12 +222,12 @@ class _DirectoryTreeGain(DirectoryTree):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
-        dir_entry = event.node.data
+        dir_entry = event.node.data.path
         if dir_entry is None:
             return
-        if not dir_entry.is_dir:
+        if not dir_entry.is_dir():
             self.valid_selection = True
-            self._gain_reference = Path(dir_entry.path)
+            self._gain_reference = dir_entry
         else:
             self.valid_selection = False
 

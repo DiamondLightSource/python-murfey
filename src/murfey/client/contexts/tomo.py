@@ -315,6 +315,9 @@ class TomographyContext(Context):
                         "motion_corr_binning", 1
                     ),
                     "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                    "voltage": environment.data_collection_parameters.get(
+                        "voltage", 300
+                    ),
                     "eer_fractionation_file": eer_fractionation_file,
                 }
                 return new_dict
@@ -629,6 +632,7 @@ class TomographyContext(Context):
                     "motion_corr_binning", 1
                 ),
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
+                "voltage": environment.data_collection_parameters.get("voltage", 300),
                 "eer_fractionation_file": eer_fractionation_file,
                 "tag": tilt_series,
             }
