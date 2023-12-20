@@ -158,7 +158,7 @@ class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
     pixel_size: float
     dose_per_frame: float
     motion_corr_binning: int = 1
-    gain_ref: str | None = None
+    gain_ref: Optional[str] = None
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="tomography_preprocessing_parameters"
     )
