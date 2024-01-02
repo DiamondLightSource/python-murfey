@@ -16,6 +16,7 @@ class MachineConfig(BaseModel):
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     murfey_db_credentials: str
+    crypto_key: str
     display_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
@@ -74,6 +75,7 @@ def get_machine_config() -> MachineConfig:
         data_directories={},
         rsync_basepath=Path("dls/tmp"),
         murfey_db_credentials="",
+        crypto_key="",
     )
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
