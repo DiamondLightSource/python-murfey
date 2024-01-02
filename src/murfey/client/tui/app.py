@@ -429,31 +429,52 @@ class MurfeyTUI(App):
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
-            if from_form:
-                requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
-                    json=json,
-                )
             source = Path(json["source"])
-            self._environment.listeners["data_collection_group_ids"] = {
-                context._flush_data_collections
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                context._flush_processing_job
-            }
-            self._environment.listeners["autoproc_program_ids"] = {
-                context._flush_preprocess
-            }
-            self._environment.id_tag_registry["data_collection_group"].append(
-                str(source)
-            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
                 "tag": str(source),
             }
-            requests.post(url, json=dcg_data)
+            capture_post(url, json=dcg_data)
+            data = {
+                "voltage": json["voltage"],
+                "pixel_size_on_image": json["pixel_size_on_image"],
+                "experiment_type": json["experiment_type"],
+                "image_size_x": json["image_size_x"],
+                "image_size_y": json["image_size_y"],
+                "file_extension": json["file_extension"],
+                "acquisition_software": json["acquisition_software"],
+                "image_directory": str(self._environment.default_destinations[source]),
+                "tag": json["tag"],
+                "data_collection_tag": json["tilt_series_tag"],
+                "source": str(source),
+                "magnification": json["magnification"],
+                "total_exposed_dose": json.get("total_exposed_dose"),
+                "c2aperture": json.get("c2aperture"),
+                "exposure_time": json.get("exposure_time"),
+                "slit_width": json.get("slit_width"),
+                "phase_plate": json.get("phase_plate", False),
+            }
+            capture_post(
+                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                json=data,
+            )
+            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                capture_post(
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                    json={"tag": str(source), "recipe": recipe},
+                )
+            log.info("Registering tomograpy processing parameters")
+            requests.post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
+                json=json,
+            )
+            capture_post(
+                f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.client_id}/flush_tomography_processing",
+                json={"rsync_source": str(source)},
+            )
+            context._flush_data_collections()
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {

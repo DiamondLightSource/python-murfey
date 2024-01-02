@@ -26,8 +26,9 @@ from textual.widgets import (
     Header,
     Input,
     Label,
-    OptionList,
     ProgressBar,
+    RadioButton,
+    RadioSet,
     RichLog,
     Static,
     Switch,
@@ -46,7 +47,7 @@ from murfey.client.instance_environment import (
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config
-from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -240,7 +241,16 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        self._context = SPAContext
+        cfg = get_machine_config(
+            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        )
+        self._context: Type[SPAModularContext] | Type[SPAContext] | Type[
+            TomographyContext
+        ]
+        if cfg.get("modular_spa"):
+            self._context = SPAContext
+        else:
+            self._context = SPAModularContext
 
     def compose(self):
         machine_data = requests.get(
@@ -257,9 +267,6 @@ class LaunchScreen(Screen):
         yield self._dir_tree
         text_log = RichLog(id="selected-directories")
         widgets = [text_log, Button("Clear", id="clear")]
-        if self.app._multigrid:
-            widgets.append(Label("Data collection modality:"))
-            widgets.append(OptionList("SPA", "Tomography", id="modality-select"))
         text_log_block = VerticalScroll(*widgets, id="selected-directories-vert")
         yield text_log_block
 
@@ -306,20 +313,6 @@ class LaunchScreen(Screen):
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
-
-    def on_option_list_option_selected(self, event):
-        log.info(f"option selected: {event.option}")
-        if event.option.prompt == "Tomography":
-            log.info("switching context to tomo")
-            self._context = TomographyContext
-        elif event.option.prompt == "SPA":
-            cfg = get_machine_config(
-                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
-            )
-            if cfg.get("modular_spa"):
-                self._context = SPAContext
-            else:
-                self._context = SPAModularContext
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
@@ -464,7 +457,7 @@ class ProcessingForm(Screen):
     def _write_params(
         self,
         params: dict | None = None,
-        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
+        model: PreprocessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
             try:
@@ -474,9 +467,9 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
-            if model == ProcessingParametersTomo:
+            if model == PreprocessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
@@ -941,6 +934,11 @@ class DestinationSelect(Screen):
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
+        with RadioSet():
+            yield RadioButton(
+                "SPA", value=self._context in (SPAContext, SPAModularContext)
+            )
+            yield RadioButton("Tomography", value=self._context is TomographyContext)
 
     def _check_dependency(self, key: str, value: Any):
         if x := self._dependencies.get(key):
@@ -967,6 +965,27 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
                     self._check_dependency(k.name, event.value)
 
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.index == 0:
+            cfg = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if cfg.get("modular_spa"):
+                self._context = SPAContext
+            else:
+                self._context = SPAModularContext
+        else:
+            self._context = TomographyContext
+        self.app.pop_screen()
+        self.app.uninstall_screen("destination-select-screen")
+        self.app.install_screen(
+            DestinationSelect(
+                self._transfer_routes, self._context, dependencies=spa_form_dependencies
+            ),
+            "destination-select-screen",
+        )
+        self.app.push_screen("destination-select-screen")
+
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):
             if not self.app._multigrid:
@@ -981,7 +1000,9 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
-                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
+                valid = validate_form(
+                    self._user_params, PreprocessingParametersTomo.Base
+                )
             else:
                 valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:

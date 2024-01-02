@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
-from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -129,6 +128,8 @@ def _construct_tilt_series_name(
 
 
 def _midpoint(angles: List[float]) -> int:
+    if not angles:
+        return 0
     sorted_angles = sorted(angles)
     return round(
         sorted_angles[len(sorted_angles) // 2]
@@ -150,7 +151,7 @@ class ProcessFileIncomplete(BaseModel):
 class TomographyContext(Context):
     user_params = [
         ProcessingParameter(
-            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)"
+            "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)", default=1
         ),
         ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
         ProcessingParameter("gain_ref", "Gain Reference"),
@@ -181,7 +182,7 @@ class TomographyContext(Context):
         self._extract_tilt_series: Callable[[Path], str] | None = None
         self._extract_tilt_tag: Callable[[Path], str] | None = None
 
-    def _flush_data_collections(self, tag: str):
+    def _flush_data_collections(self):
         logger.info(
             f"Flushing {len(self._data_collection_stash)} data collection API calls"
         )
@@ -385,6 +386,7 @@ class TomographyContext(Context):
                 float(tilt_series_num)
                 float(tilt_angle)
             except ValueError:
+                logger.error(f"whoops, {tilt_series_num}, {tilt_angle}")
                 return []
             tilt_series = _construct_tilt_series_name(
                 tilt_tag, tilt_series_num, file_path
@@ -425,15 +427,13 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
-            tilt_series_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
-            requests.post(
-                tilt_series_endpoint,
-                json={
-                    "client_id": environment.client_id,
-                    "tag": tilt_series,
-                    "rsync_source": str(file_path.parent),
-                },
-            )
+            ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
+            ts_data = {
+                "client_id": environment.client_id,
+                "tag": tilt_series,
+                "source": str(file_path.parent),
+            }
+            capture_post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
@@ -448,8 +448,9 @@ class TomographyContext(Context):
                                 file_path.parent, file_path.parent
                             )
                         ),
-                        "tag": tilt_series,
+                        "data_collection_tag": tilt_series,
                         "source": str(self._basepath),
+                        "tag": str(self._basepath),
                     }
                     if (
                         environment.data_collection_parameters
@@ -522,6 +523,7 @@ class TomographyContext(Context):
                                 "experiment_type": "tomography",
                             },
                         )
+
             except Exception as e:
                 logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
         else:
@@ -532,23 +534,63 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
-        if environment:
-            movie_path_source = _get_source(file_path, environment)
-            if movie_path_source:
-                tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
-                movie_path = _file_transferred_to(
-                    environment, movie_path_source, file_path
-                )
-                requests.post(
-                    tilt_endpoint,
-                    json={
-                        "tilt_series_tag": tilt_series,
-                        "movie_path": str(movie_path),
-                        "rsync_source": str(file_path.parent),
-                    },
+        res = []
+        if self._last_transferred_file:
+            last_tilt_series = (
+                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
+                if extract_tilt_tag(self._last_transferred_file)
+                else extract_tilt_series(self._last_transferred_file)
+            )
+            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
+            self._last_transferred_file = file_path
+            if (
+                last_tilt_series != tilt_series
+                and last_tilt_angle != tilt_angle
+                or self._tilt_series_sizes.get(tilt_series)
+            ) or self._completed_tilt_series:
+                res = self._check_tilt_series(
+                    tilt_series,
+                    required_position_files or [],
+                    file_transferred_to,
+                    rsync_source=source,
+                    environment=environment,
                 )
 
-        if environment and environment.autoproc_program_ids.get(tilt_series):
+        if res and environment:
+            for r in res:
+                associated_tilts = (
+                    requests.get(
+                        f"{str(environment.url.geturl())}/clients/{environment.client_id}/tilt_series/{r}/tilts"
+                    )
+                    .json()
+                    .get(str(file_path.parent), [])
+                )
+                manual_tilt_offset = _midpoint(
+                    [float(extract_tilt_angle(Path(t))) for t in associated_tilts]
+                )
+                capture_post(
+                    f"{str(environment.url.geturl())}/clients/{environment.client_id}/tomography_processing_parameters",
+                    json={
+                        "tag": str(file_path.parent),
+                        "tilt_series_tag": tilt_series,
+                        "manual_tilt_offset": manual_tilt_offset,
+                    },
+                )
+            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+            capture_post(
+                complete_url,
+                json={"tags": res, "source": str(file_path.parent)},
+            )
+
+        if environment:
+            tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
+            tilt_data = {
+                "movie_path": str(file_transferred_to),
+                "tilt_series_tag": tilt_series,
+                "source": str(file_path.parent),
+            }
+            capture_post(tilt_url, json=tilt_data)
+
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
@@ -567,28 +609,22 @@ class TomographyContext(Context):
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tomography_preprocess"
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
                 "size": file_path.stat().st_size,
                 "timestamp": file_path.stat().st_ctime,
-                "processing_job": environment.processing_job_ids[tilt_series][
-                    "em-tomo-preprocess"
-                ],
-                "data_collection_id": environment.data_collection_ids[tilt_series],
+                "data_collection_id": environment.data_collection_ids.get(tilt_series),
                 "image_number": environment.movies[file_transferred_to].movie_number,
-                "pixel_size": environment.data_collection_parameters[
-                    "pixel_size_on_image"
-                ],
-                "autoproc_program_id": environment.autoproc_program_ids[tilt_series][
-                    "em-tomo-preprocess"
-                ],
-                "mc_uuid": environment.movies[
-                    file_transferred_to
-                ].motion_correction_uuid,
+                "pixel_size": environment.data_collection_parameters.get(
+                    "pixel_size_on_image", 0
+                ),
+                "autoproc_program_id": environment.autoproc_program_ids.get(
+                    tilt_series, {}
+                ).get("em-tomo-preprocess"),
                 "dose_per_frame": environment.data_collection_parameters.get(
-                    "dose_per_frame"
+                    "dose_per_frame", 0
                 ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
@@ -596,40 +632,9 @@ class TomographyContext(Context):
                 "gain_ref": environment.data_collection_parameters.get("gain_ref"),
                 "voltage": environment.data_collection_parameters.get("voltage", 300),
                 "eer_fractionation_file": eer_fractionation_file,
+                "tag": tilt_series,
             }
             capture_post(preproc_url, json=preproc_data)
-        elif environment:
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tomography_preprocess"
-            pfi = ProcessFileIncomplete(
-                dest=file_transferred_to,
-                source=source,
-                image_number=environment.movies[file_transferred_to].movie_number,
-                mc_uuid=environment.movies[file_transferred_to].motion_correction_uuid,
-                tag=tilt_series,
-            )
-            if (
-                environment.autoproc_program_ids is None
-                or environment.processing_job_ids is None
-            ) or (
-                environment.autoproc_program_ids.get(tilt_series) is None
-                or environment.processing_job_ids.get(tilt_series) is None
-            ):
-                if self._preprocessing_triggers.get(tilt_series):
-                    self._preprocessing_triggers[tilt_series].append(
-                        (
-                            preproc_url,
-                            pfi,
-                            environment,
-                        )
-                    )
-                else:
-                    self._preprocessing_triggers[tilt_series] = [
-                        (
-                            preproc_url,
-                            pfi,
-                            environment,
-                        )
-                    ]
 
         if self._last_transferred_file:
             last_tilt_series = (
@@ -652,7 +657,7 @@ class TomographyContext(Context):
                     environment=environment,
                 )
         self._last_transferred_file = file_path
-        return []
+        return res
 
     def _check_tilt_series(
         self,
@@ -674,7 +679,8 @@ class TomographyContext(Context):
             else (this_tilt_series_size >= tilt_series_size)
         )
         if tilt_series_size_check and not required_position_files:
-            self._completed_tilt_series.append(tilt_series)
+            if tilt_series not in self._completed_tilt_series:
+                self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
         for ts, ta in self._tilt_series.items():
             required_position_files_check = (
@@ -873,6 +879,12 @@ class TomographyContext(Context):
                             rsync_source=transferred_file.parent,
                             environment=environment,
                         )
+        if completed_tilts and environment:
+            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+            capture_post(
+                complete_url,
+                json={"tags": completed_tilts, "source": str(transferred_file.parent)},
+            )
         return completed_tilts
 
     def post_first_transfer(
@@ -984,6 +996,10 @@ class TomographyContext(Context):
                 [float(b["TiltAngle"]) for b in blocks]
             )
             mdoc_metadata["source"] = str(self._basepath)
+            mdoc_metadata["tag"] = str(self._basepath)
+            mdoc_metadata["tilt_series_tag"] = metadata_file.stem
+            mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
+            mdoc_metadata["slit_width"] = float(mdoc_data_block["FilterSlitAndLoss"][0])
             mdoc_metadata[
                 "file_extension"
             ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"

@@ -92,13 +92,14 @@ class ProcessFile(BaseModel):
     description: str
     size: int
     timestamp: float
-    processing_job: Optional[int]
+    tag: str
     data_collection_id: Optional[int]
     image_number: int
-    mc_uuid: int
-    autoproc_program_id: Optional[int]
     pixel_size: float
     dose_per_frame: float
+    processing_job: Optional[int] = None
+    autoproc_program_id: Optional[int] = None
+    mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1
     gain_ref: Optional[str] = None
@@ -126,13 +127,18 @@ class SPAProcessFile(BaseModel):
 class TiltInfo(BaseModel):
     tilt_series_tag: str
     movie_path: str
-    rsync_source: str
+    source: str
 
 
 class TiltSeriesInfo(BaseModel):
     client_id: int
     tag: str
-    rsync_source: str
+    source: str
+
+
+class TiltSeriesGroupInfo(BaseModel):
+    tags: List[str]
+    source: str
 
 
 class CompletedTiltSeries(BaseModel):
@@ -180,9 +186,10 @@ class DCParameters(BaseModel):
     exposure_time: Optional[float] = None
     slit_width: Optional[float] = None
     phase_plate: bool = False
+    data_collection_tag: str = ""
 
 
-class ProcessingParametersTomo(BaseModel):
+class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
     gain_ref: Optional[str]
     experiment_type: str
@@ -193,12 +200,19 @@ class ProcessingParametersTomo(BaseModel):
     motion_corr_binning: int
     manual_tilt_offset: float
     file_extension: str
-    acquisition_software: str
+    tag: str
+    tilt_series_tag: str
 
     class Base(BaseModel):
         dose_per_frame: float
         gain_ref: Optional[str]
         manual_tilt_offset: float
+
+
+class ProcessingParametersTomo(BaseModel):
+    manual_tilt_offset: int
+    tag: str
+    tilt_series_tag: str
 
 
 class ProcessingParametersSPA(BaseModel):

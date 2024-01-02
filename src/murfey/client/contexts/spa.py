@@ -59,6 +59,7 @@ class _SPAContext(Context):
         ProcessingParameter(
             "dose_per_frame",
             "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
+            default=1,
         ),
         ProcessingParameter(
             "estimate_particle_diameter",

@@ -3,10 +3,9 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import socket
 import time
 from datetime import datetime
-from functools import lru_cache, partial, singledispatch
+from functools import partial, singledispatch
 from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NamedTuple, Tuple
@@ -29,11 +28,12 @@ from sqlalchemy import func
 from sqlalchemy.exc import InvalidRequestError, PendingRollbackError, SQLAlchemyError
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
+from werkzeug.utils import secure_filename
 
 import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
-from murfey.server.config import MachineConfig, get_machine_config
+from murfey.server.config import get_hostname, get_machine_config, get_microscope
 from murfey.server.murfey_db import url  # murfey_db
 
 try:
@@ -72,6 +72,7 @@ class ExtendedRecord(NamedTuple):
 
 
 class JobIDs(NamedTuple):
+    dcgid: int
     dcid: int
     pid: int
     appid: int
@@ -80,6 +81,10 @@ class JobIDs(NamedTuple):
 
 def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
+
+
+def santise_path(in_path: Path) -> Path:
+    return Path("/".join(secure_filename(p) for p in in_path.parts))
 
 
 def get_angle(tilt_file_name: str) -> float:
@@ -127,37 +132,46 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
     return [_mc_path(Path(r.movie_path)) for r in results]
 
 
-def get_job_ids(tilt_series_id: int) -> JobIDs:
+def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
     results = murfey_db.exec(
         select(
             db.TiltSeries,
             db.AutoProcProgram,
             db.ProcessingJob,
             db.DataCollection,
+            db.DataCollectionGroup,
             db.ClientEnvironment,
         )
         .where(db.TiltSeries.id == tilt_series_id)
         .where(db.DataCollection.tag == db.TiltSeries.tag)
         .where(db.ProcessingJob.id == db.AutoProcProgram.pj_id)
+        .where(db.AutoProcProgram.id == appid)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+        .where(db.DataCollectionGroup.id == db.DataCollection.dcg_id)
         .where(db.ClientEnvironment.session_id == db.TiltSeries.session_id)
     ).all()
     return JobIDs(
+        dcgid=results[0][4].id,
         dcid=results[0][3].id,
         pid=results[0][2].id,
         appid=results[0][1].id,
-        client_id=results[0][4].client_id,
+        client_id=results[0][5].client_id,
     )
 
 
-def get_tomo_proc_params(client_id: int, *args) -> db.TomographyProcessingParameters:
-    client = murfey_db.exec(
-        select(db.ClientEnvironment).where(db.ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
+def get_tomo_proc_params(pj_id: int, *args) -> db.TomographyProcessingParameters:
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
-            db.TomographyProcessingParameters.session_id == session_id
+            db.TomographyProcessingParameters.pj_id == pj_id
+        )
+    ).one()
+    return results
+
+
+def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingParameters:
+    results = murfey_db.exec(
+        select(db.TomographyPreprocessingParameters).where(
+            db.TomographyPreprocessingParameters.dcg_id == dcg_id
         )
     ).one()
     return results
@@ -307,26 +321,6 @@ def shutdown():
     if _running_server:
         _running_server.should_exit = True
         _running_server.force_exit = True
-
-
-def get_microscope(machine_config: MachineConfig | None = None) -> str:
-    try:
-        hostname = get_hostname()
-        microscope_from_hostname = hostname.split(".")[0]
-    except OSError:
-        microscope_from_hostname = "Unknown"
-    if machine_config:
-        microscope_name = machine_config.machine_override or os.getenv(
-            "BEAMLINE", microscope_from_hostname
-        )
-    else:
-        microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
-    return microscope_name
-
-
-@lru_cache()
-def get_hostname():
-    return socket.gethostname()
 
 
 def _set_up_logging(quiet: bool, verbosity: int):
@@ -1607,6 +1601,102 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
+def _flush_tomography_preprocessing(message: dict):
+    machine_config = get_machine_config()
+    session_id = (
+        murfey_db.exec(
+            select(db.ClientEnvironment).where(
+                db.ClientEnvironment.client_id == message["client_id"]
+            )
+        )
+        .one()
+        .session_id
+    )
+    stashed_files = murfey_db.exec(
+        select(db.PreprocessStash).where(
+            db.PreprocessStash.client_id == message["client_id"]
+        )
+    ).all()
+    if not stashed_files:
+        return
+    collected_ids = murfey_db.exec(
+        select(
+            db.DataCollectionGroup,
+            db.DataCollection,
+            db.ProcessingJob,
+            db.AutoProcProgram,
+        )
+        .where(db.DataCollectionGroup.session_id == session_id)
+        .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
+        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+        .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    proc_params = murfey_db.exec(
+        select(db.TomographyPreprocessingParameters).where(
+            db.TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        )
+    ).one()
+    if not proc_params:
+        visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
+        logger.warning(
+            f"No tomography processing parameters found for client {sanitise(str(message['client_id']))} on visit {sanitise(visit_name)}"
+        )
+        return
+
+    detached_ids = [c.id for c in collected_ids]
+
+    murfey_ids = _murfey_id(
+        detached_ids[3], murfey_db, number=2 * len(stashed_files), close=False
+    )
+    for i, f in enumerate(stashed_files):
+        p = Path(f.mrc_out)
+        if not p.parent.exists():
+            p.parent.mkdir(parents=True)
+        movie = db.Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        murfey_db.add(movie)
+        zocalo_message = {
+            "recipes": ["em-tomo-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config.feedback_queue,
+                "dcid": detached_ids[1],
+                "autoproc_program_id": detached_ids[3],
+                "movie": f.file_path,
+                "mrc_out": f.mrc_out,
+                "pix_size": proc_params.pixel_size,
+                "image_number": f.image_number,
+                "microscope": get_microscope(),
+                "mc_uuid": murfey_ids[2 * i],
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
+                if proc_params.gain_ref
+                else proc_params.gain_ref,
+            },
+        }
+        logger.info(
+            f"Launching tomography preprocessing with Zocalo message: {zocalo_message}"
+        )
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        else:
+            feedback_callback(
+                {},
+                {
+                    "register": "motion_corrected",
+                    "movie": f.file_path,
+                    "mrc_out": f.mrc_out,
+                    "movie_id": murfey_ids[2 * i],
+                    "program_id": detached_ids[3],
+                },
+            )
+        murfey_db.delete(f)
+    murfey_db.commit()
+
+
 def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
@@ -1642,10 +1732,11 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
             murfey_db.close()
-            if check_tilt_series_mc(relevant_tilt.tilt_series_id):
-                tilts = get_all_tilts(relevant_tilt.tilt_series_id)
-                ids = get_job_ids(relevant_tilt.tilt_series_id)
-                params = get_tomo_proc_params(ids.client_id)
+            if check_tilt_series_mc(relevant_tilt_series.id):
+                tilts = get_all_tilts(relevant_tilt_series.id)
+                ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
+                params = get_tomo_proc_params(ids.pid)
+                preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
                     / "align_output"
@@ -1661,7 +1752,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
-                        "pix_size": params.pixel_size,
+                        "pix_size": preproc_params.pixel_size,
                         "manual_tilt_offset": params.manual_tilt_offset,
                     },
                 }
@@ -1671,6 +1762,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                     )
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
+                    )
+                else:
+                    logger.info(
+                        f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
 
             if _transport_object:
@@ -1719,12 +1814,30 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
+            client = murfey_db.exec(
+                select(db.ClientEnvironment).where(
+                    db.ClientEnvironment.client_id == message["client_id"]
+                )
+            ).one()
+            murfey_dcg = db.DataCollectionGroup(
+                id=dcgid,
+                session_id=client.session_id,
+                tag=message.get("tag"),
+            )
+            murfey_db.add(murfey_dcg)
+            murfey_db.commit()
+            murfey_db.close()
             return None
         elif message["register"] == "data_collection":
-            dcgid = global_state.get("data_collection_group_ids", {}).get(  # type: ignore
-                message["source"]
-            )
-            if dcgid is None:
+            dcg = murfey_db.exec(
+                select(db.DataCollectionGroup).where(
+                    db.DataCollectionGroup.tag == message["source"]
+                )
+            ).all()
+            if dcg:
+                dcgid = dcg.id
+                # flush_data_collections(message["source"], murfey_db)
+            else:
                 raise ValueError(
                     f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
                 )
@@ -1771,7 +1884,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             if dcid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
-            logger.debug(f"registered: {message.get('tag')}")
             if global_state.get("data_collection_ids") and isinstance(
                 global_state["data_collection_ids"], dict
             ):
@@ -1863,6 +1975,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "flush_tomography_preprocess":
+            _flush_tomography_preprocessing(message)
         elif message["register"] == "flush_spa_preprocess":
             session_id = (
                 murfey_db.exec(
@@ -1995,8 +2109,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all():
                 machine_config = get_machine_config()
                 params = db.SPARelionParameters(
-                    pj_id=pj_id,
-                    angpix=float(message["pixel_size_on_image"]) * 1e10,
+                    pj_id=collected_ids[2].id,
+                    angpix=0.8,  # message["pixel_size_on_image"],
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=str(machine_config.rsync_basepath / message["gain_ref"])
                     if message["gain_ref"]
@@ -2012,7 +2126,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     mask_diameter=message["mask_diameter"],
                 )
                 feedback_params = db.SPAFeedbackParameters(
-                    pj_id=pj_id,
+                    pj_id=collected_ids[2].id,
                     estimate_particle_diameter=not bool(message["particle_diameter"]),
                     hold_class2d=False,
                     hold_class3d=False,
@@ -2025,13 +2139,45 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.add(feedback_params)
                 murfey_db.commit()
                 logger.info(
-                    f"SPA processing parameters registered for processing job {pj_id}, particle_diameter={sanitise(str(message['particle_diameter']))}"
+                    f"SPA processing parameters registered for processing job {collected_ids[2].id}"
                 )
                 murfey_db.close()
             else:
                 logger.info(
                     f"SPA processing parameters already exist for processing job ID {pj_id}"
                 )
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["register"] == "tomography_processing_parameters":
+            client = murfey_db.exec(
+                select(db.ClientEnvironment).where(
+                    db.ClientEnvironment.client_id == message["client_id"]
+                )
+            ).one()
+            session_id = client.session_id
+            collected_ids = murfey_db.exec(
+                select(
+                    db.DataCollectionGroup,
+                    db.DataCollection,
+                    db.ProcessingJob,
+                    db.AutoProcProgram,
+                )
+                .where(db.DataCollectionGroup.session_id == session_id)
+                .where(db.DataCollectionGroup.tag == message["tag"])
+                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+            ).one()
+            params = db.TomographyProcessingParameters(
+                pj_id=collected_ids[2].id,
+                pixel_size=message["pixel_size_on_image"],
+                manual_tilt_offset=message["manual_tilt_offset"],
+            )
+            murfey_db.add(params)
+            murfey_db.commit()
+            murfey_db.close()
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None

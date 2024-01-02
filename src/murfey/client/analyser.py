@@ -13,7 +13,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config
-from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -53,7 +53,7 @@ class Analyser(Observer):
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
         self.parameters_model: Type[ProcessingParametersSPA] | Type[
-            ProcessingParametersTomo
+            PreprocessingParametersTomo
         ] | None = None
 
         self.queue: queue.Queue = queue.Queue()
@@ -125,7 +125,7 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
-                    self.parameters_model = ProcessingParametersTomo
+                    self.parameters_model = PreprocessingParametersTomo
                 if not self._role:
                     if (
                         "Fractions" in split_file_name[-1]
@@ -158,7 +158,7 @@ class Analyser(Observer):
                     # This covers the case of ignoring the averaged movies written out by the Falcon
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = ProcessingParametersTomo
+                self.parameters_model = PreprocessingParametersTomo
                 if not self._role:
                     if "Frames" in file_path.parts:
                         self._role = "detector"
