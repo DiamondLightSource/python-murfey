@@ -1,4 +1,4 @@
-from cryptography import Fernet
+from cryptography.fernet import Fernet
 
 
 def run():

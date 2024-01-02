@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 
 import yaml
-from cryptography import Fernet
+from cryptography.fernet import Fernet
 from fastapi import Depends
 from sqlmodel import Session, create_engine
 

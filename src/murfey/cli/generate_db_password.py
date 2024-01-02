@@ -1,7 +1,7 @@
 import secrets
 import string
 
-from cryptography import Fernet
+from cryptography.fernet import Fernet
 
 from murfey.server.config import get_machine_config
 
@@ -11,4 +11,5 @@ def run():
     f = Fernet(machine_config.crypto_key.encode("ascii"))
     alphabet = string.ascii_letters + string.digits
     password = "".join(secrets.choice(alphabet) for i in range(32))
-    print(f.encrypt(password.encrypt("ascii")).decode())
+    print(password)
+    print(f.encrypt(password.encode("ascii")).decode())
