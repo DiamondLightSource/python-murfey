@@ -996,7 +996,9 @@ def register_dc_group(
 
 
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
-def start_dc(visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db):
+def start_dc(
+    visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
+) -> DCParameters | None:
     dcg_tag = dc_params.tag
     log.info(f"Starting data collection, data collection tag {dcg_tag}")
     dcg = db.exec(
@@ -1008,7 +1010,7 @@ def start_dc(visit_name: str, client_id: int, dc_params: DCParameters, db=murfey
         .where(DataCollection.tag == dc_tag)
         .where(DataCollection.dcg_id == dcg.id)
     ).all():
-        return
+        return None
     dc_id = next(global_counter)
     murfey_dc = DataCollection(
         id=dc_id,
