@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
@@ -341,3 +342,11 @@ class Class3D(SQLModel, table=True):  # type: ignore
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
+
+
+def clear(url: str):
+    engine = create_engine(url)
+    metadata = sqlalchemy.MetaData(engine)
+    metadata.reflect()
+
+    metadata.drop_all(engine)
