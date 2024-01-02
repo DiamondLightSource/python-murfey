@@ -63,7 +63,6 @@ from murfey.util.models import (
     BLSubSampleParameters,
     ClearanceKeys,
     ClientInfo,
-    CompletedTiltSeries,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -85,6 +84,7 @@ from murfey.util.models import (
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
+    TiltSeriesGroupInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
@@ -431,7 +431,7 @@ def register_tilt_series(
 def register_completed_tilt_series(
     visit_name: str,
     client_id: int,
-    completed_tilt_series: CompletedTiltSeries,
+    tilt_series_group: TiltSeriesGroupInfo,
     db=murfey_db,
 ):
     session_id = (
@@ -443,9 +443,9 @@ def register_completed_tilt_series(
     )
     tilt_series_db = db.exec(
         select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
-        .where(TiltSeries.rsync_source == completed_tilt_series.rsync_source)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
         .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
     ).all()
     for ts in tilt_series_db:
         ts.complete = True
@@ -784,22 +784,17 @@ async def request_tomography_preprocessing(
         .session_id
     )
     data_collection = db.exec(
-        select(DataCollectionGroup, DataCollection)
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.tag == proc_file.tag)
+        .where(DataCollectionGroup.tag == proc_file.tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
     ).all()
     if data_collection:
-        collected_ids = db.exec(
-            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-            .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == proc_file.tag)
-            .where(DataCollection.dcg_id == DataCollectionGroup.id)
-            .where(ProcessingJob.dc_id == DataCollection.id)
-            .where(AutoProcProgram.pj_id == ProcessingJob.id)
-            .where(ProcessingJob.recipe == "em-tomo-preprocess")
-        ).one()
         dcid = data_collection[0][1].id
-        appid = collected_ids[3].id
+        appid = data_collection[0][3].id
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
