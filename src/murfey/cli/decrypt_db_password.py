@@ -21,7 +21,6 @@ def run():
 
     args = parser.parse_args()
 
-    args = parser.parse_args()
     if args.microscope:
         os.environ["BEAMLINE"] = args.microscope
 

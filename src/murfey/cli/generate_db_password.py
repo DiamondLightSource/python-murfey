@@ -11,5 +11,4 @@ def run():
     f = Fernet(machine_config.crypto_key.encode("ascii"))
     alphabet = string.ascii_letters + string.digits
     password = "".join(secrets.choice(alphabet) for i in range(32))
-    print(password)
     print(f.encrypt(password.encode("ascii")).decode())
