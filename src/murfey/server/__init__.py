@@ -2101,7 +2101,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.add(feedback_params)
                 murfey_db.commit()
                 logger.info(
-                    f"SPA processing parameters registered for processing job {collected_ids[2].id}, particle_diameter={message['particle_diameter']}"
+                    f"SPA processing parameters registered for processing job {collected_ids[2].id}"
                 )
                 murfey_db.close()
             else:

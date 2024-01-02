@@ -322,7 +322,7 @@ def register_tomo_preproc_params(
     ).one()
     session_id = client.session_id
     log.info(
-        f"Registering tomography preprocessing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+        f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
     )
     collected_ids = db.exec(
         select(
@@ -375,7 +375,7 @@ def register_tomo_proc_params(
     ).one()
     session_id = client.session_id
     log.info(
-        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+        f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
     )
     collected_ids = db.exec(
         select(
@@ -813,9 +813,10 @@ def flush_tomography_processing(
 async def request_tomography_preprocessing(
     visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
 ):
+    proc_file_path = str(proc_file.path).replace("\r\n", "").replace("\n", "")
     if not Path(proc_file.path).exists():
-        log.warning(f"{proc_file.path} has not been transferred before preprocessing")
-    log.info(f"Tomo preprocesing requested for {proc_file.path}")
+        log.warning(f"{proc_file_path} has not been transferred before preprocessing")
+    log.info(f"Tomo preprocesing requested for {proc_file_path}")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
@@ -1000,7 +1001,7 @@ def register_dc_group(
 def start_dc(
     visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
 ) -> DCParameters | None:
-    dcg_tag = dc_params.tag
+    dcg_tag = dc_params.tag.replace("\r\n", "").replace("\n", "")
     log.info(f"Starting data collection, data collection tag {dcg_tag}")
     dcg = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)

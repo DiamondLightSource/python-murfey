@@ -332,7 +332,7 @@ def register_tomo_proc_params(
     ).one()
     session_id = client.session_id
     log.info(
-        f"Registering tomography processing parameters {proc_params.tag}, {proc_params.tilt_series_tag}, {session_id}"
+        f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
     )
     collected_ids = db.exec(
         select(
@@ -758,7 +758,7 @@ async def request_tomography_preprocessing(
 ):
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
+    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
     mrc_out = (
         core
@@ -832,7 +832,7 @@ async def request_tomography_preprocessing(
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             log.error(
-                f"Pe-processing was requested for {ppath.name} but no Zocalo transport object was found"
+                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
             )
             return proc_file
     else:
