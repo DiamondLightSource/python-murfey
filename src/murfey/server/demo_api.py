@@ -818,7 +818,7 @@ async def request_tomography_preprocessing(
     log.info(f"Tomo preprocesing requested for {proc_file.path}")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
+    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
     sub_dataset = (
         ppath.relative_to(core).parts[0]
         if len(ppath.relative_to(core).parts) > 1
@@ -831,6 +831,7 @@ async def request_tomography_preprocessing(
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
+    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
