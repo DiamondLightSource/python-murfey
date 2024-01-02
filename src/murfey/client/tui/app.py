@@ -533,7 +533,6 @@ class MurfeyTUI(App):
                     json={"tag": str(source)},
                 )
             if isinstance(context, SPAContext):
-                source = Path(json["source"])
                 url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
                 self._environment.listeners["data_collection_group_ids"] = {
                     partial(
