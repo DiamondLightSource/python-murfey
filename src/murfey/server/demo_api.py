@@ -30,6 +30,7 @@ from murfey.server import (
     get_hostname,
     get_microscope,
     sanitise,
+    santise_path,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
@@ -813,10 +814,11 @@ def flush_tomography_processing(
 async def request_tomography_preprocessing(
     visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
 ):
-    proc_file_path = str(proc_file.path).replace("\r\n", "").replace("\n", "")
-    if not Path(proc_file.path).exists():
-        log.warning(f"{proc_file_path} has not been transferred before preprocessing")
-    log.info(f"Tomo preprocesing requested for {proc_file_path}")
+    if not santise_path(Path(proc_file.path)).exists():
+        log.warning(
+            f"{sanitise(str(proc_file.path))} has not been transferred before preprocessing"
+        )
+    log.info(f"Tomo preprocesing requested for {sanitise(str(proc_file.path))}")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))

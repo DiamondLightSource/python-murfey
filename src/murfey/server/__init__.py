@@ -28,6 +28,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import InvalidRequestError, PendingRollbackError, SQLAlchemyError
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
+from werkzeug.utils import secure_filename
 
 import murfey
 import murfey.server.prometheus as prom
@@ -80,6 +81,10 @@ class JobIDs(NamedTuple):
 
 def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
+
+
+def santise_path(in_path: Path) -> Path:
+    return Path("/".join(secure_filename(p) for p in in_path.parts))
 
 
 def get_angle(tilt_file_name: str) -> float:
@@ -1845,7 +1850,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             if dcid is None and _transport_object:
                 _transport_object.transport.nack(header)
                 return None
-            logger.debug(f"registered: {message.get('tag')}")
             if global_state.get("data_collection_ids") and isinstance(
                 global_state["data_collection_ids"], dict
             ):
