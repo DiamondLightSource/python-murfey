@@ -16,6 +16,7 @@ class MachineConfig(BaseModel):
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     murfey_db_credentials: str
+    crypto_key: str
     display_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
@@ -35,7 +36,6 @@ class MachineConfig(BaseModel):
     processing_enabled: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
-    crypto_key: str = "nsKa7sP8tEdGlk4pk2gfeNXBiy0zFD5fpzCusy-RJ-M="
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
