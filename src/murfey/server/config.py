@@ -75,6 +75,7 @@ def get_machine_config() -> MachineConfig:
         data_directories={},
         rsync_basepath=Path("dls/tmp"),
         murfey_db_credentials="",
+        crypto_key="",
     )
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
