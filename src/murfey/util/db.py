@@ -37,6 +37,7 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
+    visit: str = Field(default="")
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )

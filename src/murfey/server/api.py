@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
+import aiohttp
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
@@ -36,7 +37,7 @@ from murfey.server import (
     get_microscope,
     templates,
 )
-from murfey.server.config import from_file, settings
+from murfey.server.config import MachineConfig, from_file, settings
 from murfey.server.gain import Camera, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
@@ -99,6 +100,18 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
+@router.get("/instrument_server")
+async def check_instrument_server():
+    data = None
+    if machine_config.instrument_server:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{machine_config.instrument_server}/health"
+            ) as resp:
+                data = await resp.text()
+    return data
+
+
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -130,11 +143,11 @@ def connections_check():
 
 @lru_cache(maxsize=1)
 @router.get("/machine/")
-def machine_info():
+def machine_info() -> MachineConfig | None:
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
-        return from_file(settings.murfey_machine_configuration, microscope)
-    return {}
+        return from_file(Path(settings.murfey_machine_configuration), microscope)
+    return None
 
 
 @router.get("/microscope/")

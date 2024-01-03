@@ -36,6 +36,7 @@ class MachineConfig(BaseModel):
     machine_override: str = ""
     processed_extra_directory: str = ""
     instrument_name: str = ""
+    instrument_server: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
