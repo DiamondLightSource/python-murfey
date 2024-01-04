@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -8,7 +9,6 @@ from queue import Queue
 from typing import Awaitable, Callable, Dict, List, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from textual.app import App
 from textual.reactive import reactive
@@ -203,7 +203,7 @@ class MurfeyTUI(App):
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
-                gain_rsync = procrunner.run(
+                gain_rsync = subprocess.run(
                     [
                         "rsync",
                         str(self._environment.gain_ref),

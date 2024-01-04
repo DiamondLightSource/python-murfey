@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
-
-import procrunner
 
 from murfey.util import Processor
 from murfey.util.file_monitor import Monitor
@@ -32,7 +31,7 @@ class RsyncPipe(Processor):
         self.received_bytes = 0
         self.byte_rate: float = 0
         self.total_size = 0
-        self.runner_return: List[procrunner.ReturnObject] = []
+        self.runner_return: List[subprocess.CompletedProcess] = []
         self._root = root
         self._sub_structure: Optional[Path] = None
         self._notify = notify or (lambda f: None)
@@ -53,7 +52,7 @@ class RsyncPipe(Processor):
         retry: bool = True,
     ):
         """
-        Run rsync -v on a list of files using procrunner.
+        Run rsync -v on a list of files using subprocess run.
 
         :param root: root path of files for transferring; structure below the root is preserved
         :type root: pathlib.Path object
@@ -109,11 +108,11 @@ class RsyncPipe(Processor):
         else:
             cmd.append(str(self._finaldir / sub_struct) + "/")
         self._transferring = True
-        runner = procrunner.run(
-            cmd,
-            callback_stdout=self._parse_rsync_stdout,
-            callback_stderr=self._parse_rsync_stderr,
-        )
+
+        runner = subprocess.run(cmd, capture_output=True)
+        self._parse_rsync_stdout(runner.stdout)
+        self._parse_rsync_stderr(runner.stderr)
+
         self.runner_return.append(runner)
         self.failed.extend(root / sub_struct / f for f in self._failed_tmp)
         if retry:
@@ -127,8 +126,7 @@ class RsyncPipe(Processor):
         :param stdout: stdout of rsync process
         :type stdout: bytes
         """
-        stringy_stdout = str(stdout)
-        if stringy_stdout:
+        for stringy_stdout in stdout.decode("utf8", "replace").split("\n"):
             if self._transferring:
                 if stringy_stdout.startswith("sent"):
                     self._transferring = False
@@ -165,8 +163,7 @@ class RsyncPipe(Processor):
         :param stderr: stderr of rsync process
         :type stderr: bytes
         """
-        stringy_stderr = str(stderr)
-        if stringy_stderr:
+        for stringy_stderr in stderr.decode("utf8", "replace").split("\n"):
             if (
                 stringy_stderr.startswith("rsync: link_stat")
                 and "failed" in stringy_stderr
