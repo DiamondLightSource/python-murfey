@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename

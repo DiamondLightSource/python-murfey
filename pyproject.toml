@@ -31,7 +31,8 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "pydantic>=2",
+    "pydantic_settings",
     "requests",
     "rich",
     "werkzeug",

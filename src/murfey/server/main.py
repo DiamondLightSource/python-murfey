@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 import murfey.server
 import murfey.server.api.auth

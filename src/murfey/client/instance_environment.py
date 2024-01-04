@@ -8,7 +8,8 @@ from threading import RLock
 from typing import Callable, Dict, List, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 
 from murfey.client.watchdir import DirWatcher
 
@@ -40,20 +41,20 @@ class MurfeyInstanceEnvironment(BaseModel):
     destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
-    data_collection_group_ids: Dict[str, int] = {}
-    data_collection_ids: Dict[str, int] = {}
-    processing_job_ids: Dict[str, Dict[str, int]] = {}
-    autoproc_program_ids: Dict[str, Dict[str, int]] = {}
     id_tag_registry: Dict[str, List[str]] = {
         "data_collection_group": [],
         "data_collection": [],
         "processing_job": [],
         "auto_proc_program": [],
     }
+    listeners: Dict[str, Set[Callable]] = {}
+    data_collection_group_ids: Dict[str, int] = {}
+    data_collection_ids: Dict[str, int] = {}
+    processing_job_ids: Dict[str, Dict[str, int]] = {}
+    autoproc_program_ids: Dict[str, Dict[str, int]] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     motion_corrected_movies: Dict[Path, List[str]] = {}
-    listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
     movie_counters: Dict[str, itertools.count] = {}
@@ -64,42 +65,41 @@ class MurfeyInstanceEnvironment(BaseModel):
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
 
-    class Config:
-        validate_assignment: bool = True
-        arbitrary_types_allowed: bool = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @validator("data_collection_group_ids")
-    def dcg_callback(cls, v, values):
+    @field_validator("data_collection_group_ids")
+    def dcg_callback(cls, v, info: FieldValidationInfo):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("data_collection_group_ids", []):
+            for l in info.data.get("listeners", {}).get(
+                "data_collection_group_ids", []
+            ):
                 for k in v.keys():
-                    if k not in values["id_tag_registry"]["data_collection"]:
+                    if k not in info.data["id_tag_registry"]["data_collection"]:
                         l(k)
         return v
 
-    @validator("data_collection_ids")
-    def dc_callback(cls, v, values):
+    @field_validator("data_collection_ids")
+    def dc_callback(cls, v, info: FieldValidationInfo):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("data_collection_ids", []):
+            for l in info.data.get("listeners", {}).get("data_collection_ids", []):
                 for k in v.keys():
-                    if k not in values["id_tag_registry"]["processing_job"]:
+                    if k not in info.data["id_tag_registry"]["processing_job"]:
                         l(k)
         return v
 
-    @validator("processing_job_ids")
-    def job_callback(cls, v, values):
+    @field_validator("processing_job_ids")
+    def job_callback(cls, v, info: FieldValidationInfo):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("processing_job_ids", []):
+            for l in info.data.get("listeners", {}).get("processing_job_ids", []):
                 for k in v.keys():
-                    if k not in values["id_tag_registry"]["auto_proc_program"]:
+                    if k not in info.data["id_tag_registry"]["auto_proc_program"]:
                         l(k, v[k]["ispyb-relion"])
         return v
 
-    @validator("autoproc_program_ids")
-    def app_callback(cls, v, values):
-        # logger.info(f"autoproc program ids validator: {v}")
+    @field_validator("autoproc_program_ids")
+    def app_callback(cls, v, info: FieldValidationInfo):
         with global_env_lock:
-            for l in values.get("listeners", {}).get("autoproc_program_ids", []):
+            for l in info.data.get("listeners", {}).get("autoproc_program_ids", []):
                 for k in v.keys():
                     if v[k].get("em-tomo-preprocess"):
                         l(k, v[k]["em-tomo-preprocess"])

@@ -219,13 +219,13 @@ class SPAProcessFile(BaseModel):
     tag: str
     path: str
     description: str
-    processing_job: Optional[int]
-    data_collection_id: Optional[int]
+    processing_job: Optional[int] = None
+    data_collection_id: Optional[int] = None
     image_number: int
-    autoproc_program_id: Optional[int]
-    foil_hole_id: Optional[int]
-    pixel_size: Optional[float]
-    dose_per_frame: Optional[float]
+    autoproc_program_id: Optional[int] = None
+    foil_hole_id: Optional[int] = None
+    pixel_size: Optional[float] = None
+    dose_per_frame: Optional[float] = None
     mc_binning: Optional[int] = 1
     gain_ref: Optional[str] = None
     extract_downscale: bool = True
@@ -236,7 +236,7 @@ class SPAProcessFile(BaseModel):
 class ProcessingParametersSPA(BaseModel):
     tag: str
     dose_per_frame: float
-    gain_ref: Optional[str]
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -247,12 +247,12 @@ class ProcessingParametersSPA(BaseModel):
     acquisition_software: str
     use_cryolo: bool
     symmetry: str
-    mask_diameter: Optional[int]
-    boxsize: Optional[int]
+    mask_diameter: Optional[int] = None
+    boxsize: Optional[int] = None
     downscale: bool
-    small_boxsize: Optional[int]
+    small_boxsize: Optional[int] = None
     eer_fractionation: int
-    particle_diameter: Optional[float]
+    particle_diameter: Optional[float] = None
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
     c2aperture: Optional[float] = None
@@ -261,14 +261,14 @@ class ProcessingParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
+        dose_per_frame: Optional[float] = None
+        gain_ref: Optional[str] = None
         use_cryolo: bool
         symmetry: str
-        mask_diameter: Optional[int]
-        boxsize: Optional[int]
+        mask_diameter: Optional[int] = None
+        boxsize: Optional[int] = None
         downscale: bool
-        small_boxsize: Optional[int]
+        small_boxsize: Optional[int] = None
         eer_fractionation: int
 
 
