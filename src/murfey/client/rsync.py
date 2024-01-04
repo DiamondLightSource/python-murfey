@@ -3,14 +3,13 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import subprocess
 import threading
 import time
 from enum import Enum
 from pathlib import Path
 from typing import List, NamedTuple
 from urllib.parse import ParseResult
-
-import procrunner
 
 from murfey.client.tui.status_bar import StatusBar
 from murfey.util import Observer
@@ -385,28 +384,29 @@ class RSyncer(Observer):
 
         success = True
         if rsync_stdin:
-            result = procrunner.run(
+            result = subprocess.run(
                 rsync_cmd,
-                callback_stdout=parse_stdout,
-                callback_stderr=parse_stderr,
-                working_directory=str(self._basepath),
-                stdin=rsync_stdin,
-                print_stdout=False,
-                print_stderr=False,
+                cwd=str(self._basepath),
+                capture_output=True,
+                input=rsync_stdin,
             )
+            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
+                parse_stdout(stdout_line)
+            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
+                parse_stderr(stderr_line)
             success = result.returncode == 0
 
         if rsync_stdin_remove:
             rsync_cmd.insert(-2, "--remove-source-files")
-            result = procrunner.run(
+            result = subprocess.run(
                 rsync_cmd,
-                callback_stdout=parse_stdout,
-                callback_stderr=parse_stderr,
-                working_directory=str(self._basepath),
-                stdin=rsync_stdin_remove,
-                print_stdout=False,
-                print_stderr=False,
+                cwd=str(self._basepath),
+                input=rsync_stdin_remove,
             )
+            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
+                parse_stdout(stdout_line)
+            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
+                parse_stderr(stderr_line)
 
             if success:
                 success = result.returncode == 0

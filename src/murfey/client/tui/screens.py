@@ -2,12 +2,12 @@ from __future__ import annotations
 
 # import contextlib
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
 
-import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
@@ -766,7 +766,7 @@ class GainReference(Screen):
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
             else:
-                gain_rsync = procrunner.run(cmd)
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
                         f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
