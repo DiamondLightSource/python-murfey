@@ -61,12 +61,13 @@ class ClientInfo(BaseModel):
 class RsyncerInfo(BaseModel):
     source: str
     destination: str
-    client_id: int
+    session_id: int
     transferring: bool = True
     increment_count: int = 1
     bytes: int = 0
     increment_data_count: int = 0
     data_bytes: int = 0
+    tag: str = ""
 
 
 class ClearanceKeys(BaseModel):
@@ -279,3 +280,8 @@ class FractionationParameters(BaseModel):
     fractionation: int
     dose_per_frame: float
     fractionation_file_name: str = "eer_fractionation.txt"
+
+
+class MultigridWatcherSetup(BaseModel):
+    source: Path
+    skip_existing_processing: bool = False

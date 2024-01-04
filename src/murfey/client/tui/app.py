@@ -203,6 +203,7 @@ class MurfeyTUI(App):
             source,
             basepath_remote=Path(destination),
             server_url=self._url,
+            stop_callback=lambda *args: None,
             # local=self._environment.demo,
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,

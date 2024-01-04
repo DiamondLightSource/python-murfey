@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 import random
 import time
@@ -59,6 +60,7 @@ from murfey.util.models import (
     File,
     FractionationParameters,
     GainReference,
+    MultigridWatcherSetup,
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
@@ -195,12 +197,13 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
 
 
 @router.post("/visits/{visit_name}/rsyncer")
-def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
+async def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
-        client_id=rsyncer_info.client_id,
+        session_id=rsyncer_info.session_id,
         transferring=rsyncer_info.transferring,
         destination=rsyncer_info.destination,
+        tag=rsyncer_info.tag,
     )
     db.add(rsync_instance)
     db.commit()
@@ -209,7 +212,25 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
+    await ws.manager.broadcast(json.dumps({"message": "refresh"}))
     return rsyncer_info
+
+
+class RsyncerBasicInfo(BaseModel):
+    source: str
+    session_id: int
+
+
+@router.post("/rsyncer_stopped")
+def rsyncer_stopped(rsyncer_info: RsyncerBasicInfo, db=murfey_db):
+    rsync_instance = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.source == rsyncer_info.source)
+        .where(RsyncInstance.session_id == rsyncer_info.session_id)
+    ).one()
+    rsync_instance.transferring = False
+    db.add(rsync_instance)
+    db.commit()
 
 
 @router.get("/clients/{client_id}/rsyncers", response_model=List[RsyncInstance])
@@ -225,15 +246,8 @@ def get_rsyncers_for_client(client_id: int, db=murfey_db) -> List[RsyncInstance]
 
 @router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
 def get_rsyncers_for_session(session_id: int, db=murfey_db) -> List[RsyncInstance]:
-    client_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
-        )
-        .all()[0]
-        .client_id
-    )
     rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     )
     return rsync_instances.all()
 
@@ -246,7 +260,7 @@ def increment_rsync_file_count(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_counted += 1
@@ -265,7 +279,7 @@ def increment_rsync_transferred_files(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_transferred += 1
@@ -279,18 +293,14 @@ def increment_rsync_transferred_files(
     )
 
 
-@router.post("/clients/{client_id}/spa_processing_parameters")
-def register_spa_proc_params(
-    client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
+@router.post("/sessions/{session_id}/spa_processing_parameters")
+async def register_spa_proc_params(
+    session_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
     log.info(
         f"Registration request for SPA processing parameters with data: {proc_params.json()}"
     )
     try:
-        client = db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        ).one()
-        session_id = client.session_id
         collected_ids = db.exec(
             select(
                 DataCollectionGroup,
@@ -335,6 +345,16 @@ def register_spa_proc_params(
     db.add(params)
     db.add(feedback_params)
     db.commit()
+    await ws.manager.broadcast(
+        json.dumps(
+            {
+                "message": "update",
+                "payload": f"SPA processing parameters registered for ISPyB processing job {collected_ids[2].id}",
+                "session_id": session_id,
+                "duration": 5000,
+            }
+        )
+    )
 
 
 class ProcessingDetails(BaseModel):
@@ -390,14 +410,6 @@ def get_spa_proc_param_details(
         )
         for i, d in zip(unique_dcg_indices, dcg_ids)
     ]
-
-
-@router.get("/clients/{client_id}/spa_processing_parameters")
-def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
-    params = db.exec(
-        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
-    ).all()
-    return [p.json() for p in params]
 
 
 @router.post("/visits/{visit_name}/tilt_series")
@@ -543,17 +555,20 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
     return proc_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+@router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
+async def flush_spa_processing(visit_name: str, session_id: int, db=murfey_db):
+    await ws.manager.broadcast(
+        json.dumps(
+            {
+                "message": "update",
+                "payload": f"Starting SPA processing for {visit_name}",
+                "session_id": session_id,
+                "status": "success",
+            }
         )
-        .one()
-        .session_id
     )
     stashed_files = db.exec(
-        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
+        select(PreprocessStash).where(PreprocessStash.session_id == session_id)
     ).all()
     if not stashed_files:
         return
@@ -575,7 +590,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     if not proc_params:
         visit_name = visit_name.replace("\r\n", "").replace("\n", "")
         log.warning(
-            f"No SPA processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
+            f"No SPA processing parameters found for session {sanitise(str(session_id))} on visit {sanitise(visit_name)}"
         )
         return
 
@@ -622,9 +637,9 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     return
 
 
-@router.post("/visits/{visit_name}/{client_id}/spa_preprocess")
+@router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
-    visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
+    visit_name: str, session_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
     parts = [secure_filename(p) for p in Path(proc_file.path).parts]
     visit_idx = parts.index(visit_name)
@@ -648,15 +663,6 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(DataCollectionGroup.session_id == session_id)
@@ -676,15 +682,6 @@ async def request_spa_preprocessing(
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     if proc_params:
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(
@@ -708,7 +705,9 @@ async def request_spa_preprocessing(
         db.commit()
 
         if not mrc_out.parent.exists():
-            Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
+            Path("/".join(secure_filename(p) for p in mrc_out.parts)).parent.mkdir(
+                parents=True, exist_ok=True
+            )
         log.info("Sending Zocalo message")
         _register_picked_particles_use_diameter(
             {
@@ -738,7 +737,7 @@ async def request_spa_preprocessing(
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
             tag=proc_file.tag,
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
         )
@@ -842,17 +841,14 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
-def register_dc_group(
-    visit_name: str, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
+@router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
+async def register_dc_group(
+    visit_name: str, session_id: int, dcg_params: DCGroupParameters, db=murfey_db
 ):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
     murfey_dcg = DataCollectionGroup(
         id=1,
-        session_id=client.session_id,
+        session_id=session_id,
         tag=dcg_params.tag,
     )
     db.add(murfey_dcg)
@@ -889,17 +885,30 @@ def register_dc_group(
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
     ):
-        global_state["data_collection_group_ids"] = {
-            **global_state["data_collection_group_ids"],
-            dcg_params.tag: 1,
-        }
+        await global_state.aupdate(
+            "data_collection_group_ids",
+            {
+                **global_state["data_collection_group_ids"],
+                dcg_params.tag: 1,
+            },
+        )
     else:
-        global_state["data_collection_group_ids"] = {dcg_params.tag: 1}
+        await global_state.aupdate("data_collection_group_ids", {dcg_params.tag: 1})
+    await ws.manager.broadcast(
+        json.dumps(
+            {
+                "message": "update",
+                "session_id": session_id,
+                "payload": f"Registered data collection group {dcg_params.tag}",
+                "duration": 5000,
+            }
+        )
+    )
     return dcg_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/start_data_collection")
-def start_dc(visit_name, client_id: int, dc_params: DCParameters):
+@router.post("/visits/{visit_name}/{session_id}/start_data_collection")
+def start_dc(visit_name, session_id: int, dc_params: DCParameters):
     if global_state.get("data_collection_ids") and isinstance(
         global_state["data_collection_ids"], dict
     ):
@@ -913,8 +922,8 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     return dc_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_processing_job")
-def register_proc(visit_name, client_id: int, proc_params: ProcessingJobParameters):
+@router.post("/visits/{visit_name}/{session_id}/register_processing_job")
+def register_proc(visit_name, session_id: int, proc_params: ProcessingJobParameters):
     log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
@@ -1050,6 +1059,15 @@ def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
     return sid
 
 
+@router.post("/visits/{visit}/session/{name}")
+def create_session(visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit)
+    db.add(s)
+    db.commit()
+    sid = s.id
+    return sid
+
+
 @router.delete("/clients/{client_id}/session")
 def remove_session(client_id: int, db=murfey_db):
     client = db.exec(
@@ -1090,10 +1108,11 @@ def remove_session(client_id: int, db=murfey_db):
 
 
 @router.delete("/sessions/{session_id}")
-def remove_session_by_id(session_id: int, db=murfey_db):
+async def remove_session_by_id(session_id: int, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()
+    await ws.manager.broadcast(json.dumps({"message": "refresh"}))
     return
 
 
@@ -1116,3 +1135,58 @@ async def write_eer_fractionation_file(
             f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}
+
+
+@router.post("/sessions/{session_id}/multigrid_watcher")
+async def start_multigrid_watcher(
+    session_id: int, watcher_spec: MultigridWatcherSetup, db=murfey_db
+) -> bool:
+    if machine_config["instrument_server"]:
+        session = db.exec(select(Session).where(Session.id == session_id)).one()
+        visit = session.visit
+        label = session.name
+        _config = {
+            "acquisition_software": machine_config["acquisition_software"],
+            "calibrations": machine_config["calibrations"],
+            "data_directories": {
+                str(k): v for k, v in machine_config["data_directories"].items()
+            },
+            "rsync_basepath": str(machine_config["rsync_basepath"]),
+            "murfey_db_credentials": machine_config["murfey_db_credentials"],
+            "visit": visit,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config['instrument_server']}/sessions/{session_id}/multigrid_watcher",
+                json={
+                    "source": str(watcher_spec.source / visit),
+                    "visit": visit,
+                    "configuration": _config,
+                    "label": label,
+                    "skip_existing_processing": watcher_spec.skip_existing_processing,
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
+class RsyncerSource(BaseModel):
+    source: str
+
+
+@router.post("/sessions/{session_id}/stop_rsyncer")
+async def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource, db=murfey_db):
+    log.info(f"Stopping rsyncer from {rsyncer_source.source}")
+    if machine_config["instrument_server"]:
+        session_name = (
+            db.exec(select(Session).where(Session.id == session_id)).one().name
+        )
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config['instrument_server']}/sessions/{session_id}/stop_rsyncer",
+                json={
+                    "source": rsyncer_source.source,
+                    "label": session_name,
+                },
+            ) as resp:
+                await resp.json()

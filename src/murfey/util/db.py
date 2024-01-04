@@ -13,25 +13,17 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     visit: str = Field(default="")
     session_id: Optional[int] = Field(foreign_key="session.id")
     connected: bool
-    rsync_instances: List["RsyncInstance"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    preprocess_stashes: List["PreprocessStash"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    preprocess_tomo_stashes: List["TomographyPreprocessStash"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
 
 
 class RsyncInstance(SQLModel, table=True):  # type: ignore
     source: str = Field(primary_key=True)
     destination: str = Field(primary_key=True, default="")
-    client_id: int = Field(foreign_key="clientenvironment.client_id", primary_key=True)
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    tag: str = Field(default="")
     files_transferred: int = Field(default=0)
     files_counted: int = Field(default=0)
     transferring: bool = Field(default=False)
-    client: Optional[ClientEnvironment] = Relationship(back_populates="rsync_instances")
+    session: Optional["Session"] = Relationship(back_populates="rsync_instances")
 
 
 class Session(SQLModel, table=True):  # type: ignore
@@ -47,6 +39,15 @@ class Session(SQLModel, table=True):  # type: ignore
     tomography_processing_parameters: List[
         "TomographyProcessingParameters"
     ] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    rsync_instances: List[RsyncInstance] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    preprocess_stashes: List["PreprocessStash"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    preprocess_tomo_stashes: List["TomographyPreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -137,24 +138,20 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
     tag: str = Field(primary_key=True)
-    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
-    client: Optional[ClientEnvironment] = Relationship(
-        back_populates="preprocess_stashes"
-    )
+    session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
 
 
 class TomographyPreprocessStash(SQLModel, table=True):  # type: ignore
     tag: str
     file_path: str = Field(primary_key=True)
-    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     image_number: int
     mrc_out: str
-    client: Optional[ClientEnvironment] = Relationship(
-        back_populates="preprocess_tomo_stashes"
-    )
+    session: Optional[Session] = Relationship(back_populates="preprocess_tomo_stashes")
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore

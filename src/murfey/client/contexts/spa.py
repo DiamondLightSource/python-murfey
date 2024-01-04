@@ -393,7 +393,7 @@ class SPAModularContext(_SPAContext):
                                 "eer_fractionation_file"
                             ]
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.session_id}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
