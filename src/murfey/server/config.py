@@ -7,19 +7,20 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import yaml
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
-    calibrations: Dict[str, Dict[str, Union[dict, float]]]
+    calibrations: Dict[str, Dict[int, Union[dict, float]]]
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     murfey_db_credentials: str
     crypto_key: str
     display_name: str = ""
     image_path: Optional[Path] = None
-    software_versions: Dict[str, str] = {}
+    software_versions: Dict[str, float] = {}
     external_executables: Dict[str, str] = {}
     external_environment: Dict[str, str] = {}
     rsync_module: str = ""
