@@ -15,7 +15,7 @@ def url(machine_config: MachineConfig | None = None) -> str:
     with open(machine_config.murfey_db_credentials, "r") as stream:
         creds = yaml.safe_load(stream)
     f = Fernet(machine_config.crypto_key.encode("ascii"))
-    p = f.decrypt(creds["password"].encrypt("ascii"))
+    p = f.decrypt(creds["password"].encode("ascii"))
     return f"postgresql+psycopg2://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
