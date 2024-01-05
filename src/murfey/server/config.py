@@ -56,14 +56,18 @@ def get_hostname():
     return socket.gethostname()
 
 
-@lru_cache()
-def get_microscope():
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
     try:
         hostname = get_hostname()
         microscope_from_hostname = hostname.split(".")[0]
     except OSError:
         microscope_from_hostname = "Unknown"
-    microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
+    if machine_config:
+        microscope_name = machine_config.machine_override or os.getenv(
+            "BEAMLINE", microscope_from_hostname
+        )
+    else:
+        microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
     return microscope_name
 
 
