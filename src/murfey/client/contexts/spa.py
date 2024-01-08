@@ -183,9 +183,12 @@ class _SPAContext(Context):
             metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ExposureTime"]
-            metadata["slit_width"] = data["MicroscopeImage"]["microscopeData"][
-                "optics"
-            ]["EnergyFilter"]["EnergySelectionSlitWidth"]
+            try:
+                metadata["slit_width"] = data["MicroscopeImage"]["microscopeData"][
+                    "optics"
+                ]["EnergyFilter"]["EnergySelectionSlitWidth"]
+            except KeyError:
+                metadata["slit_width"] = None
             metadata["phase_plate"] = (
                 1
                 if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
