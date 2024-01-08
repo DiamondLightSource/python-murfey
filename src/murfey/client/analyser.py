@@ -182,10 +182,16 @@ class Analyser(Observer):
                 or mdoc_for_reading
             ):
                 if self._context:
-                    dc_metadata = self._context.gather_metadata(
-                        mdoc_for_reading or transferred_file,
-                        environment=self._environment,
-                    )
+                    try:
+                        dc_metadata = self._context.gather_metadata(
+                            mdoc_for_reading or transferred_file,
+                            environment=self._environment,
+                        )
+                    except KeyError as e:
+                        logger.error(
+                            f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                        )
+                        raise e
                     if not dc_metadata:
                         mdoc_for_reading = None
                 elif transferred_file.suffix == ".mdoc":
@@ -220,6 +226,11 @@ class Analyser(Observer):
                                 )
                             except NotImplementedError:
                                 dc_metadata = {}
+                            except KeyError as e:
+                                logger.error(
+                                    f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                                )
+                                raise e
                         if not dc_metadata or not self._force_mdoc_metadata:
                             self._unseen_xml.append(transferred_file)
                         else:
@@ -256,10 +267,17 @@ class Analyser(Observer):
                         logger.info(f"exception encountered {e}")
                     if self._role == "detector":
                         if not dc_metadata:
-                            dc_metadata = self._context.gather_metadata(
-                                mdoc_for_reading or self._xml_file(transferred_file),
-                                environment=self._environment,
-                            )
+                            try:
+                                dc_metadata = self._context.gather_metadata(
+                                    mdoc_for_reading
+                                    or self._xml_file(transferred_file),
+                                    environment=self._environment,
+                                )
+                            except KeyError as e:
+                                logger.error(
+                                    f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                                )
+                                raise e
                         if not dc_metadata or not self._force_mdoc_metadata:
                             mdoc_for_reading = None
                             self._unseen_xml.append(transferred_file)
@@ -291,10 +309,16 @@ class Analyser(Observer):
                     and self._role == "detector"
                 ):
                     if not dc_metadata:
-                        dc_metadata = self._context.gather_metadata(
-                            self._xml_file(transferred_file),
-                            environment=self._environment,
-                        )
+                        try:
+                            dc_metadata = self._context.gather_metadata(
+                                self._xml_file(transferred_file),
+                                environment=self._environment,
+                            )
+                        except KeyError as e:
+                            logger.error(
+                                f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                            )
+                            raise e
                     self.notify({"form": dc_metadata})
             elif isinstance(self._context, SPAModularContext):
                 self._context.post_transfer(
