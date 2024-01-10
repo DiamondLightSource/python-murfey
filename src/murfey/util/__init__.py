@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, Union
 from urllib.parse import ParseResult
 from uuid import uuid4
 
@@ -60,13 +60,16 @@ def set_default_acquisition_output(
         # for safety
         settings_copy = copy.deepcopy(settings)
 
-        def _set(d: dict, keys_list: List[str], value: str):
-            if len(keys_list) == 1:
-                d[keys_list[0]] = value
-                return
-            _set(d[keys_list[0]], keys_list[1:], value)
+        def _set(d: dict, keys_list: List[str], value: str) -> dict:
+            if len(keys_list) > 1:
+                tmp_value: Union[dict, str] = _set(
+                    d[keys_list[0]], keys_list[1:], value
+                )
+            else:
+                tmp_value = value
+            return {_k: tmp_value if _k == keys_list[0] else _v for _k, _v in d.items()}
 
-        _set(settings_copy, keys, str(new_output_dir))
+        settings_copy = _set(settings_copy, keys, str(new_output_dir))
 
         def _check_dict_structure(d1: dict, d2: dict) -> bool:
             if set(d1.keys()) != set(d2.keys()):
