@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
+import json
 import logging
+import shutil
 from functools import lru_cache
+from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Dict, List, Optional
 from urllib.parse import ParseResult
 from uuid import uuid4
 
@@ -37,6 +41,42 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response:
             f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
         )
     return response
+
+
+def set_default_acquisition_output(
+    new_output_dir: Path,
+    software_settings_output_directories: Dict[str, List[str]],
+    safe: bool = True,
+):
+    for p, keys in software_settings_output_directories.items():
+        if safe:
+            settings_copy_path = Path(p)
+            settings_copy_path = settings_copy_path.parent / (
+                "_murfey_" + settings_copy_path.name
+            )
+            shutil.copy(p, str(settings_copy_path))
+        with open(p, "r") as for_parsing:
+            settings = json.load(for_parsing)
+        # for safety
+        settings_copy = copy.deepcopy(settings)
+        output_dir = settings_copy
+        for k in keys[:-1]:
+            output_dir = output_dir.setdefault(k)
+        output_dir[keys[-1]] = str(new_output_dir)
+
+        def _check_dict_structure(d1: dict, d2: dict) -> bool:
+            if set(d1.keys()) != set(d2.keys()):
+                return False
+            for k in d1.keys():
+                if isinstance(d1[k], dict):
+                    if not isinstance(d2[k], dict):
+                        return False
+                    _check_dict_structure(d1[k], d2[k])
+            return True
+
+        if _check_dict_structure(settings, settings_copy):
+            with open(p, "w") as sf:
+                json.dump(settings_copy, sf)
 
 
 class Observer:

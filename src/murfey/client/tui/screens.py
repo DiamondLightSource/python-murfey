@@ -803,7 +803,7 @@ class DirectorySelection(SwitchSelection):
         super().__init__(
             "directory",
             directories,
-            "Automatically transfer and trigger processing for new directories (recommended for multigrid)",
+            "Automatically transfer and trigger processing for new directories (recommended)",
             *args,
             **kwargs,
         )
@@ -812,6 +812,7 @@ class DirectorySelection(SwitchSelection):
         self.app._multigrid = self._switch_status
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
+        self.app._set_default_acquisition_directories(visit_dir)
         machine_config = get_machine_config(
             str(self.app._environment.url.geturl()), demo=self.app._environment.demo
         )

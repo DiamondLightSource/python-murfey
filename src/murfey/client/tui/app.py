@@ -32,7 +32,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post, get_machine_config, set_default_acquisition_output
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -718,3 +718,8 @@ class MurfeyTUI(App):
 
     async def action_process(self) -> None:
         self.processing_btn.disabled = False
+
+    def _set_default_acquisition_directories(self, default_dir: Path):
+        set_default_acquisition_output(
+            default_dir, self._machine_config["software_settings_output_directories"]
+        )
