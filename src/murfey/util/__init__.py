@@ -59,10 +59,14 @@ def set_default_acquisition_output(
             settings = json.load(for_parsing)
         # for safety
         settings_copy = copy.deepcopy(settings)
-        output_dir = settings_copy
-        for k in keys[:-1]:
-            output_dir = output_dir.setdefault(k)
-        output_dir[keys[-1]] = str(new_output_dir)
+
+        def _set(d: dict, keys_list: List[str], value: str):
+            if len(keys_list) == 1:
+                d[keys_list[0]] = value
+                return
+            _set(d[keys_list[0]], keys_list[1:], value)
+
+        _set(settings_copy, keys, str(new_output_dir))
 
         def _check_dict_structure(d1: dict, d2: dict) -> bool:
             if set(d1.keys()) != set(d2.keys()):
