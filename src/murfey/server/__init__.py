@@ -312,10 +312,11 @@ def run():
         log_config=None,
         ws_ping_interval=300,
         ws_ping_timeout=300,
+        workers=args.workers,
     )
 
     _running_server = uvicorn.Server(config=config)
-    _running_server.run(workers=args.workers)
+    _running_server.run()
     logger.info("Server shutting down")
 
 
