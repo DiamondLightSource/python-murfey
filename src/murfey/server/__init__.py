@@ -237,6 +237,9 @@ def run():
         default=8000,
     )
     parser.add_argument(
+        "--workers", help="Number of workers for Uvicorn server", type=int, default=2
+    )
+    parser.add_argument(
         "--demo",
         action="store_true",
     )
@@ -312,7 +315,7 @@ def run():
     )
 
     _running_server = uvicorn.Server(config=config)
-    _running_server.run()
+    _running_server.run(workers=args.workers)
     logger.info("Server shutting down")
 
 
