@@ -200,18 +200,34 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source)
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(
+        0
+    )
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     return rsyncer_info
 
 
@@ -239,10 +255,10 @@ def increment_rsync_file_count(
     db.commit()
     db.close()
     prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count
+        rsyncer_info.increment_count, visit=visit_name
     )
     prom.seen_data_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_data_count
+        rsyncer_info.increment_data_count, visit=visit_name
     )
 
 
@@ -268,16 +284,16 @@ def increment_rsync_transferred_files_prometheus(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
     prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count
+        rsyncer_info.increment_count, visit=visit_name
     )
     prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.bytes
+        rsyncer_info.bytes, visit=visit_name
     )
     prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_data_count
+        rsyncer_info.increment_data_count, visit=visit_name
     )
     prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.data_bytes
+        rsyncer_info.data_bytes, visit=visit_name
     )
 
 
