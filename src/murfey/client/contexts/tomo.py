@@ -450,7 +450,7 @@ class TomographyContext(Context):
                         ),
                         "data_collection_tag": tilt_series,
                         "source": str(self._basepath),
-                        "tag": str(self._basepath),
+                        "tag": tilt_series,
                     }
                     if (
                         environment.data_collection_parameters
@@ -613,8 +613,6 @@ class TomographyContext(Context):
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
-                "size": file_path.stat().st_size,
-                "timestamp": file_path.stat().st_ctime,
                 "data_collection_id": environment.data_collection_ids.get(tilt_series),
                 "image_number": environment.movies[file_transferred_to].movie_number,
                 "pixel_size": environment.data_collection_parameters.get(

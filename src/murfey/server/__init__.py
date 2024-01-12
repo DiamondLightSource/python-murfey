@@ -1820,10 +1820,19 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
-            dcg = murfey_db.exec(
-                select(db.DataCollectionGroup).where(
-                    db.DataCollectionGroup.tag == message["source"]
+            murfey_session_id = (
+                murfey_db.exec(
+                    select(db.ClientEnvironment).where(
+                        db.ClientEnvironment.client_id == message["client_id"]
+                    )
                 )
+                .one()
+                .session_id
+            )
+            dcg = murfey_db.exec(
+                select(db.DataCollectionGroup)
+                .where(db.DataCollectionGroup.session_id == murfey_session_id)
+                .where(db.DataCollectionGroup.tag == message["source"])
             ).one()
             if dcg:
                 dcgid = dcg.id
@@ -1968,6 +1977,9 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "flush_tomography_preprocess":
             _flush_tomography_preprocessing(message)
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         elif message["register"] == "flush_spa_preprocess":
             session_id = (
                 murfey_db.exec(
@@ -2161,10 +2173,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
                 .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
             ).one()
-            params = db.TomographyProcessingParameters(
-                pj_id=collected_ids[2].id,
+            params = db.TomographyPreprocessingParameters(
+                dcg_id=collected_ids[0].id,
                 pixel_size=message["pixel_size_on_image"],
-                manual_tilt_offset=message["manual_tilt_offset"],
+                dose_per_frame=message["dose_per_frame"],
+                motion_corr_binning=message["motion_corr_binning"],
+                gain_ref=message["gain_ref"],
             )
             murfey_db.add(params)
             murfey_db.commit()

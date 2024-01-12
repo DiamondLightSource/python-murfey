@@ -206,6 +206,7 @@ class MurfeyTUI(App):
             # local=self._environment.demo,
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
+            required_substrings_for_removal=self._data_substrings,
             remove_files=remove_files,
         )
 
@@ -446,8 +447,7 @@ class MurfeyTUI(App):
                 "file_extension": json["file_extension"],
                 "acquisition_software": json["acquisition_software"],
                 "image_directory": str(self._environment.default_destinations[source]),
-                "tag": json["tag"],
-                "data_collection_tag": json["tilt_series_tag"],
+                "tag": json["tilt_series_tag"],
                 "source": str(source),
                 "magnification": json["magnification"],
                 "total_exposed_dose": json.get("total_exposed_dose"),
@@ -463,9 +463,9 @@ class MurfeyTUI(App):
             for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                 capture_post(
                     f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
-                    json={"tag": str(source), "recipe": recipe},
+                    json={"tag": json["tilt_series_tag"], "recipe": recipe},
                 )
-            log.info("Registering tomograpy processing parameters")
+            log.info("Registering tomography processing parameters")
             requests.post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                 json=json,

@@ -90,8 +90,6 @@ class SPAProcessingParameters(BaseModel):
 class ProcessFile(BaseModel):
     path: str
     description: str
-    size: int
-    timestamp: float
     tag: str
     data_collection_id: Optional[int]
     image_number: int
