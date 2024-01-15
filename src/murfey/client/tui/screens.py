@@ -832,6 +832,7 @@ class DestinationSelect(Screen):
         context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
+        use_transfer_routes: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -841,17 +842,16 @@ class DestinationSelect(Screen):
         self._dependencies = dependencies or {}
         self._inputs: Dict[Input, str] = {}
         self._context = context
+        self._use_transfer_routes = use_transfer_routes
 
     def compose(self):
         bulk = []
-        if self.app._multigrid:
-            with RadioSet():
-                yield RadioButton(
-                    "SPA", value=self._context in (SPAContext, SPAModularContext)
-                )
-                yield RadioButton(
-                    "Tomography", value=self._context is TomographyContext
-                )
+        with RadioSet():
+            yield RadioButton(
+                "SPA", value=self._context in (SPAContext, SPAModularContext)
+            )
+            yield RadioButton("Tomography", value=self._context is TomographyContext)
+        if self.app._multigrid and not self._use_transfer_routes:
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             destinations = []
             for s in self._transfer_routes.keys():
@@ -896,13 +896,17 @@ class DestinationSelect(Screen):
                             )
                         )
         else:
+            machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             for s, d in self._transfer_routes.items():
-                bulk.append(Label(f"Copy the source {s} to:"))
-                bulk.append(
-                    Input(
-                        value=d, id=f"destination-{str(s)}", classes="input-destination"
+                if Path(d).name not in machine_config["create_directories"]:
+                    bulk.append(Label(f"Copy the source {s} to:"))
+                    bulk.append(
+                        Input(
+                            value=d,
+                            id=f"destination-{str(s)}",
+                            classes="input-destination",
+                        )
                     )
-                )
         yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid and self.app._processing_enabled:
@@ -942,11 +946,6 @@ class DestinationSelect(Screen):
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
-        # with RadioSet():
-        #     yield RadioButton(
-        #         "SPA", value=self._context in (SPAContext, SPAModularContext)
-        #     )
-        #     yield RadioButton("Tomography", value=self._context is TomographyContext)
 
     def _check_dependency(self, key: str, value: Any):
         if x := self._dependencies.get(key):
@@ -988,7 +987,10 @@ class DestinationSelect(Screen):
         self.app.uninstall_screen("destination-select-screen")
         self.app.install_screen(
             DestinationSelect(
-                self._transfer_routes, self._context, dependencies=spa_form_dependencies
+                self._destination_overrides,
+                self._context,
+                dependencies=spa_form_dependencies,
+                use_transfer_routes=True,
             ),
             "destination-select-screen",
         )
