@@ -6,6 +6,8 @@ import threading
 from pathlib import Path
 from typing import Type
 
+import requests
+
 from murfey.client.context import Context
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -301,9 +303,12 @@ class Analyser(Observer):
                             )
             elif isinstance(self._context, TomographyContext):
                 _tilt_series = set(self._context._tilt_series.keys())
-                self._context.post_transfer(
-                    transferred_file, role=self._role, environment=self._environment
-                )
+                try:
+                    self._context.post_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
+                except Exception as e:
+                    logger.error(f"An exception was encountered post transfer: {e}")
                 if (
                     len(self._context._tilt_series.keys()) > len(_tilt_series)
                     and self._role == "detector"
@@ -314,6 +319,23 @@ class Analyser(Observer):
                                 self._xml_file(transferred_file),
                                 environment=self._environment,
                             )
+                            if dc_metadata.get("num_eer_frames"):
+                                response = requests.post(
+                                    f"{str(self._environment.url.geturl())}/visits/{self._environment.visit}/eer_fractionation_file",
+                                    json={
+                                        "num_frames": dc_metadata["num_eer_frames"],
+                                        "fractionation": dc_metadata[
+                                            "eer_fractionation"
+                                        ],
+                                        "dose_per_frame": dc_metadata["dose_per_frame"],
+                                        "fractionation_file_name": "eer_fractionation_tomo.txt",
+                                    },
+                                )
+                                dc_metadata["eer_fractionation_file"] = response.json()[
+                                    "eer_fractionation_file"
+                                ]
+                            else:
+                                dc_metadata["eer_fractionation_file"] = None
                         except KeyError as e:
                             logger.error(
                                 f"Metadata gathering failed with a key error for key: {e.args[0]}"

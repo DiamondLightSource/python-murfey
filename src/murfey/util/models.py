@@ -200,6 +200,7 @@ class PreprocessingParametersTomo(BaseModel):
     file_extension: str
     tag: str
     tilt_series_tag: str
+    eer_fractionation_file: Optional[str]
 
     class Base(BaseModel):
         dose_per_frame: float

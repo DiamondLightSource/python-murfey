@@ -1676,6 +1676,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
                 "pix_size": proc_params.pixel_size,
+                "kv": proc_params.voltage,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
@@ -1684,6 +1685,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
                 if proc_params.gain_ref
                 else proc_params.gain_ref,
+                "fm_int_file": proc_params.eer_fractionation_file or "",
             },
         }
         logger.info(
@@ -2183,9 +2185,11 @@ def feedback_callback(header: dict, message: dict) -> None:
             params = db.TomographyPreprocessingParameters(
                 dcg_id=collected_ids[0].id,
                 pixel_size=message["pixel_size_on_image"],
+                voltage=message["voltage"],
                 dose_per_frame=message["dose_per_frame"],
                 motion_corr_binning=message["motion_corr_binning"],
                 gain_ref=message["gain_ref"],
+                eer_fractionation_file=message["eer_fractionation_file"],
             )
             murfey_db.add(params)
             murfey_db.commit()
