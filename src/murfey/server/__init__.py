@@ -33,6 +33,7 @@ from werkzeug.utils import secure_filename
 import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
+from murfey.client.contexts.tomo import _midpoint
 from murfey.server.config import get_hostname, get_machine_config, get_microscope
 from murfey.server.murfey_db import url  # murfey_db
 
@@ -1626,20 +1627,13 @@ def _flush_tomography_preprocessing(message: dict):
     collected_ids = murfey_db.exec(
         select(
             db.DataCollectionGroup,
-            db.DataCollection,
-            db.ProcessingJob,
-            db.AutoProcProgram,
         )
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
-        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
-    ).one()
+    ).first()
     proc_params = murfey_db.exec(
         select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+            db.TomographyPreprocessingParameters.dcg_id == collected_ids.id
         )
     ).one()
     if not proc_params:
@@ -1649,16 +1643,29 @@ def _flush_tomography_preprocessing(message: dict):
         )
         return
 
-    detached_ids = [c.id for c in collected_ids]
+    for f in stashed_files:
+        collected_ids = murfey_db.exec(
+            select(
+                db.DataCollectionGroup,
+                db.DataCollection,
+                db.ProcessingJob,
+                db.AutoProcProgram,
+            )
+            .where(db.DataCollectionGroup.session_id == session_id)
+            .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
+            .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+            .where(db.DataCollection.tag == f.tag)
+            .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+            .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+            .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+        ).one()
+        detached_ids = [c.id for c in collected_ids]
 
-    murfey_ids = _murfey_id(
-        detached_ids[3], murfey_db, number=2 * len(stashed_files), close=False
-    )
-    for i, f in enumerate(stashed_files):
+        murfey_ids = _murfey_id(detached_ids[3], murfey_db, number=1, close=False)
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
-        movie = db.Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        movie = db.Movie(murfey_id=murfey_ids[0], path=f.file_path)
         murfey_db.add(movie)
         zocalo_message = {
             "recipes": ["em-tomo-preprocess"],
@@ -1671,7 +1678,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "pix_size": proc_params.pixel_size,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[2 * i],
+                "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params.motion_corr_binning,
                 "fm_dose": proc_params.dose_per_frame,
                 "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
@@ -1693,12 +1700,12 @@ def _flush_tomography_preprocessing(message: dict):
                     "register": "motion_corrected",
                     "movie": f.file_path,
                     "mrc_out": f.mrc_out,
-                    "movie_id": murfey_ids[2 * i],
+                    "movie_id": murfey_ids[0],
                     "program_id": detached_ids[3],
                 },
             )
         murfey_db.delete(f)
-    murfey_db.commit()
+        murfey_db.commit()
 
 
 def feedback_callback(header: dict, message: dict) -> None:
@@ -1739,7 +1746,6 @@ def feedback_callback(header: dict, message: dict) -> None:
             if check_tilt_series_mc(relevant_tilt_series.id):
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
-                params = get_tomo_proc_params(ids.pid)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
@@ -1748,6 +1754,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)
+                tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
                     "parameters": {
@@ -1757,7 +1764,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
                         "pix_size": preproc_params.pixel_size,
-                        "manual_tilt_offset": params.manual_tilt_offset,
+                        "manual_tilt_offset": tilt_offset,
                     },
                 }
                 if _transport_object:

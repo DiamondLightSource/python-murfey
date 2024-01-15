@@ -1003,12 +1003,14 @@ def register_dc_group(
 def start_dc(
     visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
 ) -> DCParameters | None:
-    dcg_tag = dc_params.tag.replace("\r\n", "").replace("\n", "")
-    log.info(f"Starting data collection, data collection tag {dcg_tag}")
+    dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
+    log.info(
+        f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
+    )
     dcg = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
     ).one()
-    dc_tag = dc_params.data_collection_tag or dc_params.tag
+    dc_tag = dc_params.tag
     if db.exec(
         select(DataCollection)
         .where(DataCollection.tag == dc_tag)
@@ -1053,7 +1055,8 @@ def start_dc(
         }
     else:
         global_state["data_collection_ids"] = {dc_params.tag: 1}
-    prom.exposure_time.set(dc_params.exposure_time)
+    if dc_params.exposure_time:
+        prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 

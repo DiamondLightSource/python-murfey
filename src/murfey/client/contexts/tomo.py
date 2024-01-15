@@ -187,7 +187,14 @@ class TomographyContext(Context):
             f"Flushing {len(self._data_collection_stash)} data collection API calls"
         )
         for dc_data in self._data_collection_stash:
-            data = {**dc_data[2], **dc_data[1].data_collection_parameters}
+            data = {
+                **dc_data[2],
+                **{
+                    k: v
+                    for k, v in dc_data[1].data_collection_parameters.items()
+                    if k != "tag"
+                },
+            }
             capture_post(dc_data[0], json=data)
         self._data_collection_stash = []
 
@@ -196,6 +203,15 @@ class TomographyContext(Context):
             for pd in proc_data:
                 requests.post(pd[0], json=pd[1])
             self._processing_job_stash.pop(tag)
+
+    def _flush_processing_jobs(self):
+        logger.info(
+            f"Flushing {len(self._processing_job_stash.keys())} processing job API calls"
+        )
+        for v in self._processing_job_stash.values():
+            for pd in v:
+                requests.post(pd[0], json=pd[1])
+        self._processing_job_stash = {}
 
     def _flush_preprocess(self, tag: str, app_id: int):
         if tag_tr := self._preprocessing_triggers.get(tag):
@@ -505,8 +521,6 @@ class TomographyContext(Context):
                             )
                         )
                     else:
-                        if self._processing_job_stash.get(tilt_series):
-                            self._flush_processing_job(tilt_series)
                         capture_post(
                             proc_url,
                             json={
@@ -557,25 +571,6 @@ class TomographyContext(Context):
                 )
 
         if res and environment:
-            for r in res:
-                associated_tilts = (
-                    requests.get(
-                        f"{str(environment.url.geturl())}/clients/{environment.client_id}/tilt_series/{r}/tilts"
-                    )
-                    .json()
-                    .get(str(file_path.parent), [])
-                )
-                manual_tilt_offset = _midpoint(
-                    [float(extract_tilt_angle(Path(t))) for t in associated_tilts]
-                )
-                capture_post(
-                    f"{str(environment.url.geturl())}/clients/{environment.client_id}/tomography_processing_parameters",
-                    json={
-                        "tag": str(file_path.parent),
-                        "tilt_series_tag": tilt_series,
-                        "manual_tilt_offset": manual_tilt_offset,
-                    },
-                )
             complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
             capture_post(
                 complete_url,
