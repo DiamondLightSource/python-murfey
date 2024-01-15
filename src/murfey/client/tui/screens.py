@@ -845,6 +845,13 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         if self.app._multigrid:
+            with RadioSet():
+                yield RadioButton(
+                    "SPA", value=self._context in (SPAContext, SPAModularContext)
+                )
+                yield RadioButton(
+                    "Tomography", value=self._context is TomographyContext
+                )
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             destinations = []
             for s in self._transfer_routes.keys():
@@ -935,11 +942,11 @@ class DestinationSelect(Screen):
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
-        with RadioSet():
-            yield RadioButton(
-                "SPA", value=self._context in (SPAContext, SPAModularContext)
-            )
-            yield RadioButton("Tomography", value=self._context is TomographyContext)
+        # with RadioSet():
+        #     yield RadioButton(
+        #         "SPA", value=self._context in (SPAContext, SPAModularContext)
+        #     )
+        #     yield RadioButton("Tomography", value=self._context is TomographyContext)
 
     def _check_dependency(self, key: str, value: Any):
         if x := self._dependencies.get(key):

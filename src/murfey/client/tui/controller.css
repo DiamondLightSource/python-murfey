@@ -68,6 +68,10 @@ Input {
     border: solid teal;
 }
 
+RadioSet {
+    width: 100%;
+}
+
 #quit {
     width: 100%;
     height: 100%;
