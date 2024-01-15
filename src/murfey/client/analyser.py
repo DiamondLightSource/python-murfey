@@ -341,6 +341,9 @@ class Analyser(Observer):
                                 f"Metadata gathering failed with a key error for key: {e.args[0]}"
                             )
                             raise e
+                    dc_metadata[
+                        "acquisition_software"
+                    ] = self._context._acquisition_software
                     self.notify({"form": dc_metadata})
             elif isinstance(self._context, SPAModularContext):
                 self._context.post_transfer(
