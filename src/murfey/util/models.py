@@ -103,6 +103,7 @@ class ProcessFile(BaseModel):
     gain_ref: Optional[str] = None
     extract_downscale: int = 1
     eer_fractionation_file: Optional[str] = None
+    group_tag: Optional[str] = None
 
 
 class SPAProcessFile(BaseModel):

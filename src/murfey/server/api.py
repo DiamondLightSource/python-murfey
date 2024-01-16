@@ -786,7 +786,8 @@ async def request_tomography_preprocessing(
     data_collection = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == proc_file.tag)
+        .where(DataCollectionGroup.tag == proc_file.group_tag)
+        .where(DataCollection.tag == proc_file.tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -837,6 +838,7 @@ async def request_tomography_preprocessing(
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             tag=proc_file.tag,
+            group_tag=proc_file.group_tag,
         )
         db.add(for_stash)
         db.commit()

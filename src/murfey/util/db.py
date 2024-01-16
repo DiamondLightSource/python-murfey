@@ -140,6 +140,7 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
+    group_tag: Optional[str]
     client: Optional[ClientEnvironment] = Relationship(
         back_populates="preprocess_stashes"
     )

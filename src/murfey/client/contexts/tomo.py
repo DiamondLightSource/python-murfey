@@ -626,6 +626,7 @@ class TomographyContext(Context):
                 "voltage": environment.data_collection_parameters.get("voltage", 300),
                 "eer_fractionation_file": eer_fractionation_file,
                 "tag": tilt_series,
+                "group_tag": str(self._basepath),
             }
             capture_post(preproc_url, json=preproc_data)
 
