@@ -685,7 +685,7 @@ class VisitSelection(SwitchSelection):
         super().__init__(
             "visit",
             visits,
-            "Create visit directory (use this for EPU)",
+            "Create visit directory (suggested)",
             *args,
             **kwargs,
         )
