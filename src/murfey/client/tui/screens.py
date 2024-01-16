@@ -5,7 +5,17 @@ import logging
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    OrderedDict,
+    Type,
+    TypeVar,
+)
 
 import procrunner
 import requests
@@ -832,12 +842,13 @@ class DestinationSelect(Screen):
         context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
+        destination_overrides: Optional[Dict[Path, str]] = None,
         use_transfer_routes: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
-        self._destination_overrides: Dict[Path, str] = {}
+        self._destination_overrides: Dict[Path, str] = destination_overrides or {}
         self._user_params: Dict[str, str] = {}
         self._dependencies = dependencies or {}
         self._inputs: Dict[Input, str] = {}
@@ -851,50 +862,62 @@ class DestinationSelect(Screen):
                 "SPA", value=self._context in (SPAContext, SPAModularContext)
             )
             yield RadioButton("Tomography", value=self._context is TomographyContext)
-        if self.app._multigrid and not self._use_transfer_routes:
+        if self.app._multigrid:
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             destinations = []
-            for s in self._transfer_routes.keys():
-                for d in s.glob("*"):
-                    if (
-                        d.is_dir()
-                        and d.name not in machine_config["create_directories"]
-                    ):
-                        machine_data = requests.get(
-                            f"{self.app._environment.url.geturl()}/machine/"
-                        ).json()
-                        dest = determine_default_destination(
-                            self.app._visit,
-                            s,
-                            f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
-                            self.app._environment,
-                            self.app.analysers,
-                            touch=True,
+            if self._destination_overrides:
+                for k, v in self._destination_overrides.items():
+                    destinations.append(v)
+                    bulk.append(Label(f"Copy the source {k} to:"))
+                    bulk.append(
+                        Input(
+                            value=v,
+                            id=f"destination-{str(k)}",
+                            classes="input-destination",
                         )
-                        if dest and dest in destinations:
-                            dest_path = Path(dest)
-                            name_root = ""
-                            dest_num = 0
-                            for i, st in enumerate(dest_path.name):
-                                if st.isnumeric():
-                                    dest_num = int(dest_path.name[i:])
-                                    break
-                                name_root += st
-                            if dest_num:
-                                dest = str(
-                                    dest_path.parent / f"{name_root}{dest_num+1}"
-                                )
-                            else:
-                                dest = str(dest_path.parent / f"{name_root}2")
-                        destinations.append(dest)
-                        bulk.append(Label(f"Copy the source {d} to:"))
-                        bulk.append(
-                            Input(
-                                value=dest,
-                                id=f"destination-{str(d)}",
-                                classes="input-destination",
+                    )
+            else:
+                for s in self._transfer_routes.keys():
+                    for d in s.glob("*"):
+                        if (
+                            d.is_dir()
+                            and d.name not in machine_config["create_directories"]
+                        ):
+                            machine_data = requests.get(
+                                f"{self.app._environment.url.geturl()}/machine/"
+                            ).json()
+                            dest = determine_default_destination(
+                                self.app._visit,
+                                s,
+                                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+                                self.app._environment,
+                                self.app.analysers,
+                                touch=True,
                             )
-                        )
+                            if dest and dest in destinations:
+                                dest_path = Path(dest)
+                                name_root = ""
+                                dest_num = 0
+                                for i, st in enumerate(dest_path.name):
+                                    if st.isnumeric():
+                                        dest_num = int(dest_path.name[i:])
+                                        break
+                                    name_root += st
+                                if dest_num:
+                                    dest = str(
+                                        dest_path.parent / f"{name_root}{dest_num+1}"
+                                    )
+                                else:
+                                    dest = str(dest_path.parent / f"{name_root}2")
+                            destinations.append(dest)
+                            bulk.append(Label(f"Copy the source {d} to:"))
+                            bulk.append(
+                                Input(
+                                    value=dest,
+                                    id=f"destination-{str(d)}",
+                                    classes="input-destination",
+                                )
+                            )
         else:
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             for s, d in self._transfer_routes.items():
@@ -987,9 +1010,10 @@ class DestinationSelect(Screen):
         self.app.uninstall_screen("destination-select-screen")
         self.app.install_screen(
             DestinationSelect(
-                self._destination_overrides,
+                self._transfer_routes,
                 self._context,
                 dependencies=spa_form_dependencies,
+                destination_overrides=self._destination_overrides,
                 use_transfer_routes=True,
             ),
             "destination-select-screen",

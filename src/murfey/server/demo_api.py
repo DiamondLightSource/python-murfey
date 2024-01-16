@@ -351,6 +351,7 @@ def register_tomo_preproc_params(
             dose_per_frame=proc_params.dose_per_frame,
             gain_ref=proc_params.gain_ref,
             motion_corr_binning=proc_params.motion_corr_binning,
+            voltage=proc_params.voltage,
             # manual_tilt_offset=proc_params.manual_tilt_offset,
         )
         db.add(params)
