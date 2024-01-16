@@ -2178,22 +2178,28 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.DataCollectionGroup.session_id == session_id)
                 .where(db.DataCollectionGroup.tag == message["tag"])
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.DataCollection.tag == message["tilt_series_tag"])
                 .where(db.ProcessingJob.dc_id == db.DataCollection.id)
                 .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
                 .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
             ).one()
-            params = db.TomographyPreprocessingParameters(
-                dcg_id=collected_ids[0].id,
-                pixel_size=message["pixel_size_on_image"],
-                voltage=message["voltage"],
-                dose_per_frame=message["dose_per_frame"],
-                motion_corr_binning=message["motion_corr_binning"],
-                gain_ref=message["gain_ref"],
-                eer_fractionation_file=message["eer_fractionation_file"],
-            )
-            murfey_db.add(params)
-            murfey_db.commit()
-            murfey_db.close()
+            if not murfey_db.exec(
+                select(func.count(db.TomographyPreprocessingParameters.dcg_id)).where(
+                    db.TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+                )
+            ).one():
+                params = db.TomographyPreprocessingParameters(
+                    dcg_id=collected_ids[0].id,
+                    pixel_size=message["pixel_size_on_image"],
+                    voltage=message["voltage"],
+                    dose_per_frame=message["dose_per_frame"],
+                    motion_corr_binning=message["motion_corr_binning"],
+                    gain_ref=message["gain_ref"],
+                    eer_fractionation_file=message["eer_fractionation_file"],
+                )
+                murfey_db.add(params)
+                murfey_db.commit()
+                murfey_db.close()
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
