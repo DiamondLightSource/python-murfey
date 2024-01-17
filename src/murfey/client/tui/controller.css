@@ -324,6 +324,14 @@ RadioSet {
     background: blueviolet;
 } 
 
+#montiroing {
+    width: 25%;
+}
+
+.monitoring-switch {
+    width: 75%;
+}
+
 #input:hover {
     background: blue;
 }

@@ -1276,12 +1276,12 @@ def remove_session(client_id: int, db=murfey_db):
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
     ).all()
     for ri in rsync_instances:
-        prom.seen_files.remove(ri.source)
-        prom.transferred_files.remove(ri.source)
-        prom.transferred_files_bytes.remove(ri.source)
-        prom.seen_data_files.remove(ri.source)
-        prom.transferred_data_files.remove(ri.source)
-        prom.transferred_data_files_bytes.remove(ri.source)
+        prom.seen_files.remove(ri.source, client.visit)
+        prom.transferred_files.remove(ri.source, client.visit)
+        prom.transferred_files_bytes.remove(ri.source, client.visit)
+        prom.seen_data_files.remove(ri.source, client.visit)
+        prom.transferred_data_files.remove(ri.source, client.visit)
+        prom.transferred_data_files_bytes.remove(ri.source, client.visit)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)

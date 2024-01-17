@@ -1151,11 +1151,12 @@ class MainScreen(Screen):
         info_widget.write(
             f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
         )
-        self.app.processing_btn = Button(
-            "Request processing",
-            id="processing-btn",
-            disabled=not self.app._form_values,
-        )
-        yield self.app.processing_btn
+        yield Static("Monitor")
+        yield Switch(value=True, classes="monitoring")
         yield Button("Visit complete", id="new-visit-btn")
         yield Footer()
+
+    def on_switch_changed(self, event):
+        requests.post(
+            f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/monitoring/{1 if event.value else 0}"
+        )
