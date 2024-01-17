@@ -1253,3 +1253,8 @@ async def write_eer_fractionation_file(
             f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}
+
+
+@router.post("/visits/{visit_name}/mointoring/{on}")
+def change_monitoring_status(visit_name: str, on: int):
+    prom.monitoring_switch.labels(visit=visit_name).set(on)

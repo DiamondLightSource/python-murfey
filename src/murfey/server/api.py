@@ -1308,3 +1308,8 @@ def remove_session(client_id: int, db=murfey_db):
     db.delete(session)
     db.commit()
     return
+
+
+@router.post("/visits/{visit_name}/mointoring/{on}")
+def change_monitoring_status(visit_name: str, on: int):
+    prom.monitoring_switch.labels(visit=visit_name).set(on)
