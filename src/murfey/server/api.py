@@ -254,11 +254,11 @@ def increment_rsync_file_count(
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count, visit=visit_name
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
+        rsyncer_info.increment_count
     )
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_data_count, visit=visit_name
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
+        rsyncer_info.increment_data_count
     )
 
 
@@ -283,18 +283,18 @@ def increment_rsync_transferred_files(
 def increment_rsync_transferred_files_prometheus(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count, visit=visit_name
-    )
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.bytes, visit=visit_name
-    )
-    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_data_count, visit=visit_name
-    )
-    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.data_bytes, visit=visit_name
-    )
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_count)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.bytes)
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_data_count)
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.data_bytes)
 
 
 @router.get("/demo/visits_raw", response_model=List[Visit])
@@ -1272,6 +1272,7 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    prom.monitoring_switch.remove(client.visit)
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
     ).all()
@@ -1312,4 +1313,5 @@ def remove_session(client_id: int, db=murfey_db):
 
 @router.post("/visits/{visit_name}/mointoring/{on}")
 def change_monitoring_status(visit_name: str, on: int):
+    prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)
