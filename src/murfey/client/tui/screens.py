@@ -1152,7 +1152,7 @@ class MainScreen(Screen):
             f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
         )
         yield Static("Monitor")
-        yield Switch(value=True, classes="monitoring")
+        yield Switch(value=False, id="monitoring")
         yield Button("Visit complete", id="new-visit-btn")
         yield Footer()
 

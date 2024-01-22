@@ -324,8 +324,10 @@ RadioSet {
     background: blueviolet;
 } 
 
-#montiroing {
-    width: 25%;
+#monitoring {
+    width: 100%;
+    height: 90fr;
+    column-span: 1;
 }
 
 .monitoring-switch {
