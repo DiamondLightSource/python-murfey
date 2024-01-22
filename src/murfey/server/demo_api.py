@@ -635,7 +635,9 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
-        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        movie = Movie(
+            murfey_id=murfey_ids[2 * i], path=f.file_path, image_number=f.image_number
+        )
         db.add(movie)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
@@ -748,7 +750,11 @@ async def request_spa_preprocessing(
 
         feedback_params.picker_murfey_id = murfey_ids[1]
         db.add(feedback_params)
-        movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+        )
         db.add(movie)
         db.commit()
 

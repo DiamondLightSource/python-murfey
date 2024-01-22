@@ -2053,7 +2053,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ppath = Path(f.file_path)
                 if not mrcp.parent.exists():
                     mrcp.parent.mkdir(parents=True)
-                movie = db.Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+                movie = db.Movie(
+                    murfey_id=murfey_ids[2 * i],
+                    path=f.file_path,
+                    image_number=f.image_number,
+                )
                 murfey_db.add(movie)
                 zocalo_message = {
                     "recipes": ["em-spa-preprocess"],

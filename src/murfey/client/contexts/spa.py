@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 from typing import Any, Dict, OrderedDict
 
@@ -10,7 +11,6 @@ import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
-    MovieID,
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
@@ -356,8 +356,10 @@ class SPAModularContext(_SPAContext):
                         file_transferred_to = _file_transferred_to(
                             environment, source, transferred_file
                         )
+                        if not environment.movie_counters.get(str(source)):
+                            environment.movie_counters[str(source)] = count(1)
                         environment.movies[file_transferred_to] = MovieTracker(
-                            movie_number=next(MovieID),
+                            movie_number=next(environment.movie_counters[str(source)]),
                             motion_correction_uuid=next(MurfeyID),
                         )
 

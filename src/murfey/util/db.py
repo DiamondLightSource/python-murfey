@@ -216,6 +216,8 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
     path: str
+    image_number: int
+    motion_corrected: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
 
 

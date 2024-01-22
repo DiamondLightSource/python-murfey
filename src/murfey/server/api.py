@@ -693,7 +693,11 @@ async def request_spa_preprocessing(
         if feedback_params.picker_murfey_id is None:
             feedback_params.picker_murfey_id = murfey_ids[1]
             db.add(feedback_params)
-        movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+        )
         db.add(movie)
         db.commit()
         db.close()
