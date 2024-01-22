@@ -2122,7 +2122,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 machine_config = get_machine_config()
                 params = db.SPARelionParameters(
                     pj_id=collected_ids[2].id,
-                    angpix=0.8,  # message["pixel_size_on_image"],
+                    angpix=message["pixel_size_on_image"],
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=str(machine_config.rsync_basepath / message["gain_ref"])
                     if message["gain_ref"]
