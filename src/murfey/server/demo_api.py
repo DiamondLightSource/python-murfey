@@ -276,6 +276,7 @@ def register_spa_proc_params(
                 AutoProcProgram,
             )
             .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_params.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -738,6 +739,7 @@ async def request_spa_preprocessing(
                 DataCollectionGroup.session_id == session_id
                 and DataCollectionGroup.tag == "spa"
             )
+            .where(DataCollectionGroup.tag == proc_file.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -761,6 +763,10 @@ async def request_spa_preprocessing(
         if not mrc_out.parent.exists():
             Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
         log.info("Sending Zocalo message")
+        movie = db.exec(select(Movie).where(Movie.murfey_id == murfey_ids[0])).one()
+        movie.motion_corrected = True
+        db.add(movie)
+        db.commit()
         _register_picked_particles_use_diameter(
             {
                 "session_id": session_id,
@@ -778,12 +784,12 @@ async def request_spa_preprocessing(
                     },
                 },
                 "particle_diameters": [random.randint(20, 30) for i in range(400)],
-                "program_id": 1,
+                "program_id": detached_ids[3],
             },
             _db=db,
             demo=True,
         )
-        prom.preprocessed_movies.labels(processing_job=1).inc()
+        prom.preprocessed_movies.labels(processing_job=detached_ids[2]).inc()
 
     else:
         for_stash = PreprocessStash(
@@ -966,28 +972,33 @@ def register_dc_group(
     db.commit()
 
     if dcg_params.experiment_type == "single particle":
+        dcid = next(global_counter)
         murfey_dc = DataCollection(
-            id=1,
+            id=dcid,
             tag=dcg_params.tag,
-            dcg_id=1,
+            dcg_id=dcgid,
         )
         db.add(murfey_dc)
         db.commit()
 
-        murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
-        murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
-        murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
-        murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
+        pjids = [next(global_counter) for _ in range(4)]
+
+        murfey_pj_pre = ProcessingJob(
+            id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
+        )
+        murfey_pj_ext = ProcessingJob(id=pjids[1], recipe="em-spa-extract", dc_id=dcid)
+        murfey_pj_2d = ProcessingJob(id=pjids[2], recipe="em-spa-class2d", dc_id=dcid)
+        murfey_pj_3d = ProcessingJob(id=pjids[3], recipe="em-spa-class3d", dc_id=dcid)
         db.add(murfey_pj_pre)
         db.add(murfey_pj_ext)
         db.add(murfey_pj_2d)
         db.add(murfey_pj_3d)
         db.commit()
 
-        murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
-        murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
-        murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
-        murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
+        murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
+        murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
+        murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
+        murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
         db.add(murfey_app_pre)
         db.add(murfey_app_ext)
         db.add(murfey_app_2d)
