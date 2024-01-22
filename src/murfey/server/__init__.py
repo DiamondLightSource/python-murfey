@@ -2208,6 +2208,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "picked_particles":
+            movie = murfey_db.exec(
+                select(db.Movie).where(
+                    db.Movie.murfey_id == message["motion_correction_id"]
+                )
+            ).one()
+            movie.motion_corrected = True
+            murfey_db.add(movie)
+            murfey_db.commit()
             feedback_params = murfey_db.exec(
                 select(db.SPAFeedbackParameters).where(
                     db.SPAFeedbackParameters.pj_id
