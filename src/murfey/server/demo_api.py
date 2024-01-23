@@ -192,11 +192,15 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     )
     db.add(rsync_instance)
     db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     return rsyncer_info
 
 
@@ -225,7 +229,7 @@ def increment_rsync_file_count(
     rsync_instance.files_counted += 1
     db.add(rsync_instance)
     db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
         rsyncer_info.increment_count
     )
 
@@ -250,18 +254,18 @@ def increment_rsync_transferred_files(
 def increment_rsync_transferred_files_prometheus(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count
-    )
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.bytes
-    )
-    prom.transferred_data_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_data_count
-    )
-    prom.transferred_data_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.data_bytes
-    )
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_count)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.bytes)
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_data_count)
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.data_bytes)
 
 
 @router.post("/clients/{client_id}/spa_processing_parameters")
@@ -1215,13 +1219,14 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    prom.monitoring_switch.remove(client.visit)
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
     ).all()
     for ri in rsync_instances:
-        prom.seen_files.remove(ri.source)
-        prom.transferred_files.remove(ri.source)
-        prom.transferred_files_bytes.remove(ri.source)
+        prom.seen_files.remove(ri.source, client.visit)
+        prom.transferred_files.remove(ri.source, client.visit)
+        prom.transferred_files_bytes.remove(ri.source, client.visit)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1283,3 +1288,9 @@ async def write_eer_fractionation_file(
             f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}
+
+
+@router.post("/visits/{visit_name}/monitoring/{on}")
+def change_monitoring_status(visit_name: str, on: int):
+    prom.monitoring_switch.labels(visit=visit_name)
+    prom.monitoring_switch.labels(visit=visit_name).set(on)

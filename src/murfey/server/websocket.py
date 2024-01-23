@@ -9,6 +9,7 @@ from typing import Any, Dict, Generic, TypeVar
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import select
 
+import murfey.server.prometheus as prom
 from murfey.server.murfey_db import get_murfey_db_session
 from murfey.util.db import ClientEnvironment
 from murfey.util.state import State, global_state
@@ -90,6 +91,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
         log.info(f"Disconnecting Client {client_id}")
+        murfey_db = next(get_murfey_db_session())
+        client_env = murfey_db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        ).one()
+        prom.monitoring_switch.labels(visit=client_env.visit).set(0)
         manager.disconnect(websocket, client_id)
         await manager.broadcast(f"Client #{client_id} disconnected")
         await manager.delete_state(f"Client {client_id}")
@@ -124,10 +130,12 @@ async def close_ws_connection(client_id: int):
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
     client_env.connected = False
+    visit_name = client_env.visit
     murfey_db.add(client_env)
     murfey_db.commit()
     murfey_db.close()
     client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(manager.active_connections[client_id], client_id)
+    prom.monitoring_switch.labels(visit=visit_name).set(0)
     await manager.broadcast(f"Client #{client_id} disconnected")
