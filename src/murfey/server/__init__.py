@@ -2213,7 +2213,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.Movie.murfey_id == message["motion_correction_id"]
                 )
             ).one()
-            movie.motion_corrected = True
+            movie.preprocessed = True
             murfey_db.add(movie)
             murfey_db.commit()
             feedback_params = murfey_db.exec(

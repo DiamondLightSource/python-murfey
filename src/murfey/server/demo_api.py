@@ -764,7 +764,7 @@ async def request_spa_preprocessing(
             Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
         log.info("Sending Zocalo message")
         movie = db.exec(select(Movie).where(Movie.murfey_id == murfey_ids[0])).one()
-        movie.motion_corrected = True
+        movie.preprocessed = True
         db.add(movie)
         db.commit()
         _register_picked_particles_use_diameter(
