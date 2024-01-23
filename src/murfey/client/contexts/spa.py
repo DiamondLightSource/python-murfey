@@ -357,7 +357,12 @@ class SPAModularContext(_SPAContext):
                             environment, source, transferred_file
                         )
                         if not environment.movie_counters.get(str(source)):
-                            environment.movie_counters[str(source)] = count(1)
+                            movie_counts = requests.get(
+                                f"{str(environment.url.geturl())}/num_movies"
+                            ).json()
+                            environment.movie_counters[str(source)] = count(
+                                movie_counts.get(str(source), 0) + 1
+                            )
                         environment.movies[file_transferred_to] = MovieTracker(
                             movie_number=next(environment.movie_counters[str(source)]),
                             motion_correction_uuid=next(MurfeyID),

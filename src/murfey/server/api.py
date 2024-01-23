@@ -189,6 +189,14 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     return client_info
 
 
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
+
+
 @router.post("/visits/{visit_name}/rsyncer")
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
@@ -697,6 +705,7 @@ async def request_spa_preprocessing(
             murfey_id=murfey_ids[0],
             path=proc_file.path,
             image_number=proc_file.image_number,
+            tag=proc_file.tag,
         )
         db.add(movie)
         db.commit()

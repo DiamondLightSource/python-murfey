@@ -174,6 +174,14 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     return client_info
 
 
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
+
+
 @router.post("/visits/{visit_name}/rsyncer")
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
@@ -589,8 +597,12 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
     return proc_params
 
 
+class Tag(BaseModel):
+    tag: str
+
+
 @router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
+def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -606,6 +618,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == tag.tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -637,7 +650,10 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
         movie = Movie(
-            murfey_id=murfey_ids[2 * i], path=f.file_path, image_number=f.image_number
+            murfey_id=murfey_ids[2 * i],
+            path=f.file_path,
+            image_number=f.image_number,
+            tag=f.tag,
         )
         db.add(movie)
         zocalo_message = {
@@ -756,6 +772,7 @@ async def request_spa_preprocessing(
             murfey_id=murfey_ids[0],
             path=proc_file.path,
             image_number=proc_file.image_number,
+            tag=proc_file.tag,
         )
         db.add(movie)
         db.commit()
