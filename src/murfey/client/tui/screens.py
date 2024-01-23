@@ -1151,12 +1151,10 @@ class MainScreen(Screen):
         info_widget.write(
             f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
         )
-        yield Static("Monitor")
-        yield Switch(value=False, id="monitoring")
         yield Button("Visit complete", id="new-visit-btn")
         yield Footer()
 
-    def on_switch_changed(self, event):
+    def on_mount(self, event):
         requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/monitoring/{1 if event.value else 0}"
+            f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/monitoring/1"
         )
