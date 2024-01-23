@@ -1665,7 +1665,12 @@ def _flush_tomography_preprocessing(message: dict):
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
-        movie = db.Movie(murfey_id=murfey_ids[0], path=f.file_path)
+        movie = db.Movie(
+            murfey_id=murfey_ids[0],
+            path=f.file_path,
+            image_number=f.image_number,
+            tag=f.tag,
+        )
         murfey_db.add(movie)
         zocalo_message = {
             "recipes": ["em-tomo-preprocess"],
@@ -2053,7 +2058,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ppath = Path(f.file_path)
                 if not mrcp.parent.exists():
                     mrcp.parent.mkdir(parents=True)
-                movie = db.Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+                movie = db.Movie(
+                    murfey_id=murfey_ids[2 * i],
+                    path=f.file_path,
+                    image_number=f.image_number,
+                    tag=f.tag,
+                )
                 murfey_db.add(movie)
                 zocalo_message = {
                     "recipes": ["em-spa-preprocess"],
@@ -2204,6 +2214,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "picked_particles":
+            movie = murfey_db.exec(
+                select(db.Movie).where(
+                    db.Movie.murfey_id == message["motion_correction_id"]
+                )
+            ).one()
+            movie.preprocessed = True
+            murfey_db.add(movie)
+            murfey_db.commit()
             feedback_params = murfey_db.exec(
                 select(db.SPAFeedbackParameters).where(
                     db.SPAFeedbackParameters.pj_id

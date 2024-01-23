@@ -174,6 +174,14 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     return client_info
 
 
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
+
+
 @router.post("/visits/{visit_name}/rsyncer")
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
@@ -276,6 +284,7 @@ def register_spa_proc_params(
                 AutoProcProgram,
             )
             .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_params.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -588,8 +597,12 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
     return proc_params
 
 
+class Tag(BaseModel):
+    tag: str
+
+
 @router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
+def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -605,6 +618,7 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == tag.tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -635,7 +649,12 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
-        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        movie = Movie(
+            murfey_id=murfey_ids[2 * i],
+            path=f.file_path,
+            image_number=f.image_number,
+            tag=f.tag,
+        )
         db.add(movie)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
@@ -736,6 +755,7 @@ async def request_spa_preprocessing(
                 DataCollectionGroup.session_id == session_id
                 and DataCollectionGroup.tag == "spa"
             )
+            .where(DataCollectionGroup.tag == proc_file.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -748,13 +768,22 @@ async def request_spa_preprocessing(
 
         feedback_params.picker_murfey_id = murfey_ids[1]
         db.add(feedback_params)
-        movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+            tag=proc_file.tag,
+        )
         db.add(movie)
         db.commit()
 
         if not mrc_out.parent.exists():
             Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
         log.info("Sending Zocalo message")
+        movie = db.exec(select(Movie).where(Movie.murfey_id == murfey_ids[0])).one()
+        movie.preprocessed = True
+        db.add(movie)
+        db.commit()
         _register_picked_particles_use_diameter(
             {
                 "session_id": session_id,
@@ -772,12 +801,12 @@ async def request_spa_preprocessing(
                     },
                 },
                 "particle_diameters": [random.randint(20, 30) for i in range(400)],
-                "program_id": 1,
+                "program_id": detached_ids[3],
             },
             _db=db,
             demo=True,
         )
-        prom.preprocessed_movies.labels(processing_job=1).inc()
+        prom.preprocessed_movies.labels(processing_job=detached_ids[2]).inc()
 
     else:
         for_stash = PreprocessStash(
@@ -960,28 +989,33 @@ def register_dc_group(
     db.commit()
 
     if dcg_params.experiment_type == "single particle":
+        dcid = next(global_counter)
         murfey_dc = DataCollection(
-            id=1,
+            id=dcid,
             tag=dcg_params.tag,
-            dcg_id=1,
+            dcg_id=dcgid,
         )
         db.add(murfey_dc)
         db.commit()
 
-        murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
-        murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
-        murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
-        murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
+        pjids = [next(global_counter) for _ in range(4)]
+
+        murfey_pj_pre = ProcessingJob(
+            id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
+        )
+        murfey_pj_ext = ProcessingJob(id=pjids[1], recipe="em-spa-extract", dc_id=dcid)
+        murfey_pj_2d = ProcessingJob(id=pjids[2], recipe="em-spa-class2d", dc_id=dcid)
+        murfey_pj_3d = ProcessingJob(id=pjids[3], recipe="em-spa-class3d", dc_id=dcid)
         db.add(murfey_pj_pre)
         db.add(murfey_pj_ext)
         db.add(murfey_pj_2d)
         db.add(murfey_pj_3d)
         db.commit()
 
-        murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
-        murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
-        murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
-        murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
+        murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
+        murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
+        murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
+        murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
         db.add(murfey_app_pre)
         db.add(murfey_app_ext)
         db.add(murfey_app_2d)
