@@ -1620,7 +1620,7 @@ def _flush_tomography_preprocessing(message: dict):
     stashed_files = murfey_db.exec(
         select(db.PreprocessStash)
         .where(db.PreprocessStash.client_id == message["client_id"])
-        .where(db.PreprocessStash.tag == message["data_collection_group_tag"])
+        .where(db.PreprocessStash.group_tag == message["data_collection_group_tag"])
     ).all()
     if not stashed_files:
         return
