@@ -1878,8 +1878,9 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
             ).one()
         except SQLAlchemyError:
-            next_job = feedback_params.next_job
-            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 1):03}"
+            # next_job = feedback_params.next_job
+            refine_dir = f"{message['refine_dir']}501"
+            # refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
 
@@ -1894,8 +1895,8 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.commit()
             _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
 
-            next_job += 4
-            feedback_params.next_job = next_job
+            # next_job += 5
+            # feedback_params.next_job = next_job
 
         zocalo_message = {
             "parameters": {
