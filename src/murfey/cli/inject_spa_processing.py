@@ -111,7 +111,7 @@ def run():
     if args.max_image_number > 0:
         query = query.where(Movie.image_number <= args.max_image_number)
     if args.check_preproc:
-        query = query.where(not Movie.preprocessed)
+        query = query.where(Movie.preprocessed.is_(False))
     movies = murfey_db.exec(query).all()
 
     visit_name = (
