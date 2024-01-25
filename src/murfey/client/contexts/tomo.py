@@ -491,15 +491,12 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
                     if (
                         environment.data_collection_group_ids.get(str(self._basepath))
                         is None
                     ):
                         self._data_collection_stash.append((url, environment, data))
-                    else:
-                        capture_post(url, json=data)
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
-                    if environment.data_collection_ids.get(tilt_series) is None:
                         self._processing_job_stash[tilt_series] = [
                             (
                                 proc_url,
@@ -521,6 +518,7 @@ class TomographyContext(Context):
                             )
                         )
                     else:
+                        capture_post(url, json=data)
                         capture_post(
                             proc_url,
                             json={
