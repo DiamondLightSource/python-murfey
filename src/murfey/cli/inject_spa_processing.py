@@ -39,7 +39,7 @@ def run():
     parser.add_argument(
         "-s",
         "--session-id",
-        dest="session_d",
+        dest="session_id",
         required=True,
         type=int,
         help="Murfey session ID",
@@ -108,8 +108,9 @@ def run():
         select(Movie)
         .where(Movie.tag == args.tag)
         .where(Movie.image_number >= args.min_image_number)
-        .where(Movie.image_number <= args.max_image_number)
     )
+    if args.max_image_number > 0:
+        query = query.where(Movie.image_number <= args.max_image_number)
     if args.check_preproc:
         query = query.where(not Movie.preprocessed)
     movies = murfey_db.exec(query).all()
@@ -195,7 +196,7 @@ def run():
                     "fm_dose": proc_params["dose_per_frame"],
                     "gain_ref": proc_params["gain_ref"],
                     "downscale": proc_params["downscale"],
-                    "picker_uuid": feedback_params["picker_murfey_id"],
+                    "picker_uuid": feedback_params.picker_murfey_id,
                     "session_id": args.session_id,
                     "particle_diameter": proc_params["particle_diameter"] or 0,
                     "fm_int_file": args.eer_fractionation_file,
