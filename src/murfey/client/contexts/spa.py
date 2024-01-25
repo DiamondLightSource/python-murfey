@@ -230,6 +230,8 @@ class _SPAContext(Context):
                         metadata["pixel_size_on_image"] /= (
                             1 if binning_factor_xml == 2 else 2
                         )
+                else:
+                    metadata["pixel_size_on_image"] /= binning_factor
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
