@@ -29,7 +29,6 @@ def run():
     )
 
     parser.add_argument(
-        "-t",
         "--tag",
         dest="tag",
         type=str,
