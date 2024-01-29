@@ -34,7 +34,7 @@ class Session(SQLModel, table=True):  # type: ignore
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
     preprocess_stashes: List["PreprocessStash"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
 
