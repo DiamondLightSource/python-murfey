@@ -737,6 +737,7 @@ async def request_spa_preprocessing(
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
                 "kv": proc_params["voltage"],
                 "autoproc_program_id": detached_ids[3],
@@ -834,6 +835,7 @@ async def request_tomography_preprocessing(
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": dcid,
                 # "timestamp": datetime.datetime.now(),
                 "autoproc_program_id": appid,
@@ -895,6 +897,7 @@ async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails
             "stack_file": str(stack_file),
             "pix_size": tilt_series.pixel_size,
             "manual_tilt_offset": tilt_series.manual_tilt_offset,
+            "node_creator_queue": machine_config.node_creator_queue,
         },
     }
     if _transport_object:

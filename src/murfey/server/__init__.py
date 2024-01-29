@@ -640,6 +640,7 @@ def _register_picked_particles_use_diameter(
                         "kv": relion_options["voltage"],
                         "gain_ref": relion_options["gain_ref"],
                         "feedback_queue": machine_config.feedback_queue,
+                        "node_creator_queue": machine_config.node_creator_queue,
                         "session_id": message["session_id"],
                         "autoproc_program_id": _app_id(
                             _pj_id(message["program_id"], _db, recipe="em-spa-extract"),
@@ -678,6 +679,7 @@ def _register_picked_particles_use_diameter(
                     "kv": relion_options["voltage"],
                     "gain_ref": relion_options["gain_ref"],
                     "feedback_queue": machine_config.feedback_queue,
+                    "node_creator_queue": machine_config.node_creator_queue,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
                         _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
@@ -791,6 +793,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "kv": relion_params.voltage,
             "gain_ref": relion_params.gain_ref,
             "feedback_queue": machine_config.feedback_queue,
+            "node_creator_queue": machine_config.node_creator_queue,
             "session_id": message["session_id"],
             "autoproc_program_id": _app_id(
                 _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
@@ -851,6 +854,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 .murfey_id,
                 "session_id": message["session_id"],
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -931,6 +935,7 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1041,6 +1046,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
                 _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
             ),
             "feedback_queue": machine_config.feedback_queue,
+            "node_creator_queue": machine_config.node_creator_queue,
         },
         "recipes": ["em-spa-class2d"],
     }
@@ -1192,6 +1198,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1263,6 +1270,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1348,6 +1356,7 @@ def _flush_class2d(
                 "session_id": session_id,
                 "autoproc_program_id": _app_id(pj_id, _db),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1534,6 +1543,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1578,6 +1588,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1676,6 +1687,7 @@ def _flush_tomography_preprocessing(message: dict):
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
@@ -1751,6 +1763,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.commit()
             murfey_db.close()
             if check_tilt_series_mc(relevant_tilt_series.id):
+                machine_config = get_machine_config()
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
@@ -1772,6 +1785,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "stack_file": str(stack_file),
                         "pix_size": preproc_params.pixel_size,
                         "manual_tilt_offset": tilt_offset,
+                        "node_creator_queue": machine_config.node_creator_queue,
                     },
                 }
                 if _transport_object:
@@ -2069,6 +2083,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     "recipes": ["em-spa-preprocess"],
                     "parameters": {
                         "feedback_queue": machine_config.feedback_queue,
+                        "node_creator_queue": machine_config.node_creator_queue,
                         "dcid": collected_ids[1].id,
                         "kv": proc_params.voltage,
                         "autoproc_program_id": collected_ids[3].id,
