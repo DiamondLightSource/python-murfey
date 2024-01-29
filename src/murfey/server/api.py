@@ -769,7 +769,7 @@ async def request_spa_preprocessing(
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
             tag=proc_file.tag,
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             eer_fractionation_file=str(proc_file.eer_fractionation_file),
@@ -863,7 +863,7 @@ async def request_tomography_preprocessing(
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             tag=proc_file.tag,

@@ -1888,7 +1888,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 murfey_dc = db.DataCollection(
                     id=dcid,
-                    client=message["client_id"],
                     tag=message.get("tag"),
                     dcg_id=dcgid,
                 )

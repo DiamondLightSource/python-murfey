@@ -615,7 +615,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
         .session_id
     )
     stashed_files = db.exec(
-        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
+        select(PreprocessStash).where(PreprocessStash.session_id == session_id)
     ).all()
     if not stashed_files:
         return
@@ -816,7 +816,7 @@ async def request_spa_preprocessing(
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
             tag=proc_file.tag,
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
         )
@@ -904,7 +904,7 @@ async def request_tomography_preprocessing(
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             tag=proc_file.tag,
