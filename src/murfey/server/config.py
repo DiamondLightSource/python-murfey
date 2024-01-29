@@ -28,6 +28,7 @@ class MachineConfig(BaseModel):
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
     feedback_queue: str = "murfey_feedback"
+    node_creator_queue: str = "node_creator"
     superres: bool = False
     camera: str = "FALCON"
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}

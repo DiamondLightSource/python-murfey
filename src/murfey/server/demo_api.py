@@ -664,6 +664,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config["feedback_queue"],
+                "node_creator_queue": machine_config["node_creator_queue"],
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,

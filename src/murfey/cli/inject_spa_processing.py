@@ -182,6 +182,7 @@ def run():
                 "recipes": ["em-spa-preprocess"],
                 "parameters": {
                     "feedback_queue": machine_config.feedback_queue,
+                    "node_creator_queue": machine_config.node_creator_queue,
                     "dcid": detached_ids[1],
                     "kv": proc_params["voltage"],
                     "autoproc_program_id": detached_ids[3],
