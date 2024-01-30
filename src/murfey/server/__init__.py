@@ -627,7 +627,10 @@ def _register_picked_particles_use_diameter(
                         "micrographs_file": saved_message.micrographs_file,
                         "coord_list_file": saved_message.coord_list_file,
                         "output_file": saved_message.extract_file,
-                        "pix_size": relion_options["angpix"],
+                        "pix_size": (
+                            relion_options["angpix"]
+                            * relion_options["motion_corr_binning"]
+                        ),
                         "ctf_image": saved_message.ctf_image,
                         "ctf_max_resolution": saved_message.ctf_max_resolution,
                         "ctf_figure_of_merit": saved_message.ctf_figure_of_merit,
@@ -662,7 +665,9 @@ def _register_picked_particles_use_diameter(
                     "micrographs_file": params_to_forward["micrographs_file"],
                     "coord_list_file": params_to_forward["coord_list_file"],
                     "output_file": params_to_forward["extract_file"],
-                    "pix_size": relion_options["angpix"],
+                    "pix_size": (
+                        relion_options["angpix"] * relion_options["motion_corr_binning"]
+                    ),
                     "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
                     "ctf_max_resolution": params_to_forward["ctf_values"][
                         "CtfMaxResolution"
@@ -778,7 +783,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "micrographs_file": params_to_forward["micrographs_file"],
             "coord_list_file": params_to_forward["coord_list_file"],
             "output_file": params_to_forward["extract_file"],
-            "pix_size": relion_params.angpix,
+            "pix_size": relion_params.angpix * relion_params.motion_corr_binning,
             "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
             "ctf_max_resolution": params_to_forward["ctf_values"]["CtfMaxResolution"],
             "ctf_figure_of_merit": params_to_forward["ctf_values"]["CtfFigureOfMerit"],
