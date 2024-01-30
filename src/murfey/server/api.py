@@ -89,6 +89,7 @@ from murfey.util.models import (
     TiltSeriesProcessingDetails,
     Visit,
 )
+from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.api")
@@ -750,11 +751,11 @@ async def request_spa_preprocessing(
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": proc_params["gain_ref"],
-                "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
