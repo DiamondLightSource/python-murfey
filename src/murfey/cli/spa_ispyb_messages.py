@@ -176,7 +176,7 @@ def run():
             ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
         )
     except (KeyError, IndexError):
-        pass
+        num_fractions = 1
     metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
         "a:KeyValueOfstringanyType"
     ][3]["a:Value"]["#text"]
