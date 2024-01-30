@@ -12,9 +12,6 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     rsync_instances: List["RsyncInstance"] = Relationship(
         back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
     )
-    preprocess_stashes: List["PreprocessStash"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
 
 
 class RsyncInstance(SQLModel, table=True):  # type: ignore
@@ -34,6 +31,9 @@ class Session(SQLModel, table=True):  # type: ignore
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    preprocess_stashes: List["PreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -136,14 +136,12 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
     tag: str = Field(primary_key=True)
-    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
     group_tag: Optional[str]
-    client: Optional[ClientEnvironment] = Relationship(
-        back_populates="preprocess_stashes"
-    )
+    session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
