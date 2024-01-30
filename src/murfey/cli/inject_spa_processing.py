@@ -21,6 +21,7 @@ from murfey.util.db import (
     SPAFeedbackParameters,
     SPARelionParameters,
 )
+from murfey.util.spa_params import default_spa_parameters
 
 
 def run():
@@ -195,11 +196,11 @@ def run():
                     "ft_bin": proc_params["motion_corr_binning"],
                     "fm_dose": proc_params["dose_per_frame"],
                     "gain_ref": proc_params["gain_ref"],
-                    "downscale": proc_params["downscale"],
                     "picker_uuid": feedback_params.picker_murfey_id,
                     "session_id": args.session_id,
                     "particle_diameter": proc_params["particle_diameter"] or 0,
                     "fm_int_file": args.eer_fractionation_file,
+                    "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 },
             }
             _transport_object.send("processing_recipe", zocalo_message)

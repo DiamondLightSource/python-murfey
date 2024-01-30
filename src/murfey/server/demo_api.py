@@ -79,6 +79,7 @@ from murfey.util.models import (
     TiltSeriesProcessingDetails,
     Visit,
 )
+from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -680,8 +681,8 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
                 )
                 if proc_params["gain_ref"]
                 else proc_params["gain_ref"],
-                "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[2 * i + 1],
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             },
         }
         log.info(f"Launching SPA preprocessing with Zoaclo message: {zocalo_message}")
