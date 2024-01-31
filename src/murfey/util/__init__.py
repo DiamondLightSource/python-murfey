@@ -34,11 +34,34 @@ def _get_visit_list(api_base: ParseResult):
     return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
-def capture_post(url: str, json: dict | list = {}) -> requests.Response:
-    response = requests.post(url, json=json)
+def capture_post(
+    url: str, json: dict | list = {}, catch: bool = False
+) -> requests.Response | None:
+    try:
+        response = requests.post(url, json=json)
+    except Exception as e:
+        if catch:
+            logger.warning(f"Exception encountered in get from {url}: {e}")
+            return None
+        raise
     if response.status_code != 200:
         logger.warning(
             f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
+        )
+    return response
+
+
+def capture_get(url: str, catch: bool = False) -> requests.Response | None:
+    try:
+        response = requests.get(url)
+    except Exception as e:
+        if catch:
+            logger.warning(f"Exception encountered in post to {url}: {e}")
+            return None
+        raise
+    if response.status_code != 200:
+        logger.warning(
+            f"Response to get from {url} had status code {response.status_code}. The reason given was {response.reason}"
         )
     return response
 

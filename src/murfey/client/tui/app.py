@@ -528,6 +528,11 @@ class MurfeyTUI(App):
                         "tag": str(source),
                     },
                 )
+                if response is None:
+                    log.error(
+                        "Could not reach Murfey server to insert SPA processing parameters"
+                    )
+                    return None
                 if not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(

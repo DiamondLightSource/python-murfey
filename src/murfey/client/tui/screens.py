@@ -110,6 +110,8 @@ def determine_default_destination(
                                         "touch": touch,
                                     },
                                 )
+                                if suggested_path_response is None:
+                                    raise RuntimeError("Murfey server is unreachable")
                                 _default = suggested_path_response.json().get(
                                     "suggested_path"
                                 )
