@@ -211,13 +211,30 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     )
 
 
+class GridSquare(SQLModel, table=True):  # type: ignore
+    id: int
+    session_id: int = Field(foreign_key="session.id")
+    session: Optional[Session] = Relationship(back_populates="session")
+
+
+class FoilHole(SQLModel, table=True):  # type: ignore
+    id: int
+    grid_square_id: int = Field(foreign_key="gridsquare.id")
+    x_location: float
+    y_location: float
+    pixel_size: float
+    grid_square: Optional[GridSquare] = Relationship(back_populates="gridsquare")
+
+
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    foil_hole_id: int = Field(foreignkey="foilhole.id")
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
+    foil_hole: Optional[FoilHole] = Relationship(back_populates="foilhole")
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
