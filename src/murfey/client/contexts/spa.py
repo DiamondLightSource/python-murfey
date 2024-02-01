@@ -326,7 +326,7 @@ class SPAModularContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
+    ) -> bool:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -345,16 +345,16 @@ class SPAModularContext(_SPAContext):
 
                     if not environment:
                         logger.warning("No environment passed in")
-                        return
+                        return True
                     source = _get_source(transferred_file, environment)
                     if not source:
                         logger.warning(f"No source found for file {transferred_file}")
-                        return
+                        return True
 
                     if required_strings and not any(
                         r in transferred_file.name for r in required_strings
                     ):
-                        return
+                        return True
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
@@ -391,7 +391,7 @@ class SPAModularContext(_SPAContext):
                                 catch=True,
                             )
                             if response is None:
-                                return
+                                return False
                             eer_fractionation_file = response.json()[
                                 "eer_fractionation_file"
                             ]
@@ -433,7 +433,7 @@ class SPAModularContext(_SPAContext):
                             catch=True,
                         )
 
-        return
+        return True
 
     def _register_data_collection(
         self,
@@ -499,8 +499,8 @@ class SPAContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
-        return
+    ) -> bool:
+        return True
 
     def _register_processing_job(
         self,
