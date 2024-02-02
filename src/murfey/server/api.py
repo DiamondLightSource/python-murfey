@@ -732,8 +732,6 @@ async def request_spa_preprocessing(
             Path(secure_filename(str(mrc_out))).parent.mkdir(
                 parents=True, exist_ok=True
             )
-        if not Path(proc_file.path).is_file():
-            return proc_file
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
