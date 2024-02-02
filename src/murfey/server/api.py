@@ -39,7 +39,7 @@ from murfey.server import (
     templates,
 )
 from murfey.server.config import from_file, settings
-from murfey.server.gain import Camera, prepare_gain
+from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
     AutoProcProgram,
@@ -1073,7 +1073,10 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 @router.post("/visits/{visit_name}/process_gain")
 async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
-    executables = machine_config.external_executables
+    if gain_reference_params.eer:
+        executables = machine_config.external_executables_eer
+    else:
+        executables = machine_config.external_executables
     env = machine_config.external_environment
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
@@ -1083,13 +1086,20 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
-    new_gain_ref, new_gain_ref_superres = await prepare_gain(
-        camera,
-        filepath / safe_path_name,
-        executables,
-        env,
-        rescale=gain_reference_params.rescale,
-    )
+    if gain_reference_params.eer:
+        new_gain_ref, new_gain_ref_superres = await prepare_eer_gain(
+            filepath / safe_path_name,
+            executables,
+            env,
+        )
+    else:
+        new_gain_ref, new_gain_ref_superres = await prepare_gain(
+            camera,
+            filepath / safe_path_name,
+            executables,
+            env,
+            rescale=gain_reference_params.rescale,
+        )
     if new_gain_ref and new_gain_ref_superres:
         return {
             "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
