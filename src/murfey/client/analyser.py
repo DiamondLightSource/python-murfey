@@ -307,11 +307,9 @@ class Analyser(Observer):
                 except Exception as e:
                     logger.error(f"An exception was encountered post transfer: {e}")
             elif isinstance(self._context, SPAModularContext):
-                post_transfer_success = self._context.post_transfer(
+                self._context.post_transfer(
                     transferred_file, role=self._role, environment=self._environment
                 )
-                if not post_transfer_success:
-                    self.queue.put(transferred_file)
         self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:
