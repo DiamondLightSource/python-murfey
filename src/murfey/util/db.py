@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
@@ -9,12 +10,6 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     session_id: Optional[int] = Field(foreign_key="session.id")
     connected: bool
     rsync_instances: List["RsyncInstance"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    preprocess_stashes: List["PreprocessStash"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    preprocess_tomo_stashes: List["TomographyPreprocessStash"] = Relationship(
         back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -38,15 +33,13 @@ class Session(SQLModel, table=True):  # type: ignore
     data_collection_groups: List["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    tomography_processing_parameters: List[
-        "TomographyProcessingParameters"
-    ] = Relationship(
+    preprocess_stashes: List["PreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(primary_key=True)
     tag: str
     rsync_source: str
     session_id: int = Field(foreign_key="session.id")
@@ -59,7 +52,8 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
-    movie_path: str = Field(primary_key=True)
+    id: int = Field(primary_key=True)
+    movie_path: str
     tilt_series_id: int = Field(foreign_key="tiltseries.id")
     motion_corrected: bool = False
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
@@ -71,6 +65,12 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    tomography_preprocessing_parameters: List[
+        "TomographyPreprocessingParameters"
+    ] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -111,6 +111,11 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
+    tomography_processing_parameters: List[
+        "TomographyProcessingParameters"
+    ] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -131,24 +136,12 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
 class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
     tag: str = Field(primary_key=True)
-    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
+    session_id: int = Field(primary_key=True, foreign_key="session.id")
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
-    client: Optional[ClientEnvironment] = Relationship(
-        back_populates="preprocess_stashes"
-    )
-
-
-class TomographyPreprocessStash(SQLModel, table=True):  # type: ignore
-    tag: str
-    file_path: str = Field(primary_key=True)
-    client_id: int = Field(primary_key=True, foreign_key="clientenvironment.client_id")
-    image_number: int
-    mrc_out: str
-    client: Optional[ClientEnvironment] = Relationship(
-        back_populates="preprocess_tomo_stashes"
-    )
+    group_tag: Optional[str]
+    session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
@@ -160,11 +153,23 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
     )
 
 
-class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    session_id: int = Field(primary_key=True, foreign_key="session.id")
+class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
+    dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
     pixel_size: float
+    dose_per_frame: float
+    voltage: int
+    eer_fractionation_file: Optional[str] = None
+    motion_corr_binning: int = 1
+    gain_ref: Optional[str] = None
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="tomography_preprocessing_parameters"
+    )
+
+
+class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     manual_tilt_offset: int
-    session: Optional[Session] = Relationship(
+    processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="tomography_processing_parameters"
     )
 
@@ -209,6 +214,9 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
     path: str
+    image_number: int
+    tag: str
+    preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
 
 
@@ -338,3 +346,11 @@ class Class3D(SQLModel, table=True):  # type: ignore
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
+
+
+def clear(url: str):
+    engine = create_engine(url)
+    metadata = sqlalchemy.MetaData(engine)
+    metadata.reflect()
+
+    metadata.drop_all(engine)

@@ -24,6 +24,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         default_destinations={tmp_path: str(tmp_path)},
     )
     context = TomographyContext("tomo", tmp_path)
+    (tmp_path / "Position_1_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
@@ -37,6 +38,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     assert (
         context._last_transferred_file == tmp_path / "Position_1_[30.0]_fractions.tiff"
     )
+    (tmp_path / "Position_1_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
@@ -44,6 +46,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         required_strings=["fractions"],
         environment=env,
     )
+    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
     assert not context._completed_tilt_series
     context.post_transfer(
         tmp_path / "Position_2_[30.0]_fractions.tiff",
@@ -66,6 +69,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         default_destinations={tmp_path: str(tmp_path)},
     )
     context = TomographyContext("tomo", tmp_path)
+    (tmp_path / "Position_1_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
@@ -79,6 +83,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     assert (
         context._last_transferred_file == tmp_path / "Position_1_[30.0]_fractions.tiff"
     )
+    (tmp_path / "Position_1_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
@@ -87,6 +92,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         environment=env,
     )
     assert not context._completed_tilt_series
+    (tmp_path / "Position_2_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_[-30.0]_fractions.tiff",
         role="detector",
@@ -96,6 +102,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     )
     assert len(context._tilt_series.values()) == 2
     assert not context._completed_tilt_series
+    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
@@ -105,6 +112,8 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     )
     assert len(context._tilt_series.values()) == 2
     assert not context._completed_tilt_series
+    (tmp_path / "Position_3_[30.0]_fractions.tiff").touch()
+    (tmp_path / "Position_3_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_3_[-30.0]_fractions.tiff",
         role="detector",
@@ -121,6 +130,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         required_strings=["fractions"],
         environment=env,
     )
+    print(context._completed_tilt_series)
     assert context._completed_tilt_series == ["Position_1", "Position_2", "Position_3"]
 
 
@@ -134,6 +144,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         default_destinations={tmp_path: str(tmp_path)},
     )
     context = TomographyContext("tomo", tmp_path)
+    (tmp_path / "Position_1_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[30.0]_fractions.tiff",
         role="detector",
@@ -147,6 +158,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     assert (
         context._last_transferred_file == tmp_path / "Position_1_[30.0]_fractions.tiff"
     )
+    (tmp_path / "Position_1_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_[-30.0]_fractions.tiff",
         role="detector",
@@ -155,6 +167,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         environment=env,
     )
     assert not context._completed_tilt_series
+    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
@@ -164,6 +177,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     )
     assert len(context._tilt_series.values()) == 2
     assert context._completed_tilt_series == ["Position_1"]
+    (tmp_path / "Position_2_[-30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_[-30.0]_fractions.tiff",
         role="detector",
@@ -171,6 +185,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         required_strings=["fractions"],
         environment=env,
     )
+    (tmp_path / "Position_1_[60.0]_fractions.tiff").touch()
     new_series = context.post_transfer(
         tmp_path / "Position_1_[60.0]_fractions.tiff",
         role="detector",
@@ -198,11 +213,13 @@ def test_tomography_context_add_serialem_tilt(mock_post, mock_get, tmp_path):
         default_destinations={tmp_path: str(tmp_path)},
     )
     context = TomographyContext("serialem", tmp_path)
+    (tmp_path / "tomography_1_2_30.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_1_2_30.tiff", role="detector", environment=env
     )
     assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.tiff"]}
     assert context._last_transferred_file == tmp_path / "tomography_1_2_30.tiff"
+    (tmp_path / "tomography_1_2_-30.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_1_2_-30.tiff", role="detector", environment=env
     )
@@ -213,6 +230,7 @@ def test_tomography_context_add_serialem_tilt(mock_post, mock_get, tmp_path):
         ]
     }
     assert not context._completed_tilt_series
+    (tmp_path / "tomography_2_2_30.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_2_2_30.tiff", role="detector", environment=env
     )
@@ -230,11 +248,13 @@ def test_tomography_context_add_serialem_decimal_tilt(mock_post, mock_get, tmp_p
         default_destinations={tmp_path: str(tmp_path)},
     )
     context = TomographyContext("serialem", tmp_path)
+    (tmp_path / "tomography_1_2_30.0.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_1_2_30.0.tiff", role="detector", environment=env
     )
     assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.0.tiff"]}
     assert context._last_transferred_file == tmp_path / "tomography_1_2_30.0.tiff"
+    (tmp_path / "tomography_1_2_-30.0.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_1_2_-30.0.tiff", role="detector", environment=env
     )
@@ -245,6 +265,7 @@ def test_tomography_context_add_serialem_decimal_tilt(mock_post, mock_get, tmp_p
         ]
     }
     assert not context._completed_tilt_series
+    (tmp_path / "tomography_2_2_30.0.tiff").touch()
     context.post_transfer(
         tmp_path / "tomography_2_2_30.0.tiff", role="detector", environment=env
     )
@@ -275,6 +296,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     assert context._tilt_series_sizes == {"test_1": 11}
     (tmp_path / "test_1.mdoc").touch()
     tilt = -50
+    (tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / f"test_1_[{tilt:.1f}]_fractions.tiff",
         role="detector",
@@ -286,6 +308,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     }
     for t in range(-40, 60, 10):
         assert not context._completed_tilt_series
+        (tmp_path / f"test_1_[{t:.1f}]_fractions.tiff").touch()
         context.post_transfer(
             tmp_path / f"test_1_[{t:.1f}]_fractions.tiff",
             role="detector",

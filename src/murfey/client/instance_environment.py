@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 from itertools import count
 from pathlib import Path
@@ -50,6 +51,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
+    movie_counters: Dict[str, itertools.count] = {}
     visit: str = ""
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None

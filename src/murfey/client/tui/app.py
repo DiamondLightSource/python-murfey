@@ -32,7 +32,7 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post, get_machine_config, set_default_acquisition_output
 
 log = logging.getLogger("murfey.tui.app")
 
@@ -206,6 +206,7 @@ class MurfeyTUI(App):
             # local=self._environment.demo,
             status_bar=self._statusbar,
             do_transfer=self._do_transfer,
+            required_substrings_for_removal=self._data_substrings,
             remove_files=remove_files,
         )
 
@@ -224,6 +225,13 @@ class MurfeyTUI(App):
                 self.rsync_processes[update.base_path].enqueue(update.file_path)
 
         self.rsync_processes[source].subscribe(rsync_result)
+        self.rsync_processes[source].subscribe(
+            partial(
+                self._increment_transferred_files_prometheus,
+                destination=destination,
+                source=str(source),
+            )
+        )
         self.rsync_processes[source].subscribe(
             partial(
                 self._increment_transferred_files,
@@ -288,23 +296,51 @@ class MurfeyTUI(App):
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str
     ):
-        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
-        num_data_files = len(
-            [
-                f
-                for f in observed_files
-                if f.suffix in self._data_suffixes
-                and any(substring in f.name for substring in self._data_substrings)
-            ]
-        )
-        data = {
-            "source": source,
-            "destination": destination,
-            "client_id": self._environment.client_id,
-            "increment_count": len(observed_files),
-            "increment_data_count": num_data_files,
-        }
-        requests.post(url, json=data)
+        if len(observed_files):
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_file_count"
+            num_data_files = len(
+                [
+                    f
+                    for f in observed_files
+                    if f.suffix in self._data_suffixes
+                    and any(substring in f.name for substring in self._data_substrings)
+                ]
+            )
+            data = {
+                "source": source,
+                "destination": destination,
+                "client_id": self._environment.client_id,
+                "increment_count": len(observed_files),
+                "increment_data_count": num_data_files,
+            }
+            requests.post(url, json=data)
+
+    # Prometheus can handle higher traffic so update for every transferred file rather
+    # than batching as we do for the Murfey database updates in _increment_transferred_files
+    def _increment_transferred_files_prometheus(
+        self, update: RSyncerUpdate, source: str, destination: str
+    ):
+        if update.outcome is TransferResult.SUCCESS:
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/increment_rsync_transferred_files_prometheus"
+            data_files = (
+                [update]
+                if update.file_path.suffix in self._data_suffixes
+                and any(
+                    substring in update.file_path.name
+                    for substring in self._data_substrings
+                )
+                else []
+            )
+            data = {
+                "source": source,
+                "destination": destination,
+                "client_id": self._environment.client_id,
+                "increment_count": 1,
+                "bytes": update.file_size,
+                "increment_data_count": len(data_files),
+                "data_bytes": sum(f.file_size for f in data_files),
+            }
+            requests.post(url, json=data)
 
     def _increment_transferred_files(
         self, updates: List[RSyncerUpdate], source: str, destination: str
@@ -394,31 +430,53 @@ class MurfeyTUI(App):
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
-            if from_form:
-                requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
-                    json=json,
-                )
             source = Path(json["source"])
-            self._environment.listeners["data_collection_group_ids"] = {
-                context._flush_data_collections
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                context._flush_processing_job
-            }
-            self._environment.listeners["autoproc_program_ids"] = {
-                context._flush_preprocess
-            }
-            self._environment.id_tag_registry["data_collection_group"].append(
-                str(source)
-            )
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
                 "tag": str(source),
             }
-            requests.post(url, json=dcg_data)
+            capture_post(url, json=dcg_data)
+            data = {
+                "voltage": json["voltage"],
+                "pixel_size_on_image": json["pixel_size_on_image"],
+                "experiment_type": json["experiment_type"],
+                "image_size_x": json["image_size_x"],
+                "image_size_y": json["image_size_y"],
+                "file_extension": json["file_extension"],
+                "acquisition_software": json["acquisition_software"],
+                "image_directory": str(self._environment.default_destinations[source]),
+                "tag": json["tilt_series_tag"],
+                "source": str(source),
+                "magnification": json["magnification"],
+                "total_exposed_dose": json.get("total_exposed_dose"),
+                "c2aperture": json.get("c2aperture"),
+                "exposure_time": json.get("exposure_time"),
+                "slit_width": json.get("slit_width"),
+                "phase_plate": json.get("phase_plate", False),
+            }
+            capture_post(
+                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                json=data,
+            )
+            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                capture_post(
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                    json={"tag": json["tilt_series_tag"], "recipe": recipe},
+                )
+            log.info("Registering tomography processing parameters")
+            requests.post(
+                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
+                json=json,
+            )
+            context._flush_data_collections()
+            context._flush_processing_jobs()
+            capture_post(
+                f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.client_id}/flush_tomography_processing",
+                json={"rsync_source": str(source)},
+            )
+            log.info("tomography processing flushed")
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
             dcg_data = {
@@ -470,6 +528,11 @@ class MurfeyTUI(App):
                         "tag": str(source),
                     },
                 )
+                if response is None:
+                    log.error(
+                        "Could not reach Murfey server to insert SPA processing parameters"
+                    )
+                    return None
                 if not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(
@@ -662,3 +725,8 @@ class MurfeyTUI(App):
 
     async def action_process(self) -> None:
         self.processing_btn.disabled = False
+
+    def _set_default_acquisition_directories(self, default_dir: Path):
+        set_default_acquisition_output(
+            default_dir, self._machine_config["software_settings_output_directories"]
+        )

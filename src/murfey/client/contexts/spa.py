@@ -2,21 +2,19 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 from typing import Any, Dict, OrderedDict
 
-import requests
 import xmltodict
 
-import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
-    MovieID,
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import get_machine_config
+from murfey.util import capture_get, capture_post, get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
@@ -60,6 +58,7 @@ class _SPAContext(Context):
         ProcessingParameter(
             "dose_per_frame",
             "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
+            default=1,
         ),
         ProcessingParameter(
             "estimate_particle_diameter",
@@ -183,9 +182,12 @@ class _SPAContext(Context):
             metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ExposureTime"]
-            metadata["slit_width"] = data["MicroscopeImage"]["microscopeData"][
-                "optics"
-            ]["EnergyFilter"]["EnergySelectionSlitWidth"]
+            try:
+                metadata["slit_width"] = data["MicroscopeImage"]["microscopeData"][
+                    "optics"
+                ]["EnergyFilter"]["EnergySelectionSlitWidth"]
+            except KeyError:
+                metadata["slit_width"] = None
             metadata["phase_plate"] = (
                 1
                 if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
@@ -204,11 +206,17 @@ class _SPAContext(Context):
         )
         binning_factor = 1
         if environment:
-            server_config = requests.get(
-                f"{str(environment.url.geturl())}/machine/"
-            ).json()
-            if server_config.get("superres") and environment.superres:
+            server_config_response = capture_get(
+                f"{str(environment.url.geturl())}/machine/", catch=True
+            )
+            if server_config_response is None:
+                return None
+            server_config = server_config_response.json()
+            if server_config.get("superres") and not environment.superres:
+                # If camera is capable of superres and collection is in superres
                 binning_factor = 2
+            elif not server_config.get("superres"):
+                binning_factor_xml = 2
             if magnification:
                 ps_from_mag = (
                     server_config.get("calibrations", {})
@@ -221,10 +229,11 @@ class _SPAContext(Context):
                     # then the pixel size from the magnification table will be correct but the binning_factor will be 2
                     # this is divided out later so multiply it in here to cancel
                     if server_config.get("superres") and not environment.superres:
-                        metadata["pixel_size_on_image"] *= binning_factor
-        metadata["pixel_size_on_image"] = (
-            metadata["pixel_size_on_image"] / binning_factor
-        )
+                        metadata["pixel_size_on_image"] /= (
+                            1 if binning_factor_xml == 2 else 2
+                        )
+                else:
+                    metadata["pixel_size_on_image"] /= binning_factor
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
@@ -307,22 +316,6 @@ class _SPAContext(Context):
             if environment
             else None
         ) or True
-        images_disc_index: int = 0
-        for i, p in enumerate(metadata_file.parts):
-            if p.startswith("Images-Disc"):
-                images_disc_index = i
-        if images_disc_index:
-            data_file = (
-                Path("/".join(metadata_file.parts[: images_disc_index - 2]))
-                / "/".join(metadata_file.parts[images_disc_index - 1 : -1])
-                / metadata_file.with_name(metadata_file.stem + "_EER")
-                .with_suffix(".eer")
-                .name
-            )
-            if data_file.is_file():
-                metadata["num_eer_frames"] = murfey.util.eer.num_frames(
-                    metadata_file.parent.parent / metadata_file.parent.name / data_file
-                )
         return metadata
 
 
@@ -333,7 +326,7 @@ class SPAModularContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
+    ) -> bool:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -352,34 +345,41 @@ class SPAModularContext(_SPAContext):
 
                     if not environment:
                         logger.warning("No environment passed in")
-                        return
+                        return True
                     source = _get_source(transferred_file, environment)
                     if not source:
                         logger.warning(f"No source found for file {transferred_file}")
-                        return
+                        return True
 
                     if required_strings and not any(
                         r in transferred_file.name for r in required_strings
                     ):
-                        return
+                        return True
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
                             environment, source, transferred_file
                         )
+                        if not environment.movie_counters.get(str(source)):
+                            movie_counts_get = capture_get(
+                                f"{str(environment.url.geturl())}/num_movies",
+                                catch=True,
+                            )
+                            if movie_counts_get is not None:
+                                environment.movie_counters[str(source)] = count(
+                                    movie_counts_get.json().get(str(source), 0) + 1
+                                )
                         environment.movies[file_transferred_to] = MovieTracker(
-                            movie_number=next(MovieID),
+                            movie_number=next(environment.movie_counters[str(source)]),
                             motion_correction_uuid=next(MurfeyID),
                         )
 
                         eer_fractionation_file = None
-                        if environment.data_collection_parameters.get("num_eer_frames"):
-                            response = requests.post(
+                        if file_transferred_to.suffix == ".eer":
+                            response = capture_post(
                                 f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
                                 json={
-                                    "num_frames": environment.data_collection_parameters[
-                                        "num_eer_frames"
-                                    ],
+                                    "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
                                         "eer_fractionation"
                                     ],
@@ -388,7 +388,10 @@ class SPAModularContext(_SPAContext):
                                     ],
                                     "fractionation_file_name": "eer_fractionation_spa.txt",
                                 },
+                                catch=True,
                             )
+                            if response is None:
+                                return False
                             eer_fractionation_file = response.json()[
                                 "eer_fractionation_file"
                             ]
@@ -421,15 +424,16 @@ class SPAModularContext(_SPAContext):
                             "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
                         }
-                        requests.post(
+                        capture_post(
                             preproc_url,
                             json={
                                 k: None if v == "None" else v
                                 for k, v in preproc_data.items()
                             },
+                            catch=True,
                         )
 
-        return
+        return True
 
     def _register_data_collection(
         self,
@@ -487,7 +491,7 @@ class SPAContext(_SPAContext):
             "slit_width": data.get("slit_width"),
             "phase_plate": data.get("phase_plate", False),
         }
-        requests.post(url, json=json)
+        capture_post(url, json=json, catch=True)
 
     def post_transfer(
         self,
@@ -495,8 +499,8 @@ class SPAContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
-        return
+    ) -> bool:
+        return True
 
     def _register_processing_job(
         self,
@@ -543,7 +547,7 @@ class SPAContext(_SPAContext):
         }
         if parameters["particle_diameter"]:
             msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
+        capture_post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
         self,
@@ -554,4 +558,4 @@ class SPAContext(_SPAContext):
     ):
         environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
-        requests.post(url, json=data)
+        capture_post(url, json=data)

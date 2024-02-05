@@ -5,7 +5,17 @@ import logging
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NamedTuple, OrderedDict, Type, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    OrderedDict,
+    Type,
+    TypeVar,
+)
 
 import procrunner
 import requests
@@ -26,8 +36,9 @@ from textual.widgets import (
     Header,
     Input,
     Label,
-    OptionList,
     ProgressBar,
+    RadioButton,
+    RadioSet,
     RichLog,
     Static,
     Switch,
@@ -46,7 +57,7 @@ from murfey.client.instance_environment import (
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config
-from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -99,6 +110,8 @@ def determine_default_destination(
                                         "touch": touch,
                                     },
                                 )
+                                if suggested_path_response is None:
+                                    raise RuntimeError("Murfey server is unreachable")
                                 _default = suggested_path_response.json().get(
                                     "suggested_path"
                                 )
@@ -240,7 +253,16 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        self._context = SPAContext
+        cfg = get_machine_config(
+            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        )
+        self._context: Type[SPAModularContext] | Type[SPAContext] | Type[
+            TomographyContext
+        ]
+        if cfg.get("modular_spa"):
+            self._context = SPAContext
+        else:
+            self._context = SPAModularContext
 
     def compose(self):
         machine_data = requests.get(
@@ -257,9 +279,6 @@ class LaunchScreen(Screen):
         yield self._dir_tree
         text_log = RichLog(id="selected-directories")
         widgets = [text_log, Button("Clear", id="clear")]
-        if self.app._multigrid:
-            widgets.append(Label("Data collection modality:"))
-            widgets.append(OptionList("SPA", "Tomography", id="modality-select"))
         text_log_block = VerticalScroll(*widgets, id="selected-directories-vert")
         yield text_log_block
 
@@ -306,20 +325,6 @@ class LaunchScreen(Screen):
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
-
-    def on_option_list_option_selected(self, event):
-        log.info(f"option selected: {event.option}")
-        if event.option.prompt == "Tomography":
-            log.info("switching context to tomo")
-            self._context = TomographyContext
-        elif event.option.prompt == "SPA":
-            cfg = get_machine_config(
-                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
-            )
-            if cfg.get("modular_spa"):
-                self._context = SPAContext
-            else:
-                self._context = SPAModularContext
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "quit":
@@ -464,7 +469,7 @@ class ProcessingForm(Screen):
     def _write_params(
         self,
         params: dict | None = None,
-        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
+        model: PreprocessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
             try:
@@ -474,9 +479,9 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
-            if model == ProcessingParametersTomo:
+            if model == PreprocessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
@@ -682,7 +687,7 @@ class VisitSelection(SwitchSelection):
         super().__init__(
             "visit",
             visits,
-            "Create visit directory (use this for EPU)",
+            "Create visit directory (suggested)",
             *args,
             **kwargs,
         )
@@ -810,7 +815,7 @@ class DirectorySelection(SwitchSelection):
         super().__init__(
             "directory",
             directories,
-            "Automatically transfer and trigger processing for new directories (recommended for multigrid)",
+            "Automatically transfer and trigger processing for new directories (recommended)",
             *args,
             **kwargs,
         )
@@ -819,6 +824,7 @@ class DirectorySelection(SwitchSelection):
         self.app._multigrid = self._switch_status
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
+        self.app._set_default_acquisition_directories(visit_dir)
         machine_config = get_machine_config(
             str(self.app._environment.url.geturl()), demo=self.app._environment.demo
         )
@@ -838,70 +844,94 @@ class DestinationSelect(Screen):
         context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
+        destination_overrides: Optional[Dict[Path, str]] = None,
+        use_transfer_routes: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._transfer_routes = transfer_routes
-        self._destination_overrides: Dict[Path, str] = {}
+        self._destination_overrides: Dict[Path, str] = destination_overrides or {}
         self._user_params: Dict[str, str] = {}
         self._dependencies = dependencies or {}
         self._inputs: Dict[Input, str] = {}
         self._context = context
+        self._use_transfer_routes = use_transfer_routes
 
     def compose(self):
         bulk = []
+        with RadioSet():
+            yield RadioButton(
+                "SPA", value=self._context in (SPAContext, SPAModularContext)
+            )
+            yield RadioButton("Tomography", value=self._context is TomographyContext)
         if self.app._multigrid:
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             destinations = []
-            for s in self._transfer_routes.keys():
-                for d in s.glob("*"):
-                    if (
-                        d.is_dir()
-                        and d.name not in machine_config["create_directories"]
-                    ):
-                        machine_data = requests.get(
-                            f"{self.app._environment.url.geturl()}/machine/"
-                        ).json()
-                        dest = determine_default_destination(
-                            self.app._visit,
-                            s,
-                            f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
-                            self.app._environment,
-                            self.app.analysers,
-                            touch=True,
+            if self._destination_overrides:
+                for k, v in self._destination_overrides.items():
+                    destinations.append(v)
+                    bulk.append(Label(f"Copy the source {k} to:"))
+                    bulk.append(
+                        Input(
+                            value=v,
+                            id=f"destination-{str(k)}",
+                            classes="input-destination",
                         )
-                        if dest and dest in destinations:
-                            dest_path = Path(dest)
-                            name_root = ""
-                            dest_num = 0
-                            for i, st in enumerate(dest_path.name):
-                                if st.isnumeric():
-                                    dest_num = int(dest_path.name[i:])
-                                    break
-                                name_root += st
-                            if dest_num:
-                                dest = str(
-                                    dest_path.parent / f"{name_root}{dest_num+1}"
-                                )
-                            else:
-                                dest = str(dest_path.parent / f"{name_root}2")
-                        destinations.append(dest)
-                        bulk.append(Label(f"Copy the source {d} to:"))
-                        bulk.append(
-                            Input(
-                                value=dest,
-                                id=f"destination-{str(d)}",
-                                classes="input-destination",
-                            )
-                        )
-        else:
-            for s, d in self._transfer_routes.items():
-                bulk.append(Label(f"Copy the source {s} to:"))
-                bulk.append(
-                    Input(
-                        value=d, id=f"destination-{str(s)}", classes="input-destination"
                     )
-                )
+            else:
+                for s in self._transfer_routes.keys():
+                    for d in s.glob("*"):
+                        if (
+                            d.is_dir()
+                            and d.name not in machine_config["create_directories"]
+                        ):
+                            machine_data = requests.get(
+                                f"{self.app._environment.url.geturl()}/machine/"
+                            ).json()
+                            dest = determine_default_destination(
+                                self.app._visit,
+                                s,
+                                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+                                self.app._environment,
+                                self.app.analysers,
+                                touch=True,
+                            )
+                            if dest and dest in destinations:
+                                dest_path = Path(dest)
+                                name_root = ""
+                                dest_num = 0
+                                for i, st in enumerate(dest_path.name):
+                                    if st.isnumeric():
+                                        dest_num = int(dest_path.name[i:])
+                                        break
+                                    name_root += st
+                                if dest_num:
+                                    dest = str(
+                                        dest_path.parent / f"{name_root}{dest_num+1}"
+                                    )
+                                else:
+                                    dest = str(dest_path.parent / f"{name_root}2")
+                            destinations.append(dest)
+                            bulk.append(Label(f"Copy the source {d} to:"))
+                            bulk.append(
+                                Input(
+                                    value=dest,
+                                    id=f"destination-{str(d)}",
+                                    classes="input-destination",
+                                )
+                            )
+        else:
+            machine_config = get_machine_config(str(self.app._environment.url.geturl()))
+            for s, d in self._transfer_routes.items():
+                if Path(d).name not in machine_config["create_directories"]:
+                    bulk.append(Label(f"Copy the source {s} to:"))
+                    bulk.append(
+                        Input(
+                            value=d,
+                            id=f"destination-{str(s)}",
+                            classes="input-destination",
+                        )
+                    )
         yield VerticalScroll(*bulk, id="destination-holder")
         params_bulk = []
         if self.app._multigrid and self.app._processing_enabled:
@@ -967,6 +997,31 @@ class DestinationSelect(Screen):
                     self._user_params[k.name] = event.value
                     self._check_dependency(k.name, event.value)
 
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.index == 0:
+            cfg = get_machine_config(
+                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            )
+            if cfg.get("modular_spa"):
+                self._context = SPAContext
+            else:
+                self._context = SPAModularContext
+        else:
+            self._context = TomographyContext
+        self.app.pop_screen()
+        self.app.uninstall_screen("destination-select-screen")
+        self.app.install_screen(
+            DestinationSelect(
+                self._transfer_routes,
+                self._context,
+                dependencies=spa_form_dependencies,
+                destination_overrides=self._destination_overrides,
+                use_transfer_routes=True,
+            ),
+            "destination-select-screen",
+        )
+        self.app.push_screen("destination-select-screen")
+
     def on_input_changed(self, event):
         if event.input.id.startswith("destination-"):
             if not self.app._multigrid:
@@ -981,7 +1036,9 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
-                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
+                valid = validate_form(
+                    self._user_params, PreprocessingParametersTomo.Base
+                )
             else:
                 valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:
@@ -1096,11 +1153,10 @@ class MainScreen(Screen):
         info_widget.write(
             f"[bold]Welcome to Murfey ({self.app._environment.visit})[/bold]"
         )
-        self.app.processing_btn = Button(
-            "Request processing",
-            id="processing-btn",
-            disabled=not self.app._form_values,
-        )
-        yield self.app.processing_btn
         yield Button("Visit complete", id="new-visit-btn")
         yield Footer()
+
+    def on_mount(self, event):
+        requests.post(
+            f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/monitoring/1"
+        )

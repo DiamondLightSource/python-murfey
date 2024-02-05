@@ -68,6 +68,10 @@ Input {
     border: solid teal;
 }
 
+RadioSet {
+    width: 100%;
+}
+
 #quit {
     width: 100%;
     height: 100%;
@@ -319,6 +323,16 @@ Input {
     text-style: bold;
     background: blueviolet;
 } 
+
+#monitoring {
+    width: 100%;
+    height: 90fr;
+    column-span: 1;
+}
+
+.monitoring-switch {
+    width: 75%;
+}
 
 #input:hover {
     background: blue;

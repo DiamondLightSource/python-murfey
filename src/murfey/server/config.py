@@ -16,6 +16,7 @@ class MachineConfig(BaseModel):
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     murfey_db_credentials: str
+    crypto_key: str
     display_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
@@ -27,6 +28,7 @@ class MachineConfig(BaseModel):
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
     feedback_queue: str = "murfey_feedback"
+    node_creator_queue: str = "node_creator"
     superres: bool = False
     camera: str = "FALCON"
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
@@ -36,6 +38,7 @@ class MachineConfig(BaseModel):
     machine_override: str = ""
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
+    software_settings_output_directories: Dict[str, List[str]] = {}
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
@@ -56,14 +59,18 @@ def get_hostname():
     return socket.gethostname()
 
 
-@lru_cache()
-def get_microscope():
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
     try:
         hostname = get_hostname()
         microscope_from_hostname = hostname.split(".")[0]
     except OSError:
         microscope_from_hostname = "Unknown"
-    microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
+    if machine_config:
+        microscope_name = machine_config.machine_override or os.getenv(
+            "BEAMLINE", microscope_from_hostname
+        )
+    else:
+        microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
     return microscope_name
 
 
@@ -75,6 +82,7 @@ def get_machine_config() -> MachineConfig:
         data_directories={},
         rsync_basepath=Path("dls/tmp"),
         murfey_db_credentials="",
+        crypto_key="",
     )
     if settings.murfey_machine_configuration:
         microscope = get_microscope()

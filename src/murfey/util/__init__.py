@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
+import json
 import logging
+import shutil
 from functools import lru_cache
+from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, Union
 from urllib.parse import ParseResult
 from uuid import uuid4
 
@@ -30,13 +34,79 @@ def _get_visit_list(api_base: ParseResult):
     return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
-def capture_post(url: str, json: dict | list = {}) -> requests.Response:
-    response = requests.post(url, json=json)
+def capture_post(
+    url: str, json: dict | list = {}, catch: bool = False
+) -> requests.Response | None:
+    try:
+        response = requests.post(url, json=json)
+    except Exception as e:
+        if catch:
+            logger.warning(f"Exception encountered in get from {url}: {e}")
+            return None
+        raise
     if response.status_code != 200:
         logger.warning(
             f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
         )
     return response
+
+
+def capture_get(url: str, catch: bool = False) -> requests.Response | None:
+    try:
+        response = requests.get(url)
+    except Exception as e:
+        if catch:
+            logger.warning(f"Exception encountered in post to {url}: {e}")
+            return None
+        raise
+    if response.status_code != 200:
+        logger.warning(
+            f"Response to get from {url} had status code {response.status_code}. The reason given was {response.reason}"
+        )
+    return response
+
+
+def set_default_acquisition_output(
+    new_output_dir: Path,
+    software_settings_output_directories: Dict[str, List[str]],
+    safe: bool = True,
+):
+    for p, keys in software_settings_output_directories.items():
+        if safe:
+            settings_copy_path = Path(p)
+            settings_copy_path = settings_copy_path.parent / (
+                "_murfey_" + settings_copy_path.name
+            )
+            shutil.copy(p, str(settings_copy_path))
+        with open(p, "r") as for_parsing:
+            settings = json.load(for_parsing)
+        # for safety
+        settings_copy = copy.deepcopy(settings)
+
+        def _set(d: dict, keys_list: List[str], value: str) -> dict:
+            if len(keys_list) > 1:
+                tmp_value: Union[dict, str] = _set(
+                    d[keys_list[0]], keys_list[1:], value
+                )
+            else:
+                tmp_value = value
+            return {_k: tmp_value if _k == keys_list[0] else _v for _k, _v in d.items()}
+
+        settings_copy = _set(settings_copy, keys, str(new_output_dir))
+
+        def _check_dict_structure(d1: dict, d2: dict) -> bool:
+            if set(d1.keys()) != set(d2.keys()):
+                return False
+            for k in d1.keys():
+                if isinstance(d1[k], dict):
+                    if not isinstance(d2[k], dict):
+                        return False
+                    _check_dict_structure(d1[k], d2[k])
+            return True
+
+        if _check_dict_structure(settings, settings_copy):
+            with open(p, "w") as sf:
+                json.dump(settings_copy, sf)
 
 
 class Observer:

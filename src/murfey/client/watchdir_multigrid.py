@@ -87,7 +87,13 @@ class MultigridDirWatcher(murfey.util.Observer):
                             and d02 not in self._seen_dirs
                             and list((d.parent.parent / d.name).iterdir())
                         ):
-                            self.notify(d02, include_mid_path=False)
+                            self.notify(
+                                d02,
+                                include_mid_path=False,
+                                analyse=not (
+                                    first_loop and self._skip_existing_processing
+                                ),
+                            )
                             self._seen_dirs.append(d02)
 
             if first_loop:

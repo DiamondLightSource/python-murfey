@@ -10,7 +10,7 @@ class SPAParameters(BaseModel):
     nr_classes_3d: int = 4
     downscale: bool = True
     do_icebreaker_jobs: bool = True
-    fraction_of_classes_to_remove_2d: float = 0.5
+    fraction_of_classes_to_remove_2d: float = 0.7
     nr_picks_before_diameter: int = 10000
 
 

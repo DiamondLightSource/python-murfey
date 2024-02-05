@@ -4,28 +4,33 @@ import datetime
 import logging
 import random
 from functools import lru_cache
+from itertools import count
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
+from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
+import murfey.util.eer
 from murfey.server import (
+    _flush_tomography_preprocessing,
     _murfey_id,
     _register_picked_particles_use_diameter,
     feedback_callback,
     get_hostname,
     get_microscope,
     sanitise,
+    santise_path,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
@@ -45,10 +50,11 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
+    TomographyPreprocessingParameters,
+    TomographyProcessingParameters,
 )
 from murfey.util.models import (
     ClientInfo,
-    CompletedTiltSeries,
     ConnectionFileParameters,
     ContextInfo,
     DCGroupParameters,
@@ -56,9 +62,11 @@ from murfey.util.models import (
     File,
     FractionationParameters,
     GainReference,
+    PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
+    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     SessionInfo,
@@ -66,10 +74,12 @@ from murfey.util.models import (
     SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
+    TiltSeriesGroupInfo,
     TiltSeriesInfo,
     TiltSeriesProcessingDetails,
     Visit,
 )
+from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -77,6 +87,10 @@ log = logging.getLogger("murfey.server.demo_api")
 tags_metadata = [murfey.server.bootstrap.tag]
 
 router = APIRouter()
+router.raw_count = 2
+
+
+global_counter = count()
 
 
 class Settings(BaseSettings):
@@ -161,6 +175,14 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     return client_info
 
 
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
+
+
 @router.post("/visits/{visit_name}/rsyncer")
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
@@ -171,11 +193,15 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     )
     db.add(rsync_instance)
     db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source)
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).set(0)
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).set(0)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     return rsyncer_info
 
 
@@ -204,7 +230,7 @@ def increment_rsync_file_count(
     rsync_instance.files_counted += 1
     db.add(rsync_instance)
     db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source).inc(
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
         rsyncer_info.increment_count
     )
 
@@ -223,12 +249,24 @@ def increment_rsync_transferred_files(
     rsync_instance.files_transferred += 1
     db.add(rsync_instance)
     db.commit()
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.increment_count
-    )
-    prom.transferred_files_bytes.labels(rsync_source=rsyncer_info.source).inc(
-        rsyncer_info.bytes
-    )
+
+
+@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
+def increment_rsync_transferred_files_prometheus(
+    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+):
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_count)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.bytes)
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_data_count)
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.data_bytes)
 
 
 @router.post("/clients/{client_id}/spa_processing_parameters")
@@ -251,6 +289,7 @@ def register_spa_proc_params(
                 AutoProcProgram,
             )
             .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_params.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -289,6 +328,99 @@ def register_spa_proc_params(
     db.commit()
 
 
+@router.post("/clients/{client_id}/tomography_preprocessing_parameters")
+def register_tomo_preproc_params(
+    client_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    if not db.exec(
+        select(func.count(TomographyPreprocessingParameters.dcg_id)).where(
+            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        )
+    ).one():
+        params = TomographyPreprocessingParameters(
+            dcg_id=collected_ids[0].id,
+            pixel_size=proc_params.pixel_size_on_image,
+            dose_per_frame=proc_params.dose_per_frame,
+            gain_ref=proc_params.gain_ref,
+            motion_corr_binning=proc_params.motion_corr_binning,
+            voltage=proc_params.voltage,
+            # manual_tilt_offset=proc_params.manual_tilt_offset,
+        )
+        db.add(params)
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
+
+
+@router.post("/clients/{client_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    session_id = client.session_id
+    log.info(
+        f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
+    )
+    collected_ids = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_params.tag)
+        .where(DataCollection.tag == proc_params.tilt_series_tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).one()
+    if not db.exec(
+        select(func.count(TomographyProcessingParameters.pj_id)).where(
+            TomographyProcessingParameters.pj_id == collected_ids[2].id
+        )
+    ).one():
+        tomogram_params = TomographyProcessingParameters(
+            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
+        )
+        db.add(tomogram_params)
+    db.commit()
+    db.close()
+
+
 @router.get("/clients/{client_id}/spa_processing_parameters")
 def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     params = db.exec(
@@ -313,7 +445,7 @@ def register_tilt_series(
     tilt_series = TiltSeries(
         session_id=session_id,
         tag=tilt_series_info.tag,
-        rsync_source=tilt_series_info.rsync_source,
+        rsync_source=tilt_series_info.source,
     )
     db.add(tilt_series)
     db.commit()
@@ -323,7 +455,7 @@ def register_tilt_series(
 def register_completed_tilt_series(
     visit_name: str,
     client_id: int,
-    completed_tilt_series: CompletedTiltSeries,
+    tilt_series_group: TiltSeriesGroupInfo,
     db=murfey_db,
 ):
     session_id = (
@@ -335,9 +467,9 @@ def register_completed_tilt_series(
     )
     tilt_series_db = db.exec(
         select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(completed_tilt_series.tilt_series))
-        .where(TiltSeries.rsync_source == completed_tilt_series.rsync_source)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
         .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
     ).all()
     for ts in tilt_series_db:
         ts.complete = True
@@ -345,14 +477,44 @@ def register_completed_tilt_series(
     db.commit()
 
 
-@router.post("/visits/{visit_name}/tilt")
-def register_tilt(visit_name: str, tilt_info: TiltInfo, db=murfey_db):
-    tilt_series = db.exec(
-        select(TiltSeries)
-        .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-        .where(TiltSeries.rsync_source == tilt_info.rsync_source)
-    ).one()
-    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series.id)
+@router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
+def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
+    res = db.exec(
+        select(ClientEnvironment, TiltSeries, Tilt)
+        .where(ClientEnvironment.client_id == client_id)
+        .where(TiltSeries.tag == tilt_series_tag)
+        .where(TiltSeries.session_id == ClientEnvironment.session_id)
+        .where(Tilt.tilt_series_id == TiltSeries.id)
+    ).all()
+    tilts: Dict[str, List[str]] = {}
+    for el in res:
+        if tilts.get(el[1].rsync_source):
+            tilts[el[1].rsync_source].append(el[2].movie_path)
+        else:
+            tilts[el[1].rsync_source] = [el[2].movie_path]
+    return tilts
+
+
+@router.post("/visits/{visit_name}/{client_id}/tilt")
+def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_id = (
+        db.exec(
+            select(TiltSeries)
+            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+            .where(TiltSeries.session_id == session_id)
+            .where(TiltSeries.rsync_source == tilt_info.source)
+        )
+        .one()
+        .id
+    )
+    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
     db.add(tilt)
     db.commit()
 
@@ -440,8 +602,12 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
     return proc_params
 
 
+class Tag(BaseModel):
+    tag: str
+
+
 @router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
+def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -450,13 +616,14 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         .session_id
     )
     stashed_files = db.exec(
-        select(PreprocessStash).where(PreprocessStash.client_id == client_id)
+        select(PreprocessStash).where(PreprocessStash.session_id == session_id)
     ).all()
     if not stashed_files:
         return
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == tag.tag)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -487,12 +654,18 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
         p = Path(f.mrc_out)
         if not p.parent.exists():
             p.parent.mkdir(parents=True)
-        movie = Movie(murfey_id=murfey_ids[2 * i], path=f.file_path)
+        movie = Movie(
+            murfey_id=murfey_ids[2 * i],
+            path=f.file_path,
+            image_number=f.image_number,
+            tag=f.tag,
+        )
         db.add(movie)
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config["feedback_queue"],
+                "node_creator_queue": machine_config["node_creator_queue"],
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
@@ -508,8 +681,8 @@ def flush_spa_processing(visit_name: str, client_id: int, db=murfey_db):
                 )
                 if proc_params["gain_ref"]
                 else proc_params["gain_ref"],
-                "downscale": proc_params["downscale"],
                 "picker_uuid": murfey_ids[2 * i + 1],
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             },
         }
         log.info(f"Launching SPA preprocessing with Zoaclo message: {zocalo_message}")
@@ -588,6 +761,7 @@ async def request_spa_preprocessing(
                 DataCollectionGroup.session_id == session_id
                 and DataCollectionGroup.tag == "spa"
             )
+            .where(DataCollectionGroup.tag == proc_file.tag)
             .where(DataCollection.dcg_id == DataCollectionGroup.id)
             .where(ProcessingJob.dc_id == DataCollection.id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -600,13 +774,22 @@ async def request_spa_preprocessing(
 
         feedback_params.picker_murfey_id = murfey_ids[1]
         db.add(feedback_params)
-        movie = Movie(murfey_id=murfey_ids[0], path=proc_file.path)
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+            tag=proc_file.tag,
+        )
         db.add(movie)
         db.commit()
 
         if not mrc_out.parent.exists():
             Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
         log.info("Sending Zocalo message")
+        movie = db.exec(select(Movie).where(Movie.murfey_id == murfey_ids[0])).one()
+        movie.preprocessed = True
+        db.add(movie)
+        db.commit()
         _register_picked_particles_use_diameter(
             {
                 "session_id": session_id,
@@ -624,18 +807,18 @@ async def request_spa_preprocessing(
                     },
                 },
                 "particle_diameters": [random.randint(20, 30) for i in range(400)],
-                "program_id": 1,
+                "program_id": detached_ids[3],
             },
             _db=db,
             demo=True,
         )
-        prom.preprocessed_movies.labels(processing_job=1).inc()
+        prom.preprocessed_movies.labels(processing_job=detached_ids[2]).inc()
 
     else:
         for_stash = PreprocessStash(
             file_path=str(proc_file.path),
             tag=proc_file.tag,
-            client_id=client_id,
+            session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
         )
@@ -645,13 +828,36 @@ async def request_spa_preprocessing(
     return proc_file
 
 
-@router.post("/visits/{visit_name}/tomography_preprocess")
-async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFile):
-    if not Path(proc_file.path).exists():
-        log.warning(f"{proc_file.path} has not been transferred before preprocessing")
+class Source(BaseModel):
+    rsync_source: str
+
+
+@router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
+def flush_tomography_processing(
+    visit_name: str, client_id: int, rsync_source: Source, db=murfey_db
+):
+    zocalo_message = {
+        "register": "flush_tomography_preprocess",
+        "client_id": client_id,
+        "visit_name": visit_name,
+        "data_collection_group_tag": rsync_source.rsync_source,
+    }
+    _flush_tomography_preprocessing(zocalo_message)
+    return
+
+
+@router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
+async def request_tomography_preprocessing(
+    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+):
+    if not santise_path(Path(proc_file.path)).exists():
+        log.warning(
+            f"{sanitise(str(proc_file.path))} has not been transferred before preprocessing"
+        )
+    log.info(f"Tomo preprocesing requested for {sanitise(str(proc_file.path))}")
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path(proc_file.path)
+    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
     sub_dataset = (
         ppath.relative_to(core).parts[0]
         if len(ppath.relative_to(core).parts) > 1
@@ -664,20 +870,50 @@ async def request_tomography_preprocessing(visit_name: str, proc_file: ProcessFi
         / "MotionCorr"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
-    if not mrc_out.parent.exists():
-        mrc_out.parent.mkdir(parents=True)
-    feedback_callback(
-        {},
-        {
-            "register": "motion_corrected",
-            "movie": str(proc_file.path),
-            "mrc_out": str(mrc_out),
-            "movie_id": proc_file.mc_uuid,
-            "fm_int_file": proc_file.eer_fractionation_file,
-        },
+    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+        )
+        .one()
+        .session_id
     )
-    await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
-    mrc_out.touch()
+    data_collection = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.id == DataCollection.dcg_id)
+        .where(DataCollection.tag == proc_file.tag)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+    ).all()
+    if data_collection:
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True)
+        feedback_callback(
+            {},
+            {
+                "register": "motion_corrected",
+                "movie": str(proc_file.path),
+                "mrc_out": str(mrc_out),
+                "movie_id": proc_file.mc_uuid,
+                "fm_int_file": proc_file.eer_fractionation_file,
+                "program_id": data_collection[0][3].id,
+            },
+        )
+        await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
+        mrc_out.touch()
+    else:
+        for_stash = PreprocessStash(
+            file_path=str(proc_file.path),
+            session_id=session_id,
+            image_number=proc_file.image_number,
+            mrc_out=str(mrc_out),
+            tag=proc_file.tag,
+        )
+        db.add(for_stash)
+        db.commit()
+        db.close()
     return proc_file
 
 
@@ -726,16 +962,18 @@ def shutdown():
 
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
-    count: int | None = None
+    count: int | None = router.raw_count
     check_path = (
         machine_config["rsync_basepath"] / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
+    check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
+    router.raw_count += 1
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
@@ -747,56 +985,108 @@ def register_dc_group(
     client = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
+    dcgid = next(global_counter)
     murfey_dcg = DataCollectionGroup(
-        id=1,
+        id=dcgid,
         session_id=client.session_id,
         tag=dcg_params.tag,
     )
     db.add(murfey_dcg)
     db.commit()
 
-    murfey_dc = DataCollection(
-        id=1,
-        tag=dcg_params.tag,
-        dcg_id=1,
-    )
-    db.add(murfey_dc)
-    db.commit()
+    if dcg_params.experiment_type == "single particle":
+        dcid = next(global_counter)
+        murfey_dc = DataCollection(
+            id=dcid,
+            tag=dcg_params.tag,
+            dcg_id=dcgid,
+        )
+        db.add(murfey_dc)
+        db.commit()
 
-    murfey_pj_pre = ProcessingJob(id=1, recipe="em-spa-preprocess", dc_id=1)
-    murfey_pj_ext = ProcessingJob(id=2, recipe="em-spa-extract", dc_id=1)
-    murfey_pj_2d = ProcessingJob(id=3, recipe="em-spa-class2d", dc_id=1)
-    murfey_pj_3d = ProcessingJob(id=4, recipe="em-spa-class3d", dc_id=1)
-    db.add(murfey_pj_pre)
-    db.add(murfey_pj_ext)
-    db.add(murfey_pj_2d)
-    db.add(murfey_pj_3d)
-    db.commit()
+        pjids = [next(global_counter) for _ in range(4)]
 
-    murfey_app_pre = AutoProcProgram(id=1, pj_id=1)
-    murfey_app_ext = AutoProcProgram(id=2, pj_id=2)
-    murfey_app_2d = AutoProcProgram(id=3, pj_id=3)
-    murfey_app_3d = AutoProcProgram(id=4, pj_id=4)
-    db.add(murfey_app_pre)
-    db.add(murfey_app_ext)
-    db.add(murfey_app_2d)
-    db.add(murfey_app_3d)
-    db.commit()
+        murfey_pj_pre = ProcessingJob(
+            id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
+        )
+        murfey_pj_ext = ProcessingJob(id=pjids[1], recipe="em-spa-extract", dc_id=dcid)
+        murfey_pj_2d = ProcessingJob(id=pjids[2], recipe="em-spa-class2d", dc_id=dcid)
+        murfey_pj_3d = ProcessingJob(id=pjids[3], recipe="em-spa-class3d", dc_id=dcid)
+        db.add(murfey_pj_pre)
+        db.add(murfey_pj_ext)
+        db.add(murfey_pj_2d)
+        db.add(murfey_pj_3d)
+        db.commit()
+
+        murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
+        murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
+        murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
+        murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
+        db.add(murfey_app_pre)
+        db.add(murfey_app_ext)
+        db.add(murfey_app_2d)
+        db.add(murfey_app_3d)
+        db.commit()
 
     if global_state.get("data_collection_group_ids") and isinstance(
         global_state["data_collection_group_ids"], dict
     ):
         global_state["data_collection_group_ids"] = {
             **global_state["data_collection_group_ids"],
-            dcg_params.tag: 1,
+            dcg_params.tag: dcgid,
         }
     else:
-        global_state["data_collection_group_ids"] = {dcg_params.tag: 1}
+        global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
     return dcg_params
 
 
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
-def start_dc(visit_name, client_id: int, dc_params: DCParameters):
+def start_dc(
+    visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
+) -> DCParameters | None:
+    dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
+    log.info(
+        f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
+    )
+    dcg = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
+    ).one()
+    dc_tag = dc_params.tag
+    if db.exec(
+        select(DataCollection)
+        .where(DataCollection.tag == dc_tag)
+        .where(DataCollection.dcg_id == dcg.id)
+    ).all():
+        return None
+    dc_id = next(global_counter)
+    murfey_dc = DataCollection(
+        id=dc_id,
+        client=client_id,
+        tag=dc_tag,
+        dcg_id=dcg.id,
+    )
+    db.add(murfey_dc)
+    db.commit()
+    pj_id_preproc = next(global_counter)
+    pj_id_align = next(global_counter)
+    murfey_pj = ProcessingJob(
+        id=pj_id_preproc,
+        recipe="em-tomo-preprocess",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_pj = ProcessingJob(
+        id=pj_id_align,
+        recipe="em-tomo-align",
+        dc_id=dc_id,
+    )
+    db.add(murfey_pj)
+    murfey_app = AutoProcProgram(id=pj_id_preproc, pj_id=pj_id_preproc)
+    db.add(murfey_app)
+    murfey_app = AutoProcProgram(id=pj_id_align, pj_id=pj_id_align)
+    db.add(murfey_app)
+    db.commit()
+    db.close()
     if global_state.get("data_collection_ids") and isinstance(
         global_state["data_collection_ids"], dict
     ):
@@ -806,7 +1096,8 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
         }
     else:
         global_state["data_collection_ids"] = {dc_params.tag: 1}
-    prom.exposure_time.set(dc_params.exposure_time)
+    if dc_params.exposure_time:
+        prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
 
 
@@ -930,13 +1221,14 @@ def remove_session(client_id: int, db=murfey_db):
     db.commit()
     if session_id is None:
         return
+    prom.monitoring_switch.remove(client.visit)
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.client_id == client_id)
     ).all()
     for ri in rsync_instances:
-        prom.seen_files.remove(ri.source)
-        prom.transferred_files.remove(ri.source)
-        prom.transferred_files_bytes.remove(ri.source)
+        prom.seen_files.remove(ri.source, client.visit)
+        prom.transferred_files.remove(ri.source, client.visit)
+        prom.transferred_files_bytes.remove(ri.source, client.visit)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
@@ -980,8 +1272,27 @@ async def write_eer_fractionation_file(
     log.info(f"EER fractionation file {file_path} creation requested")
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
+
+    if fractionation_params.num_frames:
+        num_eer_frames = fractionation_params.num_frames
+    elif (
+        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+    ):
+        num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
+    else:
+        log.warning(
+            f"EER fractionation unable to find {fractionation_params.eer_path} "
+            f"or use {fractionation_params.num_frames} frames"
+        )
+        return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
         frac_file.write(
-            f"{fractionation_params.num_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
         )
     return {"eer_fractionation_file": str(file_path)}
+
+
+@router.post("/visits/{visit_name}/monitoring/{on}")
+def change_monitoring_status(visit_name: str, on: int):
+    prom.monitoring_switch.labels(visit=visit_name)
+    prom.monitoring_switch.labels(visit=visit_name).set(on)
