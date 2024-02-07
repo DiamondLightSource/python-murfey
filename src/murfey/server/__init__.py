@@ -2270,6 +2270,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             _transport_object.transport.nack(header, requeue=True)
     except OperationalError:
         logger.warning("Murfey database error encountered", exc_info=True)
+        time.sleep(1)
         if _transport_object:
             _transport_object.transport.nack(header, requeue=True)
     except Exception:
