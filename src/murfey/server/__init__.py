@@ -25,7 +25,12 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy import func
-from sqlalchemy.exc import InvalidRequestError, PendingRollbackError, SQLAlchemyError
+from sqlalchemy.exc import (
+    InvalidRequestError,
+    OperationalError,
+    PendingRollbackError,
+    SQLAlchemyError,
+)
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
@@ -2261,6 +2266,10 @@ def feedback_callback(header: dict, message: dict) -> None:
         murfey_db.rollback()
         murfey_db.close()
         logger.warning("Murfey database required a rollback")
+        if _transport_object:
+            _transport_object.transport.nack(header, requeue=True)
+    except OperationalError:
+        logger.warning("Murfey database error encountered", exc_info=True)
         if _transport_object:
             _transport_object.transport.nack(header, requeue=True)
     except Exception:
