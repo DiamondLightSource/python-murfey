@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from functools import lru_cache
@@ -22,6 +23,7 @@ from ispyb.sqlalchemy import (
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -497,27 +499,38 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
 
 
 @router.post("/visits/{visit_name}/{client_id}/tilt")
-def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+async def register_tilt(
+    visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db
+):
+    def _add_tilt():
+        session_id = (
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.client_id == client_id
+                )
+            )
+            .one()
+            .session_id
         )
-        .one()
-        .session_id
-    )
-    tilt_series_id = (
-        db.exec(
-            select(TiltSeries)
-            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-            .where(TiltSeries.session_id == session_id)
-            .where(TiltSeries.rsync_source == tilt_info.source)
+        tilt_series_id = (
+            db.exec(
+                select(TiltSeries)
+                .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+                .where(TiltSeries.session_id == session_id)
+                .where(TiltSeries.rsync_source == tilt_info.source)
+            )
+            .one()
+            .id
         )
-        .one()
-        .id
-    )
-    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
-    db.add(tilt)
-    db.commit()
+        tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
+        db.add(tilt)
+        db.commit()
+
+    try:
+        _add_tilt()
+    except OperationalError:
+        asyncio.sleep(30)
+        _add_tilt()
 
 
 @router.get("/visits_raw", response_model=List[Visit])
