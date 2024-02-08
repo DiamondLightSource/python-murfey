@@ -64,7 +64,7 @@ async def prepare_gain(
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await newstack_proc.communicate()
+            await newstack_proc.communicate()
             if newstack_proc.returncode:
                 return None, None
         if rescale:
@@ -84,7 +84,7 @@ async def prepare_eer_gain(
     mrc_convert = await asyncio.create_subprocess_shell(
         f"{executables['tif2mrc']} {gain_path} {gain_out}"
     )
-    stdout, stderr = await mrc_convert.communicate()
+    await mrc_convert.communicate()
     if mrc_convert.returncode:
         return None, None
     return gain_out, None
