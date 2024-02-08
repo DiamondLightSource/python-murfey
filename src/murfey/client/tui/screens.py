@@ -787,6 +787,9 @@ class GainReference(Screen):
                 url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
                 json={
                     "gain_ref": str(self._dir_tree._gain_reference),
+                    "eer": bool(
+                        self.app._machine_config.get("external_executables_eer")
+                    ),
                 },
             )
             if str(process_gain_response.status_code).startswith("4"):
