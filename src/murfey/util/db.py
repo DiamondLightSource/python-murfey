@@ -36,6 +36,12 @@ class Session(SQLModel, table=True):  # type: ignore
     preprocess_stashes: List["PreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    grid_squares: List["GridSquare"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    foil_holes: List["FoilHole"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -137,11 +143,13 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
     tag: str = Field(primary_key=True)
     session_id: int = Field(primary_key=True, foreign_key="session.id")
+    foil_hole_id: Optional[int] = Field(foreign_key="foilhole.id", default=None)
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
     group_tag: Optional[str]
     session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
+    foil_hole: Optional["FoilHole"] = Relationship(back_populates="preprocess_stashes")
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
@@ -212,18 +220,29 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 
 
 class GridSquare(SQLModel, table=True):  # type: ignore
-    id: int
-    session_id: int = Field(foreign_key="session.id")
-    session: Optional[Session] = Relationship(back_populates="session")
+    id: int = Field(primary_key=True)
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    session: Optional[Session] = Relationship(back_populates="grid_squares")
+    foil_holes: List["FoilHole"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class FoilHole(SQLModel, table=True):  # type: ignore
-    id: int
-    grid_square_id: int = Field(foreign_key="gridsquare.id")
+    id: int = Field(primary_key=True)
+    grid_square_id: int = Field(foreign_key="gridsquare.id", primary_key=True)
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
     x_location: float
     y_location: float
     pixel_size: float
-    grid_square: Optional[GridSquare] = Relationship(back_populates="gridsquare")
+    grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
+    session: Optional[Session] = Relationship(back_populates="foil_holes")
+    movies: List["Movie"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    preprocess_stashes: List[PreprocessStash] = Relationship(
+        back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class Movie(SQLModel, table=True):  # type: ignore
@@ -234,7 +253,7 @@ class Movie(SQLModel, table=True):  # type: ignore
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
-    foil_hole: Optional[FoilHole] = Relationship(back_populates="foilhole")
+    foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore

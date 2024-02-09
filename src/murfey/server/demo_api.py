@@ -41,6 +41,8 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -60,6 +62,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FoilHoleParameters,
     FractionationParameters,
     GainReference,
     PreprocessingParametersTomo,
@@ -429,6 +432,30 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
+@router.post("/sessions/{session_id}/grid_square/{gsid}")
+def register_grid_square(session_id: int, gsid: int, db=murfey_db):
+    grid_square = GridSquare(id=gsid, session_id=session_id)
+    db.add(grid_square)
+    db.commit()
+    db.close()
+
+
+@router.post("/sessions/{session_id}/grid_square/{gsid}/foil_hole")
+def register_foil_hole(
+    session_id: int, gsid: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+):
+    foil_hole = FoilHole(
+        id=foil_hole_params.id,
+        session_id=session_id,
+        grid_square_id=gsid,
+        x_location=foil_hole_params.x_location,
+        y_location=foil_hole_params.y_location,
+    )
+    db.add(foil_hole)
+    db.commit()
+    db.close()
+
+
 @router.post("/visits/{visit_name}/tilt_series")
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
@@ -659,6 +686,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
+            grid_square_id=f.foil_hole_id,
         )
         db.add(movie)
         zocalo_message = {
@@ -779,6 +807,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
+            foil_hole_id=proc_file.foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -821,6 +850,7 @@ async def request_spa_preprocessing(
             session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
+            foil_hole_id=proc_file.foil_hole_id,
         )
         db.add(for_stash)
         db.commit()

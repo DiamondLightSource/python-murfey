@@ -114,6 +114,7 @@ class SPAProcessFile(BaseModel):
     data_collection_id: Optional[int]
     image_number: int
     autoproc_program_id: Optional[int]
+    foil_hole_id: int
     pixel_size: Optional[float]
     dose_per_frame: Optional[float]
     mc_binning: Optional[int] = 1
@@ -294,3 +295,9 @@ class FractionationParameters(BaseModel):
     num_frames: int = 0
     eer_path: Optional[str] = None
     fractionation_file_name: str = "eer_fractionation.txt"
+
+
+class FoilHoleParameters(BaseModel):
+    id: int
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None

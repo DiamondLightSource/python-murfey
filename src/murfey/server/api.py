@@ -46,6 +46,8 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -68,6 +70,7 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FoilHoleParameters,
     FractionationParameters,
     GainReference,
     MillingParameters,
@@ -333,6 +336,30 @@ def register_spa_proc_params(
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
+
+
+@router.post("/sessions/{session_id}/grid_square/{gsid}")
+def register_grid_square(session_id: int, gsid: int, db=murfey_db):
+    grid_square = GridSquare(id=gsid, session_id=session_id)
+    db.add(grid_square)
+    db.commit()
+    db.close()
+
+
+@router.post("/sessions/{session_id}/grid_square/{gsid}/foil_hole")
+def register_foil_hole(
+    session_id: int, gsid: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+):
+    foil_hole = FoilHole(
+        id=foil_hole_params.id,
+        session_id=session_id,
+        grid_square_id=gsid,
+        x_location=foil_hole_params.x_location,
+        y_location=foil_hole_params.y_location,
+    )
+    db.add(foil_hole)
+    db.commit()
+    db.close()
 
 
 @router.post("/clients/{client_id}/tomography_preprocessing_parameters")
@@ -723,6 +750,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
+            foil_hole_id=proc_file.foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -775,6 +803,7 @@ async def request_spa_preprocessing(
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             eer_fractionation_file=str(proc_file.eer_fractionation_file),
+            foil_hole_id=proc_file.foil_hole_id,
         )
         db.add(for_stash)
         db.commit()

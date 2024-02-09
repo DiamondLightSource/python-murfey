@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, OrderedDict
+from typing import Any, Dict, List, OrderedDict, Tuple
 
 import requests
 import xmltodict
@@ -15,7 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import get_machine_config
+from murfey.util import capture_post, get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
@@ -37,6 +37,63 @@ def _file_transferred_to(
         / Path(environment.default_destinations[source])
         / environment.visit
         / file_path.relative_to(source)
+    )
+
+
+def _grid_square_from_file(f: Path) -> int:
+    for p in f.parts:
+        if p.startswith("GridSquare"):
+            return int(p.split("_")[1])
+    raise ValueError(f"Grid square ID could not be determined from path {f}")
+
+
+def _foil_hole_from_file(f: Path) -> int:
+    return int(f.name.split("_")[1])
+
+
+def _grid_square_metadata_file(
+    f: Path, data_directories: Dict[Path, str], visit: str, grid_square: int
+) -> Path:
+    for dd in data_directories.keys():
+        if str(f).startswith(str(dd)):
+            base_dir = dd
+            mid_dir = f.relative_to(dd).parent
+            break
+    else:
+        raise ValueError(f"Could not determine grid square metadata path for {f}")
+    return (
+        base_dir
+        / visit
+        / mid_dir.parent.parent.parent
+        / "Metadata"
+        / f"GridSquare_{grid_square}.dm"
+    )
+
+
+def _foil_hole_position(xml_path: Path, foil_hole: int) -> Tuple[int, int]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if required_key:
+        for fh_block in serialization_array[required_key]:
+            if fh_block["b:value"]["IsNearGridBar"] == "false":
+                stage = fh_block["b:value"]["PixelCenter"]
+                if int(fh_block["b:key"]) == foil_hole:
+                    return (
+                        int(float(stage["c:x"])),
+                        int(float(stage["c:y"])),
+                    )
+    raise ValueError(
+        f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
 
 
@@ -96,6 +153,7 @@ class _SPAContext(Context):
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
+        self._foil_holes: Dict[int, List[int]] = {}
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -389,6 +447,42 @@ class SPAModularContext(_SPAContext):
                                 "eer_fractionation_file"
                             ]
 
+                        grid_square = _grid_square_from_file(transferred_file)
+                        if self._foil_holes.get(grid_square) is None:
+                            self._foil_holes[grid_square] = []
+                            gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+                            capture_post(gs_url)
+                        foil_hole = _foil_hole_from_file(transferred_file)
+                        if foil_hole not in self._foil_holes[grid_square]:
+                            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+                            machine_config = get_machine_config(
+                                str(environment.url.geturl()), demo=environment.demo
+                            )
+                            grid_square_metadata_file = _grid_square_metadata_file(
+                                transferred_file,
+                                {
+                                    Path(d): l
+                                    for d, l in machine_config[
+                                        "data_directories"
+                                    ].items()
+                                },
+                                environment.visit,
+                                grid_square,
+                            )
+                            if grid_square_metadata_file.is_file():
+                                fh_pos = _foil_hole_position(
+                                    grid_square_metadata_file, foil_hole
+                                )
+                                capture_post(
+                                    fh_url,
+                                    json={
+                                        "id": foil_hole,
+                                        "x_location": fh_pos[0],
+                                        "y_location": fh_pos[1],
+                                    },
+                                )
+                            self._foil_holes[grid_square].append(foil_hole)
+
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
@@ -416,6 +510,7 @@ class SPAModularContext(_SPAContext):
                             ),
                             "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
+                            "foil_hole_id": foil_hole,
                         }
                         requests.post(
                             preproc_url,
