@@ -176,9 +176,16 @@ class _SPAContext(Context):
                 )
             except (KeyError, IndexError):
                 pass
+            c2_index = 3
+            for i, el in enumerate(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"]
+            ):
+                if el["a:Key"] == "Aperture[C2].Name":
+                    c2_index = i
+                    break
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
-            ][3]["a:Value"]["#text"]
+            ][c2_index]["a:Value"]["#text"]
             metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ExposureTime"]
