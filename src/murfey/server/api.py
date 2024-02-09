@@ -1120,6 +1120,11 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
                 Path(machine_config.rsync_basepath)
             ),
         }
+    elif new_gain_ref:
+        return {
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref_superres": None,
+        }
     else:
         return {"gain_ref": str(filepath / safe_path_name), "gain_ref_superres": None}
 
