@@ -65,6 +65,7 @@ from murfey.util.models import (
     FoilHoleParameters,
     FractionationParameters,
     GainReference,
+    GridSquareParameters,
     PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
@@ -433,19 +434,50 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
 
 
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
-def register_grid_square(session_id: int, gsid: int, db=murfey_db):
-    grid_square = GridSquare(id=gsid, session_id=session_id)
+def register_grid_square(
+    session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
+):
+    grid_square = GridSquare(
+        name=gsid,
+        session_id=session_id,
+        tag=grid_square_params.tag,
+        x_location=grid_square_params.x_location,
+        y_location=grid_square_params.y_location,
+        x_stage_position=grid_square_params.x_stage_position,
+        y_stage_position=grid_square_params.y_stage_position,
+    )
     db.add(grid_square)
     db.commit()
     db.close()
 
 
-@router.post("/sessions/{session_id}/grid_square/{gsid}/foil_hole")
+@router.get("/sessions/{session_id}/foil_hole/{fh_name}")
+def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare)
+        .where(FoilHole.name == fh_name)
+        .where(FoilHole.session_id == session_id)
+        .where(GridSquare.id == FoilHole.grid_square_id)
+    ).all()
+    return {f[1].tag: f[0].id for f in foil_holes}
+
+
+@router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
 def register_foil_hole(
-    session_id: int, gsid: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+    session_id: int, gs_name: int, foil_hole_params: FoilHoleParameters, db=murfey_db
 ):
+    gsid = (
+        db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == foil_hole_params.tag)
+            .where(GridSquare.session_id == session_id)
+            .where(GridSquare.name == gs_name)
+        )
+        .one()
+        .id
+    )
     foil_hole = FoilHole(
-        id=foil_hole_params.id,
+        name=foil_hole_params.id,
         session_id=session_id,
         grid_square_id=gsid,
         x_location=foil_hole_params.x_location,
@@ -686,7 +718,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
-            grid_square_id=f.foil_hole_id,
+            foil_hole_id=f.foil_hole_id,
         )
         db.add(movie)
         zocalo_message = {
@@ -773,6 +805,17 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
+    foil_hole_id = (
+        db.exec(
+            select(FoilHole, GridSquare)
+            .where(FoilHole.name == proc_file.foil_hole_id)
+            .where(FoilHole.session_id == session_id)
+            .where(GridSquare.id == FoilHole.grid_square_id)
+            .where(GridSquare.tag == proc_file.tag)
+        )
+        .one()
+        .id
+    )
     if proc_params:
         session_id = (
             db.exec(
@@ -807,7 +850,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
-            foil_hole_id=proc_file.foil_hole_id,
+            foil_hole_id=foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -850,7 +893,7 @@ async def request_spa_preprocessing(
             session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
-            foil_hole_id=proc_file.foil_hole_id,
+            foil_hole_id=foil_hole_id,
         )
         db.add(for_stash)
         db.commit()

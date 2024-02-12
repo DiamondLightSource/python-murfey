@@ -645,10 +645,10 @@ class SessionSelection(Screen):
             session_id = self.app._environment.murfey_session
             self.app.pop_screen()
         session_name = "Client connection"
-        requests.post(
+        self.app._environment.murfey_session = requests.post(
             f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
-        )
+        ).json()
 
     def _remove_session(self, session_id: int, **kwargs):
         requests.delete(f"{self.app._environment.url.geturl()}/sessions/{session_id}")
@@ -674,10 +674,10 @@ class SessionSelection(Screen):
             self.app.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            capture_post(
+            self.app._environment.murfey_session = capture_post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
-            )
+            ).json()
 
 
 class VisitSelection(SwitchSelection):

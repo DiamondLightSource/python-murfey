@@ -612,10 +612,10 @@ class MurfeyTUI(App):
             self.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            capture_post(
+            self._environment.murfey_session = capture_post(
                 f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
-            )
+            ).json()
 
     def on_log_book_log(self, message):
         self.log_book.write(message.renderable)

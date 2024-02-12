@@ -73,6 +73,7 @@ from murfey.util.models import (
     FoilHoleParameters,
     FractionationParameters,
     GainReference,
+    GridSquareParameters,
     MillingParameters,
     PreprocessingParametersTomo,
     ProcessFile,
@@ -339,8 +340,17 @@ def register_spa_proc_params(
 
 
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
-def register_grid_square(session_id: int, gsid: int, db=murfey_db):
-    grid_square = GridSquare(id=gsid, session_id=session_id)
+def register_grid_square(
+    session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
+):
+    grid_square = GridSquare(
+        id=gsid,
+        session_id=session_id,
+        x_location=grid_square_params.x_location,
+        y_location=grid_square_params.y_location,
+        x_stage_position=grid_square_params.x_stage_position,
+        y_stage_position=grid_square_params.y_stage_position,
+    )
     db.add(grid_square)
     db.commit()
     db.close()
@@ -736,6 +746,17 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
+    foil_hole_id = (
+        db.exec(
+            select(FoilHole, GridSquare)
+            .where(FoilHole.name == proc_file.foil_hole_id)
+            .where(FoilHole.session_id == session_id)
+            .where(GridSquare.id == FoilHole.grid_square_id)
+            .where(GridSquare.tag == proc_file.tag)
+        )
+        .one()
+        .id
+    )
     if proc_params:
 
         detached_ids = [c.id for c in collected_ids]
@@ -750,7 +771,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
-            foil_hole_id=proc_file.foil_hole_id,
+            foil_hole_id=foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -803,7 +824,7 @@ async def request_spa_preprocessing(
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
             eer_fractionation_file=str(proc_file.eer_fractionation_file),
-            foil_hole_id=proc_file.foil_hole_id,
+            foil_hole_id=foil_hole_id,
         )
         db.add(for_stash)
         db.commit()

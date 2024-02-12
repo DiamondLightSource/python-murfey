@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, OrderedDict, Tuple
+from typing import Any, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -16,6 +16,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util import capture_post, get_machine_config
+from murfey.util.db import FoilHole
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
@@ -70,7 +71,9 @@ def _grid_square_metadata_file(
     )
 
 
-def _foil_hole_position(xml_path: Path, foil_hole: int) -> Tuple[int, int]:
+def _foil_hole_data(
+    xml_path: Path, foil_hole: int, grid_square: int, session_id: int
+) -> FoilHole:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
@@ -86,11 +89,17 @@ def _foil_hole_position(xml_path: Path, foil_hole: int) -> Tuple[int, int]:
     if required_key:
         for fh_block in serialization_array[required_key]:
             if fh_block["b:value"]["IsNearGridBar"] == "false":
-                stage = fh_block["b:value"]["PixelCenter"]
+                pix = fh_block["b:value"]["PixelCenter"]
+                stage = fh_block["b:value"]["StagePosition"]
                 if int(fh_block["b:key"]) == foil_hole:
-                    return (
-                        int(float(stage["c:x"])),
-                        int(float(stage["c:y"])),
+                    return FoilHole(
+                        id=foil_hole,
+                        grid_square_id=grid_square,
+                        session_id=session_id,
+                        x_location=float(pix["c:x"]),
+                        y_location=float(pix["c:y"]),
+                        x_stage_position=float(stage["c:X"]),
+                        y_stage_position=float(stage["c:Y"]),
                     )
     raise ValueError(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
@@ -451,10 +460,10 @@ class SPAModularContext(_SPAContext):
                         if self._foil_holes.get(grid_square) is None:
                             self._foil_holes[grid_square] = []
                             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
-                            capture_post(gs_url)
+                            capture_post(gs_url, json={"tag": str(source)})
                         foil_hole = _foil_hole_from_file(transferred_file)
                         if foil_hole not in self._foil_holes[grid_square]:
-                            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+                            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
                             machine_config = get_machine_config(
                                 str(environment.url.geturl()), demo=environment.demo
                             )
@@ -469,16 +478,30 @@ class SPAModularContext(_SPAContext):
                                 environment.visit,
                                 grid_square,
                             )
-                            if grid_square_metadata_file.is_file():
-                                fh_pos = _foil_hole_position(
-                                    grid_square_metadata_file, foil_hole
+                            if (
+                                grid_square_metadata_file.is_file()
+                                and environment.murfey_session is not None
+                            ):
+                                fh = _foil_hole_data(
+                                    grid_square_metadata_file,
+                                    foil_hole,
+                                    grid_square,
+                                    environment.murfey_session,
                                 )
                                 capture_post(
                                     fh_url,
                                     json={
                                         "id": foil_hole,
-                                        "x_location": fh_pos[0],
-                                        "y_location": fh_pos[1],
+                                        "x_location": fh.x_location,
+                                        "y_location": fh.y_location,
+                                        "tag": str(source),
+                                    },
+                                )
+                            else:
+                                capture_post(
+                                    fh_url,
+                                    json={
+                                        "id": foil_hole,
                                     },
                                 )
                             self._foil_holes[grid_square].append(foil_hole)

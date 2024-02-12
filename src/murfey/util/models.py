@@ -297,7 +297,16 @@ class FractionationParameters(BaseModel):
     fractionation_file_name: str = "eer_fractionation.txt"
 
 
+class GridSquareParameters(BaseModel):
+    tag: str
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+
+
 class FoilHoleParameters(BaseModel):
-    id: int
+    tag: str
+    name: int
     x_location: Optional[float] = None
     y_location: Optional[float] = None

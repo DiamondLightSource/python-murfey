@@ -220,25 +220,35 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 
 
 class GridSquare(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True)
-    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: int
+    tag: str
+    x_location: Optional[float]
+    y_location: Optional[float]
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    pixel_size: Optional[float] = None
     session: Optional[Session] = Relationship(back_populates="grid_squares")
     foil_holes: List["FoilHole"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
 
 
 class FoilHole(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True)
-    grid_square_id: int = Field(foreign_key="gridsquare.id", primary_key=True)
-    session_id: int = Field(foreign_key="session.id", primary_key=True)
-    x_location: float
-    y_location: float
-    pixel_size: float
+    id: Optional[int] = Field(primary_key=True, default=None)
+    grid_square_id: int = Field(foreign_key="gridsquare.id")
+    session_id: int = Field(foreign_key="session.id")
+    name: int
+    x_location: Optional[float]
+    y_location: Optional[float]
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    pixel_size: Optional[float] = None
     grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
     session: Optional[Session] = Relationship(back_populates="foil_holes")
     movies: List["Movie"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+        back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
     )
     preprocess_stashes: List[PreprocessStash] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
@@ -247,7 +257,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
-    foil_hole_id: int = Field(foreignkey="foilhole.id")
+    foil_hole_id: int = Field(foreign_key="foilhole.id")
     path: str
     image_number: int
     tag: str

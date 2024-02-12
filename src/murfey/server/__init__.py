@@ -2062,7 +2062,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     path=f.file_path,
                     image_number=f.image_number,
                     tag=f.tag,
-                    grid_square_id=f.foil_hole_id,
+                    foil_hole_id=f.foil_hole_id,
                 )
                 murfey_db.add(movie)
                 zocalo_message = {
