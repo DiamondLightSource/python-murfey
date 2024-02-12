@@ -108,6 +108,7 @@ def determine_default_destination(
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
+                                        "extra_directory": extra_directory,
                                     },
                                 )
                                 if suggested_path_response is None:

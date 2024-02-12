@@ -959,6 +959,8 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
         check_path.mkdir()
+        if params.extra_directory:
+            (check_path / params.extra_directory).mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
