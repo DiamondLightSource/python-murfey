@@ -960,7 +960,7 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     if params.touch:
         check_path.mkdir()
         if params.extra_directory:
-            (check_path / params.extra_directory).mkdir()
+            (check_path / secure_filename(params.extra_directory)).mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
