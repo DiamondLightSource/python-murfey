@@ -1125,9 +1125,14 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
-        feedback_params.next_job = (
+        job_number_after_first_batch = (
             10 if default_spa_parameters.do_icebreaker_jobs else 7
         )
+        if (
+            feedback_params.next_job is not None
+            and feedback_params.next_job < job_number_after_first_batch
+        ):
+            feedback_params.next_job = job_number_after_first_batch
         if not feedback_params.star_combination_job:
             feedback_params.star_combination_job = feedback_params.next_job + (
                 3 if default_spa_parameters.do_icebreaker_jobs else 2
