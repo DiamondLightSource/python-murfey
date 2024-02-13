@@ -423,7 +423,7 @@ class MurfeyTUI(App):
         # it is then necessary to extract the data from the message
         if from_form:
             json = json.get("form", {})
-            json = {k: str(v) for k, v in json.items()}
+            json = {k: v if v is None else str(v) for k, v in json.items()}
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
