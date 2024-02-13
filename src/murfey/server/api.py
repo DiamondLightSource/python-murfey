@@ -1356,7 +1356,7 @@ def remove_session(client_id: int, db=murfey_db):
     return
 
 
-@router.post("/visits/{visit_name}/mointoring/{on}")
+@router.post("/visits/{visit_name}/monitoring/{on}")
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)
