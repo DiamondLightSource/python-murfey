@@ -1,4 +1,4 @@
-cryptography==42.0.0
+cryptography==42.0.4
 mysql-connector-python<=8.0.29
 fastapi==0.101.0
 httpx==0.23.3
