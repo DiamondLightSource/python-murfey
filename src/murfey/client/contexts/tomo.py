@@ -167,7 +167,7 @@ class TomographyContext(Context):
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__(acquisition_software)
+        super().__init__("Tomography", acquisition_software)
         self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_sizes: Dict[str, int] = {}

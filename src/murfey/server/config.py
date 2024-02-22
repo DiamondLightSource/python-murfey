@@ -38,6 +38,7 @@ class MachineConfig(BaseModel):
     processing_enabled: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
+    plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
 
 

@@ -33,7 +33,7 @@ def _number_from_name(name: str) -> int:
 
 class FIBContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__(acquisition_software)
+        super().__init__("FIB", acquisition_software)
         self._basepath = basepath
         self._milling: Dict[int, List[MillingProgress]] = {}
         self._lamellae: Dict[int, Lamella] = {}
@@ -45,6 +45,9 @@ class FIBContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
+        super().post_transfer(
+            transferred_file, role=role, environment=environment, **kwargs
+        )
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":
