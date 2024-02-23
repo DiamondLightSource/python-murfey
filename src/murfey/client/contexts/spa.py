@@ -491,7 +491,7 @@ class SPAModularContext(_SPAContext):
                                 capture_post(
                                     fh_url,
                                     json={
-                                        "id": foil_hole,
+                                        "name": foil_hole,
                                         "x_location": fh.x_location,
                                         "y_location": fh.y_location,
                                         "tag": str(source),
@@ -542,7 +542,6 @@ class SPAModularContext(_SPAContext):
                                 for k, v in preproc_data.items()
                             },
                         )
-
         return
 
     def _register_data_collection(

@@ -140,6 +140,7 @@ class MurfeyTUI(App):
         destination_overrides: Dict[Path, str] | None = None,
         remove_files: bool = False,
         analyse: bool = True,
+        limited: bool = False,
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
@@ -171,8 +172,10 @@ class MurfeyTUI(App):
             source,
             destination,
             force_metadata=self._processing_enabled,
-            analyse=not extra_directory and use_suggested_path and analyse,
+            # analyse=not extra_directory and use_suggested_path and analyse,
+            analyse=analyse,
             remove_files=remove_files,
+            limited=limited,
         )
 
     def _start_rsyncer(
@@ -183,6 +186,7 @@ class MurfeyTUI(App):
         force_metadata: bool = False,
         analyse: bool = True,
         remove_files: bool = False,
+        limited: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -256,6 +260,7 @@ class MurfeyTUI(App):
                 source,
                 environment=self._environment if not self._dummy_dc else None,
                 force_mdoc_metadata=self._force_mdoc_metadata,
+                limited=limited,
             )
             machine_data = requests.get(
                 f"{self._environment.url.geturl()}/machine/"
@@ -436,6 +441,12 @@ class MurfeyTUI(App):
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
                 "tag": str(source),
+                "atlas": str(self._environment.samples[source].atlas)
+                if self._environment.samples.get(source)
+                else "",
+                "sample": self._environment.samples[source].sample
+                if self._environment.samples.get(source)
+                else None,
             }
             capture_post(url, json=dcg_data)
             data = {

@@ -49,7 +49,7 @@ class MultigridDirWatcher(murfey.util.Observer):
         first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.name in self._machine_config["create_directories"]:
+                if d.name in self._machine_config["create_directories"].values():
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(d, include_mid_path=False, use_suggested_path=False)
                         self._seen_dirs.append(d)
@@ -59,6 +59,8 @@ class MultigridDirWatcher(murfey.util.Observer):
                             d,
                             extra_directory=f"metadata_{d.name}",
                             include_mid_path=False,
+                            analyse=True,  # not (first_loop and self._skip_existing_processing),
+                            limited=True,
                         )
                         self._seen_dirs.append(d)
                     processing_started = bool(

@@ -167,6 +167,8 @@ class DCGroupParameters(BaseModel):
     experiment_type: str
     experiment_type_id: int
     tag: str
+    atlas: str = ""
+    sample: Optional[int] = None
 
 
 class DCParameters(BaseModel):

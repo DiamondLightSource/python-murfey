@@ -23,6 +23,11 @@ class MovieTracker(NamedTuple):
     motion_correction_uuid: int
 
 
+class SampleInfo(NamedTuple):
+    atlas: Path
+    sample: int
+
+
 global_env_lock = RLock()
 
 
@@ -57,6 +62,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     gain_ref: Optional[Path] = None
     superres: bool = True
     murfey_session: Optional[int] = None
+    samples: Dict[Path, SampleInfo] = {}
 
     class Config:
         validate_assignment: bool = True

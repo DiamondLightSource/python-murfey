@@ -477,7 +477,7 @@ def register_foil_hole(
         .id
     )
     foil_hole = FoilHole(
-        name=foil_hole_params.id,
+        name=foil_hole_params.name,
         session_id=session_id,
         grid_square_id=gsid,
         x_location=foil_hole_params.x_location,
@@ -805,7 +805,7 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_id = (
+    foil_hole_name = (
         db.exec(
             select(FoilHole, GridSquare)
             .where(FoilHole.name == proc_file.foil_hole_id)
@@ -814,7 +814,7 @@ async def request_spa_preprocessing(
             .where(GridSquare.tag == proc_file.tag)
         )
         .one()
-        .id
+        .name
     )
     if proc_params:
         session_id = (
@@ -850,7 +850,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
-            foil_hole_id=foil_hole_id,
+            foil_hole_name=foil_hole_name,
         )
         db.add(movie)
         db.commit()
@@ -893,7 +893,7 @@ async def request_spa_preprocessing(
             session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
-            foil_hole_id=foil_hole_id,
+            foil_hole_id=foil_hole_name,
         )
         db.add(for_stash)
         db.commit()
@@ -1058,58 +1058,76 @@ def register_dc_group(
     client = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
-    dcgid = next(global_counter)
-    murfey_dcg = DataCollectionGroup(
-        id=dcgid,
-        session_id=client.session_id,
-        tag=dcg_params.tag,
-    )
-    db.add(murfey_dcg)
-    db.commit()
-
-    if dcg_params.experiment_type == "single particle":
-        dcid = next(global_counter)
-        murfey_dc = DataCollection(
-            id=dcid,
-            tag=dcg_params.tag,
-            dcg_id=dcgid,
-        )
-        db.add(murfey_dc)
+    if dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.tag == dcg_params.tag)
+    ).all():
+        dcg_murfey[0].atlas = dcg_params.atlas
+        dcg_murfey[0].sample = dcg_params.sample
+        db.add(dcg_murfey[0])
         db.commit()
-
-        pjids = [next(global_counter) for _ in range(4)]
-
-        murfey_pj_pre = ProcessingJob(
-            id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
-        )
-        murfey_pj_ext = ProcessingJob(id=pjids[1], recipe="em-spa-extract", dc_id=dcid)
-        murfey_pj_2d = ProcessingJob(id=pjids[2], recipe="em-spa-class2d", dc_id=dcid)
-        murfey_pj_3d = ProcessingJob(id=pjids[3], recipe="em-spa-class3d", dc_id=dcid)
-        db.add(murfey_pj_pre)
-        db.add(murfey_pj_ext)
-        db.add(murfey_pj_2d)
-        db.add(murfey_pj_3d)
-        db.commit()
-
-        murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
-        murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
-        murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
-        murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
-        db.add(murfey_app_pre)
-        db.add(murfey_app_ext)
-        db.add(murfey_app_2d)
-        db.add(murfey_app_3d)
-        db.commit()
-
-    if global_state.get("data_collection_group_ids") and isinstance(
-        global_state["data_collection_group_ids"], dict
-    ):
-        global_state["data_collection_group_ids"] = {
-            **global_state["data_collection_group_ids"],
-            dcg_params.tag: dcgid,
-        }
     else:
-        global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
+        dcgid = next(global_counter)
+        murfey_dcg = DataCollectionGroup(
+            id=dcgid,
+            session_id=client.session_id,
+            tag=dcg_params.tag,
+            atlas=dcg_params.atlas,
+            sample=dcg_params.sample,
+        )
+        db.add(murfey_dcg)
+        db.commit()
+
+        if dcg_params.experiment_type == "single particle":
+            dcid = next(global_counter)
+            murfey_dc = DataCollection(
+                id=dcid,
+                tag=dcg_params.tag,
+                dcg_id=dcgid,
+            )
+            db.add(murfey_dc)
+            db.commit()
+
+            pjids = [next(global_counter) for _ in range(4)]
+
+            murfey_pj_pre = ProcessingJob(
+                id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
+            )
+            murfey_pj_ext = ProcessingJob(
+                id=pjids[1], recipe="em-spa-extract", dc_id=dcid
+            )
+            murfey_pj_2d = ProcessingJob(
+                id=pjids[2], recipe="em-spa-class2d", dc_id=dcid
+            )
+            murfey_pj_3d = ProcessingJob(
+                id=pjids[3], recipe="em-spa-class3d", dc_id=dcid
+            )
+            db.add(murfey_pj_pre)
+            db.add(murfey_pj_ext)
+            db.add(murfey_pj_2d)
+            db.add(murfey_pj_3d)
+            db.commit()
+
+            murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
+            murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
+            murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
+            murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
+            db.add(murfey_app_pre)
+            db.add(murfey_app_ext)
+            db.add(murfey_app_2d)
+            db.add(murfey_app_3d)
+            db.commit()
+
+        if global_state.get("data_collection_group_ids") and isinstance(
+            global_state["data_collection_group_ids"], dict
+        ):
+            global_state["data_collection_group_ids"] = {
+                **global_state["data_collection_group_ids"],
+                dcg_params.tag: dcgid,
+            }
+        else:
+            global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
     return dcg_params
 
 

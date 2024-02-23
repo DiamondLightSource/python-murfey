@@ -8,6 +8,7 @@ from typing import Type
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
@@ -40,9 +41,11 @@ class Analyser(Observer):
         basepath_local: Path,
         environment: MurfeyInstanceEnvironment | None = None,
         force_mdoc_metadata: bool = False,
+        limited: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
+        self._limited = limited
         self._experiment_type = ""
         self._acquisition_software = ""
         self._role = ""
@@ -175,142 +178,161 @@ class Analyser(Observer):
             if not transferred_file:
                 self._halt_thread = True
                 continue
-            dc_metadata = {}
-            if (
-                self._force_mdoc_metadata
-                and transferred_file.suffix == ".mdoc"
-                or mdoc_for_reading
-            ):
+            if self._limited:
+                if (
+                    "Metadata" in transferred_file.parts
+                    or transferred_file.name == "EpuSession.dm"
+                    and not self._context
+                ):
+                    self._context = SPAMetadataContext("epu", self._basepath)
                 if self._context:
-                    try:
-                        dc_metadata = self._context.gather_metadata(
-                            mdoc_for_reading or transferred_file,
-                            environment=self._environment,
-                        )
-                    except KeyError as e:
-                        logger.error(
-                            f"Metadata gathering failed with a key error for key: {e.args[0]}"
-                        )
-                        raise e
-                    if not dc_metadata:
-                        mdoc_for_reading = None
-                elif transferred_file.suffix == ".mdoc":
-                    mdoc_for_reading = transferred_file
-            if not self._context:
-                self._find_extension(transferred_file)
-                found = self._find_context(transferred_file)
-                if not found:
-                    # logger.warning(
-                    #     f"Context not understood for {transferred_file}, stopping analysis"
-                    # )
-                    self.queue.task_done()
-                    continue
-                elif self._extension:
-                    logger.info(f"Context found successfully: {self._role}")
-                    try:
-                        self._context.post_first_transfer(
-                            transferred_file,
-                            role=self._role,
-                            environment=self._environment,
-                        )
-                    except Exception as e:
-                        logger.info(f"exception encountered {e}")
-                    if self._role == "detector":
-                        if not dc_metadata:
-                            try:
-                                dc_metadata = self._context.gather_metadata(
-                                    transferred_file.with_suffix(".mdoc")
-                                    if self._context._acquisition_software == "serialem"
-                                    else self._xml_file(transferred_file),
-                                    environment=self._environment,
-                                )
-                            except NotImplementedError:
-                                dc_metadata = {}
-                            except KeyError as e:
-                                logger.error(
-                                    f"Metadata gathering failed with a key error for key: {e.args[0]}"
-                                )
-                                raise e
-                        if not dc_metadata or not self._force_mdoc_metadata:
-                            self._unseen_xml.append(transferred_file)
-                        else:
-                            self._unseen_xml = []
-                            if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"]
-                            else:
-                                dc_metadata["file_extension"] = self._extension
-                            dc_metadata[
-                                "acquisition_software"
-                            ] = self._context._acquisition_software
-                            self.notify(
-                                {
-                                    "form": dc_metadata,
-                                    "dependencies": spa_form_dependencies
-                                    if isinstance(self._context, SPAContext)
-                                    or isinstance(self._context, SPAModularContext)
-                                    else {},
-                                }
-                            )
-            elif not self._extension or self._unseen_xml:
-                self._find_extension(transferred_file)
-                if self._extension:
-                    logger.info(
-                        f"Context found successfully: {self._role}, {transferred_file}"
+                    self._context.post_transfer(
+                        transferred_file, environment=self._environment
                     )
+            else:
+                dc_metadata = {}
+                if (
+                    self._force_mdoc_metadata
+                    and transferred_file.suffix == ".mdoc"
+                    or mdoc_for_reading
+                ):
+                    if self._context:
+                        try:
+                            dc_metadata = self._context.gather_metadata(
+                                mdoc_for_reading or transferred_file,
+                                environment=self._environment,
+                            )
+                        except KeyError as e:
+                            logger.error(
+                                f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                            )
+                            raise e
+                        if not dc_metadata:
+                            mdoc_for_reading = None
+                    elif transferred_file.suffix == ".mdoc":
+                        mdoc_for_reading = transferred_file
+                if not self._context:
+                    self._find_extension(transferred_file)
+                    found = self._find_context(transferred_file)
+                    if not found:
+                        # logger.warning(
+                        #     f"Context not understood for {transferred_file}, stopping analysis"
+                        # )
+                        self.queue.task_done()
+                        continue
+                    elif self._extension:
+                        logger.info(f"Context found successfully: {self._role}")
+                        try:
+                            self._context.post_first_transfer(
+                                transferred_file,
+                                role=self._role,
+                                environment=self._environment,
+                            )
+                        except Exception as e:
+                            logger.warning(f"exception encountered {e}")
+                        if self._role == "detector":
+                            if not dc_metadata:
+                                try:
+                                    dc_metadata = self._context.gather_metadata(
+                                        transferred_file.with_suffix(".mdoc")
+                                        if self._context._acquisition_software
+                                        == "serialem"
+                                        else self._xml_file(transferred_file),
+                                        environment=self._environment,
+                                    )
+                                except NotImplementedError:
+                                    dc_metadata = {}
+                                except KeyError as e:
+                                    logger.error(
+                                        f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                                    )
+                                    raise e
+                            if not dc_metadata or not self._force_mdoc_metadata:
+                                self._unseen_xml.append(transferred_file)
+                            else:
+                                self._unseen_xml = []
+                                if dc_metadata.get("file_extension"):
+                                    self._extension = dc_metadata["file_extension"]
+                                else:
+                                    dc_metadata["file_extension"] = self._extension
+                                dc_metadata[
+                                    "acquisition_software"
+                                ] = self._context._acquisition_software
+                                self.notify(
+                                    {
+                                        "form": dc_metadata,
+                                        "dependencies": spa_form_dependencies
+                                        if isinstance(self._context, SPAContext)
+                                        or isinstance(self._context, SPAModularContext)
+                                        else {},
+                                    }
+                                )
+                elif not self._extension or self._unseen_xml:
+                    self._find_extension(transferred_file)
+                    if self._extension:
+                        logger.info(
+                            f"Context found successfully: {self._role}, {transferred_file}"
+                        )
+                        try:
+                            self._context.post_first_transfer(
+                                transferred_file,
+                                role=self._role,
+                                environment=self._environment,
+                            )
+                        except Exception as e:
+                            logger.info(f"exception encountered {e}")
+                        if self._role == "detector":
+                            if not dc_metadata:
+                                try:
+                                    dc_metadata = self._context.gather_metadata(
+                                        mdoc_for_reading
+                                        or self._xml_file(transferred_file),
+                                        environment=self._environment,
+                                    )
+                                except KeyError as e:
+                                    logger.error(
+                                        f"Metadata gathering failed with a key error for key: {e.args[0]}"
+                                    )
+                                    raise e
+                            if not dc_metadata or not self._force_mdoc_metadata:
+                                mdoc_for_reading = None
+                                self._unseen_xml.append(transferred_file)
+                            if dc_metadata:
+                                self._unseen_xml = []
+                                if dc_metadata.get("file_extension"):
+                                    self._extension = dc_metadata["file_extension"]
+                                else:
+                                    dc_metadata["file_extension"] = self._extension
+                                dc_metadata[
+                                    "acquisition_software"
+                                ] = self._context._acquisition_software
+                                self.notify(
+                                    {
+                                        "form": dc_metadata,
+                                        "dependencies": spa_form_dependencies
+                                        if isinstance(self._context, SPAContext)
+                                        or isinstance(self._context, SPAModularContext)
+                                        else {},
+                                    }
+                                )
+                elif isinstance(self._context, TomographyContext):
                     try:
-                        self._context.post_first_transfer(
+                        self._context.post_transfer(
                             transferred_file,
                             role=self._role,
                             environment=self._environment,
                         )
                     except Exception as e:
-                        logger.info(f"exception encountered {e}")
-                    if self._role == "detector":
-                        if not dc_metadata:
-                            try:
-                                dc_metadata = self._context.gather_metadata(
-                                    mdoc_for_reading
-                                    or self._xml_file(transferred_file),
-                                    environment=self._environment,
-                                )
-                            except KeyError as e:
-                                logger.error(
-                                    f"Metadata gathering failed with a key error for key: {e.args[0]}"
-                                )
-                                raise e
-                        if not dc_metadata or not self._force_mdoc_metadata:
-                            mdoc_for_reading = None
-                            self._unseen_xml.append(transferred_file)
-                        if dc_metadata:
-                            self._unseen_xml = []
-                            if dc_metadata.get("file_extension"):
-                                self._extension = dc_metadata["file_extension"]
-                            else:
-                                dc_metadata["file_extension"] = self._extension
-                            dc_metadata[
-                                "acquisition_software"
-                            ] = self._context._acquisition_software
-                            self.notify(
-                                {
-                                    "form": dc_metadata,
-                                    "dependencies": spa_form_dependencies
-                                    if isinstance(self._context, SPAContext)
-                                    or isinstance(self._context, SPAModularContext)
-                                    else {},
-                                }
-                            )
-            elif isinstance(self._context, TomographyContext):
-                try:
+                        logger.error(f"An exception was encountered post transfer: {e}")
+                elif isinstance(self._context, SPAModularContext):
                     self._context.post_transfer(
                         transferred_file, role=self._role, environment=self._environment
                     )
-                except Exception as e:
-                    logger.error(f"An exception was encountered post transfer: {e}")
-            elif isinstance(self._context, SPAModularContext):
-                self._context.post_transfer(
-                    transferred_file, role=self._role, environment=self._environment
-                )
-        self.queue.task_done()
+                elif isinstance(self._context, SPAMetadataContext):
+                    self._context.post_transfer(
+                        transferred_file, role=self._role, environment=self._environment
+                    )
+            self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
@@ -321,17 +343,6 @@ class Analyser(Observer):
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)
                 mid_dir = data_file.relative_to(dd).parent
-                # if (
-                #     base_dir
-                #     / self._environment.visit
-                #     / mid_dir.parts[0]
-                #     / "Images-Disc1"
-                # ).is_dir():
-                #     mid_dir = Path(
-                #         mid_dir.parts[0]
-                #         + "/Images-Disc1/"
-                #         + "/".join(mid_dir.parts[1:])
-                #     )
                 break
         else:
             return data_file.with_suffix(".xml")

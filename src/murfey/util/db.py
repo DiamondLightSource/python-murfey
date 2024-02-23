@@ -69,6 +69,8 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
+    atlas: str = ""
+    sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
