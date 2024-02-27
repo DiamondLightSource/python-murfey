@@ -6,6 +6,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
+from murfey.util import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
@@ -31,8 +32,11 @@ class SPAMetadataContext(Context):
             ]["#text"]
             visit_index = windows_path.split("\\").index(environment.visit)
             partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+            visitless_path = Path(
+                str(transferred_file).replace(f"/{environment.visit}", "")
+            )
             source = _get_source(
-                Path(str(transferred_file).replace(f"/{environment.visit}", "")),
+                visitless_path.parent / "Images-Disc1" / visitless_path.name,
                 environment,
             )
             sample = None
@@ -47,3 +51,12 @@ class SPAMetadataContext(Context):
                 environment.samples[source] = SampleInfo(
                     atlas=Path(partial_path), sample=sample
                 )
+                url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_data_collection_group"
+                dcg_data = {
+                    "experiment_type": "single particle",
+                    "experiment_type_id": 37,
+                    "tag": str(source),
+                    "atlas": str(environment.samples[source].atlas),
+                    "sample": environment.samples[source].sample,
+                }
+                capture_post(url, json=dcg_data)

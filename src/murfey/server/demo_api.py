@@ -813,7 +813,7 @@ async def request_spa_preprocessing(
             .where(GridSquare.id == FoilHole.grid_square_id)
             .where(GridSquare.tag == proc_file.tag)
         )
-        .one()
+        .one()[0]
         .name
     )
     if proc_params:

@@ -494,6 +494,12 @@ class MurfeyTUI(App):
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
                 "tag": str(source),
+                "atlas": str(self._environment.samples[source].atlas)
+                if self._environment.samples.get(source)
+                else "",
+                "sample": self._environment.samples[source].sample
+                if self._environment.samples.get(source)
+                else None,
             }
             capture_post(url, json=dcg_data)
             if from_form:
