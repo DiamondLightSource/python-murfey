@@ -841,6 +841,12 @@ async def request_tomography_preprocessing(
         .where(ProcessingJob.recipe == "em-tomo-preprocess")
     ).all()
     if data_collection:
+        if registered_tilts := db.exec(
+            select(Tilt).where(Tilt.movie_path == proc_file.path)
+        ):
+            if len(registered_tilts) == 1:
+                if registered_tilts[0].motion_corrected:
+                    return proc_file
         dcid = data_collection[0][1].id
         appid = data_collection[0][3].id
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
