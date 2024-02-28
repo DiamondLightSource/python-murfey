@@ -32,11 +32,17 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
+    _midpoint,
     _murfey_id,
     _transport_object,
+    check_tilt_series_mc,
+    get_all_tilts,
+    get_angle,
     get_hostname,
+    get_job_ids,
     get_machine_config,
     get_microscope,
+    get_tomo_preproc_params,
     templates,
 )
 from murfey.server.config import from_file, settings
@@ -477,6 +483,66 @@ def register_completed_tilt_series(
         ts.complete = True
         db.add(ts)
     db.commit()
+    for ts in tilt_series_db:
+        if check_tilt_series_mc(ts.id):
+            collected_ids = db.exec(
+                select(
+                    DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
+                )
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == ts.tag)
+                .where(DataCollection.dcg_id == DataCollectionGroup.id)
+                .where(ProcessingJob.dc_id == DataCollection.id)
+                .where(AutoProcProgram.pj_id == ProcessingJob.id)
+                .where(ProcessingJob.recipe == "em-tomo-align")
+            ).one()
+            machine_config = get_machine_config()
+            tilts = get_all_tilts(ts.id)
+            ids = get_job_ids(ts.id, collected_ids[3].id)
+            preproc_params = get_tomo_preproc_params(ids.dcgid)
+
+            first_tilt = db.exec(
+                select(Tilt).where(Tilt.tilt_series_id == ts.id)
+            ).first()
+            parts = [secure_filename(p) for p in Path(first_tilt.movie_path).parts]
+            visit_idx = parts.index(visit_name)
+            core = Path(*Path(first_tilt.movie_path).parts[: visit_idx + 1])
+            ppath = Path(
+                "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
+            )
+            sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            stack_file = (
+                core
+                / machine_config.processed_directory_name
+                / sub_dataset
+                / "align_output"
+                / f"{ts.tag}_stack.mrc"
+            )
+            if not stack_file.parent.exists():
+                stack_file.parent.mkdir(parents=True)
+            tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+            zocalo_message = {
+                "recipes": ["em-tomo-align"],
+                "parameters": {
+                    "input_file_list": str([[t, str(get_angle(t))] for t in tilts]),
+                    "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
+                    "dcid": ids.dcid,
+                    "appid": ids.appid,
+                    "stack_file": str(stack_file),
+                    "pix_size": preproc_params.pixel_size,
+                    "manual_tilt_offset": tilt_offset,
+                    "node_creator_queue": machine_config.node_creator_queue,
+                },
+            }
+            if _transport_object:
+                log.info(f"Sending Zocalo message for processing: {zocalo_message}")
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
+            else:
+                log.info(
+                    f"No transport object found. Zocalo message would be {zocalo_message}"
+                )
 
 
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
