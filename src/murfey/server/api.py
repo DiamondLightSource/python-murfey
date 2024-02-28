@@ -521,6 +521,12 @@ async def register_tilt(
             .one()
             .id
         )
+        if db.exec(
+            select(Tilt)
+            .where(Tilt.movie_path == tilt_info.movie_path)
+            .where(Tilt.tilt_series_id == tilt_series_id)
+        ).all():
+            return
         tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
         db.add(tilt)
         db.commit()
