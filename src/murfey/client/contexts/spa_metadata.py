@@ -6,9 +6,30 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util import capture_post
+from murfey.util import capture_post, get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
+
+
+def _atlas_destination(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+) -> Path:
+    machine_config = get_machine_config(
+        str(environment.url.geturl()), demo=environment.demo
+    )
+    if environment.visit in environment.default_destinations[source]:
+        return (
+            Path(machine_config.get("rsync_basepath", ""))
+            / Path(environment.default_destinations[source]).parent
+            / machine_config.get("create_directories", {}).get("atlas", "")
+        )
+    logger.info("dither")
+    return (
+        Path(machine_config.get("rsync_basepath", ""))
+        / Path(environment.default_destinations[source]).parent
+        / environment.visit
+        / machine_config.get("create_directories", {}).get("atlas", "")
+    )
 
 
 class SPAMetadataContext(Context):
@@ -56,7 +77,10 @@ class SPAMetadataContext(Context):
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
                     "tag": str(source),
-                    "atlas": str(environment.samples[source].atlas),
+                    "atlas": str(
+                        _atlas_destination(environment, source, transferred_file)
+                        / environment.samples[source].atlas
+                    ),
                     "sample": environment.samples[source].sample,
                 }
                 capture_post(url, json=dcg_data)
