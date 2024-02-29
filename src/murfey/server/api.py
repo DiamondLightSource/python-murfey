@@ -450,6 +450,13 @@ def register_tilt_series(
         .one()
         .session_id
     )
+    if db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all():
+        return
     tilt_series = TiltSeries(
         session_id=session_id,
         tag=tilt_series_info.tag,
