@@ -805,7 +805,7 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_name = (
+    foil_hole_id = (
         db.exec(
             select(FoilHole, GridSquare)
             .where(FoilHole.name == proc_file.foil_hole_id)
@@ -814,7 +814,7 @@ async def request_spa_preprocessing(
             .where(GridSquare.tag == proc_file.tag)
         )
         .one()[0]
-        .name
+        .id
     )
     if proc_params:
         session_id = (
@@ -850,7 +850,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
-            foil_hole_name=foil_hole_name,
+            foil_hole_id=foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -893,7 +893,7 @@ async def request_spa_preprocessing(
             session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
-            foil_hole_id=foil_hole_name,
+            foil_hole_id=foil_hole_id,
         )
         db.add(for_stash)
         db.commit()
