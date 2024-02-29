@@ -90,7 +90,6 @@ def _foil_hole_data(
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
-            logger.info(f"{foil_hole}, {fh_block['b:key']}")
             if int(fh_block["b:key"]) == foil_hole:
                 return FoilHole(
                     id=foil_hole,
