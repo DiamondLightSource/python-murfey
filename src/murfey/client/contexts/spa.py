@@ -88,19 +88,19 @@ def _foil_hole_data(
             break
     if required_key:
         for fh_block in serialization_array[required_key]:
-            if fh_block["b:value"]["IsNearGridBar"] == "false":
-                pix = fh_block["b:value"]["PixelCenter"]
-                stage = fh_block["b:value"]["StagePosition"]
-                if int(fh_block["b:key"]) == foil_hole:
-                    return FoilHole(
-                        id=foil_hole,
-                        grid_square_id=grid_square,
-                        session_id=session_id,
-                        x_location=float(pix["c:x"]),
-                        y_location=float(pix["c:y"]),
-                        x_stage_position=float(stage["c:X"]),
-                        y_stage_position=float(stage["c:Y"]),
-                    )
+            pix = fh_block["b:value"]["PixelCenter"]
+            stage = fh_block["b:value"]["StagePosition"]
+            logger.info(f"{foil_hole}, {fh_block['b:key']}")
+            if int(fh_block["b:key"]) == foil_hole:
+                return FoilHole(
+                    id=foil_hole,
+                    grid_square_id=grid_square,
+                    session_id=session_id,
+                    x_location=float(pix["c:x"]),
+                    y_location=float(pix["c:y"]),
+                    x_stage_position=float(stage["c:X"]),
+                    y_stage_position=float(stage["c:Y"]),
+                )
     raise ValueError(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
