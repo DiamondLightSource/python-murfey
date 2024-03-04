@@ -1244,7 +1244,7 @@ async def write_eer_fractionation_file(
         return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
         frac_file.write(
-            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame / fractionation_params.fractionation}"
         )
     return {"eer_fractionation_file": str(file_path)}
 
