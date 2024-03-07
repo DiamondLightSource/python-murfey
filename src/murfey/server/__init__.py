@@ -1718,13 +1718,25 @@ def _flush_tomography_preprocessing(message: dict):
 def _flush_grid_square_records(message: dict, _db=murfey_db, demo: bool = False):
     tag = message["tag"]
     session_id = message["session_id"]
+    gs_ids = []
     for gs in _db.exec(
         select(db.GridSquare)
         .where(db.GridSquare.session_id == session_id)
         .where(db.GridSquare.tag == tag)
     ).all():
+        gs_ids.append(gs.id)
         if demo:
             logger.info(f"Flushing grid square {gs.name}")
+    for i in gs_ids:
+        _flush_foil_hole_records(i, _db=_db, demo=demo)
+
+
+def _flush_foil_hole_records(grid_square_id: int, _db=murfey_db, demo: bool = False):
+    for fh in _db.exec(
+        select(db.FoilHole).where(db.FoilHole.grid_square_id == grid_square_id)
+    ).all():
+        if demo:
+            logger.info(f"Flushing foil hole: {fh.name}")
 
 
 def feedback_callback(header: dict, message: dict) -> None:
