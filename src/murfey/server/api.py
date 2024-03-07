@@ -916,7 +916,7 @@ async def request_tomography_preprocessing(
     if data_collection:
         if registered_tilts := db.exec(
             select(Tilt).where(Tilt.movie_path == proc_file.path)
-        ):
+        ).all():
             if len(registered_tilts) == 1:
                 if registered_tilts[0].motion_corrected:
                     return proc_file
