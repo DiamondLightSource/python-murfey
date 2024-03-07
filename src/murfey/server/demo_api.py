@@ -23,6 +23,7 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
+    _flush_grid_square_records,
     _flush_tomography_preprocessing,
     _murfey_id,
     _register_picked_particles_use_diameter,
@@ -1128,6 +1129,10 @@ def register_dc_group(
             }
         else:
             global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
+    if dcg_params.atlas:
+        _flush_grid_square_records(
+            {"session_id": client.session_id, "tag": dcg_params.tag}, demo=True
+        )
     return dcg_params
 
 

@@ -1715,6 +1715,18 @@ def _flush_tomography_preprocessing(message: dict):
         murfey_db.commit()
 
 
+def _flush_grid_square_records(message: dict, _db=murfey_db, demo: bool = False):
+    tag = message["tag"]
+    session_id = message["session_id"]
+    for gs in _db.exec(
+        select(db.GridSquare)
+        .where(db.GridSquare.session_id == session_id)
+        .where(db.GridSquare.tag == tag)
+    ).all():
+        if demo:
+            logger.info(f"Flushing grid square {gs.name}")
+
+
 def feedback_callback(header: dict, message: dict) -> None:
     try:
         record = None
@@ -2278,6 +2290,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_class_selection":
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
+        elif message["payload"] == "atlas_registered":
+            _flush_grid_square_records(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
