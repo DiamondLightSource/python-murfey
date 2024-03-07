@@ -312,3 +312,4 @@ class FoilHoleParameters(BaseModel):
     name: int
     x_location: Optional[float] = None
     y_location: Optional[float] = None
+    image: str = ""

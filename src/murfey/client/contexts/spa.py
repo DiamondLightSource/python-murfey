@@ -87,6 +87,13 @@ def _foil_hole_data(
             required_key = key
             break
     if required_key:
+        image_paths = list(
+            (xml_path.parent.parent).glob(
+                f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{foil_hole}_*.jpg"
+            )
+        )
+        image_paths.sort(key=lambda x: x.stat().st_ctime)
+        image_path = image_paths[-1] if image_paths else ""
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
@@ -99,6 +106,7 @@ def _foil_hole_data(
                     y_location=float(pix["c:y"]),
                     x_stage_position=float(stage["c:X"]),
                     y_stage_position=float(stage["c:Y"]),
+                    image=str(image_path),
                 )
     raise ValueError(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
@@ -494,6 +502,7 @@ class SPAModularContext(_SPAContext):
                                         "x_location": fh.x_location,
                                         "y_location": fh.y_location,
                                         "tag": str(source),
+                                        "image": fh.image,
                                     },
                                 )
                             else:

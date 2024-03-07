@@ -247,6 +247,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     x_stage_position: Optional[float]
     y_stage_position: Optional[float]
     pixel_size: Optional[float] = None
+    image: str = ""
     grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
     session: Optional[Session] = Relationship(back_populates="foil_holes")
     movies: List["Movie"] = Relationship(
