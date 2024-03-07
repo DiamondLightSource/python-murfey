@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import xmltodict
 
@@ -41,7 +42,7 @@ class SPAMetadataContext(Context):
         self,
         transferred_file: Path,
         role: str = "",
-        environment: MurfeyInstanceEnvironment | None = None,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
         if transferred_file.name == "EpuSession.dm" and environment:
