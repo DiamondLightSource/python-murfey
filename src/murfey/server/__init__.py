@@ -996,7 +996,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": refine_params.class3d_dir,
                 "class_number": refine_params.class_number,
-                "pix_size": relion_params.angpix,
+                "pixel_size": relion_params.angpix,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -1043,7 +1043,8 @@ def _release_bfactor_hold(message: dict, _db=murfey_db):
     ).one()
     if bfactor_params.run:
         machine_config = get_machine_config()
-        bfactor_particle_count = 1000
+        # Run bfactors for particle counts between the minimum and the batch size
+        bfactor_particle_count = default_spa_parameters.bfactor_min_particles
         while bfactor_particle_count < bfactor_params.batch_size:
             bfactor_run_name = f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
             bfactor_run = _db.exec(
@@ -1056,8 +1057,6 @@ def _release_bfactor_hold(message: dict, _db=murfey_db):
             _db.add(bfactor_run)
             _db.commit()
 
-            bfactor_particle_count *= 2
-
             zocalo_message = {
                 "parameters": {
                     "bfactor_directory": bfactor_run.bfactor_directory,
@@ -1065,9 +1064,11 @@ def _release_bfactor_hold(message: dict, _db=murfey_db):
                     "class_number": bfactor_params.class_number,
                     "number_of_particles": bfactor_run.number_of_particles,
                     "batch_size": bfactor_params.batch_size,
-                    "pix_size": relion_params.angpix,
-                    "mask_file": bfactor_params.mask_file,
+                    "pixel_size": relion_params.angpix,
+                    "mask": bfactor_params.mask_file,
                     "mask_diameter": relion_params.mask_diameter or 0,
+                    "picker_id": feedback_params.picker_ispyb_id,
+                    "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                     "refined_class_uuid": bfactor_params.refined_class_uuid,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
@@ -1081,6 +1082,9 @@ def _release_bfactor_hold(message: dict, _db=murfey_db):
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
+
+            # Next bfactor particle count will be double the current ont
+            bfactor_particle_count *= 2
         bfactor_params.run = False
         _db.add(bfactor_params)
     else:
@@ -1903,7 +1907,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": message["class3d_dir"],
                 "class_number": message["best_class"],
-                "pix_size": relion_options["angpix"],
+                "pixel_size": relion_options["angpix"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
@@ -1964,6 +1968,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
         bfactor_params.run = True
         bfactor_params.project_dir = message["project_dir"]
         bfactor_params.batch_size = message["batch_size"]
+        bfactor_params.refined_grp_uuid = message["refined_grp_uuid"]
         bfactor_params.refined_class_uuid = message["refined_class_uuid"]
         bfactor_params.class_reference = message["class_reference"]
         bfactor_params.class_number = message["class_number"]
@@ -2020,9 +2025,11 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                     "class_number": bfactor_params.class_number,
                     "number_of_particles": bfactor_run.number_of_particles,
                     "batch_size": bfactor_params.batch_size,
-                    "pix_size": relion_options["angpix"],
-                    "mask_file": bfactor_params.mask_file,
+                    "pixel_size": relion_options["angpix"],
+                    "mask": bfactor_params.mask_file,
                     "mask_diameter": relion_options["mask_diameter"] or 0,
+                    "picker_id": feedback_params.picker_ispyb_id,
+                    "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                     "refined_class_uuid": bfactor_params.refined_class_uuid,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
@@ -2638,7 +2645,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "done_3d_batch":
             _release_3d_hold(message)
-            _register_refinement(message)
+            if message["do_refinement"]:
+                _register_refinement(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None

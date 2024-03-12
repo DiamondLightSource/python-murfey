@@ -384,6 +384,7 @@ class BFactorParameters(SQLModel, table=True):  # type: ignore
     project_dir: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     batch_size: int
+    refined_grp_uuid: int
     refined_class_uuid: int
     class_reference: str
     class_number: int
