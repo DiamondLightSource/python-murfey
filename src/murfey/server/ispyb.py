@@ -27,6 +27,7 @@ from ispyb.sqlalchemy import (
     ZcZocaloBuffer,
     url,
 )
+from sqlalchemy.exc import OperationalError
 
 from murfey.util.models import Sample, Visit
 
@@ -297,7 +298,7 @@ def get_session_id(
     )
     try:
         query = query_exp.all()
-    except Exception:
+    except OperationalError:
         time.sleep(30)
         query = query_exp.all()
     res = query[0][1]
