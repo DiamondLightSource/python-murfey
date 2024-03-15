@@ -974,11 +974,15 @@ class TomographyContext(Context):
                     float(mdoc_data["PixelSpacing"]) * 1e-10
                 )
             mdoc_metadata["motion_corr_binning"] = binning_factor
-            mdoc_metadata["gain_ref"] = (
-                f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-                if environment
-                else None
-            )
+            if environment:
+                mdoc_metadata["gain_ref"] = (
+                    environment.data_collection_parameters.get("gain_ref")
+                    if environment.data_collection_parameters.get("gain_ref")
+                    not in (None, "None")
+                    else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+                )
+            else:
+                mdoc_metadata["gain_ref"] = None
             mdoc_metadata["dose_per_frame"] = (
                 environment.data_collection_parameters.get("dose_per_frame")
                 if environment
