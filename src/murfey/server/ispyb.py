@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import time
 from typing import Callable, List, Optional
 
 import ispyb
@@ -282,7 +283,7 @@ def get_session_id(
     visit_number: str,
     db: sqlalchemy.orm.Session,
 ) -> int:
-    query = (
+    query_exp = (
         db.query(BLSession)
         .join(Proposal)
         .filter(
@@ -293,8 +294,12 @@ def get_session_id(
             BLSession.visit_number == visit_number,
         )
         .add_columns(BLSession.sessionId)
-        .all()
     )
+    try:
+        query = query_exp.all()
+    except Exception:
+        time.sleep(30)
+        query = query_exp.all()
     res = query[0][1]
     db.close()
     return res
