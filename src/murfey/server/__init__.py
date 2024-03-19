@@ -998,6 +998,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "class_number": refine_params.class_number,
                 "pixel_size": relion_params.angpix,
                 "mask_diameter": relion_params.mask_diameter or 0,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "refined_class_uuid": _refine_murfey_id(
@@ -1067,6 +1068,7 @@ def _release_bfactor_hold(message: dict, _db=murfey_db):
                     "pixel_size": relion_params.angpix,
                     "mask": bfactor_params.mask_file,
                     "mask_diameter": relion_params.mask_diameter or 0,
+                    "node_creator_queue": machine_config.node_creator_queue,
                     "picker_id": feedback_params.picker_ispyb_id,
                     "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                     "refined_class_uuid": bfactor_params.refined_class_uuid,
@@ -1909,6 +1911,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "class_number": message["best_class"],
                 "pixel_size": relion_options["angpix"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
                 "refined_class_uuid": _refine_murfey_id(
@@ -2028,6 +2031,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                     "pixel_size": relion_options["angpix"],
                     "mask": bfactor_params.mask_file,
                     "mask_diameter": relion_options["mask_diameter"] or 0,
+                    "node_creator_queue": machine_config.node_creator_queue,
                     "picker_id": feedback_params.picker_ispyb_id,
                     "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                     "refined_class_uuid": bfactor_params.refined_class_uuid,
