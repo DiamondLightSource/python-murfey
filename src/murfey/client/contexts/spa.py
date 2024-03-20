@@ -17,7 +17,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util import capture_post, get_machine_config
-from murfey.util.db import FoilHole
+from murfey.util.db import FoilHole, GridSquare
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
@@ -70,6 +70,38 @@ def _grid_square_metadata_file(
         / "Metadata"
         / f"GridSquare_{grid_square}.dm"
     )
+
+
+def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> GridSquare:
+    image_paths = list(
+        (xml_path.parent.parent).glob(
+            f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
+        )
+    )
+    if image_paths:
+        image_paths.sort(key=lambda x: x.stat().st_ctime)
+        image_path = image_paths[0]
+        jpeg_size = Image.open(image_path).size
+        with open(Path(image_path).with_suffix(".xml")) as gs_xml:
+            gs_xml_data = xmltodict.parse(gs_xml.read())
+        readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
+            "camera"
+        ]["ReadoutArea"]
+        pixel_size = gs_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+            "numericValue"
+        ]
+        full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+        return GridSquare(
+            id=grid_square,
+            session_id=session_id,
+            readout_area_x=full_size[0] if image_path else None,
+            readout_area_y=full_size[1] if image_path else None,
+            thumbnail_size_x=jpeg_size[0] if image_path else None,
+            thumbnail_size_y=jpeg_size[1] if image_path else None,
+            pixel_size=float(pixel_size) if image_path else None,
+            image=str(image_path),
+        )
+    return GridSquare(id=grid_square, session_id=session_id)
 
 
 def _foil_hole_data(
@@ -481,26 +513,43 @@ class SPAModularContext(_SPAContext):
                             ]
 
                         grid_square = _grid_square_from_file(transferred_file)
-                        if self._foil_holes.get(grid_square) is None:
+                        grid_square_metadata_file = _grid_square_metadata_file(
+                            transferred_file,
+                            {
+                                Path(d): l
+                                for d, l in machine_config["data_directories"].items()
+                            },
+                            environment.visit,
+                            grid_square,
+                        )
+                        if (
+                            grid_square is None
+                            and self._foil_holes.get(grid_square) is None
+                        ):
                             self._foil_holes[grid_square] = []
                             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
-                            capture_post(gs_url, json={"tag": str(source)})
+                            gs = _grid_square_data(
+                                grid_square_metadata_file,
+                                grid_square,
+                                environment.murfey_session,
+                            )
+                            capture_post(
+                                gs_url,
+                                json={
+                                    "tag": str(source),
+                                    "readout_area_x": gs.readout_area_x,
+                                    "readout_area_y": gs.readout_area_y,
+                                    "thumbnail_size_x": gs.thumbnail_size_x,
+                                    "thumbnail_size_y": gs.thumbnail_size_y,
+                                    "pixel_size": gs.pixel_size,
+                                    "image": gs.image,
+                                },
+                            )
                         foil_hole = _foil_hole_from_file(transferred_file)
                         if foil_hole not in self._foil_holes[grid_square]:
                             fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
                             machine_config = get_machine_config(
                                 str(environment.url.geturl()), demo=environment.demo
-                            )
-                            grid_square_metadata_file = _grid_square_metadata_file(
-                                transferred_file,
-                                {
-                                    Path(d): l
-                                    for d, l in machine_config[
-                                        "data_directories"
-                                    ].items()
-                                },
-                                environment.visit,
-                                grid_square,
                             )
                             if (
                                 grid_square_metadata_file.is_file()

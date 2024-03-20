@@ -230,7 +230,12 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     y_location: Optional[float]
     x_stage_position: Optional[float]
     y_stage_position: Optional[float]
+    readout_area_x: Optional[int]
+    readout_area_y: Optional[int]
+    thumbnail_size_x: Optional[int]
+    thumbnail_size_y: Optional[int]
     pixel_size: Optional[float] = None
+    image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}

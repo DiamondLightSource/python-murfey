@@ -446,6 +446,12 @@ def register_grid_square(
         y_location=grid_square_params.y_location,
         x_stage_position=grid_square_params.x_stage_position,
         y_stage_position=grid_square_params.y_stage_position,
+        readout_area_x=grid_square_params.readout_area_x,
+        readout_area_y=grid_square_params.readout_area_y,
+        thumbnail_size_x=grid_square_params.thumbnail_size_x,
+        thumbnail_size_y=grid_square_params.thumbnail_size_y,
+        pixel_size=grid_square_params.pixel_size,
+        image=grid_square_params.image,
     )
     db.add(grid_square)
     db.commit()
