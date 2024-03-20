@@ -483,6 +483,9 @@ def register_foil_hole(
         grid_square_id=gsid,
         x_location=foil_hole_params.x_location,
         y_location=foil_hole_params.y_location,
+        x_stage_position=foil_hole_params.x_stage_position,
+        y_stage_position=foil_hole_params.y_stage_position,
+        pixel_size=foil_hole_params.pixel_size,
         image=foil_hole_params.image,
     )
     db.add(foil_hole)

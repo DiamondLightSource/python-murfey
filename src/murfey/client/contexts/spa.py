@@ -18,6 +18,9 @@ from murfey.client.instance_environment import (
 from murfey.util import capture_post, get_machine_config
 from murfey.util.db import FoilHole
 
+# from PIL import Image
+
+
 logger = logging.getLogger("murfey.client.contexts.spa")
 
 
@@ -93,7 +96,18 @@ def _foil_hole_data(
             )
         )
         image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path = image_paths[-1] if image_paths else ""
+        image_path: Path | str = image_paths[-1] if image_paths else ""
+        if image_path:
+            # jpeg_size = Image.open(image_path).size
+            with open(Path(image_path).with_suffix(".xml")) as fh_xml:
+                fh_xml_data = xmltodict.parse(fh_xml.read())
+            # readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
+            #     "acquisition"
+            # ]["camera"]["ReadoutArea"]
+            pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"][
+                "x"
+            ]["numericValue"]
+            # full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
@@ -106,6 +120,7 @@ def _foil_hole_data(
                     y_location=float(pix["c:y"]),
                     x_stage_position=float(stage["c:X"]),
                     y_stage_position=float(stage["c:Y"]),
+                    pixel_size=float(pixel_size) if image_path else None,
                     image=str(image_path),
                 )
     raise ValueError(
@@ -501,6 +516,9 @@ class SPAModularContext(_SPAContext):
                                         "name": foil_hole,
                                         "x_location": fh.x_location,
                                         "y_location": fh.y_location,
+                                        "x_stage_position": fh.x_stage_position,
+                                        "y_stage_position": fh.y_stage_position,
+                                        "pixel_size": fh.pixel_size,
                                         "tag": str(source),
                                         "image": fh.image,
                                     },
