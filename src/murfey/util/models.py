@@ -314,5 +314,9 @@ class FoilHoleParameters(BaseModel):
     y_location: Optional[float] = None
     x_stage_position: Optional[float] = None
     y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""

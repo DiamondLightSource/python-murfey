@@ -485,6 +485,10 @@ def register_foil_hole(
         y_location=foil_hole_params.y_location,
         x_stage_position=foil_hole_params.x_stage_position,
         y_stage_position=foil_hole_params.y_stage_position,
+        readout_area_x=foil_hole_params.readout_area_x,
+        readout_area_y=foil_hole_params.readout_area_y,
+        thumbnail_size_x=foil_hole_params.thumbnail_size_x,
+        thumbnail_size_y=foil_hole_params.thumbnail_size_y,
         pixel_size=foil_hole_params.pixel_size,
         image=foil_hole_params.image,
     )

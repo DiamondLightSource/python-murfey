@@ -8,6 +8,7 @@ from typing import Any, Dict, List, OrderedDict
 
 import requests
 import xmltodict
+from PIL import Image
 
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
@@ -17,9 +18,6 @@ from murfey.client.instance_environment import (
 )
 from murfey.util import capture_post, get_machine_config
 from murfey.util.db import FoilHole
-
-# from PIL import Image
-
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
@@ -98,16 +96,16 @@ def _foil_hole_data(
         image_paths.sort(key=lambda x: x.stat().st_ctime)
         image_path: Path | str = image_paths[-1] if image_paths else ""
         if image_path:
-            # jpeg_size = Image.open(image_path).size
+            jpeg_size = Image.open(image_path).size
             with open(Path(image_path).with_suffix(".xml")) as fh_xml:
                 fh_xml_data = xmltodict.parse(fh_xml.read())
-            # readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
-            #     "acquisition"
-            # ]["camera"]["ReadoutArea"]
+            readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
+                "acquisition"
+            ]["camera"]["ReadoutArea"]
             pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"][
                 "x"
             ]["numericValue"]
-            # full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+            full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
@@ -120,6 +118,10 @@ def _foil_hole_data(
                     y_location=float(pix["c:y"]),
                     x_stage_position=float(stage["c:X"]),
                     y_stage_position=float(stage["c:Y"]),
+                    readout_area_x=full_size[0] if image_path else None,
+                    readout_area_y=full_size[1] if image_path else None,
+                    thumbnail_size_x=jpeg_size[0] if image_path else None,
+                    thumbnail_size_y=jpeg_size[1] if image_path else None,
                     pixel_size=float(pixel_size) if image_path else None,
                     image=str(image_path),
                 )
@@ -518,6 +520,10 @@ class SPAModularContext(_SPAContext):
                                         "y_location": fh.y_location,
                                         "x_stage_position": fh.x_stage_position,
                                         "y_stage_position": fh.y_stage_position,
+                                        "readout_area_x": fh.readout_area_x,
+                                        "readout_area_y": fh.readout_area_y,
+                                        "thumbnail_size_x": fh.thumbnail_size_x,
+                                        "thumbnail_size_y": fh.thumbnail_size_y,
                                         "pixel_size": fh.pixel_size,
                                         "tag": str(source),
                                         "image": fh.image,
