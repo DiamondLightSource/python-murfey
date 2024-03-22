@@ -523,7 +523,8 @@ class SPAModularContext(_SPAContext):
                             grid_square,
                         )
                         if (
-                            grid_square is None
+                            grid_square is not None
+                            and environment.murfey_session is not None
                             and self._foil_holes.get(grid_square) is None
                         ):
                             self._foil_holes[grid_square] = []

@@ -24,7 +24,6 @@ def _atlas_destination(
             / Path(environment.default_destinations[source]).parent
             / machine_config.get("create_directories", {}).get("atlas", "")
         )
-    logger.info("dither")
     return (
         Path(machine_config.get("rsync_basepath", ""))
         / Path(environment.default_destinations[source]).parent
