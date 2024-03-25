@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import requests
 import xmltodict
 
 from murfey.client.context import Context
@@ -84,3 +85,81 @@ class SPAMetadataContext(Context):
                     "sample": environment.samples[source].sample,
                 }
                 capture_post(url, json=dcg_data)
+                registered_grid_squares = (
+                    requests.get(
+                        f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_squares"
+                    )
+                    .json()
+                    .get(str(source), [])
+                )
+                if registered_grid_squares:
+                    with open(
+                        _atlas_destination(environment, source, transferred_file)
+                        / environment.samples[source].atlas,
+                        "r",
+                    ) as dm:
+                        atlas_data = xmltodict.parse(dm.read())
+                    tile_info = atlas_data["AtlasSessionXml"]["Atlas"][
+                        "TilesEfficient"
+                    ]["_items"]["TileXml"]
+                    gs_pix_positions = {}
+                    for ti in tile_info:
+                        try:
+                            nodes = ti["Nodes"]["KeyValuePairs"]
+                        except KeyError:
+                            continue
+                        required_key = ""
+                        for key in nodes.keys():
+                            if key.startswith("KeyValuePairOfintNodeXml"):
+                                required_key = key
+                                break
+                        if not required_key:
+                            continue
+                        for gs in nodes[required_key]:
+                            gs_pix_positions[gs["key"]] = (
+                                int(
+                                    float(
+                                        gs["value"]["b:PositionOnTheAtlas"]["c:Center"][
+                                            "d:x"
+                                        ]
+                                    )
+                                ),
+                                int(
+                                    float(
+                                        gs["value"]["b:PositionOnTheAtlas"]["c:Center"][
+                                            "d:y"
+                                        ]
+                                    )
+                                ),
+                                float(
+                                    gs["value"]["b:PositionOnTheAtlas"]["c:Physical"][
+                                        "d:x"
+                                    ]
+                                )
+                                * 1e9,
+                                float(
+                                    gs["value"]["b:PositionOnTheAtlas"]["c:Physical"][
+                                        "d:y"
+                                    ]
+                                )
+                                * 1e9,
+                            )
+                    for gs in registered_grid_squares:
+                        pos_data = gs_pix_positions.get(gs.name)
+                        if pos_data:
+                            capture_post(
+                                f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs.name}",
+                                json={
+                                    "tag": gs.tag,
+                                    "readout_area_x": gs.readout_area_x,
+                                    "readout_area_y": gs.readout_area_y,
+                                    "thumbnail_size_x": gs.thumbnail_size_x,
+                                    "thumbnail_size_y": gs.thumbnail_size_y,
+                                    "pixel_size": gs.pixel_size,
+                                    "image": gs.image,
+                                    "x_location": pos_data[0],
+                                    "y_location": pos_data[1],
+                                    "x_stage_position": pos_data[2],
+                                    "y_stage_position": pos_data[3],
+                                },
+                            )
