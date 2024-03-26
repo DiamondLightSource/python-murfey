@@ -1087,6 +1087,14 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
+@router.get("/sessions/{session_id}/data_collection_groups")
+def get_dc_groups(session_id: int, db=murfey_db):
+    data_collection_groups = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+    ).all()
+    return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
 @router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
 def register_dc_group(
     visit_name: str, client_id: int, dcg_params: DCGroupParameters, db=murfey_db

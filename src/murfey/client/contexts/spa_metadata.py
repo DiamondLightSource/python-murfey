@@ -6,7 +6,7 @@ import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import _get_source
+from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import capture_post, get_machine_config
 
@@ -93,57 +93,10 @@ class SPAMetadataContext(Context):
                     .get(str(source), [])
                 )
                 if registered_grid_squares:
-                    with open(
+                    gs_pix_positions = _get_grid_square_atlas_positions(
                         _atlas_destination(environment, source, transferred_file)
-                        / environment.samples[source].atlas,
-                        "r",
-                    ) as dm:
-                        atlas_data = xmltodict.parse(dm.read())
-                    tile_info = atlas_data["AtlasSessionXml"]["Atlas"][
-                        "TilesEfficient"
-                    ]["_items"]["TileXml"]
-                    gs_pix_positions = {}
-                    for ti in tile_info:
-                        try:
-                            nodes = ti["Nodes"]["KeyValuePairs"]
-                        except KeyError:
-                            continue
-                        required_key = ""
-                        for key in nodes.keys():
-                            if key.startswith("KeyValuePairOfintNodeXml"):
-                                required_key = key
-                                break
-                        if not required_key:
-                            continue
-                        for gs in nodes[required_key]:
-                            gs_pix_positions[gs["key"]] = (
-                                int(
-                                    float(
-                                        gs["value"]["b:PositionOnTheAtlas"]["c:Center"][
-                                            "d:x"
-                                        ]
-                                    )
-                                ),
-                                int(
-                                    float(
-                                        gs["value"]["b:PositionOnTheAtlas"]["c:Center"][
-                                            "d:y"
-                                        ]
-                                    )
-                                ),
-                                float(
-                                    gs["value"]["b:PositionOnTheAtlas"]["c:Physical"][
-                                        "d:x"
-                                    ]
-                                )
-                                * 1e9,
-                                float(
-                                    gs["value"]["b:PositionOnTheAtlas"]["c:Physical"][
-                                        "d:y"
-                                    ]
-                                )
-                                * 1e9,
-                            )
+                        / environment.samples[source].atlas
+                    )
                     for gs in registered_grid_squares:
                         pos_data = gs_pix_positions.get(gs.name)
                         if pos_data:
