@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, OrderedDict
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
 import requests
 import xmltodict
@@ -20,6 +20,49 @@ from murfey.util import capture_post, get_machine_config
 from murfey.util.db import FoilHole, GridSquare
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+
+def _get_grid_square_atlas_positions(
+    xml_path: Path, grid_square: str = ""
+) -> Dict[str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]]:
+    with open(
+        xml_path,
+        "r",
+    ) as dm:
+        atlas_data = xmltodict.parse(dm.read())
+    tile_info = atlas_data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"][
+        "TileXml"
+    ]
+    gs_pix_positions: Dict[
+        str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]
+    ] = {}
+    for ti in tile_info:
+        try:
+            nodes = ti["Nodes"]["KeyValuePairs"]
+        except KeyError:
+            continue
+        required_key = ""
+        for key in nodes.keys():
+            if key.startswith("KeyValuePairOfintNodeXml"):
+                required_key = key
+                break
+        if not required_key:
+            continue
+        for gs in nodes[required_key]:
+            if not isinstance(gs, dict):
+                continue
+            if not grid_square or gs["key"] == grid_square:
+                gs_pix_positions[gs["key"]] = (
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
+                    * 1e9,
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
+                    * 1e9,
+                )
+                if grid_square:
+                    break
+    return gs_pix_positions
 
 
 def _file_transferred_to(
@@ -528,6 +571,24 @@ class SPAModularContext(_SPAContext):
                             and self._foil_holes.get(grid_square) is None
                         ):
                             self._foil_holes[grid_square] = []
+                            gs_pix_position: Tuple[
+                                Optional[int],
+                                Optional[int],
+                                Optional[float],
+                                Optional[float],
+                            ] = (None, None, None, None)
+                            data_collection_group = (
+                                requests.get(
+                                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                                )
+                                .json()
+                                .get(str(source), {})
+                            )
+                            if data_collection_group.get("atlas"):
+                                gs_pix_position = _get_grid_square_atlas_positions(
+                                    data_collection_group["atlas"],
+                                    grid_square=str(grid_square),
+                                )[str(grid_square)]
                             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
                             gs = _grid_square_data(
                                 grid_square_metadata_file,
@@ -544,6 +605,10 @@ class SPAModularContext(_SPAContext):
                                     "thumbnail_size_y": gs.thumbnail_size_y,
                                     "pixel_size": gs.pixel_size,
                                     "image": gs.image,
+                                    "x_location": gs_pix_position[0],
+                                    "y_location": gs_pix_position[1],
+                                    "x_stage_position": gs_pix_position[2],
+                                    "y_stage_position": gs_pix_position[3],
                                 },
                             )
                         foil_hole = _foil_hole_from_file(transferred_file)

@@ -434,25 +434,49 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
+@router.get("/sessions/{session_id}/grid_squares")
+def get_grid_squares(session_id: int, db=murfey_db):
+    grid_squares = db.exec(
+        select(GridSquare).where(GridSquare.session_id == session_id)
+    ).all()
+    tags = {gs.tag for gs in grid_squares}
+    res = {}
+    for t in tags:
+        res[t] = [gs for gs in grid_squares if gs.tag == t]
+    return res
+
+
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
 ):
-    grid_square = GridSquare(
-        name=gsid,
-        session_id=session_id,
-        tag=grid_square_params.tag,
-        x_location=grid_square_params.x_location,
-        y_location=grid_square_params.y_location,
-        x_stage_position=grid_square_params.x_stage_position,
-        y_stage_position=grid_square_params.y_stage_position,
-        readout_area_x=grid_square_params.readout_area_x,
-        readout_area_y=grid_square_params.readout_area_y,
-        thumbnail_size_x=grid_square_params.thumbnail_size_x,
-        thumbnail_size_y=grid_square_params.thumbnail_size_y,
-        pixel_size=grid_square_params.pixel_size,
-        image=grid_square_params.image,
-    )
+    try:
+        grid_square = db.exec(
+            select(GridSquare)
+            .where(GridSquare.name == gsid)
+            .where(GridSquare.tag == grid_square_params.tag)
+            .where(GridSquare.session_id == session_id)
+        ).one()
+        grid_square.x_location = grid_square_params.x_location
+        grid_square.y_location = grid_square_params.y_location
+        grid_square.x_stage_position = grid_square_params.x_stage_position
+        grid_square.y_stage_position = grid_square_params.y_stage_position
+    except Exception:
+        grid_square = GridSquare(
+            name=gsid,
+            session_id=session_id,
+            tag=grid_square_params.tag,
+            x_location=grid_square_params.x_location,
+            y_location=grid_square_params.y_location,
+            x_stage_position=grid_square_params.x_stage_position,
+            y_stage_position=grid_square_params.y_stage_position,
+            readout_area_x=grid_square_params.readout_area_x,
+            readout_area_y=grid_square_params.readout_area_y,
+            thumbnail_size_x=grid_square_params.thumbnail_size_x,
+            thumbnail_size_y=grid_square_params.thumbnail_size_y,
+            pixel_size=grid_square_params.pixel_size,
+            image=grid_square_params.image,
+        )
     db.add(grid_square)
     db.commit()
     db.close()
@@ -1065,6 +1089,14 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
+@router.get("/sessions/{session_id}/data_collection_groups")
+def get_dc_groups(session_id: int, db=murfey_db):
+    data_collection_groups = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+    ).all()
+    return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
 @router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
 def register_dc_group(
     visit_name: str, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
@@ -1158,8 +1190,13 @@ def start_dc(
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
     )
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
     dcg = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.tag == dcg_tag)
+        .where(DataCollectionGroup.session_id == client.session_id)
     ).one()
     dc_tag = dc_params.tag
     if db.exec(

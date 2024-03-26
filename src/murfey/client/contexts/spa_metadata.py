@@ -2,10 +2,11 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import _get_source
+from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import capture_post, get_machine_config
 
@@ -84,3 +85,34 @@ class SPAMetadataContext(Context):
                     "sample": environment.samples[source].sample,
                 }
                 capture_post(url, json=dcg_data)
+                registered_grid_squares = (
+                    requests.get(
+                        f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_squares"
+                    )
+                    .json()
+                    .get(str(source), [])
+                )
+                if registered_grid_squares:
+                    gs_pix_positions = _get_grid_square_atlas_positions(
+                        _atlas_destination(environment, source, transferred_file)
+                        / environment.samples[source].atlas
+                    )
+                    for gs in registered_grid_squares:
+                        pos_data = gs_pix_positions.get(str(gs["name"]))
+                        if pos_data:
+                            capture_post(
+                                f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs['name']}",
+                                json={
+                                    "tag": gs["tag"],
+                                    "readout_area_x": gs["readout_area_x"],
+                                    "readout_area_y": gs["readout_area_y"],
+                                    "thumbnail_size_x": gs["thumbnail_size_x"],
+                                    "thumbnail_size_y": gs["thumbnail_size_y"],
+                                    "pixel_size": gs["pixel_size"],
+                                    "image": gs["image"],
+                                    "x_location": pos_data[0],
+                                    "y_location": pos_data[1],
+                                    "x_stage_position": pos_data[2],
+                                    "y_stage_position": pos_data[3],
+                                },
+                            )
