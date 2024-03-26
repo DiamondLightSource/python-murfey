@@ -1026,76 +1026,6 @@ def _release_refine_hold(message: dict, _db=murfey_db):
     _db.close()
 
 
-def _release_bfactor_hold(message: dict, _db=murfey_db):
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
-    relion_params = _db.exec(
-        select(db.SPARelionParameters).where(
-            db.SPARelionParameters.pj_id == pj_id_params
-        )
-    ).one()
-    feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
-        )
-    ).one()
-    bfactor_params = _db.exec(
-        select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
-    ).one()
-    if bfactor_params.run:
-        machine_config = get_machine_config()
-        # Run bfactors for particle counts between the minimum and the batch size
-        bfactor_particle_count = default_spa_parameters.bfactor_min_particles
-        while bfactor_particle_count < bfactor_params.batch_size:
-            bfactor_run_name = f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
-            bfactor_run = _db.exec(
-                select(db.BFactors).where(
-                    db.BFactors.pj_id == pj_id
-                    and db.BFactors.bfactor_directory == bfactor_run_name
-                )
-            ).one()
-            bfactor_run.resolution = 0
-            _db.add(bfactor_run)
-            _db.commit()
-
-            zocalo_message = {
-                "parameters": {
-                    "bfactor_directory": bfactor_run.bfactor_directory,
-                    "class_reference": bfactor_params.class_reference,
-                    "class_number": bfactor_params.class_number,
-                    "number_of_particles": bfactor_run.number_of_particles,
-                    "batch_size": bfactor_params.batch_size,
-                    "pixel_size": relion_params.angpix,
-                    "mask": bfactor_params.mask_file,
-                    "mask_diameter": relion_params.mask_diameter or 0,
-                    "node_creator_queue": machine_config.node_creator_queue,
-                    "picker_id": feedback_params.picker_ispyb_id,
-                    "refined_grp_uuid": bfactor_params.refined_grp_uuid,
-                    "refined_class_uuid": bfactor_params.refined_class_uuid,
-                    "session_id": message["session_id"],
-                    "autoproc_program_id": _app_id(
-                        _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
-                    ),
-                    "feedback_queue": machine_config.feedback_queue,
-                },
-                "recipes": ["em-spa-bfactor"],
-            }
-            if _transport_object:
-                _transport_object.send(
-                    "processing_recipe", zocalo_message, new_connection=True
-                )
-
-            # Next bfactor particle count will be double the current ont
-            bfactor_particle_count *= 2
-        bfactor_params.run = False
-        _db.add(bfactor_params)
-    else:
-        feedback_params.hold_bfactor = False
-    _db.add(feedback_params)
-    _db.commit()
-    _db.close()
-
-
 def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
@@ -1963,7 +1893,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
     _db.add(bfactor_run)
     _db.commit()
 
-    if feedback_params.hold_bfactors:
+    if feedback_params.hold_refine:
         # If waiting then save the message
         bfactor_params = _db.exec(
             select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
@@ -2070,7 +2000,6 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id).all())
     particle_counts = [bf.number_of_particles for bf in all_bfactors]
     resolutions = [bf.resolution for bf in all_bfactors]
-    _db.close()
 
     if all(resolutions):
         # Calculate b-factor and add to ispyb class table
@@ -2099,7 +2028,12 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
                     "content": {"dummy": "dummy"},
                 },
             )
-        _release_bfactor_hold(message)
+
+        # Clean up the b-factors table and release the hold
+        _db.delete(all_bfactors)
+        _db.commit()
+        _release_refine_hold(message)
+    _db.close()
 
 
 def feedback_callback(header: dict, message: dict) -> None:
@@ -2673,7 +2607,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_refinement":
-            _release_refine_hold(message)
             _register_bfactors(message)
             if _transport_object:
                 _transport_object.transport.ack(header)

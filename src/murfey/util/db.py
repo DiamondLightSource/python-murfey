@@ -285,7 +285,6 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     rerun_class2d: bool = False
     hold_class3d: bool = False
     hold_refine: bool = False
-    hold_bfactors: bool = False
     class_selection_score: float
     star_combination_job: int
     initial_model: str
