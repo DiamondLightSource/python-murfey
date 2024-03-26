@@ -451,7 +451,7 @@ def register_grid_square(
     session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
 ):
     try:
-        grid_square = murfey_db.exec(
+        grid_square = db.exec(
             select(GridSquare)
             .where(GridSquare.name == gsid)
             .where(GridSquare.tag == grid_square_params.tag)
@@ -459,6 +459,8 @@ def register_grid_square(
         ).one()
         grid_square.x_location = grid_square_params.x_location
         grid_square.y_location = grid_square_params.y_location
+        grid_square.x_stage_position = grid_square_params.x_stage_position
+        grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
         grid_square = GridSquare(
             name=gsid,
@@ -1188,8 +1190,13 @@ def start_dc(
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
     )
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
     dcg = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.tag == dcg_tag)
+        .where(DataCollectionGroup.session_id == client.session_id)
     ).one()
     dc_tag = dc_params.tag
     if db.exec(

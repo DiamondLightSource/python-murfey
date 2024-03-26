@@ -41,21 +41,27 @@ def _get_grid_square_atlas_positions(
             nodes = ti["Nodes"]["KeyValuePairs"]
         except KeyError:
             continue
-        required_key = grid_square
-        if not required_key:
-            for key in nodes.keys():
-                if key.startswith("KeyValuePairOfintNodeXml"):
-                    required_key = key
-                    break
+        required_key = ""
+        for key in nodes.keys():
+            if key.startswith("KeyValuePairOfintNodeXml"):
+                required_key = key
+                break
         if not required_key:
             continue
         for gs in nodes[required_key]:
-            gs_pix_positions[gs["key"]] = (
-                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
-                int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
-                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"]) * 1e9,
-                float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"]) * 1e9,
-            )
+            if not isinstance(gs, dict):
+                continue
+            if not grid_square or gs["key"] == grid_square:
+                gs_pix_positions[gs["key"]] = (
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
+                    * 1e9,
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
+                    * 1e9,
+                )
+                if grid_square:
+                    break
     return gs_pix_positions
 
 
@@ -571,10 +577,14 @@ class SPAModularContext(_SPAContext):
                                 Optional[float],
                                 Optional[float],
                             ] = (None, None, None, None)
-                            data_collection_group = requests.get(
-                                f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
-                            ).json()[str(source)]
-                            if data_collection_group["atlas"]:
+                            data_collection_group = (
+                                requests.get(
+                                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                                )
+                                .json()
+                                .get(str(source), {})
+                            )
+                            if data_collection_group.get("atlas"):
                                 gs_pix_position = _get_grid_square_atlas_positions(
                                     data_collection_group["atlas"],
                                     grid_square=str(grid_square),

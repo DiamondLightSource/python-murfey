@@ -98,18 +98,18 @@ class SPAMetadataContext(Context):
                         / environment.samples[source].atlas
                     )
                     for gs in registered_grid_squares:
-                        pos_data = gs_pix_positions.get(gs.name)
+                        pos_data = gs_pix_positions.get(str(gs["name"]))
                         if pos_data:
                             capture_post(
-                                f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs.name}",
+                                f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs['name']}",
                                 json={
-                                    "tag": gs.tag,
-                                    "readout_area_x": gs.readout_area_x,
-                                    "readout_area_y": gs.readout_area_y,
-                                    "thumbnail_size_x": gs.thumbnail_size_x,
-                                    "thumbnail_size_y": gs.thumbnail_size_y,
-                                    "pixel_size": gs.pixel_size,
-                                    "image": gs.image,
+                                    "tag": gs["tag"],
+                                    "readout_area_x": gs["readout_area_x"],
+                                    "readout_area_y": gs["readout_area_y"],
+                                    "thumbnail_size_x": gs["thumbnail_size_x"],
+                                    "thumbnail_size_y": gs["thumbnail_size_y"],
+                                    "pixel_size": gs["pixel_size"],
+                                    "image": gs["image"],
                                     "x_location": pos_data[0],
                                     "y_location": pos_data[1],
                                     "x_stage_position": pos_data[2],
