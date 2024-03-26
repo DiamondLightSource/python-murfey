@@ -515,6 +515,7 @@ class MurfeyTUI(App):
                     "em-spa-extract",
                     "em-spa-class2d",
                     "em-spa-class3d",
+                    "em-spa-refine",
                 ):
                     capture_post(
                         f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
