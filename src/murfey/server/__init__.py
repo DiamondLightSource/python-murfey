@@ -1883,6 +1883,10 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
         )
     ).one()
 
+    if not feedback_params.hold_refine:
+        logger.warning("B-Factors requested but refine hold is off")
+        return False
+
     # Add b-factor for refinement run
     bfactor_run = db.BFactors(
         pj_id=pj_id,
@@ -1962,6 +1966,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                 "processing_recipe", zocalo_message, new_connection=True
             )
     _db.close()
+    return True
 
 
 def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
@@ -2587,9 +2592,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_refinement":
-            _register_bfactors(message)
+            bfactors_registered = _register_bfactors(message)
             if _transport_object:
-                _transport_object.transport.ack(header)
+                if bfactors_registered:
+                    _transport_object.transport.ack(header)
+                else:
+                    _transport_object.transport.nack(header)
             return None
         elif message["register"] == "done_bfactor":
             _save_bfactor(message)
