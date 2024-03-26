@@ -507,9 +507,9 @@ def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
         .pj_id
     )
     refined_class = _db.exec(
-        select(db.Refine3D).where(
-            db.Refine3D.refine_dir == refine_dir and db.Refine3D.pj_id == pj_id
-        )
+        select(db.Refine3D)
+        .where(db.Refine3D.refine_dir == refine_dir)
+        .where(db.Refine3D.pj_id == pj_id)
     ).one()
     return refined_class.murfey_id
 
@@ -1801,6 +1801,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
         refine_params = _db.exec(
             select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
         ).one()
+        # refine_params.refine_dir is not set as it will be the same as before
         refine_params.run = True
         refine_params.class3d_dir = message["class3d_dir"]
         refine_params.class_number = message["best_class"]
@@ -1814,9 +1815,8 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
             ).one()
         except SQLAlchemyError:
-            # next_job = feedback_params.next_job
-            refine_dir = f"{message['refine_dir']}501"
-            # refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
+            next_job = feedback_params.next_job
+            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
 
@@ -1831,8 +1831,8 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.commit()
             _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
 
-            # next_job += 5
-            # feedback_params.next_job = next_job
+            next_job += 5
+            feedback_params.next_job = next_job
 
         zocalo_message = {
             "parameters": {
@@ -1860,7 +1860,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.hold_class3d = True
+        feedback_params.hold_refine = True
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -1928,15 +1928,14 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
             _db.add(bfactor_params)
             _db.commit()
 
-        bfactor_particle_count = 1000
+        bfactor_particle_count = default_spa_parameters.bfactor_min_particles
         while bfactor_particle_count < bfactor_params.batch_size:
             bfactor_run_name = f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
             try:
                 bfactor_run = _db.exec(
-                    select(db.BFactors).where(
-                        db.BFactors.pj_id == pj_id
-                        and db.BFactors.bfactor_directory == bfactor_run_name
-                    )
+                    select(db.BFactors)
+                    .where(db.BFactors.pj_id == pj_id)
+                    .where(db.BFactors.bfactor_directory == bfactor_run_name)
                 ).one()
                 bfactor_run.resolution = 0
             except SQLAlchemyError:
@@ -1987,10 +1986,9 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     """Received b-factor from refinement run"""
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
     bfactor_run = _db.exec(
-        select(db.BFactors).where(
-            db.BFactors.pj_id == pj_id
-            and db.BFactors.bfactor_directory == message["bfactor_directory"]
-        )
+        select(db.BFactors)
+        .where(db.BFactors.pj_id == pj_id)
+        .where(db.BFactors.bfactor_directory == message["bfactor_directory"])
     ).one()
     bfactor_run.resolution = message["resolution"]
     _db.add(bfactor_run)
@@ -2583,7 +2581,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "done_3d_batch":
             _release_3d_hold(message)
-            if message["do_refinement"]:
+            if message.get("do_refinement"):
                 _register_refinement(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
