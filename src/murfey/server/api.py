@@ -1167,31 +1167,46 @@ def get_dc_groups(session_id: int, db=murfey_db):
 
 
 @router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
-def register_dc_group(visit_name, client_id: int, dcg_params: DCGroupParameters):
+def register_dc_group(
+    visit_name, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
+):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     microscope = get_microscope(machine_config=machine_config)
     log.info(f"Registering data collection group on microscope {microscope}")
-    dcg_parameters = {
-        "session_id": murfey.server.ispyb.get_session_id(
-            microscope=microscope,
-            proposal_code=ispyb_proposal_code,
-            proposal_number=ispyb_proposal_number,
-            visit_number=ispyb_visit_number,
-            db=murfey.server.ispyb.Session(),
-        ),
-        "start_time": str(datetime.datetime.now()),
-        "experiment_type": dcg_params.experiment_type,
-        "experiment_type_id": dcg_params.experiment_type_id,
-        "tag": dcg_params.tag,
-        "client_id": client_id,
-    }
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
+    if dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.tag == dcg_params.tag)
+    ).all():
+        dcg_murfey[0].atlas = dcg_params.atlas
+        dcg_murfey[0].sample = dcg_params.sample
+        db.add(dcg_murfey[0])
+        db.commit()
+    else:
+        dcg_parameters = {
+            "session_id": murfey.server.ispyb.get_session_id(
+                microscope=microscope,
+                proposal_code=ispyb_proposal_code,
+                proposal_number=ispyb_proposal_number,
+                visit_number=ispyb_visit_number,
+                db=murfey.server.ispyb.Session(),
+            ),
+            "start_time": str(datetime.datetime.now()),
+            "experiment_type": dcg_params.experiment_type,
+            "experiment_type_id": dcg_params.experiment_type_id,
+            "tag": dcg_params.tag,
+            "client_id": client_id,
+        }
 
-    if _transport_object:
-        _transport_object.send(
-            machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
-        )
+        if _transport_object:
+            _transport_object.send(
+                machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+            )
     return dcg_parameters
 
 
