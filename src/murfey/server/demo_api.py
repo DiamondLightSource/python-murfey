@@ -23,6 +23,7 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
+    _flush_grid_square_records,
     _flush_tomography_preprocessing,
     _murfey_id,
     _register_picked_particles_use_diameter,
@@ -41,6 +42,8 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -60,8 +63,10 @@ from murfey.util.models import (
     DCGroupParameters,
     DCParameters,
     File,
+    FoilHoleParameters,
     FractionationParameters,
     GainReference,
+    GridSquareParameters,
     PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
@@ -429,6 +434,99 @@ def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     return [p.json() for p in params]
 
 
+@router.get("/sessions/{session_id}/grid_squares")
+def get_grid_squares(session_id: int, db=murfey_db):
+    grid_squares = db.exec(
+        select(GridSquare).where(GridSquare.session_id == session_id)
+    ).all()
+    tags = {gs.tag for gs in grid_squares}
+    res = {}
+    for t in tags:
+        res[t] = [gs for gs in grid_squares if gs.tag == t]
+    return res
+
+
+@router.post("/sessions/{session_id}/grid_square/{gsid}")
+def register_grid_square(
+    session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
+):
+    try:
+        grid_square = db.exec(
+            select(GridSquare)
+            .where(GridSquare.name == gsid)
+            .where(GridSquare.tag == grid_square_params.tag)
+            .where(GridSquare.session_id == session_id)
+        ).one()
+        grid_square.x_location = grid_square_params.x_location
+        grid_square.y_location = grid_square_params.y_location
+        grid_square.x_stage_position = grid_square_params.x_stage_position
+        grid_square.y_stage_position = grid_square_params.y_stage_position
+    except Exception:
+        grid_square = GridSquare(
+            name=gsid,
+            session_id=session_id,
+            tag=grid_square_params.tag,
+            x_location=grid_square_params.x_location,
+            y_location=grid_square_params.y_location,
+            x_stage_position=grid_square_params.x_stage_position,
+            y_stage_position=grid_square_params.y_stage_position,
+            readout_area_x=grid_square_params.readout_area_x,
+            readout_area_y=grid_square_params.readout_area_y,
+            thumbnail_size_x=grid_square_params.thumbnail_size_x,
+            thumbnail_size_y=grid_square_params.thumbnail_size_y,
+            pixel_size=grid_square_params.pixel_size,
+            image=grid_square_params.image,
+        )
+    db.add(grid_square)
+    db.commit()
+    db.close()
+
+
+@router.get("/sessions/{session_id}/foil_hole/{fh_name}")
+def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare)
+        .where(FoilHole.name == fh_name)
+        .where(FoilHole.session_id == session_id)
+        .where(GridSquare.id == FoilHole.grid_square_id)
+    ).all()
+    return {f[1].tag: f[0].id for f in foil_holes}
+
+
+@router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
+def register_foil_hole(
+    session_id: int, gs_name: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+):
+    gsid = (
+        db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == foil_hole_params.tag)
+            .where(GridSquare.session_id == session_id)
+            .where(GridSquare.name == gs_name)
+        )
+        .one()
+        .id
+    )
+    foil_hole = FoilHole(
+        name=foil_hole_params.name,
+        session_id=session_id,
+        grid_square_id=gsid,
+        x_location=foil_hole_params.x_location,
+        y_location=foil_hole_params.y_location,
+        x_stage_position=foil_hole_params.x_stage_position,
+        y_stage_position=foil_hole_params.y_stage_position,
+        readout_area_x=foil_hole_params.readout_area_x,
+        readout_area_y=foil_hole_params.readout_area_y,
+        thumbnail_size_x=foil_hole_params.thumbnail_size_x,
+        thumbnail_size_y=foil_hole_params.thumbnail_size_y,
+        pixel_size=foil_hole_params.pixel_size,
+        image=foil_hole_params.image,
+    )
+    db.add(foil_hole)
+    db.commit()
+    db.close()
+
+
 @router.post("/visits/{visit_name}/tilt_series")
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
@@ -659,6 +757,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
+            foil_hole_id=f.foil_hole_id,
         )
         db.add(movie)
         zocalo_message = {
@@ -745,6 +844,17 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
+    foil_hole_id = (
+        db.exec(
+            select(FoilHole, GridSquare)
+            .where(FoilHole.name == proc_file.foil_hole_id)
+            .where(FoilHole.session_id == session_id)
+            .where(GridSquare.id == FoilHole.grid_square_id)
+            .where(GridSquare.tag == proc_file.tag)
+        )
+        .one()[0]
+        .id
+    )
     if proc_params:
         session_id = (
             db.exec(
@@ -779,6 +889,7 @@ async def request_spa_preprocessing(
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
+            foil_hole_id=foil_hole_id,
         )
         db.add(movie)
         db.commit()
@@ -821,6 +932,7 @@ async def request_spa_preprocessing(
             session_id=session_id,
             image_number=proc_file.image_number,
             mrc_out=str(mrc_out),
+            foil_hole_id=foil_hole_id,
         )
         db.add(for_stash)
         db.commit()
@@ -977,6 +1089,14 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
 
 
+@router.get("/sessions/{session_id}/data_collection_groups")
+def get_dc_groups(session_id: int, db=murfey_db):
+    data_collection_groups = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+    ).all()
+    return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
 @router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
 def register_dc_group(
     visit_name: str, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
@@ -985,58 +1105,80 @@ def register_dc_group(
     client = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
-    dcgid = next(global_counter)
-    murfey_dcg = DataCollectionGroup(
-        id=dcgid,
-        session_id=client.session_id,
-        tag=dcg_params.tag,
-    )
-    db.add(murfey_dcg)
-    db.commit()
-
-    if dcg_params.experiment_type == "single particle":
-        dcid = next(global_counter)
-        murfey_dc = DataCollection(
-            id=dcid,
-            tag=dcg_params.tag,
-            dcg_id=dcgid,
-        )
-        db.add(murfey_dc)
+    if dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.tag == dcg_params.tag)
+    ).all():
+        dcg_murfey[0].atlas = dcg_params.atlas
+        dcg_murfey[0].sample = dcg_params.sample
+        db.add(dcg_murfey[0])
         db.commit()
-
-        pjids = [next(global_counter) for _ in range(4)]
-
-        murfey_pj_pre = ProcessingJob(
-            id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
-        )
-        murfey_pj_ext = ProcessingJob(id=pjids[1], recipe="em-spa-extract", dc_id=dcid)
-        murfey_pj_2d = ProcessingJob(id=pjids[2], recipe="em-spa-class2d", dc_id=dcid)
-        murfey_pj_3d = ProcessingJob(id=pjids[3], recipe="em-spa-class3d", dc_id=dcid)
-        db.add(murfey_pj_pre)
-        db.add(murfey_pj_ext)
-        db.add(murfey_pj_2d)
-        db.add(murfey_pj_3d)
-        db.commit()
-
-        murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
-        murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
-        murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
-        murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
-        db.add(murfey_app_pre)
-        db.add(murfey_app_ext)
-        db.add(murfey_app_2d)
-        db.add(murfey_app_3d)
-        db.commit()
-
-    if global_state.get("data_collection_group_ids") and isinstance(
-        global_state["data_collection_group_ids"], dict
-    ):
-        global_state["data_collection_group_ids"] = {
-            **global_state["data_collection_group_ids"],
-            dcg_params.tag: dcgid,
-        }
     else:
-        global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
+        dcgid = next(global_counter)
+        murfey_dcg = DataCollectionGroup(
+            id=dcgid,
+            session_id=client.session_id,
+            tag=dcg_params.tag,
+            atlas=dcg_params.atlas,
+            sample=dcg_params.sample,
+        )
+        db.add(murfey_dcg)
+        db.commit()
+
+        if dcg_params.experiment_type == "single particle":
+            dcid = next(global_counter)
+            murfey_dc = DataCollection(
+                id=dcid,
+                tag=dcg_params.tag,
+                dcg_id=dcgid,
+            )
+            db.add(murfey_dc)
+            db.commit()
+
+            pjids = [next(global_counter) for _ in range(4)]
+
+            murfey_pj_pre = ProcessingJob(
+                id=pjids[0], recipe="em-spa-preprocess", dc_id=dcid
+            )
+            murfey_pj_ext = ProcessingJob(
+                id=pjids[1], recipe="em-spa-extract", dc_id=dcid
+            )
+            murfey_pj_2d = ProcessingJob(
+                id=pjids[2], recipe="em-spa-class2d", dc_id=dcid
+            )
+            murfey_pj_3d = ProcessingJob(
+                id=pjids[3], recipe="em-spa-class3d", dc_id=dcid
+            )
+            db.add(murfey_pj_pre)
+            db.add(murfey_pj_ext)
+            db.add(murfey_pj_2d)
+            db.add(murfey_pj_3d)
+            db.commit()
+
+            murfey_app_pre = AutoProcProgram(id=next(global_counter), pj_id=pjids[0])
+            murfey_app_ext = AutoProcProgram(id=next(global_counter), pj_id=pjids[1])
+            murfey_app_2d = AutoProcProgram(id=next(global_counter), pj_id=pjids[2])
+            murfey_app_3d = AutoProcProgram(id=next(global_counter), pj_id=pjids[3])
+            db.add(murfey_app_pre)
+            db.add(murfey_app_ext)
+            db.add(murfey_app_2d)
+            db.add(murfey_app_3d)
+            db.commit()
+
+        if global_state.get("data_collection_group_ids") and isinstance(
+            global_state["data_collection_group_ids"], dict
+        ):
+            global_state["data_collection_group_ids"] = {
+                **global_state["data_collection_group_ids"],
+                dcg_params.tag: dcgid,
+            }
+        else:
+            global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
+    if dcg_params.atlas:
+        _flush_grid_square_records(
+            {"session_id": client.session_id, "tag": dcg_params.tag}, demo=True
+        )
     return dcg_params
 
 
@@ -1048,8 +1190,13 @@ def start_dc(
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
     )
+    client = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+    ).one()
     dcg = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.tag == dcg_tag)
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.tag == dcg_tag)
+        .where(DataCollectionGroup.session_id == client.session_id)
     ).one()
     dc_tag = dc_params.tag
     if db.exec(

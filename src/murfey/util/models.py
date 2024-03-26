@@ -114,6 +114,7 @@ class SPAProcessFile(BaseModel):
     data_collection_id: Optional[int]
     image_number: int
     autoproc_program_id: Optional[int]
+    foil_hole_id: int
     pixel_size: Optional[float]
     dose_per_frame: Optional[float]
     mc_binning: Optional[int] = 1
@@ -167,6 +168,8 @@ class DCGroupParameters(BaseModel):
     experiment_type: str
     experiment_type_id: int
     tag: str
+    atlas: str = ""
+    sample: Optional[int] = None
 
 
 class DCParameters(BaseModel):
@@ -296,3 +299,32 @@ class FractionationParameters(BaseModel):
     num_frames: int = 0
     eer_path: Optional[str] = None
     fractionation_file_name: str = "eer_fractionation.txt"
+
+
+class GridSquareParameters(BaseModel):
+    tag: str
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+
+
+class FoilHoleParameters(BaseModel):
+    tag: str
+    name: int
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
+    pixel_size: Optional[float] = None
+    image: str = ""

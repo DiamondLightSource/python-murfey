@@ -648,10 +648,10 @@ class SessionSelection(Screen):
             session_id = self.app._environment.murfey_session
             self.app.pop_screen()
         session_name = "Client connection"
-        requests.post(
+        self.app._environment.murfey_session = requests.post(
             f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
-        )
+        ).json()
 
     def _remove_session(self, session_id: int, **kwargs):
         requests.delete(f"{self.app._environment.url.geturl()}/sessions/{session_id}")
@@ -677,10 +677,12 @@ class SessionSelection(Screen):
             self.app.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            capture_post(
+            resp = capture_post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
+            if resp:
+                self.app._environment.murfey_session = resp.json()
 
 
 class VisitSelection(SwitchSelection):
@@ -832,7 +834,7 @@ class DirectorySelection(SwitchSelection):
         machine_config = get_machine_config(
             str(self.app._environment.url.geturl()), demo=self.app._environment.demo
         )
-        for dir in machine_config["create_directories"]:
+        for dir in machine_config["create_directories"].values():
             (visit_dir / dir).mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
@@ -887,7 +889,8 @@ class DestinationSelect(Screen):
                     for d in s.glob("*"):
                         if (
                             d.is_dir()
-                            and d.name not in machine_config["create_directories"]
+                            and d.name
+                            not in machine_config["create_directories"].values()
                         ):
                             machine_data = requests.get(
                                 f"{self.app._environment.url.geturl()}/machine/"
@@ -927,7 +930,7 @@ class DestinationSelect(Screen):
         else:
             machine_config = get_machine_config(str(self.app._environment.url.geturl()))
             for s, d in self._transfer_routes.items():
-                if Path(d).name not in machine_config["create_directories"]:
+                if Path(d).name not in machine_config["create_directories"].values():
                     bulk.append(Label(f"Copy the source {s} to:"))
                     bulk.append(
                         Input(

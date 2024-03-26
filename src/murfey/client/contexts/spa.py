@@ -4,9 +4,11 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, OrderedDict
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
+import requests
 import xmltodict
+from PIL import Image
 
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
@@ -15,8 +17,52 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util import capture_get, capture_post, get_machine_config
+from murfey.util.db import FoilHole, GridSquare
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+
+def _get_grid_square_atlas_positions(
+    xml_path: Path, grid_square: str = ""
+) -> Dict[str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]]:
+    with open(
+        xml_path,
+        "r",
+    ) as dm:
+        atlas_data = xmltodict.parse(dm.read())
+    tile_info = atlas_data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"][
+        "TileXml"
+    ]
+    gs_pix_positions: Dict[
+        str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]
+    ] = {}
+    for ti in tile_info:
+        try:
+            nodes = ti["Nodes"]["KeyValuePairs"]
+        except KeyError:
+            continue
+        required_key = ""
+        for key in nodes.keys():
+            if key.startswith("KeyValuePairOfintNodeXml"):
+                required_key = key
+                break
+        if not required_key:
+            continue
+        for gs in nodes[required_key]:
+            if not isinstance(gs, dict):
+                continue
+            if not grid_square or gs["key"] == grid_square:
+                gs_pix_positions[gs["key"]] = (
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
+                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
+                    * 1e9,
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
+                    * 1e9,
+                )
+                if grid_square:
+                    break
+    return gs_pix_positions
 
 
 def _file_transferred_to(
@@ -36,6 +82,126 @@ def _file_transferred_to(
         / Path(environment.default_destinations[source])
         / environment.visit
         / file_path.relative_to(source)
+    )
+
+
+def _grid_square_from_file(f: Path) -> int:
+    for p in f.parts:
+        if p.startswith("GridSquare"):
+            return int(p.split("_")[1])
+    raise ValueError(f"Grid square ID could not be determined from path {f}")
+
+
+def _foil_hole_from_file(f: Path) -> int:
+    return int(f.name.split("_")[1])
+
+
+def _grid_square_metadata_file(
+    f: Path, data_directories: Dict[Path, str], visit: str, grid_square: int
+) -> Path:
+    for dd in data_directories.keys():
+        if str(f).startswith(str(dd)):
+            base_dir = dd
+            mid_dir = f.relative_to(dd).parent
+            break
+    else:
+        raise ValueError(f"Could not determine grid square metadata path for {f}")
+    return (
+        base_dir
+        / visit
+        / mid_dir.parent.parent.parent
+        / "Metadata"
+        / f"GridSquare_{grid_square}.dm"
+    )
+
+
+def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> GridSquare:
+    image_paths = list(
+        (xml_path.parent.parent).glob(
+            f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
+        )
+    )
+    if image_paths:
+        image_paths.sort(key=lambda x: x.stat().st_ctime)
+        image_path = image_paths[0]
+        jpeg_size = Image.open(image_path).size
+        with open(Path(image_path).with_suffix(".xml")) as gs_xml:
+            gs_xml_data = xmltodict.parse(gs_xml.read())
+        readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
+            "camera"
+        ]["ReadoutArea"]
+        pixel_size = gs_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+            "numericValue"
+        ]
+        full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+        return GridSquare(
+            id=grid_square,
+            session_id=session_id,
+            readout_area_x=full_size[0] if image_path else None,
+            readout_area_y=full_size[1] if image_path else None,
+            thumbnail_size_x=jpeg_size[0] if image_path else None,
+            thumbnail_size_y=jpeg_size[1] if image_path else None,
+            pixel_size=float(pixel_size) if image_path else None,
+            image=str(image_path),
+        )
+    return GridSquare(id=grid_square, session_id=session_id)
+
+
+def _foil_hole_data(
+    xml_path: Path, foil_hole: int, grid_square: int, session_id: int
+) -> FoilHole:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if required_key:
+        image_paths = list(
+            (xml_path.parent.parent).glob(
+                f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{foil_hole}_*.jpg"
+            )
+        )
+        image_paths.sort(key=lambda x: x.stat().st_ctime)
+        image_path: Path | str = image_paths[-1] if image_paths else ""
+        if image_path:
+            jpeg_size = Image.open(image_path).size
+            with open(Path(image_path).with_suffix(".xml")) as fh_xml:
+                fh_xml_data = xmltodict.parse(fh_xml.read())
+            readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
+                "acquisition"
+            ]["camera"]["ReadoutArea"]
+            pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"][
+                "x"
+            ]["numericValue"]
+            full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+        for fh_block in serialization_array[required_key]:
+            pix = fh_block["b:value"]["PixelCenter"]
+            stage = fh_block["b:value"]["StagePosition"]
+            if int(fh_block["b:key"]) == foil_hole:
+                return FoilHole(
+                    id=foil_hole,
+                    grid_square_id=grid_square,
+                    session_id=session_id,
+                    x_location=float(pix["c:x"]),
+                    y_location=float(pix["c:y"]),
+                    x_stage_position=float(stage["c:X"]),
+                    y_stage_position=float(stage["c:Y"]),
+                    readout_area_x=full_size[0] if image_path else None,
+                    readout_area_y=full_size[1] if image_path else None,
+                    thumbnail_size_x=jpeg_size[0] if image_path else None,
+                    thumbnail_size_y=jpeg_size[1] if image_path else None,
+                    pixel_size=float(pixel_size) if image_path else None,
+                    image=str(image_path),
+                )
+    raise ValueError(
+        f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
 
 
@@ -95,6 +261,7 @@ class _SPAContext(Context):
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
+        self._foil_holes: Dict[int, List[int]] = {}
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -403,6 +570,101 @@ class SPAModularContext(_SPAContext):
                                 "eer_fractionation_file"
                             ]
 
+                        grid_square = _grid_square_from_file(transferred_file)
+                        grid_square_metadata_file = _grid_square_metadata_file(
+                            transferred_file,
+                            {
+                                Path(d): l
+                                for d, l in machine_config["data_directories"].items()
+                            },
+                            environment.visit,
+                            grid_square,
+                        )
+                        if (
+                            grid_square is not None
+                            and environment.murfey_session is not None
+                            and self._foil_holes.get(grid_square) is None
+                        ):
+                            self._foil_holes[grid_square] = []
+                            gs_pix_position: Tuple[
+                                Optional[int],
+                                Optional[int],
+                                Optional[float],
+                                Optional[float],
+                            ] = (None, None, None, None)
+                            data_collection_group = (
+                                requests.get(
+                                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                                )
+                                .json()
+                                .get(str(source), {})
+                            )
+                            if data_collection_group.get("atlas"):
+                                gs_pix_position = _get_grid_square_atlas_positions(
+                                    data_collection_group["atlas"],
+                                    grid_square=str(grid_square),
+                                )[str(grid_square)]
+                            gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+                            gs = _grid_square_data(
+                                grid_square_metadata_file,
+                                grid_square,
+                                environment.murfey_session,
+                            )
+                            capture_post(
+                                gs_url,
+                                json={
+                                    "tag": str(source),
+                                    "readout_area_x": gs.readout_area_x,
+                                    "readout_area_y": gs.readout_area_y,
+                                    "thumbnail_size_x": gs.thumbnail_size_x,
+                                    "thumbnail_size_y": gs.thumbnail_size_y,
+                                    "pixel_size": gs.pixel_size,
+                                    "image": gs.image,
+                                    "x_location": gs_pix_position[0],
+                                    "y_location": gs_pix_position[1],
+                                    "x_stage_position": gs_pix_position[2],
+                                    "y_stage_position": gs_pix_position[3],
+                                },
+                            )
+                        foil_hole = _foil_hole_from_file(transferred_file)
+                        if foil_hole not in self._foil_holes[grid_square]:
+                            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
+                            if (
+                                grid_square_metadata_file.is_file()
+                                and environment.murfey_session is not None
+                            ):
+                                fh = _foil_hole_data(
+                                    grid_square_metadata_file,
+                                    foil_hole,
+                                    grid_square,
+                                    environment.murfey_session,
+                                )
+                                capture_post(
+                                    fh_url,
+                                    json={
+                                        "name": foil_hole,
+                                        "x_location": fh.x_location,
+                                        "y_location": fh.y_location,
+                                        "x_stage_position": fh.x_stage_position,
+                                        "y_stage_position": fh.y_stage_position,
+                                        "readout_area_x": fh.readout_area_x,
+                                        "readout_area_y": fh.readout_area_y,
+                                        "thumbnail_size_x": fh.thumbnail_size_x,
+                                        "thumbnail_size_y": fh.thumbnail_size_y,
+                                        "pixel_size": fh.pixel_size,
+                                        "tag": str(source),
+                                        "image": fh.image,
+                                    },
+                                )
+                            else:
+                                capture_post(
+                                    fh_url,
+                                    json={
+                                        "id": foil_hole,
+                                    },
+                                )
+                            self._foil_holes[grid_square].append(foil_hole)
+
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
@@ -430,6 +692,7 @@ class SPAModularContext(_SPAContext):
                             ),
                             "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
+                            "foil_hole_id": foil_hole,
                         }
                         capture_post(
                             preproc_url,

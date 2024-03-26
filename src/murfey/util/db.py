@@ -36,6 +36,12 @@ class Session(SQLModel, table=True):  # type: ignore
     preprocess_stashes: List["PreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    grid_squares: List["GridSquare"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    foil_holes: List["FoilHole"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -63,6 +69,8 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
+    atlas: str = ""
+    sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
@@ -143,11 +151,13 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     file_path: str = Field(primary_key=True)
     tag: str = Field(primary_key=True)
     session_id: int = Field(primary_key=True, foreign_key="session.id")
+    foil_hole_id: Optional[int] = Field(foreign_key="foilhole.id", default=None)
     image_number: int
     mrc_out: str
     eer_fractionation_file: Optional[str]
     group_tag: Optional[str]
     session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
+    foil_hole: Optional["FoilHole"] = Relationship(back_populates="preprocess_stashes")
 
 
 class SelectionStash(SQLModel, table=True):  # type: ignore
@@ -223,13 +233,61 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     )
 
 
+class GridSquare(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: int
+    tag: str
+    x_location: Optional[float]
+    y_location: Optional[float]
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    readout_area_x: Optional[int]
+    readout_area_y: Optional[int]
+    thumbnail_size_x: Optional[int]
+    thumbnail_size_y: Optional[int]
+    pixel_size: Optional[float] = None
+    image: str = ""
+    session: Optional[Session] = Relationship(back_populates="grid_squares")
+    foil_holes: List["FoilHole"] = Relationship(
+        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
+class FoilHole(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    grid_square_id: int = Field(foreign_key="gridsquare.id")
+    session_id: int = Field(foreign_key="session.id")
+    name: int
+    x_location: Optional[float]
+    y_location: Optional[float]
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    readout_area_x: Optional[int]
+    readout_area_y: Optional[int]
+    thumbnail_size_x: Optional[int]
+    thumbnail_size_y: Optional[int]
+    pixel_size: Optional[float] = None
+    image: str = ""
+    grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
+    session: Optional[Session] = Relationship(back_populates="foil_holes")
+    movies: List["Movie"] = Relationship(
+        back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    preprocess_stashes: List[PreprocessStash] = Relationship(
+        back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    foil_hole_id: int = Field(foreign_key="foilhole.id")
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
+    foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
