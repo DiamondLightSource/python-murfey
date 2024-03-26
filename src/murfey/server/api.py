@@ -339,33 +339,93 @@ def register_spa_proc_params(
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
 
 
+@router.get("/sessions/{session_id}/grid_squares")
+def get_grid_squares(session_id: int, db=murfey_db):
+    grid_squares = db.exec(
+        select(GridSquare).where(GridSquare.session_id == session_id)
+    ).all()
+    tags = {gs.tag for gs in grid_squares}
+    res = {}
+    for t in tags:
+        res[t] = [gs for gs in grid_squares if gs.tag == t]
+    return res
+
+
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
 ):
-    grid_square = GridSquare(
-        id=gsid,
-        session_id=session_id,
-        x_location=grid_square_params.x_location,
-        y_location=grid_square_params.y_location,
-        x_stage_position=grid_square_params.x_stage_position,
-        y_stage_position=grid_square_params.y_stage_position,
-    )
+    try:
+        grid_square = db.exec(
+            select(GridSquare)
+            .where(GridSquare.name == gsid)
+            .where(GridSquare.tag == grid_square_params.tag)
+            .where(GridSquare.session_id == session_id)
+        ).one()
+        grid_square.x_location = grid_square_params.x_location
+        grid_square.y_location = grid_square_params.y_location
+        grid_square.x_stage_position = grid_square_params.x_stage_position
+        grid_square.y_stage_position = grid_square_params.y_stage_position
+    except Exception:
+        grid_square = GridSquare(
+            name=gsid,
+            session_id=session_id,
+            tag=grid_square_params.tag,
+            x_location=grid_square_params.x_location,
+            y_location=grid_square_params.y_location,
+            x_stage_position=grid_square_params.x_stage_position,
+            y_stage_position=grid_square_params.y_stage_position,
+            readout_area_x=grid_square_params.readout_area_x,
+            readout_area_y=grid_square_params.readout_area_y,
+            thumbnail_size_x=grid_square_params.thumbnail_size_x,
+            thumbnail_size_y=grid_square_params.thumbnail_size_y,
+            pixel_size=grid_square_params.pixel_size,
+            image=grid_square_params.image,
+        )
     db.add(grid_square)
     db.commit()
     db.close()
 
 
-@router.post("/sessions/{session_id}/grid_square/{gsid}/foil_hole")
+@router.get("/sessions/{session_id}/foil_hole/{fh_name}")
+def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare)
+        .where(FoilHole.name == fh_name)
+        .where(FoilHole.session_id == session_id)
+        .where(GridSquare.id == FoilHole.grid_square_id)
+    ).all()
+    return {f[1].tag: f[0].id for f in foil_holes}
+
+
+@router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
 def register_foil_hole(
-    session_id: int, gsid: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+    session_id: int, gs_name: int, foil_hole_params: FoilHoleParameters, db=murfey_db
 ):
+    gsid = (
+        db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == foil_hole_params.tag)
+            .where(GridSquare.session_id == session_id)
+            .where(GridSquare.name == gs_name)
+        )
+        .one()
+        .id
+    )
     foil_hole = FoilHole(
-        id=foil_hole_params.id,
+        name=foil_hole_params.name,
         session_id=session_id,
         grid_square_id=gsid,
         x_location=foil_hole_params.x_location,
         y_location=foil_hole_params.y_location,
+        x_stage_position=foil_hole_params.x_stage_position,
+        y_stage_position=foil_hole_params.y_stage_position,
+        readout_area_x=foil_hole_params.readout_area_x,
+        readout_area_y=foil_hole_params.readout_area_y,
+        thumbnail_size_x=foil_hole_params.thumbnail_size_x,
+        thumbnail_size_y=foil_hole_params.thumbnail_size_y,
+        pixel_size=foil_hole_params.pixel_size,
+        image=foil_hole_params.image,
     )
     db.add(foil_hole)
     db.commit()
@@ -999,6 +1059,14 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
     if params.touch:
         check_path.mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
+
+
+@router.get("/sessions/{session_id}/data_collection_groups")
+def get_dc_groups(session_id: int, db=murfey_db):
+    data_collection_groups = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+    ).all()
+    return {dcg.tag: dcg for dcg in data_collection_groups}
 
 
 @router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
