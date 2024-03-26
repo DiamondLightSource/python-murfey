@@ -35,7 +35,7 @@ def _atlas_destination(
 
 class SPAMetadataContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__(acquisition_software)
+        super().__init__("SPA metadata", acquisition_software)
         self._basepath = basepath
 
     def post_transfer(

@@ -428,7 +428,7 @@ class MurfeyTUI(App):
         # it is then necessary to extract the data from the message
         if from_form:
             json = json.get("form", {})
-            json = {k: str(v) for k, v in json.items()}
+            json = {k: v if v is None else str(v) for k, v in json.items()}
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
@@ -532,6 +532,7 @@ class MurfeyTUI(App):
                     "em-spa-extract",
                     "em-spa-class2d",
                     "em-spa-class3d",
+                    "em-spa-refine",
                 ):
                     capture_post(
                         f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
@@ -545,6 +546,11 @@ class MurfeyTUI(App):
                         "tag": str(source),
                     },
                 )
+                if response is None:
+                    log.error(
+                        "Could not reach Murfey server to insert SPA processing parameters"
+                    )
+                    return None
                 if not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(
@@ -629,10 +635,12 @@ class MurfeyTUI(App):
             self.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            self._environment.murfey_session = capture_post(
+            resp = capture_post(
                 f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
-            ).json()
+            )
+            if resp:
+                self._environment.murfey_session = resp.json()
 
     def on_log_book_log(self, message):
         self.log_book.write(message.renderable)

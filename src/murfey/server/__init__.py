@@ -25,7 +25,12 @@ from ispyb.sqlalchemy._auto_db_schema import (
 )
 from rich.logging import RichHandler
 from sqlalchemy import func
-from sqlalchemy.exc import InvalidRequestError, PendingRollbackError, SQLAlchemyError
+from sqlalchemy.exc import (
+    InvalidRequestError,
+    OperationalError,
+    PendingRollbackError,
+    SQLAlchemyError,
+)
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
@@ -454,6 +459,18 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _d
     _db.close()
 
 
+def _murfey_refine(murfey_id: int, refine_dir: str, app_id: int, _db):
+    pj_id = _pj_id(app_id, _db, recipe="em-spa-refine")
+    refine3d = db.Refine3D(
+        refine_dir=refine_dir,
+        pj_id=pj_id,
+        murfey_id=murfey_id,
+    )
+    _db.add(refine3d)
+    _db.commit()
+    _db.close()
+
+
 def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
@@ -481,6 +498,20 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
         )
     ).all()
     return {str(cl.class_number): cl.murfey_id for cl in classes}
+
+
+def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
+    pj_id = (
+        _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
+        .one()
+        .pj_id
+    )
+    refined_class = _db.exec(
+        select(db.Refine3D)
+        .where(db.Refine3D.refine_dir == refine_dir)
+        .where(db.Refine3D.pj_id == pj_id)
+    ).one()
+    return refined_class.murfey_id
 
 
 def _app_id(pj_id: int, _db) -> int:
@@ -898,6 +929,7 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "particles_file": class3d_params.particles_file,
                 "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_params.batch_size,
+                "symmetry": relion_params.symmetry,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "do_initial_model": False if feedback_params.initial_model else True,
@@ -942,6 +974,59 @@ def _release_3d_hold(message: dict, _db=murfey_db):
         _db.add(class3d_params)
     else:
         feedback_params.hold_class3d = False
+    _db.add(feedback_params)
+    _db.commit()
+    _db.close()
+
+
+def _release_refine_hold(message: dict, _db=murfey_db):
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    refine_params = _db.exec(
+        select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+    ).one()
+    if refine_params.run:
+        machine_config = get_machine_config()
+        zocalo_message = {
+            "parameters": {
+                "refine_job_dir": refine_params.refine_dir,
+                "class3d_dir": refine_params.class3d_dir,
+                "class_number": refine_params.class_number,
+                "pixel_size": relion_params.angpix,
+                "mask_diameter": relion_params.mask_diameter or 0,
+                "node_creator_queue": machine_config.node_creator_queue,
+                "nr_iter": default_spa_parameters.nr_iter_3d,
+                "picker_id": feedback_params.picker_ispyb_id,
+                "refined_class_uuid": _refine_murfey_id(
+                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                ),
+                "refined_grp_uuid": refine_params.murfey_id,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-refine"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        refine_params.run = False
+        _db.add(refine_params)
+    else:
+        feedback_params.hold_refine = False
     _db.add(feedback_params)
     _db.commit()
     _db.close()
@@ -1130,9 +1215,14 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
-        feedback_params.next_job = (
+        job_number_after_first_batch = (
             10 if default_spa_parameters.do_icebreaker_jobs else 7
         )
+        if (
+            feedback_params.next_job is not None
+            and feedback_params.next_job < job_number_after_first_batch
+        ):
+            feedback_params.next_job = job_number_after_first_batch
         if not feedback_params.star_combination_job:
             feedback_params.star_combination_job = feedback_params.next_job + (
                 3 if default_spa_parameters.do_icebreaker_jobs else 2
@@ -1513,6 +1603,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "particles_file": class3d_message["particles_file"],
                 "class3d_dir": class3d_dir,
                 "batch_size": class3d_message["batch_size"],
+                "symmetry": relion_options["symmetry"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": True,
@@ -1554,6 +1645,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "particles_file": class3d_message["particles_file"],
                 "class3d_dir": class3d_params.class3d_dir,
                 "batch_size": class3d_message["batch_size"],
+                "symmetry": relion_options["symmetry"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": False,
@@ -1737,6 +1829,249 @@ def _flush_foil_hole_records(grid_square_id: int, _db=murfey_db, demo: bool = Fa
     ).all():
         if demo:
             logger.info(f"Flushing foil hole: {fh.name}")
+
+
+def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
+    """Received class to refine from 3D classification"""
+    machine_config = get_machine_config()
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    relion_options = dict(relion_params)
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+    other_options = dict(feedback_params)
+
+    if feedback_params.hold_refine:
+        # If waiting then save the message
+        refine_params = _db.exec(
+            select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+        ).one()
+        # refine_params.refine_dir is not set as it will be the same as before
+        refine_params.run = True
+        refine_params.class3d_dir = message["class3d_dir"]
+        refine_params.class_number = message["best_class"]
+        _db.add(refine_params)
+        _db.commit()
+        _db.close()
+    else:
+        # Send all other messages on to a container
+        try:
+            refine_params = _db.exec(
+                select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+            ).one()
+        except SQLAlchemyError:
+            next_job = feedback_params.next_job
+            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
+            refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+            refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
+
+            refine_params = db.RefineParameters(
+                pj_id=pj_id,
+                murfey_id=refined_grp_uuid,
+                refine_dir=refine_dir,
+                class3d_dir=message["class3d_dir"],
+                class_number=message["best_class"],
+            )
+            _db.add(refine_params)
+            _db.commit()
+            _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
+
+            next_job += 5
+            feedback_params.next_job = next_job
+
+        zocalo_message = {
+            "parameters": {
+                "refine_job_dir": refine_params.refine_dir,
+                "class3d_dir": message["class3d_dir"],
+                "class_number": message["best_class"],
+                "pixel_size": relion_options["angpix"],
+                "mask_diameter": relion_options["mask_diameter"] or 0,
+                "node_creator_queue": machine_config.node_creator_queue,
+                "nr_iter": default_spa_parameters.nr_iter_3d,
+                "picker_id": other_options["picker_ispyb_id"],
+                "refined_class_uuid": _refine_murfey_id(
+                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                ),
+                "refined_grp_uuid": refine_params.murfey_id,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-refine"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        feedback_params.hold_refine = True
+        _db.add(feedback_params)
+        _db.commit()
+        _db.close()
+
+
+def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
+    """Received refined class to calculate b-factor"""
+    machine_config = get_machine_config()
+    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    relion_params = _db.exec(
+        select(db.SPARelionParameters).where(
+            db.SPARelionParameters.pj_id == pj_id_params
+        )
+    ).one()
+    relion_options = dict(relion_params)
+    feedback_params = _db.exec(
+        select(db.SPAFeedbackParameters).where(
+            db.SPAFeedbackParameters.pj_id == pj_id_params
+        )
+    ).one()
+
+    if not feedback_params.hold_refine:
+        logger.warning("B-Factors requested but refine hold is off")
+        return False
+
+    # Add b-factor for refinement run
+    bfactor_run = db.BFactors(
+        pj_id=pj_id,
+        bfactor_directory=f"{message['project_dir']}/Refine3D/bfactor_{message['batch_size']}",
+        number_of_particles=message["batch_size"],
+        resolution=message["resolution"],
+    )
+    _db.add(bfactor_run)
+    _db.commit()
+
+    # All messages should create b-factor jobs as the refine hold is on at this point
+    try:
+        bfactor_params = _db.exec(
+            select(db.BFactorParameters).where(db.BFactorParameters.pj_id == pj_id)
+        ).one()
+    except SQLAlchemyError:
+        bfactor_params = db.BFactorParameters(
+            pj_id=pj_id,
+            project_dir=message["project_dir"],
+            batch_size=message["number_of_particles"],
+            refined_class_uuid=message["refined_class_uuid"],
+            class_reference=message["class_reference"],
+            class_number=message["class_number"],
+            mask_file=message["mask_file"],
+        )
+        _db.add(bfactor_params)
+        _db.commit()
+
+    bfactor_particle_count = default_spa_parameters.bfactor_min_particles
+    while bfactor_particle_count < bfactor_params.batch_size:
+        bfactor_run_name = (
+            f"{bfactor_params.project_dir}/BFactors/bfactor_{bfactor_particle_count}"
+        )
+        try:
+            bfactor_run = _db.exec(
+                select(db.BFactors)
+                .where(db.BFactors.pj_id == pj_id)
+                .where(db.BFactors.bfactor_directory == bfactor_run_name)
+            ).one()
+            bfactor_run.resolution = 0
+        except SQLAlchemyError:
+            bfactor_run = db.BFactors(
+                pj_id=pj_id,
+                bfactor_directory=bfactor_run_name,
+                number_of_particles=bfactor_particle_count,
+                resolution=0,
+            )
+        _db.add(bfactor_run)
+        _db.commit()
+
+        bfactor_particle_count *= 2
+
+        zocalo_message = {
+            "parameters": {
+                "bfactor_directory": bfactor_run.bfactor_directory,
+                "class_reference": bfactor_params.class_reference,
+                "class_number": bfactor_params.class_number,
+                "number_of_particles": bfactor_run.number_of_particles,
+                "batch_size": bfactor_params.batch_size,
+                "pixel_size": relion_options["angpix"],
+                "mask": bfactor_params.mask_file,
+                "mask_diameter": relion_options["mask_diameter"] or 0,
+                "node_creator_queue": machine_config.node_creator_queue,
+                "picker_id": feedback_params.picker_ispyb_id,
+                "refined_grp_uuid": bfactor_params.refined_grp_uuid,
+                "refined_class_uuid": bfactor_params.refined_class_uuid,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                ),
+                "feedback_queue": machine_config.feedback_queue,
+            },
+            "recipes": ["em-spa-bfactor"],
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+    _db.close()
+    return True
+
+
+def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
+    """Received b-factor from refinement run"""
+    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    bfactor_run = _db.exec(
+        select(db.BFactors)
+        .where(db.BFactors.pj_id == pj_id)
+        .where(db.BFactors.bfactor_directory == message["bfactor_directory"])
+    ).one()
+    bfactor_run.resolution = message["resolution"]
+    _db.add(bfactor_run)
+    _db.commit()
+
+    # Find all the resolutions in the b-factors table
+    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id).all())
+    particle_counts = [bf.number_of_particles for bf in all_bfactors]
+    resolutions = [bf.resolution for bf in all_bfactors]
+
+    if all(resolutions):
+        # Calculate b-factor and add to ispyb class table
+        bfactor_fitting = np.polyfit(
+            np.log(particle_counts), 1 / np.array(resolutions) ** 2, 2
+        )
+        refined_class_uuid = message["refined_class_uuid"]
+
+        # Request an ispyb insert of the b-factor fitting parameters
+        if _transport_object:
+            _transport_object.send(
+                "ispyb_connector",
+                {
+                    "parameters": {
+                        "ispyb_command": "buffer",
+                        "buffer_lookup": {
+                            "particle_classification_id": refined_class_uuid,
+                        },
+                        "buffer_command": {
+                            "ispyb_command": "insert_particle_classification"
+                        },
+                        "bfactor_fit_intercept": bfactor_fitting[2],
+                        "bfactor_fit_linear": bfactor_fitting[1],
+                        "bfactor_fit_quadratic": bfactor_fitting[0],
+                    },
+                    "content": {"dummy": "dummy"},
+                },
+            )
+
+        # Clean up the b-factors table and release the hold
+        _db.delete(all_bfactors)
+        _db.commit()
+        _release_refine_hold(message)
+    _db.close()
 
 
 def feedback_callback(header: dict, message: dict) -> None:
@@ -2284,6 +2619,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "done_3d_batch":
             _release_3d_hold(message)
+            if message.get("do_refinement"):
+                _register_refinement(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
@@ -2310,6 +2647,19 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "done_refinement":
+            bfactors_registered = _register_bfactors(message)
+            if _transport_object:
+                if bfactors_registered:
+                    _transport_object.transport.ack(header)
+                else:
+                    _transport_object.transport.nack(header)
+            return None
+        elif message["register"] == "done_bfactor":
+            _save_bfactor(message)
+            if _transport_object:
+                _transport_object.transport.ack(header)
+            return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
@@ -2317,6 +2667,11 @@ def feedback_callback(header: dict, message: dict) -> None:
         murfey_db.rollback()
         murfey_db.close()
         logger.warning("Murfey database required a rollback")
+        if _transport_object:
+            _transport_object.transport.nack(header, requeue=True)
+    except OperationalError:
+        logger.warning("Murfey database error encountered", exc_info=True)
+        time.sleep(1)
         if _transport_object:
             _transport_object.transport.nack(header, requeue=True)
     except Exception:

@@ -161,6 +161,7 @@ class TiltSeriesProcessingDetails(BaseModel):
 class SuggestedPathParameters(BaseModel):
     base_path: Path
     touch: bool = False
+    extra_directory: str = ""
 
 
 class DCGroupParameters(BaseModel):
@@ -277,6 +278,7 @@ class ConnectionFileParameters(BaseModel):
 class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
+    eer: bool = False
 
 
 class SessionInfo(BaseModel):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 
+import importlib_metadata
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -50,6 +51,10 @@ app.mount("/images", StaticFiles(directory=template_files / "images"), name="ima
 app.include_router(murfey.server.bootstrap.bootstrap)
 app.include_router(murfey.server.bootstrap.cygwin)
 app.include_router(murfey.server.bootstrap.pypi)
+app.include_router(murfey.server.bootstrap.plugins)
 app.include_router(murfey.server.websocket.ws)
 
 app.include_router(router)
+
+for r in importlib_metadata.entry_points(group="murfey.routers"):
+    app.include_router(r.load())

@@ -64,10 +64,27 @@ async def prepare_gain(
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await newstack_proc.communicate()
+            await newstack_proc.communicate()
             if newstack_proc.returncode:
                 return None, None
         if rescale:
             gain_out_superres.symlink_to(gain_path_superres)
         return gain_out, gain_out_superres if rescale else gain_out
     return None, None
+
+
+async def prepare_eer_gain(
+    gain_path: Path, executables: Dict[str, str], env: Dict[str, str]
+) -> Tuple[Path | None, Path | None]:
+    if not executables.get("tif2mrc"):
+        return None, None
+    gain_out = gain_path.parent / "gain.mrc"
+    for k, v in env.items():
+        os.environ[k] = v
+    mrc_convert = await asyncio.create_subprocess_shell(
+        f"{executables['tif2mrc']} {gain_path} {gain_out}"
+    )
+    await mrc_convert.communicate()
+    if mrc_convert.returncode:
+        return None, None
+    return gain_out, None

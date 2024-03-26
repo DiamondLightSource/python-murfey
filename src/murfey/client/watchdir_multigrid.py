@@ -63,11 +63,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                             limited=True,
                         )
                         self._seen_dirs.append(d)
-                    processing_started = bool(
-                        set(self._seen_dirs).intersection(
-                            set((d.parent.parent / d.name).glob("Images-Disc*"))
-                        )
-                    )
+                    processing_started = False
                     for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
                         if d02 not in self._seen_dirs:
                             # if skip exisiting processing is set then do not process for any
@@ -77,11 +73,12 @@ class MultigridDirWatcher(murfey.util.Observer):
                                 d02,
                                 include_mid_path=False,
                                 remove_files=True,
-                                analyse=not processing_started
-                                and not (first_loop and self._skip_existing_processing),
+                                analyse=not (
+                                    first_loop and self._skip_existing_processing
+                                ),
                             )
                             self._seen_dirs.append(d02)
-                            processing_started = True
+                        processing_started = d02 in self._seen_dirs
                     if not processing_started:
                         d02 = d.parent.parent / d.name
                         if (

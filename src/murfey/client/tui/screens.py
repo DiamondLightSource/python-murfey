@@ -108,8 +108,11 @@ def determine_default_destination(
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
+                                        "extra_directory": extra_directory,
                                     },
                                 )
+                                if suggested_path_response is None:
+                                    raise RuntimeError("Murfey server is unreachable")
                                 _default = suggested_path_response.json().get(
                                     "suggested_path"
                                 )
@@ -674,10 +677,12 @@ class SessionSelection(Screen):
             self.app.push_screen("session-select-screen")
         else:
             session_name = "Client connection"
-            self.app._environment.murfey_session = capture_post(
+            resp = capture_post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
-            ).json()
+            )
+            if resp:
+                self.app._environment.murfey_session = resp.json()
 
 
 class VisitSelection(SwitchSelection):
@@ -785,6 +790,9 @@ class GainReference(Screen):
                 url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
                 json={
                     "gain_ref": str(self._dir_tree._gain_reference),
+                    "eer": bool(
+                        self.app._machine_config.get("external_executables_eer")
+                    ),
                 },
             )
             if str(process_gain_response.status_code).startswith("4"):

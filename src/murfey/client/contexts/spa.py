@@ -16,7 +16,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_get, capture_post, get_machine_config
 from murfey.util.db import FoilHole, GridSquare
 
 logger = logging.getLogger("murfey.client.contexts.spa")
@@ -257,7 +257,7 @@ class _SPAContext(Context):
     ]
 
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__(acquisition_software)
+        super().__init__("SPA", acquisition_software)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
@@ -343,9 +343,16 @@ class _SPAContext(Context):
                 )
             except (KeyError, IndexError):
                 pass
+            c2_index = 3
+            for i, el in enumerate(
+                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"]
+            ):
+                if el["a:Key"] == "Aperture[C2].Name":
+                    c2_index = i
+                    break
             metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
                 "a:KeyValueOfstringanyType"
-            ][3]["a:Value"]["#text"]
+            ][c2_index]["a:Value"]["#text"]
             metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ExposureTime"]
@@ -373,9 +380,12 @@ class _SPAContext(Context):
         )
         binning_factor = 1
         if environment:
-            server_config = requests.get(
-                f"{str(environment.url.geturl())}/machine/"
-            ).json()
+            server_config_response = capture_get(
+                f"{str(environment.url.geturl())}/machine/", catch=True
+            )
+            if server_config_response is None:
+                return None
+            server_config = server_config_response.json()
             if server_config.get("superres") and not environment.superres:
                 # If camera is capable of superres and collection is in superres
                 binning_factor = 2
@@ -490,7 +500,7 @@ class SPAModularContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
+    ) -> bool:
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -509,28 +519,30 @@ class SPAModularContext(_SPAContext):
 
                     if not environment:
                         logger.warning("No environment passed in")
-                        return
+                        return True
                     source = _get_source(transferred_file, environment)
                     if not source:
                         logger.warning(f"No source found for file {transferred_file}")
-                        return
+                        return True
 
                     if required_strings and not any(
                         r in transferred_file.name for r in required_strings
                     ):
-                        return
+                        return True
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
                             environment, source, transferred_file
                         )
                         if not environment.movie_counters.get(str(source)):
-                            movie_counts = requests.get(
-                                f"{str(environment.url.geturl())}/num_movies"
-                            ).json()
-                            environment.movie_counters[str(source)] = count(
-                                movie_counts.get(str(source), 0) + 1
+                            movie_counts_get = capture_get(
+                                f"{str(environment.url.geturl())}/num_movies",
+                                catch=True,
                             )
+                            if movie_counts_get is not None:
+                                environment.movie_counters[str(source)] = count(
+                                    movie_counts_get.json().get(str(source), 0) + 1
+                                )
                         environment.movies[file_transferred_to] = MovieTracker(
                             movie_number=next(environment.movie_counters[str(source)]),
                             motion_correction_uuid=next(MurfeyID),
@@ -538,7 +550,7 @@ class SPAModularContext(_SPAContext):
 
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
-                            response = requests.post(
+                            response = capture_post(
                                 f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
                                 json={
                                     "eer_path": str(file_transferred_to),
@@ -550,7 +562,10 @@ class SPAModularContext(_SPAContext):
                                     ],
                                     "fractionation_file_name": "eer_fractionation_spa.txt",
                                 },
+                                catch=True,
                             )
+                            if response is None:
+                                return False
                             eer_fractionation_file = response.json()[
                                 "eer_fractionation_file"
                             ]
@@ -682,14 +697,16 @@ class SPAModularContext(_SPAContext):
                             "tag": str(source),
                             "foil_hole_id": foil_hole,
                         }
-                        requests.post(
+                        capture_post(
                             preproc_url,
                             json={
                                 k: None if v == "None" else v
                                 for k, v in preproc_data.items()
                             },
+                            catch=True,
                         )
-        return
+
+        return True
 
     def _register_data_collection(
         self,
@@ -747,7 +764,7 @@ class SPAContext(_SPAContext):
             "slit_width": data.get("slit_width"),
             "phase_plate": data.get("phase_plate", False),
         }
-        requests.post(url, json=json)
+        capture_post(url, json=json, catch=True)
 
     def post_transfer(
         self,
@@ -755,8 +772,8 @@ class SPAContext(_SPAContext):
         role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
-    ):
-        return
+    ) -> bool:
+        return True
 
     def _register_processing_job(
         self,
@@ -803,7 +820,7 @@ class SPAContext(_SPAContext):
         }
         if parameters["particle_diameter"]:
             msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        requests.post(proc_url, json=msg)
+        capture_post(proc_url, json=msg)
 
     def _launch_spa_pipeline(
         self,
@@ -814,4 +831,4 @@ class SPAContext(_SPAContext):
     ):
         environment.id_tag_registry["auto_proc_program"].append(tag)
         data = {"job_id": jobid}
-        requests.post(url, json=data)
+        capture_post(url, json=data)

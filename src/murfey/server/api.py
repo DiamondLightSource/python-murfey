@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from functools import lru_cache
@@ -22,24 +23,30 @@ from ispyb.sqlalchemy import (
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
-import murfey.server.bootstrap
 import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
+    _midpoint,
     _murfey_id,
     _transport_object,
+    check_tilt_series_mc,
+    get_all_tilts,
+    get_angle,
     get_hostname,
+    get_job_ids,
     get_machine_config,
     get_microscope,
+    get_tomo_preproc_params,
     templates,
 )
 from murfey.server.config import from_file, settings
-from murfey.server.gain import Camera, prepare_gain
+from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
     AutoProcProgram,
@@ -540,6 +547,13 @@ def register_tilt_series(
         .one()
         .session_id
     )
+    if db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all():
+        return
     tilt_series = TiltSeries(
         session_id=session_id,
         tag=tilt_series_info.tag,
@@ -573,6 +587,66 @@ def register_completed_tilt_series(
         ts.complete = True
         db.add(ts)
     db.commit()
+    for ts in tilt_series_db:
+        if check_tilt_series_mc(ts.id):
+            collected_ids = db.exec(
+                select(
+                    DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
+                )
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == ts.tag)
+                .where(DataCollection.dcg_id == DataCollectionGroup.id)
+                .where(ProcessingJob.dc_id == DataCollection.id)
+                .where(AutoProcProgram.pj_id == ProcessingJob.id)
+                .where(ProcessingJob.recipe == "em-tomo-align")
+            ).one()
+            machine_config = get_machine_config()
+            tilts = get_all_tilts(ts.id)
+            ids = get_job_ids(ts.id, collected_ids[3].id)
+            preproc_params = get_tomo_preproc_params(ids.dcgid)
+
+            first_tilt = db.exec(
+                select(Tilt).where(Tilt.tilt_series_id == ts.id)
+            ).first()
+            parts = [secure_filename(p) for p in Path(first_tilt.movie_path).parts]
+            visit_idx = parts.index(visit_name)
+            core = Path(*Path(first_tilt.movie_path).parts[: visit_idx + 1])
+            ppath = Path(
+                "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
+            )
+            sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            stack_file = (
+                core
+                / machine_config.processed_directory_name
+                / sub_dataset
+                / "align_output"
+                / f"{ts.tag}_stack.mrc"
+            )
+            if not stack_file.parent.exists():
+                stack_file.parent.mkdir(parents=True)
+            tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+            zocalo_message = {
+                "recipes": ["em-tomo-align"],
+                "parameters": {
+                    "input_file_list": str([[t, str(get_angle(t))] for t in tilts]),
+                    "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
+                    "dcid": ids.dcid,
+                    "appid": ids.appid,
+                    "stack_file": str(stack_file),
+                    "pix_size": preproc_params.pixel_size,
+                    "manual_tilt_offset": tilt_offset,
+                    "node_creator_queue": machine_config.node_creator_queue,
+                },
+            }
+            if _transport_object:
+                log.info(f"Sending Zocalo message for processing: {zocalo_message}")
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
+            else:
+                log.info(
+                    f"No transport object found. Zocalo message would be {zocalo_message}"
+                )
 
 
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
@@ -594,27 +668,44 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
 
 
 @router.post("/visits/{visit_name}/{client_id}/tilt")
-def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
+async def register_tilt(
+    visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db
+):
+    def _add_tilt():
+        session_id = (
+            db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.client_id == client_id
+                )
+            )
+            .one()
+            .session_id
         )
-        .one()
-        .session_id
-    )
-    tilt_series_id = (
-        db.exec(
-            select(TiltSeries)
-            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-            .where(TiltSeries.session_id == session_id)
-            .where(TiltSeries.rsync_source == tilt_info.source)
+        tilt_series_id = (
+            db.exec(
+                select(TiltSeries)
+                .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+                .where(TiltSeries.session_id == session_id)
+                .where(TiltSeries.rsync_source == tilt_info.source)
+            )
+            .one()
+            .id
         )
-        .one()
-        .id
-    )
-    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
-    db.add(tilt)
-    db.commit()
+        if db.exec(
+            select(Tilt)
+            .where(Tilt.movie_path == tilt_info.movie_path)
+            .where(Tilt.tilt_series_id == tilt_series_id)
+        ).all():
+            return
+        tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
+        db.add(tilt)
+        db.commit()
+
+    try:
+        _add_tilt()
+    except OperationalError:
+        asyncio.sleep(30)
+        _add_tilt()
 
 
 @router.get("/visits_raw", response_model=List[Visit])
@@ -841,8 +932,6 @@ async def request_spa_preprocessing(
             Path(secure_filename(str(mrc_out))).parent.mkdir(
                 parents=True, exist_ok=True
             )
-        if not Path(proc_file.path).is_file():
-            return proc_file
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
@@ -935,6 +1024,12 @@ async def request_tomography_preprocessing(
         .where(ProcessingJob.recipe == "em-tomo-preprocess")
     ).all()
     if data_collection:
+        if registered_tilts := db.exec(
+            select(Tilt).where(Tilt.movie_path == proc_file.path)
+        ).all():
+            if len(registered_tilts) == 1:
+                if registered_tilts[0].motion_corrected:
+                    return proc_file
         dcid = data_collection[0][1].id
         appid = data_collection[0][3].id
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
@@ -1058,6 +1153,8 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
         check_path.mkdir()
+        if params.extra_directory:
+            (check_path / secure_filename(params.extra_directory)).mkdir()
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
@@ -1193,7 +1290,10 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 @router.post("/visits/{visit_name}/process_gain")
 async def process_gain(visit_name, gain_reference_params: GainReference):
     camera = getattr(Camera, machine_config.camera)
-    executables = machine_config.external_executables
+    if gain_reference_params.eer:
+        executables = machine_config.external_executables_eer
+    else:
+        executables = machine_config.external_executables
     env = machine_config.external_environment
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
@@ -1203,19 +1303,31 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
-    new_gain_ref, new_gain_ref_superres = await prepare_gain(
-        camera,
-        filepath / safe_path_name,
-        executables,
-        env,
-        rescale=gain_reference_params.rescale,
-    )
+    if gain_reference_params.eer:
+        new_gain_ref, new_gain_ref_superres = await prepare_eer_gain(
+            filepath / safe_path_name,
+            executables,
+            env,
+        )
+    else:
+        new_gain_ref, new_gain_ref_superres = await prepare_gain(
+            camera,
+            filepath / safe_path_name,
+            executables,
+            env,
+            rescale=gain_reference_params.rescale,
+        )
     if new_gain_ref and new_gain_ref_superres:
         return {
             "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
             "gain_ref_superres": new_gain_ref_superres.relative_to(
                 Path(machine_config.rsync_basepath)
             ),
+        }
+    elif new_gain_ref:
+        return {
+            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref_superres": None,
         }
     else:
         return {"gain_ref": str(filepath / safe_path_name), "gain_ref_superres": None}
@@ -1250,7 +1362,7 @@ async def write_eer_fractionation_file(
         return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
         frac_file.write(
-            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
+            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame / fractionation_params.fractionation}"
         )
     return {"eer_fractionation_file": str(file_path)}
 
@@ -1446,7 +1558,7 @@ def remove_session(client_id: int, db=murfey_db):
     return
 
 
-@router.post("/visits/{visit_name}/mointoring/{on}")
+@router.post("/visits/{visit_name}/monitoring/{on}")
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)

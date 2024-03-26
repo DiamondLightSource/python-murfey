@@ -133,10 +133,16 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     class3d_parameters: List["Class3DParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
+    refine_parameters: List["RefineParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
     class2ds: List["Class2D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
     class3ds: List["Class3D"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    refine3ds: List["Refine3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -207,10 +213,16 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     class3ds: Optional["Class3D"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
+    refine3ds: Optional["Refine3D"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
     class2d_parameters: Optional["Class2DParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
     class3d_parameters: Optional["Class3DParameters"] = Relationship(
+        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    refine_parameters: Optional["RefineParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
     spa_feedback_parameters: Optional["SPAFeedbackParameters"] = Relationship(
@@ -330,6 +342,7 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     hold_class2d: bool = False
     rerun_class2d: bool = False
     hold_class3d: bool = False
+    hold_refine: bool = False
     class_selection_score: float
     star_combination_job: int
     initial_model: str
@@ -399,6 +412,48 @@ class Class3D(SQLModel, table=True):  # type: ignore
     # )
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="class3ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class3ds")
+
+
+class RefineParameters(SQLModel, table=True):  # type: ignore
+    refine_dir: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
+    class3d_dir: str
+    class_number: int
+    run: bool = True
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="refine_parameters"
+    )
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(
+        back_populates="refine_parameters"
+    )
+
+
+class Refine3D(SQLModel, table=True):  # type: ignore
+    refine_dir: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    murfey_id: int = Field(foreign_key="murfeyledger.id")
+    processing_job: Optional[ProcessingJob] = Relationship(back_populates="refine3ds")
+    murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="refine3ds")
+
+
+class BFactorParameters(SQLModel, table=True):  # type: ignore
+    project_dir: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    batch_size: int
+    refined_grp_uuid: int
+    refined_class_uuid: int
+    class_reference: str
+    class_number: int
+    mask_file: str
+    run: bool = True
+
+
+class BFactors(SQLModel, table=True):  # type: ignore
+    bfactor_directory: str = Field(primary_key=True)
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    number_of_particles: int
+    resolution: float
 
 
 def setup(url: str):

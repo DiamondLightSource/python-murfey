@@ -12,6 +12,7 @@ class SPAParameters(BaseModel):
     do_icebreaker_jobs: bool = True
     fraction_of_classes_to_remove_2d: float = 0.7
     nr_picks_before_diameter: int = 10000
+    bfactor_min_particles: int = 2000
 
 
 default_spa_parameters = SPAParameters()
