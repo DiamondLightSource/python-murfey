@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, Optional, OrderedDict, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, OrderedDict, Tuple
 
 import requests
 import xmltodict
@@ -17,9 +17,40 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util import capture_get, capture_post, get_machine_config
-from murfey.util.db import FoilHole, GridSquare
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+
+class FoilHole(NamedTuple):
+    session_id: int
+    id: int
+    grid_square_id: int
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+
+
+class GridSquare(NamedTuple):
+    session_id: int
+    id: int
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+    tag: str = ""
 
 
 def _get_grid_square_atlas_positions(
