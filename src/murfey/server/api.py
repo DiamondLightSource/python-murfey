@@ -374,6 +374,7 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
+        jpeg_size = Image.open(grid_square_params.image).size
         grid_square = GridSquare(
             name=gsid,
             session_id=session_id,
@@ -384,8 +385,8 @@ def register_grid_square(
             y_stage_position=grid_square_params.y_stage_position,
             readout_area_x=grid_square_params.readout_area_x,
             readout_area_y=grid_square_params.readout_area_y,
-            thumbnail_size_x=grid_square_params.thumbnail_size_x,
-            thumbnail_size_y=grid_square_params.thumbnail_size_y,
+            thumbnail_size_x=grid_square_params.thumbnail_size_x or jpeg_size[0],
+            thumbnail_size_y=grid_square_params.thumbnail_size_y or jpeg_size[1],
             pixel_size=grid_square_params.pixel_size,
             image=grid_square_params.image,
         )
@@ -419,6 +420,7 @@ def register_foil_hole(
         .one()
         .id
     )
+    jpeg_size = Image.open(foil_hole_params.image).size
     foil_hole = FoilHole(
         name=foil_hole_params.name,
         session_id=session_id,
@@ -429,8 +431,8 @@ def register_foil_hole(
         y_stage_position=foil_hole_params.y_stage_position,
         readout_area_x=foil_hole_params.readout_area_x,
         readout_area_y=foil_hole_params.readout_area_y,
-        thumbnail_size_x=foil_hole_params.thumbnail_size_x,
-        thumbnail_size_y=foil_hole_params.thumbnail_size_y,
+        thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
+        thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
         pixel_size=foil_hole_params.pixel_size,
         image=foil_hole_params.image,
     )
