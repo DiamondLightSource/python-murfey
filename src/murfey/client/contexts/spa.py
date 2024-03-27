@@ -8,7 +8,6 @@ from typing import Any, Dict, List, NamedTuple, Optional, OrderedDict, Tuple
 
 import requests
 import xmltodict
-from PIL import Image
 
 from murfey.client.context import Context, ProcessingParameter
 from murfey.client.instance_environment import (
@@ -155,7 +154,6 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
     if image_paths:
         image_paths.sort(key=lambda x: x.stat().st_ctime)
         image_path = image_paths[0]
-        jpeg_size = Image.open(image_path).size
         with open(Path(image_path).with_suffix(".xml")) as gs_xml:
             gs_xml_data = xmltodict.parse(gs_xml.read())
         readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
@@ -170,8 +168,8 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
             session_id=session_id,
             readout_area_x=full_size[0] if image_path else None,
             readout_area_y=full_size[1] if image_path else None,
-            thumbnail_size_x=jpeg_size[0] if image_path else None,
-            thumbnail_size_y=jpeg_size[1] if image_path else None,
+            thumbnail_size_x=None,
+            thumbnail_size_y=None,
             pixel_size=float(pixel_size) if image_path else None,
             image=str(image_path),
         )
@@ -202,7 +200,6 @@ def _foil_hole_data(
         image_paths.sort(key=lambda x: x.stat().st_ctime)
         image_path: Path | str = image_paths[-1] if image_paths else ""
         if image_path:
-            jpeg_size = Image.open(image_path).size
             with open(Path(image_path).with_suffix(".xml")) as fh_xml:
                 fh_xml_data = xmltodict.parse(fh_xml.read())
             readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
@@ -226,8 +223,8 @@ def _foil_hole_data(
                     y_stage_position=float(stage["c:Y"]),
                     readout_area_x=full_size[0] if image_path else None,
                     readout_area_y=full_size[1] if image_path else None,
-                    thumbnail_size_x=jpeg_size[0] if image_path else None,
-                    thumbnail_size_y=jpeg_size[1] if image_path else None,
+                    thumbnail_size_x=None,
+                    thumbnail_size_y=None,
                     pixel_size=float(pixel_size) if image_path else None,
                     image=str(image_path),
                 )
@@ -641,6 +638,9 @@ class SPAModularContext(_SPAContext):
                                 grid_square,
                                 environment.murfey_session,
                             )
+                            image_path = _file_transferred_to(
+                                environment, source, Path(gs.image)
+                            )
                             capture_post(
                                 gs_url,
                                 json={
@@ -650,7 +650,7 @@ class SPAModularContext(_SPAContext):
                                     "thumbnail_size_x": gs.thumbnail_size_x,
                                     "thumbnail_size_y": gs.thumbnail_size_y,
                                     "pixel_size": gs.pixel_size,
-                                    "image": gs.image,
+                                    "image": str(image_path),
                                     "x_location": gs_pix_position[0],
                                     "y_location": gs_pix_position[1],
                                     "x_stage_position": gs_pix_position[2],
@@ -670,6 +670,9 @@ class SPAModularContext(_SPAContext):
                                     grid_square,
                                     environment.murfey_session,
                                 )
+                                image_path = _file_transferred_to(
+                                    environment, source, Path(fh.image)
+                                )
                                 capture_post(
                                     fh_url,
                                     json={
@@ -684,7 +687,7 @@ class SPAModularContext(_SPAContext):
                                         "thumbnail_size_y": fh.thumbnail_size_y,
                                         "pixel_size": fh.pixel_size,
                                         "tag": str(source),
-                                        "image": fh.image,
+                                        "image": str(image_path),
                                     },
                                 )
                             else:
