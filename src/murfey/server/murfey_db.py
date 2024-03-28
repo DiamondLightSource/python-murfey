@@ -31,4 +31,6 @@ def get_murfey_db_session(
             session.close()
 
 
-murfey_db = Depends(partial(get_murfey_db_session, get_machine_config()))
+murfey_db_session = partial(get_murfey_db_session, get_machine_config())
+
+murfey_db = Depends(murfey_db_session)
