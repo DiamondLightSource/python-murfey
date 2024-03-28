@@ -31,9 +31,12 @@ from murfey.util.models import Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
 
-Session = sqlalchemy.orm.sessionmaker(
-    bind=sqlalchemy.create_engine(url(), connect_args={"use_pure": True})
-)
+try:
+    Session = sqlalchemy.orm.sessionmaker(
+        bind=sqlalchemy.create_engine(url(), connect_args={"use_pure": True})
+    )
+except AttributeError:
+    Session = None
 
 
 def _send_using_new_connection(transport_type: str, queue: str, message: dict) -> None:
