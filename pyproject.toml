@@ -2,6 +2,96 @@
 requires = ["setuptools >= 40.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# TEP 2024-04-03
+[project]
+name = "murfey"
+authors = []
+description = "Client-Server architecture hauling Cryo-EM data"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = [""]
+license = {text = "BSD License"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pydantic",
+    "requests",
+    "rich",
+]
+version = "0.11.5"
+#dynamic = ["version"]  # Clashes with version variable immediately above
+
+# TEP 2024-04-03
+[project.optional-dependencies]
+client = [
+    "procrunner",
+    "textual==0.42.0",
+    "websocket-client",
+    "werkzeug",
+    "xmltodict",
+]
+server = [
+    "mysql-connector-python<=8.0.29",
+    "fastapi>=0.101",
+    "cryptography",
+    "importlib_resources; python_version<'3.9'",
+    "ispyb",
+    "jinja2",
+    "packaging",
+    "numpy",
+    "sqlmodel",
+    "pillow",
+    "prometheus_client",
+    "uvicorn[standard]",
+    "werkzeug",
+    "zocalo",
+]
+developer = [
+    "pytest",
+    "pre-commit",
+    "bump2version",
+]
+
+# TEP 2024-04-03
+[project.scripts]
+# Where there are "." in the variable name, enclose with inverted commas
+murfey = "murfey.client:run"
+"murfey.server" = "murfey.server:run"
+"murfey.simulate" = "murfey.cli.dummy:run"
+"murfey.transfer" = "murfey.cli.transfer:run"
+"murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
+"murfey.sessions" = "murfey.cli.db_sessions:run"
+"murfey.generate_password" = "murfey.cli.generate_db_password:run" 
+"murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
+"murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
+"murfey.create_db" = "murfey.cli.create_db:run"
+"murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
+"murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
+
+# TEP 2024-04-03
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+zip-safe = false
+
+# TEP 2024-04-03
+#[tool.setuptools.packages]
+#find = {}  # This option leads to pip searching for stuff in "tests"
+
+# TEP 2024-04-03
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# TEP 2024-04-03
+[tool.setuptools.package-data]
+"murfey.client.tui" = ["*.css"]
+
 [tool.isort]
 profile = "black"
 
