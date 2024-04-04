@@ -6,18 +6,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "murfey"
 authors = []
+maintainers = []
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = [""]
-license = {text = "BSD License"}
+license = {file = "LICENSE"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "pydantic",
@@ -26,6 +31,12 @@ dependencies = [
 ]
 version = "0.11.5"
 #dynamic = ["version"]  # Clashes with version variable immediately above
+
+[project.urls]
+Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
+Documentation = "https://github.com/DiamondLightSource/python-murfey"
+GitHub = "https://github.com/DiamondLightSource/python-murfey"
+
 
 # TEP 2024-04-03
 [project.optional-dependencies]
@@ -92,11 +103,60 @@ where = ["src"]
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
 
+# TEP 2024-04-04
+# Found potential .toml interpreter for Flake8
+# Flake8-pyproject: https://pypi.org/project/Flake8-pyproject/
+[tool.flake8]
+select = [
+    "C4",
+    "E401",
+    "E711",
+    "E712",
+    "E713",
+    "E714",
+    "E721",
+    "E722",
+    "E901",
+    "F401",
+    "F402",
+    "F403",
+    "F405",
+    "F541",
+    "F631",
+    "F632",
+    "F633",
+    "F811",
+    "F812",
+    "F821",
+    "F822",
+    "F841",
+    "F901",
+    "W191",
+    "W291",
+    "W292",
+    "W293",
+    "W602",
+    "W603",
+    "W604",
+    "W605",
+    "W606",
+]
+ignore = [
+    "E203", 
+    "E266",
+    "E501", 
+    "W503"
+]
+max-line-length = "88"
+# Also worth investigating Ruff
+# Suggested by VSCode's auto-fill, so should be pretty popular
+# Ruff: https://github.com/astral-sh/ruff
+
 [tool.isort]
 profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 
-[tool.mypy]
-mypy_path = "src"
+#[tool.mypy]
+#mypy_path = "src"
