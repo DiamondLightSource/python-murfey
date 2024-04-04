@@ -628,8 +628,16 @@ class SPAModularContext(_SPAContext):
                                 .get(str(source), {})
                             )
                             if data_collection_group.get("atlas"):
+                                visit_path = ""
+                                for p in transferred_file.parts:
+                                    if p == environment.visit:
+                                        break
+                                    visit_path += f"/{p}"
+                                local_atlas_path = (
+                                    Path(visit_path) / environment.samples[source].atlas
+                                )
                                 gs_pix_position = _get_grid_square_atlas_positions(
-                                    data_collection_group["atlas"],
+                                    local_atlas_path,
                                     grid_square=str(grid_square),
                                 )[str(grid_square)]
                             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
