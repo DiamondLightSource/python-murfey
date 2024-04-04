@@ -23,13 +23,11 @@ def _atlas_destination(
         return (
             Path(machine_config.get("rsync_basepath", ""))
             / Path(environment.default_destinations[source]).parent
-            / machine_config.get("create_directories", {}).get("atlas", "")
         )
     return (
         Path(machine_config.get("rsync_basepath", ""))
         / Path(environment.default_destinations[source]).parent
         / environment.visit
-        / machine_config.get("create_directories", {}).get("atlas", "")
     )
 
 
