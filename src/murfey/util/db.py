@@ -281,7 +281,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
-    foil_hole_id: int = Field(foreign_key="foilhole.id")
+    foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
     path: str
     image_number: int
     tag: str

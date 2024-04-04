@@ -596,7 +596,7 @@ def register_completed_tilt_series(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
                 )
                 .where(DataCollectionGroup.session_id == session_id)
-                .where(DataCollectionGroup.tag == ts.tag)
+                .where(DataCollection.tag == ts.tag)
                 .where(DataCollection.dcg_id == DataCollectionGroup.id)
                 .where(ProcessingJob.dc_id == DataCollection.id)
                 .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -1209,7 +1209,7 @@ def register_dc_group(
             _transport_object.send(
                 machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
             )
-    return dcg_parameters
+    return dcg_params
 
 
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
