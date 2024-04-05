@@ -1057,9 +1057,11 @@ async def request_tomography_preprocessing(
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
-                "gain_ref": str(machine_config.rsync_basepath / proc_file.gain_ref)
-                if proc_file.gain_ref
-                else proc_file.gain_ref,
+                "gain_ref": (
+                    str(machine_config.rsync_basepath / proc_file.gain_ref)
+                    if proc_file.gain_ref
+                    else proc_file.gain_ref
+                ),
                 "fm_int_file": proc_file.eer_fractionation_file,
             },
         }

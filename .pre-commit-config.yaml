@@ -46,9 +46,13 @@ repos:
   rev: 7.0.0
   hooks:
   - id: flake8
+    # Added Flake8-pyproject plugin for .toml compatibility
     # flake8-comprehensions URL: https://pypi.org/project/flake8-comprehensions/
     #additional_dependencies: ['flake8-comprehensions==3.8.0']
-    additional_dependencies: ['flake8-comprehensions==3.14.0']
+    additional_dependencies: [
+      "Flake8-pyproject==1.2.3",
+      'flake8-comprehensions==3.14.0'
+      ]
 
 # Type checking
 - repo: https://github.com/pre-commit/mirrors-mypy

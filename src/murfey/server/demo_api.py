@@ -112,6 +112,7 @@ if settings.murfey_machine_configuration:
         from_file(Path(settings.murfey_machine_configuration), microscope)
     )
 
+
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -778,11 +779,11 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
                 "mc_uuid": murfey_ids[2 * i],
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(
-                    machine_config["rsync_basepath"] / proc_params["gain_ref"]
-                )
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
+                "gain_ref": (
+                    str(machine_config["rsync_basepath"] / proc_params["gain_ref"])
+                    if proc_params["gain_ref"]
+                    else proc_params["gain_ref"]
+                ),
                 "picker_uuid": murfey_ids[2 * i + 1],
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             },

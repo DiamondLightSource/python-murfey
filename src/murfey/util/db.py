@@ -76,11 +76,11 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    tomography_preprocessing_parameters: List[
-        "TomographyPreprocessingParameters"
-    ] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
+    tomography_preprocessing_parameters: List["TomographyPreprocessingParameters"] = (
+        Relationship(
+            back_populates="data_collection_group",
+            sa_relationship_kwargs={"cascade": "delete"},
+        )
     )
 
 
@@ -119,10 +119,11 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    tomography_processing_parameters: List[
-        "TomographyProcessingParameters"
-    ] = Relationship(
-        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
+        Relationship(
+            back_populates="processing_job",
+            sa_relationship_kwargs={"cascade": "delete"},
+        )
     )
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}

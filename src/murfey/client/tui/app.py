@@ -153,9 +153,9 @@ class MurfeyTUI(App):
                     destination = str(k / extra_directory)
                     break
             else:
-                self._environment.default_destinations[
-                    source
-                ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                self._environment.default_destinations[source] = (
+                    f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                )
                 destination = determine_default_destination(
                     self._visit,
                     source,
@@ -402,9 +402,9 @@ class MurfeyTUI(App):
                 f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
             )
             if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values[
-                    "gain_ref"
-                ] = self._environment.data_collection_parameters.get("gain_ref")
+                self._form_values["gain_ref"] = (
+                    self._environment.data_collection_parameters.get("gain_ref")
+                )
             self._form_dependencies = response.get("dependencies", {})
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
@@ -441,12 +441,16 @@ class MurfeyTUI(App):
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
                 "tag": str(source),
-                "atlas": str(self._environment.samples[source].atlas)
-                if self._environment.samples.get(source)
-                else "",
-                "sample": self._environment.samples[source].sample
-                if self._environment.samples.get(source)
-                else None,
+                "atlas": (
+                    str(self._environment.samples[source].atlas)
+                    if self._environment.samples.get(source)
+                    else ""
+                ),
+                "sample": (
+                    self._environment.samples[source].sample
+                    if self._environment.samples.get(source)
+                    else None
+                ),
             }
             capture_post(url, json=dcg_data)
             data = {
@@ -494,12 +498,16 @@ class MurfeyTUI(App):
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
                 "tag": str(source),
-                "atlas": str(self._environment.samples[source].atlas)
-                if self._environment.samples.get(source)
-                else "",
-                "sample": self._environment.samples[source].sample
-                if self._environment.samples.get(source)
-                else None,
+                "atlas": (
+                    str(self._environment.samples[source].atlas)
+                    if self._environment.samples.get(source)
+                    else ""
+                ),
+                "sample": (
+                    self._environment.samples[source].sample
+                    if self._environment.samples.get(source)
+                    else None
+                ),
             }
             capture_post(url, json=dcg_data)
             if from_form:

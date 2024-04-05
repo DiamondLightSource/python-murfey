@@ -55,9 +55,9 @@ class Analyser(Observer):
         self._batch_store: dict = {}
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
-        self.parameters_model: Type[ProcessingParametersSPA] | Type[
-            PreprocessingParametersTomo
-        ] | None = None
+        self.parameters_model: (
+            Type[ProcessingParametersSPA] | Type[PreprocessingParametersTomo] | None
+        ) = None
 
         self.queue: queue.Queue = queue.Queue()
         self.thread = threading.Thread(name="Analyser", target=self._analyse)
@@ -234,10 +234,12 @@ class Analyser(Observer):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
-                                        transferred_file.with_suffix(".mdoc")
-                                        if self._context._acquisition_software
-                                        == "serialem"
-                                        else self._xml_file(transferred_file),
+                                        (
+                                            transferred_file.with_suffix(".mdoc")
+                                            if self._context._acquisition_software
+                                            == "serialem"
+                                            else self._xml_file(transferred_file)
+                                        ),
                                         environment=self._environment,
                                     )
                                 except NotImplementedError:
@@ -255,16 +257,20 @@ class Analyser(Observer):
                                     self._extension = dc_metadata["file_extension"]
                                 else:
                                     dc_metadata["file_extension"] = self._extension
-                                dc_metadata[
-                                    "acquisition_software"
-                                ] = self._context._acquisition_software
+                                dc_metadata["acquisition_software"] = (
+                                    self._context._acquisition_software
+                                )
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": spa_form_dependencies
-                                        if isinstance(self._context, SPAContext)
-                                        or isinstance(self._context, SPAModularContext)
-                                        else {},
+                                        "dependencies": (
+                                            spa_form_dependencies
+                                            if isinstance(self._context, SPAContext)
+                                            or isinstance(
+                                                self._context, SPAModularContext
+                                            )
+                                            else {}
+                                        ),
                                     }
                                 )
                 elif not self._extension or self._unseen_xml:
@@ -303,16 +309,20 @@ class Analyser(Observer):
                                     self._extension = dc_metadata["file_extension"]
                                 else:
                                     dc_metadata["file_extension"] = self._extension
-                                dc_metadata[
-                                    "acquisition_software"
-                                ] = self._context._acquisition_software
+                                dc_metadata["acquisition_software"] = (
+                                    self._context._acquisition_software
+                                )
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": spa_form_dependencies
-                                        if isinstance(self._context, SPAContext)
-                                        or isinstance(self._context, SPAModularContext)
-                                        else {},
+                                        "dependencies": (
+                                            spa_form_dependencies
+                                            if isinstance(self._context, SPAContext)
+                                            or isinstance(
+                                                self._context, SPAModularContext
+                                            )
+                                            else {}
+                                        ),
                                     }
                                 )
                 elif isinstance(self._context, TomographyContext):
