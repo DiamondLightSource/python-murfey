@@ -658,7 +658,10 @@ def _register_picked_particles_use_diameter(
                         "micrographs_file": saved_message.micrographs_file,
                         "coord_list_file": saved_message.coord_list_file,
                         "output_file": saved_message.extract_file,
-                        "pix_size": relion_options["angpix"],
+                        "pix_size": (
+                            relion_options["angpix"]
+                            * relion_options["motion_corr_binning"]
+                        ),
                         "ctf_image": saved_message.ctf_image,
                         "ctf_max_resolution": saved_message.ctf_max_resolution,
                         "ctf_figure_of_merit": saved_message.ctf_figure_of_merit,
@@ -667,10 +670,9 @@ def _register_picked_particles_use_diameter(
                         "defocus_angle": saved_message.defocus_angle,
                         "particle_diameter": particle_diameter,
                         "downscale": relion_options["downscale"],
-                        "fm_dose": relion_options["dose_per_frame"],
                         "kv": relion_options["voltage"],
-                        "gain_ref": relion_options["gain_ref"],
                         "feedback_queue": machine_config.feedback_queue,
+                        "node_creator_queue": machine_config.node_creator_queue,
                         "session_id": message["session_id"],
                         "autoproc_program_id": _app_id(
                             _pj_id(message["program_id"], _db, recipe="em-spa-extract"),
@@ -692,7 +694,9 @@ def _register_picked_particles_use_diameter(
                     "micrographs_file": params_to_forward["micrographs_file"],
                     "coord_list_file": params_to_forward["coord_list_file"],
                     "output_file": params_to_forward["extract_file"],
-                    "pix_size": relion_options["angpix"],
+                    "pix_size": (
+                        relion_options["angpix"] * relion_options["motion_corr_binning"]
+                    ),
                     "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
                     "ctf_max_resolution": params_to_forward["ctf_values"][
                         "CtfMaxResolution"
@@ -705,10 +709,9 @@ def _register_picked_particles_use_diameter(
                     "defocus_angle": params_to_forward["ctf_values"]["DefocusAngle"],
                     "particle_diameter": particle_diameter,
                     "downscale": relion_options["downscale"],
-                    "fm_dose": relion_options["dose_per_frame"],
                     "kv": relion_options["voltage"],
-                    "gain_ref": relion_options["gain_ref"],
                     "feedback_queue": machine_config.feedback_queue,
+                    "node_creator_queue": machine_config.node_creator_queue,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
                         _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
@@ -807,7 +810,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "micrographs_file": params_to_forward["micrographs_file"],
             "coord_list_file": params_to_forward["coord_list_file"],
             "output_file": params_to_forward["extract_file"],
-            "pix_size": relion_params.angpix,
+            "pix_size": relion_params.angpix * relion_params.motion_corr_binning,
             "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
             "ctf_max_resolution": params_to_forward["ctf_values"]["CtfMaxResolution"],
             "ctf_figure_of_merit": params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -818,10 +821,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "boxsize": relion_params.boxsize,
             "small_boxsize": relion_params.small_boxsize,
             "downscale": relion_params.downscale,
-            "fm_dose": relion_params.dose_per_frame,
             "kv": relion_params.voltage,
-            "gain_ref": relion_params.gain_ref,
             "feedback_queue": machine_config.feedback_queue,
+            "node_creator_queue": machine_config.node_creator_queue,
             "session_id": message["session_id"],
             "autoproc_program_id": _app_id(
                 _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
@@ -857,13 +859,8 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score or 0,
                 "autoproc_program_id": message["program_id"],
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -882,6 +879,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 .murfey_id,
                 "session_id": message["session_id"],
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -948,14 +946,9 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 )
                 .one()
                 .murfey_id,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": message["session_id"],
@@ -963,6 +956,7 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1098,14 +1092,9 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
             "picker_id": other_options["picker_ispyb_id"],
-            "pix_size": relion_options["angpix"],
-            "fm_dose": relion_options["dose_per_frame"],
-            "kv": relion_options["voltage"],
-            "gain_ref": relion_options["gain_ref"],
             "nr_iter": default_spa_parameters.nr_iter_2d,
             "batch_size": default_spa_parameters.batch_size_2d,
             "nr_classes": default_spa_parameters.nr_classes_2d,
-            "downscale": default_spa_parameters.downscale,
             "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
             "mask_diameter": 0,
@@ -1126,6 +1115,7 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
                 _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
             ),
             "feedback_queue": machine_config.feedback_queue,
+            "node_creator_queue": machine_config.node_creator_queue,
         },
         "recipes": ["em-spa-class2d"],
     }
@@ -1267,14 +1257,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
                 "batch_size": default_spa_parameters.batch_size_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": message["session_id"],
@@ -1282,6 +1267,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1338,14 +1324,9 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
                 "batch_size": default_spa_parameters.batch_size_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": message["session_id"],
@@ -1353,6 +1334,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1426,18 +1408,14 @@ def _flush_class2d(
                     saved_message.particles_file, _app_id(pj_id, _db), _db
                 ),
                 "class2d_grp_uuid": saved_message.murfey_id,
-                "pix_size": relion_params.angpix,
-                "fm_dose": relion_params.dose_per_frame,
-                "kv": relion_params.voltage,
-                "gain_ref": relion_params.gain_ref,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": session_id,
                 "autoproc_program_id": _app_id(pj_id, _db),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
@@ -1610,14 +1588,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
                 "class3d_grp_uuid": class3d_grp_uuid,
-                "pix_size": relion_options["angpix"],
-                "fm_dose": relion_options["dose_per_frame"],
-                "kv": relion_params.voltage,
-                "gain_ref": relion_options["gain_ref"],
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": message["session_id"],
@@ -1625,6 +1598,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1655,14 +1629,9 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
                 "class3d_grp_uuid": class3d_params.murfey_id,
-                "pix_size": relion_options["angpix"],
-                "fm_dose": relion_options["dose_per_frame"],
-                "kv": relion_options["voltage"],
-                "gain_ref": relion_options["gain_ref"],
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
-                "downscale": default_spa_parameters.downscale,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": message["session_id"],
@@ -1670,6 +1639,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
@@ -1768,6 +1738,7 @@ def _flush_tomography_preprocessing(message: dict):
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
@@ -2110,6 +2081,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             murfey_db.commit()
             murfey_db.close()
             if check_tilt_series_mc(relevant_tilt_series.id):
+                machine_config = get_machine_config()
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
@@ -2131,6 +2103,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "stack_file": str(stack_file),
                         "pix_size": preproc_params.pixel_size,
                         "manual_tilt_offset": tilt_offset,
+                        "node_creator_queue": machine_config.node_creator_queue,
                     },
                 }
                 if _transport_object:
@@ -2428,6 +2401,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     "recipes": ["em-spa-preprocess"],
                     "parameters": {
                         "feedback_queue": machine_config.feedback_queue,
+                        "node_creator_queue": machine_config.node_creator_queue,
                         "dcid": collected_ids[1].id,
                         "kv": proc_params.voltage,
                         "autoproc_program_id": collected_ids[3].id,
@@ -2440,11 +2414,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "ft_bin": proc_params.motion_corr_binning,
                         "fm_dose": proc_params.dose_per_frame,
                         "gain_ref": proc_params.gain_ref,
-                        "downscale": proc_params.downscale,
                         "picker_uuid": murfey_ids[2 * i + 1],
                         "session_id": session_id,
                         "particle_diameter": proc_params.particle_diameter or 0,
                         "fm_int_file": f.eer_fractionation_file,
+                        "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                     },
                 }
                 if _transport_object:
