@@ -646,8 +646,15 @@ class SPAModularContext(_SPAContext):
                                 grid_square,
                                 environment.murfey_session,
                             )
+                            metadata_source = Path(
+                                (
+                                    "/".join(source.parts[:-2])
+                                    + f"/{environment.visit}/"
+                                    + source.parts[-2]
+                                )[:-1]
+                            )
                             image_path = _file_transferred_to(
-                                environment, source, Path(gs.image)
+                                environment, metadata_source, Path(gs.image)
                             )
                             capture_post(
                                 gs_url,
@@ -678,8 +685,15 @@ class SPAModularContext(_SPAContext):
                                     grid_square,
                                     environment.murfey_session,
                                 )
+                                metadata_source = Path(
+                                    (
+                                        "/".join(source.parts[:-2])
+                                        + f"/{environment.visit}/"
+                                        + source.parts[-2]
+                                    )[:-1]
+                                )
                                 image_path = _file_transferred_to(
-                                    environment, source, Path(fh.image)
+                                    environment, metadata_source, Path(fh.image)
                                 )
                                 capture_post(
                                     fh_url,
