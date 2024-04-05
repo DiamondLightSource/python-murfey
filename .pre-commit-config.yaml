@@ -4,7 +4,7 @@ repos:
 # Syntax validation and some basic sanity checks
 - repo: https://github.com/pre-commit/pre-commit-hooks
   #rev: v4.0.1
-  rev: v4.5.0  # Input over here depends entirely on how the version tag is formatted on the repo (with 'v' or without)
+  rev: v4.5.0  # Format depends entirely on how version tag is formatted on the repo (with 'v', without it, etc.)
   hooks:
   - id: check-merge-conflict
   - id: check-ast
@@ -62,5 +62,5 @@ repos:
   rev: v1.9.0
   hooks:
   - id: mypy
-    files: 'src/.*\.py$'  # Single quote critical due to the escape character '\' used in the search string (see 7.3 Flow Scalar Styles)'
+    files: 'src/.*\.py$'  # Single quote critical due to escape character '\' used in RegEx search string (see YAML - 7.3 Flow Scalar Styles)
     additional_dependencies: [types-requests]
