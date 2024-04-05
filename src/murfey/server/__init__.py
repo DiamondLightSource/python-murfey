@@ -2709,9 +2709,10 @@ def _(record: Base, header: dict, **kwargs):
 
 @_register.register  # type: ignore
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    return _transport_object.do_create_ispyb_job(
-        extended_record.record, params=extended_record.record_params
-    )["return_value"]
+    if _transport_object:
+        return _transport_object.do_create_ispyb_job(
+            extended_record.record, params=extended_record.record_params
+        )["return_value"]
 
 
 def feedback_listen():
