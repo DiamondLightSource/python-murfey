@@ -148,7 +148,7 @@ ignore = [
     "W503"
 ]
 max-line-length = "88"
-# Also worth investigating Ruff
+# Also worth investigating Ruff's compatibility with Flake8 for use with pyproject.toml
 # Suggested by VSCode's auto-fill, so should be pretty popular
 # Ruff: https://github.com/astral-sh/ruff
 
