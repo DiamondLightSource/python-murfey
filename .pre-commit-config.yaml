@@ -15,24 +15,6 @@ repos:
   - id: check-yaml
     args: [--allow-multiple-documents]
 
-# Automatically sort imports
-- repo: https://github.com/PyCQA/isort
-  #rev: 5.12.0
-  rev: 5.13.2
-  hooks:
-  - id: isort
-    args: [
-           #'-a', 'from __future__ import annotations',        # 3.7-3.11
-           '--rm', 'from __future__ import absolute_import',  # -3.0
-           '--rm', 'from __future__ import division',         # -3.0
-           '--rm', 'from __future__ import generator_stop',   # -3.7
-           '--rm', 'from __future__ import generators',       # -2.3
-           '--rm', 'from __future__ import nested_scopes',    # -2.2
-           '--rm', 'from __future__ import print_function',   # -3.0
-           '--rm', 'from __future__ import unicode_literals', # -3.0
-           '--rm', 'from __future__ import with_statement',   # -2.6
-          ]
-
 # Automatic source code formatting
 - repo: https://github.com/psf/black
   #rev: 22.3.0
@@ -41,20 +23,50 @@ repos:
   - id: black
     args: [--safe, --quiet]
 
-# Linting
-- repo: https://github.com/PyCQA/flake8
-  # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
-  #rev: 4.0.1
-  rev: 7.0.0
+# Ruff for linting and formatting
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.3.5
   hooks:
-  - id: flake8
-    # Added Flake8-pyproject plugin for .toml compatibility
-    # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
-    #additional_dependencies: ['flake8-comprehensions==3.8.0']
-    additional_dependencies: [
-      "Flake8-pyproject==1.2.3",
-      'flake8-comprehensions==3.14.0'
-      ]
+  # Ruff linter
+  - id: ruff
+    args: [--fix]
+  # Ruff formatter
+  - id: ruff-format
+    types_or: [python]
+
+# Ruff can replace isort and flake8 (https://docs.astral.sh/ruff/linter/)
+# # Automatically sort imports
+# - repo: https://github.com/PyCQA/isort
+#   #rev: 5.12.0
+#   rev: 5.13.2
+#   hooks:
+#   - id: isort
+#     args: [
+#            #'-a', 'from __future__ import annotations',        # 3.7-3.11
+#            '--rm', 'from __future__ import absolute_import',  # -3.0
+#            '--rm', 'from __future__ import division',         # -3.0
+#            '--rm', 'from __future__ import generator_stop',   # -3.7
+#            '--rm', 'from __future__ import generators',       # -2.3
+#            '--rm', 'from __future__ import nested_scopes',    # -2.2
+#            '--rm', 'from __future__ import print_function',   # -3.0
+#            '--rm', 'from __future__ import unicode_literals', # -3.0
+#            '--rm', 'from __future__ import with_statement',   # -2.6
+#           ]
+
+# # Linting
+# - repo: https://github.com/PyCQA/flake8
+#   # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
+#   #rev: 4.0.1
+#   rev: 7.0.0
+#   hooks:
+#   - id: flake8
+#     # Added Flake8-pyproject plugin for .toml compatibility
+#     # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
+#     #additional_dependencies: ['flake8-comprehensions==3.8.0']
+#     additional_dependencies: [
+#       "Flake8-pyproject==1.2.3",
+#       'flake8-comprehensions==3.14.0'
+#       ]
 
 # Type checking
 - repo: https://github.com/pre-commit/mirrors-mypy
