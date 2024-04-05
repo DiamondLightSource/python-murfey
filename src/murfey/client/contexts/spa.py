@@ -651,7 +651,7 @@ class SPAModularContext(_SPAContext):
                                     "/".join(source.parts[:-2])
                                     + f"/{environment.visit}/"
                                     + source.parts[-2]
-                                )[:-1]
+                                )[1:]
                             )
                             image_path = _file_transferred_to(
                                 environment, metadata_source, Path(gs.image)
@@ -690,7 +690,7 @@ class SPAModularContext(_SPAContext):
                                         "/".join(source.parts[:-2])
                                         + f"/{environment.visit}/"
                                         + source.parts[-2]
-                                    )[:-1]
+                                    )[1:]
                                 )
                                 image_path = _file_transferred_to(
                                     environment, metadata_source, Path(fh.image)
