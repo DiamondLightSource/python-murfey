@@ -228,9 +228,10 @@ def _foil_hole_data(
                     pixel_size=float(pixel_size) if image_path else None,
                     image=str(image_path),
                 )
-    raise ValueError(
+    logger.warning(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
+    return FoilHole(id=foil_hole, grid_square_id=grid_square, session_id=session_id)
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -633,13 +634,15 @@ class SPAModularContext(_SPAContext):
                                     if p == environment.visit:
                                         break
                                     visit_path += f"/{p}"
-                                local_atlas_path = (
-                                    Path(visit_path) / environment.samples[source].atlas
-                                )
-                                gs_pix_position = _get_grid_square_atlas_positions(
-                                    local_atlas_path,
-                                    grid_square=str(grid_square),
-                                )[str(grid_square)]
+                                if source in list(environment.samples.keys()):
+                                    local_atlas_path = (
+                                        Path(visit_path)
+                                        / environment.samples[source].atlas
+                                    )
+                                    gs_pix_position = _get_grid_square_atlas_positions(
+                                        local_atlas_path,
+                                        grid_square=str(grid_square),
+                                    )[str(grid_square)]
                             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
                             gs = _grid_square_data(
                                 grid_square_metadata_file,
@@ -653,8 +656,12 @@ class SPAModularContext(_SPAContext):
                                     + source.parts[-2]
                                 )[1:]
                             )
-                            image_path = _file_transferred_to(
-                                environment, metadata_source, Path(gs.image)
+                            image_path = (
+                                _file_transferred_to(
+                                    environment, metadata_source, Path(gs.image)
+                                )
+                                if gs.image
+                                else ""
                             )
                             capture_post(
                                 gs_url,
@@ -692,8 +699,12 @@ class SPAModularContext(_SPAContext):
                                         + source.parts[-2]
                                     )[1:]
                                 )
-                                image_path = _file_transferred_to(
-                                    environment, metadata_source, Path(fh.image)
+                                image_path = (
+                                    _file_transferred_to(
+                                        environment, metadata_source, Path(fh.image)
+                                    )
+                                    if fh.image
+                                    else ""
                                 )
                                 capture_post(
                                     fh_url,
@@ -716,7 +727,8 @@ class SPAModularContext(_SPAContext):
                                 capture_post(
                                     fh_url,
                                     json={
-                                        "id": foil_hole,
+                                        "name": foil_hole,
+                                        "tag": str(source),
                                     },
                                 )
                             self._foil_holes[grid_square].append(foil_hole)
