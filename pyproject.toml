@@ -159,8 +159,11 @@ profile = "black"
 addopts = "-ra"
 
 [tool.mypy]
-mypy_path = "src"
-disable_error_code = "annotation-unchecked"  # Disables non-error messages thrown up by mypy
+#mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
+disable_error_code = [
+    "annotation-unchecked",  # Message that the bodies of untyped functions aren't checked. Not critical
+    "import-untyped"  # Error for missing library stubs. Not critical
+]
 
 [tool.ruff]
 include = [

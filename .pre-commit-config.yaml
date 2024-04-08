@@ -4,15 +4,20 @@ repos:
 # Syntax validation and some basic sanity checks
 - repo: https://github.com/pre-commit/pre-commit-hooks
   #rev: v4.0.1
-  rev: v4.5.0  # Format depends entirely on how version tag is formatted on the repo (with 'v', without it, etc.)
+  rev: v4.5.0  # Format depends on how version tag is formatted on the repo (with 'v', without it, etc.)
   hooks:
   - id: check-merge-conflict
+    name: Checking for merge conflicts
   - id: check-ast
+    name: Checking AST consistency
     fail_fast: True
   - id: check-json
+    name: Checking for JSON files
   - id: check-added-large-files
+    name: Checking for added large files
     args: ['--maxkb=200']
   - id: check-yaml
+    name: Checking for YAML files
     args: [--allow-multiple-documents]
 
 # Automatic source code formatting
@@ -21,6 +26,7 @@ repos:
   rev: 24.3.0
   hooks:
   - id: black
+    name: Checking for compliance with Black formatting standards
     args: [--safe, --quiet]
 
 # Ruff for linting and formatting
@@ -30,9 +36,11 @@ repos:
 #   hooks:
 #   # Ruff linter
 #   - id: ruff
+#     name: Running Ruff linter
 #     args: [--fix]
 #   # Ruff formatter
 #   - id: ruff-format
+#     name: Running Ruff formatter
 #     types_or: [python]
 
 # # Automatically sort imports
@@ -41,6 +49,7 @@ repos:
   rev: 5.13.2
   hooks:
   - id: isort
+    name: Arranging imports logically via Isort
     args: [
            #'-a', 'from __future__ import annotations',        # 3.7-3.11
            '--rm', 'from __future__ import absolute_import',  # -3.0
@@ -51,7 +60,7 @@ repos:
            '--rm', 'from __future__ import print_function',   # -3.0
            '--rm', 'from __future__ import unicode_literals', # -3.0
            '--rm', 'from __future__ import with_statement',   # -2.6
-          ]
+      ]
 
 # # Linting
 - repo: https://github.com/PyCQA/flake8
@@ -60,9 +69,11 @@ repos:
   rev: 7.0.0
   hooks:
   - id: flake8
+    name: Linting according to chosen Flake8 codes
     # Added Flake8-pyproject plugin for .toml compatibility
     # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
     #additional_dependencies: ['flake8-comprehensions==3.8.0']
+    
     additional_dependencies: [
       "Flake8-pyproject==1.2.3",
       'flake8-comprehensions==3.14.0'
@@ -74,5 +85,14 @@ repos:
   rev: v1.9.0
   hooks:
   - id: mypy
-    files: '(src|tests)/.*\.py$'  # Single quote critical due to escape character '\' used in RegEx search string (see YAML - 7.3 Flow Scalar Styles)
-    additional_dependencies: [types-requests]
+    name: Checking typing using MyPy
+    files: '(src|tests)/.*\.py$'  # RegEx string showing directories and files to check
+    # Single quote critical due to escape character '\' used in the search string
+    # (see YAML specifications - 7.3 Flow Scalar Styles)
+
+    additional_dependencies: [
+                              # Install missing stub packages
+                              types-requests,
+                              types-xmltodict,
+                              types-PyYAML,
+                              ]
