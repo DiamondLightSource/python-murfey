@@ -15,23 +15,22 @@ repos:
   - id: check-merge-conflict
     name: Checking for merge conflicts
   - id: check-ast
-    name: Verifying Python files
+    name: Verifying Python file syntax
   - id: check-json
-    name: Verifying JSON files
+    name: Verifying JSON file syntax
   - id: check-yaml
-    name: Verifying YAML files
+    name: Verifying YAML file syntax
     args: [--allow-multiple-documents]
   - id: check-toml
-    name: Verifying TOML files
+    name: Verifying TOML file syntax
 
-# Automatic source code formatting
-- repo: https://github.com/psf/black
-  #rev: 22.3.0
-  rev: 24.3.0
+# Format the pyproject.toml file
+- repo: https://github.com/tox-dev/pyproject-fmt
+  rev: "1.7.0"
   hooks:
-  - id: black
-    name: Checking for compliance with Black formatting standards
-    args: [--safe, --quiet]
+    - id: pyproject-fmt
+      name: 'Re-formatting pyproject.toml file'
+      additional_dependencies: ["tox>=4.9"]
 
 # Ruff for linting and formatting
 # Ruff can replace isort and flake8 (https://docs.astral.sh/ruff/linter/)
@@ -47,7 +46,16 @@ repos:
 #     name: Running Ruff formatter
 #     types_or: [python]
 
-# # Automatically sort imports
+# Automatic source code formatting
+- repo: https://github.com/psf/black
+  #rev: 22.3.0
+  rev: 24.3.0
+  hooks:
+  - id: black
+    name: Checking code compliance with Black formatting standards
+    args: [--safe, --quiet]
+
+# Automatically sort imports
 - repo: https://github.com/PyCQA/isort
   #rev: 5.12.0
   rev: 5.13.2
@@ -66,7 +74,7 @@ repos:
            '--rm', 'from __future__ import with_statement',   # -2.6
       ]
 
-# # Linting
+# Linting
 - repo: https://github.com/PyCQA/flake8
   # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
   #rev: 4.0.1

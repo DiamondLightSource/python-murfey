@@ -1,16 +1,22 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools >= 40.6.0",
+    "wheel",
+]
 
 [project]
 name = "murfey"
-authors = []
-maintainers = []
+version = "0.11.7"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
-requires-python = ">=3.9"
-keywords = [""]
+keywords = [
+    "",
+]
 license = {file = "LICENSE"}
+maintainers = []
+authors = []
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -28,13 +34,6 @@ dependencies = [
     "requests",
     "rich",
 ]
-version = "0.11.7"
-
-[project.urls]
-Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
-Documentation = "https://github.com/DiamondLightSource/python-murfey"
-GitHub = "https://github.com/DiamondLightSource/python-murfey"
-
 [project.optional-dependencies]
 client = [
     "procrunner",
@@ -43,43 +42,44 @@ client = [
     "werkzeug",
     "xmltodict",
 ]
+developer = [
+    "bump2version",
+    "pre-commit",
+    "pytest",
+]
 server = [
-    "ispyb",
-    "mysql-connector-python<=8.0.29",  # ispyb (latest version) requires ==8.0.29
-    "stomp-py<=8.1.0",  # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "cryptography", # "importlib_resources; python_version<'3.9'",  # Not needed anymore, since dropping support for Python 3.8
     "fastapi",
-    "cryptography",
-    # "importlib_resources; python_version<'3.9'",  # Not needed anymore, since dropping support for Python 3.8
+    "ispyb",
     "jinja2",
-    "packaging",
+    "mysql-connector-python<=8.0.29", # ispyb (latest version) requires ==8.0.29
     "numpy",
-    "sqlmodel",
+    "packaging",
     "pillow",
     "prometheus_client",
+    "sqlmodel",
+    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "uvicorn[standard]",
     "werkzeug",
     "zocalo",
 ]
-developer = [
-    "pytest",
-    "pre-commit",
-    "bump2version",
-]
-
+[project.urls]
+Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
+Documentation = "https://github.com/DiamondLightSource/python-murfey"
+GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
-# Where there are "." in the variable name, enclose with inverted commas
 murfey = "murfey.client:run"
-"murfey.server" = "murfey.server:run"
-"murfey.simulate" = "murfey.cli.dummy:run"
-"murfey.transfer" = "murfey.cli.transfer:run"
-"murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
-"murfey.sessions" = "murfey.cli.db_sessions:run"
-"murfey.generate_password" = "murfey.cli.generate_db_password:run" 
-"murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
-"murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
+"murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
+"murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
+"murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
+"murfey.generate_password" = "murfey.cli.generate_db_password:run" 
+"murfey.server" = "murfey.server:run"
+"murfey.sessions" = "murfey.cli.db_sessions:run"
+"murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
+"murfey.transfer" = "murfey.cli.transfer:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -94,64 +94,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
-
-[tool.flake8]
-# Flake8-pyproject allows .toml settings to be read into Flake8
-# Flake8-pyproject: https://pypi.org/project/Flake8-pyproject/
-select = [
-    "C4",
-    "E401",
-    "E711",
-    "E712",
-    "E713",
-    "E714",
-    "E721",
-    "E722",
-    "E901",
-    "F401",
-    "F402",
-    "F403",
-    "F405",
-    "F541",
-    "F631",
-    "F632",
-    "F633",
-    "F811",
-    "F812",
-    "F821",
-    "F822",
-    "F841",
-    "F901",
-    "W191",
-    "W291",
-    "W292",
-    "W293",
-    "W602",
-    "W603",
-    "W604",
-    "W605",
-    "W606",
-]
-ignore = [
-    "E203", 
-    "E266",
-    "E501", 
-    "W503"
-]
-max-line-length = "88"
-
-[tool.isort]
-profile = "black"
-
-[tool.pytest.ini_options]
-addopts = "-ra"
-
-[tool.mypy]
-#mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
-disable_error_code = [
-    "annotation-unchecked",  # Message that the bodies of untyped functions aren't checked. Not critical
-    "import-untyped"  # Error for missing library stubs. Not critical
-]
 
 [tool.ruff]
 # Copied default recommended settings for testing
@@ -259,3 +201,68 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = false
 docstring-code-line-length = "dynamic"
+
+[tool.isort]
+profile = "black"
+
+[tool.flake8]
+# Flake8-pyproject allows .toml settings to be read into Flake8
+# Flake8-pyproject: https://pypi.org/project/Flake8-pyproject/
+select = [
+    "C4",
+    "E401",
+    "E711",
+    "E712",
+    "E713",
+    "E714",
+    "E721",
+    "E722",
+    "E901",
+    "F401",
+    "F402",
+    "F403",
+    "F405",
+    "F541",
+    "F631",
+    "F632",
+    "F633",
+    "F811",
+    "F812",
+    "F821",
+    "F822",
+    "F841",
+    "F901",
+    "W191",
+    "W291",
+    "W292",
+    "W293",
+    "W602",
+    "W603",
+    "W604",
+    "W605",
+    "W606",
+]
+ignore = [
+    "E203", 
+    "E266",
+    "E501", 
+    "W503"
+]
+max-line-length = "88"
+
+[tool.pyproject-fmt]
+inputs = "pyproject.toml"
+check = false
+indent = 4
+keep_full_version = true
+max-supported-python = "3.12"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+
+[tool.mypy]
+#mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
+disable_error_code = [
+    "annotation-unchecked",  # Message that the bodies of untyped functions aren't checked. Not critical
+    "import-untyped"  # Error for missing library stubs. Not critical
+]
