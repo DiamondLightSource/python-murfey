@@ -38,7 +38,7 @@ stages:
         displayName: Syntax validation
 
       - bash: |
-          pip install --disable-pip-version-check flake8
+          pip install --disable-pip-version-check flake8 flake8-pyproject
           python .azure-pipelines/flake8-validation.py
         displayName: Flake8 validation
 
