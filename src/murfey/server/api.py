@@ -710,7 +710,7 @@ async def register_tilt(
     try:
         _add_tilt()
     except OperationalError:
-        asyncio.sleep(30)
+        await asyncio.sleep(30)
         _add_tilt()
 
 
