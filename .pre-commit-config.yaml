@@ -16,14 +16,15 @@ repos:
     args: [--allow-multiple-documents]
 
 # Automatic source code formatting
-- repo: https://github.com/psf/black
-  #rev: 22.3.0
-  rev: 24.3.0
-  hooks:
-  - id: black
-    args: [--safe, --quiet]
+# - repo: https://github.com/psf/black
+#   #rev: 22.3.0
+#   rev: 24.3.0
+#   hooks:
+#   - id: black
+#     args: [--safe, --quiet]
 
 # Ruff for linting and formatting
+# Ruff can replace isort and flake8 (https://docs.astral.sh/ruff/linter/)
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.3.5
   hooks:
@@ -34,7 +35,6 @@ repos:
   - id: ruff-format
     types_or: [python]
 
-# Ruff can replace isort and flake8 (https://docs.astral.sh/ruff/linter/)
 # # Automatically sort imports
 # - repo: https://github.com/PyCQA/isort
 #   #rev: 5.12.0
@@ -74,5 +74,5 @@ repos:
   rev: v1.9.0
   hooks:
   - id: mypy
-    files: 'src/.*\.py$'  # Single quote critical due to escape character '\' used in RegEx search string (see YAML - 7.3 Flow Scalar Styles)
+    files: '(src|tests)/.*\.py$'  # Single quote critical due to escape character '\' used in RegEx search string (see YAML - 7.3 Flow Scalar Styles)
     additional_dependencies: [types-requests]
