@@ -50,6 +50,7 @@ client = [
 server = [
     "mysql-connector-python<=8.0.29",
     "fastapi>=0.101",
+    "stomp-py<8.1.1",
     "cryptography",
     "importlib_resources; python_version<'3.9'",
     "ispyb",
