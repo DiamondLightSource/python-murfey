@@ -2710,10 +2710,13 @@ def _(record: Base, header: dict, **kwargs):
 
 @_register.register  # type: ignore
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    if _transport_object:
-        return _transport_object.do_create_ispyb_job(
-            extended_record.record, params=extended_record.record_params
-        )["return_value"]
+    if not _transport_object:
+        raise ValueError(
+            "Transport object should not be None if a database record is being updated"
+        )
+    return _transport_object.do_create_ispyb_job(
+        extended_record.record, params=extended_record.record_params
+    )["return_value"]
 
 
 def feedback_listen():
