@@ -6,7 +6,7 @@ import random
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import packaging.version
 import sqlalchemy
@@ -1189,7 +1189,7 @@ def register_dc_group(
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
 def start_dc(
     visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
-) -> DCParameters | None:
+) -> Optional[DCParameters]:
     dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
