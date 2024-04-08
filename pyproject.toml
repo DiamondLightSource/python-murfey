@@ -139,9 +139,6 @@ ignore = [
     "W503"
 ]
 max-line-length = "88"
-# Also worth investigating Ruff's compatibility with Flake8 for use with pyproject.toml
-# Suggested by VSCode's auto-fill, so should be pretty popular
-# Ruff: https://github.com/astral-sh/ruff
 
 [tool.isort]
 profile = "black"
@@ -157,6 +154,9 @@ disable_error_code = [
 ]
 
 [tool.ruff]
+# Copied default recommended settings for testing
+
+# Files and dirs to format
 include = [
     "pyproject.toml",
     "setup.cfg",
@@ -194,7 +194,7 @@ exclude = [
     "venv",
 ]
 
-# Same as Black.
+# Format same as Black.
 line-length = 88
 indent-width = 4
 
@@ -213,7 +213,7 @@ select = [
     "E714",
     "E721",
     "E722",
-    # "E901",
+    # "E901",  # Not available in Ruff (VSCode threw an error)
     "F401",
     "F402",
     "F403",
@@ -223,7 +223,7 @@ select = [
     "F632",
     "F633",
     "F811",
-    # "F812",
+    # "F812",  # Not available in Ruff (VSCode threw an error)
     "F821",
     "F822",
     "F841",
@@ -232,20 +232,20 @@ select = [
     "W291",
     "W292",
     "W293",
-    # "W602",
-    # "W603",
-    # "W604",
+    # "W602",  # Not available in Ruff (VSCode threw an error)
+    # "W603",  # Not available in Ruff (VSCode threw an error)
+    # "W604",  # Not available in Ruff (VSCode threw an error)
     "W605",
-    # "W606",
+    # "W606",  # Not available in Ruff (VSCode threw an error)
 ]
 ignore = [
     "E203", 
     "E266",
     "E501", 
-    # "W503"
+    # "W503"  # Not available in Ruff (VSCode threw an error)
 ]
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
+# Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
 fixable = ["ALL"]
 unfixable = []
 

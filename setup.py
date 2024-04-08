@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import setuptools
+from setuptools import setup
 
 if __name__ == "__main__":
-    # Do not add any parameters here. Edit setup.cfg instead.
-    setuptools.setup()
+    # Do not add any parameters here. Edit pyproject.toml instead.
+    setup()
