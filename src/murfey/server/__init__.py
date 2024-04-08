@@ -2022,7 +2022,7 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
         refined_class_uuid = message["refined_class_uuid"]
 
         # Request an ispyb insert of the b-factor fitting parameters
-        if _transport_object:
+        if False and _transport_object:
             _transport_object.send(
                 "ispyb_connector",
                 {
@@ -2034,16 +2034,17 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
                         "buffer_command": {
                             "ispyb_command": "insert_particle_classification"
                         },
-                        "bfactor_fit_intercept": bfactor_fitting[2],
-                        "bfactor_fit_linear": bfactor_fitting[1],
-                        "bfactor_fit_quadratic": bfactor_fitting[0],
+                        "bfactor_fit_intercept": str(bfactor_fitting[2]),
+                        "bfactor_fit_linear": str(bfactor_fitting[1]),
+                        "bfactor_fit_quadratic": str(bfactor_fitting[0]),
                     },
                     "content": {"dummy": "dummy"},
                 },
+                new_connection=True,
             )
 
         # Clean up the b-factors table and release the hold
-        _db.delete(all_bfactors)
+        [_db.delete(bf) for bf in all_bfactors]
         _db.commit()
         _release_refine_hold(message)
     _db.close()
