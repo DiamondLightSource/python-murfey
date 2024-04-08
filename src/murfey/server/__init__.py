@@ -2010,7 +2010,7 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     _db.commit()
 
     # Find all the resolutions in the b-factors table
-    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id).all())
+    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id)).all()
     particle_counts = [bf.number_of_particles for bf in all_bfactors]
     resolutions = [bf.resolution for bf in all_bfactors]
 
