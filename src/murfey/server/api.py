@@ -374,7 +374,10 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
-        jpeg_size = Image.open(grid_square_params.image).size
+        if grid_square_params.image and Path(grid_square_params.image).is_file():
+            jpeg_size = Image.open(grid_square_params.image).size
+        else:
+            jpeg_size = (0, 0)
         grid_square = GridSquare(
             name=gsid,
             session_id=session_id,
@@ -420,7 +423,7 @@ def register_foil_hole(
         .one()
         .id
     )
-    if foil_hole_params.image:
+    if foil_hole_params.image and Path(foil_hole_params.image).is_file():
         jpeg_size = Image.open(foil_hole_params.image).size
     else:
         jpeg_size = (0, 0)
