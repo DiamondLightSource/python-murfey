@@ -4,21 +4,25 @@ repos:
 # Syntax validation and some basic sanity checks
 - repo: https://github.com/pre-commit/pre-commit-hooks
   #rev: v4.0.1
-  rev: v4.5.0  # Format depends on how version tag is formatted on the repo (with 'v', without it, etc.)
+  rev: v4.5.0  # Depends on how version tag is formatted on the repo (with 'v', without it, etc.)
   hooks:
-  - id: check-merge-conflict
-    name: Checking for merge conflicts
-  - id: check-ast
-    name: Checking AST consistency
-    fail_fast: True
-  - id: check-json
-    name: Checking for JSON files
   - id: check-added-large-files
     name: Checking for added large files
     args: ['--maxkb=200']
+    fail_fast: True
+  - id: check-case-conflict
+    name: Checking for name case conflicts
+  - id: check-merge-conflict
+    name: Checking for merge conflicts
+  - id: check-ast
+    name: Verifying Python files
+  - id: check-json
+    name: Verifying JSON files
   - id: check-yaml
-    name: Checking for YAML files
+    name: Verifying YAML files
     args: [--allow-multiple-documents]
+  - id: check-toml
+    name: Verifying TOML files
 
 # Automatic source code formatting
 - repo: https://github.com/psf/black
@@ -49,7 +53,7 @@ repos:
   rev: 5.13.2
   hooks:
   - id: isort
-    name: Arranging imports logically via Isort
+    name: Re-arranging imports via Isort
     args: [
            #'-a', 'from __future__ import annotations',        # 3.7-3.11
            '--rm', 'from __future__ import absolute_import',  # -3.0
@@ -69,7 +73,7 @@ repos:
   rev: 7.0.0
   hooks:
   - id: flake8
-    name: Linting according to chosen Flake8 codes
+    name: Running Flake8 linter for chosen codes
     # Added Flake8-pyproject plugin for .toml compatibility
     # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
     #additional_dependencies: ['flake8-comprehensions==3.8.0']
@@ -85,7 +89,7 @@ repos:
   rev: v1.9.0
   hooks:
   - id: mypy
-    name: Checking typing using MyPy
+    name: Checking types using MyPy
     files: '(src|tests)/.*\.py$'  # RegEx string showing directories and files to check
     # Single quote critical due to escape character '\' used in the search string
     # (see YAML specifications - 7.3 Flow Scalar Styles)
