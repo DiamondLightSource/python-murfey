@@ -2,7 +2,6 @@
 requires = ["setuptools >= 40.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# TEP 2024-04-03
 [project]
 name = "murfey"
 authors = []
@@ -30,15 +29,12 @@ dependencies = [
     "rich",
 ]
 version = "0.11.5"
-#dynamic = ["version"]  # Clashes with version variable immediately above
 
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 
-
-# TEP 2024-04-03
 [project.optional-dependencies]
 client = [
     "procrunner",
@@ -48,11 +44,12 @@ client = [
     "xmltodict",
 ]
 server = [
-    "mysql-connector-python<=8.0.29",
-    "fastapi>=0.101",
-    "cryptography",
-    "importlib_resources; python_version<'3.9'",
     "ispyb",
+    "mysql-connector-python<=8.0.29",  # ispyb (latest version) requires ==8.0.29
+    "stomp-py<=8.1.0",  # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "fastapi",
+    "cryptography",
+    # "importlib_resources; python_version<'3.9'",  # Not needed anymore, since dropping support for Python 3.8
     "jinja2",
     "packaging",
     "numpy",
@@ -69,7 +66,6 @@ developer = [
     "bump2version",
 ]
 
-# TEP 2024-04-03
 [project.scripts]
 # Where there are "." in the variable name, enclose with inverted commas
 murfey = "murfey.client:run"
@@ -85,28 +81,23 @@ murfey = "murfey.client:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 
-# TEP 2024-04-03
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
 zip-safe = false
 
-# TEP 2024-04-03
-#[tool.setuptools.packages]
+[tool.setuptools.packages]
 #find = {}  # This option leads to pip searching for stuff in "tests"
 
-# TEP 2024-04-03
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# TEP 2024-04-03
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
 
-# TEP 2024-04-04
+[tool.flake8]
 # Flake8-pyproject allows .toml settings to be read into Flake8
 # Flake8-pyproject: https://pypi.org/project/Flake8-pyproject/
-[tool.flake8]
 select = [
     "C4",
     "E401",
@@ -142,9 +133,9 @@ select = [
     "W606",
 ]
 ignore = [
-    # "E203", 
-    # "E266",
-    # "E501", 
+    "E203", 
+    "E266",
+    "E501", 
     "W503"
 ]
 max-line-length = "88"
@@ -207,8 +198,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.8
-target-version = "py38"
+# Assume Python 3.9 and above
+target-version = "py39"
 
 [tool.ruff.lint]
 # Currently, not all Flake8 rule coes are implemented in Ruff
