@@ -420,6 +420,10 @@ def register_foil_hole(
         .one()
         .id
     )
+    if foil_hole_params.image:
+        jpeg_size = Image.open(foil_hole_params.image).size
+    else:
+        jpeg_size = (0, 0)
     jpeg_size = Image.open(foil_hole_params.image).size
     foil_hole = FoilHole(
         name=foil_hole_params.name,
@@ -899,17 +903,20 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_id = (
-        db.exec(
-            select(FoilHole, GridSquare)
-            .where(FoilHole.name == proc_file.foil_hole_id)
-            .where(FoilHole.session_id == session_id)
-            .where(GridSquare.id == FoilHole.grid_square_id)
-            .where(GridSquare.tag == proc_file.tag)
+    try:
+        foil_hole_id = (
+            db.exec(
+                select(FoilHole, GridSquare)
+                .where(FoilHole.name == proc_file.foil_hole_id)
+                .where(FoilHole.session_id == session_id)
+                .where(GridSquare.id == FoilHole.grid_square_id)
+                .where(GridSquare.tag == proc_file.tag)
+            )
+            .one()[0]
+            .id
         )
-        .one()
-        .id
-    )
+    except Exception:
+        foil_hole_id = None
     if proc_params:
 
         detached_ids = [c.id for c in collected_ids]

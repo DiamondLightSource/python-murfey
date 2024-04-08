@@ -170,6 +170,15 @@ class Analyser(Observer):
                 return True
         return False
 
+    def post_transfer(self, transferred_file: Path):
+        try:
+            if self._context:
+                self._context.post_transfer(
+                    transferred_file, role=self._role, environment=self._environment
+                )
+        except Exception as e:
+            logger.error(f"An exception was encountered post transfer: {e}")
+
     def _analyse(self):
         logger.info("Analyser thread started")
         mdoc_for_reading = None
@@ -185,10 +194,7 @@ class Analyser(Observer):
                     and not self._context
                 ):
                     self._context = SPAMetadataContext("epu", self._basepath)
-                if self._context:
-                    self._context.post_transfer(
-                        transferred_file, environment=self._environment
-                    )
+                self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}
                 if (
@@ -325,23 +331,11 @@ class Analyser(Observer):
                                         ),
                                     }
                                 )
-                elif isinstance(self._context, TomographyContext):
-                    try:
-                        self._context.post_transfer(
-                            transferred_file,
-                            role=self._role,
-                            environment=self._environment,
-                        )
-                    except Exception as e:
-                        logger.error(f"An exception was encountered post transfer: {e}")
-                elif isinstance(self._context, SPAModularContext):
-                    self._context.post_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
-                elif isinstance(self._context, SPAMetadataContext):
-                    self._context.post_transfer(
-                        transferred_file, role=self._role, environment=self._environment
-                    )
+                elif isinstance(
+                    self._context,
+                    (TomographyContext, SPAModularContext, SPAMetadataContext),
+                ):
+                    self.post_transfer(transferred_file)
             self.queue.task_done()
 
     def _xml_file(self, data_file: Path) -> Path:

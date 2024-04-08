@@ -1916,8 +1916,8 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
     # Add b-factor for refinement run
     bfactor_run = db.BFactors(
         pj_id=pj_id,
-        bfactor_directory=f"{message['project_dir']}/Refine3D/bfactor_{message['batch_size']}",
-        number_of_particles=message["batch_size"],
+        bfactor_directory=f"{message['project_dir']}/Refine3D/bfactor_{message['number_of_particles']}",
+        number_of_particles=message["number_of_particles"],
         resolution=message["resolution"],
     )
     _db.add(bfactor_run)
@@ -1933,6 +1933,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
             pj_id=pj_id,
             project_dir=message["project_dir"],
             batch_size=message["number_of_particles"],
+            refined_grp_uuid=message["refined_grp_uuid"],
             refined_class_uuid=message["refined_class_uuid"],
             class_reference=message["class_reference"],
             class_number=message["class_number"],
@@ -1972,7 +1973,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                 "class_number": bfactor_params.class_number,
                 "number_of_particles": bfactor_run.number_of_particles,
                 "batch_size": bfactor_params.batch_size,
-                "pixel_size": relion_options["angpix"],
+                "pixel_size": message["pixel_size"],
                 "mask": bfactor_params.mask_file,
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "node_creator_queue": machine_config.node_creator_queue,
@@ -2001,7 +2002,7 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     bfactor_run = _db.exec(
         select(db.BFactors)
         .where(db.BFactors.pj_id == pj_id)
-        .where(db.BFactors.bfactor_directory == message["bfactor_directory"])
+        .where(db.BFactors.number_of_particles == message["number_of_particles"])
     ).one()
     bfactor_run.resolution = message["resolution"]
     _db.add(bfactor_run)
@@ -2622,7 +2623,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
-        elif message["payload"] == "atlas_registered":
+        elif message["register"] == "atlas_registered":
             _flush_grid_square_records(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
