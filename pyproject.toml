@@ -35,7 +35,6 @@ dependencies = [
     "rich",
     "werkzeug",
 ]
-
 [project.optional-dependencies]
 client = [
     "procrunner",
@@ -51,7 +50,7 @@ developer = [
 server = [
     "cryptography",
     "fastapi",
-    # "importlib_resources; python_version<'3.9'", # Not needed anymore, since dropping support for Python 3.8
+    "importlib_resources; python_version<'3.9'", # Not needed anymore, since dropping support for Python 3.8
     "ispyb",
     "jinja2",
     "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
@@ -64,19 +63,17 @@ server = [
     "uvicorn[standard]",
     "zocalo",
 ]
-
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
-
 [project.scripts]
 murfey = "murfey.client:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
-"murfey.generate_password" = "murfey.cli.generate_db_password:run" 
+"murfey.generate_password" = "murfey.cli.generate_db_password:run"
 "murfey.server" = "murfey.server:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
@@ -89,25 +86,24 @@ package-dir = {"" = "src"}
 include-package-data = true
 zip-safe = false
 
-[tool.setuptools.packages]
-#find = {}  # This option leads to pip searching for stuff in "tests"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
 
+[tool.setuptools.packages.find]
+where = ["src", "tests"]
+
 [tool.ruff]
-# Copied default recommended settings for testing
-include = [  # Files and dirs to format
+# Copied Ruff default recommended settings
+# Files and dirs to format
+include = [
     "pyproject.toml",
     # "setup.cfg",
     "setup.py",
     "src/**/*.py",
-    "tests/**/*.py"
+    "tests/**/*.py",
 ]
-exclude = [  # Exclude commonly ignored directories
+# Exclude commonly ignored directories
+exclude = [
     ".bzr",
     ".direnv",
     ".eggs",
@@ -135,12 +131,22 @@ exclude = [  # Exclude commonly ignored directories
     "site-packages",
     "venv",
 ]
-line-length = 88  # Format same as Black.
 indent-width = 4  # Format same as Black.
-target-version = "py39" # Assume Python 3.9 and above
+line-length = 88  # Format same as Black.
+target-version = "py39"  # Assume Python 3.9 and above
+
+[tool.ruff.format]
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
-# Currently, not all Flake8 rule codes are implemented in Ruff.
+# Currently, not all Flake8 rule codes appear to be implemented in Ruff. VSCode throws up errors for them.
+# select: E901, F812, W602, W603, W604, W606
+# ignore: W503
 # A mix of the two need to be used for the rule codes currently desired.
 select = [
     "C4",
@@ -151,7 +157,6 @@ select = [
     "E714",
     "E721",
     "E722",
-    # "E901",  # Not available in Ruff (VSCode threw an error)
     "F401",
     "F402",
     "F403",
@@ -161,7 +166,6 @@ select = [
     "F632",
     "F633",
     "F811",
-    # "F812",  # Not available in Ruff (VSCode threw an error)
     "F821",
     "F822",
     "F841",
@@ -170,29 +174,16 @@ select = [
     "W291",
     "W292",
     "W293",
-    # "W602",  # Not available in Ruff (VSCode threw an error)
-    # "W603",  # Not available in Ruff (VSCode threw an error)
-    # "W604",  # Not available in Ruff (VSCode threw an error)
     "W605",
-    # "W606",  # Not available in Ruff (VSCode threw an error)
 ]
 ignore = [
-    "E203", 
+    "E203",
     "E266",
-    "E501", 
-    # "W503"  # Not available in Ruff (VSCode threw an error)
+    "E501",
 ]
 fixable = ["ALL"]  # Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"  # Allow unused variables when underscore-prefixed.
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-docstring-code-format = false
-docstring-code-line-length = "dynamic"
 
 [tool.isort]
 profile = "black"
@@ -235,10 +226,10 @@ select = [
     "W606",
 ]
 ignore = [
-    "E203", 
+    "E203",
     "E266",
-    "E501", 
-    "W503"
+    "E501",
+    "W503",
 ]
 max-line-length = "88"
 
@@ -253,8 +244,7 @@ max-supported-python = "3.12"
 addopts = "-ra"
 
 [tool.mypy]
-# mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
 disable_error_code = [
-    "annotation-unchecked",  # Message that the bodies of untyped functions aren't checked. Not critical
-    "import-untyped"  # Error for missing library stubs. Not critical
+    "annotation-unchecked",  # Notification that the bodies of untyped functions aren't checked. Not critical
+    "import-untyped",  # Error for missing library stubs. Not critical
 ]
