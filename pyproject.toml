@@ -33,13 +33,14 @@ dependencies = [
     "pydantic",
     "requests",
     "rich",
+    "werkzeug",
 ]
+
 [project.optional-dependencies]
 client = [
     "procrunner",
     "textual==0.42.0",
     "websocket-client",
-    "werkzeug",
     "xmltodict",
 ]
 developer = [
@@ -48,11 +49,12 @@ developer = [
     "pytest",
 ]
 server = [
-    "cryptography", # "importlib_resources; python_version<'3.9'",  # Not needed anymore, since dropping support for Python 3.8
+    "cryptography",
     "fastapi",
+    # "importlib_resources; python_version<'3.9'", # Not needed anymore, since dropping support for Python 3.8
     "ispyb",
     "jinja2",
-    "mysql-connector-python<=8.0.29", # ispyb (latest version) requires ==8.0.29
+    "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
     "numpy",
     "packaging",
     "pillow",
@@ -60,13 +62,14 @@ server = [
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "uvicorn[standard]",
-    "werkzeug",
     "zocalo",
 ]
+
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
+
 [project.scripts]
 murfey = "murfey.client:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
@@ -97,17 +100,14 @@ where = ["src"]
 
 [tool.ruff]
 # Copied default recommended settings for testing
-
-# Files and dirs to format
-include = [
+include = [  # Files and dirs to format
     "pyproject.toml",
-    "setup.cfg",
+    # "setup.cfg",
     "setup.py",
     "src/**/*.py",
     "tests/**/*.py"
 ]
-# Exclude a variety of commonly ignored directories.
-exclude = [
+exclude = [  # Exclude commonly ignored directories
     ".bzr",
     ".direnv",
     ".eggs",
@@ -135,17 +135,13 @@ exclude = [
     "site-packages",
     "venv",
 ]
-
-# Format same as Black.
-line-length = 88
-indent-width = 4
-
-# Assume Python 3.9 and above
-target-version = "py39"
+line-length = 88  # Format same as Black.
+indent-width = 4  # Format same as Black.
+target-version = "py39" # Assume Python 3.9 and above
 
 [tool.ruff.lint]
-# Currently, not all Flake8 rule coes are implemented in Ruff
-# A mix of the two need to be used for the rule codes currently desired
+# Currently, not all Flake8 rule codes are implemented in Ruff.
+# A mix of the two need to be used for the rule codes currently desired.
 select = [
     "C4",
     "E401",
@@ -186,13 +182,9 @@ ignore = [
     "E501", 
     # "W503"  # Not available in Ruff (VSCode threw an error)
 ]
-
-# Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
-fixable = ["ALL"]
+fixable = ["ALL"]  # Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
 unfixable = []
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"  # Allow unused variables when underscore-prefixed.
 
 [tool.ruff.format]
 quote-style = "double"
@@ -207,7 +199,7 @@ profile = "black"
 
 [tool.flake8]
 # Flake8-pyproject allows .toml settings to be read into Flake8
-# Flake8-pyproject: https://pypi.org/project/Flake8-pyproject/
+# URL: https://pypi.org/project/Flake8-pyproject/
 select = [
     "C4",
     "E401",
@@ -261,7 +253,7 @@ max-supported-python = "3.12"
 addopts = "-ra"
 
 [tool.mypy]
-#mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
+# mypy_path = "src"  # Doesn't appear to be needed, given the conditions in the pre-commit file
 disable_error_code = [
     "annotation-unchecked",  # Message that the bodies of untyped functions aren't checked. Not critical
     "import-untyped"  # Error for missing library stubs. Not critical
