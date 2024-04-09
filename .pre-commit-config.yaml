@@ -25,12 +25,12 @@ repos:
     name: Verifying TOML file syntax
 
 # Format the pyproject.toml file
-- repo: https://github.com/tox-dev/pyproject-fmt
-  rev: "1.7.0"
-  hooks:
-    - id: pyproject-fmt
-      name: 'Re-formatting pyproject.toml file'
-      additional_dependencies: ["tox>=4.9"]
+# - repo: https://github.com/tox-dev/pyproject-fmt
+#   rev: "1.7.0"
+#   hooks:
+#     - id: pyproject-fmt
+#       name: 'Re-formatting pyproject.toml file'
+#       additional_dependencies: ["tox>=4.9"]
 
 # Ruff for linting and formatting
 # Ruff can replace isort and flake8 (https://docs.astral.sh/ruff/linter/)
