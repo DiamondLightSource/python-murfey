@@ -997,6 +997,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "class3d_dir": refine_params.class3d_dir,
                 "class_number": refine_params.class_number,
                 "pixel_size": relion_params.angpix,
+                "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
@@ -1866,6 +1867,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "class3d_dir": message["class3d_dir"],
                 "class_number": message["best_class"],
                 "pixel_size": relion_options["angpix"],
+                "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
@@ -1975,6 +1977,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                 "batch_size": bfactor_params.batch_size,
                 "pixel_size": message["pixel_size"],
                 "mask": bfactor_params.mask_file,
+                "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -2009,7 +2012,7 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     _db.commit()
 
     # Find all the resolutions in the b-factors table
-    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id).all())
+    all_bfactors = _db.exec(select(db.BFactors).where(db.BFactors.pj_id == pj_id)).all()
     particle_counts = [bf.number_of_particles for bf in all_bfactors]
     resolutions = [bf.resolution for bf in all_bfactors]
 
@@ -2021,7 +2024,7 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
         refined_class_uuid = message["refined_class_uuid"]
 
         # Request an ispyb insert of the b-factor fitting parameters
-        if _transport_object:
+        if False and _transport_object:
             _transport_object.send(
                 "ispyb_connector",
                 {
@@ -2033,16 +2036,17 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
                         "buffer_command": {
                             "ispyb_command": "insert_particle_classification"
                         },
-                        "bfactor_fit_intercept": bfactor_fitting[2],
-                        "bfactor_fit_linear": bfactor_fitting[1],
-                        "bfactor_fit_quadratic": bfactor_fitting[0],
+                        "bfactor_fit_intercept": str(bfactor_fitting[2]),
+                        "bfactor_fit_linear": str(bfactor_fitting[1]),
+                        "bfactor_fit_quadratic": str(bfactor_fitting[0]),
                     },
                     "content": {"dummy": "dummy"},
                 },
+                new_connection=True,
             )
 
         # Clean up the b-factors table and release the hold
-        _db.delete(all_bfactors)
+        [_db.delete(bf) for bf in all_bfactors]
         _db.commit()
         _release_refine_hold(message)
     _db.close()
