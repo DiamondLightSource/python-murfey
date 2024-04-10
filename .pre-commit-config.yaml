@@ -1,110 +1,120 @@
 # YAML formatting specifications: https://yaml.org/spec/1.2.2/
 
 repos:
-# Syntax validation and some basic sanity checks
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.5.0  # prev: v4.0.1
-  # rev input based on version tag format in repo (e.g. with or without 'v')
-  hooks:
-  - id: check-added-large-files
-    name: Checking for added large files
-    args: ['--maxkb=200']
-    fail_fast: True
-  - id: check-case-conflict
-    name: Checking for name case conflicts
-  - id: check-merge-conflict
-    name: Checking for merge conflicts
-  - id: check-ast
-    name: Verifying Python file syntax
-  - id: check-json
-    name: Verifying JSON file syntax
-  - id: check-yaml
-    name: Verifying YAML file syntax
-    args: [--allow-multiple-documents]
-  - id: check-toml
-    name: Verifying TOML file syntax
+  # Syntax validation and some basic sanity checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0 # Released 2023-10-09 # Prev: v4.0.1
+    # rev input based on version tag format in repo (e.g. with or without 'v')
+    hooks:
+      - id: check-added-large-files
+        name: Checking for added large files
+        args: ["--maxkb=200"]
+        fail_fast: True
+      - id: check-case-conflict
+        name: Checking for name case conflicts
+      - id: check-merge-conflict
+        name: Checking for merge conflicts
+      - id: check-ast
+        name: Verifying Python file syntax
+      - id: check-json
+        name: Verifying JSON file syntax
+      - id: check-yaml
+        name: Verifying YAML file syntax
+        args: [--allow-multiple-documents]
+      - id: check-toml
+        name: Verifying TOML file syntax
 
-# Format the pyproject.toml file
-- repo: https://github.com/tox-dev/pyproject-fmt
-  rev: 1.7.0
-  hooks:
-    - id: pyproject-fmt
-      name: 'Formatting pyproject.toml file'
-      additional_dependencies: ["tox>=4.9"]
+  # Format the pyproject.toml file
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: 1.7.0 # Released 2024-01-22
+    hooks:
+      - id: pyproject-fmt
+        name: Formatting the pyproject.toml file
+        additional_dependencies: ["tox>=4.9"]
 
-# Use Prettier to format other files
-- repo: https://github.com/pre-commit/mirrors-prettier
-  rev: v4.0.0-alpha.8
-  hooks:
-    - id: prettier
+  # Ruff for linting and formatting
+  # Possible replacement for isort and flake8 (https://docs.astral.sh/ruff/linter/)
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.3.5 # Released 2024-04-01
+  #   hooks:
+  #   # Ruff linter
+  #   - id: ruff
+  #     name: Running Ruff linter
+  #     args: [--fix]
+  #   # Ruff formatter
+  #   - id: ruff-format
+  #     name: Running Ruff formatter
+  #     types_or: [python]
 
-# Ruff for linting and formatting
-# Possible replacement for isort and flake8 (https://docs.astral.sh/ruff/linter/)
-# - repo: https://github.com/astral-sh/ruff-pre-commit
-#   rev: v0.3.5
-#   hooks:
-#   # Ruff linter
-#   - id: ruff
-#     name: Running Ruff linter
-#     args: [--fix]
-#   # Ruff formatter
-#   - id: ruff-format
-#     name: Running Ruff formatter
-#     types_or: [python]
+  # Automatic source code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.3.0 # Released 2024-03-15 # Prev: 22.3.0
+    hooks:
+      - id: black
+        name: Formatting Python scripts according to Black
+        args: [--safe, --quiet]
 
-# Automatic source code formatting
-- repo: https://github.com/psf/black
-  rev: 24.3.0  # prev: 22.3.0
-  hooks:
-  - id: black
-    name: Checking code compliance with Black formatting standards
-    args: [--safe, --quiet]
+  # Automatically sort imports
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2 # Released 2023-12-13 # Prev: 5.12.0
+    hooks:
+      - id: isort
+        name: Tidying Python imports via Isort
+        args: [
+            #'-a', 'from __future__ import annotations',        # 3.7-3.11
+            "--rm",
+            "from __future__ import absolute_import", # -3.0
+            "--rm",
+            "from __future__ import division", # -3.0
+            "--rm",
+            "from __future__ import generator_stop", # -3.7
+            "--rm",
+            "from __future__ import generators", # -2.3
+            "--rm",
+            "from __future__ import nested_scopes", # -2.2
+            "--rm",
+            "from __future__ import print_function", # -3.0
+            "--rm",
+            "from __future__ import unicode_literals", # -3.0
+            "--rm",
+            "from __future__ import with_statement", # -2.6
+          ]
 
-# Automatically sort imports
-- repo: https://github.com/PyCQA/isort
-  rev: 5.13.2  # prev: 5.12.0
-  hooks:
-  - id: isort
-    name: Re-arranging imports via Isort
-    args: [
-           #'-a', 'from __future__ import annotations',        # 3.7-3.11
-           '--rm', 'from __future__ import absolute_import',  # -3.0
-           '--rm', 'from __future__ import division',         # -3.0
-           '--rm', 'from __future__ import generator_stop',   # -3.7
-           '--rm', 'from __future__ import generators',       # -2.3
-           '--rm', 'from __future__ import nested_scopes',    # -2.2
-           '--rm', 'from __future__ import print_function',   # -3.0
-           '--rm', 'from __future__ import unicode_literals', # -3.0
-           '--rm', 'from __future__ import with_statement',   # -2.6
-      ]
+  # Linting
+  - repo: https://github.com/PyCQA/flake8
+    # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
+    rev: 7.0.0 # Released 2024-01-05 # Prev: 4.0.1
+    hooks:
+      - id: flake8
+        name: Running Flake8 linter on Python files
+        additional_dependencies: [
+            # Added Flake8-pyproject plugin for .toml compatibility
+            "Flake8-pyproject==1.2.3",
+            # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
+            "flake8-comprehensions==3.14.0", # prev: 3.8.0
+          ]
 
-# Linting
-- repo: https://github.com/PyCQA/flake8
-  # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
-  rev: 7.0.0  # prev: 4.0.1
-  hooks:
-  - id: flake8
-    name: Running Flake8 linter for chosen codes
-    additional_dependencies: [
-      # Added Flake8-pyproject plugin for .toml compatibility
-      'Flake8-pyproject==1.2.3',
-      # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
-      'flake8-comprehensions==3.14.0'  # prev: 3.8.0
-      ]
+  # Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0 # Released 2024-03-09 # Prev: v0.910
+    hooks:
+      - id: mypy
+        name: Checking types in Python scripts using MyPy
+        files: '(src|tests)/.*\.py$' # RegEx string showing directories and files to check
+        # Single quote critical due to escape character '\' used in the search string
+        # (see YAML specifications - 7.3 Flow Scalar Styles)
 
-# Type checking
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.9.0  # prev: v0.910
-  hooks:
-  - id: mypy
-    name: Checking types using MyPy
-    files: '(src|tests)/.*\.py$'  # RegEx string showing directories and files to check
-    # Single quote critical due to escape character '\' used in the search string
-    # (see YAML specifications - 7.3 Flow Scalar Styles)
+        additional_dependencies: [
+            # Install missing stub packages
+            types-requests,
+            types-xmltodict,
+            types-PyYAML,
+          ]
 
-    additional_dependencies: [
-      # Install missing stub packages
-      types-requests,
-      types-xmltodict,
-      types-PyYAML,
-      ]
+  # Use Prettier to format other files
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0 # Latest stable version (Released 2023-11-13)
+    hooks:
+      - id: prettier
+        name: Formatting other file types according to Prettier
+        # types_or: [css, html, json, yaml]
