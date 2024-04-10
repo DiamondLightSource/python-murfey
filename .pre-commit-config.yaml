@@ -32,6 +32,12 @@ repos:
       name: 'Formatting pyproject.toml file'
       additional_dependencies: ["tox>=4.9"]
 
+# Use Prettier to format other files
+- repo: https://github.com/pre-commit/mirrors-prettier
+  rev: v4.0.0-alpha.8
+  hooks:
+    - id: prettier
+
 # Ruff for linting and formatting
 # Possible replacement for isort and flake8 (https://docs.astral.sh/ruff/linter/)
 # - repo: https://github.com/astral-sh/ruff-pre-commit
