@@ -23,10 +23,10 @@ components:
           title: Processing Job
           type: array
       required:
-      - data_collection_group
-      - data_collection
-      - processing_job
-      - autoproc_program
+        - data_collection_group
+        - data_collection
+        - processing_job
+        - autoproc_program
       title: ClearanceKeys
       type: object
     ConnectionFileParameters:
@@ -40,8 +40,8 @@ components:
           title: Filename
           type: string
       required:
-      - filename
-      - destinations
+        - filename
+        - destinations
       title: ConnectionFileParameters
       type: object
     ContextInfo:
@@ -53,8 +53,8 @@ components:
           title: Experiment Type
           type: string
       required:
-      - experiment_type
-      - acquisition_software
+        - experiment_type
+        - acquisition_software
       title: ContextInfo
       type: object
     DCGroupParameters:
@@ -69,9 +69,9 @@ components:
           title: Tag
           type: string
       required:
-      - experiment_type
-      - experiment_type_id
-      - tag
+        - experiment_type
+        - experiment_type_id
+        - tag
       title: DCGroupParameters
       type: object
     DCParameters:
@@ -126,17 +126,17 @@ components:
           title: Voltage
           type: number
       required:
-      - voltage
-      - pixel_size_on_image
-      - experiment_type
-      - image_size_x
-      - image_size_y
-      - file_extension
-      - acquisition_software
-      - image_directory
-      - tag
-      - source
-      - magnification
+        - voltage
+        - pixel_size_on_image
+        - experiment_type
+        - image_size_x
+        - image_size_y
+        - file_extension
+        - acquisition_software
+        - image_directory
+        - tag
+        - source
+        - magnification
       title: DCParameters
       type: object
     File:
@@ -154,10 +154,10 @@ components:
           title: Timestamp
           type: number
       required:
-      - name
-      - description
-      - size
-      - timestamp
+        - name
+        - description
+        - size
+        - timestamp
       title: File
       type: object
     GainReference:
@@ -167,14 +167,14 @@ components:
           title: Gain Ref
           type: string
       required:
-      - gain_ref
+        - gain_ref
       title: GainReference
       type: object
     HTTPValidationError:
       properties:
         detail:
           items:
-            $ref: '#/components/schemas/ValidationError'
+            $ref: "#/components/schemas/ValidationError"
           title: Detail
           type: array
       title: HTTPValidationError
@@ -222,17 +222,17 @@ components:
           title: Timestamp
           type: number
       required:
-      - path
-      - description
-      - size
-      - timestamp
-      - processing_job
-      - data_collection_id
-      - image_number
-      - mc_uuid
-      - autoproc_program_id
-      - pixel_size
-      - dose_per_frame
+        - path
+        - description
+        - size
+        - timestamp
+        - processing_job
+        - data_collection_id
+        - image_number
+        - mc_uuid
+        - autoproc_program_id
+        - pixel_size
+        - dose_per_frame
       title: ProcessFile
       type: object
     ProcessingJobParameters:
@@ -248,8 +248,8 @@ components:
           title: Tag
           type: string
       required:
-      - tag
-      - recipe
+        - tag
+        - recipe
       title: ProcessingJobParameters
       type: object
     RegistrationMessage:
@@ -261,7 +261,7 @@ components:
           title: Registration
           type: string
       required:
-      - registration
+        - registration
       title: RegistrationMessage
       type: object
     SPAProcessingParameters:
@@ -270,7 +270,7 @@ components:
           title: Job Id
           type: integer
       required:
-      - job_id
+        - job_id
       title: SPAProcessingParameters
       type: object
     SuggestedPathParameters:
@@ -284,7 +284,7 @@ components:
           title: Touch
           type: boolean
       required:
-      - base_path
+        - base_path
       title: SuggestedPathParameters
       type: object
     TiltSeries:
@@ -317,15 +317,15 @@ components:
           title: Processing Job
           type: integer
       required:
-      - name
-      - file_tilt_list
-      - dcid
-      - processing_job
-      - autoproc_program_id
-      - motion_corrected_path
-      - movie_id
-      - pixel_size
-      - manual_tilt_offset
+        - name
+        - file_tilt_list
+        - dcid
+        - processing_job
+        - autoproc_program_id
+        - motion_corrected_path
+        - movie_id
+        - pixel_size
+        - manual_tilt_offset
       title: TiltSeries
       type: object
     ValidationError:
@@ -333,8 +333,8 @@ components:
         loc:
           items:
             anyOf:
-            - type: string
-            - type: integer
+              - type: string
+              - type: integer
           title: Location
           type: array
         msg:
@@ -344,9 +344,9 @@ components:
           title: Error Type
           type: string
       required:
-      - loc
-      - msg
-      - type
+        - loc
+        - msg
+        - type
       title: ValidationError
       type: object
     Visit:
@@ -372,12 +372,12 @@ components:
           title: Start
           type: string
       required:
-      - start
-      - end
-      - session_id
-      - name
-      - beamline
-      - proposal_title
+        - start
+        - end
+        - session_id
+        - name
+        - beamline
+        - proposal_title
       title: Visit
       type: object
 info:
@@ -389,7 +389,7 @@ paths:
     get:
       operationId: root__get
       responses:
-        '200':
+        "200":
           content:
             text/html:
               schema:
@@ -398,13 +398,14 @@ paths:
       summary: Root
   /bootstrap/:
     get:
-      description: 'Return a website containing instructions for installing the Murfey
+      description:
+        "Return a website containing instructions for installing the Murfey
         client on a
 
-        machine with no internet access.'
+        machine with no internet access."
       operationId: get_bootstrap_instructions_bootstrap__get
       responses:
-        '200':
+        "200":
           content:
             text/html:
               schema:
@@ -412,46 +413,48 @@ paths:
           description: Successful Response
       summary: Get Bootstrap Instructions
       tags:
-      - bootstrap
+        - bootstrap
   /bootstrap/murfey.whl:
     get:
-      description: 'Return a wheel file containing the latest release version of Murfey.
+      description:
+        "Return a wheel file containing the latest release version of Murfey.
         We should
 
         not have to worry about the exact Python compatibility here, as long as
 
         murfey.bootstrap is compatible with all relevant versions of Python.
 
-        This also ignores yanked releases, which again should be fine.'
+        This also ignores yanked releases, which again should be fine."
       operationId: get_murfey_wheel_bootstrap_murfey_whl_get
       responses:
-        '200':
+        "200":
           description: Successful Response
       summary: Get Murfey Wheel
       tags:
-      - bootstrap
+        - bootstrap
   /bootstrap/pip.whl:
     get:
-      description: 'Return a static version of pip. This does not need to be the newest
+      description:
+        "Return a static version of pip. This does not need to be the newest
         or best,
 
         but has to be compatible with all supported Python versions.
 
         This is only used during bootstrapping by the client to identify and then
 
-        download the actually newest appropriate version of pip.'
+        download the actually newest appropriate version of pip."
       operationId: get_pip_wheel_bootstrap_pip_whl_get
       responses:
-        '200':
+        "200":
           description: Successful Response
       summary: Get Pip Wheel
       tags:
-      - bootstrap
+        - bootstrap
   /connections/:
     get:
       operationId: connections_check_connections__get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
@@ -459,51 +462,52 @@ paths:
       summary: Connections Check
   /cygwin/setup-x86_64.exe:
     get:
-      description: 'Obtain and past though a Cygwin installer from an official source.
+      description:
+        "Obtain and past though a Cygwin installer from an official source.
 
         This is used during client bootstrapping and can download and install the
 
-        Cygwin distribution that then remains on the client machines.'
+        Cygwin distribution that then remains on the client machines."
       operationId: get_cygwin_setup_cygwin_setup_x86_64_exe_get
       responses:
-        '200':
+        "200":
           description: Successful Response
       summary: Get Cygwin Setup
       tags:
-      - bootstrap
+        - bootstrap
   /cygwin/{request_path}:
     get:
       description: Forward a Cygwin setup request to an official mirror.
       operationId: parse_cygwin_request_cygwin__request_path__get
       parameters:
-      - in: path
-        name: request_path
-        required: true
-        schema:
-          title: Request Path
-          type: string
+        - in: path
+          name: request_path
+          required: true
+          schema:
+            title: Request Path
+            type: string
       responses:
-        '200':
+        "200":
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Parse Cygwin Request
       tags:
-      - bootstrap
+        - bootstrap
   /demo/visits_raw:
     get:
       operationId: get_current_visits_demo_demo_visits_raw_get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/Visit'
+                  $ref: "#/components/schemas/Visit"
                 title: Response Get Current Visits Demo Demo Visits Raw Get
                 type: array
           description: Successful Response
@@ -515,26 +519,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegistrationMessage'
+              $ref: "#/components/schemas/RegistrationMessage"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Send Murfey Message
   /health/:
     get:
       operationId: health_check_health__get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
@@ -544,7 +548,7 @@ paths:
     get:
       operationId: machine_info_machine__get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
@@ -554,7 +558,7 @@ paths:
     get:
       operationId: get_mic_microscope__get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
@@ -565,97 +569,98 @@ paths:
       description: Obtain list of all PyPI packages via the simple API (PEP 503).
       operationId: get_pypi_index_pypi__get
       responses:
-        '200':
+        "200":
           description: Successful Response
       summary: Get Pypi Index
       tags:
-      - bootstrap
+        - bootstrap
   /pypi/{package}/:
     get:
-      description: 'Obtain list of all package downloads from PyPI via the simple
+      description:
+        "Obtain list of all package downloads from PyPI via the simple
         API (PEP 503),
 
         and rewrite all download URLs to point to this server,
 
-        underneath the current directory.'
+        underneath the current directory."
       operationId: get_pypi_package_downloads_list_pypi__package___get
       parameters:
-      - in: path
-        name: package
-        required: true
-        schema:
-          title: Package
-          type: string
+        - in: path
+          name: package
+          required: true
+          schema:
+            title: Package
+            type: string
       responses:
-        '200':
+        "200":
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Get Pypi Package Downloads List
       tags:
-      - bootstrap
+        - bootstrap
   /pypi/{package}/{filename}:
     get:
       description: Obtain and pass through a specific download for a PyPI package.
       operationId: get_pypi_file_pypi__package___filename__get
       parameters:
-      - in: path
-        name: package
-        required: true
-        schema:
-          title: Package
-          type: string
-      - in: path
-        name: filename
-        required: true
-        schema:
-          title: Filename
-          type: string
+        - in: path
+          name: package
+          required: true
+          schema:
+            title: Package
+            type: string
+        - in: path
+          name: filename
+          required: true
+          schema:
+            title: Filename
+            type: string
       responses:
-        '200':
+        "200":
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Get Pypi File
       tags:
-      - bootstrap
+        - bootstrap
   /version:
     get:
       operationId: get_version_version_get
       parameters:
-      - in: query
-        name: client_version
-        required: false
-        schema:
-          default: ''
-          title: Client Version
-          type: string
+        - in: query
+          name: client_version
+          required: false
+          schema:
+            default: ""
+            title: Client Version
+            type: string
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Get Version
   /visits/:
     get:
       operationId: all_visit_info_visits__get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
@@ -665,23 +670,23 @@ paths:
     get:
       operationId: visit_info_visits__visit_name__get
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
-          type: string
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Visit Info
   /visits/{visit_name}/align:
@@ -691,47 +696,47 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TiltSeries'
+              $ref: "#/components/schemas/TiltSeries"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Request Tilt Series Alignment
   /visits/{visit_name}/clean_state:
     post:
       operationId: clean_state_visits__visit_name__clean_state_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ClearanceKeys'
+              $ref: "#/components/schemas/ClearanceKeys"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Clean State
   /visits/{visit_name}/context:
@@ -741,19 +746,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ContextInfo'
+              $ref: "#/components/schemas/ContextInfo"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Register Context
   /visits/{visit_name}/files:
@@ -763,257 +768,257 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/File'
+              $ref: "#/components/schemas/File"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Add File
   /visits/{visit_name}/process_gain:
     post:
       operationId: process_gain_visits__visit_name__process_gain_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GainReference'
+              $ref: "#/components/schemas/GainReference"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Process Gain
   /visits/{visit_name}/register_data_collection_group:
     post:
       operationId: register_dc_group_visits__visit_name__register_data_collection_group_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DCGroupParameters'
+              $ref: "#/components/schemas/DCGroupParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Register Dc Group
   /visits/{visit_name}/register_processing_job:
     post:
       operationId: register_proc_visits__visit_name__register_processing_job_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProcessingJobParameters'
+              $ref: "#/components/schemas/ProcessingJobParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Register Proc
   /visits/{visit_name}/spa_processing:
     post:
       operationId: request_spa_processing_visits__visit_name__spa_processing_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
-          type: string
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SPAProcessingParameters'
+              $ref: "#/components/schemas/SPAProcessingParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Request Spa Processing
   /visits/{visit_name}/start_data_collection:
     post:
       operationId: start_dc_visits__visit_name__start_data_collection_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DCParameters'
+              $ref: "#/components/schemas/DCParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Start Dc
   /visits/{visit_name}/suggested_path:
     post:
       operationId: suggest_path_visits__visit_name__suggested_path_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SuggestedPathParameters'
+              $ref: "#/components/schemas/SuggestedPathParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Suggest Path
   /visits/{visit_name}/tomography_preprocess:
     post:
       operationId: request_tomography_preprocessing_visits__visit_name__tomography_preprocess_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
-          type: string
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProcessFile'
+              $ref: "#/components/schemas/ProcessFile"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Request Tomography Preprocessing
   /visits/{visit_name}/write_connections_file:
     post:
       operationId: write_conn_file_visits__visit_name__write_connections_file_post
       parameters:
-      - in: path
-        name: visit_name
-        required: true
-        schema:
-          title: Visit Name
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ConnectionFileParameters'
+              $ref: "#/components/schemas/ConnectionFileParameters"
         required: true
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Write Conn File
   /visits_raw:
     get:
       operationId: get_current_visits_visits_raw_get
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/Visit'
+                  $ref: "#/components/schemas/Visit"
                 title: Response Get Current Visits Visits Raw Get
                 type: array
           description: Successful Response
@@ -1022,49 +1027,49 @@ paths:
     delete:
       operationId: close_ws_connection_ws_test__client_id__delete
       parameters:
-      - in: path
-        name: client_id
-        required: true
-        schema:
-          title: Client Id
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
       responses:
-        '200':
+        "200":
           content:
             application/json:
               schema: {}
           description: Successful Response
-        '422':
+        "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: "#/components/schemas/HTTPValidationError"
           description: Validation Error
       summary: Close Ws Connection
       tags:
-      - websocket
+        - websocket
 tags:
-- description: '
+  - description: "
 
-    API endpoints related to installing Murfey on a client.
-
-
-    Client machines may not have a direct internet connection, so Murfey allows
-
-    passing through requests to PyPI using the PEP 503 simple API, and download
-
-    requests to the Cygwin website and mirrors.
+      API endpoints related to installing Murfey on a client.
 
 
-    A static HTML page gives instructions on how to install on a network-isolated
+      Client machines may not have a direct internet connection, so Murfey allows
 
-    system that has Python already installed. A previously set up system does not
+      passing through requests to PyPI using the PEP 503 simple API, and download
 
-    need to have pip installed in order to bootstrap Murfey. Python and rsync are
+      requests to the Cygwin website and mirrors.
 
-    required.
 
-    '
-  externalDocs:
-    description: PEP 503
-    url: https://www.python.org/dev/peps/pep-0503/
-  name: bootstrap
+      A static HTML page gives instructions on how to install on a network-isolated
+
+      system that has Python already installed. A previously set up system does not
+
+      need to have pip installed in order to bootstrap Murfey. Python and rsync are
+
+      required.
+
+      "
+    externalDocs:
+      description: PEP 503
+      url: https://www.python.org/dev/peps/pep-0503/
+    name: bootstrap
