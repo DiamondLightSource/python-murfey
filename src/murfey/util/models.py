@@ -114,7 +114,7 @@ class SPAProcessFile(BaseModel):
     data_collection_id: Optional[int]
     image_number: int
     autoproc_program_id: Optional[int]
-    foil_hole_id: int
+    foil_hole_id: Optional[int]
     pixel_size: Optional[float]
     dose_per_frame: Optional[float]
     mc_binning: Optional[int] = 1
