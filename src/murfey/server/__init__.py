@@ -2233,7 +2233,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 murfey_db.close()
             if dcid is None and _transport_object:
-                _transport_object.transport.nack(header)
+                _transport_object.transport.nack(header, requeue=True)
                 return None
             if global_state.get("data_collection_ids") and isinstance(
                 global_state["data_collection_ids"], dict
@@ -2276,7 +2276,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 murfey_db.close()
             if pid is None and _transport_object:
-                _transport_object.transport.nack(header)
+                _transport_object.transport.nack(header, requeue=True)
                 return None
             prom.preprocessed_movies.labels(processing_job=pid)
             if global_state.get("processing_job_ids"):
@@ -2304,7 +2304,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 appid = _register(record, header)
                 if appid is None and _transport_object:
-                    _transport_object.transport.nack(header)
+                    _transport_object.transport.nack(header, requeue=True)
                     return None
                 murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
                 murfey_db.add(murfey_app)
