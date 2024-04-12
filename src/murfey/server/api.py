@@ -433,7 +433,6 @@ def register_foil_hole(
         jpeg_size = Image.open(foil_hole_params.image).size
     else:
         jpeg_size = (0, 0)
-    jpeg_size = Image.open(foil_hole_params.image).size
     foil_hole = FoilHole(
         name=foil_hole_params.name,
         session_id=session_id,
