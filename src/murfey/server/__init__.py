@@ -2155,7 +2155,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.close()
             if _transport_object:
                 if dcgid is None:
-                    _transport_object.transport.nack(header)
+                    time.sleep(2)
+                    _transport_object.transport.nack(header, requeue=True)
                     return None
                 if global_state.get("data_collection_group_ids") and isinstance(
                     global_state["data_collection_group_ids"], dict
