@@ -77,7 +77,7 @@ class TransportManager:
                 e,
                 exc_info=True,
             )
-        return False
+        return {"success": False, "return_value": None}
 
     def send(self, queue: str, message: dict, new_connection: bool = False):
         if self.transport:

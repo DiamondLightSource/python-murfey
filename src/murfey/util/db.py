@@ -421,7 +421,7 @@ class RefineParameters(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     class_number: int
-    run: bool = True
+    run: bool = False
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="refine_parameters"
     )

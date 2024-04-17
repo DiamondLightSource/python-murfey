@@ -23,7 +23,7 @@ from ispyb.sqlalchemy import (
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import NoResultFound, OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -413,21 +413,26 @@ def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]
 def register_foil_hole(
     session_id: int, gs_name: int, foil_hole_params: FoilHoleParameters, db=murfey_db
 ):
-    gsid = (
-        db.exec(
-            select(GridSquare)
-            .where(GridSquare.tag == foil_hole_params.tag)
-            .where(GridSquare.session_id == session_id)
-            .where(GridSquare.name == gs_name)
+    try:
+        gsid = (
+            db.exec(
+                select(GridSquare)
+                .where(GridSquare.tag == foil_hole_params.tag)
+                .where(GridSquare.session_id == session_id)
+                .where(GridSquare.name == gs_name)
+            )
+            .one()
+            .id
         )
-        .one()
-        .id
-    )
+    except NoResultFound:
+        log.debug(
+            f"Foil hole {foil_hole_params.name} could not be registered as grid square {gs_name} was not found"
+        )
+        return
     if foil_hole_params.image and Path(foil_hole_params.image).is_file():
         jpeg_size = Image.open(foil_hole_params.image).size
     else:
         jpeg_size = (0, 0)
-    jpeg_size = Image.open(foil_hole_params.image).size
     foil_hole = FoilHole(
         name=foil_hole_params.name,
         session_id=session_id,

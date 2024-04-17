@@ -2157,7 +2157,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.close()
             if _transport_object:
                 if dcgid is None:
-                    _transport_object.transport.nack(header)
+                    time.sleep(2)
+                    _transport_object.transport.nack(header, requeue=True)
                     return None
                 if global_state.get("data_collection_group_ids") and isinstance(
                     global_state["data_collection_group_ids"], dict
@@ -2191,9 +2192,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcgid = dcg.id
                 # flush_data_collections(message["source"], murfey_db)
             else:
-                raise ValueError(
+                logger.warning(
                     f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
                 )
+                if _transport_object:
+                    _transport_object.transport.nack(header, requeue=True)
+                return None
             if dc_murfey := murfey_db.exec(
                 select(db.DataCollection)
                 .where(db.DataCollection.tag == message.get("tag"))
@@ -2236,7 +2240,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 murfey_db.close()
             if dcid is None and _transport_object:
-                _transport_object.transport.nack(header)
+                _transport_object.transport.nack(header, requeue=True)
                 return None
             if global_state.get("data_collection_ids") and isinstance(
                 global_state["data_collection_ids"], dict
@@ -2253,7 +2257,12 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif message["register"] == "processing_job":
             logger.info("registering processing job")
             assert isinstance(global_state["data_collection_ids"], dict)
-            _dcid = global_state["data_collection_ids"][message["tag"]]
+            _dcid = global_state["data_collection_ids"].get(message["tag"])
+            if _dcid is None:
+                logger.warning(f"No data collection ID found for {message['tag']}")
+                if _transport_object:
+                    _transport_object.transport.nack(header, requeue=True)
+                return None
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
                 .where(db.ProcessingJob.recipe == message["recipe"])
@@ -2279,7 +2288,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 murfey_db.close()
             if pid is None and _transport_object:
-                _transport_object.transport.nack(header)
+                _transport_object.transport.nack(header, requeue=True)
                 return None
             prom.preprocessed_movies.labels(processing_job=pid)
             if global_state.get("processing_job_ids"):
@@ -2307,7 +2316,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 appid = _register(record, header)
                 if appid is None and _transport_object:
-                    _transport_object.transport.nack(header)
+                    _transport_object.transport.nack(header, requeue=True)
                     return None
                 murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
                 murfey_db.add(murfey_app)
