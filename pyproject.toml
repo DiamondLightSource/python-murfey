@@ -46,6 +46,8 @@ developer = [
     "bump2version",
     "pre-commit",
     "pytest",
+    "readlif", # Testing for cryo-CLEM workflow
+    "tifffile", # Testing for cryo-CLEM workflow
 ]
 server = [
     "cryptography",
