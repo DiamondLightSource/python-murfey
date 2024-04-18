@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.11.8"
+version = "0.11.9"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -43,11 +43,14 @@ client = [
     "xmltodict",
 ]
 developer = [
-    "bump2version",
-    "pre-commit",
-    "pytest",
+    "bump2version", # Version control
+    "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
+    "pre-commit", # Formatting, linting, type checking, etc.
+    "pytest", # Test code functionality
     "readlif", # Testing for cryo-CLEM workflow
     "tifffile", # Testing for cryo-CLEM workflow
+    "matplotlib", # For statistical analysis of images
+    "ipykernel", # For interactive coding with VS Code and Jupyter Notebook
 ]
 server = [
     "cryptography",
