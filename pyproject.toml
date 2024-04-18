@@ -1,12 +1,250 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools >= 40.6.0",
+    "wheel",
+]
+
+[project]
+name = "murfey"
+version = "0.11.8"
+description = "Client-Server architecture hauling Cryo-EM data"
+readme = "README.md"
+keywords = [
+    "",
+]
+license = {file = "LICENSE"}
+maintainers = []
+authors = []
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic",
+    "requests",
+    "rich",
+    "werkzeug",
+]
+[project.optional-dependencies]
+client = [
+    "procrunner",
+    "textual==0.42.0",
+    "websocket-client",
+    "xmltodict",
+]
+developer = [
+    "bump2version",
+    "pre-commit",
+    "pytest",
+]
+server = [
+    "cryptography",
+    "fastapi",
+    "importlib_resources; python_version<'3.9'", # Not needed anymore, since dropping support for Python 3.8
+    "ispyb",
+    "jinja2",
+    "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
+    "numpy",
+    "packaging",
+    "pillow",
+    "prometheus_client",
+    "sqlmodel",
+    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "uvicorn[standard]",
+    "zocalo",
+]
+[project.urls]
+Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
+Documentation = "https://github.com/DiamondLightSource/python-murfey"
+GitHub = "https://github.com/DiamondLightSource/python-murfey"
+[project.scripts]
+murfey = "murfey.client:run"
+"murfey.create_db" = "murfey.cli.create_db:run"
+"murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
+"murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
+"murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
+"murfey.generate_password" = "murfey.cli.generate_db_password:run"
+"murfey.server" = "murfey.server:run"
+"murfey.sessions" = "murfey.cli.db_sessions:run"
+"murfey.simulate" = "murfey.cli.dummy:run"
+"murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
+"murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
+"murfey.transfer" = "murfey.cli.transfer:run"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.package-data]
+"murfey.client.tui" = ["*.css"]
+
+[tool.setuptools.packages.find]
+where = ["src", "tests"]
+
+[tool.ruff]
+# Copied Ruff default recommended settings
+# Files and dirs to format
+include = [
+    "pyproject.toml",
+    # "setup.cfg",
+    "setup.py",
+    "src/**/*.py",
+    "tests/**/*.py",
+]
+# Exclude commonly ignored directories
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+indent-width = 4  # Format same as Black.
+line-length = 88  # Format same as Black.
+target-version = "py39"  # Assume Python 3.9 and above
+
+[tool.ruff.format]
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+# Currently, not all Flake8 rule codes appear to be implemented in Ruff. VSCode throws up errors for them.
+# select: E901, F812, W602, W603, W604, W606
+# ignore: W503
+# A mix of the two need to be used for the rule codes currently desired.
+select = [
+    "C4",
+    "E401",
+    "E711",
+    "E712",
+    "E713",
+    "E714",
+    "E721",
+    "E722",
+    "F401",
+    "F402",
+    "F403",
+    "F405",
+    "F541",
+    "F631",
+    "F632",
+    "F633",
+    "F811",
+    "F821",
+    "F822",
+    "F841",
+    "F901",
+    "W191",
+    "W291",
+    "W292",
+    "W293",
+    "W605",
+]
+ignore = [
+    "E203",
+    "E266",
+    "E501",
+]
+fixable = ["ALL"]  # Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"  # Allow unused variables when underscore-prefixed.
 
 [tool.isort]
 profile = "black"
+
+[tool.flake8]
+# Flake8-pyproject allows .toml settings to be read into Flake8
+# URL: https://pypi.org/project/Flake8-pyproject/
+select = [
+    "C4",
+    "E401",
+    "E711",
+    "E712",
+    "E713",
+    "E714",
+    "E721",
+    "E722",
+    "E901",
+    "F401",
+    "F402",
+    "F403",
+    "F405",
+    "F541",
+    "F631",
+    "F632",
+    "F633",
+    "F811",
+    "F812",
+    "F821",
+    "F822",
+    "F841",
+    "F901",
+    "W191",
+    "W291",
+    "W292",
+    "W293",
+    "W602",
+    "W603",
+    "W604",
+    "W605",
+    "W606",
+]
+ignore = [
+    "E203",
+    "E266",
+    "E501",
+    "W503",
+]
+max-line-length = "88"
+
+[tool.pyproject-fmt]
+inputs = "pyproject.toml"
+check = false
+indent = 4
+keep_full_version = true
+max-supported-python = "3.12"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 
 [tool.mypy]
-mypy_path = "src"
+disable_error_code = [
+    "annotation-unchecked",  # Notification that the bodies of untyped functions aren't checked. Not critical
+    "import-untyped",  # Error for missing library stubs. Not critical
+]

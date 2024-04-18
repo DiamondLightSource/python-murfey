@@ -1,24 +1,15 @@
 {
-  "extends": [
-    "config:base",
-    ":disableDependencyDashboard"
-  ],
-  "labels": [
-    "dependencies"
-  ],
+  "extends": ["config:base", ":disableDependencyDashboard"],
+  "labels": ["dependencies"],
   "pip_requirements": {
-    "fileMatch": [
-      "^requirements.*\\.txt$"
-    ],
+    "fileMatch": ["^requirements.*\\.txt$"],
     "groupName": "all dependencies",
     "groupSlug": "all",
     "packageRules": [
       {
         "groupName": "all dependencies",
         "groupSlug": "all",
-        "matchPackagePatterns": [
-          "*"
-        ]
+        "matchPackagePatterns": ["*"]
       }
     ]
   },
@@ -30,9 +21,7 @@
     ],
     "stabilityDays": 10
   },
-  "schedule": [
-    "after 7am and before 4pm every monday"
-  ],
+  "schedule": ["after 7am and before 4pm every monday"],
   "stabilityDays": 2,
   "timezone": "Europe/London"
 }

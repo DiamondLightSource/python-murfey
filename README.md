@@ -2,7 +2,6 @@
 
 A transporter for data from Diamond eBIC microscope and detector machines onto the Diamond network.
 
-
 ### Who is Murfey?
 
 Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationalrrmuseum.org/blog/mother-of-invention-women-railroad-innovators/):
@@ -11,7 +10,6 @@ Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationa
 > to improve the bearings on rail wheels. With sixteen patents for her lubrication system,
 > it was Murfey who designed the packings that would lubricate the axles with oil, aiding
 > in the reduction of derailments caused by seized axles and bearings.
-
 
 ### How do I set up a development environment?
 
@@ -26,6 +24,7 @@ $ pip install -e .[client,server]
 ```
 
 You will also want to set up pre-commits:
+
 ```bash
 $ pip install pre-commit
 $ pre-commit install
@@ -35,11 +34,13 @@ Finally, you may want to set up an ISPyB mock database server and a Zocalo
 development environment. The instructions for this are out of scope here.
 
 You can then start the Murfey server with
+
 ```bash
 $ murfey.server
 ```
 
 and connect the client with
+
 ```bash
 $ murfey --server http://127.0.0.1:8000
 ```

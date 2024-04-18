@@ -345,9 +345,11 @@ def run():
         pj_id=collected_ids[2].id,
         angpix=float(metadata["pixel_size_on_image"]) * 1e10,
         dose_per_frame=metadata["dose_per_frame"],
-        gain_ref=str(machine_config.rsync_basepath / metadata["gain_ref"])
-        if metadata["gain_ref"]
-        else metadata["gain_ref"],
+        gain_ref=(
+            str(machine_config.rsync_basepath / metadata["gain_ref"])
+            if metadata["gain_ref"]
+            else metadata["gain_ref"]
+        ),
         voltage=metadata["voltage"],
         motion_corr_binning=metadata["motion_corr_binning"],
         eer_grouping=metadata["eer_fractionation"],
@@ -417,11 +419,11 @@ def run():
                     "mc_uuid": murfey_ids[2 * i],
                     "ft_bin": metadata["motion_corr_binning"],
                     "fm_dose": metadata["dose_per_frame"],
-                    "gain_ref": str(
-                        machine_config.rsync_basepath / metadata["gain_ref"]
-                    )
-                    if metadata["gain_ref"]
-                    else metadata["gain_ref"],
+                    "gain_ref": (
+                        str(machine_config.rsync_basepath / metadata["gain_ref"])
+                        if metadata["gain_ref"]
+                        else metadata["gain_ref"]
+                    ),
                     "downscale": metadata["downscale"],
                     "picker_uuid": murfey_ids[2 * i + 1],
                     "session_id": args.session_id,

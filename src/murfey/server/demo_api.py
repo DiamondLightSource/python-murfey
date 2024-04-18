@@ -6,7 +6,7 @@ import random
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import packaging.version
 import sqlalchemy
@@ -111,6 +111,7 @@ if settings.murfey_machine_configuration:
     machine_config = dict(
         from_file(Path(settings.murfey_machine_configuration), microscope)
     )
+
 
 # This will be the homepage for a given microscope.
 @router.get("/", response_class=HTMLResponse)
@@ -778,11 +779,11 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
                 "mc_uuid": murfey_ids[2 * i],
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": str(
-                    machine_config["rsync_basepath"] / proc_params["gain_ref"]
-                )
-                if proc_params["gain_ref"]
-                else proc_params["gain_ref"],
+                "gain_ref": (
+                    str(machine_config["rsync_basepath"] / proc_params["gain_ref"])
+                    if proc_params["gain_ref"]
+                    else proc_params["gain_ref"]
+                ),
                 "picker_uuid": murfey_ids[2 * i + 1],
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             },
@@ -1188,7 +1189,7 @@ def register_dc_group(
 @router.post("/visits/{visit_name}/{client_id}/start_data_collection")
 def start_dc(
     visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
-) -> DCParameters | None:
+) -> Optional[DCParameters]:
     dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"

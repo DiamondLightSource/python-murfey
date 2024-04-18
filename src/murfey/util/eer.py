@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import BinaryIO
+from typing import BinaryIO, Literal
 
 
 def _count_ifds(file_stream: BinaryIO) -> int:
@@ -9,7 +9,7 @@ def _count_ifds(file_stream: BinaryIO) -> int:
     # get the byte order mark
     # for TIFFs II means intel ordering (little-endian) and MM means motorola ordering (big-endian)
     bom = bytes(file_stream.read(2)).decode("utf-8")
-    byteorder = "little" if bom == "II" else "big"
+    byteorder: Literal["little", "big"] = "little" if bom == "II" else "big"
     file_stream.seek(8, 0)
     ifd = int.from_bytes(file_stream.read(8), byteorder)
     n = 0

@@ -257,9 +257,9 @@ class LaunchScreen(Screen):
         cfg = get_machine_config(
             str(self.app._environment.url.geturl()), demo=self.app._environment.demo
         )
-        self._context: Type[SPAModularContext] | Type[SPAContext] | Type[
-            TomographyContext
-        ]
+        self._context: (
+            Type[SPAModularContext] | Type[SPAContext] | Type[TomographyContext]
+        )
         if cfg.get("modular_spa"):
             self._context = SPAContext
         else:
@@ -271,9 +271,9 @@ class LaunchScreen(Screen):
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
-            data_directories=machine_data.get("data_directories", {})
-            if self.app._strict
-            else {},
+            data_directories=(
+                machine_data.get("data_directories", {}) if self.app._strict else {}
+            ),
             id="dir-select",
         )
 
@@ -320,9 +320,9 @@ class LaunchScreen(Screen):
             machine_data = requests.get(
                 f"{self.app._environment.url.geturl()}/machine/"
             ).json()
-            self.app._default_destinations[
-                source
-            ] = f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+            self.app._default_destinations[source] = (
+                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+            )
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
@@ -630,9 +630,11 @@ class SessionSelection(Screen):
             self.app.pop_screen()
             self.app.install_screen(
                 ConfirmScreen(
-                    f"Remove session {session_id} [WARNING: there are clients already using this session]"
-                    if str(event.button.label) in self._sessions_with_client
-                    else f"Remove session {session_id}",
+                    (
+                        f"Remove session {session_id} [WARNING: there are clients already using this session]"
+                        if str(event.button.label) in self._sessions_with_client
+                        else f"Remove session {session_id}"
+                    ),
                     pressed_callback=partial(self._remove_session, session_id),
                     button_names={"launch": "Yes"},
                     push="visit-select-screen",
@@ -803,9 +805,9 @@ class GainReference(Screen):
                 log.info(
                     f"Gain reference file {process_gain_response.json().get('gain_ref')}"
                 )
-                self.app._environment.data_collection_parameters[
-                    "gain_ref"
-                ] = process_gain_response.json().get("gain_ref")
+                self.app._environment.data_collection_parameters["gain_ref"] = (
+                    process_gain_response.json().get("gain_ref")
+                )
                 self.app._environment.data_collection_parameters[
                     "gain_ref_superres"
                 ] = process_gain_response.json().get("gain_ref_superres")

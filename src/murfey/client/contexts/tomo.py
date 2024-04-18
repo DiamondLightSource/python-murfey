@@ -786,9 +786,11 @@ class TomographyContext(Context):
             tilt_info_extraction.angle,
             tilt_info_extraction.tag,
             environment=environment,
-            required_position_files=required_position_files
-            if required_position_files is not None
-            else [file_path.parent / (tilt_series + ".mdoc")],
+            required_position_files=(
+                required_position_files
+                if required_position_files is not None
+                else [file_path.parent / (tilt_series + ".mdoc")]
+            ),
             required_strings=required_strings,
         )
 
@@ -996,9 +998,9 @@ class TomographyContext(Context):
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
             mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
             mdoc_metadata["slit_width"] = float(mdoc_data_block["FilterSlitAndLoss"][0])
-            mdoc_metadata[
-                "file_extension"
-            ] = f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+            mdoc_metadata["file_extension"] = (
+                f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
+            )
 
             data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
             if data_file.split(".")[-1] == "eer":

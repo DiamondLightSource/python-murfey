@@ -8,7 +8,6 @@ spec:
   owner: user:kif41228
 
 ---
-
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
@@ -30,7 +29,6 @@ spec:
     - component:zocalo
 
 ---
-
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
@@ -49,7 +47,6 @@ spec:
     - murfey-rest
 
 ---
-
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:

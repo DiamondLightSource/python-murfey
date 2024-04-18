@@ -1751,9 +1751,11 @@ def _flush_tomography_preprocessing(message: dict):
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params.motion_corr_binning,
                 "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": str(machine_config.rsync_basepath / proc_params.gain_ref)
-                if proc_params.gain_ref
-                else proc_params.gain_ref,
+                "gain_ref": (
+                    str(machine_config.rsync_basepath / proc_params.gain_ref)
+                    if proc_params.gain_ref
+                    else proc_params.gain_ref
+                ),
                 "fm_int_file": proc_params.eer_fractionation_file or "",
             },
         }
@@ -2223,9 +2225,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcid = _register(
                     record,
                     header,
-                    tag=message.get("tag")
-                    if message["experiment_type"] == "tomography"
-                    else "",
+                    tag=(
+                        message.get("tag")
+                        if message["experiment_type"] == "tomography"
+                        else ""
+                    ),
                 )
                 murfey_dc = db.DataCollection(
                     id=dcid,
@@ -2481,9 +2485,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                     pj_id=collected_ids[2].id,
                     angpix=float(message["pixel_size_on_image"]) * 1e10,
                     dose_per_frame=message["dose_per_frame"],
-                    gain_ref=str(machine_config.rsync_basepath / message["gain_ref"])
-                    if message["gain_ref"]
-                    else message["gain_ref"],
+                    gain_ref=(
+                        str(machine_config.rsync_basepath / message["gain_ref"])
+                        if message["gain_ref"]
+                        else message["gain_ref"]
+                    ),
                     voltage=message["voltage"],
                     motion_corr_binning=message["motion_corr_binning"],
                     eer_grouping=message["eer_fractionation"],
@@ -2717,6 +2723,10 @@ def _(record: Base, header: dict, **kwargs):
 
 @_register.register  # type: ignore
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):
+    if not _transport_object:
+        raise ValueError(
+            "Transport object should not be None if a database record is being updated"
+        )
     return _transport_object.do_create_ispyb_job(
         extended_record.record, params=extended_record.record_params
     )["return_value"]
