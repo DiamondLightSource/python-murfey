@@ -1,37 +1,163 @@
 """
-Contains functions that help with reading .lif files and converting them into other useful file formats (e.g. .tiff files) as part of the cryo-CLEM workflow
+Contains functions that help with reading .lif files and converting them into other
+useful file formats (e.g. .tiff files) as part of the cryo-CLEM workflow
 """
 
 from __future__ import annotations
 
+import time as tm  # Prevent ambiguity with time as-defined in functions below
+import xml.etree.ElementTree as ET
+from multiprocessing import Process, Queue
 from pathlib import Path
+from typing import Callable
 
 import bioformats as bf
 import javabridge as jb
 import numpy as np
-import time
 
 # import tifffile as tif
 from matplotlib import pyplot as plt
 from readlif.reader import LifFile as lif
-#from xml.dom import minidom
-import xml.etree.ElementTree as ET
 
 
-def use_readlif(file: Path):
+def _init_logger():
+    """
+    This is so that Javabridge doesn't spill out a lot of DEBUG/WARNING messages during
+    runtime.
+    Copied from: https://github.com/pskeshu/microscoper/blob/master/microscoper/io.py#L141-L162
+
+    Valid logging options: TRACE, DEBUG, INFO, WARN, ERROR, OFF, ALL
+    Taken from: https://logback.qos.ch/manual/architecture.html
+    """
+
+    rootLoggerName = jb.get_static_field(
+        "org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;"
+    )
+
+    rootLogger = jb.static_call(
+        "org/slf4j/LoggerFactory",
+        "getLogger",
+        "(Ljava/lang/String;)Lorg/slf4j/Logger;",
+        rootLoggerName,
+    )
+
+    logLevel = jb.get_static_field(
+        "ch/qos/logback/classic/Level",
+        "ERROR",  # Show only error messages or worse
+        "Lch/qos/logback/classic/Level;",
+    )
+
+    jb.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
+
+
+def _run_as_separate_process(
+    function: Callable, args=list  # List of arguments the function takes, IN ORDER
+):
+    """
+    Run the function as its own separate process. Currently used for handling functions
+    that make use of Java virtual machines, which cannot be started again after they
+    have been stopped in a Python instance.
+    """
+    # Create a queue object to pass to the process
+    queue: Queue = Queue()
+
+    # Run functions that need JVM instances as a separate process
+    p = Process(
+        target=function, args=(*args, queue)  # Process takes arguments as a tuple
+    )
+    p.start()
+
+    # Extract the result from the function
+    results = queue.get()
+    p.join()
+
+    return results
+
+
+def _get_xml_string(file: Path, queue: Queue):  # multiprocessing queue
+    # Start Java virtual machine
+    jb.start_vm(class_path=bf.JARS, run_headless=True)
+    _init_logger()
+
+    # Get OME-XML string from file
+    xml_string = bf.get_omexml_metadata(path=str(file))
+    print("Loaded OME-XML metadata from file")
+
+    # Kill virtual machine
+    jb.kill_vm()
+
+    # Add result to queue
+    queue.put(xml_string)
+    return xml_string
+
+
+def get_xml_string(file: Path):
+    xml_string = _run_as_separate_process(function=_get_xml_string, args=[file])
+    return xml_string
+
+
+def write_to_raw_xml(xml_string: str):
+    # Write raw xml to file
+    xml_file = file.parent.joinpath(file.stem + ".xml")
+    if xml_file.exists():
+        print("XML file already exists")
+        pass
+    else:
+        with open(xml_file, mode="w", encoding="utf-8") as log_file:
+            log_file.writelines(xml_string)
+        log_file.close()
+        print("Wrote raw OME-XML metadata to XML file")
+
+    return xml_file
+
+
+def convert_to_xml_tree(xml_string: str):
+    # Convert to ElementTree
+    tree = ET.ElementTree(ET.fromstring(xml_string))
+    print("Created ElementTree successfully")
+
+    # Add indent to XML file
+    ET.indent(tree, space="\t", level=0)
+
+    return tree
+
+
+def write_to_pretty_xml(xml_tree: ET.ElementTree, file: Path):
+    # Write out metadata contents in a formatted structure
+    xml_file = file.parent.joinpath(file.stem + ".xml")
+    if xml_file.exists():
+        print("XML file already exists")
+        pass
+    else:
+        xml_tree.write(xml_file, encoding="utf-8")
+        print("Wrote formatted OME-XML metadata to XML file")
+
+    return xml_file
+
+
+def extract_xml_metadata(file: Path):
+    # Convert OME-XML metadata
+    xml_string = get_xml_string(file=file)
+    xml_tree = convert_to_xml_tree(xml_string=xml_string)
+    write_to_pretty_xml(xml_tree=xml_tree, file=file)
+
+    return xml_tree
+
+
+def inspect_lif_file(file: Path):
     """
     Inspection of the contents and structure of a .lif file using readlif Python package
     """
     # Load file as a LifFile object
-    file = lif(file)
+    liffile = lif(file)
 
     # Inspect contents
     # Number of sub-files
-    num_imgs = len(list(file.get_iter_image()))
+    num_imgs = len(list(liffile.get_iter_image()))
     print(f"There are {num_imgs} sub-files in this document")
 
     # Get list of images
-    img_list = list(file.get_iter_image())
+    img_list = list(liffile.get_iter_image())
     [print(i) for i in img_list]  # Check properties of files
 
     # Inspect single image
@@ -103,149 +229,16 @@ def use_readlif(file: Path):
     return None
 
 
-def use_bioformats(file: Path):
-    # Start Java virtual machine
-    jb.start_vm(class_path=bf.JARS,
-                run_headless=True)
-
-    # Load file metadata
-    print(f"Loading {file.stem + file.suffix} metadata")
-    metadata = bf.OMEXML(bf.get_omexml_metadata(path=str(file)))  # get_omexml_metadata returns it as a string
-    print("Successfully opened metadata")
-    print(f"Metadata is {type(metadata)}")
-
-    # Inspect metadata
-    # print(f"Namespaces contains {metadata.ns}")
-    # print(f"Root node contains {metadata.root_node}")
-    # print(f"Metadata contains {[item for item in metadata.dom.iter()]}")  # Iter is a LONG list of objects
-
-    # Get number of images in file metadata
-    num_imgs = metadata.get_image_count()
-    print(f"This file contains {num_imgs} images")
-    # Iterate through metadata for each image
-    for n in range(num_imgs):
-        try:
-            md = metadata
-            print(f"Plates: {md.plates}")
-            print(f"Structured annotations: {md.structured_annotations}")
-            im = metadata.image(n)
-            print(f"ID: {im.ID}")  # Equivalent to get_ID()
-            print(f"Name: {im.Name}")  # Equivalent to get_Name()
-            print(f"Acquisition date: {im.AcquisitionDate}")  # Equivalent to get_AcquisitionDate()
-            print(f"Number of ROI refs: {im.get_roiref_count()}")
-            num_roiref = im.get_roiref_count()
-            for r in range(num_roiref):
-                print(f"ROI ref number {r}: {im.roiref(r)}")
-            px = im.Pixels
-            print(f"Pixel ID: {px.ID}")
-            print(f"Pixel dimension order: {px.DimensionOrder}")
-            print(f"Pixel type: {px.PixelType}")
-
-            print(f"Number of channels: {px.SizeC}")
-            num_chan = px.SizeC
-            print(f"Number of timepoints: {px.SizeT}")
-            print(f"Number of x-pixels: {px.SizeX}")
-            print(f"Number of y-pixels: {px.SizeY}")
-            print(f"Number of slices: {px.SizeZ}")
-            for c in range(num_chan):
-                ch = px.Channel(c)
-                print(f"Channel ID: {ch.ID}")
-                print(f"Channel name: {ch.Name}")
-                print(f"Channel samples per pixel: {ch.SamplesPerPixel}")
-        except:
-            print(f"Request failed for image number {n}")
-    
-    # Inspect generated metadata
-    # file_name = metadata.image().Name
-    # print(f"File name is {file_name}")
-
-    # Identify channels
-    # num_channels = metadata.image().Pixels.channel_count  # Get number of channels
-    # channel_list = [metadata.image().Pixels.Channel(i).Name for i in range(num_channels)]
-    # print(f"There are {num_channels} channels in this file with the names:")
-    # [print(c) for c in channel_list]
-
-    # End Java virtual machine
-    jb.kill_vm()  # Javabridge cannot restart in VS Code Interactive Window
-
+def read_lif_file(file: Path):
     return None
-
-
-def get_xml(file: Path):
-    # Start Java virtual machine
-    jb.start_vm(class_path=bf.JARS,
-                run_headless=True)
-
-    # Get OME-XML string from file
-    xml_string = bf.get_omexml_metadata(path=str(file))
-    print("Loaded OME-XML metadata from file")
-
-    # Write to file
-    txt_file = file.parent.joinpath(file.stem + ".txt")
-    if txt_file.exists():
-        pass
-        print("Text file already exists")
-    else:
-        tree = ET.ElementTree(ET.fromstring(xml_string))
-        root = tree.getroot()
-        xml_formatted = ET.tostring(root, encoding="utf8").decode("utf8")
-        # print(xml_formatted)
-        with open(txt_file, "w") as log_file:
-            log_file.writelines(xml_formatted)
-        log_file.close()
-        print("Wrote OME-XML metadata to text file")
-
-    # End Java virtual machine
-    jb.kill_vm()
-
-    return xml_string
-
-
-def use_xml(file: Path):
-    # Convert OME-XML metadata
-    xml_string = get_xml(file=file)
-    tree = ET.ElementTree(ET.fromstring(xml_string))
-    # Navigate to XML root
-    root = tree.getroot()
-    print("Created ElementTree successfully")
-    
-    # Inspect element
-    # print(f"Root tag: {root.tag}")
-    # print(f"Root attribute: {root.attrib}")
-    print(f"There are {len(root)} items under root")
-    # [print(root[i].attrib) for i in range(len(root))]  # Top-level attributes: Present
-    # [print(root[i].tag) for i in range(len(root))]  # Top-level tags: Present
-    # [print(root[i].text) for i in range(len(root))]  # Top-level text: None
-    
-    # Inspect one level down
-    branch0 = root[0]
-    branch1 = root[int((len(root)-1)/2)]
-    branch2 = root[-1]
-    
-    print(f"Examining {branch0.attrib}")
-    print(f"There are {len(branch0)} items under this branch")
-    [print(# child.tag,  # Tag is just the website
-        child.attrib,  # Attributes present
-        # child.text  # No text
-        ) for child in branch0]
-    print("\n")
-
-    print(f"Examining {branch1.attrib}")
-    print(f"There are {len(branch1)} items under this branch")
-    [print(# child.tag,  # Tag is just the website
-        child.attrib,  # Attributes present
-        # child.text  # No text
-        ) for child in branch1]
-    print("\n")
-
-    print(f"Examining {branch2.attrib}")
-    print(f"There are {len(branch2)} items under this branch")
-    print("\n")
-    return tree
 
 
 # Run only if opened as a file
 if __name__ == "__main__":
+
+    # Start the stopwatch
+    time_start = tm.time_ns()
+
     # Define test directory to extract data from
     test_repo = Path(
         "/dls/ebic/data/staff-scratch/tieneupin/projects/murfey-clem/test-data/nt26538-160/raw"
@@ -257,14 +250,19 @@ if __name__ == "__main__":
     # Search in test repo
     file_list = list(test_repo.glob("*.lif"))  # Convert to list object
     file_list.sort()  # Sort in alphabetical order
-    [
-        print(f"{f.stem + f.suffix} | Path object? {isinstance(f, Path)}")
-        for f in file_list
-    ]  # Print individually to check
 
-    file = file_list[0]  # Select one file to work with
-    
-    # Open and examine files
-    # use_readlif(file=file)
-    # use_bioformats(file=file)
-    use_xml(file=file)
+    for f in range(len(file_list)):
+        # if not f == 0:  # Select one file to work with
+        #     continue
+
+        file = file_list[f]
+
+        # Extract data
+        xml_tree = extract_xml_metadata(file=file)  # Get and save metadata
+        lif_file = read_lif_file(file=file)  # Get image stacks
+
+    # Stop the stopwatch
+    time_stop = tm.time_ns()
+    # Report time taken
+    time_diff = time_stop - time_start  # In ns
+    print(f"Time to completion was {round(time_diff * 10**-9, 2)} s")
