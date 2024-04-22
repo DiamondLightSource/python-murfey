@@ -175,12 +175,9 @@ def inspect_lif_file(file: Path):
 
     channel = len(list(img.get_iter_c()))
     print(f"The number of channels is {channel}")
-    # Channel order
-    # 0 - G
-    # 1 - R
-    # 2 - B/W
     # LIF files are not in RGB format!
-    # Better to treat them as individual image stacks
+    # Channel colour defined in metadata under LUT key
+    # Better to treat them as individual image stacks?
 
     bit_depth = img.bit_depth  # Bit depth for each channel in image
     print(f"The bit depth of each channel is {bit_depth}")
@@ -230,6 +227,11 @@ def inspect_lif_file(file: Path):
 
 
 def read_lif_file(file: Path):
+    """
+    Placeholder function
+
+    Extract image data from LIF files as numpy array.
+    """
     return None
 
 
