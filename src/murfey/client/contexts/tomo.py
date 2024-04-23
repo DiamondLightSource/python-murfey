@@ -436,6 +436,13 @@ class TomographyContext(Context):
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            rerun_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/rerun_tilt_series"
+            rerun_data = {
+                "client_id": environment.client_id,
+                "tag": tilt_series,
+                "source": str(file_path.parent),
+            }
+            capture_post(rerun_url, json=rerun_data)
             if tilt_series in self._aligned_tilt_series:
                 with self._lock:
                     self._aligned_tilt_series.remove(tilt_series)

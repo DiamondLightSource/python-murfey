@@ -667,6 +667,32 @@ def register_completed_tilt_series(
     db.commit()
 
 
+@router.post("/visits/{visit_name}/rerun_tilt_series")
+def register_tilt_series_for_rerun(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    """Set processing to false for cases where an extra tilt is found for a series"""
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(
+                ClientEnvironment.client_id == tilt_series_info.client_id
+            )
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts.processing_requested = False
+        db.add(ts)
+    db.commit()
+
+
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
 def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
     res = db.exec(
