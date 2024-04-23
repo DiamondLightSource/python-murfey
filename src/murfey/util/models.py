@@ -206,11 +206,13 @@ class PreprocessingParametersTomo(BaseModel):
     tag: str
     tilt_series_tag: str
     eer_fractionation_file: Optional[str]
+    eer_fractionation: int
 
     class Base(BaseModel):
         dose_per_frame: float
         gain_ref: Optional[str]
         manual_tilt_offset: float
+        eer_fractionation: int
 
 
 class ProcessingParametersTomo(BaseModel):

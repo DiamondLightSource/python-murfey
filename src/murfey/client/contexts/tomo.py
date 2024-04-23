@@ -1001,6 +1001,11 @@ class TomographyContext(Context):
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )
+            mdoc_metadata["eer_fractionation"] = (
+                environment.data_collection_parameters.get("eer_fractionation")
+                if environment
+                else None
+            ) or 20
 
             data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
             if data_file.split(".")[-1] == "eer":
