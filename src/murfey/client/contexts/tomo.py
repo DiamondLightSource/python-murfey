@@ -627,25 +627,6 @@ class TomographyContext(Context):
             }
             capture_post(preproc_url, json=preproc_data)
 
-        if self._last_transferred_file:
-            last_tilt_series = (
-                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
-                if extract_tilt_tag(self._last_transferred_file)
-                else extract_tilt_series(self._last_transferred_file)
-            )
-            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
-            self._last_transferred_file = file_path
-            if (
-                last_tilt_series != tilt_series
-                and last_tilt_angle != tilt_angle
-                or self._tilt_series_sizes.get(tilt_series)
-            ) or self._completed_tilt_series:
-                return self._check_tilt_series(
-                    tilt_series,
-                    required_position_files or [],
-                    file_transferred_to,
-                    environment=environment,
-                )
         self._last_transferred_file = file_path
         return res
 
