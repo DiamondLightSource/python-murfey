@@ -49,7 +49,7 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
     tag: str
     rsync_source: str
     session_id: int = Field(foreign_key="session.id")
-    complete: bool = False
+    tilt_series_length: int
     processing_requested: bool = False
     session: Optional[Session] = Relationship(back_populates="tilt_series")
     tilts: List["Tilt"] = Relationship(

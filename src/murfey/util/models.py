@@ -139,6 +139,7 @@ class TiltSeriesInfo(BaseModel):
 class TiltSeriesGroupInfo(BaseModel):
     tags: List[str]
     source: str
+    tilt_series_lengths: List[int]
 
 
 class CompletedTiltSeries(BaseModel):

@@ -597,7 +597,8 @@ def register_completed_tilt_series(
         .where(TiltSeries.rsync_source == tilt_series_group.source)
     ).all()
     for ts in tilt_series_db:
-        ts.complete = True
+        ts_index = tilt_series_group.tags == ts.tag
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
