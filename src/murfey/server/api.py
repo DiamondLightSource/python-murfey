@@ -97,7 +97,6 @@ from murfey.util.models import (
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
-    TiltSeriesProcessingDetails,
     Visit,
 )
 from murfey.util.spa_params import default_spa_parameters
@@ -1101,42 +1100,6 @@ async def request_tomography_preprocessing(
         db.close()
     # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
-
-
-@router.post("/visits/{visit_name}/align")
-async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails):
-    stack_file = (
-        Path(tilt_series.motion_corrected_path).parents[1]
-        / "align_output"
-        / f"{tilt_series.name}_stack.mrc"
-    )
-    if not stack_file.parent.exists():
-        stack_file.parent.mkdir(parents=True)
-    zocalo_message = {
-        "recipes": ["em-tomo-align"],
-        "parameters": {
-            "input_file_list": tilt_series.file_tilt_list,
-            "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
-            "dcid": tilt_series.dcid,
-            "appid": tilt_series.autoproc_program_id,
-            "stack_file": str(stack_file),
-            "pix_size": tilt_series.pixel_size,
-            "manual_tilt_offset": tilt_series.manual_tilt_offset,
-            "node_creator_queue": machine_config.node_creator_queue,
-        },
-    }
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
-    else:
-        log.error(
-            f"Processing was requested for tilt series {sanitise(tilt_series.name)} but no Zocalo transport object was found"
-        )
-        return tilt_series
-    await ws.manager.broadcast(
-        f"Processing requested for tilt series {tilt_series.name}"
-    )
-
-    return tilt_series
 
 
 @router.get("/version")
