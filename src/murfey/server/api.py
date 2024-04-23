@@ -601,7 +601,10 @@ def register_completed_tilt_series(
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
-        if check_tilt_series_mc(ts.id):
+        if check_tilt_series_mc(ts.id) and not ts.processing_requested:
+            ts.processing_requested = True
+            db.add(ts)
+
             collected_ids = db.exec(
                 select(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
@@ -660,6 +663,7 @@ def register_completed_tilt_series(
                 log.info(
                     f"No transport object found. Zocalo message would be {zocalo_message}"
                 )
+    db.commit()
 
 
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
