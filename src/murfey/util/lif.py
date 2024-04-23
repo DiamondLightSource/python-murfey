@@ -11,43 +11,45 @@ from multiprocessing import Process, Queue
 from pathlib import Path
 from typing import Callable
 
-import bioformats as bf
-import javabridge as jb
+# import bioformats as bf
+# import javabridge as jb  # javabridge can't work with Python > 3.10
 import numpy as np
 
-# import tifffile as tif
+import tifffile as tif
 from matplotlib import pyplot as plt
 from readlif.reader import LifFile as lif
+from bioio import BioImage
 
 
 def _init_logger():
     """
     This is so that Javabridge doesn't spill out a lot of DEBUG/WARNING messages during
     runtime.
-    Copied from: https://github.com/pskeshu/microscoper/blob/master/microscoper/io.py#L141-L162
+    Source: https://github.com/pskeshu/microscoper/blob/master/microscoper/io.py#L141-L162
 
     Valid logging options: TRACE, DEBUG, INFO, WARN, ERROR, OFF, ALL
-    Taken from: https://logback.qos.ch/manual/architecture.html
+    Source: https://logback.qos.ch/manual/architecture.html
     """
 
-    rootLoggerName = jb.get_static_field(
-        "org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;"
-    )
+    # rootLoggerName = jb.get_static_field(
+    #     "org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;"
+    # )
 
-    rootLogger = jb.static_call(
-        "org/slf4j/LoggerFactory",
-        "getLogger",
-        "(Ljava/lang/String;)Lorg/slf4j/Logger;",
-        rootLoggerName,
-    )
+    # rootLogger = jb.static_call(
+    #     "org/slf4j/LoggerFactory",
+    #     "getLogger",
+    #     "(Ljava/lang/String;)Lorg/slf4j/Logger;",
+    #     rootLoggerName,
+    # )
 
-    logLevel = jb.get_static_field(
-        "ch/qos/logback/classic/Level",
-        "ERROR",  # Show only error messages or worse
-        "Lch/qos/logback/classic/Level;",
-    )
+    # logLevel = jb.get_static_field(
+    #     "ch/qos/logback/classic/Level",
+    #     "ERROR",  # Show only error messages or worse
+    #     "Lch/qos/logback/classic/Level;",
+    # )
 
-    jb.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
+    # jb.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
+    return None
 
 
 def _run_as_separate_process(
@@ -75,20 +77,21 @@ def _run_as_separate_process(
 
 
 def _get_xml_string(file: Path, queue: Queue):  # multiprocessing queue
-    # Start Java virtual machine
-    jb.start_vm(class_path=bf.JARS, run_headless=True)
-    _init_logger()
+    # # Start Java virtual machine
+    # jb.start_vm(class_path=bf.JARS, run_headless=True)
+    # _init_logger()
 
-    # Get OME-XML string from file
-    xml_string = bf.get_omexml_metadata(path=str(file))
-    print("Loaded OME-XML metadata from file")
+    # # Get OME-XML string from file
+    # xml_string = bf.get_omexml_metadata(path=str(file))
+    # print("Loaded OME-XML metadata from file")
 
-    # Kill virtual machine
-    jb.kill_vm()
+    # # Kill virtual machine
+    # jb.kill_vm()
 
-    # Add result to queue
-    queue.put(xml_string)
-    return xml_string
+    # # Add result to queue
+    # queue.put(xml_string)
+    # return xml_string
+    return None
 
 
 def get_xml_string(file: Path):
@@ -144,7 +147,7 @@ def extract_xml_metadata(file: Path):
     return xml_tree
 
 
-def inspect_lif_file(file: Path):
+def inspect_with_readlif(file: Path):
     """
     Inspection of the contents and structure of a .lif file using readlif Python package
     """
@@ -226,6 +229,40 @@ def inspect_lif_file(file: Path):
     return None
 
 
+def inspect_with_bioio(file: Path):
+    # Load image as BioImage object
+    imgs = BioImage(str(file))
+    print(f"Successfully loaded {file.stem + file.suffix}")
+
+    # Use available commands to explore file
+    num_scenes = len(imgs.scenes)
+    print(f"There are {num_scenes} scenes in this file")  # Image defaults to one of those scenes when examined
+
+    for i in range(num_scenes):
+        img_id = imgs.scenes[i]
+        imgs.set_scene(i)  # Changes metadata references in-place
+        img = imgs
+        print(f"Now examining {img_id}")
+
+        print(f"Image file has the shape {img.shape}")
+        print(f"Image dimensions are in the order {img.dims.order}")
+
+        metadata = img.metadata  # returns the metadata object for this file format (XML, JSON, etc.)
+        channels = img.channel_names  # returns a list of string channel names found in the metadata
+        size_x = img.physical_pixel_sizes.X  # returns the X dimension pixel size as found in the metadata
+        size_y = img.physical_pixel_sizes.Y  # returns the Y dimension pixel size as found in the metadata
+        size_z = img.physical_pixel_sizes.Z  # returns the Z dimension pixel size as found in the metadata
+
+        print(f"Metadata contains {metadata} \n",
+            f"Channels contains {channels} \n",
+            f"Size X is {size_x} \n",  # Units of um?
+            f"Size Y is {size_y} \n",  # Units of um?
+            f"Size Z is {size_z} \n",  #
+            )
+
+    return None
+
+
 def read_lif_file(file: Path):
     """
     Placeholder function
@@ -249,19 +286,20 @@ if __name__ == "__main__":
 
     file_ext = ".lif"  # Look only for .lif files
 
-    # Search in test repo
-    file_list = list(test_repo.glob("*.lif"))  # Convert to list object
+    # Get list of files
+    file_list = list(test_repo.glob("*" + file_ext))  # Search via glob and convert to list object
     file_list.sort()  # Sort in alphabetical order
 
     for f in range(len(file_list)):
-        # if not f == 0:  # Select one file to work with
-        #     continue
+        if not f == 1:  # Select one file to work with
+            continue
 
         file = file_list[f]
 
         # Extract data
-        xml_tree = extract_xml_metadata(file=file)  # Get and save metadata
-        lif_file = read_lif_file(file=file)  # Get image stacks
+        # xml_tree = extract_xml_metadata(file=file)  # Get and save metadata
+        # lif_file = read_lif_file(file=file)  # Get image stacks
+        inspect_with_bioio(file)
 
     # Stop the stopwatch
     time_stop = tm.time_ns()

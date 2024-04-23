@@ -36,6 +36,13 @@ dependencies = [
     "werkzeug",
 ]
 [project.optional-dependencies]
+clem = [
+    # "python-bioformats", # cryo-CLEM; read LIF metadata thoroughly; python-javabridge only supports 3.8-3.9; not ideal
+    # "readlif", # cryo-CLEM; open LIF files; part of bioio-lif
+    "tifffile", # cryo-CLEM; save to TIFF
+    "bioio", # cryo-CLEM; alternative to python-bioformats
+    "bioio-lif", # cryo-CLEM; bioio plugin for LIF files
+]
 client = [
     "procrunner",
     "textual==0.42.0",
@@ -44,13 +51,10 @@ client = [
 ]
 developer = [
     "bump2version", # Version control
-    "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
-    "matplotlib", # For statistical analysis of images
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
-    "python-bioformats", # cryo-CLEM; read .lif metadata thoroughly
-    "readlif", # cryo-CLEM; open .lif files
-    "tifffile", # cryo-CLEM; convert .lif to .tiff
+    "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
+    "matplotlib", # For visual statistical analysis of images
 ]
 server = [
     "cryptography",
