@@ -106,7 +106,10 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
         .where(db.TiltSeries.id == tilt_series_id)
     ).all()
-    return all(r[0].motion_corrected for r in results) and results[0][1].complete
+    return (
+        all(r[0].motion_corrected for r in results)
+        and len(results) == results[0][1].tilt_series_length
+    )
 
 
 def get_all_tilts(tilt_series_id: int) -> List[str]:
@@ -2086,8 +2089,13 @@ def feedback_callback(header: dict, message: dict) -> None:
             relevant_tilt.motion_corrected = True
             murfey_db.add(relevant_tilt)
             murfey_db.commit()
-            murfey_db.close()
-            if check_tilt_series_mc(relevant_tilt_series.id):
+            if (
+                check_tilt_series_mc(relevant_tilt_series.id)
+                and not relevant_tilt_series.processing_requested
+            ):
+                relevant_tilt_series.processing_requested = True
+                murfey_db.add(relevant_tilt_series)
+
                 machine_config = get_machine_config()
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
@@ -2125,6 +2133,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                         f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
 
+            murfey_db.commit()
+            murfey_db.close()
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
