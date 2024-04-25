@@ -97,7 +97,6 @@ from murfey.util.models import (
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
-    TiltSeriesProcessingDetails,
     Visit,
 )
 from murfey.util.spa_params import default_spa_parameters
@@ -598,11 +597,15 @@ def register_completed_tilt_series(
         .where(TiltSeries.rsync_source == tilt_series_group.source)
     ).all()
     for ts in tilt_series_db:
-        ts.complete = True
+        ts_index = tilt_series_group.tags.index(ts.tag)
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
-        if check_tilt_series_mc(ts.id):
+        if check_tilt_series_mc(ts.id) and not ts.processing_requested:
+            ts.processing_requested = True
+            db.add(ts)
+
             collected_ids = db.exec(
                 select(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
@@ -661,6 +664,33 @@ def register_completed_tilt_series(
                 log.info(
                     f"No transport object found. Zocalo message would be {zocalo_message}"
                 )
+    db.commit()
+
+
+@router.post("/visits/{visit_name}/rerun_tilt_series")
+def register_tilt_series_for_rerun(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    """Set processing to false for cases where an extra tilt is found for a series"""
+    session_id = (
+        db.exec(
+            select(ClientEnvironment).where(
+                ClientEnvironment.client_id == tilt_series_info.client_id
+            )
+        )
+        .one()
+        .session_id
+    )
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts.processing_requested = False
+        db.add(ts)
+    db.commit()
 
 
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
@@ -1101,42 +1131,6 @@ async def request_tomography_preprocessing(
         db.close()
     # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
-
-
-@router.post("/visits/{visit_name}/align")
-async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails):
-    stack_file = (
-        Path(tilt_series.motion_corrected_path).parents[1]
-        / "align_output"
-        / f"{tilt_series.name}_stack.mrc"
-    )
-    if not stack_file.parent.exists():
-        stack_file.parent.mkdir(parents=True)
-    zocalo_message = {
-        "recipes": ["em-tomo-align"],
-        "parameters": {
-            "input_file_list": tilt_series.file_tilt_list,
-            "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
-            "dcid": tilt_series.dcid,
-            "appid": tilt_series.autoproc_program_id,
-            "stack_file": str(stack_file),
-            "pix_size": tilt_series.pixel_size,
-            "manual_tilt_offset": tilt_series.manual_tilt_offset,
-            "node_creator_queue": machine_config.node_creator_queue,
-        },
-    }
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
-    else:
-        log.error(
-            f"Processing was requested for tilt series {sanitise(tilt_series.name)} but no Zocalo transport object was found"
-        )
-        return tilt_series
-    await ws.manager.broadcast(
-        f"Processing requested for tilt series {tilt_series.name}"
-    )
-
-    return tilt_series
 
 
 @router.get("/version")

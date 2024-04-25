@@ -82,7 +82,6 @@ from murfey.util.models import (
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
-    TiltSeriesProcessingDetails,
     Visit,
 )
 from murfey.util.spa_params import default_spa_parameters
@@ -1031,22 +1030,6 @@ async def request_tomography_preprocessing(
         db.commit()
         db.close()
     return proc_file
-
-
-@router.post("/visits/{visit_name}/align")
-async def request_tilt_series_alignment(tilt_series: TiltSeriesProcessingDetails):
-    stack_file = (
-        Path(tilt_series.motion_corrected_path).parents[1]
-        / "align_output"
-        / f"aligned_file_{tilt_series.name}.mrc"
-    )
-    if not stack_file.parent.exists():
-        stack_file.parent.mkdir(parents=True)
-    await ws.manager.broadcast(
-        f"Processing requested for tilt series {tilt_series.name}"
-    )
-    stack_file.touch()
-    return tilt_series
 
 
 @router.get("/version")

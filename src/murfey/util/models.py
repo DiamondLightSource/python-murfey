@@ -139,23 +139,12 @@ class TiltSeriesInfo(BaseModel):
 class TiltSeriesGroupInfo(BaseModel):
     tags: List[str]
     source: str
+    tilt_series_lengths: List[int]
 
 
 class CompletedTiltSeries(BaseModel):
     tilt_series: List[str]
     rsync_source: str
-
-
-class TiltSeriesProcessingDetails(BaseModel):
-    name: str
-    file_tilt_list: str
-    dcid: int
-    processing_job: int
-    autoproc_program_id: int
-    motion_corrected_path: str
-    movie_id: int
-    pixel_size: float
-    manual_tilt_offset: int
 
 
 class SuggestedPathParameters(BaseModel):
@@ -206,11 +195,13 @@ class PreprocessingParametersTomo(BaseModel):
     tag: str
     tilt_series_tag: str
     eer_fractionation_file: Optional[str]
+    eer_fractionation: int
 
     class Base(BaseModel):
         dose_per_frame: float
         gain_ref: Optional[str]
         manual_tilt_offset: float
+        eer_fractionation: int
 
 
 class ProcessingParametersTomo(BaseModel):

@@ -436,6 +436,13 @@ class TomographyContext(Context):
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            rerun_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/rerun_tilt_series"
+            rerun_data = {
+                "client_id": environment.client_id,
+                "tag": tilt_series,
+                "source": str(file_path.parent),
+            }
+            capture_post(rerun_url, json=rerun_data)
             if tilt_series in self._aligned_tilt_series:
                 with self._lock:
                     self._aligned_tilt_series.remove(tilt_series)
@@ -564,16 +571,8 @@ class TomographyContext(Context):
                     tilt_series,
                     required_position_files or [],
                     file_transferred_to,
-                    rsync_source=source,
                     environment=environment,
                 )
-
-        if res and environment:
-            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
-            capture_post(
-                complete_url,
-                json={"tags": res, "source": str(file_path.parent)},
-            )
 
         if environment:
             tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
@@ -628,26 +627,6 @@ class TomographyContext(Context):
             }
             capture_post(preproc_url, json=preproc_data)
 
-        if self._last_transferred_file:
-            last_tilt_series = (
-                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
-                if extract_tilt_tag(self._last_transferred_file)
-                else extract_tilt_series(self._last_transferred_file)
-            )
-            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
-            self._last_transferred_file = file_path
-            if (
-                last_tilt_series != tilt_series
-                and last_tilt_angle != tilt_angle
-                or self._tilt_series_sizes.get(tilt_series)
-            ) or self._completed_tilt_series:
-                return self._check_tilt_series(
-                    tilt_series,
-                    required_position_files or [],
-                    file_transferred_to,
-                    rsync_source=source,
-                    environment=environment,
-                )
         self._last_transferred_file = file_path
         return res
 
@@ -656,14 +635,13 @@ class TomographyContext(Context):
         tilt_series: str,
         required_position_files: List[Path],
         file_transferred_to: Path | None,
-        rsync_source: Path,
         environment: MurfeyInstanceEnvironment | None = None,
-    ):
-        newly_completed_series = []
+    ) -> List[str]:
+        newly_completed_series: List[str] = []
         if self._tilt_series:
             tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
         else:
-            tilt_series_size = 0
+            return newly_completed_series
         this_tilt_series_size = len(self._tilt_series.get(tilt_series, []))
         tilt_series_size_check = (
             (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
@@ -673,7 +651,7 @@ class TomographyContext(Context):
         if tilt_series_size_check and not required_position_files:
             if tilt_series not in self._completed_tilt_series:
                 self._completed_tilt_series.append(tilt_series)
-            newly_completed_series.append(tilt_series)
+                newly_completed_series.append(tilt_series)
         for ts, ta in self._tilt_series.items():
             required_position_files_check = (
                 all(_f.is_file() for _f in required_position_files)
@@ -739,19 +717,6 @@ class TomographyContext(Context):
                                     "pixel_size_on_image"
                                 ),
                             )
-        if newly_completed_series:
-            logger.info(
-                f"The following tilt series are considered complete: {newly_completed_series}"
-            )
-            if environment:
-                completed_tilt_endpoint = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
-                requests.post(
-                    completed_tilt_endpoint,
-                    json={
-                        "tilt_series": newly_completed_series,
-                        "rsync_source": str(rsync_source),
-                    },
-                )
         return newly_completed_series
 
     def _add_tomo_tilt(
@@ -870,14 +835,23 @@ class TomographyContext(Context):
                             self._file_transferred_to(
                                 environment, source, transferred_file
                             ),
-                            rsync_source=transferred_file.parent,
                             environment=environment,
                         )
         if completed_tilts and environment:
+            logger.info(
+                f"The following tilt series are considered complete: {completed_tilts} "
+                f"after {transferred_file}"
+            )
             complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
             capture_post(
                 complete_url,
-                json={"tags": completed_tilts, "source": str(transferred_file.parent)},
+                json={
+                    "tags": completed_tilts,
+                    "source": str(transferred_file.parent),
+                    "tilt_series_lengths": [
+                        len(self._tilt_series.get(ts, [])) for ts in completed_tilts
+                    ],
+                },
             )
         return completed_tilts
 
@@ -1001,6 +975,11 @@ class TomographyContext(Context):
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )
+            mdoc_metadata["eer_fractionation"] = (
+                environment.data_collection_parameters.get("eer_fractionation")
+                if environment
+                else None
+            ) or 20
 
             data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
             if data_file.split(".")[-1] == "eer":
