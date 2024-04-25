@@ -4,3 +4,7 @@ useful file formats (e.g. .tiff files) as part of the cryo-CLEM workflow
 """
 
 from __future__ import annotations
+
+
+def lif_to_tiff():
+    return None
