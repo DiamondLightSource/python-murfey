@@ -48,6 +48,23 @@ def capture_post(
         logger.warning(
             f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
         )
+        url_without_port = url.split(":")
+        url_port = url_without_port[1].split("/")[0]
+        failure_url = f"{url_without_port[0]}:{url_port}/failed_client_post"
+        try:
+            resend_response = requests.post(
+                failure_url, json={"url": url, "data": json}
+            )
+        except Exception as e:
+            if catch:
+                logger.warning(f"Exception encountered in get from {failure_url}: {e}")
+                return None
+            raise
+        if resend_response.status_code != 200:
+            logger.warning(
+                f"Response to post to {failure_url} failed with {resend_response.reason}"
+            )
+
     return response
 
 
