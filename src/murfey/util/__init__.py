@@ -34,20 +34,18 @@ def _get_visit_list(api_base: ParseResult):
     return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
-def capture_post(
-    url: str, json: dict | list = {}, catch: bool = False
-) -> requests.Response | None:
+def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
     try:
         response = requests.post(url, json=json)
     except Exception as e:
-        if catch:
-            logger.warning(f"Exception encountered in get from {url}: {e}")
-            return None
-        raise
-    if response.status_code != 200:
-        logger.warning(
-            f"Response to post to {url} with data {json} had status code {response.status_code}. The reason given was {response.reason}"
-        )
+        logger.error(f"Exception encountered in post to {url}: {e}")
+        response = None
+    if not response or response.status_code != 200:
+        if response:
+            logger.warning(
+                f"Response to post to {url} with data {json} had status code "
+                f"{response.status_code}. The reason given was {response.reason}"
+            )
         url_without_port = url.split(":")
         url_port = url_without_port[1].split("/")[0]
         failure_url = f"{url_without_port[0]}:{url_port}/failed_client_post"
@@ -56,11 +54,9 @@ def capture_post(
                 failure_url, json={"url": url, "data": json}
             )
         except Exception as e:
-            if catch:
-                logger.warning(f"Exception encountered in get from {failure_url}: {e}")
-                return None
-            raise
-        if resend_response.status_code != 200:
+            logger.error(f"Exception encountered in post to {failure_url}: {e}")
+            resend_response = None
+        if resend_response and resend_response.status_code != 200:
             logger.warning(
                 f"Response to post to {failure_url} failed with {resend_response.reason}"
             )
@@ -68,17 +64,16 @@ def capture_post(
     return response
 
 
-def capture_get(url: str, catch: bool = False) -> requests.Response | None:
+def capture_get(url: str) -> requests.Response | None:
     try:
         response = requests.get(url)
     except Exception as e:
-        if catch:
-            logger.warning(f"Exception encountered in post to {url}: {e}")
-            return None
-        raise
-    if response.status_code != 200:
+        logger.error(f"Exception encountered in get from {url}: {e}")
+        response = None
+    if response and response.status_code != 200:
         logger.warning(
-            f"Response to get from {url} had status code {response.status_code}. The reason given was {response.reason}"
+            f"Response to get from {url} had status code {response.status_code}. "
+            f"The reason given was {response.reason}"
         )
     return response
 
