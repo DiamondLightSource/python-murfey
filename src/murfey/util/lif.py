@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Optional
 from xml.etree import ElementTree as ET
 
+import numpy as np
+import matplotlib.pyplot as plt
 from readlif.reader import LifFile
 from tifffile import TiffFile
 
@@ -79,21 +81,55 @@ def lif_to_tiff(file: Path):
 
     # Iterate through scenes
     for i in range(len(scene_list)):
+        # Load image
         img = lf.get_image(i)  # Set sub-image
-        elem = elem_list[i]  # Load relevant metadata
+
+        # Load relevant metadata (name, dimensions, channels, timestamps)
+        elem = elem_list[i]  # Select corresponding element
         img_name = elem.attrib["Name"]  # Get sub-image name
+        # Common to all images
+        dimensions = elem.findall("Data/Image/ImageDescription/Dimensions/DimensionDescription")
+        # Split by channel
+        channels = elem.findall("Data/Image/ImageDescription/Channels/ChannelDescription")
+        timestamps = elem.find("Data/Image/TimeStampList")
 
         # Create save dirs for TIFF files and their metadata
         save_dir = process_dir.joinpath(img_name)
         xml_dir = save_dir.joinpath("metadata")
-
-        # Get dimensions, channels, and time information
-        dimensions = elem.findall("Data/Image/ImageDescription/Channels")  # Common
-        channels = elem.findall("Data/Image/ImageDescription/Channels")  # To split
-        timestamps = elem.find("Data/Image/TimeStampList")  # To split
+        for folder in [save_dir, xml_dir]:
+            if not save_dir.exists():
+                os.makedirs(save_dir)
 
         # Parijat wants the images in 8-bit; scale down from 16-bit
         # Save channels as individual TIFFs
+        for c in range(len(list(img.get_iter_c()))):
+            # Extract image data
+            arr = []  # Array to store frames in
+            bit_depth = img.bit_depth[c]  # Initial bit depth
+            # Iterate over slices
+            for z in range(len(list(img.get_iter_z()))):
+                frame = img.get_frame(z=z, t=0, c=c)  # PIL object; array-like
+                arr.append(frame)
+            arr = np.asarray(arr)
+
+            # Get color
+            color = channels[c].attrib["LUTName"]
+            # Rescale intensity values for fluorescent channels
+            if any(color.lower() in ["red", "green"]):  # Eliminate case-sensitivity
+                # Remove outliers
+                p_lo = 0.5   # Lower percentile
+                p_up = 99.5  # Upper percentile
+                round_to = 16  # Round bounds to reasonably granular power of 2
+                bounds = [
+                    np.floor(np.percentile(arr, p_lo) / round_to) * round_to,
+                    np.ceil(np.percentile(arr, p_up) / round_to) * round_to,
+                ]
+                # Rescale
+                arr[arr < bounds[0]] = bounds[0]  # Set lower outliers to floor
+                arr[arr > bounds[1]] = bounds[1]  # Set upper outliers to ceiling
+                arr = arr - bounds[0]  # Set lower bound to zero
+                arr = arr * (2**bit_depth) / np.diff(bounds, n=1)
+                arr = arr.astype(np.uint16)  # Set to unsigned 16-bit
 
 
     return None
