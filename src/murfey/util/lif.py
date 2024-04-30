@@ -7,17 +7,18 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from xml.etree import ElementTree as ET
 
 import numpy as np
 import matplotlib.pyplot as plt
 from readlif.reader import LifFile
-from tifffile import TiffFile
+from tifffile import imwrite
 
-def get_xml_metadata(file: LifFile,
-                     save_xml: Optional[Path] = None,
-                     ) -> ET.Element:
+def get_xml_metadata(
+        file: LifFile,
+        save_xml: Optional[Path] = None,
+) -> ET.Element:
     """
     Extracts and returns the file metadata as a formatted XML tree, and optionally
     saves it as an XML file to the specified file path.
@@ -31,19 +32,110 @@ def get_xml_metadata(file: LifFile,
         xml_file = str(save_xml)
         # Save XML metadata for LIF file as one single unit
         xml_tree.write(xml_file, encoding="utf-8")
+        print(f"File metadata saved to {xml_file}")
         pass
 
     return xml_root
 
 
-def lif_to_tiff(file: Path):
-    # Set up directories
-    raw_dir = file.parent  # Raw data location
-    root_dir = raw_dir.parent  # Session ID folder
+def change_bit_depth(
+        array: np.ndarray,
+        bit_depth: int,
+) -> np.ndarray:
+    """
+    Change the bit depth of the array without changing the values (barring rounding).
+    """
+    # Use shorter terms
+    arr = array
 
-    # Create new directories
-    process_dir = root_dir.joinpath("processed").joinpath(file.stem)  # Store processing here
-    raw_xml_dir = raw_dir.joinpath("metadata")  # Raw metadata
+    # NumPy defaults to float64; revert back to unsigned int
+    if bit_depth == 8:
+        arr = arr.astype(np.uint8)
+    elif bit_depth == 16:
+        arr = arr.astype(np.uint16)
+    elif bit_depth == 32:
+        arr = arr.astype(np.uint32)
+    elif bit_depth == 64:
+        arr = arr.astype(np.uint64)
+    else:
+        raise TypeError("The channel bit depth provided is not recognised. "
+                        "Only 8, 16, 32, and 64-bit channel depths are allowed. ")
+    return arr
+
+
+def rescale_across_channel(
+        array: np.ndarray,
+        bit_depth: int,
+        percentile_range: Optional[Tuple[float, float]],  # Lower and upper percentiles
+        round_to: Optional[int] = 16,  # Round bounds to reasonably granular power of 2
+) -> np.ndarray:
+    """
+    Checks the range of values occupied by the data, then rescales it across the
+    channel's bit depth.
+    """
+    # Check that bit depth is valid before processing even begins
+    if not any(bit_depth == b for b in [8, 16, 32, 64]):
+        raise TypeError("The channel bit depth provided is not recognised. "
+                        "Only 8, 16, 32, and 64-bit channel depths are allowed. ")
+    else:
+        pass  # Proceed to rest of function
+
+    # Use shorter variable names
+    arr = array
+    if not percentile_range:
+        print("No percentile range provided. Returning original array.")
+        pass
+    else:
+        # Use shorter variables
+        p_lo = percentile_range[0]
+        p_up = percentile_range[1]
+
+        # Calculate lower and upper bounds
+        b_lo = np.floor(np.percentile(arr, p_lo) / round_to) * round_to  # Lower bound
+        b_up = np.ceil(np.percentile(arr, p_up) / round_to) * round_to # Upper bound (2**n - 1)
+
+        # Rescale across channel bit depth
+        arr[arr < b_lo] = b_lo  # Overwrite lower outliers
+        arr[arr > b_up] = b_up  # Overwrite upper outliers
+        arr = arr - b_lo  # Shift lower bound to zero
+        arr = (arr / (b_up - b_lo)) * (2**bit_depth - 1)  # Ensure data points don't exceed bit depth
+        arr[arr >= (2**bit_depth - 1)] = 2**bit_depth - 1  # Ensure data points don't exceed bit depth
+
+        # Change bit depth back to initial one
+        arr = change_bit_depth(arr, bit_depth)
+
+    return arr
+
+
+def rescale_to_bit_depth(
+        array: np.ndarray,
+        initial_bit_depth: int,
+        target_bit_depth: int,
+) -> Tuple[np.ndarray, int]:
+
+    # Use shorter names for variables
+    arr = array
+    bd_init = initial_bit_depth
+    bd_final = target_bit_depth
+
+    # Check that allowed target bit depth is given
+    if not any(bd_final == b for b in [8, 16, 32, 64]):
+        raise TypeError("The target channel bit depth provided is not recognised. "
+                        "Only 8, 16, 32, and 64-bit channel depths are allowed. ")
+    else:
+        pass  # Continue with rest of function
+
+    # Rescale (DIVIDE BEFORE MULTIPLY)
+    arr = (arr / (2**bd_init - 1)) * (2**bd_final - 1)  # Avoid exceeding bit depth
+    arr[arr >= (2**bd_final - 1)] = 2**bd_final - 1  # Avoid exceeding bit depth
+
+    # Change to correct unsigned integer type
+    arr = change_bit_depth(arr, bd_final)
+
+    return arr, bd_final
+
+
+def convert_lif_to_tiff(file: Path):
 
     # DLS eBIC experiment sessions have the following folder structure:
     # parent        <- Session ID
@@ -61,25 +153,40 @@ def lif_to_tiff(file: Path):
     # |           |_ metadata
     # |              |_ xml_files   <- Individual XML files
 
+    # Set up directories
+    raw_dir = file.parent  # Raw data location
+    root_dir = raw_dir.parent  # Session ID folder
+
+    # Create new directories
+    process_dir = root_dir.joinpath("processed").joinpath(file.stem)  # Store processing here
+    raw_xml_dir = raw_dir.joinpath("metadata")  # Raw metadata
+
     # Create new folders if not already present
     for folder in [process_dir, raw_xml_dir]:
         if not folder.exists():
             os.makedirs(str(folder))
+            print(f"Created {folder}")
         else:
+            print(f"{folder} already exists")
             pass
 
     # Load LIF file as a LifFile class
+    print(f"Loading {file}")
     lf = LifFile(str(file))  # Stack of scenes
+    print("Done")
     scene_list = list(lf.get_iter_image())  # List of scene names
 
     # Save original metadata as XML tree
+    print("Extracting image metadata")
     xml_root = get_xml_metadata(file=lf,
                                 save_xml=raw_xml_dir.joinpath(file.stem + ".xml"),
                                 )
+    print("Done")
     # Get metadata for individual datasets as a list
     elem_list = xml_root.findall("Element/Children/Element")
 
     # Iterate through scenes
+    print("Examining sub-images")
     for i in range(len(scene_list)):
         # Load image
         img = lf.get_image(i)  # Set sub-image
@@ -87,6 +194,8 @@ def lif_to_tiff(file: Path):
         # Load relevant metadata (name, dimensions, channels, timestamps)
         elem = elem_list[i]  # Select corresponding element
         img_name = elem.attrib["Name"]  # Get sub-image name
+        print(f"Examining {img_name}")
+
         # Common to all images
         dimensions = elem.findall("Data/Image/ImageDescription/Dimensions/DimensionDescription")
         # Split by channel
@@ -97,39 +206,91 @@ def lif_to_tiff(file: Path):
         save_dir = process_dir.joinpath(img_name)
         xml_dir = save_dir.joinpath("metadata")
         for folder in [save_dir, xml_dir]:
-            if not save_dir.exists():
-                os.makedirs(save_dir)
+            if not folder.exists():
+                os.makedirs(str(folder))
+                print(f"Created {folder}")
+            else:
+                print(f"{folder} already exists")
+                pass
 
         # Parijat wants the images in 8-bit; scale down from 16-bit
         # Save channels as individual TIFFs
         for c in range(len(list(img.get_iter_c()))):
-            # Extract image data
+            # Get color
+            color = channels[c].attrib["LUTName"]
+            print(f"Examining the {color.lower()} channel")
+
+            # Extract image data to array
+            print("Loading image stack")
             arr = []  # Array to store frames in
-            bit_depth = img.bit_depth[c]  # Initial bit depth
             # Iterate over slices
             for z in range(len(list(img.get_iter_z()))):
                 frame = img.get_frame(z=z, t=0, c=c)  # PIL object; array-like
                 arr.append(frame)
-            arr = np.asarray(arr)
+            arr = np.array(arr)  # Make independent copy of this array
+            print("Done")
 
-            # Get color
-            color = channels[c].attrib["LUTName"]
+            # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
+            bit_depth = img.bit_depth[c]  # Initial bit depth
+            if not any(bit_depth == b for b in [8, 16, 32, 64]):
+                print("Bit depth non-standard, converting to 16-bit")
+                arr, bit_depth = rescale_to_bit_depth(array=arr,
+                                                      initial_bit_depth=bit_depth,
+                                                      target_bit_depth=16)
+            else:
+                pass
+
             # Rescale intensity values for fluorescent channels
-            if any(color.lower() in ["red", "green"]):  # Eliminate case-sensitivity
-                # Remove outliers
-                p_lo = 0.5   # Lower percentile
-                p_up = 99.5  # Upper percentile
-                round_to = 16  # Round bounds to reasonably granular power of 2
-                bounds = [
-                    np.floor(np.percentile(arr, p_lo) / round_to) * round_to,
-                    np.ceil(np.percentile(arr, p_up) / round_to) * round_to,
-                ]
-                # Rescale
-                arr[arr < bounds[0]] = bounds[0]  # Set lower outliers to floor
-                arr[arr > bounds[1]] = bounds[1]  # Set upper outliers to ceiling
-                arr = arr - bounds[0]  # Set lower bound to zero
-                arr = arr * (2**bit_depth) / np.diff(bounds, n=1)
-                arr = arr.astype(np.uint16)  # Set to unsigned 16-bit
+            if any(color.lower() in key for key in  ["red", "green"]):  # Eliminate case-sensitivity
+                print(f"Rescaling {color.lower()} across channel depth")
+                arr = rescale_across_channel(array=arr,
+                                             bit_depth=bit_depth,
+                                             percentile_range=(0.5, 99.5),
+                                             round_to=16,
+                                             )
+                print("Done")
 
+            # Convert to 8-bit
+            print(f"Converting to 8-bit image")
+            arr, bit_depth = rescale_to_bit_depth(arr,
+                                                  initial_bit_depth=bit_depth,
+                                                  target_bit_depth=8)
+            print("Done")
 
+            # Get x, y, and z scales
+            # Get resolution (pixels per distance)
+            x_res = img.scale[0]  # Pixels per um
+            y_res = img.scale[1]  # Pixels per um
+
+            x_scale = 1 / x_res  # um per pixel
+            y_scale = 1 / y_res  # um per pixel
+
+            # Check that depth axis exists
+            if not img.scale[2]:
+                z_res = 0
+                z_scale = 0  # Avoid divide by zero errors
+            else:
+                z_res = img.scale[2]
+                z_scale = 1 / z_res
+
+            # Generate slice labels
+            image_labels = [f"{f}" for f in range(len(list(img.get_iter_z())))]
+
+            # Save as a greyscale TIFF
+            tiff_name = save_dir.joinpath(color + ".tiff")
+            print(f"Saving {color.lower()} image as {tiff_name}")
+            imwrite(tiff_name, arr,
+                    imagej=True,  # ImageJ comppatible
+                    photometric="minisblack",  # Grayscale image
+                    shape=np.shape(arr),
+                    dtype=arr.dtype,
+                    resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
+                    metadata={
+                        "spacing": z_scale,
+                        "unit": "micron",
+                        "axes": "ZYX",
+                        "Labels": image_labels,
+                    }
+                    )
+            print("Done")
     return None
