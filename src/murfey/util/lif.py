@@ -97,9 +97,7 @@ def rescale_across_channel(
 
         # Calculate lower and upper bounds
         b_lo = np.floor(np.percentile(arr, p_lo) / round_to) * round_to  # Lower bound
-        b_up = (
-            np.ceil(np.percentile(arr, p_up) / round_to) * round_to
-        )  # Upper bound (2**n - 1)
+        b_up = np.ceil(np.percentile(arr, p_up) / round_to) * round_to  # Upper bound
 
         # Rescale across channel bit depth
         arr[arr < b_lo] = b_lo  # Overwrite lower outliers
@@ -108,9 +106,11 @@ def rescale_across_channel(
         arr = (arr / (b_up - b_lo)) * (
             2**bit_depth - 1
         )  # Ensure data points don't exceed bit depth
-        arr[arr >= (2**bit_depth - 1)] = (
-            2**bit_depth - 1
-        )  # Ensure data points don't exceed bit depth
+
+        # This step probably not needed
+        # arr[arr >= (2**bit_depth - 1)] = (
+        #     2**bit_depth - 1
+        # )  # Ensure data points don't exceed bit depth
 
         # Change bit depth back to initial one
         arr = change_bit_depth(arr, bit_depth)
@@ -140,7 +140,9 @@ def rescale_to_bit_depth(
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = (arr / (2**bd_init - 1)) * (2**bd_final - 1)  # Avoid exceeding bit depth
-    arr[arr >= (2**bd_final - 1)] = 2**bd_final - 1  # Avoid exceeding bit depth
+
+    # This step probably not needed
+    # arr[arr >= (2**bd_final - 1)] = 2**bd_final - 1  # Avoid exceeding bit depth
 
     # Change to correct unsigned integer type
     arr = change_bit_depth(arr, bd_final)
@@ -212,15 +214,18 @@ def convert_lif_to_tiff(file: Path):
         img_name = elem.attrib["Name"]  # Get sub-image name
         print(f"Examining {img_name}")
 
-        # Common to all images
-        # dimensions = elem.findall(
-        #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
-        # )
         # Split by channel
         channels = elem.findall(
             "Data/Image/ImageDescription/Channels/ChannelDescription"
         )
+        # Might be useful in the future
         # timestamps = elem.find("Data/Image/TimeStampList")
+
+        # Might be useful in the future
+        # Common to all images
+        # dimensions = elem.findall(
+        #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
+        # )
 
         # Create save dirs for TIFF files and their metadata
         save_dir = process_dir.joinpath(img_name)
@@ -264,7 +269,7 @@ def convert_lif_to_tiff(file: Path):
             if any(
                 color.lower() in key for key in ["red", "green"]
             ):  # Eliminate case-sensitivity
-                print(f"Rescaling {color.lower()} across channel depth")
+                print(f"Rescaling {color.lower()} channel across channel depth")
                 arr = rescale_across_channel(
                     array=arr,
                     bit_depth=bit_depth,
@@ -285,6 +290,7 @@ def convert_lif_to_tiff(file: Path):
             x_res = img.scale[0]  # Pixels per um
             y_res = img.scale[1]  # Pixels per um
 
+            # Might be used in future versions of formula
             # x_scale = 1 / x_res  # um per pixel
             # y_scale = 1 / y_res  # um per pixel
 
