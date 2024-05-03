@@ -1232,6 +1232,15 @@ def register_dc_group(
             _transport_object.send(
                 machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
             )
+            _transport_object.send(
+                machine_config.feedback_queue,
+                {
+                    "register": "atlas",
+                    "atlas_image": dcg_params.atlas,
+                    "pixel_size": dcg_params.atlas_pixel_size,
+                    "dcg_tag": dcg_params.tag,
+                },
+            )
     return dcg_parameters
 
 

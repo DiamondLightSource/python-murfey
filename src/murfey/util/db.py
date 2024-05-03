@@ -68,6 +68,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
+    atlas_id: int
     tag: str = Field(primary_key=True)
     atlas: str = ""
     sample: Optional[int] = None
