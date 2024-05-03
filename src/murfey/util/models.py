@@ -319,3 +319,8 @@ class FoilHoleParameters(BaseModel):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+
+
+class PostInfo(BaseModel):
+    url: str
+    data: dict
