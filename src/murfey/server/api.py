@@ -18,8 +18,9 @@ from ispyb.sqlalchemy import (
     BLSampleImage,
     BLSession,
     BLSubSample,
-    Proposal,
 )
+from ispyb.sqlalchemy import GridSquare as ISPyBGridSquare
+from ispyb.sqlalchemy import Proposal
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -362,6 +363,29 @@ def get_grid_squares(session_id: int, db=murfey_db):
 def register_grid_square(
     session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
 ):
+    atlas_id = (
+        db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == grid_square_params.tag)
+        )
+        .one()
+        .atlas_id
+    )
+    jpeg_size = Image.open(grid_square_params.image).size
+    ispyb_grid_square = ISPyBGridSquare(
+        gridSquareLabel=gsid,
+        gridSquareImage=grid_square_params.image,
+        atlasId=atlas_id,
+        pixelLocationX=grid_square_params.x_location,
+        pixelLocationY=grid_square_params.y_location,
+        stageLocationX=grid_square_params.x_stage_position,
+        stageLocationY=grid_square_params.y_stage_position,
+        pixelSize=grid_square_params.pixel_size,
+        height=grid_square_params.thumbnail_size_x or jpeg_size[0],
+        width=grid_square_params.thumbnail_size_y or jpeg_size[1],
+    )
+    murfey.server.ispyb.do_insert(ispyb_grid_square)
     try:
         grid_square = db.exec(
             select(GridSquare)
@@ -374,7 +398,6 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
-        jpeg_size = Image.open(grid_square_params.image).size
         grid_square = GridSquare(
             name=gsid,
             session_id=session_id,

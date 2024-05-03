@@ -26,6 +26,7 @@ from ispyb.sqlalchemy import (
     ZcZocaloBuffer,
     url,
 )
+from sqlalchemy.inspection import inspect
 
 from murfey.util.models import Sample, Visit
 
@@ -48,6 +49,13 @@ def _send_using_new_connection(transport_type: str, queue: str, message: dict) -
         send_call.result()
     transport.disconnect()
     return None
+
+
+def do_insert(obj) -> list:
+    with Session() as sess:
+        sess.add(obj)
+        sess.commit()
+    return [getattr(obj, key.name) for key in inspect(obj.__class__).primary_key]
 
 
 class TransportManager:
