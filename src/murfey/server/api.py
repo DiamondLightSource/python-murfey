@@ -82,6 +82,7 @@ from murfey.util.models import (
     GainReference,
     GridSquareParameters,
     MillingParameters,
+    PostInfo,
     PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
@@ -1590,3 +1591,14 @@ def remove_session(client_id: int, db=murfey_db):
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)
+
+
+@router.post("/failed_client_post")
+def failed_client_post(post_info: PostInfo):
+    zocalo_message = {
+        "register": "failed_client_post",
+        "url": post_info.url,
+        "json": post_info.data,
+    }
+    if _transport_object:
+        _transport_object.send(machine_config.feedback_queue, zocalo_message)

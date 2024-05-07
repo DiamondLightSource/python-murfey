@@ -410,7 +410,7 @@ class _SPAContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/machine/", catch=True
+                f"{str(environment.url.geturl())}/machine/"
             )
             if server_config_response is None:
                 return None
@@ -700,7 +700,6 @@ class SPAModularContext(_SPAContext):
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
                                 f"{str(environment.url.geturl())}/num_movies",
-                                catch=True,
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(
@@ -725,7 +724,6 @@ class SPAModularContext(_SPAContext):
                                     ],
                                     "fractionation_file_name": "eer_fractionation_spa.txt",
                                 },
-                                catch=True,
                             )
                             if response is None:
                                 return False
@@ -776,7 +774,6 @@ class SPAModularContext(_SPAContext):
                                 k: None if v == "None" else v
                                 for k, v in preproc_data.items()
                             },
-                            catch=True,
                         )
 
         return True
@@ -837,7 +834,7 @@ class SPAContext(_SPAContext):
             "slit_width": data.get("slit_width"),
             "phase_plate": data.get("phase_plate", False),
         }
-        capture_post(url, json=json, catch=True)
+        capture_post(url, json=json)
 
     def post_transfer(
         self,
