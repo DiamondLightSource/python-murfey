@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 # import matplotlib.pyplot as plt
@@ -32,11 +32,52 @@ def get_xml_metadata(
     else:
         xml_file = str(save_xml)
         # Save XML metadata for LIF file as one single unit
+        ET.indent(xml_tree, "  ")  # Tidy it up
         xml_tree.write(xml_file, encoding="utf-8")
         print(f"File metadata saved to {xml_file}")
         pass
 
     return xml_root
+
+
+def get_image_elements(root: ET.Element) -> List[ET.Element]:
+    """
+    Searches through the XML metadata recursively to find the nodes tagged as "Element"
+    that have image-related tags. Some LIF datasets have layers of nested elements.
+    """
+
+    # Nested function which generates list of elements with
+    def _find_elements_recursively(
+        node: ET.Element,
+    ) -> Generator[ET.Element, None, None]:
+        # Find items labelled "Element" under current node
+        elem_list = node.findall("./Children/Element")
+        if len(elem_list) < 1:  # Try alternative path for top-level of XML tree
+            elem_list = node.findall("./Element")
+
+        # Recursively search for items tagged as Element under child branches
+        for elem in elem_list:
+            yield elem
+            new_node = elem
+            new_elem_list = _find_elements_recursively(new_node)
+            for new_elem in new_elem_list:
+                yield new_elem
+
+    # Get initial list of elements
+    elem_list = list(_find_elements_recursively(root))
+
+    # Keep only the ones that have image-related tags
+    elem_list = [elem for elem in elem_list if elem.find("./Data/Image")]
+
+    return elem_list
+
+
+def raise_bit_depth_error(bit_depth: int):
+    raise Exception(
+        "The channel bit depth provided is not compatible with Numpy. "
+        "Only 8, 16, 32, and 64-bit channel depths are allowed. "
+        f"Current bit depth: {bit_depth}"
+    )
 
 
 def change_bit_depth(
@@ -59,10 +100,7 @@ def change_bit_depth(
     elif bit_depth == 64:
         arr = arr.astype(np.uint64)
     else:
-        raise TypeError(
-            "The channel bit depth provided is not recognised. "
-            "Only 8, 16, 32, and 64-bit channel depths are allowed. "
-        )
+        raise_bit_depth_error(bit_depth)
     return arr
 
 
@@ -78,10 +116,7 @@ def rescale_across_channel(
     """
     # Check that bit depth is valid before processing even begins
     if not any(bit_depth == b for b in [8, 16, 32, 64]):
-        raise TypeError(
-            "The channel bit depth provided is not recognised. "
-            "Only 8, 16, 32, and 64-bit channel depths are allowed. "
-        )
+        raise_bit_depth_error(bit_depth)
     else:
         pass  # Proceed to rest of function
 
@@ -126,48 +161,45 @@ def rescale_to_bit_depth(
 
     # Use shorter names for variables
     arr = array
-    bd_init = initial_bit_depth
-    bd_final = target_bit_depth
+    bit_init = initial_bit_depth
+    bit_final = target_bit_depth
 
     # Check that allowed target bit depth is given
-    if not any(bd_final == b for b in [8, 16, 32, 64]):
-        raise TypeError(
-            "The target channel bit depth provided is not recognised. "
-            "Only 8, 16, 32, and 64-bit channel depths are allowed. "
-        )
+    if not any(bit_final == b for b in [8, 16, 32, 64]):
+        raise_bit_depth_error(bit_final)
     else:
         pass  # Continue with rest of function
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
-    arr = (arr / (2**bd_init - 1)) * (2**bd_final - 1)  # Avoid exceeding bit depth
+    arr = (arr / (2**bit_init - 1)) * (2**bit_final - 1)  # Avoid exceeding bit depth
 
     # This step probably not needed
-    # arr[arr >= (2**bd_final - 1)] = 2**bd_final - 1  # Avoid exceeding bit depth
+    # arr[arr >= (2**bit_final - 1)] = 2**bit_final - 1  # Overwrite pixels that exceed channel bit depth
 
     # Change to correct unsigned integer type
-    arr = change_bit_depth(arr, bd_final)
+    arr = change_bit_depth(arr, bit_final)
 
-    return arr, bd_final
+    return arr, bit_final
 
 
 def convert_lif_to_tiff(file: Path):
-
-    # DLS eBIC experiment sessions have the following folder structure:
-    # parent        <- Session ID
-    # |_ processing <- ARCHIVED; Not used
-    # |_ spool      <- NOT ARCHIVED; For work proprietary work
-    # |_ tmp        <- DELETED; Intermediate files
-    # |_ xml        <- ARCHIVED; Not used
-    # |_ raw        <- ARCHIVED; Raw data stored here
-    # |  |_ metadata    <- Create this and save raw XML metadata file here
-    # |_ processed  <- ARCHIVED; Created by us
-    # |  |_ raw_n   <- Following the structure of the raw folders
-    # |     |_ lif_file     <- Following LIF file name
-    # |        |_ sub_image <- Folders for individual sub-images
-    # |           |_ tiffs      <- Save by channel
-    # |           |_ metadata
-    # |              |_ xml_files   <- Individual XML files
-
+    """
+    DLS eBIC experiment sessions have the following folder structure:
+    parent          <- Session ID
+    |_ processing   <- ARCHIVED BY DLS; Not used
+    |_ spool        <- NOT ARCHIVED BY DLS; For work proprietary work
+    |_ tmp          <- DELETED; Intermediate files
+    |_ xml          <- ARCHIVED BY DLS; Not used
+    |_ raw          <- ARCHIVED BY DLS; Raw data stored here
+    |  |_ metadata  <- Create this and save raw XML metadata file here
+    |_ processed    <- ARCHIVED BY DLS; Created by us
+    |  |_ raw_n     <- Following the structure of the raw folders
+    |     |_ lif_file       <- Following LIF file name
+    |        |_ sub_image   <- Folders for individual sub-images
+    |           |_ tiffs    <- Save by channel
+    |           |_ metadata
+    |              |_ xml_files     <- Individual XML files
+    """
     # Set up directories
     raw_dir = file.parent  # Raw data location
     root_dir = raw_dir.parent  # Session ID folder
@@ -200,8 +232,19 @@ def convert_lif_to_tiff(file: Path):
         save_xml=raw_xml_dir.joinpath(file.stem + ".xml"),
     )
     print("Done")
-    # Get metadata for individual datasets as a list
-    elem_list = xml_root.findall("Element/Children/Element")
+
+    # Recursively generate element list of metadata
+    elem_list = get_image_elements(xml_root)
+
+    # Check that elements match number of images
+    if not len(elem_list) == len(scene_list):
+        raise Exception(
+            "Error matching metadata list to list of sub-images. \n"
+            f"Metadata entries: {len(elem_list)} \n"
+            f"Sub-images: {len(scene_list)}"
+        )
+    else:
+        pass  # Carry on
 
     # Iterate through scenes
     print("Examining sub-images")
