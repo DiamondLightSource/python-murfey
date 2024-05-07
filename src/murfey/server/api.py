@@ -1203,13 +1203,6 @@ def register_dc_group(
         db.commit()
     else:
         dcg_parameters = {
-            "session_id": murfey.server.ispyb.get_session_id(
-                microscope=microscope,
-                proposal_code=ispyb_proposal_code,
-                proposal_number=ispyb_proposal_number,
-                visit_number=ispyb_visit_number,
-                db=murfey.server.ispyb.Session(),
-            ),
             "start_time": str(datetime.datetime.now()),
             "experiment_type": dcg_params.experiment_type,
             "experiment_type_id": dcg_params.experiment_type_id,
@@ -1219,7 +1212,7 @@ def register_dc_group(
 
         if _transport_object:
             _transport_object.send(
-                machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters}  # type: ignore
+                machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters, "microscope": microscope, "proposal_code": ispyb_proposal_code, "proposal_number": ispyb_proposal_number, "visit_number": ispyb_visit_number}  # type: ignore
             )
     return dcg_params
 
@@ -1235,13 +1228,6 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     )
     dc_parameters = {
         "visit": visit_name,
-        "session_id": murfey.server.ispyb.get_session_id(
-            microscope=get_microscope(machine_config=machine_config),
-            proposal_code=ispyb_proposal_code,
-            proposal_number=ispyb_proposal_number,
-            visit_number=ispyb_visit_number,
-            db=murfey.server.ispyb.Session(),
-        ),
         "image_directory": str(
             machine_config.rsync_basepath / dc_params.image_directory
         ),
@@ -1267,7 +1253,14 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     if _transport_object:
         _transport_object.send(
             machine_config.feedback_queue,
-            {"register": "data_collection", **dc_parameters},
+            {
+                "register": "data_collection",
+                **dc_parameters,
+                "microscope": get_microscope(machine_config=machine_config),
+                "proposal_code": ispyb_proposal_code,
+                "proposal_number": ispyb_proposal_number,
+                "visit_number": ispyb_visit_number,
+            },
         )
     if dc_params.exposure_time:
         prom.exposure_time.set(dc_params.exposure_time)

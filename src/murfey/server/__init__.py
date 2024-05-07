@@ -2144,6 +2144,13 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.ClientEnvironment.client_id == message["client_id"]
                 )
             ).one()
+            ispyb_session_id = murfey.server.ispyb.get_session_id(
+                microscope=message["microscope"],
+                proposal_code=message["proposal_code"],
+                proposal_number=message["proposal_number"],
+                visit_number=message["visit_number"],
+                db=murfey.server.ispyb.Session(),
+            )
             if dcg_murfey := murfey_db.exec(
                 select(db.DataCollectionGroup)
                 .where(db.DataCollectionGroup.session_id == client.session_id)
@@ -2152,7 +2159,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcgid = dcg_murfey[0].id
             else:
                 record = DataCollectionGroup(
-                    sessionId=message["session_id"],
+                    sessionId=ispyb_session_id,
                     experimentType=message["experiment_type"],
                     experimentTypeId=message["experiment_type_id"],
                 )
@@ -2193,13 +2200,20 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .one()
                 .session_id
             )
+            ispyb_session_id = murfey.server.ispyb.get_session_id(
+                microscope=message["microscope"],
+                proposal_code=message["proposal_code"],
+                proposal_number=message["proposal_number"],
+                visit_number=message["visit_number"],
+                db=murfey.server.ispyb.Session(),
+            )
             dcg = murfey_db.exec(
                 select(db.DataCollectionGroup)
                 .where(db.DataCollectionGroup.session_id == murfey_session_id)
                 .where(db.DataCollectionGroup.tag == message["source"])
-            ).one()
+            ).all()
             if dcg:
-                dcgid = dcg.id
+                dcgid = dcg[0].id
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
@@ -2216,7 +2230,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcid = dc_murfey[0].id
             else:
                 record = DataCollection(
-                    SESSIONID=message["session_id"],
+                    SESSIONID=ispyb_session_id,
                     experimenttype=message["experiment_type"],
                     imageDirectory=message["image_directory"],
                     imageSuffix=message["image_suffix"],
