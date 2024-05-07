@@ -2197,9 +2197,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 select(db.DataCollectionGroup)
                 .where(db.DataCollectionGroup.session_id == murfey_session_id)
                 .where(db.DataCollectionGroup.tag == message["source"])
-            ).one()
+            ).all()
             if dcg:
-                dcgid = dcg.id
+                dcgid = dcg[0].id
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
