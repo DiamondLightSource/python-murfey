@@ -233,7 +233,7 @@ def convert_lif_to_tiff(file: Path):
 
     # Path to new directories
     # Save processed data here
-    process_dir = root_dir.joinpath("processed").joinpath(file.stem)
+    process_dir = root_dir / "processed" / file.stem
     # Save raw XML metadata here
     raw_xml_dir = raw_dir.joinpath("metadata")
 
