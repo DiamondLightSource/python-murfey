@@ -298,8 +298,8 @@ def convert_lif_to_tiff(file: Path):
         img_xml_dir = img_dir / "metadata"
         for folder in [img_dir, img_xml_dir]:
             if not folder.exists():
-                os.makedirs(str(folder))
-                print(f"Created {folder}")
+                folder.mkdir(parents=True)
+                logger.info(f"Created {folder}")
             else:
                 print(f"{folder} already exists")
                 pass
