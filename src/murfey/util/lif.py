@@ -301,8 +301,7 @@ def convert_lif_to_tiff(file: Path):
                 folder.mkdir(parents=True)
                 logger.info(f"Created {folder}")
             else:
-                print(f"{folder} already exists")
-                pass
+                logger.info(f"{folder} already exists")
 
         # Parijat wants the images in 8-bit; scale down from 16-bit
         # Save channels as individual TIFFs
