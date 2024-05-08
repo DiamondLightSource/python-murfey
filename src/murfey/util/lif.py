@@ -340,7 +340,6 @@ def convert_lif_to_tiff(file: Path):
                     percentile_range=(0.5, 99.5),
                     round_to=16,
                 )
-                print("Done")
 
             # Convert to 8-bit
             print("Converting to 8-bit image")
