@@ -346,7 +346,6 @@ def convert_lif_to_tiff(file: Path):
             arr, bit_depth = rescale_to_bit_depth(
                 arr, initial_bit_depth=bit_depth, target_bit_depth=8
             )
-            print("Done")
 
             # Get x, y, and z scales
             # Get resolution (pixels per um)
