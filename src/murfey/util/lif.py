@@ -318,7 +318,6 @@ def convert_lif_to_tiff(file: Path):
                 frame = img.get_frame(z=z, t=0, c=c)  # PIL object; array-like
                 arr.append(frame)
             arr = np.array(arr)  # Make independent copy of this array
-            print("Done")
 
             # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
             bit_depth = img.bit_depth[c]  # Initial bit depth
