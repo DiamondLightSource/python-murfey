@@ -11,7 +11,7 @@ from pathlib import Path
 from queue import Queue
 from threading import Thread
 from typing import Awaitable, Callable, Dict, List, Optional, Union
-from urllib.parse import ParseResult
+from urllib.parse import ParseResult, urljoin
 from uuid import uuid4
 
 import requests
@@ -46,9 +46,7 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
                 f"Response to post to {url} with data {json} had status code "
                 f"{response.status_code}. The reason given was {response.reason}"
             )
-        url_without_port = url.split(":")
-        url_port = url_without_port[1].split("/")[0]
-        failure_url = f"{url_without_port[0]}:{url_port}/failed_client_post"
+        failure_url = urljoin(url, "failed_client_post")
         try:
             resend_response = requests.post(
                 failure_url, json={"url": url, "data": json}
