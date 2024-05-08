@@ -240,9 +240,8 @@ def convert_lif_to_tiff(file: Path):
     # Create new folders if not already present
     for folder in [process_dir, raw_xml_dir]:
         if not folder.exists():
-            os.makedirs(str(folder))
-            print(f"Created {folder}")
-            pass
+            folder.mkdir(parents=True)
+            logger.info(f"Created {folder}")
         else:
             print(f"{folder} already exists")
             pass
