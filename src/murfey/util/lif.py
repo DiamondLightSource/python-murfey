@@ -243,8 +243,7 @@ def convert_lif_to_tiff(file: Path):
             folder.mkdir(parents=True)
             logger.info(f"Created {folder}")
         else:
-            print(f"{folder} already exists")
-            pass
+            logger.info(f"{folder} already exists")
 
     # Load LIF file as a LifFile class
     print(f"Loading {file}")
