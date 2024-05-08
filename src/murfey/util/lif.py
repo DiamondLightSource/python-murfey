@@ -370,7 +370,7 @@ def convert_lif_to_tiff(file: Path):
 
             # Save as a greyscale TIFF
             save_name = img_dir.joinpath(color + ".tiff")
-            print(f"Saving {color.lower()} image as {save_name}")
+            logger.info(f"Saving {color.lower()} image as {save_name}")
             imwrite(
                 save_name,
                 arr,
