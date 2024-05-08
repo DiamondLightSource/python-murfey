@@ -36,8 +36,7 @@ def get_xml_metadata(
         xml_file = str(save_xml)  # Convert Path to string
         ET.indent(xml_tree, "  ")  # Format with proper indentation
         xml_tree.write(xml_file, encoding="utf-8")  # Save
-        print(f"File metadata saved to {xml_file}")
-        pass
+        logger.info(f"File metadata saved to {xml_file}")
 
     return xml_root
 
