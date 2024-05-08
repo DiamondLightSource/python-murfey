@@ -14,7 +14,9 @@ from xml.etree import ElementTree as ET
 import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
+import logging
 
+logger = logging.getLogger("murfey.util.lif")
 
 def get_xml_metadata(
     file: LifFile,
