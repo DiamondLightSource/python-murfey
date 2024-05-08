@@ -281,7 +281,7 @@ def convert_lif_to_tiff(file: Path):
         # Get name of sub-image
         elem = elem_list[i]  # Select corresponding element
         img_name = elem.attrib["Name"]  # Get sub-image name
-        print(f"Examining {img_name}")
+        logger.info(f"Examining {img_name}")
 
         # Load relevant metadata (channels, dimensions, timestamps etc.)
         channels = elem.findall(
