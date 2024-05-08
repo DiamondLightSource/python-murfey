@@ -135,8 +135,7 @@ def rescale_across_channel(
 
     # Check if percentiles are provided
     if not percentile_range:
-        print("No percentile range provided. Returning original array.")
-        pass
+        logger.warning("No percentile range provided. Returning original array.")
     else:
         # Use shorter variables
         p_lo = percentile_range[0]
