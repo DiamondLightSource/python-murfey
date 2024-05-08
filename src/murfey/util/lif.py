@@ -333,7 +333,7 @@ def convert_lif_to_tiff(file: Path):
             if any(
                 color.lower() in key for key in ["red", "green"]
             ):  # Eliminate case-sensitivity
-                print(f"Rescaling {color.lower()} channel across channel depth")
+                logger.info(f"Rescaling {color.lower()} channel across channel depth")
                 arr = rescale_across_channel(
                     array=arr,
                     bit_depth=bit_depth,
