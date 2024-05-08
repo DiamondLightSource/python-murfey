@@ -235,7 +235,7 @@ def convert_lif_to_tiff(file: Path):
     # Save processed data here
     process_dir = root_dir / "processed" / file.stem
     # Save raw XML metadata here
-    raw_xml_dir = raw_dir.joinpath("metadata")
+    raw_xml_dir = raw_dir / "metadata"
 
     # Create new folders if not already present
     for folder in [process_dir, raw_xml_dir]:
