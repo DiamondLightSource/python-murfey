@@ -342,7 +342,7 @@ def convert_lif_to_tiff(file: Path):
                 )
 
             # Convert to 8-bit
-            print("Converting to 8-bit image")
+            logger.info("Converting to 8-bit image")
             arr, bit_depth = rescale_to_bit_depth(
                 arr, initial_bit_depth=bit_depth, target_bit_depth=8
             )
