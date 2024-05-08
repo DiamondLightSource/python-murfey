@@ -322,7 +322,7 @@ def convert_lif_to_tiff(file: Path):
             # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
             bit_depth = img.bit_depth[c]  # Initial bit depth
             if not any(bit_depth == b for b in [8, 16, 32, 64]):
-                print("Bit depth non-standard, converting to 16-bit")
+                logger.info("Bit depth non-standard, converting to 16-bit")
                 arr, bit_depth = rescale_to_bit_depth(
                     array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
                 )
