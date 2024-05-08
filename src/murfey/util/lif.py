@@ -5,7 +5,7 @@ as part of the cryo-CLEM workflow.
 
 from __future__ import annotations
 
-import os
+import logging
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 from xml.etree import ElementTree as ET
@@ -14,9 +14,10 @@ from xml.etree import ElementTree as ET
 import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
-import logging
 
+# Create logger object to output messages with
 logger = logging.getLogger("murfey.util.lif")
+
 
 def get_xml_metadata(
     file: LifFile,
@@ -142,10 +143,8 @@ def rescale_across_channel(
         p_up = percentile_range[1]
 
         # Calculate lower and upper bounds
-        b_lo = np.floor(np.percentile(arr, p_lo) / round_to) * round_to  # Lower bound
-        b_up = (
-            np.ceil(np.percentile(arr, p_up) / round_to) * round_to
-        ) - 1  # Upper bound
+        b_lo = np.floor(np.percentile(arr, p_lo) / round_to) * round_to
+        b_up = (np.ceil(np.percentile(arr, p_up) / round_to) * round_to) - 1
 
         # Rescale across channel bit depth
         arr[arr < b_lo] = b_lo  # Overwrite lower outliers
