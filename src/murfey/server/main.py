@@ -12,6 +12,8 @@ from pydantic import BaseSettings
 
 import murfey.server
 import murfey.server.bootstrap
+import murfey.server.clem.api
+import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
 
@@ -48,13 +50,14 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=template_files / "static"), name="static")
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
+# Add router endpoints to the API
+app.include_router(router)
 app.include_router(murfey.server.bootstrap.bootstrap)
 app.include_router(murfey.server.bootstrap.cygwin)
 app.include_router(murfey.server.bootstrap.pypi)
 app.include_router(murfey.server.bootstrap.plugins)
+app.include_router(murfey.server.clem.api.router)
 app.include_router(murfey.server.websocket.ws)
-
-app.include_router(router)
 
 for r in importlib_metadata.entry_points(group="murfey.routers"):
     app.include_router(r.load())
