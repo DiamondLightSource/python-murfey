@@ -386,5 +386,4 @@ def convert_lif_to_tiff(file: Path):
                     "Labels": image_labels,
                 },
             )
-            print("Done")
     return None
