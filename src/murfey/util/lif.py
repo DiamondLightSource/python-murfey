@@ -272,7 +272,7 @@ def convert_lif_to_tiff(file: Path):
         pass  # Carry on
 
     # Iterate through scenes
-    print("Examining sub-images")
+    logger.info("Examining sub-images")
     for i in range(len(scene_list)):
 
         # Load image
