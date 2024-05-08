@@ -294,7 +294,7 @@ def convert_lif_to_tiff(file: Path):
         # )
 
         # Create save dirs for TIFF files and their metadata
-        img_dir = process_dir.joinpath(img_name)
+        img_dir = process_dir / img_name
         img_xml_dir = img_dir.joinpath("metadata")
         for folder in [img_dir, img_xml_dir]:
             if not folder.exists():
