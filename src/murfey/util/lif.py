@@ -32,9 +32,7 @@ def get_xml_metadata(
     xml_tree = ET.ElementTree(xml_root)  # This one for saving
 
     # Skip saving the metadata if save_xml not provided
-    if not save_xml:
-        pass
-    else:
+    if save_xml:
         xml_file = str(save_xml)  # Convert Path to string
         ET.indent(xml_tree, "  ")  # Format with proper indentation
         xml_tree.write(xml_file, encoding="utf-8")  # Save
