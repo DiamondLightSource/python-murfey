@@ -308,10 +308,10 @@ def convert_lif_to_tiff(file: Path):
         for c in range(len(list(img.get_iter_c()))):
             # Get color
             color = channels[c].attrib["LUTName"]
-            print(f"Examining the {color.lower()} channel")
+            logger.info(f"Examining the {color.lower()} channel")
 
             # Extract image data to array
-            print("Loading image stack")
+            logger.info("Loading image stack")
             arr: np.ndarray = []  # Array to store frames in
             # Iterate over slices
             for z in range(len(list(img.get_iter_z()))):
