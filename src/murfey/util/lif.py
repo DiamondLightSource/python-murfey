@@ -246,18 +246,16 @@ def convert_lif_to_tiff(file: Path):
             logger.info(f"{folder} already exists")
 
     # Load LIF file as a LifFile class
-    print(f"Loading {file}")
+    logger.info(f"Loading {file}")
     lif_file = LifFile(str(file))  # Stack of scenes
-    print("Done")
     scene_list = list(lif_file.get_iter_image())  # List of scene names
 
     # Save original metadata as XML tree
-    print("Extracting image metadata")
+    logger.info("Extracting image metadata")
     xml_root = get_xml_metadata(
         file=lif_file,
         save_xml=raw_xml_dir.joinpath(file.stem + ".xml"),
     )
-    print("Done")
 
     # Recursively generate list of metadata-containing elements
     elem_list = get_image_elements(xml_root)
