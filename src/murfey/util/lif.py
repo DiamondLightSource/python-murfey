@@ -185,8 +185,6 @@ def rescale_to_bit_depth(
     # Check that target bit depth is allowed
     if not any(bit_final == b for b in [8, 16, 32, 64]):
         raise_bit_depth_error(bit_final)
-    else:
-        pass  # Carry on
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = (arr / (2**bit_init - 1)) * (2**bit_final - 1)
