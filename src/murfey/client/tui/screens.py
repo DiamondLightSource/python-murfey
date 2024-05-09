@@ -2,8 +2,10 @@ from __future__ import annotations
 
 # import contextlib
 import logging
+import zipfile
 from datetime import datetime
 from functools import partial
+from io import BytesIO
 from pathlib import Path
 from typing import (
     Any,
@@ -762,6 +764,21 @@ class UpstreamDownloads(Screen):
         yield Button("Skip", classes="btn-directory")
 
     def on_button_pressed(self, event: Button.Pressed):
+        machine_data = requests.get(
+            f"{self.app._environment.url.geturl()}/machine/"
+        ).json()
+        if machine_data.get("upstream_data_download_directory"):
+            download_dir = Path(machine_data["upstream_data_download_directory"]) / str(
+                event.button.label
+            )
+            download_dir.mkdir(exist_ok=True)
+            upstream_data_response = requests.get(
+                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_data"
+            )
+            with zipfile.ZipFile(
+                BytesIO(upstream_data_response.content)
+            ) as zip_archive:
+                zip_archive.extractall(download_dir)
         self.app.pop_screen()
 
 

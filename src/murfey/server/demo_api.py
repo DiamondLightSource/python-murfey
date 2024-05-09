@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import datetime
+import io
 import logging
 import random
+import zipfile
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
@@ -11,7 +13,7 @@ from typing import Dict, List, Optional
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
 from pydantic import BaseModel, BaseSettings
@@ -1439,3 +1441,31 @@ def find_upstream_visits(visit_name: str):
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
             upstream_visits[v.name] = v / machine_config["processed_directory_name"]
     return upstream_visits
+
+
+@router.get("/visits/{visit_name}/upstream_data")
+def fetch_upstream_data(visit_name: str):
+    for p in machine_config["upstream_data_directories"]:
+        if (Path(p) / visit_name).is_dir():
+            processed_dir = (
+                Path(p) / visit_name / machine_config["processed_directory_name"]
+            )
+            break
+    else:
+        log.warning(
+            f"No candidate directory found for upstream download from visit {visit_name}"
+        )
+        return
+    zip_io = io.BytesIO()
+    with zipfile.ZipFile(
+        zip_io, mode="w", compression=zipfile.ZIP_DEFLATED
+    ) as stream_zip:
+        for f in processed_dir.glob("**/*.tiff"):
+            stream_zip.write(f, arcname=f.relative_to(processed_dir))
+    return StreamingResponse(
+        iter([zip_io.getvalue()]),
+        media_type="application/x-zip-compressed",
+        headers={
+            "Content-Disposition": f"attachment; filename={visit_name}-processed.zip"
+        },
+    )
