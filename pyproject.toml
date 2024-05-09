@@ -36,6 +36,9 @@ dependencies = [
     "werkzeug",
 ]
 [project.optional-dependencies]
+cicd = [
+    "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
+]
 clem = [
     # "matplotlib", # For visual statistical analysis of images
     "readlif", # cryo-CLEM; open LIF files; part of bioio-lif
@@ -56,7 +59,6 @@ developer = [
 server = [
     "cryptography",
     "fastapi",
-    "importlib_resources; python_version<'3.9'", # Not needed anymore, since dropping support for Python 3.8
     "ispyb",
     "jinja2",
     "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
@@ -98,104 +100,11 @@ zip-safe = false
 [tool.setuptools.packages.find]
 where = ["src", "tests"]
 
-[tool.ruff]
-# Copied Ruff default recommended settings
-# Files and dirs to format
-include = [
-    "pyproject.toml",
-    # "setup.cfg",
-    "setup.py",
-    "src/**/*.py",
-    "tests/**/*.py",
-]
-# Exclude commonly ignored directories
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-]
-indent-width = 4  # Format same as Black.
-line-length = 88  # Format same as Black.
-target-version = "py39"  # Assume Python 3.9 and above
-
-[tool.ruff.format]
-docstring-code-format = false
-docstring-code-line-length = "dynamic"
-indent-style = "space"
-line-ending = "auto"
-quote-style = "double"
-skip-magic-trailing-comma = false
-
-[tool.ruff.lint]
-# Currently, not all Flake8 rule codes appear to be implemented in Ruff. VSCode throws up errors for them.
-# select: E901, F812, W602, W603, W604, W606
-# ignore: W503
-# A mix of the two need to be used for the rule codes currently desired.
-select = [
-    "C4",
-    "E401",
-    "E711",
-    "E712",
-    "E713",
-    "E714",
-    "E721",
-    "E722",
-    "F401",
-    "F402",
-    "F403",
-    "F405",
-    "F541",
-    "F631",
-    "F632",
-    "F633",
-    "F811",
-    "F821",
-    "F822",
-    "F841",
-    "F901",
-    "W191",
-    "W291",
-    "W292",
-    "W293",
-    "W605",
-]
-ignore = [
-    "E203",
-    "E266",
-    "E501",
-]
-fixable = ["ALL"]  # Allow fix for all enabled rules (when `--fix`) is provided in pre-commit.
-unfixable = []
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"  # Allow unused variables when underscore-prefixed.
-
 [tool.isort]
 profile = "black"
 
 [tool.flake8]
-# Flake8-pyproject allows .toml settings to be read into Flake8
+# Flake8-pyproject allows TOML file settings to be read into Flake8
 # URL: https://pypi.org/project/Flake8-pyproject/
 select = [
     "C4",

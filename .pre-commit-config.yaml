@@ -3,7 +3,7 @@
 repos:
   # Syntax validation and some basic sanity checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0 # Released 2023-10-09 # Prev: v4.0.1
+    rev: v4.5.0 # Released 2023-10-09
     # rev input based on version tag format in repo (e.g. with or without 'v')
     hooks:
       - id: check-added-large-files
@@ -32,23 +32,9 @@ repos:
         name: Formatting the pyproject.toml file
         additional_dependencies: ["tox>=4.9"]
 
-  # Ruff for linting and formatting
-  # Possible replacement for isort and flake8 (https://docs.astral.sh/ruff/linter/)
-  # - repo: https://github.com/astral-sh/ruff-pre-commit
-  #   rev: v0.3.5 # Released 2024-04-01
-  #   hooks:
-  #   # Ruff linter
-  #   - id: ruff
-  #     name: Running Ruff linter
-  #     args: [--fix]
-  #   # Ruff formatter
-  #   - id: ruff-format
-  #     name: Running Ruff formatter
-  #     types_or: [python]
-
   # Automatic source code formatting
   - repo: https://github.com/psf/black
-    rev: 24.3.0 # Released 2024-03-15 # Prev: 22.3.0
+    rev: 24.3.0 # Released 2024-03-15
     hooks:
       - id: black
         name: Formatting Python scripts according to Black
@@ -56,7 +42,7 @@ repos:
 
   # Automatically sort imports
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2 # Released 2023-12-13 # Prev: 5.12.0
+    rev: 5.13.2 # Released 2023-12-13
     hooks:
       - id: isort
         name: Tidying Python imports via Isort
@@ -83,20 +69,20 @@ repos:
   # Linting
   - repo: https://github.com/PyCQA/flake8
     # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
-    rev: 7.0.0 # Released 2024-01-05 # Prev: 4.0.1
+    rev: 7.0.0 # Released 2024-01-05
     hooks:
       - id: flake8
         name: Running Flake8 linter on Python files
         additional_dependencies: [
             # Added Flake8-pyproject plugin for .toml compatibility
-            "Flake8-pyproject==1.2.3",
+            "Flake8-pyproject==1.2.3", # Released 2023-03-21
             # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
-            "flake8-comprehensions==3.14.0", # prev: 3.8.0
+            "flake8-comprehensions==3.14.0", # Released 2023-07-10
           ]
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0 # Released 2024-03-09 # Prev: v0.910
+    rev: v1.9.0 # Released 2024-03-09
     hooks:
       - id: mypy
         name: Checking types in Python scripts using MyPy
@@ -113,7 +99,7 @@ repos:
 
   # Use Prettier to format other files
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0 # Latest stable version (Released 2023-11-13)
+    rev: v3.1.0 # Released 2023-11-13 | Latest stable version
     hooks:
       - id: prettier
         name: Formatting other file types according to Prettier
