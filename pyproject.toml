@@ -38,7 +38,7 @@ dependencies = [
 [project.optional-dependencies]
 clem = [
     # "matplotlib", # For visual statistical analysis of images
-    "readlif", # cryo-CLEM; open LIF files; part of bioio-lif
+    "readlif", # cryo-CLEM; open LIF files
     "tifffile", # cryo-CLEM; for saving to to TIFF files
 ]
 client = [
