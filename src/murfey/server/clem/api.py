@@ -12,7 +12,7 @@ router = APIRouter()
 # Allow function to be seen as an endpoint by the router
 @router.post("/sessions/{session_id}/lif_to_tiff")
 def lif_to_tiff(
-    # session_id: int,  # Unused for now
+    session_id: int,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
     convert_lif_to_tiff(file=lif_info.name)
