@@ -104,5 +104,4 @@ class CLEMContext(Context):
                     "description": "",
                 },
             )
-            return True
         return True
