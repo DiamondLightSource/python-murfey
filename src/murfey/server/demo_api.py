@@ -1446,16 +1446,18 @@ def find_upstream_visits(visit_name: str):
 @router.get("/visits/{visit_name}/upstream_data")
 def fetch_upstream_data(visit_name: str):
     for p in machine_config["upstream_data_directories"]:
-        if (Path(p) / visit_name).is_dir():
+        if (Path(p) / secure_filename(visit_name)).is_dir():
             processed_dir = (
-                Path(p) / visit_name / machine_config["processed_directory_name"]
+                Path(p)
+                / secure_filename(visit_name)
+                / machine_config["processed_directory_name"]
             )
             break
     else:
         log.warning(
-            f"No candidate directory found for upstream download from visit {visit_name}"
+            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
         )
-        return
+        return None
     zip_io = io.BytesIO()
     with zipfile.ZipFile(
         zip_io, mode="w", compression=zipfile.ZIP_DEFLATED
