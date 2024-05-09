@@ -44,8 +44,9 @@ steps:
 
   - script: |
       set -eux
-      pip install --disable-pip-version-check -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
-      pip install --no-deps --disable-pip-version-check -e "$(Pipeline.Workspace)/src"
+      # pip install --disable-pip-version-check -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
+      # pip install --no-deps --disable-pip-version-check -e "$(Pipeline.Workspace)/src"
+      pip install -e "$(Pipeline.Workspace)/src"[azure,clem,client,server,developer]
     displayName: Install package
 
   - script: |

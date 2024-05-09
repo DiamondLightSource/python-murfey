@@ -36,6 +36,9 @@ dependencies = [
     "werkzeug",
 ]
 [project.optional-dependencies]
+azure = [
+    "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
+]
 clem = [
     # "matplotlib", # For visual statistical analysis of images
     "readlif", # cryo-CLEM; open LIF files; part of bioio-lif
