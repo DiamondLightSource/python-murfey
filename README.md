@@ -14,12 +14,11 @@ Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationa
 ### How do I set up a development environment?
 
 We suggest you start with your favourite virtual environment (mamba/conda/python virtualenv/...),
-then install the dependencies listed in `requirements_dev.txt` with eg.
+then install the dependencies listed in `pyproject.toml` with eg.
 
 ```bash
 $ git clone git@github.com:DiamondLightSource/python-murfey.git
 $ cd python-murfey
-$ pip install -r requirements_dev.txt
 $ pip install -e .[client,server]
 ```
 
