@@ -68,7 +68,7 @@ class RSyncer(Observer):
         if local:
             self._remote = str(basepath_remote)
         else:
-            self._remote = f"{server_url.hostname}::{basepath_remote}"
+            self._remote = f"{server_url.hostname}::{basepath_remote}/"
         # For local tests you can use something along the lines of
         # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
         # to avoid having to set up an rsync daemon
