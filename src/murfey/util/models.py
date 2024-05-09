@@ -83,6 +83,13 @@ class File(BaseModel):
     timestamp: float
 
 
+class LifFileInfo(BaseModel):
+    name: Path
+    size: int
+    timestamp: float
+    description: str = ""
+
+
 class SPAProcessingParameters(BaseModel):
     job_id: int
 

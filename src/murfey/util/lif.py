@@ -15,6 +15,8 @@ import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
 
+from murfey.server.api import sanitise
+
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.lif")
 
@@ -245,7 +247,7 @@ def convert_lif_to_tiff(file: Path):
             logger.info(f"{folder} already exists")
 
     # Load LIF file as a LifFile class
-    logger.info(f"Loading {file}")
+    logger.info(f"Loading {sanitise(file.name)}")
     lif_file = LifFile(str(file))  # Stack of scenes
     scene_list = list(lif_file.get_iter_image())  # List of scene names
 
