@@ -9,6 +9,7 @@ Provide a post transfer function to pass on:
 # import requests
 import logging
 from pathlib import Path
+from typing import Optional
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -20,7 +21,7 @@ logger = logging.getLogger("murfey.client.contexts.clem")
 
 def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
-):
+) -> Optional[Path]:
     machine_config = get_machine_config(
         str(environment.url.geturl()), demo=environment.demo
     )
@@ -38,7 +39,9 @@ def _file_transferred_to(
     )
 
 
-def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+def _get_source(
+    file_path: Path, environment: MurfeyInstanceEnvironment
+) -> Optional[Path]:
     for s in environment.sources:
         if file_path.is_relative_to(s):
             return s
@@ -54,7 +57,7 @@ class CLEMContext(Context):
         self,
         transferred_file: Path,
         role: str = "",
-        environment: MurfeyInstanceEnvironment | None = None,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
         super().post_transfer(
