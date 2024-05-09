@@ -59,7 +59,7 @@ class CLEMContext(Context):
         role: str = "",
         environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
-    ):
+    ) -> bool:
         super().post_transfer(
             transferred_file, role=role, environment=environment, **kwargs
         )
@@ -104,3 +104,5 @@ class CLEMContext(Context):
                     "description": "",
                 },
             )
+            return True
+        return True
