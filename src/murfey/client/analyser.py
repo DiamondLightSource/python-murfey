@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Type
 
 from murfey.client.context import Context
+from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -92,8 +93,14 @@ class Analyser(Observer):
         ):
             logger.info(f"File extension re-evaluated: {file_path.suffix}")
             self._extension = file_path.suffix
+        elif file_path.suffix == ".lif":
+            self._extension = file_path.suffix
 
     def _find_context(self, file_path: Path) -> bool:
+        if file_path.suffix == ".lif":
+            self._role = "detector"
+            self._context = CLEMContext("leica", self._basepath)
+            return True
         split_file_name = file_path.name.split("_")
         if split_file_name:
             if split_file_name[0].startswith("FoilHole"):
@@ -333,7 +340,12 @@ class Analyser(Observer):
                                 )
                 elif isinstance(
                     self._context,
-                    (TomographyContext, SPAModularContext, SPAMetadataContext),
+                    (
+                        TomographyContext,
+                        SPAModularContext,
+                        SPAMetadataContext,
+                        CLEMContext,
+                    ),
                 ):
                     self.post_transfer(transferred_file)
             self.queue.task_done()
