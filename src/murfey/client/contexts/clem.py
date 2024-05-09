@@ -96,8 +96,8 @@ class CLEMContext(Context):
                 url,
                 json={
                     "name": str(file_path),
-                    "size": "get it from ",
-                    "timestamp": "Unix epoch time",
+                    "size": transferred_file.stat().st_size,
+                    "timestamp": transferred_file.stat().st_ctime,
                     "description": "",
                 },
             )
