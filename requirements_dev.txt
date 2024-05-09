@@ -10,7 +10,7 @@ procrunner==2.3.3
 prometheus_client==0.20.0  # 0.17.1
 pillow==10.3.0  # 10.2.0
 pydantic==1.10.15  # 1.10.1
-# pytest-cov==4.0.0  # Not present in fresh Python environment?
+pytest-cov==5.0.0  # 4.0.0  # Used by Azure Pipelines; not needed in actual environment
 pytest==8.2.0  # 7.1.2
 pyyaml==6.0.1  # 6.0
 readlif==0.6.5
