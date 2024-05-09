@@ -709,6 +709,7 @@ class VisitSelection(SwitchSelection):
         machine_data = requests.get(
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()
+
         if self._switch_status:
             self.app.install_screen(
                 DirectorySelection(
@@ -737,6 +738,31 @@ class VisitSelection(SwitchSelection):
             else:
                 self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
                 self.app.push_screen("launcher")
+
+        if machine_data.get("upstream_data_directories"):
+            upstream_downloads = requests.get(
+                f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/upstream_visits"
+            ).json()
+            self.app.install_screen(
+                UpstreamDownloads(upstream_downloads), "upstream-downloads"
+            )
+            self.app.push_screen("upstream-downloads")
+
+
+class UpstreamDownloads(Screen):
+    def __init__(self, connected_visits: Dict[str, Path], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connected_visits = connected_visits
+
+    def compose(self):
+        visit_buttons = [
+            Button(cv, classes="btn-directory") for cv in self._connected_visits.keys()
+        ]
+        yield VerticalScroll(*visit_buttons)
+        yield Button("Skip", classes="btn-directory")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.app.pop_screen()
 
 
 class GainReference(Screen):

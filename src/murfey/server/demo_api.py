@@ -1430,3 +1430,12 @@ async def write_eer_fractionation_file(
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)
+
+
+@router.get("/visits/{visit_name}/upstream_visits")
+def find_upstream_visits(visit_name: str):
+    upstream_visits = {}
+    for p in machine_config["upstream_data_directories"]:
+        for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
+            upstream_visits[v.name] = v / machine_config["processed_directory_name"]
+    return upstream_visits

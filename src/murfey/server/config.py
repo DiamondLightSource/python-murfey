@@ -40,6 +40,7 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    upstream_data_directories: List[Path] = []
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

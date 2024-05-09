@@ -26,6 +26,13 @@ ConfirmScreen {
   border: hidden;
 }
 
+UpstreamDownloads {
+  layout: grid;
+  grid-size: 2;
+  padding: 2;
+  border: hidden;
+}
+
 WaitingScreen {
   layout: grid;
   grid_size: 4;
