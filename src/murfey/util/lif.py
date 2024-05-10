@@ -200,7 +200,7 @@ def rescale_to_bit_depth(
     return arr, bit_final
 
 
-def convert_lif_to_tiff(file: Path):
+def convert_lif_to_tiff(file: Path, data_directory: str = "images"):
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
     sub-images stored inside it, saving each channel in the sub-image as a separate
@@ -229,8 +229,16 @@ def convert_lif_to_tiff(file: Path):
     """
 
     # Set up parent directories
-    raw_dir = file.parent  # Raw data location
-    root_dir = raw_dir.parent  # Session ID folder
+    raw_dir = file.parent  # Raw data locationroot_parts = []
+    root_parts = []
+    for p in file.parts:
+        if p == data_directory:
+            break
+        root_parts.append(p)
+    else:
+        logger.error(f"Subpath {data_directory} was not found in image path {file}")
+        return None
+    root_dir = Path("/".join(root_parts))  # Session ID folder
 
     # Path to new directories
     # Save processed data here
