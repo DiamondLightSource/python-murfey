@@ -236,7 +236,7 @@ def convert_lif_to_tiff(
     # Identify the root directory
     root_parts = []
     for p in file.parts:  # Iterate through parts until hitting root folder
-        if p == root_folder:
+        if p.lower() == root_folder.lower():  # Eliminate case-sensitivity
             break
         root_parts.append(p)
     else:
