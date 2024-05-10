@@ -15,10 +15,12 @@ import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
 
-from murfey.server.api import sanitise
-
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.lif")
+
+
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 def get_xml_metadata(
@@ -240,7 +242,7 @@ def convert_lif_to_tiff(
             break
         root_parts.append(p)
     else:
-        logger.error(f"Subpath {root_folder} was not found in image path {file}")
+        logger.error(f"Subpath {sanitise(root_folder)} was not found in image path {file}")
         return None
     root_dir = Path("/".join(root_parts))  # Session ID folder
 
@@ -252,7 +254,7 @@ def convert_lif_to_tiff(
             break
         child_parts.append(p)
     else:
-        logger.error(f"Subpath {root_folder} was not found in image path {file}")
+        logger.error(f"Subpath {sanitise(root_folder)} was not found in image path {file}")
     child_path = Path(
         "/".join(reversed(child_parts))
     )  # Reverse it to get the right order
