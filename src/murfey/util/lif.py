@@ -243,7 +243,9 @@ def convert_lif_to_tiff(
         root_parts.append(p)
     else:
         root_folder_clean = sanitise(root_folder)
-        logger.error(f"Subpath {sanitise(root_folder_clean)} was not found in image path {file}")
+        logger.error(
+            f"Subpath {sanitise(root_folder_clean)} was not found in image path {file}"
+        )
         return None
     root_dir = Path("/".join(root_parts))  # Session ID folder
 
@@ -256,7 +258,9 @@ def convert_lif_to_tiff(
         child_parts.append(p)
     else:
         root_folder_clean = sanitise(root_folder)
-        logger.error(f"Subpath {sanitise(root_folder_clean)} was not found in image path {file}")
+        logger.error(
+            f"Subpath {sanitise(root_folder_clean)} was not found in image path {file}"
+        )
     child_path = Path(
         "/".join(reversed(child_parts))
     )  # Reverse it to get the right order
