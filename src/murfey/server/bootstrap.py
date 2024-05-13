@@ -109,7 +109,13 @@ def get_pypi_file(package: str, filename: str):
 @plugins.get("/{package}", response_class=FileResponse)
 def get_plugin_wheel(package: str):
     machine_config = get_machine_config()
-    return machine_config.plugin_packages.get(package)
+    wheel_path = machine_config.plugin_packages.get(package)
+    if wheel_path is None:
+        return None
+    return FileResponse(
+        wheel_path,
+        headers={"Content-Disposition": "attachment; filename={wheel_path.name}"},
+    )
 
 
 @bootstrap.get("/", response_class=HTMLResponse)
