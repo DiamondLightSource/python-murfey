@@ -7,7 +7,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import List, NamedTuple
+from typing import Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
 import procrunner
@@ -49,6 +49,7 @@ class RSyncer(Observer):
         basepath_local: Path,
         basepath_remote: Path,
         server_url: ParseResult,
+        stop_callback: Callable = lambda *args: None,
         local: bool = False,
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
@@ -62,6 +63,7 @@ class RSyncer(Observer):
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal
+        self._stop_callback = stop_callback
         self._local = local
         self._server_url = server_url
         self._notify = notify
@@ -217,6 +219,7 @@ class RSyncer(Observer):
                 self.queue.task_done()
                 continue
 
+        self._stop_callback(self._basepath)
         logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:
