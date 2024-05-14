@@ -39,11 +39,6 @@ dependencies = [
 cicd = [
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
-clem = [
-    # "matplotlib", # For visual statistical analysis of images
-    "readlif", # cryo-CLEM; open LIF files
-    "tifffile", # cryo-CLEM; for saving to to TIFF files
-]
 client = [
     "procrunner",
     "textual==0.42.0",
@@ -57,11 +52,13 @@ developer = [
     "pytest", # Test code functionality
 ]
 server = [
+    # "matplotlib", # For visual statistical analysis of images
+    "readlif", # cryo-CLEM; open LIF files
+    "tifffile", # cryo-CLEM; for saving to to TIFF files
     "cryptography",
     "fastapi",
-    "ispyb",
+    "ispyb", # Responsible for setting requirements for SQLAlchemy (<2; v10.0.0) and mysql-connector-python (>=8.0.32; v10.0.0)
     "jinja2",
-    "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
     "numpy",
     "packaging",
     "pillow",
