@@ -61,7 +61,7 @@ server = [
     "fastapi",
     "ispyb",
     "jinja2",
-    "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
+    "mysql-connector-python<=8.4.0", # ispyb 8.0.0 requires ==8.0.29
     "numpy",
     "packaging",
     "pillow",
