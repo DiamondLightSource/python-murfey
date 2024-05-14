@@ -14,7 +14,7 @@ trigger:
 resources:
   containers:
     - container: mariadb
-      image: mariadb:latest # 10.8 (released 2023-06-02)
+      image: mariadb:11.3.2 # released 2024-05-06 # 10.8 # released 2023-06-02
       # Pulls image from DockerHub
       # Docker images: https://hub.docker.com/_/mariadb
       # 10.8: https://hub.docker.com/layers/library/mariadb/10.8/images/sha256-2c79abca2711c7e7fe4ae21864a29544a8404dfb519973fa6f4caebd5445f66b?context=explore
