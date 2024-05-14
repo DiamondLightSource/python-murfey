@@ -1,3 +1,5 @@
+# Contains tasks to be repeated when testing for the different Python versions listed
+# in the "Run unit tests" stage in .azure-pipelines/azure-pipelines.yml
 steps:
   - checkout: none
 
@@ -6,7 +8,7 @@ steps:
       mkdir rabbitmq-docker && cd rabbitmq-docker
 
       cat <<EOF >rabbitmq.conf
-      # allowing remote connections for default user is highly discouraged
+      # Allowing remote connections for default user is highly discouraged
       # as it dramatically decreases the security of the system. Delete the user
       # instead and create a new one with generated secure credentials.
       loopback_users = none
@@ -44,7 +46,7 @@ steps:
 
   - script: |
       set -eux
-      pip install --disable-pip-version-check -e "$(Pipeline.Workspace)/src"[cicd,clem,client,server,developer]
+      pip install --disable-pip-version-check -e "$(Pipeline.Workspace)/src"[cicd,client,server,developer]
     displayName: Install package
 
   - script: |

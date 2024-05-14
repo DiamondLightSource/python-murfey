@@ -1,5 +1,7 @@
 variables:
-  DATABASE_SCHEMA: 1.28.0
+  DATABASE_SCHEMA: 4.1.0 # 1.28.0 # released 2021-11-23
+  # This is really old. Current database schema is v4.1.0 (released 2024-03-26)
+  # GitHub versions: https://github.com/DiamondLightSource/ispyb-database/tags
 
 trigger:
   branches:
@@ -12,7 +14,9 @@ trigger:
 resources:
   containers:
     - container: mariadb
-      image: mariadb:10.8
+      image: mariadb:11.4 # 10.8
+      # Where does Azure get this from? DockerHub? 10.8 is not visible on DockerHub.
+      # Docker versions: https://hub.docker.com/_/mariadb
       env:
         MYSQL_DATABASE: ispybtest
         MYSQL_ROOT_PASSWORD: mysql_root_pwd
