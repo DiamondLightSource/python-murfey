@@ -55,7 +55,10 @@ class MultigridDirWatcher(murfey.util.Observer):
                             d,
                             include_mid_path=False,
                             use_suggested_path=False,
-                            analyse=False,
+                            analyse=(
+                                d.name
+                                in self._machine_config["analyse_created_directories"]
+                            ),
                         )
                         self._seen_dirs.append(d)
                 else:

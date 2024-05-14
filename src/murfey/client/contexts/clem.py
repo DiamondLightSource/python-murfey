@@ -8,6 +8,7 @@ Provide a post transfer function to pass on:
 
 # import requests
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -25,16 +26,11 @@ def _file_transferred_to(
     machine_config = get_machine_config(
         str(environment.url.geturl()), demo=environment.demo
     )
-    if environment.visit in environment.default_destinations[source]:
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source])
-            / file_path.relative_to(source)
-        )
     return (
         Path(machine_config.get("rsync_basepath", ""))
-        / Path(environment.default_destinations[source])
-        / environment.visit
+        / machine_config.get("rsync_module", "data")
+        / str(datetime.now().year)
+        / source.name
         / file_path.relative_to(source)
     )
 

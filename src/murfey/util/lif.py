@@ -15,10 +15,12 @@ import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
 
-from murfey.server.api import sanitise
-
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.lif")
+
+
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 def get_xml_metadata(
@@ -200,7 +202,10 @@ def rescale_to_bit_depth(
     return arr, bit_final
 
 
-def convert_lif_to_tiff(file: Path):
+def convert_lif_to_tiff(
+    file: Path,
+    root_folder: str,  # The name of the folder to be treated as the root
+):
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
     sub-images stored inside it, saving each channel in the sub-image as a separate
@@ -213,30 +218,58 @@ def convert_lif_to_tiff(file: Path):
     folders created as part of the workflow shown as well.
 
     parent_folder   <- Session ID
-    |_ processing   <- ARCHIVED BY DLS; Not used
-    |_ spool        <- NOT ARCHIVED BY DLS; For confidential work
-    |_ tmp          <- DELETED BY DLS AFTER A WHILE; Intermediate files
-    |_ xml          <- ARCHIVED BY DLS; Not used
-    |_ raw          <- ARCHIVED BY DLS; Raw data stored here; can have multiple raws
-    |  |_ lifs
-    |  |_ metadata  <- Created by us; Save raw XML metadata file here
+    |_ processing   <- Created by DLS; will be archived; not used
+    |_ spool        <- Created by DLS; for confidential work; not used
+    |_ tmp          <- Created by DLS; for intermediate files; not used
+    |_ xml          <- Created by DLS; not used
+    |_ images       <- Created by us; raw data stored here
+    |  |_ sample_name   <- Folders for samples
+    |     |_ lif files  <- LIF files of specific sample
+    |     |_ metadata   <- Created by us; Save raw XML metadata file here
     |_ processed    <- ARCHIVED BY DLS; Created by us
-    |  |_ raw_n     <- Following the structure of the raw folders
-    |     |_ lif_file_names <- Folders for data from the same LIF file
-    |        |_ sub_image   <- Folders for individual sub-images
-    |           |_ tiffs    <- Save channels as individual image stacks
-    |           |_ metadata <- Individual XML files saved here (not yet implemented)
+    |  |_ sample_name
+    |     |_ lif_file_names     <- Folders for data from the same LIF file
+    |        |_ sub_image       <- Folders for individual sub-images
+    |           |_ tiffs        <- Save channels as individual image stacks
+    |           |_ metadata     <- Individual XML files saved here (not yet implemented)
     """
 
-    # Set up parent directories
-    raw_dir = file.parent  # Raw data location
-    root_dir = raw_dir.parent  # Session ID folder
+    # Set up new directories
+    # Identify the root directory
+    root_parts = []
+    for p in file.parts:  # Iterate through parts until hitting root folder
+        if p.lower() == root_folder.lower():  # Eliminate case-sensitivity
+            break
+        root_parts.append(p)
+    else:
+        logger.error(
+            f"Subpath {sanitise(root_folder)} was not found in image path {sanitise(str(file))}"
+        )
+        return None
+    root_dir = Path("/".join(root_parts))  # Session ID folder
 
-    # Path to new directories
-    # Save processed data here
-    process_dir = root_dir / "processed" / file.stem
+    # Get remaining path to file from root folder
+    child_parts = []  # Path from the root directory to the file
+    for p in reversed(file.parts):
+        # Append everything up until the root directory
+        if p == root_folder:
+            break
+        child_parts.append(p)
+    else:
+        logger.error(
+            f"Subpath {sanitise(root_folder)} was not found in image path {sanitise(str(file))}"
+        )
+    child_path = Path(
+        "/".join(reversed(child_parts))
+    )  # Reverse it to get the right order
+
+    # Create directory to store processed files in
+    process_dir = (
+        root_dir / "processed" / child_path.stem
+    )  # Replace root folder with "processed"
+
     # Save raw XML metadata here
-    raw_xml_dir = raw_dir / "metadata"
+    raw_xml_dir = file.parent / "metadata"
 
     # Create new folders if not already present
     for folder in [process_dir, raw_xml_dir]:

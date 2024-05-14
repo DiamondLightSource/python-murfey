@@ -15,4 +15,7 @@ def lif_to_tiff(
     session_id: int,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
-    convert_lif_to_tiff(file=lif_info.name)
+    convert_lif_to_tiff(
+        file=lif_info.name,
+        root_folder="images",
+    )
