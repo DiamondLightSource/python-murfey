@@ -53,18 +53,18 @@ developer = [
 ]
 server = [
     # "matplotlib", # For visual statistical analysis of images
-    "readlif", # cryo-CLEM; open LIF files
-    "tifffile", # cryo-CLEM; for saving to to TIFF files
     "cryptography",
     "fastapi",
-    "ispyb", # Responsible for setting requirements for SQLAlchemy (<2; v10.0.0) and mysql-connector-python (>=8.0.32; v10.0.0)
+    "ispyb", # Responsible for setting requirements for SQLAlchemy (<2) and mysql-connector-python (>=8.0.32); currently running v10.0.0
     "jinja2",
     "numpy",
     "packaging",
     "pillow",
     "prometheus_client",
+    "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
 ]
