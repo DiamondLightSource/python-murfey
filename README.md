@@ -14,20 +14,22 @@ Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationa
 ### How do I set up a development environment?
 
 We suggest you start with your favourite virtual environment (mamba/conda/python virtualenv/...),
-then install the dependencies listed in `pyproject.toml` with eg.
+then install using the following command.
+
+#### From Git
 
 ```bash
 $ git clone git@github.com:DiamondLightSource/python-murfey.git
 $ cd python-murfey
-$ pip install -e .[client,server]
+$ pip install -e .[client,server,developer]
 ```
 
-You will also want to set up pre-commits:
+The packages included under the `[developer]` installation key contain some helpful tools to aid you with developing Murfey further:
 
-```bash
-$ pip install pre-commit
-$ pre-commit install
-```
+- `ipykernel` - Enables interactive code development via Jupyter Notebooks.
+- `pre-commit` - Allows for the installation and running of hooks to help with linting, formatting, and type checking your code.
+- `pytest` - Used in conjunction with test functions to evaluate the reliability of your code.
+- `bump2version` - A nice little script to simplify version control.
 
 Finally, you may want to set up an ISPyB mock database server and a Zocalo
 development environment. The instructions for this are out of scope here.
