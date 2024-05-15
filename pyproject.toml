@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.11.13"
+version = "0.11.14"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -39,11 +39,6 @@ dependencies = [
 cicd = [
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
-clem = [
-    # "matplotlib", # For visual statistical analysis of images
-    "readlif", # cryo-CLEM; open LIF files
-    "tifffile", # cryo-CLEM; for saving to to TIFF files
-]
 client = [
     "procrunner",
     "textual==0.42.0",
@@ -57,17 +52,19 @@ developer = [
     "pytest", # Test code functionality
 ]
 server = [
+    # "matplotlib", # For visual statistical analysis of images
     "cryptography",
     "fastapi",
-    "ispyb",
+    "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
-    "mysql-connector-python<=8.0.29", # ispyb 8.0.0 requires ==8.0.29
     "numpy",
     "packaging",
     "pillow",
     "prometheus_client",
+    "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
 ]

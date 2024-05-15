@@ -1,5 +1,9 @@
 variables:
-  DATABASE_SCHEMA: 1.28.0
+  DATABASE_SCHEMA: 4.1.0 # released 2024-03-26
+  # Installs from GitHub
+  # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
+  # Previous version(s):
+  # 1.28.0 # released 2021-11-23
 
 trigger:
   branches:
@@ -12,7 +16,11 @@ trigger:
 resources:
   containers:
     - container: mariadb
-      image: mariadb:10.8
+      image: mariadb:11.3.2 # released 2024-05-06
+      # Pulls image from DockerHub
+      # Docker images: https://hub.docker.com/_/mariadb
+      # Previous version(s):
+      # 10.8 # released 2023-06-02 # https://hub.docker.com/layers/library/mariadb/10.8/images/sha256-2c79abca2711c7e7fe4ae21864a29544a8404dfb519973fa6f4caebd5445f66b?context=explore
       env:
         MYSQL_DATABASE: ispybtest
         MYSQL_ROOT_PASSWORD: mysql_root_pwd
