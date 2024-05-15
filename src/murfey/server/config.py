@@ -41,7 +41,7 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
-    upstream_data_directories: List[Path] = []
+    upstream_data_directories: List[Path] = []  # Where you're allowed to look for upstream data
     upstream_data_download_directory: Optional[Path] = None
 
 
