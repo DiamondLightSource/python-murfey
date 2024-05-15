@@ -71,6 +71,9 @@ class Analyser(Observer):
         )
 
     def _find_extension(self, file_path: Path):
+        """
+        Identifies the file extension and stores that information in the class.
+        """
         if (
             required_substrings := self._murfey_config.get(
                 "data_required_substrings", {}
@@ -81,18 +84,21 @@ class Analyser(Observer):
             if not any(r in file_path.name for r in required_substrings):
                 return []
 
+        # Checks for MRC, TIFF, TIF, and EER files if no extension has been defined
         if (
             file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
             and not self._extension
         ):
             logger.info(f"File extension determined: {file_path.suffix}")
             self._extension = file_path.suffix
+        # Check for TIFF, TIF, or EER if the file's already been assigned an extension
         elif (
             file_path.suffix in (".tiff", ".tif", ".eer")
             and self._extension != file_path.suffix
         ):
             logger.info(f"File extension re-evaluated: {file_path.suffix}")
             self._extension = file_path.suffix
+        # Check for LIF files separately
         elif file_path.suffix == ".lif":
             self._extension = file_path.suffix
 
