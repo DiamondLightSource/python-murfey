@@ -97,12 +97,21 @@ class Analyser(Observer):
             self._extension = file_path.suffix
 
     def _find_context(self, file_path: Path) -> bool:
+        """
+        Using various conditionals, identifies what workflow the file is part of, and
+        assigns the necessary context class to it for subsequent stages of processing
+        """
+
+        # CLEM workflow check
+        # Look for LIF files
         if file_path.suffix == ".lif":
             self._role = "detector"
             self._context = CLEMContext("leica", self._basepath)
             return True
+
         split_file_name = file_path.name.split("_")
         if split_file_name:
+            # Files starting with "FoilHole" belong to the SPA workflow
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
@@ -123,9 +132,12 @@ class Analyser(Observer):
                         else SPAContext("epu", self._basepath)
                     )
                 self.parameters_model = ProcessingParametersSPA
+                # Assign it the detector attribute if not already present
                 if not self._role:
                     self._role = "detector"
                 return True
+
+            # Files starting with "Position" belong to the standard tomography workflow
             if (
                 split_file_name[0] == "Position"
                 or "[" in file_path.name
@@ -136,25 +148,34 @@ class Analyser(Observer):
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
                     self.parameters_model = PreprocessingParametersTomo
+                # Assign role if not already present
                 if not self._role:
+                    # Fractions files attributed to the detector
                     if (
                         "Fractions" in split_file_name[-1]
                         or "fractions" in split_file_name[-1]
                     ):
                         self._role = "detector"
+                    # MDOC files attributed to the microscope
                     elif (
                         file_path.suffix == ".mdoc"
                         or file_path.with_suffix(".mdoc").is_file()
                     ):
                         self._role = "microscope"
+                    # Attribute all other files to the detector
                     else:
                         self._role = "detector"
                 return True
+
+            # Files with these suffixes belong to the serial EM tomography workflow
             if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+                # Ignore batch files and search maps
                 if any(p in file_path.parts for p in ("Batch", "SearchMaps")):
                     return False
+                # Ignore JPG files
                 if file_path.with_suffix(".jpg").is_file():
                     return False
+                # Ignore the averaged movies written out by the Falcon
                 if (
                     len(
                         list(
@@ -165,7 +186,6 @@ class Analyser(Observer):
                     )
                     > 1
                 ):
-                    # This covers the case of ignoring the averaged movies written out by the Falcon
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = PreprocessingParametersTomo
