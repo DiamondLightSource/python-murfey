@@ -1602,7 +1602,9 @@ def failed_client_post(post_info: PostInfo):
 @router.get("/visits/{visit_name}/upstream_visits")
 def find_upstream_visits(visit_name: str):
     upstream_visits = {}
+    # Iterates through provided upstream directories
     for p in machine_config.upstream_data_directories:
+        # Looks for visit name in file path
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
             upstream_visits[v.name] = v / machine_config.processed_directory_name
     return upstream_visits
@@ -1610,6 +1612,9 @@ def find_upstream_visits(visit_name: str):
 
 @router.get("/visits/{visit_name}/upstream_data")
 def fetch_upstream_data(visit_name: str):
+    """
+    Fetches the data from the server that matches the visit name
+    """
     for p in machine_config.upstream_data_directories:
         if (Path(p) / secure_filename(visit_name)).is_dir():
             processed_dir = (
