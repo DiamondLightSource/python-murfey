@@ -71,7 +71,7 @@ class SPAMetadataContext(Context):
                 environment.samples[source] = SampleInfo(
                     atlas=Path(partial_path), sample=sample
                 )
-                url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_data_collection_group"
+                url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,

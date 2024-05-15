@@ -4,29 +4,33 @@ import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
+class MagnificationLookup(SQLModel, table=True):  # type: ignore
+    magnification: int
+    pixel_size: float
+
+
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
     client_id: Optional[int] = Field(primary_key=True, unique=True)
     visit: str = Field(default="")
     session_id: Optional[int] = Field(foreign_key="session.id")
     connected: bool
-    rsync_instances: List["RsyncInstance"] = Relationship(
-        back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
-    )
 
 
 class RsyncInstance(SQLModel, table=True):  # type: ignore
     source: str = Field(primary_key=True)
     destination: str = Field(primary_key=True, default="")
-    client_id: int = Field(foreign_key="clientenvironment.client_id", primary_key=True)
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    tag: str = Field(default="")
     files_transferred: int = Field(default=0)
     files_counted: int = Field(default=0)
     transferring: bool = Field(default=False)
-    client: Optional[ClientEnvironment] = Relationship(back_populates="rsync_instances")
+    session: Optional["Session"] = Relationship(back_populates="rsync_instances")
 
 
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
+    visit: str = Field(default="")
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -40,6 +44,9 @@ class Session(SQLModel, table=True):  # type: ignore
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
     foil_holes: List["FoilHole"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    rsync_instances: List[RsyncInstance] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 

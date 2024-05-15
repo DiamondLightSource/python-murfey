@@ -215,9 +215,10 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
-        client_id=rsyncer_info.client_id,
+        session_id=rsyncer_info.session_id,
         transferring=rsyncer_info.transferring,
         destination=rsyncer_info.destination,
+        tag=rsyncer_info.tag,
     )
     db.add(rsync_instance)
     db.commit()
@@ -253,10 +254,10 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
-@router.get("/clients/{client_id}/rsyncers", response_model=List[RsyncInstance])
-def get_rsyncers_for_client(client_id: int, db=murfey_db):
+@router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
+def get_rsyncers_for_client(session_id: int, db=murfey_db):
     rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     )
     return rsync_instances.all()
 
@@ -269,7 +270,7 @@ def increment_rsync_file_count(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_counted += rsyncer_info.increment_count
@@ -292,7 +293,7 @@ def increment_rsync_transferred_files(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_transferred += rsyncer_info.increment_count
@@ -325,24 +326,14 @@ def get_current_visits_demo(db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
 
 
-@router.get("/clients/{client_id}/tomography_processing_parameters")
-def get_tomo_proc_params(client_id: int, db=murfey_db) -> List[dict]:
-    params = db.exec(
-        select(TomographyProcessingParameters).where(
-            TomographyProcessingParameters.client_id == client_id
-        )
-    ).all()
-    return [p.json() for p in params]
-
-
-@router.post("/clients/{client_id}/spa_processing_parameters")
+@router.post("/sessions/{session_id}/spa_processing_parameters")
 def register_spa_proc_params(
-    client_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
+    session_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
     zocalo_message = {
         "register": "spa_processing_parameters",
         **dict(proc_params),
-        "client_id": client_id,
+        "session_id": session_id,
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
@@ -455,27 +446,23 @@ def register_foil_hole(
     db.close()
 
 
-@router.post("/clients/{client_id}/tomography_preprocessing_parameters")
+@router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
 def register_tomo_preproc_params(
-    client_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
+    session_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
     zocalo_message = {
         "register": "tomography_processing_parameters",
         **dict(proc_params),
-        "client_id": client_id,
+        "session_id": session_id,
     }
     if _transport_object:
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
 
 
-@router.post("/clients/{client_id}/tomography_processing_parameters")
+@router.post("/sessions/{session_id}/tomography_processing_parameters")
 def register_tomo_proc_params(
-    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
+    session_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
     log.info(
         f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
     )
@@ -507,23 +494,15 @@ def register_tomo_proc_params(
     db.close()
 
 
-@router.get("/clients/{client_id}/spa_processing_parameters")
-def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
-    params = db.exec(
-        select(SPARelionParameters).where(SPARelionParameters.client_id == client_id)
-    ).all()
-    return [p.json() for p in params]
-
-
 class Tag(BaseModel):
     tag: str
 
 
-@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
+@router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
+def flush_spa_processing(visit_name: str, session_id: int, tag: Tag, db=murfey_db):
     zocalo_message = {
         "register": "flush_spa_preprocess",
-        "client_id": client_id,
+        "session_id": session_id,
         "tag": tag.tag,
     }
     if _transport_object:
@@ -535,13 +514,13 @@ class Source(BaseModel):
     rsync_source: str
 
 
-@router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
+@router.post("/visits/{visit_name}/{session_id}/flush_tomography_processing")
 def flush_tomography_processing(
-    visit_name: str, client_id: int, rsync_source: Source, db=murfey_db
+    visit_name: str, session_id: int, rsync_source: Source, db=murfey_db
 ):
     zocalo_message = {
         "register": "flush_tomography_preprocess",
-        "client_id": client_id,
+        "session_id": session_id,
         "visit_name": visit_name,
         "data_collection_group_tag": rsync_source.rsync_source,
     }
@@ -554,15 +533,7 @@ def flush_tomography_processing(
 def register_tilt_series(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
 ):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(
-                ClientEnvironment.client_id == tilt_series_info.client_id
-            )
-        )
-        .one()
-        .session_id
-    )
+    session_id = tilt_series_info.session_id
     if db.exec(
         select(TiltSeries)
         .where(TiltSeries.session_id == session_id)
@@ -579,20 +550,13 @@ def register_tilt_series(
     db.commit()
 
 
-@router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
+@router.post("/visits/{visit_name}/{session_id}/completed_tilt_series")
 def register_completed_tilt_series(
     visit_name: str,
-    client_id: int,
+    session_id: int,
     tilt_series_group: TiltSeriesGroupInfo,
     db=murfey_db,
 ):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
     tilt_series_db = db.exec(
         select(TiltSeries)
         .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
@@ -675,15 +639,7 @@ def register_tilt_series_for_rerun(
     visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
 ):
     """Set processing to false for cases where an extra tilt is found for a series"""
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(
-                ClientEnvironment.client_id == tilt_series_info.client_id
-            )
-        )
-        .one()
-        .session_id
-    )
+    session_id = tilt_series_info.session_id
     tilt_series_db = db.exec(
         select(TiltSeries)
         .where(TiltSeries.session_id == session_id)
@@ -696,13 +652,12 @@ def register_tilt_series_for_rerun(
     db.commit()
 
 
-@router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
-def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
+@router.get("/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts")
+def get_tilts(session_id: int, tilt_series_tag: str, db=murfey_db):
     res = db.exec(
-        select(ClientEnvironment, TiltSeries, Tilt)
-        .where(ClientEnvironment.client_id == client_id)
+        select(TiltSeries, Tilt)
         .where(TiltSeries.tag == tilt_series_tag)
-        .where(TiltSeries.session_id == ClientEnvironment.session_id)
+        .where(TiltSeries.session_id == session_id)
         .where(Tilt.tilt_series_id == TiltSeries.id)
     ).all()
     tilts: Dict[str, List[str]] = {}
@@ -714,20 +669,11 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
     return tilts
 
 
-@router.post("/visits/{visit_name}/{client_id}/tilt")
+@router.post("/visits/{visit_name}/{session_id}/tilt")
 async def register_tilt(
-    visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db
+    visit_name: str, session_id: int, tilt_info: TiltInfo, db=murfey_db
 ):
     def _add_tilt():
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         tilt_series_id = (
             db.exec(
                 select(TiltSeries)
@@ -889,9 +835,9 @@ async def request_spa_processing(visit_name: str, proc_params: SPAProcessingPara
         _transport_object.send("processing_recipe", zocalo_message)
 
 
-@router.post("/visits/{visit_name}/{client_id}/spa_preprocess")
+@router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
-    visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
+    visit_name: str, session_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
     parts = [secure_filename(p) for p in Path(proc_file.path).parts]
     visit_idx = parts.index(visit_name)
@@ -917,15 +863,6 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(DataCollectionGroup.session_id == session_id)
@@ -1032,9 +969,9 @@ async def request_spa_preprocessing(
     return proc_file
 
 
-@router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
+@router.post("/visits/{visit_name}/{session_id}/tomography_preprocess")
 async def request_tomography_preprocessing(
-    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+    visit_name: str, session_id: int, proc_file: ProcessFile, db=murfey_db
 ):
     visit_idx = Path(proc_file.path).parts.index(visit_name)
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
@@ -1056,13 +993,6 @@ async def request_tomography_preprocessing(
         / str(ppath.stem + "_ctf.mrc")
     )
     ctf_out = Path("/".join(secure_filename(p) for p in ctf_out.parts))
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
     data_collection = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1182,21 +1112,18 @@ def get_dc_groups(session_id: int, db=murfey_db):
     return {dcg.tag: dcg for dcg in data_collection_groups}
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
+@router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
 def register_dc_group(
-    visit_name, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
+    visit_name, session_id: int, dcg_params: DCGroupParameters, db=murfey_db
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     microscope = get_microscope(machine_config=machine_config)
     log.info(f"Registering data collection group on microscope {microscope}")
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
     if dcg_murfey := db.exec(
         select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == dcg_params.tag)
     ).all():
         dcg_murfey[0].atlas = dcg_params.atlas
@@ -1209,7 +1136,7 @@ def register_dc_group(
             "experiment_type": dcg_params.experiment_type,
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
-            "client_id": client_id,
+            "session_id": session_id,
         }
 
         if _transport_object:
@@ -1219,8 +1146,8 @@ def register_dc_group(
     return dcg_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/start_data_collection")
-def start_dc(visit_name, client_id: int, dc_params: DCParameters):
+@router.post("/visits/{visit_name}/{session_id}/start_data_collection")
+def start_dc(visit_name, session_id: int, dc_params: DCParameters):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
@@ -1249,7 +1176,7 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
         "exposure_time": dc_params.exposure_time,
         "slit_width": dc_params.slit_width,
         "phase_plate": dc_params.phase_plate,
-        "client_id": client_id,
+        "session_id": session_id,
     }
 
     if _transport_object:
@@ -1269,17 +1196,10 @@ def start_dc(visit_name, client_id: int, dc_params: DCParameters):
     return dc_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_processing_job")
+@router.post("/visits/{visit_name}/{session_id}/register_processing_job")
 def register_proc(
-    visit_name: str, client_id: int, proc_params: ProcessingJobParameters, db=murfey_db
+    visit_name: str, session_id: int, proc_params: ProcessingJobParameters, db=murfey_db
 ):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
     proc_parameters = {
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
@@ -1504,17 +1424,10 @@ def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
     return sid
 
 
-@router.post("/clients/{client_id}/successful_processing")
+@router.post("/sessions/{session_id}/successful_processing")
 def register_processing_success_in_ispyb(
-    client_id: int, db=murfey.server.ispyb.DB, murfey_db=murfey_db
+    session_id: int, db=murfey.server.ispyb.DB, murfey_db=murfey_db
 ):
-    session_id = (
-        murfey_db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
     collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)

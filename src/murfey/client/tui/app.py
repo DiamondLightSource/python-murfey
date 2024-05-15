@@ -248,7 +248,7 @@ class MurfeyTUI(App):
         rsyncer_data = {
             "source": str(source),
             "destination": destination,
-            "client_id": self._environment.client_id,
+            "session_id": self._environment.murfey_session,
             "transferring": self._do_transfer,
         }
         requests.post(url, json=rsyncer_data)
@@ -314,7 +314,7 @@ class MurfeyTUI(App):
             data = {
                 "source": source,
                 "destination": destination,
-                "client_id": self._environment.client_id,
+                "session_id": self._environment.murfey_session,
                 "increment_count": len(observed_files),
                 "increment_data_count": num_data_files,
             }
@@ -339,7 +339,7 @@ class MurfeyTUI(App):
             data = {
                 "source": source,
                 "destination": destination,
-                "client_id": self._environment.client_id,
+                "session_id": self._environment.murfey_session,
                 "increment_count": 1,
                 "bytes": update.file_size,
                 "increment_data_count": len(data_files),
@@ -367,7 +367,7 @@ class MurfeyTUI(App):
         data = {
             "source": source,
             "destination": destination,
-            "client_id": self._environment.client_id,
+            "session_id": self._environment.murfey_session,
             "increment_count": len(checked_updates),
             "bytes": sum(f.file_size for f in checked_updates),
             "increment_data_count": len(data_files),
@@ -436,7 +436,7 @@ class MurfeyTUI(App):
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
@@ -472,28 +472,28 @@ class MurfeyTUI(App):
                 "phase_plate": json.get("phase_plate", False),
             }
             capture_post(
-                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection",
                 json=data,
             )
             for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                 capture_post(
-                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
                     json={"tag": json["tilt_series_tag"], "recipe": recipe},
                 )
             log.info("Registering tomography processing parameters")
             requests.post(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
+                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,
             )
             context._flush_data_collections()
             context._flush_processing_jobs()
             capture_post(
-                f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.client_id}/flush_tomography_processing",
+                f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
             )
             log.info("tomography processing flushed")
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_data_collection_group"
+            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
@@ -532,7 +532,7 @@ class MurfeyTUI(App):
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection",
+                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection",
                     json=data,
                 )
                 for recipe in (
@@ -543,12 +543,12 @@ class MurfeyTUI(App):
                     "em-spa-refine",
                 ):
                     capture_post(
-                        f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/register_processing_job",
+                        f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
                         json={"tag": str(source), "recipe": recipe},
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/spa_processing_parameters",
                     json={
                         **{k: None if v == "None" else v for k, v in json.items()},
                         "tag": str(source),
@@ -562,11 +562,11 @@ class MurfeyTUI(App):
                 if not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(
-                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing",
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/flush_spa_processing",
                     json={"tag": str(source)},
                 )
             if isinstance(context, SPAContext):
-                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.client_id}/start_data_collection"
+                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection"
                 self._environment.listeners["data_collection_group_ids"] = {
                     partial(
                         context._register_data_collection,
@@ -644,7 +644,7 @@ class MurfeyTUI(App):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session",
+                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/session",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -661,7 +661,7 @@ class MurfeyTUI(App):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following:\n {sources} \n"
             rsync_instances = requests.get(
-                f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/rsyncers"
+                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/rsyncers"
             ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
@@ -743,7 +743,7 @@ class MurfeyTUI(App):
             removal_rp.stop()
             log.info(f"rsyncer {rp} rerun with removal")
         requests.post(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/successful_processing"
+            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/successful_processing"
         )
         requests.delete(
             f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"

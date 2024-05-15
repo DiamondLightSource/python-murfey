@@ -1674,15 +1674,7 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
 
 def _flush_tomography_preprocessing(message: dict):
     machine_config = get_machine_config()
-    session_id = (
-        murfey_db.exec(
-            select(db.ClientEnvironment).where(
-                db.ClientEnvironment.client_id == message["client_id"]
-            )
-        )
-        .one()
-        .session_id
-    )
+    session_id = message["session_id"]
     stashed_files = murfey_db.exec(
         select(db.PreprocessStash)
         .where(db.PreprocessStash.session_id == session_id)
@@ -1705,7 +1697,7 @@ def _flush_tomography_preprocessing(message: dict):
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
-            f"No tomography processing parameters found for client {sanitise(str(message['client_id']))} on visit {sanitise(visit_name)}"
+            f"No tomography processing parameters found for Murfey session {sanitise(str(message['session_id']))} on visit {sanitise(visit_name)}"
         )
         return
 
@@ -2139,11 +2131,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection_group":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
             ispyb_session_id = murfey.server.ispyb.get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
@@ -2153,7 +2140,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )
             if dcg_murfey := murfey_db.exec(
                 select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == client.session_id)
+                .where(db.DataCollectionGroup.session_id == message["session_id"])
                 .where(db.DataCollectionGroup.tag == message.get("tag"))
             ).all():
                 dcgid = dcg_murfey[0].id
@@ -2166,7 +2153,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcgid = _register(record, header)
                 murfey_dcg = db.DataCollectionGroup(
                     id=dcgid,
-                    session_id=client.session_id,
+                    session_id=message["session_id"],
                     tag=message.get("tag"),
                 )
                 murfey_db.add(murfey_dcg)
@@ -2191,15 +2178,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
-            murfey_session_id = (
-                murfey_db.exec(
-                    select(db.ClientEnvironment).where(
-                        db.ClientEnvironment.client_id == message["client_id"]
-                    )
-                )
-                .one()
-                .session_id
-            )
+            murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
@@ -2368,15 +2347,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_spa_preprocess":
-            session_id = (
-                murfey_db.exec(
-                    select(db.ClientEnvironment).where(
-                        db.ClientEnvironment.client_id == message["client_id"]
-                    )
-                )
-                .one()
-                .session_id
-            )
+            session_id = message["session_id"]
             stashed_files = murfey_db.exec(
                 select(db.PreprocessStash)
                 .where(db.PreprocessStash.session_id == session_id)
@@ -2478,12 +2449,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "spa_processing_parameters":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
-            session_id = client.session_id
+            session_id = message["session_id"]
             collected_ids = murfey_db.exec(
                 select(
                     db.DataCollectionGroup,
@@ -2549,12 +2515,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "tomography_processing_parameters":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
-            session_id = client.session_id
+            session_id = message["session_id"]
             collected_ids = murfey_db.exec(
                 select(
                     db.DataCollectionGroup,

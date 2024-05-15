@@ -484,16 +484,16 @@ class ProcessingForm(Screen):
             self.app._start_dc(params)
             if model == PreprocessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
+                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/spa_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/spa_processing_parameters",
                     json=params,
                 )
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.client_id}/flush_spa_processing"
+                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/flush_spa_processing"
                 )
 
     def on_switch_changed(self, event):
@@ -1174,7 +1174,7 @@ class WaitingScreen(Screen):
         self.query_one(ProgressBar).advance(1)
         if self.query_one(ProgressBar).progress == self.query_one(ProgressBar).total:
             requests.post(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/successful_processing"
+                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/successful_processing"
             )
             requests.delete(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session"

@@ -739,7 +739,7 @@ class SPAModularContext(_SPAContext):
                             # try to continue if position information gathering fails so that movie is processed anyway
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
@@ -854,7 +854,7 @@ class SPAContext(_SPAContext):
         logger.info(f"registering processing job with parameters: {parameters}")
         parameters = parameters or {}
         environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
         machine_config = get_machine_config(
             str(environment.url.geturl()), demo=environment.demo
         )
