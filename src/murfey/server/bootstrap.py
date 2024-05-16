@@ -174,7 +174,7 @@ def get_murfey_wheel():
 @cygwin.get("/setup-x86_64.exe", response_class=Response)
 def get_cygwin_setup():
     """
-    Obtain and past though a Cygwin installer from an official source.
+    Obtain and pass through a Cygwin installer from an official source.
     This is used during client bootstrapping and can download and install the
     Cygwin distribution that then remains on the client machines.
     """
