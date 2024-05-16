@@ -1473,6 +1473,8 @@ async def get_tiff(visit_name: str, tiff_path: str):
     if not processed_dir:
         return None
 
+    tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+
     def iterfile():
         with open(processed_dir / tiff_path, mode="rb") as f:
             yield from f
