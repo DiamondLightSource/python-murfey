@@ -766,21 +766,28 @@ class UpstreamDownloads(Screen):
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
+            # Create the directory locally to save files to
             download_dir = Path(machine_data["upstream_data_download_directory"]) / str(
                 event.button.label
             )
             download_dir.mkdir(exist_ok=True)
+
+            # Get the paths to the TIFF files generated previously under the same session ID
             upstream_tiff_paths_response = requests.get(
                 f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
             )
             upstream_tiff_paths = upstream_tiff_paths_response.json()
+
+            # Request to download the TIFF files found
             for tp in upstream_tiff_paths:
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
+                # Write TIFF to the specified file path
                 with open(download_dir / tp, "wb") as utiff:
                     stream_response = requests.get(
                         f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
                         stream=True,
                     )
+                    # Write the file chunk-by-chunk to avoid hogging memory
                     for chunk in stream_response.iter_content():
                         utiff.write(chunk)
         self.app.pop_screen()

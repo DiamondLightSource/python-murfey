@@ -40,7 +40,6 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
 
-
 @pypi.get("/", response_class=Response)
 def get_pypi_index():
     """Obtain list of all PyPI packages via the simple API (PEP 503)."""

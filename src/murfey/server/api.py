@@ -1625,9 +1625,12 @@ def _get_upstream_processed_dir(visit_name: str) -> Optional[Path]:
     )
     return None
 
-
 @router.get("/visits/{visit_name}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str):
+    """
+    Looks for TIFF files associated with the current session in the permitted storage
+    servers, and returns their relative file paths as a list.
+    """
     upstream_tiff_paths = []
     processed_dir = _get_upstream_processed_dir(visit_name)
     if not processed_dir:
@@ -1639,12 +1642,16 @@ async def gather_upstream_tiffs(visit_name: str):
 
 @router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
 async def get_tiff(visit_name: str, tiff_path: str):
+    """
+    Transfers the requested TIFF files from the storage server to the target directory
+    """
     processed_dir = _get_upstream_processed_dir(visit_name)
     if not processed_dir:
         return None
 
     tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
 
+    # Generator object containing relative paths to the files
     def iterfile():
         with open(processed_dir / tiff_path, mode="rb") as f:
             yield from f
