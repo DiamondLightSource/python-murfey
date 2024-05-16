@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import io
 import logging
-import zipfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import packaging.version
 import sqlalchemy
@@ -1600,7 +1598,7 @@ def failed_client_post(post_info: PostInfo):
 
 
 @router.get("/visits/{visit_name}/upstream_visits")
-def find_upstream_visits(visit_name: str):
+async def find_upstream_visits(visit_name: str):
     upstream_visits = {}
     # Iterates through provided upstream directories
     for p in machine_config.upstream_data_directories:
@@ -1610,8 +1608,7 @@ def find_upstream_visits(visit_name: str):
     return upstream_visits
 
 
-@router.get("/visits/{visit_name}/upstream_data")
-def fetch_upstream_data(visit_name: str):
+def _get_upstream_processed_dir(visit_name: str) -> Optional[Path]:
     """
     Fetches the data from the server that matches the visit name
     """
@@ -1622,22 +1619,38 @@ def fetch_upstream_data(visit_name: str):
                 / secure_filename(visit_name)
                 / machine_config.processed_directory_name
             )
-            break
-    else:
-        log.warning(
-            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
-        )
+            return processed_dir
+    log.warning(
+        f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+    )
+    return None
+
+
+@router.get("/visits/{visit_name}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str):
+    upstream_tiff_paths = []
+    processed_dir = _get_upstream_processed_dir(visit_name)
+    if not processed_dir:
         return None
-    zip_io = io.BytesIO()
-    with zipfile.ZipFile(
-        zip_io, mode="w", compression=zipfile.ZIP_DEFLATED
-    ) as stream_zip:
-        for f in processed_dir.glob("**/*.tiff"):
-            stream_zip.write(f, arcname=f.relative_to(processed_dir))
+    for f in processed_dir.glob("**/*.tiff"):
+        upstream_tiff_paths.append(str(f.relative_to(processed_dir)))
+    return upstream_tiff_paths
+
+
+@router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
+async def get_tiff(visit_name: str, tiff_path: str):
+    processed_dir = _get_upstream_processed_dir(visit_name)
+    if not processed_dir:
+        return None
+
+    tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+
+    def iterfile():
+        with open(processed_dir / tiff_path, mode="rb") as f:
+            yield from f
+
     return StreamingResponse(
-        iter([zip_io.getvalue()]),
-        media_type="application/x-zip-compressed",
-        headers={
-            "Content-Disposition": f"attachment; filename={visit_name}-processed.zip"
-        },
+        iterfile(),
+        media_type="image/tiff",
+        headers={"Content-Disposition": f"attachment; filename={Path(tiff_path).name}"},
     )
