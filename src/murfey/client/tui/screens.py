@@ -2,10 +2,8 @@ from __future__ import annotations
 
 # import contextlib
 import logging
-import zipfile
 from datetime import datetime
 from functools import partial
-from io import BytesIO
 from pathlib import Path
 from typing import (
     Any,
@@ -772,13 +770,19 @@ class UpstreamDownloads(Screen):
                 event.button.label
             )
             download_dir.mkdir(exist_ok=True)
-            upstream_data_response = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_data"
+            upstream_tiff_paths_response = requests.get(
+                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
             )
-            with zipfile.ZipFile(
-                BytesIO(upstream_data_response.content)
-            ) as zip_archive:
-                zip_archive.extractall(download_dir)
+            upstream_tiff_paths = upstream_tiff_paths_response.json()
+            for tp in upstream_tiff_paths:
+                (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
+                with open(download_dir / tp, "wb") as utiff:
+                    stream_response = requests.get(
+                        f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
+                        stream=True,
+                    )
+                    for chunk in stream_response.iter_content():
+                        utiff.write(chunk)
         self.app.pop_screen()
 
 
