@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import datetime
-import io
 import logging
 import random
-import zipfile
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
@@ -1443,8 +1441,7 @@ def find_upstream_visits(visit_name: str):
     return upstream_visits
 
 
-@router.get("/visits/{visit_name}/upstream_data")
-def fetch_upstream_data(visit_name: str):
+def _get_upstream_processed_dir(visit_name: str) -> Optional[Path]:
     for p in machine_config["upstream_data_directories"]:
         if (Path(p) / secure_filename(visit_name)).is_dir():
             processed_dir = (
@@ -1452,22 +1449,36 @@ def fetch_upstream_data(visit_name: str):
                 / secure_filename(visit_name)
                 / machine_config["processed_directory_name"]
             )
-            break
-    else:
-        log.warning(
-            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
-        )
+            return processed_dir
+    log.warning(
+        f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+    )
+    return None
+
+
+@router.get("/visits/{visit_name}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str):
+    upstream_tiff_paths = []
+    processed_dir = _get_upstream_processed_dir(visit_name)
+    if not processed_dir:
         return None
-    zip_io = io.BytesIO()
-    with zipfile.ZipFile(
-        zip_io, mode="w", compression=zipfile.ZIP_DEFLATED
-    ) as stream_zip:
-        for f in processed_dir.glob("**/*.tiff"):
-            stream_zip.write(f, arcname=f.relative_to(processed_dir))
+    for f in processed_dir.glob("**/*.tiff"):
+        upstream_tiff_paths.append(str(f.relative_to(processed_dir)))
+    return upstream_tiff_paths
+
+
+@router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
+async def get_tiff(visit_name: str, tiff_path: str):
+    processed_dir = _get_upstream_processed_dir(visit_name)
+    if not processed_dir:
+        return None
+
+    def iterfile():
+        with open(processed_dir / tiff_path, mode="rb") as f:
+            yield from f
+
     return StreamingResponse(
-        iter([zip_io.getvalue()]),
-        media_type="application/x-zip-compressed",
-        headers={
-            "Content-Disposition": f"attachment; filename={visit_name}-processed.zip"
-        },
+        iterfile(),
+        media_type="image/tiff",
+        headers={"Content-Disposition": f"attachment; filename={Path(tiff_path).name}"},
     )
