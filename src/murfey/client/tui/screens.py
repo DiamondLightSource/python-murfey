@@ -776,12 +776,12 @@ class UpstreamDownloads(Screen):
             upstream_tiff_paths = upstream_tiff_paths_response.json()
             for tp in upstream_tiff_paths:
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
+                stream_response = requests.get(
+                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
+                    stream=True,
+                )
                 with open(download_dir / tp, "wb") as utiff:
-                    stream_response = requests.get(
-                        f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
-                        stream=True,
-                    )
-                    for chunk in stream_response.iter_content():
+                    for chunk in stream_response.iter_content(chunk_size=32 * 1024**2):
                         utiff.write(chunk)
         self.app.pop_screen()
 

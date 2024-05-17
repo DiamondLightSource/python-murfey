@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
     BLSample,
@@ -1640,12 +1640,4 @@ async def get_tiff(visit_name: str, tiff_path: str):
 
     tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
 
-    def iterfile():
-        with open(processed_dir / tiff_path, mode="rb") as f:
-            yield from f
-
-    return StreamingResponse(
-        iterfile(),
-        media_type="image/tiff",
-        headers={"Content-Disposition": f"attachment; filename={Path(tiff_path).name}"},
-    )
+    return FileResponse(path=processed_dir / tiff_path)
