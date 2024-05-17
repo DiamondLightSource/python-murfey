@@ -2117,7 +2117,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
                         "pix_size": preproc_params.pixel_size,
-                        "manual_tilt_offset": tilt_offset,
+                        "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
                     },
                 }
