@@ -10,8 +10,8 @@ from typing import Dict, List, Optional
 
 import packaging.version
 import sqlalchemy
-from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
 from pydantic import BaseModel, BaseSettings
@@ -36,6 +36,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
+from murfey.server.auth import validate_token
 from murfey.server.config import from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
@@ -91,7 +92,7 @@ log = logging.getLogger("murfey.server.demo_api")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(validate_token)])
 router.raw_count = 2
 
 
@@ -449,7 +450,10 @@ def get_grid_squares(session_id: int, db=murfey_db):
 
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
-    session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
+    session_id: int,
+    gsid: int,
+    grid_square_params: GridSquareParameters,
+    db=murfey_db,
 ):
     try:
         grid_square = db.exec(
@@ -1479,8 +1483,4 @@ async def get_tiff(visit_name: str, tiff_path: str):
         with open(processed_dir / tiff_path, mode="rb") as f:
             yield from f
 
-    return StreamingResponse(
-        iterfile(),
-        media_type="image/tiff",
-        headers={"Content-Disposition": f"attachment; filename={Path(tiff_path).name}"},
-    )
+    return FileResponse(path=processed_dir / tiff_path)
