@@ -56,12 +56,18 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post, get_machine_config, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
 ReactiveType = TypeVar("ReactiveType")
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 def determine_default_destination(
@@ -773,7 +779,7 @@ class UpstreamDownloads(Screen):
             upstream_tiff_paths_response = requests.get(
                 f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
             )
-            upstream_tiff_paths = upstream_tiff_paths_response.json()
+            upstream_tiff_paths = upstream_tiff_paths_response.json() or []
             for tp in upstream_tiff_paths:
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
                 with open(download_dir / tp, "wb") as utiff:

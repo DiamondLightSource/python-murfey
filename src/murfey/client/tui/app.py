@@ -32,11 +32,22 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import capture_post, get_machine_config, set_default_acquisition_output
+from murfey.util import (
+    capture_post,
+    get_machine_config,
+    read_config,
+    set_default_acquisition_output,
+)
 
 log = logging.getLogger("murfey.tui.app")
 
 ReactiveType = TypeVar("ReactiveType")
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 class MurfeyTUI(App):

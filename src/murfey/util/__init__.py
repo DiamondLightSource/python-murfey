@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import configparser
 import copy
 import inspect
 import json
 import logging
+import os
 import shutil
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
@@ -19,6 +21,27 @@ import requests
 from murfey.util.models import Visit
 
 logger = logging.getLogger("murfey.util")
+
+
+def read_config() -> configparser.ConfigParser:
+    config = configparser.ConfigParser()
+    try:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        with open(murfey_client_config_home / ".murfey") as configfile:
+            config.read_file(configfile)
+    except FileNotFoundError:
+        pass
+    if "Murfey" not in config:
+        config["Murfey"] = {}
+    return config
+
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 @lru_cache(maxsize=1)
