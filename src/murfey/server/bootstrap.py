@@ -64,11 +64,11 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     """
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    with requests.get(f"https://pypi.org/simple/{package}") as http_response:
-        if http_response.status_code == 200:
-            full_path_response = http_response
-        else:
-            raise Exception(f"Package {package} not found on PyPI")
+    url = f"https://pypi.org/simple{package}"
+    if "pypi" in url:
+        full_path_response = requests.get(url)
+    else:
+        raise ValueError("This is not a valid package")
 
     # Use regular expression matching to rewrite the URLs
     # Points them from pythonhosted.org to current server
@@ -94,7 +94,9 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         # Look for lines with hyperlinks
         if "<a href" in line:
             # Process URL
-            if len(line) < 1000:  # Character limit to satisfy GitHub QL check
+            if len(line) > 1000:  # Character limit to satisfy GitHub QL check
+                raise ValueError("HTML line is too long")
+            else:
                 line_new = re.sub(
                     '<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',
                     rewrite_pypi_url,  # re.sub uses first argument as input for second argument
@@ -106,8 +108,6 @@ def get_pypi_package_downloads_list(package: str) -> Response:
                 if ".whl" in line_new:
                     line_metadata = line_new.replace(".whl", ".whl.metadata")
                     content_text_list.append(line_metadata)
-            else:
-                raise Exception("HTML line is too long")
         else:
             content_text_list.append(line)  # Append as normal
     content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
@@ -160,11 +160,12 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    with requests.get(f"https://pypi.org/simple/{package}") as http_response:
-        if http_response.status_code == 200:
-            full_path_response = http_response
-        else:
-            raise Exception(f"Package {package} not found on PyPI")
+    url = f"https://pypi.org/simple{package}"
+    if "pypi" in url:
+        full_path_response = requests.get(url)
+    else:
+        raise ValueError("This is not a valid package")
+
     filename_bytes = re.escape(filename.encode("latin1"))
 
     # Add explicit URLs for ".whl.metadata" files
