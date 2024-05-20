@@ -64,29 +64,19 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     """
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if re.match(r"^[\w\d_-]+$", package):
+    if re.match(r"^[\w\d_-]+$", package):  # Take alphanumeric + hyphens + underscores only
         full_path_response = requests.get(f"https://pypi.org/simple/{package}")
     else:
         raise ValueError(f"{package} is not a valid package name")
 
-    # Use regular expression matching to rewrite the URLs
-    # Points them from pythonhosted.org to current server
-    # Removes the hash from the URL as well
     def rewrite_pypi_url(match):
+        """
+        Use regular expression matching to rewrite the URLs. Points them from
+        pythonhosted.org to current server, and removes the hash from the URL as well
+        """
         # url = match.group(4)  # Original
         url = match.group(3)
         return (
-            # Original
-            # "<a "
-            # + match.group(1)
-            # + 'href="'
-            # + url
-            # + '"'
-            # + match.group(3)
-            # + ">"
-            # + match.group(4)
-            # + "</a>"
-            # Simplified search, now that it's going line-by-line
             '<a href="'
             + url
             + '"'
@@ -104,14 +94,13 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         if "<a href" in line:
             # Rewrite URL to point to current proxy server
             line_new = re.sub(
-                # '<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',  # Original
-                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Simplified
+                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria to identify unique groups in HTML string
                 rewrite_pypi_url,  # re.sub uses first argument as input for second argument
                 line,
             )
             content_text_list.append(line_new)  # Add to list
 
-            # Expose wheel metadata
+            # Add entry for wheel metadata
             if ".whl" in line_new:
                 line_metadata = line_new.replace(".whl", ".whl.metadata")
                 content_text_list.append(line_metadata)  # Add to list
@@ -167,7 +156,7 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if re.match(r"^[\w\d_-]+$", package):
+    if re.match(r"^[\w\d_-]+$", package):  # Take alphanumeric + hyphens + underscores only
         full_path_response = requests.get(f"https://pypi.org/simple/{package}")
     else:
         raise ValueError(f"{package} is not a valid package name")
