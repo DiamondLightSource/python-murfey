@@ -39,13 +39,12 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
         response = requests.post(url, json=json)
     except Exception as e:
         logger.error(f"Exception encountered in post to {url}: {e}")
-        response = None
-    if not response or response.status_code != 200:
-        if response:
-            logger.warning(
-                f"Response to post to {url} with data {json} had status code "
-                f"{response.status_code}. The reason given was {response.reason}"
-            )
+        response = requests.Response()
+    if response.status_code != 200:
+        logger.warning(
+            f"Response to post to {url} with data {json} had status code "
+            f"{response.status_code}. The reason given was {response.reason}"
+        )
         failure_url = urljoin(url, "failed_client_post")
         try:
             resend_response = requests.post(
@@ -53,8 +52,8 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
             )
         except Exception as e:
             logger.error(f"Exception encountered in post to {failure_url}: {e}")
-            resend_response = None
-        if resend_response and resend_response.status_code != 200:
+            resend_response = requests.Response()
+        if resend_response.status_code != 200:
             logger.warning(
                 f"Response to post to {failure_url} failed with {resend_response.reason}"
             )
