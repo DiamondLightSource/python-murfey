@@ -41,41 +41,6 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 log = logging.getLogger("murfey.server.bootstrap")
 
 
-def expose_wheel_metadata(response_bytes: bytes) -> bytes:
-    """
-    As of pip v22.3 (coinciding with PEP 658), pip expects to find an additonal
-    ".whl.metadata" file based on the URL of the ".whl" file present on the PyPI Simple
-    Index. However, because it is not listed on the webpage itself, it is not copied
-    across to the proxy. This function adds that URL to the proxy explicitly.
-    """
-
-    # Analyse API response line-by-line
-    response_text = response_bytes.decode("latin1")  # Convert to text
-    response_text_list = []  # Write line-by-line analysis to here
-
-    for line in response_text.splitlines():
-        # Modify URLs to point to this server instead
-        if r"<a href=" in line:
-            hyperlink = line  # This is a hyperlink
-            response_text_list.append(hyperlink)  # Add to list
-
-            # Add new line to explicitly call for wheel metadata
-            if ".whl" in hyperlink:
-                # Add ".metadata" to URL and file name
-                hyperlink_metadata = hyperlink.replace(".whl", ".whl.metadata")
-                response_text_list.append(hyperlink_metadata)  # Add to list
-
-        # Append all other lines as normal
-        else:
-            response_text_list.append(line)
-
-    # Recover original structure
-    response_text_new: str = "\n".join(response_text_list)
-    response_bytes_new: bytes = bytes(response_text_new, encoding="latin-1")
-
-    return response_bytes_new
-
-
 @pypi.get("/", response_class=Response)
 def get_pypi_index():
     """
@@ -98,7 +63,12 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     rewrite all download URLs to point to this server, under the current directory.
     """
 
-    full_path_response = requests.get(f"https://pypi.org/simple/{package}")
+    # Attempt at URL verification to satisfy GitHub CodeQL requirements
+    with requests.get(f"https://pypi.org/simple/{package}") as http_response:
+        if http_response.status_code == 200:
+            full_path_response = http_response
+        else:
+            raise Exception(f"Package {package} not found on PyPI")
 
     # Use regular expression matching to rewrite the URLs
     # Points them from pythonhosted.org to current server
@@ -106,27 +76,45 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     def rewrite_pypi_url(match):
         url = match.group(4)
         return (
-            b"<a "
+            "<a "
             + match.group(1)
-            + b'href="'
+            + 'href="'
             + url
-            + b'"'
+            + '"'
             + match.group(3)
-            + b">"
+            + ">"
             + match.group(4)
-            + b"</a>"
+            + "</a>"
         )
 
-    content = re.sub(
-        b'<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',
-        rewrite_pypi_url,  # re.sub uses first argument as input for second argument
-        full_path_response.content,
-    )
-    # Add explicit URLs for ".whl.metadata" files
-    content = expose_wheel_metadata(content)
+    content: bytes = full_path_response.content
+    content_text: str = content.decode("latin1")  # Convert to strings for processing
+    content_text_list = []
+    for line in content_text.splitlines():
+        # Look for lines with hyperlinks
+        if "<a href" in line:
+            # Process URL
+            if len(line) < 1000:  # Character limit to satisfy GitHub QL check
+                line_new = re.sub(
+                    '<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',
+                    rewrite_pypi_url,  # re.sub uses first argument as input for second argument
+                    line,
+                )
+                content_text_list.append(line_new)
+
+                # Expose wheel metadata
+                if ".whl" in line_new:
+                    line_metadata = line_new.replace(".whl", ".whl.metadata")
+                    content_text_list.append(line_metadata)
+            else:
+                raise Exception("HTML line is too long")
+        else:
+            content_text_list.append(line)  # Append as normal
+    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
+    content_new = content_text_new.encode("latin1")  # Convert back to bytes
 
     return Response(
-        content=content,
+        content=content_new,
         media_type=full_path_response.headers.get("Content-Type"),
         status_code=full_path_response.status_code,
     )
@@ -138,7 +126,45 @@ def get_pypi_file(package: str, filename: str):
     Obtain and pass through a specific download for a PyPI package.
     """
 
-    full_path_response = requests.get(f"https://pypi.org/simple/{package}")
+    def expose_wheel_metadata(response_bytes: bytes) -> bytes:
+        """
+        As of pip v22.3 (coinciding with PEP 658), pip expects to find an additonal
+        ".whl.metadata" file based on the URL of the ".whl" file present on the PyPI Simple
+        Index. However, because it is not listed on the webpage itself, it is not copied
+        across to the proxy. This function adds that URL to the proxy explicitly.
+        """
+
+        # Analyse API response line-by-line
+        response_text: str = response_bytes.decode("latin1")  # Convert to text
+        response_text_list = []  # Write line-by-line analysis to here
+
+        for line in response_text.splitlines():
+            # Process URLs
+            if r"<a href=" in line:
+                response_text_list.append(line)  # Add to list
+
+                # Add new line to explicitly call for wheel metadata
+                if ".whl" in line:
+                    # Add ".metadata" to URL and file name
+                    line_new = line.replace(".whl", ".whl.metadata")
+                    response_text_list.append(line_new)  # Add to list
+
+            # Append all other lines as normal
+            else:
+                response_text_list.append(line)
+
+        # Recover original structure
+        response_text_new = str("\n".join(response_text_list))
+        response_bytes_new = bytes(response_text_new, encoding="latin-1")
+
+        return response_bytes_new
+
+    # Attempt at URL verification to satisfy GitHub CodeQL requirements
+    with requests.get(f"https://pypi.org/simple/{package}") as http_response:
+        if http_response.status_code == 200:
+            full_path_response = http_response
+        else:
+            raise Exception(f"Package {package} not found on PyPI")
     filename_bytes = re.escape(filename.encode("latin1"))
 
     # Add explicit URLs for ".whl.metadata" files
