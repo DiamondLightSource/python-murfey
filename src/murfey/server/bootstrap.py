@@ -64,7 +64,9 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     """
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if re.match(r"^[\w\d_-]+$", package):  # Take alphanumeric + hyphens + underscores only
+    if (
+        package.replace("_", "").replace("-", "").isalnum()
+    ):  # Take alphanumeric + hyphens + underscores only
         full_path_response = requests.get(f"https://pypi.org/simple/{package}")
     else:
         raise ValueError(f"{package} is not a valid package name")
@@ -76,15 +78,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         """
         # url = match.group(4)  # Original
         url = match.group(3)
-        return (
-            '<a href="'
-            + url
-            + '"'
-            + match.group(2)
-            + ">"
-            + match.group(3)
-            + "</a>"
-        )
+        return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     content: bytes = full_path_response.content
     content_text: str = content.decode("latin1")  # Convert to strings for processing
@@ -156,7 +150,9 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if re.match(r"^[\w\d_-]+$", package):  # Take alphanumeric + hyphens + underscores only
+    if (
+        package.replace("_", "").replace("-", "").isalnum()
+    ):  # Take alphanumeric + hyphens + underscores only
         full_path_response = requests.get(f"https://pypi.org/simple/{package}")
     else:
         raise ValueError(f"{package} is not a valid package name")
