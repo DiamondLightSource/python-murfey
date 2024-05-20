@@ -102,14 +102,10 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     for line in content_text.splitlines():
         # Look for lines with hyperlinks
         if "<a href" in line:
-            # Process URL
-            if len(line) > 1000:  # Character limit to satisfy GitHub QL check
-                raise ValueError("HTML line is too long")
-
             # Rewrite URL to point to current proxy server
             line_new = re.sub(
                 # '<a ([^>]*)href="([^">]*)"([^>]*)>([^<]*)</a>',  # Original
-                '<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Simplified
+                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Simplified
                 rewrite_pypi_url,  # re.sub uses first argument as input for second argument
                 line,
             )
@@ -182,7 +178,7 @@ def get_pypi_file(package: str, filename: str):
     content = expose_wheel_metadata(full_path_response.content)
 
     selected_package_link = re.search(
-        b'<a [^>]*?href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
+        b'<a href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
         content,
     )
 
