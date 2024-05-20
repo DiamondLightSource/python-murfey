@@ -64,7 +64,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     """
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    url = f"https://pypi.org/simple{package}"
+    url = f"https://pypi.org/simple/{package}"
     if "pypi" in url:
         full_path_response = requests.get(url)
     else:
@@ -160,7 +160,7 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    url = f"https://pypi.org/simple{package}"
+    url = f"https://pypi.org/simple/{package}"
     if "pypi" in url:
         full_path_response = requests.get(url)
     else:
