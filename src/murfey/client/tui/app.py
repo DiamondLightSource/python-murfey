@@ -481,6 +481,24 @@ class MurfeyTUI(App):
                     json={"tag": json["tilt_series_tag"], "recipe": recipe},
                 )
             log.info("Registering tomography processing parameters")
+            if self.app._environment.data_collection_parameters.get("num_eer_frames"):
+                eer_response = requests.post(
+                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/eer_fractionation_file",
+                    json={
+                        "num_frames": self.app._environment.data_collection_parameters[
+                            "num_eer_frames"
+                        ],
+                        "fractionation": self.app._environment.data_collection_parameters[
+                            "eer_fractionation"
+                        ],
+                        "dose_per_frame": self.app._environment.data_collection_parameters[
+                            "dose_per_frame"
+                        ],
+                        "fractionation_file_name": "eer_fractionation_tomo.txt",
+                    },
+                )
+                eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
+                json.update({"eer_fractionation_file": eer_fractionation_file})
             requests.post(
                 f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/tomography_preprocessing_parameters",
                 json=json,
