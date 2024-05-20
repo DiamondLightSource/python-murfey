@@ -22,6 +22,7 @@ import packaging.version
 import requests
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, HttpUrl, ValidationError
 
 from murfey.server import get_machine_config, respond_with_template
 
@@ -39,6 +40,21 @@ plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
+
+
+class UrlValidator(BaseModel):
+    url: HttpUrl
+
+
+def validate(url: str):
+    try:
+        UrlValidator(url=url)
+    except ValidationError:
+        log.error(f"{url} was not a valid URL")
+        return False
+    else:
+        log.info(f"{url} was a valid URL")
+        return True
 
 
 @pypi.get("/", response_class=Response)
@@ -72,16 +88,14 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         url = match.group(3)
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
-    # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if (
-        package.replace("_", "").replace("-", "").isalnum()
-    ):  # Take alphanumeric + hyphens + underscores only
-        full_path_response = requests.get("https://pypi.org/simple/" + package)
-    else:
-        raise ValueError(f"{package} is not a valid package name")
+    # Attempt at URL validation to satisfy GitHub CodeQL requirements
+    url = f"https://pypi.org/simple/{package}"
+    if validate(url):
+        full_path_response = requests.get(url)
 
-    content: bytes = full_path_response.content
-    content_text: str = content.decode("latin1")  # Convert to strings for processing
+    # Get HTML content of response
+    content: bytes = full_path_response.content  # In bytes
+    content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
     for line in content_text.splitlines():
         # Look for lines with hyperlinks
@@ -149,13 +163,10 @@ def get_pypi_file(package: str, filename: str):
 
         return response_bytes_new
 
-    # Attempt at URL verification to satisfy GitHub CodeQL requirements
-    if (
-        package.replace("_", "").replace("-", "").isalnum()
-    ):  # Take alphanumeric + hyphens + underscores only
-        full_path_response = requests.get("https://pypi.org/simple/" + package)
-    else:
-        raise ValueError(f"{package} is not a valid package name")
+    # Attempt at URL validation to satisfy GitHub CodeQL requirements
+    url = f"https://pypi.org/simple/{package}"
+    if validate(url):
+        full_path_response = requests.get(url)
 
     filename_bytes = re.escape(filename.encode("latin1"))
 
