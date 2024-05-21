@@ -17,6 +17,7 @@ import functools
 import logging
 import random
 import re
+from urllib.parse import urlparse
 
 import packaging.version
 import requests
@@ -39,6 +40,14 @@ plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
+
+
+def validate_url(url: str) -> bool:
+    parsed_url = urlparse(url)
+    if parsed_url.scheme == "https" and parsed_url.netloc.startswith("pypi.org"):
+        return True
+    else:
+        return False
 
 
 @pypi.get("/", response_class=Response)
@@ -72,9 +81,12 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         url = match.group(3)
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
-    # Get response from PyPI
+    # Validate URL
     url = f"https://pypi.org/simple/{package}"
-    full_path_response = requests.get(url)
+    if validate_url(url):
+        full_path_response = requests.get(url)  # Get response from PyPI
+    else:
+        raise ValueError("This is not a PyPI package")
 
     # Get HTML content of response
     content: bytes = full_path_response.content  # In bytes
@@ -146,20 +158,24 @@ def get_pypi_file(package: str, filename: str):
 
         return response_bytes_new
 
-    # Get response from PyPI
+    # Validate URL
     url = f"https://pypi.org/simple/{package}"
-    full_path_response = requests.get(url)
+    if validate_url(url):
+        full_path_response = requests.get(url)  # Get response from PyPI
+    else:
+        raise ValueError("This is not a PyPI package")
 
+    # Get filename in bytes
     filename_bytes = re.escape(filename.encode("latin1"))
 
     # Add explicit URLs for ".whl.metadata" files
     content = expose_wheel_metadata(full_path_response.content)
 
+    # Find package matching the specified filename
     selected_package_link = re.search(
         b'<a href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
         content,
     )
-
     if not selected_package_link:
         raise HTTPException(status_code=404, detail="File not found for package")
     original_url = selected_package_link.group(1)
