@@ -51,7 +51,7 @@ def validate_url(url: str) -> bool:
 
 
 def validate_package(package: str) -> bool:
-    if re.match(r"^[\w\d_-]+$", package):
+    if package.replace("_", "").replace("-", "").isalnum():
         return True
     else:
         return False
@@ -89,12 +89,10 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     # Validate package and URL
-    if validate_package(package):
-        url = f"https://pypi.org/simple/{package}"
-        if validate_url(url):
-            full_path_response = requests.get(url)  # Get response from PyPI
-        else:
-            raise Exception("Could not validate PyPI URL")
+    if validate_package(package) and validate_url(f"https://pypi.org/simple/{package}"):
+        full_path_response = requests.get(
+            f"https://pypi.org/simple/{package}"
+        )  # Get response from PyPI
     else:
         raise ValueError("This is not a valid package name")
 
@@ -169,12 +167,10 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Validate package and URL
-    if validate_package(package):
-        url = f"https://pypi.org/simple/{package}"
-        if validate_url(url):
-            full_path_response = requests.get(url)  # Get response from PyPI
-        else:
-            raise Exception("Could not validate PyPI URL")
+    if validate_package(package) and validate_url(f"https://pypi.org/simple/{package}"):
+        full_path_response = requests.get(
+            f"https://pypi.org/simple/{package}"
+        )  # Get response from PyPI
     else:
         raise ValueError("This is not a valid package name")
 
