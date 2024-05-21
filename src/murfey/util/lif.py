@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Generator, List, Optional, Tuple, Union
+from typing import Generator, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 # import matplotlib.pyplot as plt
@@ -23,47 +23,13 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
-def replace_list_entry(
-        lst: list,
-        old_value: Union[str, int, float],
-        new_value: Union[str, int, float],
-        counts: Optional[int] = None,  # First n values to replace
-) -> list:
-    """
-    Searches the list for the first n occurrences of a given value and replaces them.
-    Returns the modified list.
-    """
-
-    # Initial settings
-    lst_new = lst.copy()  # Avoid overwriting
-    i = -1  # Initial offset
-    counter = 0  # Number of times a value has been found and replaced
-    if counts is None:  # If explicitly None, replaces everything
-        counts = len(lst)  # Sets it to span the list
-
-    try:
-        while counter < counts:
-            i = lst_new.index(
-                old_value,
-                i + 1,  # Saves old position to continue subsequent searches from
-            )
-            lst_new[i] = new_value
-            counter += 1  # Adds to the counter
-    except ValueError:
-        pass  # Moves on if value is not present
-
-    return lst_new
-
-
 def get_xml_metadata(
     file: LifFile,
     save_xml: Optional[Path] = None,
-    summary: Optional[Path] = None,
 ) -> ET.Element:
     """
-    Extracts and returns the file metadata as a formatted XML tree. Provides options
-    to save it as an XML file to the specified file path, and/or to save a summary of
-    the
+    Extracts and returns the file metadata as a formatted XML tree. Provides option
+    to save it as an XML file to the specified file path
     """
 
     # Use readlif function to get XML metadata
@@ -76,9 +42,6 @@ def get_xml_metadata(
         ET.indent(xml_tree, "  ")  # Format with proper indentation
         xml_tree.write(xml_file, encoding="utf-8")  # Save
         logger.info(f"File metadata saved to {xml_file}")
-
-    if summary:
-        summary = str(summary)
 
     return xml_root
 
@@ -243,6 +206,8 @@ def rescale_to_bit_depth(
 Take out image stack-to-TIFF file section of function and save it as a function for use
 in parallelisation
 """
+
+
 def process_image_stack(
     image: LifImage,
     metadata: ET.Element,
@@ -359,6 +324,7 @@ def process_image_stack(
 
     return True
 
+
 def convert_lif_to_tiff(
     file: Path,
     root_folder: str,  # Name of the folder under which all raw LIF files are stored
@@ -442,7 +408,7 @@ def convert_lif_to_tiff(
             path_parts[p] = new_root_folder
             break  # First instance of such folder only
     # If specified folder not found by end of string, log as error
-    if not new_root_folder in path_parts:
+    if new_root_folder not in path_parts:
         logger.error(
             f"Subpath {sanitise(root_folder)} was not found in image path "
             f"{sanitise(str(file))}"
