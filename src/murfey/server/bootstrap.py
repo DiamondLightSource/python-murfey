@@ -44,7 +44,14 @@ log = logging.getLogger("murfey.server.bootstrap")
 
 def validate_url(url: str) -> bool:
     parsed_url = urlparse(url)
-    if parsed_url.scheme == "https" and parsed_url.netloc.startswith("pypi.org"):
+    if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
+        return True
+    else:
+        return False
+
+
+def validate_package(package: str) -> bool:
+    if re.match(r"^[\w\d_-]+$", package):
         return True
     else:
         return False
@@ -81,12 +88,15 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         url = match.group(3)
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
-    # Validate URL
-    url = f"https://pypi.org/simple/{package}"
-    if validate_url(url):
-        full_path_response = requests.get(url)  # Get response from PyPI
+    # Validate package and URL
+    if validate_package(package):
+        url = f"https://pypi.org/simple/{package}"
+        if validate_url(url):
+            full_path_response = requests.get(url)  # Get response from PyPI
+        else:
+            raise Exception("Could not validate PyPI URL")
     else:
-        raise ValueError("This is not a PyPI package")
+        raise ValueError("This is not a valid package name")
 
     # Get HTML content of response
     content: bytes = full_path_response.content  # In bytes
@@ -158,12 +168,15 @@ def get_pypi_file(package: str, filename: str):
 
         return response_bytes_new
 
-    # Validate URL
-    url = f"https://pypi.org/simple/{package}"
-    if validate_url(url):
-        full_path_response = requests.get(url)  # Get response from PyPI
+    # Validate package and URL
+    if validate_package(package):
+        url = f"https://pypi.org/simple/{package}"
+        if validate_url(url):
+            full_path_response = requests.get(url)  # Get response from PyPI
+        else:
+            raise Exception("Could not validate PyPI URL")
     else:
-        raise ValueError("This is not a PyPI package")
+        raise ValueError("This is not a valid package name")
 
     # Get filename in bytes
     filename_bytes = re.escape(filename.encode("latin1"))
