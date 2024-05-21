@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
-# import matplotlib.pyplot as plt
 import numpy as np
 from readlif.reader import LifFile  # , LifImage
 from tifffile import imwrite
@@ -133,8 +132,6 @@ def rescale_across_channel(
     # Check that bit depth is valid before processing even begins
     if not any(bit_depth == b for b in [8, 16, 32, 64]):
         raise_bit_depth_error(bit_depth)
-    else:
-        pass  # Proceed to rest of function
 
     # Use shorter variable names
     arr = array
@@ -158,12 +155,6 @@ def rescale_across_channel(
         arr = (arr / (b_up - b_lo)) * (
             2**bit_depth - 1
         )  # Ensure data points don't exceed bit depth (max bit is 2**n - 1)
-
-        # This step probably not needed
-        # Overwrite values that exceed current channel bit depth
-        # arr[arr >= (2**bit_depth - 1)] = (
-        #     2**bit_depth - 1
-        # )
 
         # Change bit depth back to initial one
         arr = change_bit_depth(arr, bit_depth)
@@ -193,10 +184,6 @@ def rescale_to_bit_depth(
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = (arr / (2**bit_init - 1)) * (2**bit_final - 1)
 
-    # This step probably not needed anymore
-    # Overwrite pixels that exceed channel bit depth
-    # arr[arr >= (2**bit_final - 1)] = 2**bit_final - 1
-
     # Change to correct unsigned integer type
     arr = change_bit_depth(arr, bit_final)
 
@@ -204,16 +191,16 @@ def rescale_to_bit_depth(
 
 
 def process_image_stack(
-    # image: LifImage,
     file: Path,
     scene_num: int,
     metadata: ET.Element,
     save_dir: Path,
 ):
     """
-    Takes a given LifImage object and its corresponding metadata, separates it into its
-    individual channels, rescales their intensity values to utilise the whole channel,
-    scales them down to 8-bit, then saves each channel's data as a separate image stack.
+    Takes the LIF file and its corresponding metadata and loads the relevant sub-stack,
+    with each channel as its own array. Rescales their intensity values to utilise the
+    whole channel, scales them down to 8-bit, then saves each each array as a separate
+    TIFF image stack.
     """
 
     # Load LIF file
@@ -273,12 +260,18 @@ def process_image_stack(
             arr, bit_depth = rescale_to_bit_depth(
                 array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
             )
-        else:
-            pass
+            bit_depth = 16  # Overwrite
 
         # Rescale intensity values for fluorescent channels
         if any(
-            color.lower() in key for key in ["red", "green"]
+            color.lower() in key
+            for key in [
+                "blue",
+                "cyan",
+                "green",
+                "magenta",
+                "red",
+            ]
         ):  # Eliminate case-sensitivity
             logger.info(f"Rescaling {color.lower()} channel across channel depth")
             arr = rescale_across_channel(
@@ -340,6 +333,7 @@ def process_image_stack(
 def convert_lif_to_tiff(
     file: Path,
     root_folder: str,  # Name of the folder under which all raw LIF files are stored
+    number_of_processes: int = 1,  # For parallel processing
 ):
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
@@ -368,6 +362,12 @@ def convert_lif_to_tiff(
     |           |_ metadata     <- Individual XML files saved here (not yet implemented)
     """
 
+    # Validate processor count input
+    num_procs = number_of_processes  # Use shorter phrase in script
+    if num_procs < 1:
+        logger.warning("Processor count set to zero or less; resetting to 1")
+        num_procs = 1
+
     # Folder for processed files with same structure as old one
     path_parts = list(file.parts)
     new_root_folder = "processed"
@@ -378,9 +378,9 @@ def convert_lif_to_tiff(
         if part == "/":
             path_parts[p] = ""
         # Rename designated raw folder to "processed"
-        if part.lower() == root_folder.lower():
+        if part.lower() == root_folder.lower():  # Remove case-sensitivity
             path_parts[p] = new_root_folder
-            break  # First instance of such folder only
+            break  # Do for first instance only
     # If specified folder not found by end of string, log as error
     if new_root_folder not in path_parts:
         logger.error(
@@ -424,8 +424,6 @@ def convert_lif_to_tiff(
             f"Metadata entries: {len(elem_list)} \n"
             f"Sub-images: {len(scene_list)}"
         )
-    else:
-        pass  # Carry on
 
     # Iterate through scenes
     logger.info("Examining sub-images")
@@ -438,20 +436,8 @@ def convert_lif_to_tiff(
             [file, i, elem_list[i], processed_dir]
         )
 
-    def _set_cpu_count() -> int:
-        # Leave one or two for other processes
-        cpu_count = mp.cpu_count() - 2
+    # Parallel process image stacks
+    with mp.Pool(processes=num_procs) as pool:
+        result = pool.starmap(process_image_stack, pool_args)
 
-        # Manually set to 1 CPU if <=2 CPUs available
-        if cpu_count <= 0:
-            cpu_count = 1
-        return cpu_count
-
-    cpu_count = _set_cpu_count()
-
-    with mp.Pool(processes=cpu_count) as pool:
-        results = pool.starmap(process_image_stack, pool_args)
-        pool.close()
-        pool.join()
-
-    return results
+    return result
