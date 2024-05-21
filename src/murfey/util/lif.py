@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple, Union
 from xml.etree import ElementTree as ET
 
 # import matplotlib.pyplot as plt
 import numpy as np
-from readlif.reader import LifFile
+from readlif.reader import LifFile, LifImage
 from tifffile import imwrite
 
 # Create logger object to output messages with
@@ -23,13 +23,47 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
+def replace_list_entry(
+        lst: list,
+        old_value: Union[str, int, float],
+        new_value: Union[str, int, float],
+        counts: Optional[int] = None,  # First n values to replace
+) -> list:
+    """
+    Searches the list for the first n occurrences of a given value and replaces them.
+    Returns the modified list.
+    """
+
+    # Initial settings
+    lst_new = lst.copy()  # Avoid overwriting
+    i = -1  # Initial offset
+    counter = 0  # Number of times a value has been found and replaced
+    if counts is None:  # If explicitly None, replaces everything
+        counts = len(lst)  # Sets it to span the list
+
+    try:
+        while counter < counts:
+            i = lst_new.index(
+                old_value,
+                i + 1,  # Saves old position to continue subsequent searches from
+            )
+            lst_new[i] = new_value
+            counter += 1  # Adds to the counter
+    except ValueError:
+        pass  # Moves on if value is not present
+
+    return lst_new
+
+
 def get_xml_metadata(
     file: LifFile,
     save_xml: Optional[Path] = None,
+    summary: Optional[Path] = None,
 ) -> ET.Element:
     """
-    Extracts and returns the file metadata as a formatted XML tree, and optionally
-    saves it as an XML file to the specified file path.
+    Extracts and returns the file metadata as a formatted XML tree. Provides options
+    to save it as an XML file to the specified file path, and/or to save a summary of
+    the
     """
 
     # Use readlif function to get XML metadata
@@ -42,6 +76,9 @@ def get_xml_metadata(
         ET.indent(xml_tree, "  ")  # Format with proper indentation
         xml_tree.write(xml_file, encoding="utf-8")  # Save
         logger.info(f"File metadata saved to {xml_file}")
+
+    if summary:
+        summary = str(summary)
 
     return xml_root
 
@@ -202,9 +239,129 @@ def rescale_to_bit_depth(
     return arr, bit_final
 
 
+"""
+Take out image stack-to-TIFF file section of function and save it as a function for use
+in parallelisation
+"""
+def process_image_stack(
+    image: LifImage,
+    metadata: ET.Element,
+    save_dir: Path,
+):
+
+    # Get name of sub-image
+    img_name = metadata.attrib["Name"]  # Get sub-image name
+    logger.info(f"Examining {img_name}")
+
+    # Load relevant metadata (channels, dimensions, timestamps etc.)
+    channels = metadata.findall(
+        "Data/Image/ImageDescription/Channels/ChannelDescription"
+    )
+    # Might be useful in the future
+    # timestamps = elem.find("Data/Image/TimeStampList")
+    # dimensions = elem.findall(
+    #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
+    # )
+
+    # Create save dirs for TIFF files and their metadata
+    img_dir = save_dir / img_name
+    img_xml_dir = img_dir / "metadata"
+    for folder in [img_dir, img_xml_dir]:
+        if not folder.exists():
+            folder.mkdir(parents=True)
+            logger.info(f"Created {folder}")
+        else:
+            logger.info(f"{folder} already exists")
+
+    # Parijat wants the images in 8-bit; scale down from 16-bit
+    # Save channels as individual TIFFs
+    for c in range(len(list(image.get_iter_c()))):
+        # Get color
+        color = channels[c].attrib["LUTName"]
+        logger.info(f"Examining the {color.lower()} channel")
+
+        # Extract image data to array
+        logger.info("Loading image stack")
+        arr: np.ndarray = []  # Array to store frames in
+        # Iterate over slices
+        for z in range(len(list(image.get_iter_z()))):
+            frame = image.get_frame(z=z, t=0, c=c)  # PIL object; array-like
+            arr.append(frame)
+        arr = np.array(arr)  # Make independent copy of this array
+
+        # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
+        bit_depth = image.bit_depth[c]  # Initial bit depth
+        if not any(bit_depth == b for b in [8, 16, 32, 64]):
+            logger.info("Bit depth non-standard, converting to 16-bit")
+            arr, bit_depth = rescale_to_bit_depth(
+                array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
+            )
+        else:
+            pass
+
+        # Rescale intensity values for fluorescent channels
+        if any(
+            color.lower() in key for key in ["red", "green"]
+        ):  # Eliminate case-sensitivity
+            logger.info(f"Rescaling {color.lower()} channel across channel depth")
+            arr = rescale_across_channel(
+                array=arr,
+                bit_depth=bit_depth,
+                percentile_range=(0.5, 99.5),
+                round_to=16,
+            )
+
+        # Convert to 8-bit
+        logger.info("Converting to 8-bit image")
+        arr, bit_depth = rescale_to_bit_depth(
+            arr, initial_bit_depth=bit_depth, target_bit_depth=8
+        )
+
+        # Get x, y, and z scales
+        # Get resolution (pixels per um)
+        x_res = image.scale[0]
+        y_res = image.scale[1]
+
+        # Might be used in future versions
+        # Get pixel size (um per pixel)
+        # x_scale = 1 / x_res
+        # y_scale = 1 / y_res
+
+        # Check that depth axis exists
+        if not image.scale[2]:
+            z_res: float = 0
+            z_scale: float = 0  # Avoid divide by zero errors
+        else:
+            z_res = image.scale[2]  # Pixels per um
+            z_scale = 1 / z_res  # um per pixel
+
+        # Generate slice labels
+        image_labels = [f"{f}" for f in range(len(list(image.get_iter_z())))]
+
+        # Save as a greyscale TIFF
+        save_name = img_dir.joinpath(color + ".tiff")
+        logger.info(f"Saving {color.lower()} image as {save_name}")
+        imwrite(
+            save_name,
+            arr,
+            imagej=True,  # ImageJ comppatible
+            photometric="minisblack",  # Grayscale image
+            shape=np.shape(arr),
+            dtype=arr.dtype,
+            resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
+            metadata={
+                "spacing": z_scale,
+                "unit": "micron",
+                "axes": "ZYX",
+                "Labels": image_labels,
+            },
+        )
+
+    return True
+
 def convert_lif_to_tiff(
     file: Path,
-    root_folder: str,  # The name of the folder to be treated as the root
+    root_folder: str,  # Name of the folder under which all raw LIF files are stored
 ):
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
@@ -212,8 +369,7 @@ def convert_lif_to_tiff(
     image stack. It uses information stored in the XML metadata to name the individual
     image stacks.
 
-    FOLDER STRUCTURE
-    ================
+    FOLDER STRUCTURE:
     Here is the folder structure of a typical DLS eBIC experiment session, with the
     folders created as part of the workflow shown as well.
 
@@ -235,44 +391,69 @@ def convert_lif_to_tiff(
     """
 
     # Set up new directories
-    # Identify the root directory
-    root_parts = []
-    for p in file.parts:  # Iterate through parts until hitting root folder
-        if p.lower() == root_folder.lower():  # Eliminate case-sensitivity
-            break
-        root_parts.append(p)
-    else:
+
+    """
+    Old code here
+    """
+    # # Identify the root directory
+    # root_parts = []
+    # for p in file.parts:  # Iterate through parts until hitting root folder
+    #     if p.lower() == raw_folder.lower():  # Eliminate case-sensitivity
+    #         break  # Break when hitting root folder
+    #     root_parts.append(p)
+    # else:
+    #     logger.error(
+    #         f"Subpath {sanitise(raw_folder)} was not found in image path {sanitise(str(file))}"
+    #     )
+    #     return None
+    # root_dir = Path("/".join(root_parts))  # Session ID folder
+
+    # # Get remaining path to file from root folder
+    # child_parts = []  # Path from the root directory to the file
+    # for p in reversed(file.parts):
+    #     # Append everything up until the root directory
+    #     if p == raw_folder:
+    #         break
+    #     child_parts.append(p)
+    # else:
+    #     logger.error(
+    #         f"Subpath {sanitise(raw_folder)} was not found in image path {sanitise(str(file))}"
+    #     )
+    # child_path = Path(
+    #     "/".join(reversed(child_parts))
+    # )  # Reverse it to get the right order
+
+    # # Create directory to store processed files in
+    # process_dir = (
+    #     root_dir / "processed" / child_path.stem
+    # )  # Replace root folder with "processed"
+
+    # Save files in same structure under a different folder name
+    path_parts = list(file.parts)
+    new_root_folder = "processed"
+    # Rewrite string in-place
+    for p in range(len(path_parts)):
+        part = path_parts[p]
+        # Omit initial "/" in Linux file systems for subsequent rejoining
+        if part == "/":
+            path_parts[p] = ""
+        # Rename designated raw folder to "processed"
+        if part.lower() == root_folder.lower():
+            path_parts[p] = new_root_folder
+            break  # First instance of such folder only
+    # If specified folder not found by end of string, log as error
+    if not new_root_folder in path_parts:
         logger.error(
-            f"Subpath {sanitise(root_folder)} was not found in image path {sanitise(str(file))}"
+            f"Subpath {sanitise(root_folder)} was not found in image path "
+            f"{sanitise(str(file))}"
         )
-        return None
-    root_dir = Path("/".join(root_parts))  # Session ID folder
+    processed_dir = Path("/".join(path_parts)).parent / file.stem
 
-    # Get remaining path to file from root folder
-    child_parts = []  # Path from the root directory to the file
-    for p in reversed(file.parts):
-        # Append everything up until the root directory
-        if p == root_folder:
-            break
-        child_parts.append(p)
-    else:
-        logger.error(
-            f"Subpath {sanitise(root_folder)} was not found in image path {sanitise(str(file))}"
-        )
-    child_path = Path(
-        "/".join(reversed(child_parts))
-    )  # Reverse it to get the right order
-
-    # Create directory to store processed files in
-    process_dir = (
-        root_dir / "processed" / child_path.stem
-    )  # Replace root folder with "processed"
-
-    # Save raw XML metadata here
+    # Folder for raw XML metadata
     raw_xml_dir = file.parent / "metadata"
 
     # Create new folders if not already present
-    for folder in [process_dir, raw_xml_dir]:
+    for folder in [processed_dir, raw_xml_dir]:
         if not folder.exists():
             folder.mkdir(parents=True)
             logger.info(f"Created {folder}")
@@ -309,115 +490,124 @@ def convert_lif_to_tiff(
     logger.info("Examining sub-images")
     for i in range(len(scene_list)):
 
-        # Load image
-        img = lif_file.get_image(i)  # Set sub-image
-
         # Get name of sub-image
         elem = elem_list[i]  # Select corresponding element
-        img_name = elem.attrib["Name"]  # Get sub-image name
-        logger.info(f"Examining {img_name}")
 
-        # Load relevant metadata (channels, dimensions, timestamps etc.)
-        channels = elem.findall(
-            "Data/Image/ImageDescription/Channels/ChannelDescription"
+        process_image_stack(
+            image=lif_file.get_image(i),
+            metadata=elem,
+            save_dir=processed_dir,
         )
-        # Might be useful in the future
-        # timestamps = elem.find("Data/Image/TimeStampList")
-        # dimensions = elem.findall(
-        #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
-        # )
 
-        # Create save dirs for TIFF files and their metadata
-        img_dir = process_dir / img_name
-        img_xml_dir = img_dir / "metadata"
-        for folder in [img_dir, img_xml_dir]:
-            if not folder.exists():
-                folder.mkdir(parents=True)
-                logger.info(f"Created {folder}")
-            else:
-                logger.info(f"{folder} already exists")
+        """
+        OLD CODE BELOW
+        """
+    #     # Load image
+    #     img = lif_file.get_image(i)  # Set sub-image
+    #     img_name = elem.attrib["Name"]  # Get sub-image name
+    #     logger.info(f"Examining {img_name}")
 
-        # Parijat wants the images in 8-bit; scale down from 16-bit
-        # Save channels as individual TIFFs
-        for c in range(len(list(img.get_iter_c()))):
-            # Get color
-            color = channels[c].attrib["LUTName"]
-            logger.info(f"Examining the {color.lower()} channel")
+    #     # Load relevant metadata (channels, dimensions, timestamps etc.)
+    #     channels = elem.findall(
+    #         "Data/Image/ImageDescription/Channels/ChannelDescription"
+    #     )
+    #     # Might be useful in the future
+    #     # timestamps = elem.find("Data/Image/TimeStampList")
+    #     # dimensions = elem.findall(
+    #     #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
+    #     # )
 
-            # Extract image data to array
-            logger.info("Loading image stack")
-            arr: np.ndarray = []  # Array to store frames in
-            # Iterate over slices
-            for z in range(len(list(img.get_iter_z()))):
-                frame = img.get_frame(z=z, t=0, c=c)  # PIL object; array-like
-                arr.append(frame)
-            arr = np.array(arr)  # Make independent copy of this array
+    #     # Create save dirs for TIFF files and their metadata
+    #     img_dir = process_dir / img_name
+    #     img_xml_dir = img_dir / "metadata"
+    #     for folder in [img_dir, img_xml_dir]:
+    #         if not folder.exists():
+    #             folder.mkdir(parents=True)
+    #             logger.info(f"Created {folder}")
+    #         else:
+    #             logger.info(f"{folder} already exists")
 
-            # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
-            bit_depth = img.bit_depth[c]  # Initial bit depth
-            if not any(bit_depth == b for b in [8, 16, 32, 64]):
-                logger.info("Bit depth non-standard, converting to 16-bit")
-                arr, bit_depth = rescale_to_bit_depth(
-                    array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
-                )
-            else:
-                pass
+    #     # Parijat wants the images in 8-bit; scale down from 16-bit
+    #     # Save channels as individual TIFFs
+    #     for c in range(len(list(img.get_iter_c()))):
+    #         # Get color
+    #         color = channels[c].attrib["LUTName"]
+    #         logger.info(f"Examining the {color.lower()} channel")
 
-            # Rescale intensity values for fluorescent channels
-            if any(
-                color.lower() in key for key in ["red", "green"]
-            ):  # Eliminate case-sensitivity
-                logger.info(f"Rescaling {color.lower()} channel across channel depth")
-                arr = rescale_across_channel(
-                    array=arr,
-                    bit_depth=bit_depth,
-                    percentile_range=(0.5, 99.5),
-                    round_to=16,
-                )
+    #         # Extract image data to array
+    #         logger.info("Loading image stack")
+    #         arr: np.ndarray = []  # Array to store frames in
+    #         # Iterate over slices
+    #         for z in range(len(list(img.get_iter_z()))):
+    #             frame = img.get_frame(z=z, t=0, c=c)  # PIL object; array-like
+    #             arr.append(frame)
+    #         arr = np.array(arr)  # Make independent copy of this array
 
-            # Convert to 8-bit
-            logger.info("Converting to 8-bit image")
-            arr, bit_depth = rescale_to_bit_depth(
-                arr, initial_bit_depth=bit_depth, target_bit_depth=8
-            )
+    #         # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
+    #         bit_depth = img.bit_depth[c]  # Initial bit depth
+    #         if not any(bit_depth == b for b in [8, 16, 32, 64]):
+    #             logger.info("Bit depth non-standard, converting to 16-bit")
+    #             arr, bit_depth = rescale_to_bit_depth(
+    #                 array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
+    #             )
+    #         else:
+    #             pass
 
-            # Get x, y, and z scales
-            # Get resolution (pixels per um)
-            x_res = img.scale[0]
-            y_res = img.scale[1]
+    #         # Rescale intensity values for fluorescent channels
+    #         if any(
+    #             color.lower() in key for key in ["red", "green"]
+    #         ):  # Eliminate case-sensitivity
+    #             logger.info(f"Rescaling {color.lower()} channel across channel depth")
+    #             arr = rescale_across_channel(
+    #                 array=arr,
+    #                 bit_depth=bit_depth,
+    #                 percentile_range=(0.5, 99.5),
+    #                 round_to=16,
+    #             )
 
-            # Might be used in future versions
-            # Get pixel size (um per pixel)
-            # x_scale = 1 / x_res
-            # y_scale = 1 / y_res
+    #         # Convert to 8-bit
+    #         logger.info("Converting to 8-bit image")
+    #         arr, bit_depth = rescale_to_bit_depth(
+    #             arr, initial_bit_depth=bit_depth, target_bit_depth=8
+    #         )
 
-            # Check that depth axis exists
-            if not img.scale[2]:
-                z_res: float = 0
-                z_scale: float = 0  # Avoid divide by zero errors
-            else:
-                z_res = img.scale[2]  # Pixels per um
-                z_scale = 1 / z_res  # um per pixel
+    #         # Get x, y, and z scales
+    #         # Get resolution (pixels per um)
+    #         x_res = img.scale[0]
+    #         y_res = img.scale[1]
 
-            # Generate slice labels
-            image_labels = [f"{f}" for f in range(len(list(img.get_iter_z())))]
+    #         # Might be used in future versions
+    #         # Get pixel size (um per pixel)
+    #         # x_scale = 1 / x_res
+    #         # y_scale = 1 / y_res
 
-            # Save as a greyscale TIFF
-            save_name = img_dir.joinpath(color + ".tiff")
-            logger.info(f"Saving {color.lower()} image as {save_name}")
-            imwrite(
-                save_name,
-                arr,
-                imagej=True,  # ImageJ comppatible
-                photometric="minisblack",  # Grayscale image
-                shape=np.shape(arr),
-                dtype=arr.dtype,
-                resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
-                metadata={
-                    "spacing": z_scale,
-                    "unit": "micron",
-                    "axes": "ZYX",
-                    "Labels": image_labels,
-                },
-            )
-    return None
+    #         # Check that depth axis exists
+    #         if not img.scale[2]:
+    #             z_res: float = 0
+    #             z_scale: float = 0  # Avoid divide by zero errors
+    #         else:
+    #             z_res = img.scale[2]  # Pixels per um
+    #             z_scale = 1 / z_res  # um per pixel
+
+    #         # Generate slice labels
+    #         image_labels = [f"{f}" for f in range(len(list(img.get_iter_z())))]
+
+    #         # Save as a greyscale TIFF
+    #         save_name = img_dir.joinpath(color + ".tiff")
+    #         logger.info(f"Saving {color.lower()} image as {save_name}")
+    #         imwrite(
+    #             save_name,
+    #             arr,
+    #             imagej=True,  # ImageJ comppatible
+    #             photometric="minisblack",  # Grayscale image
+    #             shape=np.shape(arr),
+    #             dtype=arr.dtype,
+    #             resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
+    #             metadata={
+    #                 "spacing": z_scale,
+    #                 "unit": "micron",
+    #                 "axes": "ZYX",
+    #                 "Labels": image_labels,
+    #             },
+    #         )
+    # return True
