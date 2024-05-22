@@ -17,8 +17,6 @@ import functools
 import logging
 import random
 import re
-from pathlib import Path
-from typing import List
 from urllib.parse import urlparse
 
 import packaging.version
@@ -46,20 +44,21 @@ log = logging.getLogger("murfey.server.bootstrap")
 
 approved_packages = [pkg.lower() for pkg in approved_packages]
 
-# def _validate_url(url: str) -> bool:
-#     parsed_url = urlparse(url)
-#     if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
-#         return True
-#     else:
-#         return False
+
+def _validate_url(url: str) -> bool:
+    parsed_url = urlparse(url)
+    if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
+        return True
+    else:
+        return False
 
 
-# def _validate_package_name(package: str) -> bool:
-#     # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
-#     if re.match(r"^[a-z0-9\-\_]+$", package) and len(package) < 40:
-#         return True
-#     else:
-#         return False
+def _validate_package_name(package: str) -> bool:
+    # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
+    if re.match(r"^[a-z0-9\-\_]+$", package) and len(package) < 40:
+        return True
+    else:
+        return False
 
 
 @pypi.get("/", response_class=Response)
