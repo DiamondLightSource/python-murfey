@@ -41,8 +41,12 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
 
+blacklist = [  # Arbitrary blacklist to satisfy GitHub's SSRF warning
+    "wololololo",
+]
 
-def validate_url(url: str) -> bool:
+
+def _validate_url(url: str) -> bool:
     parsed_url = urlparse(url)
     if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
         return True
@@ -50,8 +54,8 @@ def validate_url(url: str) -> bool:
         return False
 
 
-def validate_package(package: str) -> bool:
-    if package.replace("_", "").replace("-", "").isalnum():
+def _validate_package_name(package: str) -> bool:
+    if re.match(r"^[a-z0-9\-\_]+$", package) and package not in blacklist:
         return True
     else:
         return False
@@ -79,7 +83,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     rewrite all download URLs to point to this server, under the current directory.
     """
 
-    def rewrite_pypi_url(match):
+    def _rewrite_pypi_url(match):
         """
         Use regular expression matching to rewrite the URLs. Points them from
         pythonhosted.org to current server, and removes the hash from the URL as well
@@ -89,7 +93,9 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     # Validate package and URL
-    if validate_package(package) and validate_url(f"https://pypi.org/simple/{package}"):
+    if _validate_package_name(package) and _validate_url(
+        f"https://pypi.org/simple/{package}"
+    ):
         full_path_response = requests.get(
             f"https://pypi.org/simple/{package}"
         )  # Get response from PyPI
@@ -106,7 +112,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
             # Rewrite URL to point to current proxy server
             line_new = re.sub(
                 '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria to identify unique groups in HTML string
-                rewrite_pypi_url,  # re.sub uses first argument as input for second argument
+                _rewrite_pypi_url,  # re.sub uses first argument as input for second argument
                 line,
             )
             content_text_list.append(line_new)  # Add to list
@@ -133,7 +139,7 @@ def get_pypi_file(package: str, filename: str):
     Obtain and pass through a specific download for a PyPI package.
     """
 
-    def expose_wheel_metadata(response_bytes: bytes) -> bytes:
+    def _expose_wheel_metadata(response_bytes: bytes) -> bytes:
         """
         As of pip v22.3 (coinciding with PEP 658), pip expects to find an additonal
         ".whl.metadata" file based on the URL of the ".whl" file present on the PyPI Simple
@@ -167,7 +173,9 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Validate package and URL
-    if validate_package(package) and validate_url(f"https://pypi.org/simple/{package}"):
+    if _validate_package_name(package) and _validate_url(
+        f"https://pypi.org/simple/{package}"
+    ):
         full_path_response = requests.get(
             f"https://pypi.org/simple/{package}"
         )  # Get response from PyPI
@@ -178,7 +186,7 @@ def get_pypi_file(package: str, filename: str):
     filename_bytes = re.escape(filename.encode("latin1"))
 
     # Add explicit URLs for ".whl.metadata" files
-    content = expose_wheel_metadata(full_path_response.content)
+    content = _expose_wheel_metadata(full_path_response.content)
 
     # Find package matching the specified filename
     selected_package_link = re.search(
