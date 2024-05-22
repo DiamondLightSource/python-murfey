@@ -41,9 +41,9 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
 
-blacklist = [  # Arbitrary blacklist to satisfy GitHub's SSRF warning
-    "wololololo",
-]
+
+def _sanitise(input_str: str) -> str:
+    return input_str.replace("\r\n", "").replace("\n", "")
 
 
 def _validate_url(url: str) -> bool:
@@ -55,7 +55,8 @@ def _validate_url(url: str) -> bool:
 
 
 def _validate_package_name(package: str) -> bool:
-    if re.match(r"^[a-z0-9\-\_]+$", package) and package not in blacklist:
+    # Check that it only contains alphanumerics, "_", or "-"
+    if re.match(r"^[a-z0-9\-\_]+$", package):
         return True
     else:
         return False
@@ -93,12 +94,13 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     # Validate package and URL
-    if _validate_package_name(package) and _validate_url(
-        f"https://pypi.org/simple/{package}"
-    ):
-        full_path_response = requests.get(
-            f"https://pypi.org/simple/{package}"
-        )  # Get response from PyPI
+    package = _sanitise(package)
+    if _validate_package_name(package):
+        url = f"https://pypi.org/simple/{package}"
+        if _validate_url(url):
+            full_path_response = requests.get(url)  # Get response from PyPI
+        else:
+            raise ValueError("This is not a valid URL")
     else:
         raise ValueError("This is not a valid package name")
 
@@ -173,12 +175,13 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Validate package and URL
-    if _validate_package_name(package) and _validate_url(
-        f"https://pypi.org/simple/{package}"
-    ):
-        full_path_response = requests.get(
-            f"https://pypi.org/simple/{package}"
-        )  # Get response from PyPI
+    package = _sanitise(package)
+    if _validate_package_name(package):
+        url = f"https://pypi.org/simple/{package}"
+        if _validate_url(url):
+            full_path_response = requests.get(url)  # Get response from PyPI
+        else:
+            raise ValueError("This is not a valid URL")
     else:
         raise ValueError("This is not a valid package name")
 
