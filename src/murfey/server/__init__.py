@@ -89,7 +89,7 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
-def santise_path(in_path: Path) -> Path:
+def sanitise_path(in_path: Path) -> Path:
     return Path("/".join(secure_filename(p) for p in in_path.parts))
 
 

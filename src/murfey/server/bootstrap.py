@@ -24,7 +24,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
 
-from murfey.server import get_machine_config, respond_with_template
+from murfey.server import get_machine_config, respond_with_template, sanitise
 
 tag = {
     "name": "bootstrap",
@@ -42,10 +42,6 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 log = logging.getLogger("murfey.server.bootstrap")
 
 
-def _sanitise(input_str: str) -> str:
-    return input_str.replace("\r\n", "").replace("\n", "")
-
-
 def _validate_url(url: str) -> bool:
     parsed_url = urlparse(url)
     if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
@@ -55,8 +51,8 @@ def _validate_url(url: str) -> bool:
 
 
 def _validate_package_name(package: str) -> bool:
-    # Check that it only contains alphanumerics, "_", or "-"
-    if re.match(r"^[a-z0-9\-\_]+$", package):
+    # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
+    if re.match(r"^[a-z0-9\-\_]+$", package) and len(package) < 40:
         return True
     else:
         return False
@@ -94,7 +90,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     # Validate package and URL
-    package = _sanitise(package)
+    package = sanitise(package)
     if _validate_package_name(package):
         url = f"https://pypi.org/simple/{package}"
         if _validate_url(url):
@@ -175,7 +171,7 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Validate package and URL
-    package = _sanitise(package)
+    package = sanitise(package)
     if _validate_package_name(package):
         url = f"https://pypi.org/simple/{package}"
         if _validate_url(url):

@@ -43,6 +43,7 @@ from murfey.server import (
     get_machine_config,
     get_microscope,
     get_tomo_preproc_params,
+    sanitise,
     templates,
 )
 from murfey.server.config import from_file, settings
@@ -108,10 +109,6 @@ log = logging.getLogger("murfey.server.api")
 machine_config = get_machine_config()
 
 router = APIRouter()
-
-
-def sanitise(in_string: str) -> str:
-    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 # This will be the homepage for a given microscope.
