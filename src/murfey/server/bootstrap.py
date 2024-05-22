@@ -17,6 +17,8 @@ import functools
 import logging
 import random
 import re
+from pathlib import Path
+from typing import List
 from urllib.parse import urlparse
 
 import packaging.version
@@ -25,6 +27,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
 
 from murfey.server import get_machine_config, respond_with_template, sanitise
+from murfey.server.whitelist import approved_packages
 
 tag = {
     "name": "bootstrap",
@@ -41,21 +44,22 @@ cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
 
+approved_packages = [pkg.lower() for pkg in approved_packages]
 
-def _validate_url(url: str) -> bool:
-    parsed_url = urlparse(url)
-    if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
-        return True
-    else:
-        return False
+# def _validate_url(url: str) -> bool:
+#     parsed_url = urlparse(url)
+#     if parsed_url.scheme == "https" and parsed_url.hostname == "pypi.org":
+#         return True
+#     else:
+#         return False
 
 
-def _validate_package_name(package: str) -> bool:
-    # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
-    if re.match(r"^[a-z0-9\-\_]+$", package) and len(package) < 40:
-        return True
-    else:
-        return False
+# def _validate_package_name(package: str) -> bool:
+#     # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
+#     if re.match(r"^[a-z0-9\-\_]+$", package) and len(package) < 40:
+#         return True
+#     else:
+#         return False
 
 
 @pypi.get("/", response_class=Response)
@@ -90,15 +94,11 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
 
     # Validate package and URL
-    package = sanitise(package)
-    if _validate_package_name(package):
+    if package.lower() in approved_packages:
         url = f"https://pypi.org/simple/{package}"
-        if _validate_url(url):
-            full_path_response = requests.get(url)  # Get response from PyPI
-        else:
-            raise ValueError("This is not a valid URL")
+        full_path_response = requests.get(url)
     else:
-        raise ValueError("This is not a valid package name")
+        raise ValueError(f"{sanitise(package)} is not a valid package name")
 
     # Get HTML content of response
     content: bytes = full_path_response.content  # In bytes
@@ -171,15 +171,11 @@ def get_pypi_file(package: str, filename: str):
         return response_bytes_new
 
     # Validate package and URL
-    package = sanitise(package)
-    if _validate_package_name(package):
+    if package.lower() in approved_packages:
         url = f"https://pypi.org/simple/{package}"
-        if _validate_url(url):
-            full_path_response = requests.get(url)  # Get response from PyPI
-        else:
-            raise ValueError("This is not a valid URL")
+        full_path_response = requests.get(url)  # Get response from PyPI
     else:
-        raise ValueError("This is not a valid package name")
+        raise ValueError(f"{sanitise(package)} is not a valid package name")
 
     # Get filename in bytes
     filename_bytes = re.escape(filename.encode("latin1"))
