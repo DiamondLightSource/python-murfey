@@ -102,6 +102,7 @@ def record_failure(
                         or f"dlq.{machine_config.feedback_queue}"
                     )
                 _transport_object.send(record_queue, args[0], new_connection=True)
+            return None
 
     return wrapper
 
