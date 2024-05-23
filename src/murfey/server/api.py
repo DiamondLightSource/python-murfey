@@ -1630,6 +1630,8 @@ async def gather_upstream_tiffs(visit_name: str):
     for tiff_dir in tiff_dirs:
         for f in tiff_dir.glob("**/*.tiff"):
             upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+        for f in tiff_dir.glob("**/*.tif"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
     return upstream_tiff_paths
 
 
