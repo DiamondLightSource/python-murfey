@@ -1694,6 +1694,115 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
 
 
 @record_failure
+def _flush_spa_preprocessing(message: dict):
+    session_id = (
+        murfey_db.exec(
+            select(db.ClientEnvironment).where(
+                db.ClientEnvironment.client_id == message["client_id"]
+            )
+        )
+        .one()
+        .session_id
+    )
+    stashed_files = murfey_db.exec(
+        select(db.PreprocessStash)
+        .where(db.PreprocessStash.session_id == session_id)
+        .where(db.PreprocessStash.tag == message["tag"])
+    ).all()
+    if not stashed_files:
+        return None
+    machine_config = get_machine_config()
+    collected_ids = murfey_db.exec(
+        select(
+            db.DataCollectionGroup,
+            db.DataCollection,
+            db.ProcessingJob,
+            db.AutoProcProgram,
+        )
+        .where(db.DataCollectionGroup.session_id == session_id)
+        .where(db.DataCollectionGroup.tag == message["tag"])
+        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+        .where(db.ProcessingJob.recipe == "em-spa-preprocess")
+    ).one()
+    params = murfey_db.exec(
+        select(db.SPARelionParameters, db.SPAFeedbackParameters)
+        .where(db.SPARelionParameters.pj_id == collected_ids[2].id)
+        .where(db.SPAFeedbackParameters.pj_id == db.SPARelionParameters.pj_id)
+    ).one()
+    proc_params = params[0]
+    feedback_params = params[1]
+    if not proc_params:
+        logger.warning(
+            f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
+        )
+        raise ValueError(
+            "No processing parameters were foudn in the database when flushing SPA preprocessing"
+        )
+
+    murfey_ids = _murfey_id(
+        collected_ids[3].id,
+        murfey_db,
+        number=2 * len(stashed_files),
+        close=False,
+    )
+    if feedback_params.picker_murfey_id is None:
+        feedback_params.picker_murfey_id = murfey_ids[1]
+        murfey_db.add(feedback_params)
+
+    for i, f in enumerate(stashed_files):
+        mrcp = Path(f.mrc_out)
+        ppath = Path(f.file_path)
+        if not mrcp.parent.exists():
+            mrcp.parent.mkdir(parents=True)
+        movie = db.Movie(
+            murfey_id=murfey_ids[2 * i],
+            path=f.file_path,
+            image_number=f.image_number,
+            tag=f.tag,
+            foil_hole_id=f.foil_hole_id,
+        )
+        murfey_db.add(movie)
+        zocalo_message = {
+            "recipes": ["em-spa-preprocess"],
+            "parameters": {
+                "feedback_queue": machine_config.feedback_queue,
+                "node_creator_queue": machine_config.node_creator_queue,
+                "dcid": collected_ids[1].id,
+                "kv": proc_params.voltage,
+                "autoproc_program_id": collected_ids[3].id,
+                "movie": f.file_path,
+                "mrc_out": f.mrc_out,
+                "pix_size": proc_params.angpix,
+                "image_number": f.image_number,
+                "microscope": get_microscope(),
+                "mc_uuid": murfey_ids[2 * i],
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": proc_params.gain_ref,
+                "picker_uuid": murfey_ids[2 * i + 1],
+                "session_id": session_id,
+                "particle_diameter": proc_params.particle_diameter or 0,
+                "fm_int_file": f.eer_fractionation_file,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+            },
+        }
+        if _transport_object:
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+            murfey_db.delete(f)
+        else:
+            logger.error(
+                f"Pre-processing was requested for {ppath.name} but no Zocalo transport object was found"
+            )
+    murfey_db.commit()
+    murfey_db.close()
+    return None
+
+
+@record_failure
 def _flush_tomography_preprocessing(message: dict):
     machine_config = get_machine_config()
     session_id = (
@@ -2396,112 +2505,13 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_spa_preprocess":
-            session_id = (
-                murfey_db.exec(
-                    select(db.ClientEnvironment).where(
-                        db.ClientEnvironment.client_id == message["client_id"]
-                    )
-                )
-                .one()
-                .session_id
+            thread = Thread(
+                target=_flush_spa_preprocessing,
+                args=message,
+                name="spa_flush",
+                daemon=True,
             )
-            stashed_files = murfey_db.exec(
-                select(db.PreprocessStash)
-                .where(db.PreprocessStash.session_id == session_id)
-                .where(db.PreprocessStash.tag == message["tag"])
-            ).all()
-            if not stashed_files:
-                if _transport_object:
-                    _transport_object.transport.ack(header)
-                return None
-            machine_config = get_machine_config()
-            collected_ids = murfey_db.exec(
-                select(
-                    db.DataCollectionGroup,
-                    db.DataCollection,
-                    db.ProcessingJob,
-                    db.AutoProcProgram,
-                )
-                .where(db.DataCollectionGroup.session_id == session_id)
-                .where(db.DataCollectionGroup.tag == message["tag"])
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-                .where(db.ProcessingJob.recipe == "em-spa-preprocess")
-            ).one()
-            params = murfey_db.exec(
-                select(db.SPARelionParameters, db.SPAFeedbackParameters)
-                .where(db.SPARelionParameters.pj_id == collected_ids[2].id)
-                .where(db.SPAFeedbackParameters.pj_id == db.SPARelionParameters.pj_id)
-            ).one()
-            proc_params = params[0]
-            feedback_params = params[1]
-            if not proc_params:
-                logger.warning(
-                    f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
-                )
-                if _transport_object:
-                    _transport_object.transport.nack(header)
-                return None
-
-            murfey_ids = _murfey_id(
-                collected_ids[3].id,
-                murfey_db,
-                number=2 * len(stashed_files),
-                close=False,
-            )
-            if feedback_params.picker_murfey_id is None:
-                feedback_params.picker_murfey_id = murfey_ids[1]
-                murfey_db.add(feedback_params)
-
-            for i, f in enumerate(stashed_files):
-                mrcp = Path(f.mrc_out)
-                ppath = Path(f.file_path)
-                if not mrcp.parent.exists():
-                    mrcp.parent.mkdir(parents=True)
-                movie = db.Movie(
-                    murfey_id=murfey_ids[2 * i],
-                    path=f.file_path,
-                    image_number=f.image_number,
-                    tag=f.tag,
-                    foil_hole_id=f.foil_hole_id,
-                )
-                murfey_db.add(movie)
-                zocalo_message = {
-                    "recipes": ["em-spa-preprocess"],
-                    "parameters": {
-                        "feedback_queue": machine_config.feedback_queue,
-                        "node_creator_queue": machine_config.node_creator_queue,
-                        "dcid": collected_ids[1].id,
-                        "kv": proc_params.voltage,
-                        "autoproc_program_id": collected_ids[3].id,
-                        "movie": f.file_path,
-                        "mrc_out": f.mrc_out,
-                        "pix_size": proc_params.angpix,
-                        "image_number": f.image_number,
-                        "microscope": get_microscope(),
-                        "mc_uuid": murfey_ids[2 * i],
-                        "ft_bin": proc_params.motion_corr_binning,
-                        "fm_dose": proc_params.dose_per_frame,
-                        "gain_ref": proc_params.gain_ref,
-                        "picker_uuid": murfey_ids[2 * i + 1],
-                        "session_id": session_id,
-                        "particle_diameter": proc_params.particle_diameter or 0,
-                        "fm_int_file": f.eer_fractionation_file,
-                        "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                    },
-                }
-                if _transport_object:
-                    _transport_object.send(
-                        "processing_recipe", zocalo_message, new_connection=True
-                    )
-                    murfey_db.delete(f)
-                else:
-                    logger.error(
-                        f"Pre-processing was requested for {ppath.name} but no Zocalo transport object was found"
-                    )
-            murfey_db.commit()
-            murfey_db.close()
+            thread.start()
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
