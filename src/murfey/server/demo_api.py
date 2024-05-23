@@ -847,17 +847,20 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_id = (
-        db.exec(
-            select(FoilHole, GridSquare)
-            .where(FoilHole.name == proc_file.foil_hole_id)
-            .where(FoilHole.session_id == session_id)
-            .where(GridSquare.id == FoilHole.grid_square_id)
-            .where(GridSquare.tag == proc_file.tag)
+    try:
+        foil_hole_id = (
+            db.exec(
+                select(FoilHole, GridSquare)
+                .where(FoilHole.name == proc_file.foil_hole_id)
+                .where(FoilHole.session_id == session_id)
+                .where(GridSquare.id == FoilHole.grid_square_id)
+                .where(GridSquare.tag == proc_file.tag)
+            )
+            .one()[0]
+            .id
         )
-        .one()[0]
-        .id
-    )
+    except Exception:
+        foil_hole_id = None
     if proc_params:
         session_id = (
             db.exec(
