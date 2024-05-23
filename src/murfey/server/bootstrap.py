@@ -17,7 +17,7 @@ import functools
 import logging
 import random
 import re
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 import packaging.version
 import requests
@@ -43,25 +43,32 @@ log = logging.getLogger("murfey.server.bootstrap")
 
 
 def _validate_package_name(package: str) -> bool:
-    # Check that it only contains alphanumerics, "_", or "-", and isn't excessively long
-    if re.match(r"^[a-z0-9\-\_]+$", package):
+    """
+    Check that a package name follows PEP 503 naming conventions, containing only
+    alphanumerics, "_", "-", or "." characters
+    """
+    if re.match(r"^[a-z0-9\-\_\.]+$", package):
         return True
     else:
         return False
 
 
 def _get_full_path_response(package: str) -> requests.Response:
-    # Sanitise string
-    package_clean = quote_plus(package)
-    print(f"Cleaned package: {package_clean}")
+    # Validate package name
+    if _validate_package_name(package):
+        # Sanitise and normalise package name (PEP 503)
+        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()))
 
-    # Validation checks
-    if _validate_package_name(package_clean):
+        # Get HTTP response
         url = f"https://pypi.org/simple/{package_clean}"
-        print(f"URL: {url}")
-        return requests.get(url)
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            return response
+        else:
+            raise HTTPException(status_code=response.status_code)
     else:
-        raise ValueError(f"{package_clean} is not a valid package name")
+        raise ValueError(f"{package} is not a valid package name")
 
 
 @pypi.get("/", response_class=Response)
@@ -113,7 +120,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
             )
             content_text_list.append(line_new)  # Add to list
 
-            # Add entry for wheel metadata
+            # Add entry for wheel metadata (PEP 658; see _expose_wheel_metadata)
             if ".whl" in line_new:
                 line_metadata = line_new.replace(".whl", ".whl.metadata")
                 content_text_list.append(line_metadata)  # Add to list
