@@ -4,6 +4,7 @@ import importlib.metadata
 
 from fastapi import APIRouter
 
+from murfey.server import _transport_object
 from murfey.util.lif import convert_lif_to_tiff
 from murfey.util.models import LifFileInfo
 
@@ -21,7 +22,9 @@ def lif_to_tiff(
         group="murfey.workflows", name="lif_to_tiff"
     )
     if murfey_workflows:
-        murfey_workflows[0].load()(file=lif_info.name, root_folder="images")
+        murfey_workflows[0].load()(
+            file=lif_info.name, root_folder="images", messenger=_transport_object
+        )
     else:
         convert_lif_to_tiff(
             file=lif_info.name,
