@@ -13,7 +13,7 @@ def zocalo_cluster_request(
         messenger.send(
             "processing_recipe",
             {
-                "recipes": ["lif_to_tiff"],
+                "recipes": ["lif-to-tiff"],
                 "parameters": {
                     "working_dir": str(file.parent.parent),
                     "lif_path": str(file),
