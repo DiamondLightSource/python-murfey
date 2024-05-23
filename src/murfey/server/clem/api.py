@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.metadata
+
 from fastapi import APIRouter
 
 from murfey.util.lif import convert_lif_to_tiff
@@ -15,7 +17,13 @@ def lif_to_tiff(
     session_id: int,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
-    convert_lif_to_tiff(
-        file=lif_info.name,
-        root_folder="images",
+    murfey_workflows = importlib.metadata.entry_points().select(
+        group="murfey.workflows", name="lif_to_tiff"
     )
+    if murfey_workflows:
+        murfey_workflows[0].load()(file=lif_info.name, root_folder="images")
+    else:
+        convert_lif_to_tiff(
+            file=lif_info.name,
+            root_folder="images",
+        )
