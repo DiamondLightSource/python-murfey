@@ -44,6 +44,7 @@ class MachineConfig(BaseModel):
     upstream_data_directories: List[Path] = []
     upstream_data_download_directory: Optional[Path] = None
     upstream_data_tiff_locations: List[str] = ["processed"]
+    failure_queue: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

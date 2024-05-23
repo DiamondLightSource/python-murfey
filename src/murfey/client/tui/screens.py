@@ -773,7 +773,7 @@ class UpstreamDownloads(Screen):
             upstream_tiff_paths_response = requests.get(
                 f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
             )
-            upstream_tiff_paths = upstream_tiff_paths_response.json()
+            upstream_tiff_paths = upstream_tiff_paths_response.json() or []
             for tp in upstream_tiff_paths:
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
                 stream_response = requests.get(
