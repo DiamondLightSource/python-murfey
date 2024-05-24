@@ -43,6 +43,8 @@ class MachineConfig(BaseModel):
     software_settings_output_directories: Dict[str, List[str]] = {}
     upstream_data_directories: List[Path] = []  # List of prior data on the server network associated with the current session
     upstream_data_download_directory: Optional[Path] = None  # Where to download said data to; defined in the microscope config files
+    upstream_data_tiff_locations: List[str] = ["processed"]  # Names of folders where TIFF files are stored
+    failure_queue: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

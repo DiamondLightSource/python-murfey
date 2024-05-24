@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
 from pydantic import BaseModel, BaseSettings
@@ -32,7 +32,7 @@ from murfey.server import (
     get_hostname,
     get_microscope,
     sanitise,
-    santise_path,
+    sanitise_path,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
@@ -847,17 +847,20 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_id = (
-        db.exec(
-            select(FoilHole, GridSquare)
-            .where(FoilHole.name == proc_file.foil_hole_id)
-            .where(FoilHole.session_id == session_id)
-            .where(GridSquare.id == FoilHole.grid_square_id)
-            .where(GridSquare.tag == proc_file.tag)
+    try:
+        foil_hole_id = (
+            db.exec(
+                select(FoilHole, GridSquare)
+                .where(FoilHole.name == proc_file.foil_hole_id)
+                .where(FoilHole.session_id == session_id)
+                .where(GridSquare.id == FoilHole.grid_square_id)
+                .where(GridSquare.tag == proc_file.tag)
+            )
+            .one()[0]
+            .id
         )
-        .one()[0]
-        .id
-    )
+    except Exception:
+        foil_hole_id = None
     if proc_params:
         session_id = (
             db.exec(
@@ -965,7 +968,7 @@ def flush_tomography_processing(
 async def request_tomography_preprocessing(
     visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
 ):
-    if not santise_path(Path(proc_file.path)).exists():
+    if not sanitise_path(Path(proc_file.path)).exists():
         log.warning(
             f"{sanitise(str(proc_file.path))} has not been transferred before preprocessing"
         )
@@ -1441,46 +1444,46 @@ def find_upstream_visits(visit_name: str):
     return upstream_visits
 
 
-def _get_upstream_processed_dir(visit_name: str) -> Optional[Path]:
-    for p in machine_config["upstream_data_directories"]:
-        if (Path(p) / secure_filename(visit_name)).is_dir():
-            processed_dir = (
-                Path(p)
-                / secure_filename(visit_name)
-                / machine_config["processed_directory_name"]
-            )
-            return processed_dir
-    log.warning(
-        f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
-    )
-    return None
+def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
+    tiff_dirs = []
+    for directory_name in machine_config["upstream_data_tiff_locations"]:
+        for p in machine_config["upstream_data_directories"]:
+            if (Path(p) / secure_filename(visit_name)).is_dir():
+                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
+                tiff_dirs.append(processed_dir)
+                break
+    if not tiff_dirs:
+        log.warning(
+            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+        )
+    return tiff_dirs
 
 
 @router.get("/visits/{visit_name}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str):
     upstream_tiff_paths = []
-    processed_dir = _get_upstream_processed_dir(visit_name)
-    if not processed_dir:
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
         return None
-    for f in processed_dir.glob("**/*.tiff"):
-        upstream_tiff_paths.append(str(f.relative_to(processed_dir)))
+    for tiff_dir in tiff_dirs:
+        for f in tiff_dir.glob("**/*.tiff"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
     return upstream_tiff_paths
 
 
 @router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
 async def get_tiff(visit_name: str, tiff_path: str):
-    processed_dir = _get_upstream_processed_dir(visit_name)
-    if not processed_dir:
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
         return None
 
     tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+    for tiff_dir in tiff_dirs:
+        test_path = tiff_dir / tiff_path
+        if test_path.is_file():
+            break
+    else:
+        log.warning(f"TIFF {tiff_path} not found")
+        return None
 
-    def iterfile():
-        with open(processed_dir / tiff_path, mode="rb") as f:
-            yield from f
-
-    return StreamingResponse(
-        iterfile(),
-        media_type="image/tiff",
-        headers={"Content-Disposition": f"attachment; filename={Path(tiff_path).name}"},
-    )
+    return FileResponse(path=test_path)

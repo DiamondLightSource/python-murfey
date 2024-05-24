@@ -638,15 +638,13 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         newly_completed_series: List[str] = []
-        if self._tilt_series:
-            tilt_series_size = max(len(ts) for ts in self._tilt_series.values())
-        else:
+        if not self._tilt_series:
             return newly_completed_series
         this_tilt_series_size = len(self._tilt_series.get(tilt_series, []))
         tilt_series_size_check = (
             (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
             if self._tilt_series_sizes.get(tilt_series)
-            else (this_tilt_series_size >= tilt_series_size)
+            else False
         )
         if tilt_series_size_check and not required_position_files:
             if tilt_series not in self._completed_tilt_series:
@@ -663,9 +661,7 @@ class TomographyContext(Context):
                 if completion_test:
                     completion_test = required_position_files_check
             else:
-                completion_test = (
-                    required_position_files_check and len(ta) >= tilt_series_size
-                )
+                completion_test = False
             if ts not in self._completed_tilt_series and completion_test:
                 newly_completed_series.append(ts)
                 self._completed_tilt_series.append(ts)
