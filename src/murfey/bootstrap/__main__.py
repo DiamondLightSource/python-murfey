@@ -24,6 +24,7 @@ achieved. Also note that only standard library imports will be available at that
 installation stage.
 """
 
+
 def _download_to_file(url: str, outfile: str):
     """
     Downloads a single URL to a file.
@@ -58,9 +59,6 @@ if __name__ == "__main__":
         type=str, dest="server", help="URL pointing to the murfey server"
     )
     args = parser.parse_args()
-
-
-
 
     # Validate the passed server address
     # Construct a minimal base path string
