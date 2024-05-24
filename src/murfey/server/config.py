@@ -41,9 +41,11 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
-    upstream_data_directories: List[Path] = []
-    upstream_data_download_directory: Optional[Path] = None
-    upstream_data_tiff_locations: List[str] = ["processed"]
+
+    # Find and download upstream directories
+    upstream_data_directories: List[Path] = []  # Previous sessions
+    upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
+    upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
     failure_queue: str = ""
 
 

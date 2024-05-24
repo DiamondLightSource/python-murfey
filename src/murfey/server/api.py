@@ -1597,7 +1597,9 @@ def failed_client_post(post_info: PostInfo):
 @router.get("/visits/{visit_name}/upstream_visits")
 async def find_upstream_visits(visit_name: str):
     upstream_visits = {}
+    # Iterates through provided upstream directories
     for p in machine_config.upstream_data_directories:
+        # Looks for visit name in file path
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
             upstream_visits[v.name] = v / machine_config.processed_directory_name
     return upstream_visits
@@ -1620,6 +1622,10 @@ def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
 
 @router.get("/visits/{visit_name}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str):
+    """
+    Looks for TIFF files associated with the current session in the permitted storage
+    servers, and returns their relative file paths as a list.
+    """
     upstream_tiff_paths = []
     tiff_dirs = _get_upstream_tiff_dirs(visit_name)
     if not tiff_dirs:
