@@ -54,7 +54,11 @@ def _validate_package_name(package: str) -> bool:
 
 
 def _get_full_path_response(package: str) -> requests.Response:
-    # Validate package name
+    """
+    Validates the package name, sanitises it if valid, and attempts to return a HTTP
+    response from PyPI.
+    """
+
     if _validate_package_name(package):
         # Sanitise and normalise package name (PEP 503)
         package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()))
@@ -105,7 +109,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     # Validate package and URL
     full_path_response = _get_full_path_response(package)
 
-    # Get HTML content of response
+    # Process lines related to PyPI packages in response
     content: bytes = full_path_response.content  # In bytes
     content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
@@ -114,18 +118,20 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         if "<a href" in line:
             # Rewrite URL to point to current proxy server
             line_new = re.sub(
-                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria to identify unique groups in HTML string
-                _rewrite_pypi_url,  # re.sub uses first argument as input for second argument
+                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria
+                _rewrite_pypi_url,  # Search criteria applied to this function
                 line,
             )
-            content_text_list.append(line_new)  # Add to list
+            content_text_list.append(line_new)
 
             # Add entry for wheel metadata (PEP 658; see _expose_wheel_metadata)
             if ".whl" in line_new:
                 line_metadata = line_new.replace(".whl", ".whl.metadata")
-                content_text_list.append(line_metadata)  # Add to list
+                content_text_list.append(line_metadata)
         else:
-            content_text_list.append(line)  # Append other lines as normal
+            # Append other lines as normal
+            content_text_list.append(line)
+
     content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
     content_new = content_text_new.encode("latin1")  # Convert back to bytes
 
@@ -276,7 +282,7 @@ def get_murfey_wheel():
 @cygwin.get("/setup-x86_64.exe", response_class=Response)
 def get_cygwin_setup():
     """
-    Obtain and past though a Cygwin installer from an official source.
+    Obtain and pass through a Cygwin installer from an official source.
     This is used during client bootstrapping and can download and install the
     Cygwin distribution that then remains on the client machines.
     """
