@@ -3,7 +3,7 @@ from pathlib import Path
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
-    pass
+    pass  # If ISPyB credentials environment variable not set ignore
 
 
 def zocalo_cluster_request(
