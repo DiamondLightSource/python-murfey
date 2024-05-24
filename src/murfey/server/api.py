@@ -1619,6 +1619,7 @@ def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
         )
     return tiff_dirs
 
+
 @router.get("/visits/{visit_name}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str):
     """
