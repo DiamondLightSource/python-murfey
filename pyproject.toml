@@ -86,6 +86,8 @@ murfey = "murfey.client:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
+[project.entry-points."murfey.workflows"]
+"lif_to_tiff" = "murfey.workflows.lif_to_tiff:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
