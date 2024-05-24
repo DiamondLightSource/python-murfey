@@ -21,6 +21,10 @@ from murfey.util.models import Visit
 logger = logging.getLogger("murfey.util")
 
 
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
+
+
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
     return requests.get(f"{url}/machine/").json()

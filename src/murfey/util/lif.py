@@ -15,12 +15,10 @@ import numpy as np
 from readlif.reader import LifFile
 from tifffile import imwrite
 
+from murfey.util import sanitise
+
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.lif")
-
-
-def sanitise(in_string: str) -> str:
-    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 def get_xml_metadata(
