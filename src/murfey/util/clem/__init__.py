@@ -11,6 +11,8 @@ from xml.etree import ElementTree as ET
 import numpy as np
 from readlif.reader import LifFile
 
+from murfey.util import sanitise
+
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem")
 
@@ -33,7 +35,7 @@ def get_xml_metadata(
         xml_file = str(save_xml)  # Convert Path to string
         ET.indent(xml_tree, "  ")  # Format with proper indentation
         xml_tree.write(xml_file, encoding="utf-8")  # Save
-        logger.info(f"File metadata saved to {xml_file}")
+        logger.info(f"File metadata saved to {sanitise(xml_file)}")
 
     return xml_root
 
