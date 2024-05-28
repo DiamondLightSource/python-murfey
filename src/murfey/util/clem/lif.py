@@ -27,7 +27,7 @@ from murfey.util.clem import (
 logger = logging.getLogger("murfey.util.clem.lif")
 
 
-def process_image_stack(
+def process_lif_file(
     file: Path,
     scene_num: int,
     metadata: ET.Element,
@@ -315,6 +315,6 @@ def convert_lif_to_tiff(
 
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
-        result = pool.starmap(process_image_stack, pool_args)
+        result = pool.starmap_async(process_lif_file, pool_args)
 
     return result

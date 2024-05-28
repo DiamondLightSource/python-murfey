@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import logging
 
-# import multiprocessing as mp
+import multiprocessing as mp
 from pathlib import Path
 from typing import List
 
-import numpy as np
+# import numpy as np
 
 from murfey.util import sanitise
 
@@ -33,14 +33,14 @@ from murfey.util import sanitise
 logger = logging.getLogger("murfey.util.clem.tiff")
 
 
-def create_image_stack(file_list: List[Path]) -> np.ndarray:
+def process_tiff_files(file_list: List[Path]):
     """
     Opens the TIFF files provided as NumPy arrays and stacks them.
     """
     return True
 
 
-def process_tiff_files(
+def convert_tiff_to_stack(
     search_dir: Path,
     root_folder: str,  # Name of the folder to treat as the root folder
     number_of_processes: int = 1,  # Number of processing threads to run
@@ -66,17 +66,28 @@ def process_tiff_files(
             |__ Mimics "images" folder structure
     """
 
+    # Set variables and shorter names for use within function
     new_root_folder = "processed"
+    num_procs = number_of_processes
 
     # Use the location of TIFF files and their names to identify unique datasets
+    logger.info(f"Scanning for file paths with desired TIFF files")
     # TIFF file names start with "Position..." by default
-    tiff_list = list(search_dir.glob("**/Position*.tif"))
+    valid_tiffs = list(search_dir.glob("**/Position*.tif"))
     # Remove the "--Z##--C##.tiff" end of the file path strings
-    unique_paths = list({Path(str(f).split("--", 1)[0]) for f in tiff_list})
+    unique_paths = list({Path(str(f).split("--", 1)[0]) for f in valid_tiffs})
     unique_paths.sort()  # Sort by path alphabetically
+    logger.info(f"Found {len(unique_paths)} unique paths")
 
-    # Use these paths to generate folders for processed images
+    pool_args = []  # Empty list for parallel processing arguments
     for path in unique_paths:
+        # Use path to generate folders for processed images
+        logger.info(f"Processing files in {str(path)}")
+
+        # Extract key variables
+        raw_dir = path.parent  # File path not including partial file name
+        series_name = path.stem  # Last item is part of file name
+
         path_parts = list(path.parts)
         counter = 0
         for p in range(len(path_parts)):
@@ -91,14 +102,56 @@ def process_tiff_files(
             if part.lower() == root_folder.lower():
                 path_parts[p] = new_root_folder
                 counter += 0  # Do for first instance only
-            # Remove last level in path if same as previous one (redundant naming)
+            # Remove last level in path if same as previous one (redundancy)
             if p == len(path_parts) - 1:
                 if part == path_parts[p - 1]:
                     path_parts.pop(p)
-        processed_dir = Path("/".join(path_parts))
+
+        # Create processed directory
+        processed_dir = Path("/".join(path_parts[:-1]))
+        metadata_dir = processed_dir / "metadata"
 
         # Check that "processed" has been inserted into file path
         if new_root_folder in str(processed_dir):
             pass
         else:
             logger.error(f"Subpath {sanitise(root_folder)} was not found in file path")
+
+        # Make folders
+        for folder in [processed_dir, metadata_dir]:
+            if not folder.exists():
+                folder.mkdir(parents=True)
+                logger.info(f"Created {folder}")
+            else:
+                logger.info(f"{str(folder)} already exists")
+
+        # Get associated XML file
+        xml_file = raw_dir / "Metadata" / (series_name + ".xlif")
+        # Check that it exists
+        if xml_file.exists():
+            logger.info(f"Metadata file found at {xml_file}")
+            print(f"Metadata file found at {xml_file}")
+        else:
+            logger.error(f"No metadata file found at {xml_file}")
+
+        # Get associated list of TIFFs
+        tiff_list = list(raw_dir.glob("**/Position*.tif"))
+        # Check that they exist
+        if len(tiff_list) > 0:
+            logger.info(f"TIFFs found at {raw_dir}: {len(tiff_list)}")
+            print(f"TIFFs found at {raw_dir}: {len(tiff_list)}")
+        else:
+            logger.error(f"No TIFFs found at {raw_dir}")
+
+        pool_args.append(
+            # Arguments need to be pickle-able; no complex objects
+            [  # Follow order of args in the function
+                tiff_list,
+                xml_file,
+                processed_dir,
+            ]
+        )
+
+    # Parallel process image stacks
+    with mp.Pool(processes=num_procs) as pool:
+        result = pool.starmap_async(process_tiff_files, pool_args)
