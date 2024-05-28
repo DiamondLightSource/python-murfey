@@ -200,8 +200,8 @@ def process_image_stack(
 
 def convert_lif_to_tiff(
     file: Path,
-    root_folder: str,  # Name of the folder under which all raw LIF files are stored
-    number_of_processes: int = 1,  # For parallel processing
+    root_folder: str,  # Name of the folder to treat as the root folder for LIF files
+    number_of_processes: int = 1,  # Number of processing threads to run
 ):
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
@@ -241,15 +241,18 @@ def convert_lif_to_tiff(
     path_parts = list(file.parts)
     new_root_folder = "processed"
     # Rewrite string in-place
+    counter = 0
     for p in range(len(path_parts)):
         part = path_parts[p]
         # Omit initial "/" in Linux file systems for subsequent rejoining
         if part == "/":
             path_parts[p] = ""
         # Rename designated raw folder to "processed"
-        if part.lower() == root_folder.lower():  # Remove case-sensitivity
+        if (
+            part.lower() == root_folder.lower() and counter < 1
+        ):  # Remove case-sensitivity
             path_parts[p] = new_root_folder
-            break  # Do for first instance only
+            counter += 1  # Do for first instance only
     # If specified folder not found by end of string, log as error
     if new_root_folder not in path_parts:
         logger.error(

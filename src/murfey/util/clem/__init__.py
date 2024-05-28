@@ -22,7 +22,7 @@ def get_xml_metadata(
     save_xml: Optional[Path] = None,
 ) -> ET.Element:
     """
-    Extracts and returns the file metadata as a formatted XML tree. Provides option
+    Extracts and returns the file metadata as a formatted XML Element. Provides option
     to save it as an XML file to the specified file path
     """
 

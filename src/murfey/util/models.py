@@ -11,6 +11,8 @@ General Models
 ==============
 Models used in multiple workflows go here.
 """
+
+
 class Visit(BaseModel):
     start: datetime
     end: datetime
@@ -148,11 +150,14 @@ Cryo-CLEM
 =========
 Models related to the cryo-CLEM workflow will go here.
 """
+
+
 class LifFileInfo(BaseModel):
     name: Path
     size: int
     timestamp: float
     description: str = ""
+
 
 class TiffFileInfo(BaseModel):
     name: Path
@@ -160,11 +165,13 @@ class TiffFileInfo(BaseModel):
     timestamp: float
     description: str = ""
 
+
 """
 FIB
 ===
 Models related to FIB, as part of correlative workflow with TEM
 """
+
 
 class Sample(BaseModel):
     sample_group_id: int
@@ -198,6 +205,8 @@ Single Particle Analysis
 ========================
 Models related specifically to the single-particle analysis workflow go here.
 """
+
+
 class SPAProcessingParameters(BaseModel):
     job_id: int
 
@@ -293,6 +302,8 @@ Tomography
 ==========
 Models specifically related to the tomographic reconstruction workflow go here.
 """
+
+
 class ProcessFile(BaseModel):  # Rename to TomoProcessFile
     path: str
     description: str
