@@ -247,25 +247,23 @@ def convert_lif_to_tiff(
         # Omit initial "/" in Linux file systems for subsequent rejoining
         if part == "/":
             path_parts[p] = ""
-        # Rename designated raw folder to "processed"
+        # Rename designated root folder to "processed"
         if (
             part.lower() == root_folder.lower() and counter < 1
         ):  # Remove case-sensitivity
             path_parts[p] = new_root_folder
             counter += 1  # Do for first instance only
-    # If specified folder not found by end of string, log as error
+    # Check that "processed" has been inserted into file path
     if new_root_folder not in path_parts:
         logger.error(
             f"Subpath {sanitise(root_folder)} was not found in image path "
             f"{sanitise(str(file))}"
         )
         return None
-    processed_dir = Path("/".join(path_parts)).parent / file_name
-
-    # Folder for raw XML metadata
-    raw_xml_dir = file.parent / "metadata"
 
     # Create folders if not already present
+    processed_dir = Path("/".join(path_parts)).parent / file_name  # Save images
+    raw_xml_dir = file.parent / "metadata"  # Raw metadata
     for folder in [processed_dir, raw_xml_dir]:
         if not folder.exists():
             folder.mkdir(parents=True)

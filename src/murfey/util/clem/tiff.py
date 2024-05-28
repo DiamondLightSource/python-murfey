@@ -33,7 +33,11 @@ from murfey.util import sanitise
 logger = logging.getLogger("murfey.util.clem.tiff")
 
 
-def process_tiff_files(file_list: List[Path]):
+def process_tiff_files(
+        tiff_list: List[Path],
+        metadata_file: Path,
+        save_dir: Path,
+):
     """
     Opens the TIFF files provided as NumPy arrays and stacks them.
     """
@@ -79,15 +83,16 @@ def convert_tiff_to_stack(
     unique_paths.sort()  # Sort by path alphabetically
     logger.info(f"Found {len(unique_paths)} unique paths")
 
+    # Collect arguments to use for parallel processing
     pool_args = []  # Empty list for parallel processing arguments
     for path in unique_paths:
-        # Use path to generate folders for processed images
         logger.info(f"Processing files in {str(path)}")
 
         # Extract key variables
         raw_dir = path.parent  # File path not including partial file name
         series_name = path.stem  # Last item is part of file name
 
+        # Create processed directory
         path_parts = list(path.parts)
         counter = 0
         for p in range(len(path_parts)):
@@ -97,52 +102,56 @@ def convert_tiff_to_stack(
                 path_parts[p] = ""
             # Remove spaces to prevent subsequent Murfey errors
             if " " in part:
-                part.replace(" ", "_")
-            # Save data under "processed instead"
-            if part.lower() == root_folder.lower():
+                path_parts[p] = part.replace(" ", "_")
+            # Rename designated root folder to "processed"
+            if (
+                part.lower() == root_folder.lower() and counter < 1
+            ):  # Remove case-sensitivity
                 path_parts[p] = new_root_folder
                 counter += 0  # Do for first instance only
             # Remove last level in path if same as previous one (redundancy)
             if p == len(path_parts) - 1:
-                if part == path_parts[p - 1]:
+                if part.replace(" ", "_") == path_parts[p - 1].replace(" ", "_"):
                     path_parts.pop(p)
-
-        # Create processed directory
-        processed_dir = Path("/".join(path_parts[:-1]))
-        metadata_dir = processed_dir / "metadata"
-
         # Check that "processed" has been inserted into file path
-        if new_root_folder in str(processed_dir):
-            pass
-        else:
-            logger.error(f"Subpath {sanitise(root_folder)} was not found in file path")
+        if new_root_folder not in path_parts:
+            logger.error(
+                f"Subpath {sanitise(root_folder)} was not found in file path "
+                f"{sanitise(str(raw_dir))}"
+            )
+            return None
 
         # Make folders
+        processed_dir = Path("/".join(path_parts[:-1])) / series_name.replace(" ", "_") # Images
+        metadata_dir = processed_dir / "metadata"  # Metadata
         for folder in [processed_dir, metadata_dir]:
             if not folder.exists():
                 folder.mkdir(parents=True)
+                print(f"Created {folder}")
                 logger.info(f"Created {folder}")
             else:
+                print(f"{str(folder)} already exists")
                 logger.info(f"{str(folder)} already exists")
-
-        # Get associated XML file
-        xml_file = raw_dir / "Metadata" / (series_name + ".xlif")
-        # Check that it exists
-        if xml_file.exists():
-            logger.info(f"Metadata file found at {xml_file}")
-            print(f"Metadata file found at {xml_file}")
-        else:
-            logger.error(f"No metadata file found at {xml_file}")
 
         # Get associated list of TIFFs
         tiff_list = list(raw_dir.glob("**/Position*.tif"))
-        # Check that they exist
         if len(tiff_list) > 0:
             logger.info(f"TIFFs found at {raw_dir}: {len(tiff_list)}")
             print(f"TIFFs found at {raw_dir}: {len(tiff_list)}")
         else:
             logger.error(f"No TIFFs found at {raw_dir}")
+            return None
 
+        # Get associated XML file
+        xml_file = raw_dir / "Metadata" / (series_name + ".xlif")
+        if xml_file.exists():
+            logger.info(f"Metadata file found at {xml_file}")
+            print(f"Metadata file found at {xml_file}")
+        else:
+            logger.error(f"No metadata file found at {xml_file}")
+            return None
+
+        # Add list of arguments to main list
         pool_args.append(
             # Arguments need to be pickle-able; no complex objects
             [  # Follow order of args in the function
