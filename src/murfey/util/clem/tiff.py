@@ -6,14 +6,14 @@ grouping them into image stacks according to the correct channels.
 from __future__ import annotations
 
 import logging
-
 import multiprocessing as mp
 from pathlib import Path
 from typing import List
 
+from murfey.util import sanitise
+
 # import numpy as np
 
-from murfey.util import sanitise
 
 # from xml.etree import ElementTree as ET
 
@@ -71,7 +71,7 @@ def convert_tiff_to_stack(
     num_procs = number_of_processes
 
     # Use the location of TIFF files and their names to identify unique datasets
-    logger.info(f"Scanning for file paths with desired TIFF files")
+    logger.info("Scanning for file paths with desired TIFF files")
     # TIFF file names start with "Position..." by default
     valid_tiffs = list(search_dir.glob("**/Position*.tif"))
     # Remove the "--Z##--C##.tiff" end of the file path strings
@@ -155,3 +155,5 @@ def convert_tiff_to_stack(
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
         result = pool.starmap_async(process_tiff_files, pool_args)
+
+    return result
