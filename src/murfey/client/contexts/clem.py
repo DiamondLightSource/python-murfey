@@ -50,6 +50,8 @@ def _get_source(
     return None
 
 
+# WORK IN PROGRESS
+# Will need to add context for TIFF files associated with CLEM
 class CLEMContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("CLEM", acquisition_software)

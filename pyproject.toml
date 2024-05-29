@@ -88,6 +88,7 @@ murfey = "murfey.client:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.workflows"]
 "lif_to_tiff" = "murfey.workflows.lif_to_tiff:zocalo_cluster_request"
+"tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

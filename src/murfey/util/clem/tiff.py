@@ -16,19 +16,19 @@ from PIL import Image
 from tifffile import imwrite
 
 from murfey.util import sanitise
-from murfey.util.clem import (
-    change_bit_depth,
-    get_axis_resolution,
-    get_image_elements,
-    rescale_across_channel,
-    rescale_to_bit_depth,
+from murfey.util.clem.functions import (
+    _change_bit_depth,
+    _get_axis_resolution,
+    _get_image_elements,
+    _rescale_across_channel,
+    _rescale_to_bit_depth,
 )
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.tiff")
 
 
-def process_tiff_files(
+def _process_tiff_files(
     tiff_list: List[Path],
     metadata_file: Path,
     save_dir: Path,
@@ -38,7 +38,7 @@ def process_tiff_files(
     """
 
     # Load relevant metadata
-    elem_list = get_image_elements(ET.parse(metadata_file).getroot())
+    elem_list = _get_image_elements(ET.parse(metadata_file).getroot())
     metadata = elem_list[0]
 
     # Get name of image series
@@ -70,11 +70,11 @@ def process_tiff_files(
     dimensions = metadata.findall(
         "Data/Image/ImageDescription/Dimensions/DimensionDescription"
     )
-    x_res = get_axis_resolution(dimensions[0])
-    y_res = get_axis_resolution(dimensions[1])
+    x_res = _get_axis_resolution(dimensions[0])
+    y_res = _get_axis_resolution(dimensions[1])
 
     # Process z-axis differently
-    z_res = get_axis_resolution(dimensions[2]) if len(dimensions) > 2 else float(0)
+    z_res = _get_axis_resolution(dimensions[2]) if len(dimensions) > 2 else float(0)
     z_size = 1 / z_res if len(dimensions) > 2 else float(0)
 
     # Load timestamps
@@ -110,23 +110,22 @@ def process_tiff_files(
             else:
                 arr = np.append(arr, [img], axis=0)
 
-        # Get bit depth
+        # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
         bit_depth = int(channels[c].attrib["Resolution"])
         if not any(bit_depth == b for b in [8, 16, 32, 64]):
             logger.info(
                 f"{bit_depth}-bit is not supported by NumPy; converting to 16-bit"
             )
             arr = (
-                rescale_to_bit_depth(
+                _rescale_to_bit_depth(
                     array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
                 )
                 if np.max(arr) > 0
-                else change_bit_depth(array=arr, target_bit_depth=16)
+                else _change_bit_depth(array=arr, target_bit_depth=16)
             )
             bit_depth = 16  # Overwrite
 
         # Rescale intensity values for fluorescent channels
-        # Currently pre-emptively converting for all coloured ones
         if any(
             color in key
             for key in [
@@ -140,7 +139,7 @@ def process_tiff_files(
         ):
             logger.info(f"Rescaling {color} channel across channel depth")
             arr = (
-                rescale_across_channel(
+                _rescale_across_channel(
                     array=arr,
                     bit_depth=bit_depth,
                     percentile_range=(0.5, 99.5),
@@ -155,13 +154,13 @@ def process_tiff_files(
             logger.info("Converting to 8-bit image")
             bit_depth_new = 8
             arr = (
-                rescale_to_bit_depth(
+                _rescale_to_bit_depth(
                     array=arr,
                     initial_bit_depth=bit_depth,
                     target_bit_depth=bit_depth_new,
                 )
                 if np.max(arr) > 0
-                else change_bit_depth(
+                else _change_bit_depth(
                     array=arr,
                     target_bit_depth=bit_depth_new,
                 )
@@ -169,7 +168,7 @@ def process_tiff_files(
         else:
             logger.info("Image is already 8-bit")
 
-        # Save as a gresycale TIFF
+        # Save as a greyscale TIFF
         save_name = save_dir / (color + ".tiff")
         logger.info(f"Save {color} image as {save_name}")
         imwrite(
@@ -191,7 +190,7 @@ def process_tiff_files(
     return True
 
 
-def convert_tiff_to_stack(
+def _convert_tiff_to_stack(
     search_dir: Path,
     root_folder: str,  # Name of the folder to treat as the root folder
     number_of_processes: int = 1,  # Number of processing threads to run
@@ -306,6 +305,7 @@ def convert_tiff_to_stack(
 
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
-        result = pool.starmap(process_tiff_files, pool_args)
+        result = pool.starmap(_process_tiff_files, pool_args)
 
-    return result
+    if result:
+        return True

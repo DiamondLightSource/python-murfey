@@ -16,18 +16,18 @@ from readlif.reader import LifFile
 from tifffile import imwrite
 
 from murfey.util import sanitise
-from murfey.util.clem import (
-    change_bit_depth,
-    get_image_elements,
-    rescale_across_channel,
-    rescale_to_bit_depth,
+from murfey.util.clem.functions import (
+    _change_bit_depth,
+    _get_image_elements,
+    _rescale_across_channel,
+    _rescale_to_bit_depth,
 )
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.lif")
 
 
-def get_lif_xml_metadata(
+def _get_lif_xml_metadata(
     file: LifFile,
     save_xml: Optional[Path] = None,
 ) -> ET.Element:
@@ -50,7 +50,7 @@ def get_lif_xml_metadata(
     return xml_root
 
 
-def process_lif_file(
+def _process_lif_file(
     file: Path,
     scene_num: int,
     metadata: ET.Element,
@@ -147,11 +147,11 @@ def process_lif_file(
                 f"{bit_depth}-bit is not supported by NumPy; converting to 16-bit"
             )
             arr = (
-                rescale_to_bit_depth(
+                _rescale_to_bit_depth(
                     array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
                 )
                 if np.max(arr) > 0
-                else change_bit_depth(
+                else _change_bit_depth(
                     array=arr,
                     target_bit_depth=16,
                 )
@@ -159,7 +159,6 @@ def process_lif_file(
             bit_depth = 16  # Overwrite
 
         # Rescale intensity values for fluorescent channels
-        # Currently pre-emptively converting for all coloured ones
         if any(
             color in key
             for key in [
@@ -173,7 +172,7 @@ def process_lif_file(
         ):
             logger.info(f"Rescaling {color} channel across channel depth")
             arr = (
-                rescale_across_channel(
+                _rescale_across_channel(
                     array=arr,
                     bit_depth=bit_depth,
                     percentile_range=(0.5, 99.5),
@@ -188,13 +187,13 @@ def process_lif_file(
             logger.info("Converting to 8-bit image")
             bit_depth_new = 8
             arr = (
-                rescale_to_bit_depth(
+                _rescale_to_bit_depth(
                     array=arr,
                     initial_bit_depth=bit_depth,
                     target_bit_depth=bit_depth_new,
                 )
                 if np.max(arr) > 0
-                else change_bit_depth(
+                else _change_bit_depth(
                     array=arr,
                     target_bit_depth=bit_depth_new,
                 )
@@ -224,7 +223,7 @@ def process_lif_file(
     return True
 
 
-def convert_lif_to_tiff(
+def _convert_lif_to_tiff(
     file: Path,
     root_folder: str,  # Name of the folder to treat as the root folder for LIF files
     number_of_processes: int = 1,  # Number of processing threads to run
@@ -304,13 +303,13 @@ def convert_lif_to_tiff(
 
     # Save original metadata as XML tree
     logger.info("Extracting image metadata")
-    xml_root = get_lif_xml_metadata(
+    xml_root = _get_lif_xml_metadata(
         file=lif_file,
         save_xml=raw_xml_dir.joinpath(file_name + ".xml"),
     )
 
     # Recursively generate list of metadata-containing elements
-    elem_list = get_image_elements(xml_root)
+    elem_list = _get_image_elements(xml_root)
 
     # Check that elements match number of images
     if not len(elem_list) == len(scene_list):
@@ -339,6 +338,7 @@ def convert_lif_to_tiff(
 
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
-        result = pool.starmap(process_lif_file, pool_args)
+        result = pool.starmap(_process_lif_file, pool_args)
 
-    return result
+    if result:
+        return True

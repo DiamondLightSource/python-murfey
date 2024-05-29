@@ -159,6 +159,8 @@ class LifFileInfo(BaseModel):
     description: str = ""
 
 
+# WORK IN PROGRESS
+# tiff_to_stack looks for folders, not files
 class TiffFileInfo(BaseModel):
     name: Path
     size: int
