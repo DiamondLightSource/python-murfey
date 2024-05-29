@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from pathlib import Path
+from typing import Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -18,13 +19,35 @@ from murfey.util import sanitise
 from murfey.util.clem import (
     change_bit_depth,
     get_image_elements,
-    get_xml_metadata,
     rescale_across_channel,
     rescale_to_bit_depth,
 )
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.lif")
+
+
+def get_lif_xml_metadata(
+    file: LifFile,
+    save_xml: Optional[Path] = None,
+) -> ET.Element:
+    """
+    Extracts and returns the file metadata as a formatted XML Element. Provides option
+    to save it as an XML file to the specified file path
+    """
+
+    # Use readlif function to get XML metadata
+    xml_root: ET.Element = file.xml_root  # This one for navigating
+    xml_tree = ET.ElementTree(xml_root)  # This one for saving
+
+    # Skip saving the metadata if save_xml not provided
+    if save_xml:
+        xml_file = str(save_xml)  # Convert Path to string
+        ET.indent(xml_tree, "  ")  # Format with proper indentation
+        xml_tree.write(xml_file, encoding="utf-8")  # Save
+        logger.info(f"File metadata saved to {sanitise(xml_file)}")
+
+    return xml_root
 
 
 def process_lif_file(
@@ -66,17 +89,15 @@ def process_lif_file(
     logger.info(f"Image stack metadata saved to {img_xml_file}")
 
     # Load channels
-    channel_elem = metadata.findall(
+    channels = metadata.findall(
         "Data/Image/ImageDescription/Channels/ChannelDescription"
     )
-    channels: list = [
-        channel_elem[c].attrib["LUTName"].lower() for c in range(len(channel_elem))
-    ]
+    colors = [channels[c].attrib["LUTName"].lower() for c in range(len(channels))]
 
     # Load timestamps and dimensions
     # Might be useful in the future
-    # timestamps = elem.find("Data/Image/TimeStampList")
-    # dimensions = elem.findall(
+    # timestamps = metadata.find("Data/Image/TimeStampList")
+    # dimensions = metadata.findall(
     #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
     # )
 
@@ -91,18 +112,18 @@ def process_lif_file(
 
     # Get pixel size (um per pixel)
     # Might be useful in the future
-    # x_scale = 1 / x_res
-    # y_scale = 1 / y_res
+    # x_size = 1 / x_res
+    # y_size = 1 / y_res
 
     # Check that depth axis exists
     z_res: float = image.scale[2] if num_frames > 1 else float(0)  # Pixels per um
-    z_scale: float = 1 / z_res if num_frames > 1 else float(0)  # um per pixel
+    z_size: float = 1 / z_res if num_frames > 1 else float(0)  # um per pixel
 
     # Process channels as individual TIFFs
-    for c in range(len(channels)):
+    for c in range(len(colors)):
 
         # Get color
-        color = channels[c]
+        color = colors[c]
         logger.info(f"Processing {color} channel")
 
         # Load image stack to array
@@ -122,7 +143,9 @@ def process_lif_file(
         # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
         bit_depth = image.bit_depth[c]  # Initial bit depth
         if not any(bit_depth == b for b in [8, 16, 32, 64]):
-            logger.info(f"{bit_depth}-bit is non-standard; converting to 16-bit")
+            logger.info(
+                f"{bit_depth}-bit is not supported by NumPy; converting to 16-bit"
+            )
             arr = (
                 rescale_to_bit_depth(
                     array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
@@ -140,12 +163,12 @@ def process_lif_file(
         if any(
             color in key
             for key in [
-                "blue",  # Not tested
-                "cyan",  # Not tested
+                "blue",
+                "cyan",
                 "green",
-                "magenta",  # Not tested
+                "magenta",
                 "red",
-                "yellow",  # Not tested
+                "yellow",
             ]
         ):
             logger.info(f"Rescaling {color} channel across channel depth")
@@ -161,20 +184,23 @@ def process_lif_file(
             )
 
         # Convert to 8-bit
-        logger.info("Converting to 8-bit image")
-        bit_depth_new = 8
-        arr = (
-            rescale_to_bit_depth(
-                array=arr,
-                initial_bit_depth=bit_depth,
-                target_bit_depth=bit_depth_new,
+        if not bit_depth == 8:
+            logger.info("Converting to 8-bit image")
+            bit_depth_new = 8
+            arr = (
+                rescale_to_bit_depth(
+                    array=arr,
+                    initial_bit_depth=bit_depth,
+                    target_bit_depth=bit_depth_new,
+                )
+                if np.max(arr) > 0
+                else change_bit_depth(
+                    array=arr,
+                    target_bit_depth=bit_depth_new,
+                )
             )
-            if np.max(arr) > 0
-            else change_bit_depth(
-                array=arr,
-                target_bit_depth=bit_depth_new,
-            )
-        )
+        else:
+            logger.info("Image is already 8-bit")
 
         # Save as a greyscale TIFF
         save_name = img_dir.joinpath(color + ".tiff")
@@ -188,7 +214,7 @@ def process_lif_file(
             dtype=arr.dtype,
             resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
             metadata={
-                "spacing": z_scale,
+                "spacing": z_size,
                 "unit": "micron",
                 "axes": "ZYX",
                 "Labels": image_labels,
@@ -278,7 +304,7 @@ def convert_lif_to_tiff(
 
     # Save original metadata as XML tree
     logger.info("Extracting image metadata")
-    xml_root = get_xml_metadata(
+    xml_root = get_lif_xml_metadata(
         file=lif_file,
         save_xml=raw_xml_dir.joinpath(file_name + ".xml"),
     )
@@ -313,6 +339,6 @@ def convert_lif_to_tiff(
 
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
-        result = pool.starmap_async(process_lif_file, pool_args)
+        result = pool.starmap(process_lif_file, pool_args)
 
     return result
