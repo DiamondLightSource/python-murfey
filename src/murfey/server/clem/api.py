@@ -5,7 +5,7 @@ import importlib.metadata
 from fastapi import APIRouter
 
 from murfey.server import _transport_object
-from murfey.util.clem import convert_lif_to_tiff, convert_tiff_to_stack
+from murfey.util.clem import convert_lif_to_tiff  # , convert_tiff_to_stack
 from murfey.util.models import LifFileInfo, TiffFileInfo
 
 # Create APIRouter class object
@@ -46,7 +46,8 @@ def tiff_to_stack(
             file=tiff_info.name, root_folder="images", messenger=_transport_object
         )
     else:
-        convert_tiff_to_stack(
-            search_dir=tiff_info.name,
-            root_folder="images",
-        )
+        # convert_tiff_to_stack(
+        #     search_dir=tiff_info.name,
+        #     root_folder="images",
+        # )
+        pass
