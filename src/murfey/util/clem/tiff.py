@@ -109,7 +109,6 @@ def process_tiff_files(
                 arr = np.array([img])  # Store as 3D array
             else:
                 arr = np.append(arr, [img], axis=0)
-            pass
 
         # Get bit depth
         bit_depth = int(channels[c].attrib["Resolution"])
