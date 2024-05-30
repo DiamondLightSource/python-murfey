@@ -26,5 +26,4 @@ def run():
     convert_tiff_to_stack(
         Path(args.tiff_list),
         root_folder=args.root_dir,
-        number_of_processes=args.num_procs,
     )
