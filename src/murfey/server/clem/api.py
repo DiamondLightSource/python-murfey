@@ -32,7 +32,6 @@ def lif_to_tiff(
 
 
 # WORK IN PROGRESS
-# Can this work with directories instead of individual files?
 @router.post("/sessions/{session_id}/tiff_to_stack")
 def tiff_to_stack(
     session_id: int,  # Used by the decorator

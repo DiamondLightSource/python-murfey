@@ -70,6 +70,8 @@ class CLEMContext(Context):
         super().post_transfer(
             transferred_file, role=role, environment=environment, **kwargs
         )
+
+        # Process XLIF files
         if transferred_file.suffix == ".xlif":
             # Type checking to satisfy MyPy
             if not environment:
@@ -82,6 +84,7 @@ class CLEMContext(Context):
             # check if position is complete by looking at self._tiff_positions[position]
             # if complete API call (post)
 
+        # Process TIF files that are part of the CLEM workflow
         if transferred_file.suffix == ".tif":
             # Type checking to satisfy MyPy
             if not environment:
@@ -92,7 +95,7 @@ class CLEMContext(Context):
             # self._tiff_positions[position].append(transferred_file)
             # check of len(self._tiff_positions[position]) == self._position_sizes.get(position, 0)
 
-        # Check if file is a LIF file
+        # Process LIF files
         if transferred_file.suffix == ".lif":
             # Type checking to satisfy MyPy
             if not environment:
