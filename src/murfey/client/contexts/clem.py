@@ -56,6 +56,9 @@ class CLEMContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("CLEM", acquisition_software)
         self._basepath = basepath
+        # Add additional CLEM contexts here
+        self._tiff_positions: dict = {}
+        self._position_sizes: dict = {}
 
     def post_transfer(
         self,
@@ -67,6 +70,27 @@ class CLEMContext(Context):
         super().post_transfer(
             transferred_file, role=role, environment=environment, **kwargs
         )
+        if transferred_file.suffix == ".xlif":
+            # Type checking to satisfy MyPy
+            if not environment:
+                logger.warning("No environment passed in")
+                return True
+
+            # parse xlif to get position name and size
+            # self._position_sizes[position] = size
+            # check if position is complete by looking at self._tiff_positions[position]
+            # if complete API call (post)
+            pass
+        if transferred_file.suffix == ".tif":
+            # Type checking to satisfy MyPy
+            if not environment:
+                logger.warning("No environment passed in")
+                return True
+
+            # work out position name from file name
+            # self._tiff_positions[position].append(transferred_file)
+            # check of len(self._tiff_positions[position]) == self._position_sizes.get(position, 0)
+            pass
         # Check if file is a LIF file
         if transferred_file.suffix == ".lif":
             # Type checking to satisfy MyPy

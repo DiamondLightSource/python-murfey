@@ -231,7 +231,7 @@ def _convert_lif_to_tiff(
         return None
 
     # Create folders if not already present
-    processed_dir = Path("/".join(path_parts)).parent / file_name  # Save images
+    processed_dir = Path("/".join(path_parts)).parent / file_name  # Processed images
     raw_xml_dir = file.parent / "metadata"  # Raw metadata
     for folder in [processed_dir, raw_xml_dir]:
         if not folder.exists():
@@ -253,14 +253,14 @@ def _convert_lif_to_tiff(
     )
 
     # Recursively generate list of metadata-containing elements
-    elem_list = get_image_elements(xml_root)
+    metadata_list = get_image_elements(xml_root)
 
     # Check that elements match number of images
-    if not len(elem_list) == len(scene_list):
+    if not len(metadata_list) == len(scene_list):
         raise IndexError(
             "Error matching metadata list to list of sub-images. \n"
             # Show what went wrong
-            f"Metadata entries: {len(elem_list)} \n"
+            f"Metadata entries: {len(metadata_list)} \n"
             f"Sub-images: {len(scene_list)}"
         )
 
@@ -273,9 +273,9 @@ def _convert_lif_to_tiff(
         pool_args.append(
             # Arguments need to be pickle-able; no complex objects allowed
             [  # Follow order of args in the function
-                file,  # Reload as LifFile object in the process
+                file,  # Load LIF file in the sub-process
                 i,
-                elem_list[i],  # Corresponding metadata
+                metadata_list[i],  # Corresponding metadata
                 processed_dir,
             ]
         )
