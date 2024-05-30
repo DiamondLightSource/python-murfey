@@ -21,12 +21,15 @@ def convert_lif_to_tiff(
     """
     Wrapper for the actual function in lif.py
     """
-    _convert_lif_to_tiff(
+    result = _convert_lif_to_tiff(
         file,
         root_folder,
         number_of_processes,
     )
-    return True
+    if result:
+        return True
+    else:
+        return False
 
 
 def convert_tiff_to_stack(
@@ -37,9 +40,12 @@ def convert_tiff_to_stack(
     """
     Wrapper for the actual function in tiff.py
     """
-    _convert_tiff_to_stack(
+    result = _convert_tiff_to_stack(
         search_dir,
         root_folder,
         number_of_processes,
     )
-    return True
+    if result:
+        return True
+    else:
+        return False

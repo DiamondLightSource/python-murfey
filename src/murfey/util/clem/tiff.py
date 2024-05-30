@@ -13,15 +13,13 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 from PIL import Image
-from tifffile import imwrite
 
 from murfey.util import sanitise
-from murfey.util.clem.functions import (
-    _change_bit_depth,
-    _get_axis_resolution,
-    _get_image_elements,
-    _rescale_across_channel,
-    _rescale_to_bit_depth,
+from murfey.util.clem.images import (
+    get_axis_resolution,
+    get_image_elements,
+    process_img_stk,
+    write_to_tiff,
 )
 
 # Create logger object to output messages with
@@ -38,7 +36,7 @@ def _process_tiff_files(
     """
 
     # Load relevant metadata
-    elem_list = _get_image_elements(ET.parse(metadata_file).getroot())
+    elem_list = get_image_elements(ET.parse(metadata_file).getroot())
     metadata = elem_list[0]
 
     # Get name of image series
@@ -66,21 +64,20 @@ def _process_tiff_files(
     )
     colors = [channels[c].attrib["LUTName"].lower() for c in range(len(channels))]
 
-    # Load dimensions and get x, y, and z resolution
+    # Get x, y, and z resolution (pixels per um)
     dimensions = metadata.findall(
         "Data/Image/ImageDescription/Dimensions/DimensionDescription"
     )
-    x_res = _get_axis_resolution(dimensions[0])
-    y_res = _get_axis_resolution(dimensions[1])
+    x_res = get_axis_resolution(dimensions[0])
+    y_res = get_axis_resolution(dimensions[1])
 
-    # Process z-axis differently
-    z_res = _get_axis_resolution(dimensions[2]) if len(dimensions) > 2 else float(0)
-    z_size = 1 / z_res if len(dimensions) > 2 else float(0)
+    # Process z-axis if it exists
+    z_res = get_axis_resolution(dimensions[2]) if len(dimensions) > 2 else float(0)
 
-    # Load timestamps
-    # Might be useful in the future
+    # Load timestamps (might be useful in the future)
     # timestamps = elem.find("Data/Image/TimeStampList")
 
+    # Generate slice labels for later
     num_frames = (
         int(dimensions[2].attrib["NumberOfElements"]) if len(dimensions) > 2 else 1
     )
@@ -93,6 +90,9 @@ def _process_tiff_files(
         color = colors[c]
         logger.info(f"Processing {color} channel")
 
+        # Get bit depth
+        bit_depth = int(channels[c].attrib["Resolution"])
+
         # Find TIFFs from relevant channel and series
         tiff_sublist = [
             f
@@ -103,88 +103,55 @@ def _process_tiff_files(
         tiff_sublist.sort()  # Increasing order of Z
 
         # Load image stack
+        logger.info("Loading image stack")
         for t in range(len(tiff_sublist)):
             img = Image.open(tiff_sublist[t])
             if t == 0:
                 arr = np.array([img])  # Store as 3D array
             else:
                 arr = np.append(arr, [img], axis=0)
-
-        # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
-        bit_depth = int(channels[c].attrib["Resolution"])
-        if not any(bit_depth == b for b in [8, 16, 32, 64]):
-            logger.info(
-                f"{bit_depth}-bit is not supported by NumPy; converting to 16-bit"
-            )
-            arr = (
-                _rescale_to_bit_depth(
-                    array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
-                )
-                if np.max(arr) > 0
-                else _change_bit_depth(array=arr, target_bit_depth=16)
-            )
-            bit_depth = 16  # Overwrite
+        logger.info(
+            f"{img_name} {color} array has the dimensions {np.shape(arr)} \n"
+            f"Min value: {np.min(arr)} \n"
+            f"Max value: {np.max(arr)} \n"
+        )
 
         # Rescale intensity values for fluorescent channels
-        if any(
-            color in key
-            for key in [
-                "blue",
-                "cyan",
-                "green",
-                "magenta",
-                "red",
-                "yellow",
-            ]
-        ):
-            logger.info(f"Rescaling {color} channel across channel depth")
-            arr = (
-                _rescale_across_channel(
-                    array=arr,
-                    bit_depth=bit_depth,
-                    percentile_range=(0.5, 99.5),
-                    round_to=16,
-                )
-                if np.max(arr) > 0
-                else arr
+        rescale = (
+            True
+            if any(
+                color in key
+                for key in [
+                    "blue",
+                    "cyan",
+                    "green",
+                    "magenta",
+                    "red",
+                    "yellow",
+                ]
             )
+            else False
+        )
 
-        # Convert to 8-bit
-        if not bit_depth == 8:
-            logger.info("Converting to 8-bit image")
-            bit_depth_new = 8
-            arr = (
-                _rescale_to_bit_depth(
-                    array=arr,
-                    initial_bit_depth=bit_depth,
-                    target_bit_depth=bit_depth_new,
-                )
-                if np.max(arr) > 0
-                else _change_bit_depth(
-                    array=arr,
-                    target_bit_depth=bit_depth_new,
-                )
-            )
-        else:
-            logger.info("Image is already 8-bit")
+        # Process the image stack
+        arr = process_img_stk(
+            array=arr,
+            initial_bit_depth=bit_depth,
+            target_bit_depth=8,
+            rescale=rescale,
+        )
 
         # Save as a greyscale TIFF
-        save_name = save_dir / (color + ".tiff")
-        logger.info(f"Save {color} image as {save_name}")
-        imwrite(
-            save_name,
-            arr,
-            imagej=True,  # ImageJ comptaible
-            photometric="minisblack",  # Grayscale image from black to white
-            shape=np.shape(arr),
-            dtype=arr.dtype,
-            resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
-            metadata={
-                "spacing": z_size,
-                "unit": "micron",
-                "axes": "ZYX",
-                "Labels": image_labels,
-            },
+        arr = write_to_tiff(
+            array=arr,
+            save_dir=save_dir,
+            file_name=color,
+            x_res=x_res,
+            y_res=y_res,
+            z_res=z_res,
+            units="micron",
+            axes="ZYX",
+            image_labels=image_labels,
         )
 
     return True
@@ -309,3 +276,5 @@ def _convert_tiff_to_stack(
 
     if result:
         return True
+    else:
+        return False

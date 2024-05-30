@@ -13,15 +13,9 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 from readlif.reader import LifFile
-from tifffile import imwrite
 
 from murfey.util import sanitise
-from murfey.util.clem.functions import (
-    _change_bit_depth,
-    _get_image_elements,
-    _rescale_across_channel,
-    _rescale_to_bit_depth,
-)
+from murfey.util.clem.images import get_image_elements, process_img_stk, write_to_tiff
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.lif")
@@ -94,30 +88,19 @@ def _process_lif_file(
     )
     colors = [channels[c].attrib["LUTName"].lower() for c in range(len(channels))]
 
-    # Load timestamps and dimensions
-    # Might be useful in the future
-    # timestamps = metadata.find("Data/Image/TimeStampList")
-    # dimensions = metadata.findall(
-    #     "Data/Image/ImageDescription/Dimensions/DimensionDescription"
-    # )
-
     # Generate slice labels for later
     num_frames = image.dims.z
     image_labels = [f"{f}" for f in range(num_frames)]
 
-    # Get x, y, and z scales
-    # Get resolution (pixels per um)
+    # Get x, y, and z resolution (pixels per um)
     x_res = image.scale[0]
     y_res = image.scale[1]
 
-    # Get pixel size (um per pixel)
-    # Might be useful in the future
-    # x_size = 1 / x_res
-    # y_size = 1 / y_res
+    # Process z-axis if it exists
+    z_res: float = image.scale[2] if num_frames > 1 else float(0)
 
-    # Check that depth axis exists
-    z_res: float = image.scale[2] if num_frames > 1 else float(0)  # Pixels per um
-    z_size: float = 1 / z_res if num_frames > 1 else float(0)  # um per pixel
+    # Load timestamps (might be useful in the future)
+    # timestamps = metadata.find("Data/Image/TimeStampList")
 
     # Process channels as individual TIFFs
     for c in range(len(colors)):
@@ -125,6 +108,9 @@ def _process_lif_file(
         # Get color
         color = colors[c]
         logger.info(f"Processing {color} channel")
+
+        # Get bit depth
+        bit_depth = image.bit_depth[c]
 
         # Load image stack to array
         logger.info("Loading image stack")
@@ -135,89 +121,47 @@ def _process_lif_file(
             else:
                 arr = np.append(arr, [frame], axis=0)
         logger.info(
-            f"{file_name}-{img_name}-{color} has the dimensions {np.shape(arr)} \n"
+            f"{img_name} {color} array has the dimensions {np.shape(arr)} \n"
             f"Min value: {np.min(arr)} \n"
             f"Max value: {np.max(arr)} \n"
         )
 
-        # Initial rescaling if bit depth not 8, 16, 32, or 64-bit
-        bit_depth = image.bit_depth[c]  # Initial bit depth
-        if not any(bit_depth == b for b in [8, 16, 32, 64]):
-            logger.info(
-                f"{bit_depth}-bit is not supported by NumPy; converting to 16-bit"
-            )
-            arr = (
-                _rescale_to_bit_depth(
-                    array=arr, initial_bit_depth=bit_depth, target_bit_depth=16
-                )
-                if np.max(arr) > 0
-                else _change_bit_depth(
-                    array=arr,
-                    target_bit_depth=16,
-                )
-            )
-            bit_depth = 16  # Overwrite
-
         # Rescale intensity values for fluorescent channels
-        if any(
-            color in key
-            for key in [
-                "blue",
-                "cyan",
-                "green",
-                "magenta",
-                "red",
-                "yellow",
-            ]
-        ):
-            logger.info(f"Rescaling {color} channel across channel depth")
-            arr = (
-                _rescale_across_channel(
-                    array=arr,
-                    bit_depth=bit_depth,
-                    percentile_range=(0.5, 99.5),
-                    round_to=16,
-                )
-                if np.max(arr) > 0
-                else arr
+        rescale = (
+            True
+            if any(
+                color in key
+                for key in [
+                    "blue",
+                    "cyan",
+                    "green",
+                    "magenta",
+                    "red",
+                    "yellow",
+                ]
             )
+            else False
+        )
 
-        # Convert to 8-bit
-        if not bit_depth == 8:
-            logger.info("Converting to 8-bit image")
-            bit_depth_new = 8
-            arr = (
-                _rescale_to_bit_depth(
-                    array=arr,
-                    initial_bit_depth=bit_depth,
-                    target_bit_depth=bit_depth_new,
-                )
-                if np.max(arr) > 0
-                else _change_bit_depth(
-                    array=arr,
-                    target_bit_depth=bit_depth_new,
-                )
-            )
-        else:
-            logger.info("Image is already 8-bit")
+        # Process the image stack
+        arr = process_img_stk(
+            array=arr,
+            initial_bit_depth=bit_depth,
+            target_bit_depth=8,
+            rescale=rescale,
+        )
 
         # Save as a greyscale TIFF
-        save_name = img_dir.joinpath(color + ".tiff")
-        logger.info(f"Saving {color} image as {save_name}")
-        imwrite(
-            save_name,
-            arr,
-            imagej=True,  # ImageJ compatible
-            photometric="minisblack",  # Grayscale image
-            shape=np.shape(arr),
-            dtype=arr.dtype,
-            resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
-            metadata={
-                "spacing": z_size,
-                "unit": "micron",
-                "axes": "ZYX",
-                "Labels": image_labels,
-            },
+        arr = write_to_tiff(
+            array=arr,
+            save_dir=img_dir,
+            file_name=color,
+            x_res=x_res,
+            y_res=y_res,
+            z_res=z_res,
+            units="micron",
+            axes="ZYX",
+            image_labels=image_labels,
         )
 
     return True
@@ -309,7 +253,7 @@ def _convert_lif_to_tiff(
     )
 
     # Recursively generate list of metadata-containing elements
-    elem_list = _get_image_elements(xml_root)
+    elem_list = get_image_elements(xml_root)
 
     # Check that elements match number of images
     if not len(elem_list) == len(scene_list):
@@ -342,3 +286,5 @@ def _convert_lif_to_tiff(
 
     if result:
         return True
+    else:
+        return False

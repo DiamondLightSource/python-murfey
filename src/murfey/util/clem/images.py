@@ -1,19 +1,21 @@
 """
-Building block functions to help with processing the LM images generated as part of the
+Image processing functions for the LM images generated during the
 cryo-CLEM workflow.
 """
 
 import logging
+from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 import numpy as np
+from tifffile import imwrite
 
 # Create logger object to output messages with
-logger = logging.getLogger("murfey.util.clem.functions")
+logger = logging.getLogger("murfey.util.clem.images")
 
 
-def _get_image_elements(root: ET.Element) -> List[ET.Element]:
+def get_image_elements(root: ET.Element) -> List[ET.Element]:
     """
     Searches the XML metadata recursively to find the nodes tagged as "Element" that
     have image-related tags. Some LIF datasets have layers of nested elements, so a
@@ -47,7 +49,7 @@ def _get_image_elements(root: ET.Element) -> List[ET.Element]:
     return elem_list
 
 
-def _get_axis_resolution(element: ET.Element) -> float:
+def get_axis_resolution(element: ET.Element) -> float:
     """
     Calculates the resolution (pixels per unit length) for the x-, y-, and z-axes.
     Follows "readlif" convention of subtracting 1 from the number of frames/pixels
@@ -71,7 +73,7 @@ def _get_axis_resolution(element: ET.Element) -> float:
     return resolution
 
 
-def _raise_BitDepthError(bit_depth: int):
+def raise_BitDepthError(bit_depth: int):
     """
     Raises an exception if the bit depth value provided is not one that NumPy can
     handle.
@@ -84,7 +86,7 @@ def _raise_BitDepthError(bit_depth: int):
     )
 
 
-def _change_bit_depth(
+def change_bit_depth(
     array: np.ndarray,
     target_bit_depth: int,
 ) -> np.ndarray:
@@ -106,11 +108,12 @@ def _change_bit_depth(
     elif bit_depth == 64:
         arr = arr.astype(np.uint64)
     else:
-        _raise_BitDepthError(bit_depth)
+        raise_BitDepthError(bit_depth)
+
     return arr
 
 
-def _rescale_across_channel(
+def rescale_across_channel(
     array: np.ndarray,
     bit_depth: int,
     percentile_range: Optional[Tuple[float, float]],  # Lower and upper percentiles
@@ -123,7 +126,7 @@ def _rescale_across_channel(
 
     # Check that bit depth is valid before processing even begins
     if not any(bit_depth == b for b in [8, 16, 32, 64]):
-        _raise_BitDepthError(bit_depth)
+        raise_BitDepthError(bit_depth)
 
     # Use shorter variable names
     arr = array
@@ -149,12 +152,12 @@ def _rescale_across_channel(
         )  # Ensure data points don't exceed bit depth (max bit is 2**n - 1)
 
         # Change bit depth back to initial one
-        arr = _change_bit_depth(array=arr, target_bit_depth=bit_depth)
+        arr = change_bit_depth(array=arr, target_bit_depth=bit_depth)
 
     return arr
 
 
-def _rescale_to_bit_depth(
+def rescale_to_bit_depth(
     array: np.ndarray,
     initial_bit_depth: int,
     target_bit_depth: int,
@@ -171,12 +174,113 @@ def _rescale_to_bit_depth(
 
     # Check that target bit depth is allowed
     if not any(bit_final == b for b in [8, 16, 32, 64]):
-        _raise_BitDepthError(bit_final)
+        raise_BitDepthError(bit_final)
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = (arr / (2**bit_init - 1)) * (2**bit_final - 1)
 
     # Change to correct unsigned integer type
-    arr = _change_bit_depth(array=arr, target_bit_depth=bit_final)
+    arr = change_bit_depth(array=arr, target_bit_depth=bit_final)
+
+    return arr
+
+
+def process_img_stk(
+    array: np.ndarray,
+    initial_bit_depth: int,
+    target_bit_depth: int = 8,
+    rescale: bool = False,
+) -> np.ndarray:
+    """
+    Processes the NumPy array, rescaling intensities and converting to the desired bit
+    depth as needed.
+    """
+
+    # Use shorter aliases in function
+    arr = array
+    bdi = initial_bit_depth
+    bdt = target_bit_depth
+
+    if not any(bdi == b for b in [8, 16, 32, 64]):
+        logger.info(f"{bdi}-bit is not supported by NumPy; converting to 16-bit")
+        arr = (
+            rescale_to_bit_depth(array=arr, initial_bit_depth=bdi, target_bit_depth=16)
+            if np.max(arr) > 0
+            else change_bit_depth(
+                array=arr,
+                target_bit_depth=16,
+            )
+        )
+        bdi = 16  # Overwrite
+
+    # Rescale intensity values for fluorescent channels
+    if rescale is True:
+        logger.info("Rescaling channel across its bit depth")
+        arr = (
+            rescale_across_channel(
+                array=arr,
+                bit_depth=bdi,
+                percentile_range=(0.5, 99.5),
+                round_to=16,
+            )
+            if np.max(arr) > 0
+            else arr
+        )
+
+    # Convert to desired bit depth
+    if not bdi == bdt:
+        logger.info(f"Converting to {bdt}-bit image")
+        arr = (
+            rescale_to_bit_depth(
+                array=arr,
+                initial_bit_depth=bdi,
+                target_bit_depth=bdt,
+            )
+            if np.max(arr) > 0
+            else change_bit_depth(
+                array=arr,
+                target_bit_depth=bdt,
+            )
+        )
+    else:
+        logger.info(f"Image is already {bdt}-bit")
+
+    return arr
+
+
+def write_to_tiff(
+    array: np.ndarray,
+    save_dir: Path,
+    file_name: str,
+    # Resolution in pixels per unit length
+    x_res: float,
+    y_res: float,
+    z_res: float,
+    units: str,
+    axes: str,
+    image_labels: List[str],
+):
+    # Use shorter aliases and calculate what is needed
+    arr = array
+    z_size = (1 / z_res) if z_res > 0 else float(0)
+
+    # Save as a greyscale TIFF
+    save_name = save_dir.joinpath(file_name + ".tiff")
+    logger.info(f"Saving {file_name} image as {save_name}")
+    imwrite(
+        save_name,
+        arr,
+        imagej=True,  # ImageJ compatible
+        photometric="minisblack",  # Grayscale image
+        shape=np.shape(arr),
+        dtype=arr.dtype,
+        resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
+        metadata={
+            "spacing": z_size,
+            "unit": units,
+            "axes": axes,
+            "Labels": image_labels,
+        },
+    )
 
     return arr
