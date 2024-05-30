@@ -236,9 +236,9 @@ def _convert_lif_to_tiff(
     for folder in [processed_dir, raw_xml_dir]:
         if not folder.exists():
             folder.mkdir(parents=True)
-            logger.info(f"Created {folder}")
+            logger.info(f"Created {sanitise(str(folder))}")
         else:
-            logger.info(f"{folder} already exists")
+            logger.info(f"{sanitise(str(folder))} already exists")
 
     # Load LIF file as a LifFile class
     logger.info(f"Loading {sanitise(file.name)}")
