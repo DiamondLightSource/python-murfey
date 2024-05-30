@@ -7,8 +7,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from murfey.util.clem.lif import _convert_lif_to_tiff
-from murfey.util.clem.tiff import _convert_tiff_to_stack
+from murfey.util.clem import lif, tiff
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem")
@@ -22,7 +21,7 @@ def convert_lif_to_tiff(
     """
     Wrapper for the actual function in lif.py
     """
-    result = _convert_lif_to_tiff(
+    result = lif.convert_lif_to_tiff(
         file,
         root_folder,
         number_of_processes,
@@ -40,7 +39,7 @@ def convert_tiff_to_stack(
     """
     Wrapper for the actual function in tiff.py
     """
-    result = _convert_tiff_to_stack(
+    result = tiff.convert_tiff_to_stack(
         tiff_list,
         root_folder,
     )

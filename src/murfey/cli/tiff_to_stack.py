@@ -11,8 +11,8 @@ def run():
 
     parser.add_argument(
         nargs=1,
-        dest="tiff_path",
-        help="Path to directory containing TIFF files for conversion",
+        dest="tiff_list",
+        help="List of TIFF files belonging to a particular image series",
     )
     parser.add_argument(
         "--root-dir",
@@ -20,14 +20,11 @@ def run():
         type=str,
         help="Top subdirectory that TIFF files are stored in. Used to determine destination of the created image stacks",
     )
-    parser.add_argument(
-        "-n", "--num-procs", default=1, type=int, help="Number of processes"
-    )
 
     args = parser.parse_args()
 
     convert_tiff_to_stack(
-        Path(args.tiff_path),
+        Path(args.tiff_list),
         root_folder=args.root_dir,
         number_of_processes=args.num_procs,
     )

@@ -77,10 +77,11 @@ class CLEMContext(Context):
                 return True
 
             # parse xlif to get position name and size
+
             # self._position_sizes[position] = size
             # check if position is complete by looking at self._tiff_positions[position]
             # if complete API call (post)
-            pass
+
         if transferred_file.suffix == ".tif":
             # Type checking to satisfy MyPy
             if not environment:
@@ -90,7 +91,7 @@ class CLEMContext(Context):
             # work out position name from file name
             # self._tiff_positions[position].append(transferred_file)
             # check of len(self._tiff_positions[position]) == self._position_sizes.get(position, 0)
-            pass
+
         # Check if file is a LIF file
         if transferred_file.suffix == ".lif":
             # Type checking to satisfy MyPy

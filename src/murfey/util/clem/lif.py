@@ -1,6 +1,6 @@
 """
-Contains functions that help with reading LIF files and converting them into TIFF files
-as part of the cryo-CLEM workflow.
+Supporting functions to extract TIFF image stacks from the LIF files produced by the
+Leica light microscope.
 """
 
 from __future__ import annotations
@@ -8,43 +8,20 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from pathlib import Path
-from typing import Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
 from readlif.reader import LifFile
 
 from murfey.util import sanitise
-from murfey.util.clem.images import get_image_elements, process_img_stk, write_to_tiff
+from murfey.util.clem.images import process_img_stk, write_to_tiff
+from murfey.util.clem.xml import get_image_elements, get_lif_xml_metadata
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.lif")
 
 
-def _get_lif_xml_metadata(
-    file: LifFile,
-    save_xml: Optional[Path] = None,
-) -> ET.Element:
-    """
-    Extracts and returns the file metadata as a formatted XML Element. Provides option
-    to save it as an XML file to the specified file path
-    """
-
-    # Use readlif function to get XML metadata
-    xml_root: ET.Element = file.xml_root  # This one for navigating
-    xml_tree = ET.ElementTree(xml_root)  # This one for saving
-
-    # Skip saving the metadata if save_xml not provided
-    if save_xml:
-        xml_file = str(save_xml)  # Convert Path to string
-        ET.indent(xml_tree, "  ")  # Format with proper indentation
-        xml_tree.write(xml_file, encoding="utf-8")  # Save
-        logger.info(f"File metadata saved to {sanitise(xml_file)}")
-
-    return xml_root
-
-
-def _process_lif_file(
+def process_lif_file(
     file: Path,
     scene_num: int,
     metadata: ET.Element,
@@ -167,7 +144,7 @@ def _process_lif_file(
     return True
 
 
-def _convert_lif_to_tiff(
+def convert_lif_to_tiff(
     file: Path,
     root_folder: str,  # Name of the folder to treat as the root folder for LIF files
     number_of_processes: int = 1,  # Number of processing threads to run
@@ -247,7 +224,7 @@ def _convert_lif_to_tiff(
 
     # Save original metadata as XML tree
     logger.info("Extracting image metadata")
-    xml_root = _get_lif_xml_metadata(
+    xml_root = get_lif_xml_metadata(
         file=lif_file,
         save_xml=raw_xml_dir.joinpath(file_name + ".xml"),
     )
@@ -282,9 +259,9 @@ def _convert_lif_to_tiff(
 
     # Parallel process image stacks
     with mp.Pool(processes=num_procs) as pool:
-        result = pool.starmap(_process_lif_file, pool_args)
+        result = pool.starmap(process_lif_file, pool_args)
 
     if result:
         return True
     else:
-        return False
+        return None
