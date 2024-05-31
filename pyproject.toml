@@ -31,7 +31,8 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "importlib-metadata", # Used in both client and server scripts
+    "pydantic<2", # pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
     "requests",
     "rich",
     "werkzeug",
