@@ -42,7 +42,7 @@ cicd = [
 ]
 client = [
     "procrunner",
-    "textual==0.42.0",
+    "textual", # ==0.42.0", # importlib-metadata a former dependency of theirs
     "websocket-client",
     "xmltodict",
 ]
@@ -53,7 +53,6 @@ developer = [
     "pytest", # Test code functionality
 ]
 server = [
-    # "matplotlib", # For visual statistical analysis of images
     "cryptography",
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
@@ -67,7 +66,7 @@ server = [
     "python-jose[cryptography]",
     "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
-    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py", # <=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project # 8.1.2 seems ok
     "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
