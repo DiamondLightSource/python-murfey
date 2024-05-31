@@ -30,7 +30,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "pydantic<2", # Pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
+    "importlib-metadata", # Used in both client and server scripts
+    "pydantic<2", # pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
     "requests",
     "rich",
     "werkzeug",
@@ -41,7 +42,7 @@ cicd = [
 ]
 client = [
     "procrunner",
-    "textual==0.42.0",
+    "textual", # ==0.42.0", # importlib-metadata a former dependency of theirs
     "websocket-client",
     "xmltodict",
 ]
@@ -52,7 +53,6 @@ developer = [
     "pytest", # Test code functionality
 ]
 server = [
-    # "matplotlib", # For visual statistical analysis of images
     "cryptography",
     "fastapi",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
@@ -63,7 +63,7 @@ server = [
     "prometheus_client",
     "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
-    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py", # <=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project # 8.1.2 seems ok
     "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
