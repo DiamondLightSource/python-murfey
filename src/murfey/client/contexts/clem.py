@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import defusedxml.ElementTree as ET
+from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -144,7 +144,7 @@ class CLEMContext(Context):
                 )  # The previous 2 parent directories should be unique enough
 
                 # Extract metadata to get the expected size of the series
-                metadata = ET.parse(file_path).getroot()
+                metadata = parse(file_path).getroot()
                 metadata = xml.get_image_elements(metadata)[0]
 
                 # Get channel and dimension information

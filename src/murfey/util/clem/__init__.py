@@ -35,7 +35,7 @@ def convert_lif_to_tiff(
 def convert_tiff_to_stack(
     tiff_list: List[Path],  # List of TIFFs from a single series
     root_folder: str,  # Name of the folder to treat as the root folder for TIFF files
-    metadata_file: Optional[Path],  # Option to manually provide metadata file
+    metadata_file: Optional[Path] = None,  # Option to manually provide metadata file
 ):
     """
     Wrapper for the actual function in tiff.py

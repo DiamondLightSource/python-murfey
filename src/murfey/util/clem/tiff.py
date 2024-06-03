@@ -8,9 +8,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import List, Optional
+from xml.etree import ElementTree as ET
 
 import numpy as np
-from defusedxml import ElementTree as ET
+from defusedxml.ElementTree import parse
 from PIL import Image
 
 from murfey.util import sanitise
@@ -36,7 +37,7 @@ def process_tiff_files(
         return False
 
     # Load relevant metadata
-    elem_list = get_image_elements(ET.parse(metadata_file).getroot())
+    elem_list = get_image_elements(parse(metadata_file).getroot())
     metadata = elem_list[0]
 
     # Get name of image series
