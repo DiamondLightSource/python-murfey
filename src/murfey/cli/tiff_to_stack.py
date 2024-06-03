@@ -11,7 +11,7 @@ def run():
     )
     # Path to single TIFF file from series (Mandatory)
     parser.add_argument(
-        nargs=1,
+        nargs=1,  # nargs=1 produces a list of 1 item
         dest="tiff_file",
         type=str,
         help="Path to any one of the TIFF files from the series to be processed",
@@ -33,8 +33,9 @@ def run():
     # Parse the arguments
     args = parser.parse_args()
 
+    # Convert to correct object types
+    tiff_file = Path(args.tiff_file[0])
     # Generate list from the single file provided
-    tiff_file = Path(args.tiff_file)
     tiff_list = [
         f.resolve()
         for f in tiff_file.parent.glob("./*")
@@ -43,7 +44,13 @@ def run():
     ]
     tiff_list.sort()  # Sort in ascending order
 
-    # Plug it into function for processing
+    if not args.metadata:
+        metadata = None
+    else:
+        metadata = Path(args.metadata)
+
     convert_tiff_to_stack(
-        tiff_list=tiff_list, root_folder=args.root_dir, metadata_file=args.metadata
+        tiff_list=tiff_list,
+        root_folder=args.root_dir,
+        metadata_file=metadata,
     )
