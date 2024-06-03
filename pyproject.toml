@@ -40,6 +40,7 @@ cicd = [
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
 client = [
+    "defusedxml",
     "procrunner",
     "textual==0.42.0",
     "websocket-client",
