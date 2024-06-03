@@ -1,8 +1,5 @@
-"""
-Script to allow Murfey to submit the LIF-to-TIFF job to the cluster.
-"""
-
 from pathlib import Path
+from typing import Optional
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -11,11 +8,15 @@ except AttributeError:
 
 
 def zocalo_cluster_request(
-    lif_file: Path, root_folder: str, messenger: TransportManager | None = None
+    tiff_file: Path,
+    root_folder: str,
+    metadata: Optional[Path],
+    messenger: TransportManager | None = None,
 ):
     if messenger:
+
         # Set working directory to be the parent of the designated root folder
-        path_parts = list(lif_file.parts)
+        path_parts = list(tiff_file.parts)
         new_path = []
         for p in range(len(path_parts)):
             part = path_parts[p]
@@ -31,12 +32,12 @@ def zocalo_cluster_request(
         messenger.send(
             "processing_recipe",
             {
-                "recipes": ["lif-to-tiff"],
+                "recipes": ["tiff-to-stack"],
                 "parameters": {
-                    # Where the cluster generates and saves log files
                     "working_dir": str(working_dir),
-                    "lif_file": str(lif_file),
+                    "tiff_file": str(tiff_file),
                     "root_dir": root_folder,
+                    "metadata": str(metadata),
                 },
             },
             new_connection=True,
