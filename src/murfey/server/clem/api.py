@@ -50,5 +50,3 @@ def tiff_to_stack(
             root_folder="images",
             metadata_file=tiff_info.series_metadata,
         )
-        pass
-    pass

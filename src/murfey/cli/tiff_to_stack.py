@@ -20,10 +20,15 @@ def run():
         type=str,
         help="Top subdirectory that TIFF files are stored in. Used to determine destination of the created image stacks",
     )
+    parser.add_argument(
+        "--metadata",
+        default="None",
+        type=Path,
+        help="Path to the XLIF file associated with this dataset. If not provided, the script will use relative file paths to find what it thinks is the appropriate file",
+    )
 
     args = parser.parse_args()
 
     convert_tiff_to_stack(
-        Path(args.tiff_list),
-        root_folder=args.root_dir,
+        Path(args.tiff_list), root_folder=args.root_dir, metadata_file=args.metadata
     )
