@@ -5,30 +5,45 @@ from murfey.util.clem import convert_tiff_to_stack
 
 
 def run():
+    # Create an argument parser
     parser = argparse.ArgumentParser(
         description="Convert individual TIFF files into image stacks"
     )
-
+    # Path to single TIFF file from series (Mandatory)
     parser.add_argument(
         nargs=1,
-        dest="tiff_list",
-        help="List of TIFF files belonging to a particular image series",
+        dest="tiff_file",
+        type=str,
+        help="Path to any one of the TIFF files from the series to be processed",
     )
+    # Root directory (Optional)
     parser.add_argument(
         "--root-dir",
         default="images",
         type=str,
-        help="Top subdirectory that TIFF files are stored in. Used to determine destination of the created image stacks",
+        help="Top subdirectory that raw TIFF files are stored in. Used to determine destination of the created image stacks",
     )
+    # Path to metadata file (Optional)
     parser.add_argument(
         "--metadata",
-        default="None",
-        type=Path,
+        default=None,
+        type=str,
         help="Path to the XLIF file associated with this dataset. If not provided, the script will use relative file paths to find what it thinks is the appropriate file",
     )
-
+    # Parse the arguments
     args = parser.parse_args()
 
+    # Generate list from the single file provided
+    tiff_file = Path(args.tiff_file)
+    tiff_list = [
+        f.resolve()
+        for f in tiff_file.parent.glob("./*")
+        if f.suffix in {".tif", ".tiff"}
+        and f.stem.startswith(tiff_file.stem.split("--")[0])
+    ]
+    tiff_list.sort()  # Sort in ascending order
+
+    # Plug it into function for processing
     convert_tiff_to_stack(
-        Path(args.tiff_list), root_folder=args.root_dir, metadata_file=args.metadata
+        tiff_list=tiff_list, root_folder=args.root_dir, metadata_file=args.metadata
     )

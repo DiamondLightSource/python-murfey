@@ -31,7 +31,7 @@ def process_tiff_files(
     """
 
     # Validate metadata
-    if not metadata_file.parents[-3] == tiff_list[0].parents[-3]:
+    if not metadata_file.parents[-2] == tiff_list[0].parents[-2]:
         logger.error("The base paths of the metadata and TIFF files do not match")
         return False
 
