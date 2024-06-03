@@ -5,7 +5,7 @@ workflow.
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from murfey.util.clem import lif, tiff
 
@@ -35,6 +35,7 @@ def convert_lif_to_tiff(
 def convert_tiff_to_stack(
     tiff_list: List[Path],  # List of TIFFs from a single series
     root_folder: str,  # Name of the folder to treat as the root folder for TIFF files
+    metadata_file: Optional[Path],  # Option to manually provide metadata file
 ):
     """
     Wrapper for the actual function in tiff.py
@@ -42,6 +43,7 @@ def convert_tiff_to_stack(
     result = tiff.convert_tiff_to_stack(
         tiff_list,
         root_folder,
+        metadata_file,
     )
     if result:
         return True

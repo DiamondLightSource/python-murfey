@@ -161,10 +161,14 @@ class LifFileInfo(BaseModel):
 
 # WORK IN PROGRESS
 # tiff_to_stack looks for folders, not files
-class TiffFileInfo(BaseModel):
-    name: Path
-    size: int
-    timestamp: float
+class TiffStackInfo(BaseModel):
+    series_name: str
+    tiff_files: List[Path]
+    tiff_sizes: List[int]
+    tiff_timestampes: List[float]
+    series_metadata: Path
+    metadata_size: int
+    metadata_timestampe: float
     description: str = ""
 
 
