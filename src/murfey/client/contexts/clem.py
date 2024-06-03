@@ -137,10 +137,6 @@ class CLEMContext(Context):
             # Process XLIF files
             if transferred_file.suffix == ".xlif":
 
-                # Validate XLIF file paths
-                if not str(transferred_file).startswith(str(self._basepath)):
-                    raise Exception("Not allowed")
-
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "/".join(

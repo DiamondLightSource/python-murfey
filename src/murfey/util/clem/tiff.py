@@ -8,9 +8,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import List, Optional
-from xml.etree import ElementTree as ET
 
 import numpy as np
+from defusedxml import ElementTree as ET
 from PIL import Image
 
 from murfey.util import sanitise
@@ -29,6 +29,11 @@ def process_tiff_files(
     """
     Opens the TIFF files as NumPy arrays and stacks them.
     """
+
+    # Validate metadata
+    if not metadata_file.parents[-3] == tiff_list[0].parents[-3]:
+        logger.error("The base paths of the metadata and TIFF files do not match")
+        return False
 
     # Load relevant metadata
     elem_list = get_image_elements(ET.parse(metadata_file).getroot())

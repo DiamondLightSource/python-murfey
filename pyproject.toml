@@ -30,6 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "defusedxml", # For safely parsing XML files
     "pydantic<2", # Pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
     "requests",
     "rich",
@@ -40,7 +41,6 @@ cicd = [
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
 client = [
-    "defusedxml",
     "procrunner",
     "textual==0.42.0",
     "websocket-client",
