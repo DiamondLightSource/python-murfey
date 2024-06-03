@@ -30,8 +30,9 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "defusedxml", # Used for safely extracting XML elements
     "importlib-metadata", # Used in both client and server scripts
-    "pydantic<2", # pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
+    "pydantic<2", # Fixed to <2 by zocalo in [server] dependencies
     "requests",
     "rich",
     "werkzeug",
