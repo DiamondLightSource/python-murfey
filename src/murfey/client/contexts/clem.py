@@ -10,11 +10,13 @@ Provide a post transfer function to pass on:
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
+from xml.etree import ElementTree as ET
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import capture_post, get_machine_config
+from murfey.util.clem import xml
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -56,9 +58,12 @@ class CLEMContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("CLEM", acquisition_software)
         self._basepath = basepath
-        # Add additional CLEM contexts here
-        self._tiff_positions: dict = {}
-        self._position_sizes: dict = {}
+        # CLEM contexts for "auto-save" acquisition mode
+        self._tiff_series: Dict[str, List[str]] = {}  # Series name : List of TIFF files
+        self._series_metadata: Dict[str, str] = {}  # Series name: Metadata file path
+        self._series_size: Dict[str, int] = (
+            {}
+        )  # Series name : Expected number of TIFF files
 
     def post_transfer(
         self,
@@ -71,29 +76,68 @@ class CLEMContext(Context):
             transferred_file, role=role, environment=environment, **kwargs
         )
 
-        # Process XLIF files
-        if transferred_file.suffix == ".xlif":
+        # Process files generated as part of "auto-save" acquisition mode
+        # These include TIFs/TIFFs and XLIFs
+        if any(transferred_file.suffix == s for s in [".tif", ".tiff", ".xlif"]):
             # Type checking to satisfy MyPy
             if not environment:
                 logger.warning("No environment passed in")
                 return True
 
-            # parse xlif to get position name and size
+            # Process XLIF files
+            if transferred_file.suffix == ".xlif":
+                # Get series name
+                # XLIF files don't have the "--ZXX--CXX" additions in the file name
+                # XLIF files have "/Metadata/" as the immediate parent
+                series_name = str(
+                    transferred_file.parent.parent / transferred_file.stem
+                )
 
-            # self._position_sizes[position] = size
-            # check if position is complete by looking at self._tiff_positions[position]
-            # if complete API call (post)
+                # Extract metadata to get the expected size of the series
+                metadata = ET.parse(transferred_file).getroot()
+                metadata = xml.get_image_elements(metadata)[0]
 
-        # Process TIF files that are part of the CLEM workflow
-        if transferred_file.suffix == ".tif":
-            # Type checking to satisfy MyPy
-            if not environment:
-                logger.warning("No environment passed in")
-                return True
+                # Get channel and dimension information
+                channels = metadata.findall(
+                    "Data/Image/ImageDescription/Channels/ChannelDescription"
+                )
+                dimensions = metadata.findall(
+                    "Data/Image/ImageDescription/Dimensions/DimensionDescription"
+                )
 
-            # work out position name from file name
-            # self._tiff_positions[position].append(transferred_file)
-            # check of len(self._tiff_positions[position]) == self._position_sizes.get(position, 0)
+                # Calculate expected number of files for this series
+                num_channels = len(channels)
+                num_frames = (
+                    int(dimensions[2].attrib["NumberOfElements"])
+                    if len(dimensions) > 2
+                    else 1
+                )
+                num_files = num_channels * num_frames
+
+                # Update dictionary entries
+                self._series_size[series_name] = num_files
+                self._series_metadata[series_name] = str(transferred_file)
+
+            # Process TIF/TIFF files
+            if any(transferred_file.suffix == s for s in [".tif", ".tiff"]):
+                # Files should be named "PositionX--ZXX--CXX.tif" by default
+                if not len(transferred_file.stem.split("--")) == 3:
+                    logger.warning(
+                        "This TIFF file is likely not part of the CLEM workflow"
+                    )
+                    return False  # Not sure if None, False, or True is most appropriate
+
+                # Get series name from file name
+                series_name = str(
+                    transferred_file.parent / transferred_file.stem.split("--")[0]
+                )
+
+                # Create a key-value pair containing empty list if it doesn't already exist
+                if series_name not in self._tiff_series.keys():
+                    self._tiff_series[series_name] = []
+                self._tiff_series[series_name].append(str(transferred_file))
+
+            # Check if all files for the associated series have been collected
 
         # Process LIF files
         if transferred_file.suffix == ".lif":
