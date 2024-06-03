@@ -1,3 +1,8 @@
+"""
+Script to allow Murfey to submit the TIFF-to-stack job to the cluster.
+The recipe referred to here is stored on GitLab.
+"""
+
 from pathlib import Path
 from typing import Optional
 

@@ -1,5 +1,6 @@
 """
 Script to allow Murfey to submit the LIF-to-TIFF job to the cluster.
+The recipe referred to here is stored on GitLab.
 """
 
 from pathlib import Path
