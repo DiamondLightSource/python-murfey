@@ -9,7 +9,7 @@ from pydantic import BaseModel
 """
 General Models
 ==============
-Models used in multiple workflows go here.
+Models used in multiple workflows.
 """
 
 
@@ -148,7 +148,7 @@ class PostInfo(BaseModel):
 """
 Cryo-CLEM
 =========
-Models related to the cryo-CLEM workflow will go here.
+Models related to the cryo-CLEM workflow.
 """
 
 
@@ -160,22 +160,21 @@ class LifFileInfo(BaseModel):
 
 
 # WORK IN PROGRESS
-# tiff_to_stack looks for folders, not files
-class TiffStackInfo(BaseModel):
+class TiffSeriesiInfo(BaseModel):
     series_name: str
     tiff_files: List[Path]
     tiff_sizes: List[int]
-    tiff_timestampes: List[float]
+    tiff_timestamps: List[float]
     series_metadata: Path
     metadata_size: int
-    metadata_timestampe: float
+    metadata_timestamp: float
     description: str = ""
 
 
 """
 FIB
 ===
-Models related to FIB, as part of correlative workflow with TEM
+Models related to FIB, as part of correlative workflow with TEM.
 """
 
 
@@ -209,7 +208,7 @@ class MillingParameters(BaseModel):
 """
 Single Particle Analysis
 ========================
-Models related specifically to the single-particle analysis workflow go here.
+Models related to the single-particle analysis workflow.
 """
 
 
@@ -306,7 +305,7 @@ class FoilHoleParameters(BaseModel):
 """
 Tomography
 ==========
-Models specifically related to the tomographic reconstruction workflow go here.
+Models related to the tomographic reconstruction workflow.
 """
 
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from murfey.server import _transport_object
 from murfey.util.clem import convert_lif_to_tiff, convert_tiff_to_stack
-from murfey.util.models import LifFileInfo, TiffStackInfo
+from murfey.util.models import LifFileInfo, TiffSeriesiInfo
 
 # Create APIRouter class object
 router = APIRouter()
@@ -22,7 +22,10 @@ def lif_to_tiff(
     )
     if murfey_workflows:
         murfey_workflows[0].load()(
-            file=lif_info.name, root_folder="images", messenger=_transport_object
+            # Match the arguments found in murfey.workflows.lif_to_tiff
+            file=lif_info.name,
+            root_folder="images",
+            messenger=_transport_object,
         )
     else:
         convert_lif_to_tiff(
@@ -35,14 +38,18 @@ def lif_to_tiff(
 @router.post("/sessions/{session_id}/tiff_to_stack")
 def tiff_to_stack(
     session_id: int,  # Used by the decorator
-    tiff_info: TiffStackInfo,
+    tiff_info: TiffSeriesiInfo,
 ):
     murfey_workflows = importlib.metadata.entry_points().select(
         group="murfey.workflows", name="tiff_to_stack"
     )
     if murfey_workflows:
         murfey_workflows[0].load()(
-            file=tiff_info.name, root_folder="images", messenger=_transport_object
+            # Match the arguments found in murfey.workflows.tiff_to_stack
+            file=tiff_info.tiff_files,
+            root_folder="images",
+            metadata=tiff_info.series_metadata,
+            messenger=_transport_object,
         )
     else:
         convert_tiff_to_stack(
