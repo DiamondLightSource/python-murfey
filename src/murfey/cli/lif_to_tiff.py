@@ -10,8 +10,8 @@ def run():
     )
 
     parser.add_argument(
-        nargs=1,
-        dest="lif_file",
+        nargs=1,  # nargs=1 creates a 1-item list
+        dest="lif_path",
         help="Path to LIF file for conversion",
     )
     parser.add_argument(
@@ -27,7 +27,7 @@ def run():
     args = parser.parse_args()
 
     convert_lif_to_tiff(
-        Path(args.lif_file),
+        file=Path(args.lif_path[0]),
         root_folder=args.root_dir,
         number_of_processes=args.num_procs,
     )

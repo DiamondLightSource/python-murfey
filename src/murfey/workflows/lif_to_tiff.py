@@ -12,11 +12,11 @@ except AttributeError:
 
 
 def zocalo_cluster_request(
-    lif_file: Path, root_folder: str, messenger: TransportManager | None = None
+    file: Path, root_folder: str, messenger: TransportManager | None = None
 ):
     if messenger:
         # Set working directory to be the parent of the designated root folder
-        path_parts = list(lif_file.parts)
+        path_parts = list(file.parts)
         new_path = []
         for p in range(len(path_parts)):
             part = path_parts[p]
@@ -36,7 +36,7 @@ def zocalo_cluster_request(
                 "parameters": {
                     # Where the cluster generates and saves log files
                     "working_dir": str(working_dir),
-                    "lif_file": str(lif_file),
+                    "lif_path": str(file),
                     "root_dir": root_folder,
                 },
             },

@@ -12,7 +12,7 @@ def run():
     # Path to single TIFF file from series (Mandatory)
     parser.add_argument(
         nargs=1,  # nargs=1 produces a list of 1 item
-        dest="tiff_file",
+        dest="tiff_path",
         type=str,
         help="Path to any one of the TIFF files from the series to be processed",
     )
@@ -34,7 +34,7 @@ def run():
     args = parser.parse_args()
 
     # Convert to correct object types
-    tiff_file = Path(args.tiff_file[0])
+    tiff_file = Path(args.tiff_path[0])
     # Generate list from the single file provided
     tiff_list = [
         f.resolve()
@@ -44,6 +44,7 @@ def run():
     ]
     tiff_list.sort()  # Sort in ascending order
 
+    # Resolve for metadata argument
     if not args.metadata:
         metadata = None
     else:

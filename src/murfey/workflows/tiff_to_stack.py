@@ -13,7 +13,7 @@ except AttributeError:
 
 
 def zocalo_cluster_request(
-    tiff_file: Path,
+    file: Path,
     root_folder: str,
     metadata: Optional[Path],
     messenger: TransportManager | None = None,
@@ -21,7 +21,7 @@ def zocalo_cluster_request(
     if messenger:
 
         # Set working directory to be the parent of the designated root folder
-        path_parts = list(tiff_file.parts)
+        path_parts = list(file.parts)
         new_path = []
         for p in range(len(path_parts)):
             part = path_parts[p]
@@ -40,7 +40,7 @@ def zocalo_cluster_request(
                 "recipes": ["tiff-to-stack"],
                 "parameters": {
                     "working_dir": str(working_dir),
-                    "tiff_file": str(tiff_file),
+                    "tiff_path": str(file),
                     "root_dir": root_folder,
                     "metadata": str(metadata),
                 },
