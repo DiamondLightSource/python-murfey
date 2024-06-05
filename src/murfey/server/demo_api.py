@@ -69,6 +69,7 @@ from murfey.util.models import (
     FractionationParameters,
     GainReference,
     GridSquareParameters,
+    PostInfo,
     PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
@@ -1491,3 +1492,9 @@ async def get_tiff(visit_name: str, tiff_path: str):
         return None
 
     return FileResponse(path=test_path)
+
+
+@router.post("/failed_client_post")
+def failed_client_post(post_info: PostInfo):
+    log.info("Post failed")
+    return
