@@ -31,6 +31,12 @@ def hash_password(password: str) -> str:
 _url = url(machine_config)
 engine = create_engine(_url)
 
+try:
+    _url = url(get_machine_config())
+    engine = create_engine(_url)
+except Exception:
+    engine = None
+
 
 def validate_user(username: str, password: str) -> bool:
     try:
