@@ -28,9 +28,6 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-_url = url(machine_config)
-engine = create_engine(_url)
-
 try:
     _url = url(get_machine_config())
     engine = create_engine(_url)
