@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import subprocess
 import threading
 import time
 from enum import Enum
@@ -383,6 +384,7 @@ class RSyncer(Observer):
 
         rsync_cmd.extend([".", self._remote])
 
+        result: subprocess.CompletedProcess | None = None
         success = True
         if rsync_stdin:
             result = procrunner.run(
@@ -394,7 +396,7 @@ class RSyncer(Observer):
                 print_stdout=False,
                 print_stderr=False,
             )
-            success = result.returncode == 0
+            success = result.returncode == 0 if result else False
 
         if rsync_stdin_remove:
             rsync_cmd.insert(-2, "--remove-source-files")
@@ -409,7 +411,7 @@ class RSyncer(Observer):
             )
 
             if success:
-                success = result.returncode == 0
+                success = result.returncode == 0 if result else False
 
         self.notify(successful_updates, secondary=True)
 
@@ -429,8 +431,11 @@ class RSyncer(Observer):
             self.notify(update)
             success = False
 
-        logger.log(
-            logging.WARNING if result.returncode else logging.DEBUG,
-            f"rsync process finished with return code {result.returncode}",
-        )
+        if result is None:
+            logger.error(f"No rsync process ran for files: {files}")
+        else:
+            logger.log(
+                logging.WARNING if result.returncode else logging.DEBUG,
+                f"rsync process finished with return code {result.returncode}",
+            )
         return success

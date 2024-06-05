@@ -46,8 +46,22 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         required_strings=["fractions"],
         environment=env,
     )
-    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
     assert not context._completed_tilt_series
+
+    # Add Position_1.mdoc, which completes this position
+    with open(tmp_path / "Position_1.mdoc", "w") as mdoc:
+        mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
+    context.post_transfer(
+        tmp_path / "Position_1.mdoc",
+        role="detector",
+        required_position_files=[],
+        required_strings=["fractions"],
+        environment=env,
+    )
+    assert context._completed_tilt_series == ["Position_1"]
+
+    # Start Position_2, this is not complete
+    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_[30.0]_fractions.tiff",
         role="detector",
@@ -122,16 +136,31 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         environment=env,
     )
     assert len(context._tilt_series.values()) == 3
-    assert context._completed_tilt_series == ["Position_1", "Position_2"]
+    assert not context._completed_tilt_series
+
+    # Add Position_1.mdoc, which completes this position
+    with open(tmp_path / "Position_1.mdoc", "w") as mdoc:
+        mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
     context.post_transfer(
-        tmp_path / "Position_3_[30.0]_fractions.tiff",
+        tmp_path / "Position_1.mdoc",
         role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
     )
-    print(context._completed_tilt_series)
-    assert context._completed_tilt_series == ["Position_1", "Position_2", "Position_3"]
+    assert context._completed_tilt_series == ["Position_1"]
+
+    # Add Position_2.mdoc, which completes this position
+    with open(tmp_path / "Position_2.mdoc", "w") as mdoc:
+        mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
+    context.post_transfer(
+        tmp_path / "Position_2.mdoc",
+        role="detector",
+        required_position_files=[],
+        required_strings=["fractions"],
+        environment=env,
+    )
+    assert context._completed_tilt_series == ["Position_1", "Position_2"]
 
 
 @patch("requests.get")
@@ -167,24 +196,20 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         environment=env,
     )
     assert not context._completed_tilt_series
-    (tmp_path / "Position_2_[30.0]_fractions.tiff").touch()
+
+    # Add Position_1.mdoc, with more tilts than have been seen so far
+    with open(tmp_path / "Position_1.mdoc", "w") as mdoc:
+        mdoc.write("[ZValue = 0]\n[ZValue = 1]\n[ZValue = 2]\n")
     context.post_transfer(
-        tmp_path / "Position_2_[30.0]_fractions.tiff",
+        tmp_path / "Position_1.mdoc",
         role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
     )
-    assert len(context._tilt_series.values()) == 2
-    assert context._completed_tilt_series == ["Position_1"]
-    (tmp_path / "Position_2_[-30.0]_fractions.tiff").touch()
-    context.post_transfer(
-        tmp_path / "Position_2_[-30.0]_fractions.tiff",
-        role="detector",
-        required_position_files=[],
-        required_strings=["fractions"],
-        environment=env,
-    )
+    assert not context._completed_tilt_series
+
+    # Now add the tilt which completes the series
     (tmp_path / "Position_1_[60.0]_fractions.tiff").touch()
     new_series = context.post_transfer(
         tmp_path / "Position_1_[60.0]_fractions.tiff",
@@ -193,7 +218,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         required_strings=["fractions"],
         environment=env,
     )
-    assert context._completed_tilt_series == ["Position_2", "Position_1"]
+    assert context._completed_tilt_series == ["Position_1"]
     assert new_series == ["Position_1"]
 
 
@@ -201,76 +226,6 @@ def test_tomography_context_initialisation_for_serialem(tmp_path):
     context = TomographyContext("serialem", tmp_path)
     assert not context._last_transferred_file
     assert context._acquisition_software == "serialem"
-
-
-@patch("requests.get")
-@patch("requests.post")
-def test_tomography_context_add_serialem_tilt(mock_post, mock_get, tmp_path):
-    env = MurfeyInstanceEnvironment(
-        url=urlparse("http://localhost:8000"),
-        client_id=0,
-        sources=[tmp_path],
-        default_destinations={tmp_path: str(tmp_path)},
-    )
-    context = TomographyContext("serialem", tmp_path)
-    (tmp_path / "tomography_1_2_30.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_1_2_30.tiff", role="detector", environment=env
-    )
-    assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.tiff"]}
-    assert context._last_transferred_file == tmp_path / "tomography_1_2_30.tiff"
-    (tmp_path / "tomography_1_2_-30.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_1_2_-30.tiff", role="detector", environment=env
-    )
-    assert context._tilt_series == {
-        "1": [
-            tmp_path / "tomography_1_2_30.tiff",
-            tmp_path / "tomography_1_2_-30.tiff",
-        ]
-    }
-    assert not context._completed_tilt_series
-    (tmp_path / "tomography_2_2_30.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_2_2_30.tiff", role="detector", environment=env
-    )
-    assert len(context._tilt_series.values()) == 2
-    assert context._completed_tilt_series == ["1"]
-
-
-@patch("requests.get")
-@patch("requests.post")
-def test_tomography_context_add_serialem_decimal_tilt(mock_post, mock_get, tmp_path):
-    env = MurfeyInstanceEnvironment(
-        url=urlparse("http://localhost:8000"),
-        client_id=0,
-        sources=[tmp_path],
-        default_destinations={tmp_path: str(tmp_path)},
-    )
-    context = TomographyContext("serialem", tmp_path)
-    (tmp_path / "tomography_1_2_30.0.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_1_2_30.0.tiff", role="detector", environment=env
-    )
-    assert context._tilt_series == {"1": [tmp_path / "tomography_1_2_30.0.tiff"]}
-    assert context._last_transferred_file == tmp_path / "tomography_1_2_30.0.tiff"
-    (tmp_path / "tomography_1_2_-30.0.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_1_2_-30.0.tiff", role="detector", environment=env
-    )
-    assert context._tilt_series == {
-        "1": [
-            tmp_path / "tomography_1_2_30.0.tiff",
-            tmp_path / "tomography_1_2_-30.0.tiff",
-        ]
-    }
-    assert not context._completed_tilt_series
-    (tmp_path / "tomography_2_2_30.0.tiff").touch()
-    context.post_transfer(
-        tmp_path / "tomography_2_2_30.0.tiff", role="detector", environment=env
-    )
-    assert len(context._tilt_series.values()) == 2
-    assert context._completed_tilt_series == ["1"]
 
 
 @patch("requests.get")

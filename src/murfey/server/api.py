@@ -5,7 +5,7 @@ import datetime
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import packaging.version
 import sqlalchemy
@@ -43,6 +43,7 @@ from murfey.server import (
     get_machine_config,
     get_microscope,
     get_tomo_preproc_params,
+    sanitise,
     templates,
 )
 from murfey.server.config import from_file, settings
@@ -108,10 +109,6 @@ log = logging.getLogger("murfey.server.api")
 machine_config = get_machine_config()
 
 router = APIRouter()
-
-
-def sanitise(in_string: str) -> str:
-    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 # This will be the homepage for a given microscope.
@@ -652,7 +649,7 @@ def register_completed_tilt_series(
                     "appid": ids.appid,
                     "stack_file": str(stack_file),
                     "pix_size": preproc_params.pixel_size,
-                    "manual_tilt_offset": tilt_offset,
+                    "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
                 },
             }
@@ -1600,48 +1597,60 @@ def failed_client_post(post_info: PostInfo):
 @router.get("/visits/{visit_name}/upstream_visits")
 async def find_upstream_visits(visit_name: str):
     upstream_visits = {}
+    # Iterates through provided upstream directories
     for p in machine_config.upstream_data_directories:
+        # Looks for visit name in file path
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
             upstream_visits[v.name] = v / machine_config.processed_directory_name
     return upstream_visits
 
 
-def _get_upstream_processed_dir(visit_name: str) -> Optional[Path]:
-    for p in machine_config.upstream_data_directories:
-        if (Path(p) / secure_filename(visit_name)).is_dir():
-            processed_dir = (
-                Path(p)
-                / secure_filename(visit_name)
-                / machine_config.processed_directory_name
-            )
-            return processed_dir
-    log.warning(
-        f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
-    )
-    return None
+def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
+    tiff_dirs = []
+    for directory_name in machine_config.upstream_data_tiff_locations:
+        for p in machine_config.upstream_data_directories:
+            if (Path(p) / secure_filename(visit_name)).is_dir():
+                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
+                tiff_dirs.append(processed_dir)
+                break
+    if not tiff_dirs:
+        log.warning(
+            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+        )
+    return tiff_dirs
 
 
 @router.get("/visits/{visit_name}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str):
+    """
+    Looks for TIFF files associated with the current session in the permitted storage
+    servers, and returns their relative file paths as a list.
+    """
     upstream_tiff_paths = []
-    processed_dir = _get_upstream_processed_dir(visit_name)
-    if not processed_dir:
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
         return None
-    for f in processed_dir.glob("**/*.tiff"):
-        upstream_tiff_paths.append(str(f.relative_to(processed_dir)))
+    for tiff_dir in tiff_dirs:
+        for f in tiff_dir.glob("**/*.tiff"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+        for f in tiff_dir.glob("**/*.tif"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
     return upstream_tiff_paths
 
 
 @router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
 async def get_tiff(visit_name: str, tiff_path: str):
-    processed_dir = _get_upstream_processed_dir(visit_name)
-    if not processed_dir:
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
         return None
 
     tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+    for tiff_dir in tiff_dirs:
+        test_path = tiff_dir / tiff_path
+        if test_path.is_file():
+            break
+    else:
+        log.warning(f"TIFF {tiff_path} not found")
+        return None
 
-    def iterfile():
-        with open(processed_dir / tiff_path, mode="rb") as f:
-            yield from f
-
-    return FileResponse(path=processed_dir / tiff_path)
+    return FileResponse(path=test_path)
