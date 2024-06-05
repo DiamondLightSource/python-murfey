@@ -15,9 +15,16 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import capture_get, capture_post, get_machine_config
+from murfey.util import (
+    authorised_requests,
+    capture_get,
+    capture_post,
+    get_machine_config,
+)
 
 logger = logging.getLogger("murfey.client.contexts.spa")
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class FoilHole(NamedTuple):

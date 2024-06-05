@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import datetime
-import io
 import logging
 import random
-import zipfile
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
@@ -12,8 +10,8 @@ from typing import Dict, List, Optional
 
 import packaging.version
 import sqlalchemy
-from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
 from pydantic import BaseModel, BaseSettings
@@ -34,10 +32,11 @@ from murfey.server import (
     get_hostname,
     get_microscope,
     sanitise,
-    santise_path,
+    sanitise_path,
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
+from murfey.server.auth import validate_token
 from murfey.server.config import from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
@@ -70,6 +69,7 @@ from murfey.util.models import (
     FractionationParameters,
     GainReference,
     GridSquareParameters,
+    PostInfo,
     PreprocessingParametersTomo,
     ProcessFile,
     ProcessingJobParameters,
@@ -93,7 +93,7 @@ log = logging.getLogger("murfey.server.demo_api")
 
 tags_metadata = [murfey.server.bootstrap.tag]
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(validate_token)])
 router.raw_count = 2
 
 
@@ -451,7 +451,10 @@ def get_grid_squares(session_id: int, db=murfey_db):
 
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
-    session_id: int, gsid: int, grid_square_params: GridSquareParameters, db=murfey_db
+    session_id: int,
+    gsid: int,
+    grid_square_params: GridSquareParameters,
+    db=murfey_db,
 ):
     try:
         grid_square = db.exec(
@@ -849,17 +852,20 @@ async def request_spa_preprocessing(
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
-    foil_hole_id = (
-        db.exec(
-            select(FoilHole, GridSquare)
-            .where(FoilHole.name == proc_file.foil_hole_id)
-            .where(FoilHole.session_id == session_id)
-            .where(GridSquare.id == FoilHole.grid_square_id)
-            .where(GridSquare.tag == proc_file.tag)
+    try:
+        foil_hole_id = (
+            db.exec(
+                select(FoilHole, GridSquare)
+                .where(FoilHole.name == proc_file.foil_hole_id)
+                .where(FoilHole.session_id == session_id)
+                .where(GridSquare.id == FoilHole.grid_square_id)
+                .where(GridSquare.tag == proc_file.tag)
+            )
+            .one()[0]
+            .id
         )
-        .one()[0]
-        .id
-    )
+    except Exception:
+        foil_hole_id = None
     if proc_params:
         session_id = (
             db.exec(
@@ -967,7 +973,7 @@ def flush_tomography_processing(
 async def request_tomography_preprocessing(
     visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
 ):
-    if not santise_path(Path(proc_file.path)).exists():
+    if not sanitise_path(Path(proc_file.path)).exists():
         log.warning(
             f"{sanitise(str(proc_file.path))} has not been transferred before preprocessing"
         )
@@ -1443,31 +1449,52 @@ def find_upstream_visits(visit_name: str):
     return upstream_visits
 
 
-@router.get("/visits/{visit_name}/upstream_data")
-def fetch_upstream_data(visit_name: str):
-    for p in machine_config["upstream_data_directories"]:
-        if (Path(p) / secure_filename(visit_name)).is_dir():
-            processed_dir = (
-                Path(p)
-                / secure_filename(visit_name)
-                / machine_config["processed_directory_name"]
-            )
-            break
-    else:
+def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
+    tiff_dirs = []
+    for directory_name in machine_config["upstream_data_tiff_locations"]:
+        for p in machine_config["upstream_data_directories"]:
+            if (Path(p) / secure_filename(visit_name)).is_dir():
+                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
+                tiff_dirs.append(processed_dir)
+                break
+    if not tiff_dirs:
         log.warning(
             f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
         )
+    return tiff_dirs
+
+
+@router.get("/visits/{visit_name}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str):
+    upstream_tiff_paths = []
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
         return None
-    zip_io = io.BytesIO()
-    with zipfile.ZipFile(
-        zip_io, mode="w", compression=zipfile.ZIP_DEFLATED
-    ) as stream_zip:
-        for f in processed_dir.glob("**/*.tiff"):
-            stream_zip.write(f, arcname=f.relative_to(processed_dir))
-    return StreamingResponse(
-        iter([zip_io.getvalue()]),
-        media_type="application/x-zip-compressed",
-        headers={
-            "Content-Disposition": f"attachment; filename={visit_name}-processed.zip"
-        },
-    )
+    for tiff_dir in tiff_dirs:
+        for f in tiff_dir.glob("**/*.tiff"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+    return upstream_tiff_paths
+
+
+@router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
+async def get_tiff(visit_name: str, tiff_path: str):
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    if not tiff_dirs:
+        return None
+
+    tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+    for tiff_dir in tiff_dirs:
+        test_path = tiff_dir / tiff_path
+        if test_path.is_file():
+            break
+    else:
+        log.warning(f"TIFF {tiff_path} not found")
+        return None
+
+    return FileResponse(path=test_path)
+
+
+@router.post("/failed_client_post")
+def failed_client_post(post_info: PostInfo):
+    log.info("Post failed")
+    return

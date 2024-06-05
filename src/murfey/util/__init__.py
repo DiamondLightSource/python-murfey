@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import configparser
 import copy
 import inspect
 import json
 import logging
+import os
 import shutil
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Dict, List, Optional, Union
-from urllib.parse import ParseResult, urljoin
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
+from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
 import requests
@@ -19,6 +21,38 @@ import requests
 from murfey.util.models import Visit
 
 logger = logging.getLogger("murfey.util")
+
+
+def read_config() -> configparser.ConfigParser:
+    config = configparser.ConfigParser()
+    try:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        with open(murfey_client_config_home / ".murfey") as configfile:
+            config.read_file(configfile)
+    except FileNotFoundError:
+        logger.warning(
+            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
+        )
+    if "Murfey" not in config:
+        config["Murfey"] = {}
+    return config
+
+
+def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
+    token = read_config()["Murfey"].get("token", "")
+    _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+    _post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+    _put = partial(requests.put, headers={"Authorization": f"Bearer {token}"})
+    _delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+    return _get, _post, _put, _delete
+
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
+
+
+def sanitise(in_string: str) -> str:
+    return in_string.replace("\r\n", "").replace("\n", "")
 
 
 @lru_cache(maxsize=1)
@@ -39,22 +73,22 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
         response = requests.post(url, json=json)
     except Exception as e:
         logger.error(f"Exception encountered in post to {url}: {e}")
-        response = None
-    if not response or response.status_code != 200:
-        if response:
-            logger.warning(
-                f"Response to post to {url} with data {json} had status code "
-                f"{response.status_code}. The reason given was {response.reason}"
-            )
-        failure_url = urljoin(url, "failed_client_post")
+        response = requests.Response()
+    if response.status_code != 200:
+        logger.warning(
+            f"Response to post to {url} with data {json} had status code "
+            f"{response.status_code}. The reason given was {response.reason}"
+        )
+        split_url = urlparse(url)
+        failure_url = urlunparse(split_url._replace(path="/failed_client_post"))
         try:
             resend_response = requests.post(
                 failure_url, json={"url": url, "data": json}
             )
         except Exception as e:
             logger.error(f"Exception encountered in post to {failure_url}: {e}")
-            resend_response = None
-        if resend_response and resend_response.status_code != 200:
+            resend_response = requests.Response()
+        if resend_response.status_code != 200:
             logger.warning(
                 f"Response to post to {failure_url} failed with {resend_response.reason}"
             )

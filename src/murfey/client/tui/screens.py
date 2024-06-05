@@ -2,10 +2,8 @@ from __future__ import annotations
 
 # import contextlib
 import logging
-import zipfile
 from datetime import datetime
 from functools import partial
-from io import BytesIO
 from pathlib import Path
 from typing import (
     Any,
@@ -58,12 +56,18 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post, get_machine_config, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
 
 ReactiveType = TypeVar("ReactiveType")
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 def determine_default_destination(
@@ -768,17 +772,30 @@ class UpstreamDownloads(Screen):
             f"{self.app._environment.url.geturl()}/machine/"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
+            # Create the directory locally to save files to
             download_dir = Path(machine_data["upstream_data_download_directory"]) / str(
                 event.button.label
             )
             download_dir.mkdir(exist_ok=True)
-            upstream_data_response = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_data"
+
+            # Get the paths to the TIFF files generated previously under the same session ID
+            upstream_tiff_paths_response = requests.get(
+                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
             )
-            with zipfile.ZipFile(
-                BytesIO(upstream_data_response.content)
-            ) as zip_archive:
-                zip_archive.extractall(download_dir)
+            upstream_tiff_paths = upstream_tiff_paths_response.json() or []
+
+            # Request to download the TIFF files found
+            for tp in upstream_tiff_paths:
+                (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
+                # Write TIFF to the specified file path
+                stream_response = requests.get(
+                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
+                    stream=True,
+                )
+                # Write the file chunk-by-chunk to avoid hogging memory
+                with open(download_dir / tp, "wb") as utiff:
+                    for chunk in stream_response.iter_content(chunk_size=32 * 1024**2):
+                        utiff.write(chunk)
         self.app.pop_screen()
 
 

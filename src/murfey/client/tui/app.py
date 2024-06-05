@@ -32,11 +32,22 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import capture_post, get_machine_config, set_default_acquisition_output
+from murfey.util import (
+    capture_post,
+    get_machine_config,
+    read_config,
+    set_default_acquisition_output,
+)
 
 log = logging.getLogger("murfey.tui.app")
 
 ReactiveType = TypeVar("ReactiveType")
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 class MurfeyTUI(App):
@@ -481,6 +492,24 @@ class MurfeyTUI(App):
                     json={"tag": json["tilt_series_tag"], "recipe": recipe},
                 )
             log.info("Registering tomography processing parameters")
+            if self.app._environment.data_collection_parameters.get("num_eer_frames"):
+                eer_response = requests.post(
+                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/eer_fractionation_file",
+                    json={
+                        "num_frames": self.app._environment.data_collection_parameters[
+                            "num_eer_frames"
+                        ],
+                        "fractionation": self.app._environment.data_collection_parameters[
+                            "eer_fractionation"
+                        ],
+                        "dose_per_frame": self.app._environment.data_collection_parameters[
+                            "dose_per_frame"
+                        ],
+                        "fractionation_file_name": "eer_fractionation_tomo.txt",
+                    },
+                )
+                eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
+                json.update({"eer_fractionation_file": eer_fractionation_file})
             requests.post(
                 f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,

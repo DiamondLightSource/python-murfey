@@ -23,6 +23,9 @@ logger = logging.getLogger("murfey.client.contexts.clem")
 def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ) -> Optional[Path]:
+    """
+    Returns the Path of the transferred file on the DLS file system
+    """
     machine_config = get_machine_config(
         str(environment.url.geturl()), demo=environment.demo
     )
@@ -38,6 +41,9 @@ def _file_transferred_to(
 def _get_source(
     file_path: Path, environment: MurfeyInstanceEnvironment
 ) -> Optional[Path]:
+    """
+    Returns the Path of the file on the client PC
+    """
     for s in environment.sources:
         if file_path.is_relative_to(s):
             return s
@@ -87,16 +93,13 @@ class CLEMContext(Context):
                 file_path=transferred_file,
             )
 
-            # Get the file size and timestamp from transferred_file
-            # Client PC cannot see file_path; that is for server PC
-
             # Post the message and logs it if there's an error
             capture_post(
                 url,
                 json={
                     "name": str(file_path),
-                    "size": transferred_file.stat().st_size,
-                    "timestamp": transferred_file.stat().st_ctime,
+                    "size": transferred_file.stat().st_size,  # File size, in bytes
+                    "timestamp": transferred_file.stat().st_ctime,  # For Unix systems, shows last metadata change
                     "description": "",
                 },
             )

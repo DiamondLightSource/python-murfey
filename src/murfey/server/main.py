@@ -11,6 +11,7 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseSettings
 
 import murfey.server
+import murfey.server.auth.api
 import murfey.server.bootstrap
 import murfey.server.clem.api
 import murfey.server.websocket
@@ -57,6 +58,7 @@ app.include_router(murfey.server.bootstrap.cygwin)
 app.include_router(murfey.server.bootstrap.pypi)
 app.include_router(murfey.server.bootstrap.plugins)
 app.include_router(murfey.server.clem.api.router)
+app.include_router(murfey.server.auth.api.router)
 app.include_router(murfey.server.websocket.ws)
 
 for r in importlib_metadata.entry_points(group="murfey.routers"):
