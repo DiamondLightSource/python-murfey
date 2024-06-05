@@ -57,8 +57,10 @@ server = [
     "fastapi",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
+    "jose",
     "numpy",
     "packaging",
+    "passlib",
     "pillow",
     "prometheus_client",
     "readlif", # Specific to cryo-CLEM workflow
