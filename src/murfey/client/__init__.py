@@ -50,7 +50,9 @@ def read_config() -> configparser.ConfigParser:
         with open(murfey_client_config_home / ".murfey") as configfile:
             config.read_file(configfile)
     except FileNotFoundError:
-        log.warning(f"Murfey client configuration file {configfile} not found")
+        log.warning(
+            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
+        )
     if "Murfey" not in config:
         config["Murfey"] = {}
     return config
