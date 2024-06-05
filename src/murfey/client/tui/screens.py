@@ -773,9 +773,9 @@ class UpstreamDownloads(Screen):
         ).json()
         if machine_data.get("upstream_data_download_directory"):
             # Create the directory locally to save files to
-            download_dir = Path(
-                machine_data["upstream_data_download_directßory"]
-            ) / str(event.button.label)
+            download_dir = Path(machine_data["upstream_data_download_directory"]) / str(
+                event.button.label
+            )
             download_dir.mkdir(exist_ok=True)
 
             # Get the paths to the TIFF files generated previously under the same session ID
