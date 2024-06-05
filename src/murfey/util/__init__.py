@@ -12,7 +12,7 @@ from functools import lru_cache, partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Dict, List, Optional, Union
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
@@ -37,11 +37,16 @@ def read_config() -> configparser.ConfigParser:
     return config
 
 
-token = read_config()["Murfey"].get("token", "")
+def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
+    token = read_config()["Murfey"].get("token", "")
+    _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+    _post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+    _put = partial(requests.put, headers={"Authorization": f"Bearer {token}"})
+    _delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+    return _get, _post, _put, _delete
 
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def sanitise(in_string: str) -> str:

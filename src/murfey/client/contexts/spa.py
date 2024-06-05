@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from functools import partial
 from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, OrderedDict, Tuple
@@ -16,15 +15,16 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import capture_get, capture_post, get_machine_config, read_config
+from murfey.util import (
+    authorised_requests,
+    capture_get,
+    capture_post,
+    get_machine_config,
+)
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
-token = read_config()["Murfey"].get("token")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class FoilHole(NamedTuple):

@@ -1,5 +1,4 @@
 import logging
-from functools import partial
 from pathlib import Path
 from typing import Optional
 
@@ -9,15 +8,11 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util import capture_post, get_machine_config, read_config
+from murfey.util import authorised_requests, capture_post, get_machine_config
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
-token = read_config()["Murfey"].get("token", "")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _atlas_destination(

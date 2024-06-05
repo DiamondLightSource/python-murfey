@@ -2,24 +2,19 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional
 
 import requests
 import xmltodict
 
-from murfey.client import read_config
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util import authorised_requests
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
-token = read_config()["Murfey"]["token"]
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class Lamella(NamedTuple):

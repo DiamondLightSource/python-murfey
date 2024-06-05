@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 from threading import RLock
 from typing import Callable, Dict, List, NamedTuple, Optional, OrderedDict
@@ -20,16 +19,12 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import capture_post, get_machine_config, read_config
+from murfey.util import authorised_requests, capture_post, get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
 
-token = read_config()["Murfey"].get("token", "")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class TiltInfoExtraction(NamedTuple):
