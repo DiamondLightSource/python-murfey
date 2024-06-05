@@ -5,8 +5,8 @@ from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
 class MagnificationLookup(SQLModel, table=True):  # type: ignore
-    magnification: int
-    pixel_size: float
+    magnification: int = Field(primary_key=True)
+    pixel_size: float = Field(primary_key=True)
 
 
 class MurfeyUser(SQLModel, table=True):  # type: ignore
