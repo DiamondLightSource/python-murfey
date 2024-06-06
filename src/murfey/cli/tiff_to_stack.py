@@ -34,15 +34,21 @@ def run():
 
     # Convert to correct object types
     tiff_file = Path(args.tiff_path)
-    series_name = tiff_file.stem.split("--")[0]
     # Generate list from the single file provided
     tiff_list = [
         f.resolve()
         for f in tiff_file.parent.glob("./*")
-        if f.suffix in {".tif", ".tiff"} and f.stem.startswith(series_name)
+        if f.suffix in {".tif", ".tiff"}
+        and f.stem.startswith(tiff_file.stem.split("--")[0])
     ]
     # Sort by series, then channel, then frame
-    tiff_list.sort(key=lambda e: (series_name, "--C", "--Z"))
+    tiff_list.sort(
+        key=lambda e: (
+            e.stem.split("--")[0],
+            e.stem.split("--")[2],
+            e.stem.split("--")[1],
+        )
+    )
 
     # Resolve for metadata argument
     if not args.metadata:
