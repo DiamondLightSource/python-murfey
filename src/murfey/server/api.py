@@ -9,7 +9,7 @@ from typing import Dict, List
 
 import packaging.version
 import sqlalchemy
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
@@ -46,6 +46,7 @@ from murfey.server import (
     sanitise,
     templates,
 )
+from murfey.server.auth import validate_token
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
@@ -108,7 +109,7 @@ log = logging.getLogger("murfey.server.api")
 
 machine_config = get_machine_config()
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(validate_token)])
 
 
 # This will be the homepage for a given microscope.

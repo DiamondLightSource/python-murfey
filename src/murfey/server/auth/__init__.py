@@ -44,9 +44,20 @@ def validate_user(username: str, password: str) -> bool:
     return verify_password(password, user.hashed_password)
 
 
+def check_user(username: str) -> bool:
+    try:
+        with Session(engine) as murfey_db:
+            users = murfey_db.exec(select(User)).all()
+    except Exception:
+        return False
+    return username in [u.username for u in users]
+
+
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
-        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if not check_user(decoded_data.get("user")):
+            raise JWTError
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
