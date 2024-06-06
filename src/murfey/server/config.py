@@ -49,6 +49,7 @@ class MachineConfig(BaseModel):
     failure_queue: str = ""
     auth_key: str = ""
     auth_algorithm: str = ""
+    instrument_server_url: str = "http://localhost:8001"
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

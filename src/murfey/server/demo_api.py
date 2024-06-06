@@ -8,6 +8,7 @@ from itertools import count
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import aiohttp
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
@@ -36,7 +37,8 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.auth import validate_token
+from murfey.server.auth import instrument_server_tokens, validate_token
+from murfey.server.auth.api import create_access_token
 from murfey.server.config import from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
@@ -1498,3 +1500,19 @@ async def get_tiff(visit_name: str, tiff_path: str):
 def failed_client_post(post_info: PostInfo):
     log.info("Post failed")
     return
+
+
+@router.post("/activate_instrument_server")
+async def activate_instrument_server():
+    timestamp = datetime.datetime.now().timestamp()
+    token = create_access_token({"timestamp": timestamp})
+    instrument_server_tokens[timestamp] = None
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{machine_config['instrument_server_url']}/token",
+            json={"access_token": token, "token_type": "bearer"},
+        ) as response:
+            success = response.status == 200
+            instrument_server_token = await response.json()
+            instrument_server_tokens[timestamp] = instrument_server_token
+    return success

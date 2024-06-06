@@ -17,7 +17,7 @@ def run():
     )
     parser.add_argument(
         "--port",
-        help="Listen for incoming TCP connections on this port (default: 8000)",
+        help="Listen for incoming TCP connections on this port (default: 8001)",
         type=int,
         default=8001,
     )

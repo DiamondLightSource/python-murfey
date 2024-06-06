@@ -8,7 +8,13 @@ from jose import jwt
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-from murfey.server.auth import ALGORITHM, SECRET_KEY, validate_token, validate_user
+from murfey.server.auth import (
+    ALGORITHM,
+    SECRET_KEY,
+    hash_password,
+    validate_token,
+    validate_user,
+)
 
 logger = getLogger("murfey.server.auth.api")
 
@@ -39,7 +45,10 @@ def generate_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = create_access_token(
-        data={"sub": form_data.username},
+        data={
+            "user": form_data.username,
+            "hashed_password": hash_password(form_data.password),
+        },
     )
     return Token(access_token=access_token, token_type="bearer")
 

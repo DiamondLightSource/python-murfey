@@ -6,7 +6,7 @@ from typing import Dict
 from urllib.parse import urlparse
 
 import requests
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from jose import jwt
 from pydantic import BaseModel
 
@@ -24,6 +24,7 @@ router = APIRouter()
 watchers = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
+tokens = {}
 
 config = read_config()
 
@@ -43,8 +44,7 @@ def health():
     return True
 
 
-def murfey_server_handshake(token: str) -> bool:
-    # test provided token against Murfey server
+def _get_murfey_url() -> str:
     known_server = config["Murfey"].get("server")
     if not known_server:
         exit("Murfey server not set")
@@ -52,21 +52,33 @@ def murfey_server_handshake(token: str) -> bool:
         if "://" in known_server:
             exit("Unknown server protocol. Only http:// and https:// are allowed")
         known_server = f"http://{known_server}"
-    murfey_url = urlparse(known_server, allow_fragments=False)
+    return known_server
+
+
+async def murfey_server_handshake(token: str) -> bool:
+    # test provided token against Murfey server
+    murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     handshake_response = requests.get(
         f"{murfey_url.geturl()}/validate_token",
         headers={"Authorization": f"Bearer {token}"},
     )
-    return handshake_response.status_code == 200 and handshake_response.json().get(
+    res = handshake_response.status_code == 200 and handshake_response.json().get(
         "valid"
     )
+    if res:
+        tokens["token"] = token
+    return res
 
 
 @router.post("/token")
 async def token_handshake(token: Token):
-    if murfey_server_handshake(token.access_token):
+    handshake_success = await murfey_server_handshake(token.access_token)
+    if handshake_success:
         return Token(access_token=encoded_jwt, token_type="bearer")
-    return None
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Handshake failure between Murfey servers",
+    )
 
 
 @router.post("/sessions/{session_id}/multigrid_watcher")
