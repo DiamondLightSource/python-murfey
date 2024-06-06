@@ -8,7 +8,7 @@ from jose import jwt
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-from murfey.server.auth import ALGORITHM, SECRET_KEY, validate_user
+from murfey.server.auth import ALGORITHM, SECRET_KEY, validate_token, validate_user
 
 logger = getLogger("murfey.server.auth.api")
 
@@ -42,3 +42,8 @@ def generate_token(
         data={"sub": form_data.username},
     )
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.get("/validate_token")
+async def simple_token_validation(token: Annotated[str, Depends(validate_token)]):
+    return {"valid": True}
