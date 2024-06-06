@@ -104,20 +104,13 @@ def process_lif_file(
         )
 
         # Rescale intensity values for fluorescent channels
-        rescale = (
-            True
-            if any(
-                color in key
-                for key in [
-                    "blue",
-                    "cyan",
-                    "green",
-                    "magenta",
-                    "red",
-                    "yellow",
-                ]
-            )
-            else False
+        rescale = color in (
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
         )
 
         # Process the image stack
