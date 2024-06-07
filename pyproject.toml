@@ -30,6 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "defusedxml", # For safely parsing XML files
     "pydantic<2", # Pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
     "requests",
     "rich",
@@ -85,9 +86,11 @@ murfey = "murfey.client:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
+"murfey.tiff_to_stack" = "murfey.cli.tiff_to_stack:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.workflows"]
 "lif_to_tiff" = "murfey.workflows.lif_to_tiff:zocalo_cluster_request"
+"tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
