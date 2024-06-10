@@ -7,7 +7,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List
 
-import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -1130,23 +1129,6 @@ async def request_tomography_preprocessing(
         db.close()
     # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
-
-
-@router.get("/version")
-def get_version(client_version: str = ""):
-    result = {
-        "server": murfey.__version__,
-        "oldest-supported-client": murfey.__supported_client_version__,
-    }
-
-    if client_version:
-        client = packaging.version.parse(client_version)
-        server = packaging.version.parse(murfey.__version__)
-        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
-        result["client-needs-update"] = minimum_version > client
-        result["client-needs-downgrade"] = client > server
-
-    return result
 
 
 @router.post("/visits/{visit_name}/suggested_path")

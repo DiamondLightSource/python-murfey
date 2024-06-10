@@ -24,6 +24,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
 
+import murfey
 from murfey.server import get_machine_config, respond_with_template
 
 tag = {
@@ -38,6 +39,7 @@ bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
+version = APIRouter(prefix="/version", tags=["bootstrap"])
 
 log = logging.getLogger("murfey.server.bootstrap")
 
@@ -362,3 +364,20 @@ def parse_cygwin_request(request_path: str):
         media_type=cygwin_data.headers.get("Content-Type"),
         status_code=cygwin_data.status_code,
     )
+
+
+@version.get("/")
+def get_version(client_version: str = ""):
+    result = {
+        "server": murfey.__version__,
+        "oldest-supported-client": murfey.__supported_client_version__,
+    }
+
+    if client_version:
+        client = packaging.version.parse(client_version)
+        server = packaging.version.parse(murfey.__version__)
+        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
+        result["client-needs-update"] = minimum_version > client
+        result["client-needs-downgrade"] = client > server
+
+    return result
