@@ -26,7 +26,7 @@ def process_lif_file(
     scene_num: int,
     metadata: ET.Element,
     save_dir: Path,
-):
+) -> bool:
     """
     Takes the LIF file and its corresponding metadata and loads the relevant sub-stack,
     with each channel as its own array. Rescales their intensity values to utilise the
@@ -141,7 +141,7 @@ def convert_lif_to_tiff(
     file: Path,
     root_folder: str,  # Name of the folder to treat as the root folder for LIF files
     number_of_processes: int = 1,  # Number of processing threads to run
-):
+) -> bool:
     """
     Takes a LIF file, extracts its metadata as an XML tree, then parses through the
     sub-images stored inside it, saving each channel in the sub-image as a separate
@@ -198,7 +198,7 @@ def convert_lif_to_tiff(
             f"Subpath {sanitise(root_folder)} was not found in image path "
             f"{sanitise(str(file))}"
         )
-        return None
+        return False
 
     # Create folders if not already present
     processed_dir = Path("/".join(path_parts)).parent / file_name  # Processed images
@@ -255,6 +255,5 @@ def convert_lif_to_tiff(
         result = pool.starmap(process_lif_file, pool_args)
 
     if result:
-        return True
-    else:
-        return None
+        return all(result)
+    return False

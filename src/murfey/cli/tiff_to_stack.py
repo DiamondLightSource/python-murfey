@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from murfey.util.clem import convert_tiff_to_stack
+from murfey.util.clem.tiff import convert_tiff_to_stack
 
 
 def run():

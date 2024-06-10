@@ -26,7 +26,7 @@ def process_tiff_files(
     tiff_list: List[Path],
     metadata_file: Path,
     save_dir: Path,
-):
+) -> bool:
     """
     Opens the TIFF files as NumPy arrays and stacks them.
     """
@@ -225,7 +225,7 @@ def convert_tiff_to_stack(
             f"Subpath {sanitise(root_folder)} was not found in file path "
             f"{sanitise(str(parent_dir))}"
         )
-        return None
+        return False
     # Make directory for processed files
     processed_dir = Path("/".join(path_parts))  # Images
     if not processed_dir.exists():
@@ -241,13 +241,8 @@ def convert_tiff_to_stack(
             logger.info(f"Metadata file found at {xml_file}")
         else:
             logger.error(f"No metadata file found at {xml_file}")
-            return None
+            return False
     else:
         xml_file = metadata_file
 
-    result = process_tiff_files(tiff_list, xml_file, processed_dir)
-
-    if result:
-        return True
-    else:
-        return None
+    return process_tiff_files(tiff_list, xml_file, processed_dir)

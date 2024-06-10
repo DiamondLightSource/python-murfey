@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from murfey.util.clem import convert_lif_to_tiff
+from murfey.util.clem.lif import convert_lif_to_tiff
 
 
 def run():
