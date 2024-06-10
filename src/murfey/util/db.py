@@ -4,6 +4,11 @@ import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
+class MurfeyUser(SQLModel, table=True):  # type: ignore
+    username: str = Field(primary_key=True)
+    hashed_password: str
+
+
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
     client_id: Optional[int] = Field(primary_key=True, unique=True)
     visit: str = Field(default="")

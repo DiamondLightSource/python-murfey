@@ -10,8 +10,11 @@ import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util import authorised_requests
 
 logger = logging.getLogger("murfey.client.contexts.fib")
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class Lamella(NamedTuple):

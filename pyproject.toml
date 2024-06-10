@@ -60,8 +60,10 @@ server = [
     "jinja2",
     "numpy",
     "packaging",
+    "passlib",
     "pillow",
     "prometheus_client",
+    "python-jose[cryptography]",
     "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
@@ -75,6 +77,7 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 murfey = "murfey.client:run"
+"murfey.add_user" = "murfey.cli.add_user:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"

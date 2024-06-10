@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import configparser
 import copy
 import inspect
 import json
 import logging
+import os
 import shutil
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Awaitable, Callable, Dict, List, Optional, Union
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
@@ -19,6 +21,34 @@ import requests
 from murfey.util.models import Visit
 
 logger = logging.getLogger("murfey.util")
+
+
+def read_config() -> configparser.ConfigParser:
+    config = configparser.ConfigParser()
+    try:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        with open(murfey_client_config_home / ".murfey") as configfile:
+            config.read_file(configfile)
+    except FileNotFoundError:
+        logger.warning(
+            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
+        )
+    if "Murfey" not in config:
+        config["Murfey"] = {}
+    return config
+
+
+def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
+    token = read_config()["Murfey"].get("token", "")
+    _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+    _post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+    _put = partial(requests.put, headers={"Authorization": f"Bearer {token}"})
+    _delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+    return _get, _post, _put, _delete
+
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def sanitise(in_string: str) -> str:

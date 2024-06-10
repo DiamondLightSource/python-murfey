@@ -19,10 +19,12 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import capture_post, get_machine_config
+from murfey.util import authorised_requests, capture_post, get_machine_config
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class TiltInfoExtraction(NamedTuple):
