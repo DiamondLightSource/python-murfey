@@ -45,7 +45,7 @@ def process_lif_file(
     # Create save dirs for TIFF files and their metadata
     img_dir = save_dir / img_name
     img_xml_dir = img_dir / "metadata"
-    for folder in [img_dir, img_xml_dir]:
+    for folder in (img_dir, img_xml_dir):
         if not folder.exists():
             folder.mkdir(parents=True)
             logger.info(f"Created {folder}")
@@ -203,7 +203,7 @@ def convert_lif_to_tiff(
     # Create folders if not already present
     processed_dir = Path("/".join(path_parts)).parent / file_name  # Processed images
     raw_xml_dir = file.parent / "metadata"  # Raw metadata
-    for folder in [processed_dir, raw_xml_dir]:
+    for folder in (processed_dir, raw_xml_dir):
         if not folder.exists():
             folder.mkdir(parents=True)
             logger.info(f"Created {sanitise(str(folder))}")

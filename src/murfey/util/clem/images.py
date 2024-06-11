@@ -66,7 +66,7 @@ def rescale_across_channel(
     """
 
     # Check that bit depth is valid before processing even begins
-    if not any(bit_depth == b for b in [8, 16, 32, 64]):
+    if bit_depth not in (8, 16, 32, 64):
         raise_BitDepthError(bit_depth)
 
     # Use shorter variable names
@@ -114,7 +114,7 @@ def rescale_to_bit_depth(
     bit_final = target_bit_depth
 
     # Check that target bit depth is allowed
-    if not any(bit_final == b for b in [8, 16, 32, 64]):
+    if bit_final not in (8, 16, 32, 64):
         raise_BitDepthError(bit_final)
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
@@ -142,7 +142,7 @@ def process_img_stk(
     bdi = initial_bit_depth
     bdt = target_bit_depth
 
-    if not any(bdi == b for b in [8, 16, 32, 64]):
+    if bdi not in (8, 16, 32, 64):
         logger.info(f"{bdi}-bit is not supported by NumPy; converting to 16-bit")
         arr = (
             rescale_to_bit_depth(array=arr, initial_bit_depth=bdi, target_bit_depth=16)
@@ -201,6 +201,10 @@ def write_to_tiff(
     axes: str,
     image_labels: List[str],
 ):
+    """
+    Writes the NumPy array as a calibrated greyscale TIFF image stack.
+    """
+
     # Use shorter aliases and calculate what is needed
     arr = array
     z_size = (1 / z_res) if z_res > 0 else float(0)
@@ -212,7 +216,7 @@ def write_to_tiff(
         save_name,
         arr,
         imagej=True,  # ImageJ compatible
-        photometric="minisblack",  # Grayscale image
+        photometric="minisblack",  # Greyscale image
         shape=np.shape(arr),
         dtype=arr.dtype,
         resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
