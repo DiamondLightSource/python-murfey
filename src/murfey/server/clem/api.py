@@ -5,7 +5,8 @@ import importlib.metadata
 from fastapi import APIRouter
 
 from murfey.server import _transport_object
-from murfey.util.clem import convert_lif_to_tiff, convert_tiff_to_stack
+from murfey.util.clem.lif import convert_lif_to_tiff
+from murfey.util.clem.tiff import convert_tiff_to_stack
 from murfey.util.models import LifFileInfo, TiffSeriesInfo
 
 # Create APIRouter class object
