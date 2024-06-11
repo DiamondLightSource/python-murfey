@@ -59,13 +59,13 @@ class CLEMContext(Context):
         super().__init__("CLEM", acquisition_software)
         self._basepath = basepath
         # CLEM contexts for "auto-save" acquisition mode
-        self._tiff_series: Dict[str, List[str]] = {}  # Series name : List of TIFF paths
-        self._tiff_timestamps: Dict[str, List[float]] = {}  # Series name: Timestamps
-        self._tiff_sizes: Dict[str, List[int]] = {}  # Series name: File sizes
-        self._series_metadata: Dict[str, str] = {}  # Series name: Metadata file path
-        self._metadata_timestamp: Dict[str, float] = {}  # Series name: Timestamp
-        self._metadata_size: Dict[str, int] = {}  # Series name: File size
-        self._files_in_series: Dict[str, int] = {}  # Series name : Total TIFFs
+        self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
+        self._tiff_timestamps: Dict[str, List[float]] = {}  # {Series name : Timestamps}
+        self._tiff_sizes: Dict[str, List[int]] = {}  # {Series name : File sizes}
+        self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}
+        self._metadata_timestamp: Dict[str, float] = {}  # {Series name : Timestamp}
+        self._metadata_size: Dict[str, int] = {}  # {Series name : File size}
+        self._files_in_series: Dict[str, int] = {}  # {Series name : Total TIFFs}
 
     def post_transfer(
         self,
