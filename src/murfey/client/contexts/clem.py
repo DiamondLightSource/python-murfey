@@ -170,9 +170,8 @@ class CLEMContext(Context):
                 self._metadata_timestamp[series_name] = transferred_file.stat().st_ctime
 
             # Post message if all files for the associated series have been collected
-            if (
-                len(self._tiff_series[series_name])
-                == self._files_in_series[series_name]
+            if len(self._tiff_series[series_name]) == self._files_in_series.get(
+                series_name, 0
             ):
 
                 # Construct URL for Murfey server to communicate with
