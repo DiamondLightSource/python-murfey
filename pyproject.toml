@@ -32,7 +32,6 @@ classifiers = [
 dependencies = [
     "defusedxml", # For safely parsing XML files
     "pydantic<2", # Pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
-    "readlif", # Specific to cryo-CLEM workflow
     "requests",
     "rich",
     "werkzeug",
@@ -65,6 +64,7 @@ server = [
     "pillow",
     "prometheus_client",
     "python-jose[cryptography]",
+    "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "tifffile", # Specific to cryo-CLEM workflow

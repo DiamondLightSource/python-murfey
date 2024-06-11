@@ -17,7 +17,7 @@ from defusedxml.ElementTree import parse
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import capture_post, get_machine_config, sanitise
-from murfey.util.clem import xml
+from murfey.util.clem.xml import get_image_elements
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -144,7 +144,7 @@ class CLEMContext(Context):
 
                 # Extract metadata to get the expected size of the series
                 metadata = parse(file_path).getroot()
-                metadata = xml.get_image_elements(metadata)[0]
+                metadata = get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
                 channels = metadata.findall(
