@@ -7,7 +7,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List
 
-import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -1132,23 +1131,6 @@ async def request_tomography_preprocessing(
     return proc_file
 
 
-@router.get("/version")
-def get_version(client_version: str = ""):
-    result = {
-        "server": murfey.__version__,
-        "oldest-supported-client": murfey.__supported_client_version__,
-    }
-
-    if client_version:
-        client = packaging.version.parse(client_version)
-        server = packaging.version.parse(murfey.__version__)
-        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
-        result["client-needs-update"] = minimum_version > client
-        result["client-needs-downgrade"] = client > server
-
-    return result
-
-
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name, params: SuggestedPathParameters):
     count: int | None = None
@@ -1164,9 +1146,9 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir()
+        check_path.mkdir(mode=0o750)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir()
+            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
