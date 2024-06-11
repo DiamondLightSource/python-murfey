@@ -25,8 +25,8 @@ def get_lif_xml_metadata(
     save_xml: Optional[Path] = None,
 ) -> ET.Element:
     """
-    Extracts and returns the file metadata as a formatted XML Element. Provides option
-    to save it as an XML file to the specified file path
+    Extracts and returns the metadata from the LIF file as a formatted XML Element.
+    It can be optionally saved as an XML file to the specified file path.
     """
 
     # Use readlif function to get XML metadata

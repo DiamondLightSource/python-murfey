@@ -27,7 +27,7 @@ def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ) -> Optional[Path]:
     """
-    Returns the Path of the transferred file on the DLS file system
+    Returns the Path of the transferred file on the DLS file system.
     """
     machine_config = get_machine_config(
         str(environment.url.geturl()), demo=environment.demo
@@ -45,7 +45,7 @@ def _get_source(
     file_path: Path, environment: MurfeyInstanceEnvironment
 ) -> Optional[Path]:
     """
-    Returns the Path of the file on the client PC
+    Returns the Path of the file on the client PC.
     """
     for s in environment.sources:
         if file_path.is_relative_to(s):
@@ -54,7 +54,6 @@ def _get_source(
 
 
 # WORK IN PROGRESS
-# Will need to add context for TIFF files associated with CLEM
 class CLEMContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("CLEM", acquisition_software)
@@ -107,13 +106,13 @@ class CLEMContext(Context):
                 return False
 
             # Process TIF/TIFF files
-            if any(transferred_file.suffix == s for s in [".tif", ".tiff"]):
+            if transferred_file.suffix in (".tif", ".tiff"):
                 # Files should be named "PositionX--ZXX--CXX.tif" by default
                 if not len(transferred_file.stem.split("--")) == 3:
                     logger.warning(
                         "This TIFF file is likely not part of the CLEM workflow"
                     )
-                    return False  # Not sure if None, False, or True is most appropriate
+                    return False
 
                 # Get series name from file name
                 series_name = "/".join(
