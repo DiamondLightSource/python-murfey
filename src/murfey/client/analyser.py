@@ -312,6 +312,8 @@ class Analyser(Observer):
                                         ),
                                     }
                                 )
+                elif isinstance(self._context, CLEMContext):
+                    self.post_transfer(transferred_file)
                 elif not self._extension or self._unseen_xml:
                     self._find_extension(transferred_file)
                     if self._extension:
@@ -370,7 +372,6 @@ class Analyser(Observer):
                         TomographyContext,
                         SPAModularContext,
                         SPAMetadataContext,
-                        CLEMContext,
                     ),
                 ):
                     self.post_transfer(transferred_file)
