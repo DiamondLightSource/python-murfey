@@ -17,7 +17,7 @@ from defusedxml.ElementTree import parse
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import capture_post, get_machine_config, sanitise
-from murfey.util.clem import xml
+from murfey.util.clem.xml import get_image_elements
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -59,13 +59,13 @@ class CLEMContext(Context):
         super().__init__("CLEM", acquisition_software)
         self._basepath = basepath
         # CLEM contexts for "auto-save" acquisition mode
-        self._tiff_series: Dict[str, List[str]] = {}  # Series name : List of TIFF paths
-        self._tiff_timestamps: Dict[str, List[float]] = {}  # Series name: Timestamps
-        self._tiff_sizes: Dict[str, List[int]] = {}  # Series name: File sizes
-        self._series_metadata: Dict[str, str] = {}  # Series name: Metadata file path
-        self._metadata_timestamp: Dict[str, float] = {}  # Series name: Timestamp
-        self._metadata_size: Dict[str, int] = {}  # Series name: File size
-        self._files_in_series: Dict[str, int] = {}  # Series name : Total TIFFs
+        self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
+        self._tiff_timestamps: Dict[str, List[float]] = {}  # {Series name : Timestamps}
+        self._tiff_sizes: Dict[str, List[int]] = {}  # {Series name : File sizes}
+        self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}
+        self._metadata_timestamp: Dict[str, float] = {}  # {Series name : Timestamp}
+        self._metadata_size: Dict[str, int] = {}  # {Series name : File size}
+        self._files_in_series: Dict[str, int] = {}  # {Series name : Total TIFFs}
 
     def post_transfer(
         self,
@@ -144,7 +144,7 @@ class CLEMContext(Context):
 
                 # Extract metadata to get the expected size of the series
                 metadata = parse(transferred_file).getroot()
-                metadata = xml.get_image_elements(metadata)[0]
+                metadata = get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
                 channels = metadata.findall(

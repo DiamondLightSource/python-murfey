@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 from pathlib import Path
+from typing import Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -15,10 +16,33 @@ from readlif.reader import LifFile
 
 from murfey.util import sanitise
 from murfey.util.clem.images import process_img_stk, write_to_tiff
-from murfey.util.clem.xml import get_image_elements, get_lif_xml_metadata
+from murfey.util.clem.xml import get_image_elements
 
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.lif")
+
+
+def get_lif_xml_metadata(
+    file: LifFile,
+    save_xml: Optional[Path] = None,
+) -> ET.Element:
+    """
+    Extracts and returns the metadata from the LIF file as a formatted XML Element.
+    It can be optionally saved as an XML file to the specified file path.
+    """
+
+    # Use readlif function to get XML metadata
+    xml_root: ET.Element = file.xml_root  # This one for navigating
+    xml_tree = ET.ElementTree(xml_root)  # This one for saving
+
+    # Skip saving the metadata if save_xml not provided
+    if save_xml:
+        xml_file = str(save_xml)  # Convert Path to string
+        ET.indent(xml_tree, "  ")  # Format with proper indentation
+        xml_tree.write(xml_file, encoding="utf-8")  # Save
+        logger.info(f"File metadata saved to {sanitise(xml_file)}")
+
+    return xml_root
 
 
 def process_lif_file(
