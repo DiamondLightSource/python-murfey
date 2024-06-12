@@ -34,7 +34,7 @@ def _file_transferred_to(
     )
     return (
         Path(machine_config.get("rsync_basepath", ""))
-        / machine_config.get("rsync_module", "data")
+        / (machine_config.get("rsync_module", "data") or "data")
         / str(datetime.now().year)
         / source.name
         / file_path.relative_to(source)
@@ -143,7 +143,7 @@ class CLEMContext(Context):
                 )  # The previous 2 parent directories should be unique enough
 
                 # Extract metadata to get the expected size of the series
-                metadata = parse(file_path).getroot()
+                metadata = parse(transferred_file).getroot()
                 metadata = get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
@@ -170,9 +170,8 @@ class CLEMContext(Context):
                 self._metadata_timestamp[series_name] = transferred_file.stat().st_ctime
 
             # Post message if all files for the associated series have been collected
-            if (
-                len(self._tiff_series[series_name])
-                == self._files_in_series[series_name]
+            if len(self._tiff_series[series_name]) == self._files_in_series.get(
+                series_name, 0
             ):
 
                 # Construct URL for Murfey server to communicate with

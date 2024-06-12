@@ -110,10 +110,26 @@ class Analyser(Observer):
 
         # CLEM workflow check
         # Look for LIF files
-        if file_path.suffix == ".lif":
+        if file_path.suffix in (".lif", ".xlif"):
             self._role = "detector"
             self._context = CLEMContext("leica", self._basepath)
             return True
+
+        if (
+            "--" in file_path.name
+            and file_path.suffix in (".tiff", ".tif")
+            and self._environment
+        ):
+            created_directories = set(
+                get_machine_config(
+                    str(self._environment.url.geturl()),
+                    demo=self._environment.demo,
+                ).get("analyse_created_directories", [])
+            )
+            if created_directories.intersection(set(file_path.parts)):
+                self._role = "detector"
+                self._context = CLEMContext("leica", self._basepath)
+                return True
 
         split_file_name = file_path.name.split("_")
         if split_file_name:
@@ -312,6 +328,8 @@ class Analyser(Observer):
                                         ),
                                     }
                                 )
+                elif isinstance(self._context, CLEMContext):
+                    self.post_transfer(transferred_file)
                 elif not self._extension or self._unseen_xml:
                     self._find_extension(transferred_file)
                     if self._extension:
@@ -370,7 +388,6 @@ class Analyser(Observer):
                         TomographyContext,
                         SPAModularContext,
                         SPAMetadataContext,
-                        CLEMContext,
                     ),
                 ):
                     self.post_transfer(transferred_file)
