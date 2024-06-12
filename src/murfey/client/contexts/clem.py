@@ -143,7 +143,7 @@ class CLEMContext(Context):
                 )  # The previous 2 parent directories should be unique enough
 
                 # Extract metadata to get the expected size of the series
-                metadata = parse(file_path).getroot()
+                metadata = parse(transferred_file).getroot()
                 metadata = xml.get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
