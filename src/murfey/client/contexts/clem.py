@@ -108,16 +108,30 @@ class CLEMContext(Context):
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
                 # Files should be named "PositionX--ZXX--CXX.tif" by default
-                if not len(transferred_file.stem.split("--")) == 3:
+                # If Position is repeated, it will add an additional --00X to the end
+                if len(transferred_file.stem.split("--")) not in [3, 4]:
                     logger.warning(
                         "This TIFF file is likely not part of the CLEM workflow"
                     )
                     return False
 
                 # Get series name from file name
-                series_name = "/".join(
-                    [*file_path.parent.parts[-2:], file_path.stem.split("--")[0]]
-                )  # The previous 2 parent directories should be unique enough
+                # Normal scenario
+                if len(transferred_file.stem.split("--")) == 3:
+                    series_name = "/".join(
+                        [
+                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
+                            file_path.stem.split("--")[0],
+                        ]
+                    )
+                # When this a repeated position
+                elif len(transferred_file.stem.split("--")) == 4:
+                    series_name = "/".join(
+                        [
+                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
+                            "--".join(file_path.stem.split("--")[i] for i in [0, -1]),
+                        ]
+                    )
 
                 # Create key-value pairs containing empty list if not already present
                 if series_name not in self._tiff_series.keys():

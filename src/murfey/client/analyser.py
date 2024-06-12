@@ -238,7 +238,7 @@ class Analyser(Observer):
                 )
         except Exception as e:
             logger.error(
-                f"An exception was encountered posting the file for transfer: {e}"
+                f"An exception was encountered post transfer: {e}"
             )
 
     def _analyse(self):
