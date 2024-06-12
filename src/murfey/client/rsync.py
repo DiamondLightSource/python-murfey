@@ -1,3 +1,10 @@
+"""
+rsync is a Linux process that does fast, versatile remote (and local) file copying.
+This module allows Murfey to use rsync to facilitate its file transfers, and to
+parse the logs outputted by rsync in order confirm that the file has been correctly
+transferred.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -262,6 +269,10 @@ class RSyncer(Observer):
         files = [f for f in files if f.is_file()]
 
         def parse_stdout(line: str):
+            """
+            Reads the stdout from rsync in order to verify the status of transferred
+            files and other things.
+            """
             nonlocal next_file
 
             if not line:
