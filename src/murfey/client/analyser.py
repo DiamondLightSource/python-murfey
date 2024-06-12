@@ -1,3 +1,11 @@
+"""
+Contains functions for analysing the various types of files hauled by Murfey, and
+assigning to them the correct contexts (CLEM, SPA, tomography, etc.) for processing
+on the server side.
+
+Individual contexts can be found in murfey.client.contexts.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -108,13 +116,15 @@ class Analyser(Observer):
         assigns the necessary context class to it for subsequent stages of processing
         """
 
-        # CLEM workflow check
-        # Look for LIF files
+        # CLEM workflow checks
+        # Look for LIF and XLIF files
         if file_path.suffix in (".lif", ".xlif"):
             self._role = "detector"
             self._context = CLEMContext("leica", self._basepath)
             return True
-
+        # Look for TIFF files associated with CLEM workflow
+        # Leica's autosave mode seems to name the TIFFs in the format
+        # PostionXX--ZXX-CXX.tif
         if (
             "--" in file_path.name
             and file_path.suffix in (".tiff", ".tif")
@@ -131,6 +141,7 @@ class Analyser(Observer):
                 self._context = CLEMContext("leica", self._basepath)
                 return True
 
+        # Checks for tomography and SPA workflows
         split_file_name = file_path.name.split("_")
         if split_file_name:
             # Files starting with "FoilHole" belong to the SPA workflow
@@ -226,7 +237,9 @@ class Analyser(Observer):
                     transferred_file, role=self._role, environment=self._environment
                 )
         except Exception as e:
-            logger.error(f"An exception was encountered post transfer: {e}")
+            logger.error(
+                f"An exception was encountered posting the file for transfer: {e}"
+            )
 
     def _analyse(self):
         logger.info("Analyser thread started")
@@ -328,6 +341,7 @@ class Analyser(Observer):
                                         ),
                                     }
                                 )
+                # If a file with a CLEM context is identified, immediately post it
                 elif isinstance(self._context, CLEMContext):
                     self.post_transfer(transferred_file)
                 elif not self._extension or self._unseen_xml:

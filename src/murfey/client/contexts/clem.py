@@ -1,9 +1,6 @@
 """
-Add a CLEM class context (refer to src/murfey/client/contexts/fib.py)
-
-Provide a post transfer function to pass on:
-- File path on the DLS file system
-- Session ID (src/murfey/client/instance_environment.py)
+Provides instructions to the server side on how different file types associated with
+the CLEM workflow should be processed.
 """
 
 # import requests
@@ -32,9 +29,12 @@ def _file_transferred_to(
     machine_config = get_machine_config(
         str(environment.url.geturl()), demo=environment.demo
     )
+    # rsync basepath and modules are set in the microscope's configuration YAML file
     return (
         Path(machine_config.get("rsync_basepath", ""))
-        / (machine_config.get("rsync_module", "data") or "data")
+        / (
+            machine_config.get("rsync_module", "data") or "data"
+        )  # Add "data" if it wasn't set
         / str(datetime.now().year)
         / source.name
         / file_path.relative_to(source)
@@ -171,7 +171,7 @@ class CLEMContext(Context):
 
             # Post message if all files for the associated series have been collected
             if len(self._tiff_series[series_name]) == self._files_in_series.get(
-                series_name, 0
+                series_name, 0  # Return 0 if the key hasn't been generated yet
             ):
 
                 # Construct URL for Murfey server to communicate with
