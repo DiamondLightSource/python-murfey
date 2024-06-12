@@ -34,7 +34,7 @@ def _file_transferred_to(
     )
     return (
         Path(machine_config.get("rsync_basepath", ""))
-        / machine_config.get("rsync_module", "data")
+        / (machine_config.get("rsync_module", "data") or "data")
         / str(datetime.now().year)
         / source.name
         / file_path.relative_to(source)
