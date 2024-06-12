@@ -47,6 +47,8 @@ class MachineConfig(BaseModel):
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
     failure_queue: str = ""
+    auth_key: str = ""
+    auth_algorithm: str = ""
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

@@ -1,3 +1,7 @@
+"""
+Watches the directories provided and identifies potential files for transfer
+"""
+
 from __future__ import annotations
 
 import logging

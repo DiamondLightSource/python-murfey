@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.11.17"
+version = "0.11.20"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -60,8 +60,10 @@ server = [
     "jinja2",
     "numpy",
     "packaging",
+    "passlib",
     "pillow",
     "prometheus_client",
+    "python-jose[cryptography]",
     "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py", # <=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project # 8.1.2 seems ok
@@ -75,6 +77,7 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 murfey = "murfey.client:run"
+"murfey.add_user" = "murfey.cli.add_user:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
@@ -86,9 +89,11 @@ murfey = "murfey.client:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
+"murfey.tiff_to_stack" = "murfey.cli.tiff_to_stack:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.workflows"]
 "lif_to_tiff" = "murfey.workflows.lif_to_tiff:zocalo_cluster_request"
+"tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

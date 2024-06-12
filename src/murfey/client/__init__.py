@@ -12,6 +12,7 @@ import sys
 import time
 import webbrowser
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from queue import Queue
 from typing import List, Literal
@@ -39,6 +40,29 @@ from murfey.util import _get_visit_list
 
 
 log = logging.getLogger("murfey.client")
+
+
+def read_config() -> configparser.ConfigParser:
+    config = configparser.ConfigParser()
+    try:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        with open(murfey_client_config_home / ".murfey") as configfile:
+            config.read_file(configfile)
+    except FileNotFoundError:
+        log.warning(
+            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
+        )
+    if "Murfey" not in config:
+        config["Murfey"] = {}
+    return config
+
+
+token = read_config()["Murfey"].get("token", "")
+
+requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
+requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
+requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 def _enable_webbrowser_in_cygwin():
@@ -315,20 +339,6 @@ def main_loop(
         for sw in source_watchers:
             sw.scan(modification_time=modification_time, transfer_all=transfer_all)
         time.sleep(15)
-
-
-def read_config() -> configparser.ConfigParser:
-    config = configparser.ConfigParser()
-    try:
-        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
-        murfey_client_config_home = Path(mcch) if mcch else Path.home()
-        with open(murfey_client_config_home / ".murfey") as configfile:
-            config.read_file(configfile)
-    except FileNotFoundError:
-        pass
-    if "Murfey" not in config:
-        config["Murfey"] = {}
-    return config
 
 
 def write_config(config: configparser.ConfigParser):
