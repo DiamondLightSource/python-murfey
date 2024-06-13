@@ -237,9 +237,7 @@ class Analyser(Observer):
                     transferred_file, role=self._role, environment=self._environment
                 )
         except Exception as e:
-            logger.error(
-                f"An exception was encountered post transfer: {e}"
-            )
+            logger.error(f"An exception was encountered post transfer: {e}")
 
     def _analyse(self):
         logger.info("Analyser thread started")

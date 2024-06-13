@@ -39,16 +39,10 @@ def run():
         f.resolve()
         for f in tiff_file.parent.glob("./*")
         if f.suffix in {".tif", ".tiff"}
-        and f.stem.startswith(tiff_file.stem.split("--")[0])
+        # Handle cases where series start with the same position number,
+        # but deviate afterwards
+        and f.stem.startswith(tiff_file.stem.split("--")[0] + "--")
     ]
-    # Sort by series, then channel, then frame
-    tiff_list.sort(
-        key=lambda e: (
-            e.stem.split("--")[0],
-            e.stem.split("--")[2],
-            e.stem.split("--")[1],
-        )
-    )
 
     # Resolve for metadata argument
     if not args.metadata:
