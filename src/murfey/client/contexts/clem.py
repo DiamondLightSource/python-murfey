@@ -12,7 +12,7 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config, sanitise
+from murfey.util import capture_post, get_machine_config  # , sanitise
 from murfey.util.clem.xml import get_image_elements
 
 # Create logger object
@@ -116,27 +116,31 @@ class CLEMContext(Context):
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
-
-                # Get series name from file name
-                # Normal scenario
-                if len(transferred_file.stem.split("--")) == 3:
-                    series_name = "/".join(
-                        [
-                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
-                            file_path.stem.split("--")[0],
-                        ]
+                else:
+                    if len(transferred_file.stem.split("--")) == 3:
+                        series_name = "/".join(
+                            [
+                                *file_path.parent.parts[
+                                    -2:
+                                ],  # Upper 2 parent directories
+                                file_path.stem.split("--")[0],
+                            ]
+                        )
+                    # When this a repeated position
+                    elif len(transferred_file.stem.split("--")) == 4:
+                        series_name = "/".join(
+                            [
+                                *file_path.parent.parts[
+                                    -2:
+                                ],  # Upper 2 parent directories
+                                "--".join(
+                                    file_path.stem.split("--")[i] for i in [0, -1]
+                                ),
+                            ]
+                        )
+                    logger.debug(
+                        f"File {transferred_file.name!r} belongs to the TIFF series {series_name!r}"
                     )
-                # When this a repeated position
-                elif len(transferred_file.stem.split("--")) == 4:
-                    series_name = "/".join(
-                        [
-                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
-                            "--".join(file_path.stem.split("--")[i] for i in [0, -1]),
-                        ]
-                    )
-                logger.debug(
-                    f"File {transferred_file.name!r} belongs to the TIFF series {series_name!r}"
-                )
 
                 # Create key-value pairs containing empty list if not already present
                 if series_name not in self._tiff_series.keys():
@@ -164,7 +168,9 @@ class CLEMContext(Context):
                 series_name = "/".join(
                     [*file_path.parent.parent.parts[-2:], file_path.stem]
                 )  # The previous 2 parent directories should be unique enough
-                logger.debug(f"File {transferred_file.name!r} belongs to the series {series_name!r}")
+                logger.debug(
+                    f"File {transferred_file.name!r} belongs to the series {series_name!r}"
+                )
 
                 # Extract metadata to get the expected size of the series
                 metadata = parse(transferred_file).getroot()
@@ -186,16 +192,16 @@ class CLEMContext(Context):
                     else 1
                 )
                 num_files = num_channels * num_frames
-                logger.debug(f"Expected number of files in {series_name!r}: {num_files}")
+                logger.debug(
+                    f"Expected number of files in {series_name!r}: {num_files}"
+                )
 
                 # Update dictionary entries
                 self._files_in_series[series_name] = num_files
                 self._series_metadata[series_name] = str(file_path)
                 self._metadata_size[series_name] = transferred_file.stat().st_size
                 self._metadata_timestamp[series_name] = transferred_file.stat().st_ctime
-                logger.debug(
-                    f"Created XLIF dictionary entries for {series_name!r}"
-                )
+                logger.debug(f"Created XLIF dictionary entries for {series_name!r}")
 
             # Post message if all files for the associated series have been collected
             if self._files_in_series.get(series_name, None) is None:
@@ -226,7 +232,9 @@ class CLEMContext(Context):
                 )
                 return True
             else:
-                logger.debug(f"Number of files: {len(self._tiff_series[series_name])} | Expected number: {len(self._files_in_series[series_name])}")
+                logger.debug(
+                    f"Number of files: {len(self._tiff_series[series_name])} | Expected number: {self._files_in_series[series_name]}"
+                )
 
         # Process LIF files
         if transferred_file.suffix == ".lif":
@@ -267,3 +275,4 @@ class CLEMContext(Context):
                 },
             )
             return True
+        return True
