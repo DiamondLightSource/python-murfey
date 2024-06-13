@@ -116,31 +116,34 @@ class CLEMContext(Context):
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
-                else:
-                    if len(transferred_file.stem.split("--")) == 3:
-                        series_name = "/".join(
-                            [
-                                *file_path.parent.parts[
-                                    -2:
-                                ],  # Upper 2 parent directories
-                                file_path.stem.split("--")[0],
-                            ]
-                        )
-                    # When this a repeated position
-                    elif len(transferred_file.stem.split("--")) == 4:
-                        series_name = "/".join(
-                            [
-                                *file_path.parent.parts[
-                                    -2:
-                                ],  # Upper 2 parent directories
-                                "--".join(
-                                    file_path.stem.split("--")[i] for i in [0, -1]
-                                ),
-                            ]
-                        )
-                    logger.debug(
-                        f"File {transferred_file.name!r} belongs to the TIFF series {series_name!r}"
+                # For standard file name
+                if len(transferred_file.stem.split("--")) == 3:
+                    series_name = "/".join(
+                        [
+                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
+                            file_path.stem.split("--")[0],
+                        ]
                     )
+                # When this a repeated position
+                elif len(transferred_file.stem.split("--")) == 4:
+                    series_name = "/".join(
+                        [
+                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
+                            "--".join(file_path.stem.split("--")[i] for i in [0, -1]),
+                        ]
+                    )
+                else:
+                    logger.error(
+                        f"Series name could not be generated from file {transferred_file.name!r}"
+                    )
+                    return False
+                if not series_name:
+                    logger.error(
+                        f"Series name could not be generated from file {transferred_file.name!r}"
+                    )
+                logger.debug(
+                    f"File {transferred_file.name!r} belongs to the TIFF series {series_name!r}"
+                )
 
                 # Create key-value pairs containing empty list if not already present
                 if series_name not in self._tiff_series.keys():
@@ -204,10 +207,10 @@ class CLEMContext(Context):
                 logger.debug(f"Created XLIF dictionary entries for {series_name!r}")
 
             # Post message if all files for the associated series have been collected
-            if self._files_in_series.get(series_name, None) is None:
+            if self._files_in_series.get(series_name, 0) == 0:
                 logger.debug(f"Metadata for {series_name!r} not yet loaded")
             elif len(self._tiff_series[series_name]) == self._files_in_series.get(
-                series_name, None  # Return None if the key hasn't been generated yet
+                series_name, 0  # Return 0 if the key hasn't been generated yet
             ):
 
                 # Construct URL for Murfey server to communicate with
