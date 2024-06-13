@@ -1,6 +1,7 @@
 """
 Watches the specified directory, crawling through it recursively to identify potential
-files for transfer.
+files for transfer, and notifies listening processes to perform the transfer on files
+that are ready.
 """
 
 from __future__ import annotations
@@ -123,8 +124,7 @@ class DirWatcher(murfey.util.Observer):
                 else:
                     ordered_file_candidates.append(x)
 
-            # Process the files, check if they're ready, and add them to a list of
-            # files to be transfer
+            # Check if files are ready, and append them for transfer
             for x in ordered_file_candidates:
                 if x not in filelist:
                     # Delete file from file candidates list if they're no longer there
@@ -184,7 +184,7 @@ class DirWatcher(murfey.util.Observer):
                         f"Found file {Path(x).name!r} for potential future transfer"
                     )
 
-            # Notify listening processes and add files to scan history
+            # Notify secondary listening processes and add files to scan history
             self.notify(files_for_transfer, secondary=True)
             self._lastscan = filelist
         except Exception as e:
@@ -192,8 +192,8 @@ class DirWatcher(murfey.util.Observer):
 
     def _notify_for_transfer(self, file_candidate: str) -> bool:
         """
-        Checks if a file is ready to be transferred, and removes it from the file
-        candidates list.
+        Perform a Boolean check to see if a file is ready to be transferred, and
+        removes it from the file candidates list.
         """
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
         if self._statusbar:
@@ -209,7 +209,7 @@ class DirWatcher(murfey.util.Observer):
             file_candidate
         ).name.endswith("downloading")
 
-        # Send notification that file is ready, and delete it from candidates list
+        # Notify primary listeners that file is ready, and delete it from candidates list
         if transfer_check:
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
