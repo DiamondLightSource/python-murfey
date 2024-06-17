@@ -86,14 +86,14 @@ class CLEMContext(Context):
             # Type checking to satisfy MyPy
             if not environment:
                 logger.warning("No environment passed in")
-                return True
+                return False
 
             # Location of the file on the client PC
             source = _get_source(transferred_file, environment)
             # Type checking to satisfy MyPy
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
-                return True
+                return False
 
             # Get the Path on the DLS file system
             file_path = _file_transferred_to(
@@ -103,9 +103,16 @@ class CLEMContext(Context):
             )
             if not file_path:
                 logger.warning(
-                    f"File path {transferred_file!r} not found on the storage system"
+                    f"File {transferred_file.name!r} not found on the storage system"
                 )
                 return False
+
+            # Skip processing of binned "_pmd" image series
+            if "_pmd_" in transferred_file.stem:
+                logger.debug(
+                    f"File {transferred_file.name!r} belongs to the '_pmd_' series of binned images; skipping processing"
+                )
+                return True
 
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
@@ -116,6 +123,8 @@ class CLEMContext(Context):
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
+
+                # Create a unique name for the series
                 # For standard file name
                 if len(transferred_file.stem.split("--")) == 3:
                     series_name = "/".join(
@@ -137,12 +146,8 @@ class CLEMContext(Context):
                         f"Series name could not be generated from file {transferred_file.name!r}"
                     )
                     return False
-                if not series_name:
-                    logger.error(
-                        f"Series name could not be generated from file {transferred_file.name!r}"
-                    )
                 logger.debug(
-                    f"File {transferred_file.name!r} belongs to the TIFF series {series_name!r}"
+                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
                 )
 
                 # Create key-value pairs containing empty list if not already present
@@ -166,13 +171,19 @@ class CLEMContext(Context):
             if transferred_file.suffix == ".xlif":
                 logger.debug("Detected an .xlif file")
 
+                # Skip processing of "_histo" histogram XLIF files
+                if transferred_file.stem.endswith("_histo"):
+                    logger.debug(
+                        f"File {transferred_file.name!r} contains histogram metadata; skipping processing"
+                    )
+
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "/".join(
                     [*file_path.parent.parent.parts[-2:], file_path.stem]
                 )  # The previous 2 parent directories should be unique enough
                 logger.debug(
-                    f"File {transferred_file.name!r} belongs to the series {series_name!r}"
+                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
                 )
 
                 # Extract metadata to get the expected size of the series
@@ -207,12 +218,18 @@ class CLEMContext(Context):
                 logger.debug(f"Created XLIF dictionary entries for {series_name!r}")
 
             # Post message if all files for the associated series have been collected
-            if self._files_in_series.get(series_name, 0) == 0:
-                logger.debug(f"Metadata for {series_name!r} not yet loaded")
+            # .get(series_name, 0) returns 0 if no associated key is found
+            if len(self._tiff_series[series_name]) == 0:
+                logger.debug(f"TIFF series {series_name!r} not yet loaded")
+                return True
+            elif self._files_in_series.get(series_name, 0) == 0:
+                logger.debug(
+                    f"Metadata for TIFF series {series_name!r} not yet processed"
+                )
+                return True
             elif len(self._tiff_series[series_name]) == self._files_in_series.get(
-                series_name, 0  # Return 0 if the key hasn't been generated yet
+                series_name, 0
             ):
-
                 # Construct URL for Murfey server to communicate with
                 url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tiff_to_stack"
                 if not url:
@@ -235,9 +252,7 @@ class CLEMContext(Context):
                 )
                 return True
             else:
-                logger.debug(
-                    f"Number of files: {len(self._tiff_series[series_name])} | Expected number: {self._files_in_series[series_name]}"
-                )
+                logger.debug(f"TIFF series {series_name!r} is still being processed")
 
         # Process LIF files
         if transferred_file.suffix == ".lif":
