@@ -258,15 +258,16 @@ class RSyncer(Observer):
 
     def _transfer(self, files: list[Path]) -> bool:
         """
-        Actually transfer files in an rsync subprocess
+        Transfer files via an rsync sub-process, and parses the rsync stdout to verify
+        the success of the transfer.
         """
-        previously_transferred = self._files_transferred
 
-        next_file: RSyncerUpdate | None = None
+        # Set up initial variables
+        files = [f for f in files if f.is_file()]
+        previously_transferred = self._files_transferred
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []
-
-        files = [f for f in files if f.is_file()]
+        next_file: RSyncerUpdate | None = None
 
         def parse_stdout(line: str):
             """
@@ -275,9 +276,21 @@ class RSyncer(Observer):
             """
             nonlocal next_file
 
+            # Miscellaneous rsync stdout lines to skip
             if not line:
                 return
+            if line.startswith(("building file list", "created directory", "sending")):
+                return
+            if line.startswith("sent "):
+                # sent 6,676 bytes  received 397 bytes  4,715.33 bytes/sec
+                return
+            if line.startswith("total "):
+                # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
+                return
+            if line.startswith(("cd", ".d")):
+                return
 
+            # Lines with chr(13), \r, contain file transfer information
             if chr(13) in line:
                 # partial transfer
                 #
@@ -299,15 +312,8 @@ class RSyncer(Observer):
                 successful_updates.append(next_file._replace(file_size=size_bytes))
                 next_file = None
                 return
-            if line.startswith(("building file list", "created directory", "sending")):
-                return
-            if line.startswith("sent "):
-                # sent 6,676 bytes  received 397 bytes  4,715.33 bytes/sec
-                return
-            if line.startswith("total "):
-                # total size is 315,265,653  speedup is 44,573.12 (DRY RUN)
-                return
 
+            # Lines starting with "*f" contain file transfer information
             if line.startswith((".f", ">f", "<f")):
                 # .d          ./
                 # .f          README.md
@@ -328,7 +334,9 @@ class RSyncer(Observer):
                     self._files_transferred - previously_transferred
                 )
                 update = RSyncerUpdate(
-                    file_path=Path(line[12:].replace(" ", "")),
+                    file_path=Path(
+                        line[12:].rstrip()
+                    ),  # Remove trailing newlines, spaces, and carriage returns
                     file_size=0,
                     outcome=TransferResult.SUCCESS,
                     transfer_total=self._files_transferred - previously_transferred,
@@ -345,18 +353,17 @@ class RSyncer(Observer):
                     next_file = update
                 return
 
-            if line.startswith(("cd", ".d")):
-                return
-
         def parse_stderr(line: str):
-            logger.warning(line)
+            logger.warning(f"rsync stderr: {line!r}")
 
-        relative_filenames = []
+        # Generate list of relative filenames for this batch of transferred files
+        relative_filenames: List[Path] = []
         for f in files:
             try:
                 relative_filenames.append(f.relative_to(self._basepath))
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
+
         if self._remove_files:
             if self._required_substrings_for_removal:
                 rsync_stdin_remove = b"\n".join(
@@ -383,6 +390,9 @@ class RSyncer(Observer):
         else:
             rsync_stdin_remove = b""
             rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
+
+        # Create and run rsync subprocesses
+        # rsync commands to pass to subprocess
         rsync_cmd = [
             "rsync",
             "-iiv",
@@ -392,7 +402,6 @@ class RSyncer(Observer):
             "--files-from=-",
             "-p",  # preserve permissions
         ]
-
         rsync_cmd.extend([".", self._remote])
 
         result: subprocess.CompletedProcess | None = None
@@ -426,7 +435,9 @@ class RSyncer(Observer):
 
         self.notify(successful_updates, secondary=True)
 
+        # Compare files from rsync stdout to original list to verify transfer
         for f in set(relative_filenames) - transfer_success:
+            logger.warning(f"Transfer of file {f.name!r} considered a failure")
             self._files_transferred += 1
             current_outstanding = self.queue.unfinished_tasks - (
                 self._files_transferred - previously_transferred
