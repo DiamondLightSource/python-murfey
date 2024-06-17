@@ -2495,24 +2495,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_tomography_preprocess":
-            thread = Thread(
-                target=_flush_tomography_preprocessing,
-                args=message,
-                name="tomography_flush",
-                daemon=True,
-            )
-            thread.start()
+            _flush_tomography_preprocessing(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_spa_preprocess":
-            thread = Thread(
-                target=_flush_spa_preprocessing,
-                args=message,
-                name="spa_flush",
-                daemon=True,
-            )
-            thread.start()
+            _flush_spa_preprocessing(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
