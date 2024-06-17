@@ -35,7 +35,6 @@ def lif_to_tiff(
         )
 
 
-# WORK IN PROGRESS
 @router.post("/sessions/{session_id}/tiff_to_stack")
 def tiff_to_stack(
     session_id: int,  # Used by the decorator
@@ -47,7 +46,7 @@ def tiff_to_stack(
     if murfey_workflows:
         murfey_workflows[0].load()(
             # Match the arguments found in murfey.workflows.tiff_to_stack
-            file=tiff_info.tiff_files,
+            file=tiff_info.tiff_files[0],  # Pass it only one file from the list
             root_folder="images",
             metadata=tiff_info.series_metadata,
             messenger=_transport_object,
