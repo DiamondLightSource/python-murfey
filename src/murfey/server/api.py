@@ -574,19 +574,12 @@ def register_tilt_series(
     db.commit()
 
 
-@router.post("/clients/{client_id}/tilt_series_length")
+@router.post("/sessions/{session_id}/tilt_series_length")
 def register_tilt_series_length(
-    client_id: int,
+    session_id: int,
     tilt_series_group: TiltSeriesGroupInfo,
     db=murfey_db,
 ):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
     tilt_series_db = db.exec(
         select(TiltSeries)
         .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
