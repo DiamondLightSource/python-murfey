@@ -635,6 +635,7 @@ def register_completed_tilt_series(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
                 )
                 .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == tilt_series_group.source)
                 .where(DataCollection.tag == ts.tag)
                 .where(DataCollection.dcg_id == DataCollectionGroup.id)
                 .where(ProcessingJob.dc_id == DataCollection.id)
