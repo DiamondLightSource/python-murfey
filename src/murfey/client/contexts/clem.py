@@ -12,7 +12,7 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config  # , sanitise
+from murfey.util import capture_post, get_machine_config
 from murfey.util.clem.xml import get_image_elements
 
 # Create logger object
