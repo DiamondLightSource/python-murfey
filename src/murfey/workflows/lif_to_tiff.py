@@ -4,6 +4,7 @@ The recipe referred to here is stored on GitLab.
 """
 
 from pathlib import Path
+from time import time
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -12,12 +13,15 @@ except AttributeError:
 
 
 def zocalo_cluster_request(
-    file: Path, root_folder: str, messenger: TransportManager | None = None
+    file: Path,
+    root_folder: str,
+    messenger: TransportManager | None = None,
 ):
     if messenger:
-        # Set working directory to be the parent of the designated root folder
+        # Construct paths to working and logging directories
         path_parts = list(file.parts)
         new_path = []
+        log_path = []
         for p in range(len(path_parts)):
             part = path_parts[p]
             # Remove leading slash for subsequent rejoining
@@ -25,19 +29,23 @@ def zocalo_cluster_request(
                 part = ""
             # Append up to, but not including, root folder
             if part.lower() == root_folder.lower():
+                log_path.append(part)
                 break
             new_path.append(part)
+            log_path.append(part)
         working_dir = Path("/".join(new_path))
+        log_dir = Path("/".join(log_path)) / "tmp"
 
         messenger.send(
             "processing_recipe",
             {
                 "recipes": ["lif-to-tiff"],
                 "parameters": {
-                    # Where the cluster generates and saves log files
-                    "working_dir": str(working_dir),
-                    "lif_path": str(file),
+                    "working_dir": repr(str(working_dir)),  # Represent file paths canonically
+                    "lif_path": repr(str(file)),
                     "root_dir": root_folder,
+                    "log_dir": repr(str(log_dir)),
+                    "job_id": str(int(round(time(), 0))),  # Use time as a job ID (for now)
                 },
             },
             new_connection=True,
