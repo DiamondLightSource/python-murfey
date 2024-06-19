@@ -230,7 +230,7 @@ class CLEMContext(Context):
 
             # Post message if all files for the associated series have been collected
             # .get(series_name, 0) returns 0 if no associated key is found
-            if len(self._tiff_series[series_name]) == 0:
+            if len(self._tiff_series.get(series_name, [])) == 0:
                 logger.debug(f"TIFF series {series_name!r} not yet loaded")
                 return True
             elif self._files_in_series.get(series_name, 0) == 0:
@@ -238,9 +238,9 @@ class CLEMContext(Context):
                     f"Metadata for TIFF series {series_name!r} not yet processed"
                 )
                 return True
-            elif len(self._tiff_series[series_name]) == self._files_in_series.get(
-                series_name, 0
-            ):
+            elif len(
+                self._tiff_series.get(series_name, [])
+            ) == self._files_in_series.get(series_name, 0):
                 logger.debug(
                     f"Collected expected number of TIFF files for series {series_name!r}; posting job to server"
                 )
