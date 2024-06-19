@@ -2210,6 +2210,20 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.AutoProcProgram.id == message["program_id"])
             ).one()
             session_id = collected_ids[0].session_id
+
+            # Find the autoprocprogram id for the alignment recipe
+            alignment_ids = murfey_db.exec(
+                select(
+                    db.DataCollection,
+                    db.ProcessingJob,
+                    db.AutoProcProgram,
+                )
+                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                .where(db.DataCollection.id == collected_ids[1].id)
+                .where(db.ProcessingJob.recipe == message["em-tomo-align"])
+            ).one()
+
             relevant_tilt_and_series = murfey_db.exec(
                 select(db.Tilt, db.TiltSeries)
                 .where(db.Tilt.movie_path == message.get("movie"))
@@ -2230,7 +2244,7 @@ def feedback_callback(header: dict, message: dict) -> None:
 
                 machine_config = get_machine_config()
                 tilts = get_all_tilts(relevant_tilt_series.id)
-                ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
+                ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]

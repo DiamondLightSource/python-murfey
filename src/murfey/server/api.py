@@ -574,6 +574,25 @@ def register_tilt_series(
     db.commit()
 
 
+@router.post("/sessions/{session_id}/tilt_series_length")
+def register_tilt_series_length(
+    session_id: int,
+    tilt_series_group: TiltSeriesGroupInfo,
+    db=murfey_db,
+):
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts_index = tilt_series_group.tags.index(ts.tag)
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
+        db.add(ts)
+    db.commit()
+
+
 @router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
 def register_completed_tilt_series(
     visit_name: str,
@@ -609,6 +628,7 @@ def register_completed_tilt_series(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
                 )
                 .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == tilt_series_group.source)
                 .where(DataCollection.tag == ts.tag)
                 .where(DataCollection.dcg_id == DataCollectionGroup.id)
                 .where(ProcessingJob.dc_id == DataCollection.id)

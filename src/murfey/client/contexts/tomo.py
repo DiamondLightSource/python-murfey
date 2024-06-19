@@ -835,6 +835,21 @@ class TomographyContext(Context):
                             ),
                             environment=environment,
                         )
+
+                    # Always update the tilt series length in the database after an mdoc
+                    if environment.murfey_session is not None:
+                        length_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tilt_series_length"
+                        capture_post(
+                            length_url,
+                            json={
+                                "tags": [tilt_series],
+                                "source": str(transferred_file.parent),
+                                "tilt_series_lengths": [
+                                    self._tilt_series_sizes[tilt_series]
+                                ],
+                            },
+                        )
+
         if completed_tilts and environment:
             logger.info(
                 f"The following tilt series are considered complete: {completed_tilts} "
