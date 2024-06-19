@@ -300,7 +300,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.warning(f"exception encountered {e}")
+                            logger.error(f"exception encountered {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
@@ -347,7 +347,7 @@ class Analyser(Observer):
 
                 # If a file with a CLEM context is identified, immediately post it
                 elif isinstance(self._context, CLEMContext):
-                    logger.info(
+                    logger.debug(
                         f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
                     )
                     self.post_transfer(transferred_file)
@@ -366,7 +366,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.info(f"exception encountered {e}")
+                            logger.info(f"Exception encountered: {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
