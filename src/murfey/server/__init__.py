@@ -2221,7 +2221,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.ProcessingJob.dc_id == db.DataCollection.id)
                 .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
                 .where(db.DataCollection.id == collected_ids[1].id)
-                .where(db.ProcessingJob.recipe == message["em-tomo-align"])
+                .where(db.ProcessingJob.recipe == "em-tomo-align")
             ).one()
 
             relevant_tilt_and_series = murfey_db.exec(
