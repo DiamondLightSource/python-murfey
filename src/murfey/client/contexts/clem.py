@@ -114,6 +114,13 @@ class CLEMContext(Context):
                 )
                 return True
 
+            # Skip processing of "IOManagerConfiguation.xlif" files (yes, the typo IS part of the file name)
+            if "IOManagerConfiguation" in transferred_file.stem:
+                logger.debug(
+                    f"File {transferred_file.name!r} is a Leica configuration file; skipping processing"
+                )
+                return True
+
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
                 logger.debug("Detected a TIFF file")
@@ -232,6 +239,10 @@ class CLEMContext(Context):
             elif len(self._tiff_series[series_name]) == self._files_in_series.get(
                 series_name, 0
             ):
+                logger.debug(
+                    f"Collected expected number of TIFF files for series {series_name!r}; posting job to server"
+                )
+
                 # Construct URL for Murfey server to communicate with
                 url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tiff_to_stack"
                 if not url:
