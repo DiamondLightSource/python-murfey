@@ -101,7 +101,9 @@ def process_tiff_files(
             if (f"C{str(c).zfill(2)}" in f.stem or f"C{str(c).zfill(3)}" in f.stem)
             and (img_name in f.stem)
         ]
-        tiff_sublist.sort()  # Increasing order of Z
+        tiff_sublist.sort(
+            key=lambda f: (int(f.stem.split("--")[1].replace("Z", "")),)
+        )  # Increasing order of Z
 
         # Load image stack
         logger.info("Loading image stack")
@@ -190,7 +192,7 @@ def convert_tiff_to_stack(
 
     # Use the names of the TIFF files to get the unique path to it
     # Remove the "--Z##--C##.tiff" end of the file path strings
-    path = list({Path(str(f).split("--", 1)[0]) for f in tiff_list})[0]
+    path = tiff_list[0].parent / tiff_list[0].stem.split("--")[0]
 
     # Extract key variables
     parent_dir = path.parent  # File path not including partial file name

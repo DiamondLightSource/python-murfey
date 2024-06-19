@@ -141,7 +141,7 @@ class Analyser(Observer):
                 self._context = CLEMContext("leica", self._basepath)
                 return True
 
-        # Checks for tomography and SPA workflows
+        # Tomography and SPA workflow checks
         split_file_name = file_path.name.split("_")
         if split_file_name:
             # Files starting with "FoilHole" belong to the SPA workflow
@@ -237,15 +237,18 @@ class Analyser(Observer):
                     transferred_file, role=self._role, environment=self._environment
                 )
         except Exception as e:
-            logger.error(
-                f"An exception was encountered posting the file for transfer: {e}"
-            )
+            logger.error(f"An exception was encountered post transfer: {e}")
 
     def _analyse(self):
         logger.info("Analyser thread started")
         mdoc_for_reading = None
         while not self._halt_thread:
             transferred_file = self.queue.get()
+            transferred_file = (
+                Path(transferred_file)
+                if isinstance(transferred_file, str)
+                else transferred_file
+            )
             if not transferred_file:
                 self._halt_thread = True
                 continue
@@ -341,9 +344,15 @@ class Analyser(Observer):
                                         ),
                                     }
                                 )
+
                 # If a file with a CLEM context is identified, immediately post it
                 elif isinstance(self._context, CLEMContext):
+                    logger.info(
+                        f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
+                    )
                     self.post_transfer(transferred_file)
+
+                # Handle files with tomography and SPA context differently
                 elif not self._extension or self._unseen_xml:
                     self._find_extension(transferred_file)
                     if self._extension:
