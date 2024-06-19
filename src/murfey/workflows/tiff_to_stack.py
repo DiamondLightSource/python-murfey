@@ -43,12 +43,13 @@ def zocalo_cluster_request(
             {
                 "recipes": ["tiff-to-stack"],
                 "parameters": {
-                    "working_dir": repr(str(working_dir)),  # Represent file paths canonically
+                    # Represent file paths canonically
+                    "working_dir": repr(str(working_dir)),
                     "tiff_path": repr(str(file)),
                     "root_dir": root_folder,
                     "metadata": repr(str(metadata)),
                     "log_dir": repr(str(log_dir)),
-                    "job_id": str(int(round(time(), 0))),  # Use time as a job ID (for now)
+                    "job_id": str(int(round(time(), 0))),  # Use time as job ID for now
                 },
             },
             new_connection=True,
