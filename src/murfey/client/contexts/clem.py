@@ -114,13 +114,6 @@ class CLEMContext(Context):
                 )
                 return True
 
-            # Skip processing of "IOManagerConfiguation.xlif" files (yes, the typo IS part of the file name)
-            if "IOManagerConfiguation" in transferred_file.stem:
-                logger.debug(
-                    f"File {transferred_file.name!r} is a Leica configuration file; skipping processing"
-                )
-                return True
-
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
                 logger.debug("Detected a TIFF file")
@@ -185,7 +178,16 @@ class CLEMContext(Context):
                     logger.debug(
                         f"File {transferred_file.name!r} contains histogram metadata; skipping processing"
                     )
+                    return True
 
+                # Skip processing of "IOManagerConfiguation.xlif" files (yes, the typo IS part of the file name)
+                if "IOManagerConfiguation" in transferred_file.stem:
+                    logger.debug(
+                        f"File {transferred_file.name!r} is a Leica configuration file; skipping processing"
+                    )
+                    return True
+
+                # Create series name for XLIF file
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "/".join(
