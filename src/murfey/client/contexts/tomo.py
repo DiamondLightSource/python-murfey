@@ -548,12 +548,7 @@ class TomographyContext(Context):
 
         res = []
         if self._last_transferred_file:
-            if extract_tilt_tag(self._last_transferred_file) and extract_tilt_series(
-                self._last_transferred_file
-            ):
-                last_tilt_series = _construct_tilt_series_name(
-                    self._last_transferred_file
-                )
+            last_tilt_series = _construct_tilt_series_name(self._last_transferred_file)
 
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
