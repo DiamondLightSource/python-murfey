@@ -87,7 +87,7 @@ def _get_tilt_series_v5_12(p: Path) -> str:
     angle_idx = _find_angle_index(split_name)
     if split_name[angle_idx - 2].isnumeric():
         return split_name[angle_idx - 2]
-    return "0"
+    return ""
 
 
 def _get_tilt_angle_v5_12(p: Path) -> str:
@@ -122,6 +122,8 @@ tomo_tilt_info = {
 def _construct_tilt_series_name(
     tilt_tag: str, tilt_series: str, file_path: Path
 ) -> str:
+    if not tilt_series:
+        return tilt_tag
     if tilt_tag:
         if f"{tilt_tag}_{tilt_series}" in file_path.name:
             return f"{tilt_tag}_{tilt_series}"
@@ -557,11 +559,15 @@ class TomographyContext(Context):
 
         res = []
         if self._last_transferred_file:
-            last_tilt_series = (
-                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
-                if extract_tilt_tag(self._last_transferred_file)
-                else extract_tilt_series(self._last_transferred_file)
-            )
+            if extract_tilt_tag(self._last_transferred_file) and extract_tilt_series(
+                self._last_transferred_file
+            ):
+                last_tilt_series = f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
+            elif extract_tilt_tag(self._last_transferred_file):
+                last_tilt_series = f"{extract_tilt_tag(self._last_transferred_file)}"
+            else:
+                last_tilt_series = extract_tilt_series(self._last_transferred_file)
+
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
