@@ -116,7 +116,6 @@ class CLEMContext(Context):
 
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
-                logger.debug("Detected a TIFF file")
 
                 # Files should be named "PositionX--ZXX--CXX.tif" by default
                 # If Position is repeated, it will add an additional --00X to the end
@@ -125,6 +124,8 @@ class CLEMContext(Context):
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
+
+                logger.debug(f"File {transferred_file.name!r} is part of a TIFF image series")
 
                 # Create a unique name for the series
                 # For standard file name
@@ -149,7 +150,7 @@ class CLEMContext(Context):
                     )
                     return False
                 logger.debug(
-                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
+                    f"File {transferred_file.name!r} given the series name {series_name!r}"
                 )
 
                 # Create key-value pairs containing empty list if not already present
@@ -171,7 +172,6 @@ class CLEMContext(Context):
 
             # Process XLIF files
             if transferred_file.suffix == ".xlif":
-                logger.debug("Detected an XLIF file")
 
                 # Skip processing of "_histo" histogram XLIF files
                 if transferred_file.stem.endswith("_histo"):
@@ -187,6 +187,8 @@ class CLEMContext(Context):
                     )
                     return True
 
+                logger.debug(f"File {transferred_file.name!r} contains metadata for an image series")
+
                 # Create series name for XLIF file
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
@@ -194,7 +196,7 @@ class CLEMContext(Context):
                     [*file_path.parent.parent.parts[-2:], file_path.stem]
                 )  # The previous 2 parent directories should be unique enough
                 logger.debug(
-                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
+                    f"File {transferred_file.name!r} given the series name {series_name!r}"
                 )
 
                 # Extract metadata to get the expected size of the series
@@ -282,6 +284,8 @@ class CLEMContext(Context):
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
                 return True
+
+            logger.debug(f"File {transferred_file.name!r} is a valid LIF file; posting job to server")
 
             # Construct the URL for the Murfey server to communicate with
             url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_tiff"
