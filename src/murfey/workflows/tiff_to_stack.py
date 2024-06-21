@@ -4,7 +4,6 @@ The recipe referred to here is stored on GitLab.
 """
 
 from pathlib import Path
-from time import time
 from typing import Optional
 
 try:
@@ -20,10 +19,9 @@ def zocalo_cluster_request(
     messenger: TransportManager | None = None,
 ):
     if messenger:
-        # Construct paths to working and logging directories
+        # Construct path to session directory
         path_parts = list(file.parts)
         new_path = []
-        log_path = []
         for p in range(len(path_parts)):
             part = path_parts[p]
             # Remove leading slash for subsequent rejoining
@@ -31,25 +29,24 @@ def zocalo_cluster_request(
                 part = ""
             # Append up to, but not including, root folder
             if part.lower() == root_folder.lower():
-                log_path.append(part)  # Include "images" in path
                 break
             new_path.append(part)
-            log_path.append(part)
-        working_dir = Path("/".join(new_path))
-        log_dir = Path("/".join(log_path)) / "tmp"
+        session_dir = Path("/".join(new_path))
+
+        # If no metadata file provided, generate path to one
+        if metadata is None:
+            series_name = file.stem.split("--")[0]
+            metadata = file.parent / "Metadata" / (series_name + ".xlif")
 
         messenger.send(
             "processing_recipe",
             {
                 "recipes": ["tiff-to-stack"],
                 "parameters": {
-                    # Represent file paths canonically
-                    "working_dir": repr(str(working_dir)),
-                    "tiff_path": repr(str(file)),
+                    "session_dir": str(session_dir),
+                    "tiff_path": str(file),
                     "root_dir": root_folder,
-                    "metadata": repr(str(metadata)),
-                    "log_dir": repr(str(log_dir)),
-                    "job_id": str(int(round(time(), 0))),  # Use time as job ID for now
+                    "metadata": str(metadata),
                 },
             },
             new_connection=True,
