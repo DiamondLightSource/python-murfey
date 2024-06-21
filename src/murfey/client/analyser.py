@@ -157,7 +157,7 @@ class Analyser(Observer):
                                 demo=self._environment.demo,
                             )
                         except Exception as e:
-                            logger.warning(f"exception encountered: {e}")
+                            logger.error(f"Exception encountered: {e}")
                             cfg = {}
                     else:
                         cfg = {}
@@ -302,7 +302,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.error(f"exception encountered {e}")
+                            logger.error(f"Exception encountered: {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
@@ -368,7 +368,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.info(f"Exception encountered: {e}")
+                            logger.error(f"Exception encountered: {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
@@ -454,5 +454,5 @@ class Analyser(Observer):
                 self.queue.put(None)
                 self.thread.join()
         except Exception as e:
-            logger.debug(f"Exception encountered while stopping analyser: {e}")
+            logger.error(f"Exception encountered while stopping analyser: {e}")
         logger.debug("Analyser thread stop completed")
