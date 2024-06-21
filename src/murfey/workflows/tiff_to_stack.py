@@ -19,8 +19,7 @@ def zocalo_cluster_request(
     messenger: TransportManager | None = None,
 ):
     if messenger:
-
-        # Set working directory to be the parent of the designated root folder
+        # Construct path to session directory
         path_parts = list(file.parts)
         new_path = []
         for p in range(len(path_parts)):
@@ -32,14 +31,19 @@ def zocalo_cluster_request(
             if part.lower() == root_folder.lower():
                 break
             new_path.append(part)
-        working_dir = Path("/".join(new_path))
+        session_dir = Path("/".join(new_path))
+
+        # If no metadata file provided, generate path to one
+        if metadata is None:
+            series_name = file.stem.split("--")[0]
+            metadata = file.parent / "Metadata" / (series_name + ".xlif")
 
         messenger.send(
             "processing_recipe",
             {
                 "recipes": ["tiff-to-stack"],
                 "parameters": {
-                    "working_dir": str(working_dir),
+                    "session_dir": str(session_dir),
                     "tiff_path": str(file),
                     "root_dir": root_folder,
                     "metadata": str(metadata),

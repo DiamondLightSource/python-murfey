@@ -99,11 +99,18 @@ def process_tiff_files(
             f
             for f in tiff_list
             if (f"C{str(c).zfill(2)}" in f.stem or f"C{str(c).zfill(3)}" in f.stem)
-            and (img_name in f.stem)
+            and (img_name == f.stem.split("--")[0])
         ]
         tiff_sublist.sort(
             key=lambda f: (int(f.stem.split("--")[1].replace("Z", "")),)
-        )  # Increasing order of Z
+        )  # Sort by Z as an int, not str
+
+        # Return error message if the list of TIFFs is empty for some reason
+        if not tiff_sublist:
+            logger.error(
+                f"Error processing {color} channel for {img_name}; no TIFF files found"
+            )
+            return False
 
         # Load image stack
         logger.info("Loading image stack")
@@ -216,7 +223,7 @@ def convert_tiff_to_stack(
             part.lower() == root_folder.lower() and counter < 1
         ):  # Remove case-sensitivity
             path_parts[p] = new_root_folder
-            counter += 0  # Do for first instance only
+            counter += 1  # Do for first instance only
         # Remove last level in path if same as previous one (redundancy)
         if p == len(path_parts) - 1:
             if part.replace(" ", "_") == path_parts[p - 1].replace(" ", "_"):

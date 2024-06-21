@@ -116,7 +116,6 @@ class CLEMContext(Context):
 
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
-                logger.debug("Detected a TIFF file")
 
                 # Files should be named "PositionX--ZXX--CXX.tif" by default
                 # If Position is repeated, it will add an additional --00X to the end
@@ -125,6 +124,8 @@ class CLEMContext(Context):
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
+
+                logger.debug(f"File {transferred_file.name!r} is part of a TIFF image series")
 
                 # Create a unique name for the series
                 # For standard file name
@@ -149,7 +150,7 @@ class CLEMContext(Context):
                     )
                     return False
                 logger.debug(
-                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
+                    f"File {transferred_file.name!r} given the series name {series_name!r}"
                 )
 
                 # Create key-value pairs containing empty list if not already present
@@ -171,21 +172,31 @@ class CLEMContext(Context):
 
             # Process XLIF files
             if transferred_file.suffix == ".xlif":
-                logger.debug("Detected an XLIF file")
 
                 # Skip processing of "_histo" histogram XLIF files
                 if transferred_file.stem.endswith("_histo"):
                     logger.debug(
                         f"File {transferred_file.name!r} contains histogram metadata; skipping processing"
                     )
+                    return True
 
+                # Skip processing of "IOManagerConfiguation.xlif" files (yes, the typo IS part of the file name)
+                if "IOManagerConfiguation" in transferred_file.stem:
+                    logger.debug(
+                        f"File {transferred_file.name!r} is a Leica configuration file; skipping processing"
+                    )
+                    return True
+
+                logger.debug(f"File {transferred_file.name!r} contains metadata for an image series")
+
+                # Create series name for XLIF file
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "/".join(
                     [*file_path.parent.parent.parts[-2:], file_path.stem]
                 )  # The previous 2 parent directories should be unique enough
                 logger.debug(
-                    f"File {transferred_file.name!r} given the series identifier {series_name!r}"
+                    f"File {transferred_file.name!r} given the series name {series_name!r}"
                 )
 
                 # Extract metadata to get the expected size of the series
@@ -221,7 +232,7 @@ class CLEMContext(Context):
 
             # Post message if all files for the associated series have been collected
             # .get(series_name, 0) returns 0 if no associated key is found
-            if len(self._tiff_series[series_name]) == 0:
+            if not len(self._tiff_series.get(series_name, [])):
                 logger.debug(f"TIFF series {series_name!r} not yet loaded")
                 return True
             elif self._files_in_series.get(series_name, 0) == 0:
@@ -229,9 +240,13 @@ class CLEMContext(Context):
                     f"Metadata for TIFF series {series_name!r} not yet processed"
                 )
                 return True
-            elif len(self._tiff_series[series_name]) == self._files_in_series.get(
-                series_name, 0
-            ):
+            elif len(
+                self._tiff_series.get(series_name, [])
+            ) == self._files_in_series.get(series_name, 0):
+                logger.debug(
+                    f"Collected expected number of TIFF files for series {series_name!r}; posting job to server"
+                )
+
                 # Construct URL for Murfey server to communicate with
                 url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tiff_to_stack"
                 if not url:
@@ -269,6 +284,8 @@ class CLEMContext(Context):
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
                 return True
+
+            logger.debug(f"File {transferred_file.name!r} is a valid LIF file; posting job to server")
 
             # Construct the URL for the Murfey server to communicate with
             url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_tiff"

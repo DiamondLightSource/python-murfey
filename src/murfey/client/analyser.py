@@ -113,7 +113,9 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         """
         Using various conditionals, identifies what workflow the file is part of, and
-        assigns the necessary context class to it for subsequent stages of processing
+        assigns the correct context class to that batch of rsync files for subsequent
+        stages of processing. Actions to take for individual files will be determined
+        in the Context classes themselves.
         """
 
         # CLEM workflow checks
@@ -155,7 +157,7 @@ class Analyser(Observer):
                                 demo=self._environment.demo,
                             )
                         except Exception as e:
-                            logger.warning(f"exception encountered: {e}")
+                            logger.error(f"Exception encountered: {e}")
                             cfg = {}
                     else:
                         cfg = {}
@@ -300,7 +302,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.warning(f"exception encountered {e}")
+                            logger.error(f"Exception encountered: {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
@@ -347,7 +349,7 @@ class Analyser(Observer):
 
                 # If a file with a CLEM context is identified, immediately post it
                 elif isinstance(self._context, CLEMContext):
-                    logger.info(
+                    logger.debug(
                         f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
                     )
                     self.post_transfer(transferred_file)
@@ -366,7 +368,7 @@ class Analyser(Observer):
                                 environment=self._environment,
                             )
                         except Exception as e:
-                            logger.info(f"exception encountered {e}")
+                            logger.error(f"Exception encountered: {e}")
                         if self._role == "detector":
                             if not dc_metadata:
                                 try:
@@ -452,5 +454,5 @@ class Analyser(Observer):
                 self.queue.put(None)
                 self.thread.join()
         except Exception as e:
-            logger.debug(f"Exception encountered while stopping analyser: {e}")
+            logger.error(f"Exception encountered while stopping analyser: {e}")
         logger.debug("Analyser thread stop completed")
