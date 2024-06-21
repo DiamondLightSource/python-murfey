@@ -113,7 +113,9 @@ class Analyser(Observer):
     def _find_context(self, file_path: Path) -> bool:
         """
         Using various conditionals, identifies what workflow the file is part of, and
-        assigns the necessary context class to it for subsequent stages of processing
+        assigns the correct context class to that batch of rsync files for subsequent
+        stages of processing. Actions to take for individual files will be determined
+        in the Context classes themselves.
         """
 
         # CLEM workflow checks
