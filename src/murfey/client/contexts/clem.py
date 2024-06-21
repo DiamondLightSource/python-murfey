@@ -232,7 +232,7 @@ class CLEMContext(Context):
 
             # Post message if all files for the associated series have been collected
             # .get(series_name, 0) returns 0 if no associated key is found
-            if len(self._tiff_series.get(series_name, [])) == 0:
+            if not len(self._tiff_series.get(series_name, [])):
                 logger.debug(f"TIFF series {series_name!r} not yet loaded")
                 return True
             elif self._files_in_series.get(series_name, 0) == 0:
