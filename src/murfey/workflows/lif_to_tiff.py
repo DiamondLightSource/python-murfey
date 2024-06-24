@@ -36,9 +36,8 @@ def zocalo_cluster_request(
             {
                 "recipes": ["lif-to-tiff"],
                 "parameters": {
-                    # Represent file paths canonically
-                    "session_dir": repr(str(session_dir)),
-                    "lif_path": repr(str(file)),
+                    "session_dir": str(session_dir),
+                    "lif_path": str(file),
                     "root_dir": root_folder,
                 },
             },
