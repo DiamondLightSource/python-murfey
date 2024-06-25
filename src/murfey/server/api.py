@@ -998,8 +998,11 @@ async def request_spa_preprocessing(
             Path(secure_filename(str(mrc_out))).parent.mkdir(
                 parents=True, exist_ok=True
             )
+        recipe_name = machine_config.recipes.get(
+            "em-spa-preprocess", "em-spa-preprocess"
+        )
         zocalo_message = {
-            "recipes": ["em-spa-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,

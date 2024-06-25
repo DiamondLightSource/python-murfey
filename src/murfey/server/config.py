@@ -42,6 +42,15 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    recipes: Dict[str, str] = {
+        "em-spa-bfactor": "em-spa-bfactor",
+        "em-spa-class2d": "em-spa-class2d",
+        "em-spa-class3d": "em-spa-class3d",
+        "em-spa-preprocess": "em-spa-preprocess",
+        "em-spa-refine": "em-spa-refine",
+        "em-tomo-preprocess": "em-tomo-preprocess",
+        "em-tomo-align": "em-tomo-align",
+    }
 
     # Find and download upstream directories
     upstream_data_directories: List[Path] = []  # Previous sessions
