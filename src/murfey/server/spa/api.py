@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from murfey.server import get_machine_config
 from murfey.server.murfey_db import murfey_db
-from murfey.util.db import Session
+from murfey.util.db import ClientEnvironment
 
 # Create APIRouter class object
 router = APIRouter()
@@ -35,5 +35,11 @@ def _cryolo_model_path(visit: str) -> Path:
 
 @router.get("/sessions/{session_id}/cryolo_model")
 def get_cryolo_model_path(session_id: int, db=murfey_db):
-    visit = db.exec(select(Session).where(Session.session_id == session_id)).one().visit
+    visit = (
+        db.exec(
+            select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+        )
+        .one()
+        .visit
+    )
     return {"model_path": _cryolo_model_path(visit)}
