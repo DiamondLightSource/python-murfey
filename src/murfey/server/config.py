@@ -106,6 +106,7 @@ def get_machine_config() -> MachineConfig:
         rsync_basepath=Path("dls/tmp"),
         murfey_db_credentials="",
         crypto_key="",
+        default_model="/tmp/weights.h5",
     )
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
