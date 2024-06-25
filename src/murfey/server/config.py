@@ -17,6 +17,7 @@ class MachineConfig(BaseModel):
     rsync_basepath: Path
     murfey_db_credentials: str
     crypto_key: str
+    default_model: Path
     display_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
@@ -46,6 +47,9 @@ class MachineConfig(BaseModel):
     upstream_data_directories: List[Path] = []  # Previous sessions
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
+
+    model_search_directory: str = "processing"
+
     failure_queue: str = ""
     auth_key: str = ""
     auth_algorithm: str = ""
