@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
+import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch, wraps
@@ -1570,6 +1572,76 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
     return None
 
 
+def _downscaled_box_size(
+    particle_diameter: int, pixel_size: float
+) -> Tuple[int, float]:
+    box_size = int(math.ceil(1.2 * particle_diameter))
+    box_size = box_size + box_size % 2
+    for small_box_pix in (
+        48,
+        64,
+        96,
+        128,
+        160,
+        192,
+        256,
+        288,
+        300,
+        320,
+        360,
+        384,
+        400,
+        420,
+        450,
+        480,
+        512,
+        640,
+        768,
+        896,
+        1024,
+    ):
+        # Don't go larger than the original box
+        if small_box_pix > box_size:
+            return box_size, pixel_size
+        # If Nyquist freq. is better than 8.5 A, use this downscaled box, else step size
+        small_box_angpix = pixel_size * box_size / small_box_pix
+        if small_box_angpix < 4.25:
+            return small_box_pix, small_box_angpix
+    raise ValueError(f"Box size is too large: {box_size}")
+
+
+def _resize_intial_model(
+    downscaled_box_size: int,
+    downscaled_pixel_size: float,
+    input_path: Path,
+    output_path: Path,
+    executables: Dict[str, str],
+) -> None:
+    if executables.get("relion_image_handler"):
+        comp_proc = subprocess.run(
+            [
+                f"{executables['relion_image_handler']}",
+                "--i",
+                str(input_path),
+                "--new_box",
+                str(downscaled_box_size),
+                "--rescale_angpix",
+                str(downscaled_pixel_size),
+                "--force_header_angpix",
+                "--o",
+                str(output_path),
+            ],
+            capture_output=True,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if comp_proc.returncode:
+            logger.error(
+                f"Resizing initial model {input_path} failed \n {comp_proc.stdout}"
+            )
+    return None
+
+
 def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
@@ -1602,7 +1674,20 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
 
     provided_initial_model = _find_initial_model(visit_name, machine_config)
     if provided_initial_model:
-        feedback_params.initial_model = str(provided_initial_model)
+        rescaled_initial_model_path = (
+            provided_initial_model.parent
+            / f"{provided_initial_model.stem}_rescaled{provided_initial_model.suffix}"
+        )
+        _resize_intial_model(
+            *_downscaled_box_size(
+                message["particle_diameter"],
+                relion_options["angpix"],
+            ),
+            provided_initial_model,
+            rescaled_initial_model_path,
+            machine_config.external_executables,
+        )
+        feedback_params.initial_model = str(rescaled_initial_model_path)
         _db.add(feedback_params)
         _db.commit()
 
