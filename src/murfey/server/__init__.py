@@ -39,7 +39,12 @@ import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
-from murfey.server.config import get_hostname, get_machine_config, get_microscope
+from murfey.server.config import (
+    MachineConfig,
+    get_hostname,
+    get_machine_config,
+    get_microscope,
+)
 from murfey.server.murfey_db import url  # murfey_db
 
 try:
@@ -1547,6 +1552,24 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
+def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
+    if machine_config.initial_model_search_directory:
+        visit_directory = (
+            machine_config.rsync_basepath
+            / (machine_config.rsync_module or "data")
+            / str(datetime.now().year)
+            / visit
+        )
+        possible_models = list(
+            (visit_directory / machine_config.initial_model_search_directory).glob(
+                "*.mrc"
+            )
+        )
+        if possible_models:
+            return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
+    return None
+
+
 def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
@@ -1566,6 +1589,22 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         )
     ).one()
     other_options = dict(feedback_params)
+
+    visit_name = (
+        _db.exec(
+            select(db.ClientEnvironment).where(
+                db.ClientEnvironment.session_id == message["session_id"]
+            )
+        )
+        .one()
+        .visit
+    )
+
+    provided_initial_model = _find_initial_model(visit_name, machine_config)
+    if provided_initial_model:
+        feedback_params.initial_model = str(provided_initial_model)
+        _db.add(feedback_params)
+        _db.commit()
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
