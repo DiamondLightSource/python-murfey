@@ -95,11 +95,12 @@ def process_tiff_files(
         bit_depth = int(channels[c].attrib["Resolution"])
 
         # Find TIFFs from relevant channel and series
+        # Replace " " with "_" when comparing file name against series name as found in metadata
         tiff_sublist = [
             f
             for f in tiff_list
             if (f"C{str(c).zfill(2)}" in f.stem or f"C{str(c).zfill(3)}" in f.stem)
-            and (img_name == f.stem.split("--")[0])
+            and (img_name.replace(" ", "_") == f.stem.split("--")[0].replace(" ", "_"))
         ]
         tiff_sublist.sort(
             key=lambda f: (int(f.stem.split("--")[1].replace("Z", "")),)

@@ -71,7 +71,8 @@ def process_lif_file(
     img_xml_dir = img_dir / "metadata"
     for folder in (img_dir, img_xml_dir):
         if not folder.exists():
-            folder.mkdir(parents=True)
+            # Potential race condition when generating folders from multiple pools
+            folder.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created {folder}")
         else:
             logger.info(f"{folder} already exists")
