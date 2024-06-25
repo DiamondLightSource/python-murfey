@@ -1616,6 +1616,7 @@ def _resize_intial_model(
     input_path: Path,
     output_path: Path,
     executables: Dict[str, str],
+    env: Dict[str, str],
 ) -> None:
     if executables.get("relion_image_handler"):
         comp_proc = subprocess.run(
@@ -1632,8 +1633,8 @@ def _resize_intial_model(
                 str(output_path),
             ],
             capture_output=True,
-            stderr=subprocess.STDOUT,
             text=True,
+            env=env,
         )
         if comp_proc.returncode:
             logger.error(
@@ -1686,6 +1687,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             provided_initial_model,
             rescaled_initial_model_path,
             machine_config.external_executables,
+            machine_config.external_environment,
         )
         feedback_params.initial_model = str(rescaled_initial_model_path)
         _db.add(feedback_params)
