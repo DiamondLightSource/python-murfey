@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -14,12 +15,10 @@ from murfey.util.db import Session
 router = APIRouter()
 
 
-def _cryolo_model_path(session_id: int, db) -> Path:
+@lru_cache(maxsize=5)
+def _cryolo_model_path(visit: str) -> Path:
     machine_config = get_machine_config()
     if machine_config.model_search_directory:
-        visit = (
-            db.exec(select(Session).where(Session.session_id == session_id)).one().visit
-        )
         visit_directory = (
             machine_config.rsync_basepath
             / (machine_config.rsync_module or "data")
@@ -36,4 +35,5 @@ def _cryolo_model_path(session_id: int, db) -> Path:
 
 @router.get("/sessions/{session_id}/cryolo_model")
 def get_cryolo_model_path(session_id: int, db=murfey_db):
-    return {"model_path": _cryolo_model_path(session_id, db)}
+    visit = db.exec(select(Session).where(Session.session_id == session_id)).one().visit
+    return {"model_path": _cryolo_model_path(visit)}
