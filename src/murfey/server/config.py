@@ -17,6 +17,7 @@ class MachineConfig(BaseModel):
     rsync_basepath: Path
     murfey_db_credentials: str
     crypto_key: str
+    default_model: Path
     display_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
@@ -41,11 +42,23 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    recipes: Dict[str, str] = {
+        "em-spa-bfactor": "em-spa-bfactor",
+        "em-spa-class2d": "em-spa-class2d",
+        "em-spa-class3d": "em-spa-class3d",
+        "em-spa-preprocess": "em-spa-preprocess",
+        "em-spa-refine": "em-spa-refine",
+        "em-tomo-preprocess": "em-tomo-preprocess",
+        "em-tomo-align": "em-tomo-align",
+    }
 
     # Find and download upstream directories
     upstream_data_directories: List[Path] = []  # Previous sessions
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
+
+    model_search_directory: str = "processing"
+
     failure_queue: str = ""
     auth_key: str = ""
     auth_algorithm: str = ""
@@ -93,6 +106,7 @@ def get_machine_config() -> MachineConfig:
         rsync_basepath=Path("dls/tmp"),
         murfey_db_credentials="",
         crypto_key="",
+        default_model="/tmp/weights.h5",
     )
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
