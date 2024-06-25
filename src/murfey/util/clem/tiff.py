@@ -95,6 +95,7 @@ def process_tiff_files(
         bit_depth = int(channels[c].attrib["Resolution"])
 
         # Find TIFFs from relevant channel and series
+        # Replace " " with "_" when comparing file name against series name as found in metadata
         tiff_sublist = [
             f
             for f in tiff_list
