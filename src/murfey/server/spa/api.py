@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter
 from sqlmodel import select
@@ -13,8 +14,7 @@ from murfey.util.db import Session
 router = APIRouter()
 
 
-@router.get("/sessions/{session_id}/cryolo_model")
-def get_cryolo_model_path(session_id: int, db=murfey_db):
+def _cryolo_model_path(session_id: int, db) -> Path:
     machine_config = get_machine_config()
     if machine_config.model_search_directory:
         visit = (
@@ -30,9 +30,10 @@ def get_cryolo_model_path(session_id: int, db=murfey_db):
             (visit_directory / machine_config.model_search_directory).glob("*.h5")
         )
         if possible_models:
-            return {
-                "model_path": sorted(possible_models, key=lambda x: x.stat().st_ctime)[
-                    -1
-                ]
-            }
-    return {"model_path": machine_config.default_model}
+            return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
+    return machine_config.default_model
+
+
+@router.get("/sessions/{session_id}/cryolo_model")
+def get_cryolo_model_path(session_id: int, db=murfey_db):
+    return {"model_path": _cryolo_model_path(session_id, db)}

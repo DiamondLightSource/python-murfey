@@ -49,6 +49,7 @@ from murfey.server.auth import validate_token
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
+from murfey.server.spa.api import _cryolo_model_path
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,
@@ -1019,6 +1020,7 @@ async def request_spa_preprocessing(
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "cryolo_model_weights": str(_cryolo_model_path(session_id, db)),
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
