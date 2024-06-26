@@ -58,6 +58,7 @@ class MachineConfig(BaseModel):
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
 
     model_search_directory: str = "processing"
+    initial_model_search_directory: str = "processing/initial_model"
 
     failure_queue: str = ""
     auth_key: str = ""
