@@ -21,7 +21,7 @@ logger = getLogger("murfey.instrument_server.api")
 
 router = APIRouter()
 
-watchers = {}
+watchers: Dict[str, MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
 tokens = {}
@@ -82,21 +82,25 @@ async def token_handshake(token: Token):
 
 
 @router.post("/sessions/{session_id}/multigrid_watcher")
-def start_multigrid_watcher(
-    session_id: int, watcher_spec: MultigridWatcherSpec
-) -> bool:
+def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec):
     label = watcher_spec.label
     controllers[label] = MultigridController(
-        [], watcher_spec.visit, session_id, demo=True, do_transfer=False
+        [],
+        watcher_spec.visit,
+        session_id,
+        demo=True,
+        do_transfer=False,
+        _machine_config=watcher_spec.configuration.dict(),
     )
-    watchers[label] = MultigridDirWatcher(
-        watcher_spec.source,
-        watcher_spec.configuration.dict(),
-        skip_existing_processing=watcher_spec.skip_existing_processing,
-    )
-    watchers[label].subscribe(controllers[label]._start_rsyncer_multigrid)
-    watchers[label].start()
-    return True
+    # watchers[label] = MultigridDirWatcher(
+    #     [watcher_spec.source],
+    #     watcher_spec.visit,
+    #     _machine_config=watcher_spec.configuration.dict(),
+    #     processing_enabled=not watcher_spec.skip_existing_processing,
+    # )
+    # watchers[label].subscribe(controllers[label]._start_rsyncer_multigrid)
+    # watchers[label].start()
+    return {"success": True}
 
 
 @router.delete("/sessions/{session_id}/multigrid_watcher/{label}")

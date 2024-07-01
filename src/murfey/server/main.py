@@ -14,6 +14,7 @@ import murfey.server
 import murfey.server.auth.api
 import murfey.server.bootstrap
 import murfey.server.clem.api
+import murfey.server.display.api
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
@@ -42,7 +43,7 @@ app.mount("/metrics", metrics_app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +60,7 @@ app.include_router(murfey.server.bootstrap.pypi)
 app.include_router(murfey.server.bootstrap.plugins)
 app.include_router(murfey.server.clem.api.router)
 app.include_router(murfey.server.auth.api.router)
+app.include_router(murfey.server.display.api.router)
 app.include_router(murfey.server.websocket.ws)
 
 for r in importlib_metadata.entry_points(group="murfey.routers"):

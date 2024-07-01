@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import random
+import time
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
@@ -71,6 +72,7 @@ from murfey.util.models import (
     FractionationParameters,
     GainReference,
     GridSquareParameters,
+    MultigridWatcherSetup,
     PostInfo,
     PreprocessingParametersTomo,
     ProcessFile,
@@ -1394,6 +1396,14 @@ def remove_session(client_id: int, db=murfey_db):
     return
 
 
+@router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
+def get_rsyncers_for_session(session_id: int, db=murfey_db) -> List[RsyncInstance]:
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    )
+    return rsync_instances.all()
+
+
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: int, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
@@ -1502,6 +1512,28 @@ def failed_client_post(post_info: PostInfo):
     return
 
 
+@router.get("/possible_gain_references")
+async def get_possible_gain_references() -> List[File]:
+    return [
+        File(name="K3_example.dm4", description="", size=100e6, timestamp=time.time()),
+        File(
+            name="K3_not_the_real_thing.dm4",
+            description="",
+            size=1e3,
+            timestamp=time.time() - 2000,
+        ),
+    ]
+
+
+@router.post("/visits/{visit}/session/{name}")
+def create_session(visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit)
+    db.add(s)
+    db.commit()
+    sid = s.id
+    return sid
+
+
 @router.post("/activate_instrument_server")
 async def activate_instrument_server():
     timestamp = datetime.datetime.now().timestamp()
@@ -1516,3 +1548,43 @@ async def activate_instrument_server():
             instrument_server_token = await response.json()
             instrument_server_tokens[timestamp] = instrument_server_token
     return success
+
+
+@router.get("/instrument_name/")
+def get_instrument_name():
+    return machine_config.get("instrument_name", "")
+
+
+@router.post("/sessions/{session_id}/multigrid_watcher")
+async def start_multigrid_watcher(
+    session_id: int, watcher_spec: MultigridWatcherSetup, db=murfey_db
+):
+    if machine_config["instrument_server_url"]:
+        session = db.exec(select(Session).where(Session.id == session_id)).one()
+        visit = session.visit
+        label = session.name
+        _config = {
+            "acquisition_software": machine_config["acquisition_software"],
+            "calibrations": machine_config["calibrations"],
+            "data_directories": {
+                str(k): v for k, v in machine_config["data_directories"].items()
+            },
+            "rsync_basepath": str(machine_config["rsync_basepath"]),
+            "murfey_db_credentials": machine_config["murfey_db_credentials"],
+            "visit": visit,
+            "crypto_key": "",
+        }
+        log.warning(machine_config["instrument_server_url"])
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher",
+                json={
+                    "source": str(watcher_spec.source / visit),
+                    "visit": visit,
+                    "configuration": _config,
+                    "label": label,
+                    "skip_existing_processing": watcher_spec.skip_existing_processing,
+                },
+            ) as resp:
+                data = await resp.json()
+    return data

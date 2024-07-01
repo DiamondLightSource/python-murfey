@@ -332,3 +332,8 @@ class FoilHoleParameters(BaseModel):
 class PostInfo(BaseModel):
     url: str
     data: dict
+
+
+class MultigridWatcherSetup(BaseModel):
+    source: Path
+    skip_existing_processing: bool = False

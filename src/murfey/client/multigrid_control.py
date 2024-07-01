@@ -16,7 +16,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -34,6 +34,7 @@ class MultigridController:
     force_mdoc_metadata: bool = True
     rsync_processes: Dict[Path, RSyncer] = field(default_factory=lambda: {})
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
+    _machine_config: dict = field(default_factory=lambda: {})
 
     def __post_init__(self):
         machine_data = requests.get(f"{self.murfey_url}/machine/").json()
@@ -46,9 +47,6 @@ class MultigridController:
             demo=self.demo,
             visit=self.visit,
             # processing_only_mode=server_routing_prefix_found,
-        )
-        self._machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [

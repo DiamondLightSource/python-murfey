@@ -18,6 +18,7 @@ class MachineConfig(BaseModel):
     murfey_db_credentials: str
     crypto_key: str
     display_name: str = ""
+    instrument_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
