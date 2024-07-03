@@ -18,13 +18,37 @@ logger = logging.getLogger("murfey.util.clem.images")
 valid_bit_depths = (8, 16, 32, 64)
 valid_dtypes = tuple(f"uint{n}" for n in valid_bit_depths)
 
+<<<<<<< HEAD
 
 class UnsignedIntegerError(Exception):
+=======
+class UIntError(Exception):
     """
     Raised if the bit depth value provided is not one that NumPy can interpret as an
     unsigned integer dtype.
     """
 
+    def __init__(
+        self,
+        bit_depth: int,
+    ):
+        self.bit_depth = bit_depth
+        self.message = (
+            "The bit depth provided is not a NumPy-compatible unsigned integer dtype. "
+            "Only 8, 16, 32, and 64 bits are allowed. "
+            f"Current bit depth: {bit_depth}"
+        )
+        super().__init__(self.message)
+
+
+def raise_BitDepthError(bit_depth: int):
+>>>>>>> c68c307 (Added custom NumPy DTypeError class; added function to return most appropriate uint dtype)
+    """
+    Raised if the bit depth value provided is not one that NumPy can interpret as an
+    unsigned integer dtype.
+    """
+
+<<<<<<< HEAD
     def __init__(
         self,
         bit_depth: int,
@@ -38,6 +62,40 @@ class UnsignedIntegerError(Exception):
 
 
 def estimate_bit_depth(array: np.ndarray) -> int:
+=======
+    raise Exception(
+        "The bit depth provided is not a supported NumPy unsigned integer dtype. "
+        "Only 8, 16, 32, and 64-bit dtypes are currently supported. "
+        f"Current bit depth: {bit_depth}"
+    )
+
+
+def get_uint_dtype(value: int) -> str:
+    """
+    Returns the smallest NumPy unsigned integer dtype that will enclose values up to
+    the given bit depth.
+    """
+
+    int_dtypes = [8, 16, 32, 64]
+
+    # Raise error if value is too large
+    if value > 64:
+        raise UIntError(value)
+
+    # Return string form of NumPy dtype
+    if value in int_dtypes:
+        return f"uint{value}"
+    # Return smallest value that is larger than the specified one
+    else:
+        value_new = min(n for n in int_dtypes if n > value)
+        return f"uint{value_new}"
+
+
+def change_bit_depth(
+    array: np.ndarray,
+    target_bit_depth: int,
+) -> np.ndarray:
+>>>>>>> c68c307 (Added custom NumPy DTypeError class; added function to return most appropriate uint dtype)
     """
     Returns the smallest bit depth that will enclose the range of values present in
     an array.
