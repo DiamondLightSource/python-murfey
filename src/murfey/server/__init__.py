@@ -12,6 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple
 
+import mrcfile
 import numpy as np
 import uvicorn
 import workflows
@@ -1630,7 +1631,6 @@ def _resize_intial_model(
                 str(downscaled_box_size),
                 "--rescale_angpix",
                 str(downscaled_pixel_size),
-                "--force_header_angpix",
                 "--o",
                 str(output_path),
             ],
@@ -1638,6 +1638,12 @@ def _resize_intial_model(
             text=True,
             env=env,
         )
+        with mrcfile.open(output_path) as rescaled_mrc:
+            rescaled_mrc.header.cella = (
+                downscaled_pixel_size,
+                downscaled_pixel_size,
+                downscaled_pixel_size,
+            )
         if comp_proc.returncode:
             logger.error(
                 f"Resizing initial model {input_path} failed \n {comp_proc.stdout}"
