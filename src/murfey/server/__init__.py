@@ -1562,11 +1562,13 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
             / str(datetime.now().year)
             / visit
         )
-        possible_models = list(
-            (visit_directory / machine_config.initial_model_search_directory).glob(
-                "*.mrc"
-            )
-        )
+        possible_models = [
+            p
+            for p in (
+                visit_directory / machine_config.initial_model_search_directory
+            ).glob("*.mrc")
+            if "rescaled" not in p.name
+        ]
         if possible_models:
             return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
     return None
