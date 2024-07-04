@@ -1676,24 +1676,49 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     )
 
     provided_initial_model = _find_initial_model(visit_name, machine_config)
-    if provided_initial_model:
+    if provided_initial_model and not feedback_params.initial_model:
         rescaled_initial_model_path = (
             provided_initial_model.parent
-            / f"{provided_initial_model.stem}_rescaled{provided_initial_model.suffix}"
+            / f"{provided_initial_model.stem}_rescaled_{pj_id}{provided_initial_model.suffix}"
         )
-        _resize_intial_model(
-            *_downscaled_box_size(
-                message["particle_diameter"],
-                relion_options["angpix"],
-            ),
-            provided_initial_model,
-            rescaled_initial_model_path,
-            machine_config.external_executables,
-            machine_config.external_environment,
-        )
-        feedback_params.initial_model = str(rescaled_initial_model_path)
-        _db.add(feedback_params)
-        _db.commit()
+        if not rescaled_initial_model_path.is_file():
+            _resize_intial_model(
+                *_downscaled_box_size(
+                    message["particle_diameter"],
+                    relion_options["angpix"],
+                ),
+                provided_initial_model,
+                rescaled_initial_model_path,
+                machine_config.external_executables,
+                machine_config.external_environment,
+            )
+            feedback_params.initial_model = str(rescaled_initial_model_path)
+            other_options["initial_model"] = str(rescaled_initial_model_path)
+            next_job = feedback_params.next_job
+            class3d_dir = (
+                f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+            )
+            feedback_params.next_job += 1
+            _db.add(feedback_params)
+            _db.commit()
+
+            class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+            class_uuids = _murfey_id(message["program_id"], _db, number=4)
+            class3d_params = db.Class3DParameters(
+                pj_id=pj_id,
+                murfey_id=class3d_grp_uuid,
+                particles_file=class3d_message["particles_file"],
+                class3d_dir=class3d_dir,
+                batch_size=class3d_message["batch_size"],
+            )
+            _db.add(class3d_params)
+            _db.commit()
+            _murfey_class3ds(
+                class_uuids,
+                class3d_message["particles_file"],
+                message["program_id"],
+                _db,
+            )
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
@@ -1801,7 +1826,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += 1
+        feedback_params.hold_class3d = True
         _db.add(feedback_params)
         _db.commit()
         _db.close()
