@@ -34,6 +34,7 @@ class MultigridController:
     force_mdoc_metadata: bool = True
     rsync_processes: Dict[Path, RSyncer] = field(default_factory=lambda: {})
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
+    token: str = ""
     _machine_config: dict = field(default_factory=lambda: {})
 
     def __post_init__(self):
@@ -60,6 +61,17 @@ class MultigridController:
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
 
+        if self.token:
+            requests.get = partial(
+                requests.get, headers={"Authorization": f"Bearer {self.token}"}
+            )
+            requests.post = partial(
+                requests.post, headers={"Authorization": f"Bearer {self.token}"}
+            )
+            requests.delete = partial(
+                requests.delete, headers={"Authorization": f"Bearer {self.token}"}
+            )
+
     def _start_rsyncer_multigrid(
         self,
         source: Path,
@@ -70,6 +82,7 @@ class MultigridController:
         remove_files: bool = False,
         analyse: bool = True,
         tag: str = "",
+        limited: bool = False,
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
@@ -104,6 +117,7 @@ class MultigridController:
             analyse=not extra_directory and use_suggested_path and analyse,
             remove_files=remove_files,
             tag=tag,
+            limited=limited,
         )
 
     def _rsyncer_stopped(self, source: Path):
@@ -121,6 +135,7 @@ class MultigridController:
         analyse: bool = True,
         remove_files: bool = False,
         tag: str = "",
+        limited: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -186,15 +201,13 @@ class MultigridController:
                 source,
                 environment=self._environment if not self.dummy_dc else None,
                 force_mdoc_metadata=self.force_mdoc_metadata,
+                limited=limited,
             )
-            machine_data = requests.get(
-                f"{self._environment.url.geturl()}/machine/"
-            ).json()
-            for data_dir in machine_data["data_directories"].keys():
+            for data_dir in self._machine_config["data_directories"].keys():
                 if source.resolve().is_relative_to(Path(data_dir)):
-                    self.analysers[source]._role = machine_data["data_directories"][
-                        data_dir
-                    ]
+                    self.analysers[source]._role = self._machine_config[
+                        "data_directories"
+                    ][data_dir]
                     log.info(f"role found for {source}")
                     break
             if force_metadata:

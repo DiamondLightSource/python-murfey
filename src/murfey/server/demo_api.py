@@ -197,6 +197,7 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
 
 @router.post("/visits/{visit_name}/rsyncer")
 def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
+    log.info(f"Registering rsync instance {rsyncer_info.source}")
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
         client_id=rsyncer_info.client_id,
@@ -1574,7 +1575,6 @@ async def start_multigrid_watcher(
             "visit": visit,
             "crypto_key": "",
         }
-        log.warning(machine_config["instrument_server_url"])
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher",

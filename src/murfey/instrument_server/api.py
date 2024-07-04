@@ -84,22 +84,24 @@ async def token_handshake(token: Token):
 @router.post("/sessions/{session_id}/multigrid_watcher")
 def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec):
     label = watcher_spec.label
+    print("tokens", tokens)
     controllers[label] = MultigridController(
         [],
         watcher_spec.visit,
         session_id,
         demo=True,
         do_transfer=False,
+        processing_enabled=not watcher_spec.skip_existing_processing,
         _machine_config=watcher_spec.configuration.dict(),
+        token=tokens.get("token", ""),
     )
-    # watchers[label] = MultigridDirWatcher(
-    #     [watcher_spec.source],
-    #     watcher_spec.visit,
-    #     _machine_config=watcher_spec.configuration.dict(),
-    #     processing_enabled=not watcher_spec.skip_existing_processing,
-    # )
-    # watchers[label].subscribe(controllers[label]._start_rsyncer_multigrid)
-    # watchers[label].start()
+    watchers[label] = MultigridDirWatcher(
+        watcher_spec.source,
+        watcher_spec.configuration.dict(),
+        skip_existing_processing=watcher_spec.skip_existing_processing,
+    )
+    watchers[label].subscribe(controllers[label]._start_rsyncer_multigrid)
+    watchers[label].start()
     return {"success": True}
 
 

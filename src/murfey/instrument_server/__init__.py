@@ -2,8 +2,10 @@ import argparse
 import logging
 
 import uvicorn
+from rich.logging import RichHandler
 
 import murfey
+from murfey.server import LogFilter
 
 logger = logging.getLogger("murfey.instrument_server")
 
@@ -23,6 +25,14 @@ def run():
     )
     args = parser.parse_args()
 
+    LogFilter.install()
+
+    rich_handler = RichHandler(enable_link_path=False)
+    logging.getLogger("murfey").setLevel(logging.INFO)
+    logging.getLogger("murfey").addHandler(rich_handler)
+    logging.getLogger("fastapi").addHandler(rich_handler)
+    logging.getLogger("uvicorn").addHandler(rich_handler)
+
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
     )
@@ -36,6 +46,7 @@ def run():
         ws_ping_timeout=300,
     )
 
+    logger.info("Starting instrument server")
     _running_server = uvicorn.Server(config=config)
     _running_server.run()
-    logger.info("Server shutting down")
+    logger.info("Instrument server shutting down")
