@@ -38,6 +38,7 @@ class MachineConfig(BaseModel):
     allow_removal: bool = False
     modular_spa: bool = False
     processing_enabled: bool = True
+    sqlalchemy_pooling: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
