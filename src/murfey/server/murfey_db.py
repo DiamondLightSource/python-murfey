@@ -5,6 +5,7 @@ from functools import partial
 import yaml
 from cryptography.fernet import Fernet
 from fastapi import Depends
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from murfey.server.config import MachineConfig, get_machine_config
@@ -23,7 +24,10 @@ def get_murfey_db_session(
     machine_config: MachineConfig | None = None,
 ) -> Session:
     _url = url(machine_config)
-    engine = create_engine(_url)
+    if machine_config and not machine_config.sqlalchemy_pooling:
+        engine = create_engine(_url, poolclass=NullPool)
+    else:
+        engine = create_engine(_url)
     with Session(engine) as session:
         try:
             yield session
