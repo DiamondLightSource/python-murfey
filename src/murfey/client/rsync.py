@@ -401,6 +401,7 @@ class RSyncer(Observer):
             "--outbuf=line",
             "--files-from=-",
             "-p",  # preserve permissions
+            "--chmod=D0750,F0750",  # 4: Read, 2: Write, 1: Execute | User, Group, Others
         ]
         rsync_cmd.extend([".", self._remote])
 
