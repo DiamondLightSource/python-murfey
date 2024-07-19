@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from murfey.instrument_server.api import router
+from murfey.instrument_server.api import handshake_router, router
 
 log = logging.getLogger("murfey.instrument_server.main")
 
@@ -20,3 +20,4 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(handshake_router)

@@ -19,7 +19,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-instrument_server_tokens: Dict[float, str] = {}
+instrument_server_tokens: Dict[float, dict] = {}
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

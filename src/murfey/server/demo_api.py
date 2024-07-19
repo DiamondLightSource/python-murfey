@@ -200,7 +200,7 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
     log.info(f"Registering rsync instance {rsyncer_info.source}")
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
-        client_id=rsyncer_info.client_id,
+        session_id=rsyncer_info.session_id,
         transferring=rsyncer_info.transferring,
         destination=rsyncer_info.destination,
     )
@@ -237,7 +237,7 @@ def increment_rsync_file_count(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_counted += 1
@@ -256,7 +256,7 @@ def increment_rsync_transferred_files(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.client_id == rsyncer_info.client_id,
+            RsyncInstance.session_id == rsyncer_info.session_id,
         )
     ).one()
     rsync_instance.files_transferred += 1
@@ -717,15 +717,8 @@ class Tag(BaseModel):
     tag: str
 
 
-@router.post("/visits/{visit_name}/{client_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
+@router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
+def flush_spa_processing(visit_name: str, session_id: int, tag: Tag, db=murfey_db):
     stashed_files = db.exec(
         select(PreprocessStash).where(PreprocessStash.session_id == session_id)
     ).all()
@@ -750,7 +743,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
     if not proc_params:
         visit_name = visit_name.replace("\r\n", "").replace("\n", "")
         log.warning(
-            f"No SPA processing parameters found for client {sanitise(str(client_id))} on visit {sanitise(visit_name)}"
+            f"No SPA processing parameters found for Murfey session {sanitise(str(session_id))} on visit {sanitise(visit_name)}"
         )
         return
 
@@ -804,9 +797,9 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
     return
 
 
-@router.post("/visits/{visit_name}/{client_id}/spa_preprocess")
+@router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
-    visit_name: str, client_id: int, proc_file: SPAProcessFile, db=murfey_db
+    visit_name: str, session_id: int, proc_file: SPAProcessFile, db=murfey_db
 ):
     parts = [secure_filename(p) for p in Path(proc_file.path).parts]
     visit_idx = parts.index(visit_name)
@@ -830,15 +823,6 @@ async def request_spa_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(DataCollectionGroup.session_id == session_id)
@@ -872,15 +856,6 @@ async def request_spa_preprocessing(
     except Exception:
         foil_hole_id = None
     if proc_params:
-        session_id = (
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.client_id == client_id
-                )
-            )
-            .one()
-            .session_id
-        )
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
             .where(
@@ -1097,17 +1072,14 @@ def get_dc_groups(session_id: int, db=murfey_db):
     return {dcg.tag: dcg for dcg in data_collection_groups}
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_data_collection_group")
+@router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
 def register_dc_group(
-    visit_name: str, client_id: int, dcg_params: DCGroupParameters, db=murfey_db
+    visit_name: str, session_id: int, dcg_params: DCGroupParameters, db=murfey_db
 ):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
     if dcg_murfey := db.exec(
         select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == dcg_params.tag)
     ).all():
         dcg_murfey[0].atlas = dcg_params.atlas
@@ -1118,7 +1090,7 @@ def register_dc_group(
         dcgid = next(global_counter)
         murfey_dcg = DataCollectionGroup(
             id=dcgid,
-            session_id=client.session_id,
+            session_id=session_id,
             tag=dcg_params.tag,
             atlas=dcg_params.atlas,
             sample=dcg_params.sample,
@@ -1177,26 +1149,23 @@ def register_dc_group(
             global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
     if dcg_params.atlas:
         _flush_grid_square_records(
-            {"session_id": client.session_id, "tag": dcg_params.tag}, demo=True
+            {"session_id": session_id, "tag": dcg_params.tag}, demo=True
         )
     return dcg_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/start_data_collection")
+@router.post("/visits/{visit_name}/{session_id}/start_data_collection")
 def start_dc(
-    visit_name: str, client_id: int, dc_params: DCParameters, db=murfey_db
+    visit_name: str, session_id: int, dc_params: DCParameters, db=murfey_db
 ) -> Optional[DCParameters]:
     dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
     log.info(
         f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
     )
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
     dcg = db.exec(
         select(DataCollectionGroup)
         .where(DataCollectionGroup.tag == dcg_tag)
-        .where(DataCollectionGroup.session_id == client.session_id)
+        .where(DataCollectionGroup.session_id == session_id)
     ).one()
     dc_tag = dc_params.tag
     if db.exec(
@@ -1208,7 +1177,6 @@ def start_dc(
     dc_id = next(global_counter)
     murfey_dc = DataCollection(
         id=dc_id,
-        client=client_id,
         tag=dc_tag,
         dcg_id=dcg.id,
     )
@@ -1248,8 +1216,8 @@ def start_dc(
     return dc_params
 
 
-@router.post("/visits/{visit_name}/{client_id}/register_processing_job")
-def register_proc(visit_name, client_id: int, proc_params: ProcessingJobParameters):
+@router.post("/visits/{visit_name}/{session_id}/register_processing_job")
+def register_proc(visit_name, session_id: int, proc_params: ProcessingJobParameters):
     log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
@@ -1537,6 +1505,7 @@ def create_session(visit: str, name: str, db=murfey_db) -> int:
 
 @router.post("/activate_instrument_server")
 async def activate_instrument_server():
+    log.info("Activating instrument server")
     timestamp = datetime.datetime.now().timestamp()
     token = create_access_token({"timestamp": timestamp})
     instrument_server_tokens[timestamp] = None
@@ -1548,6 +1517,7 @@ async def activate_instrument_server():
             success = response.status == 200
             instrument_server_token = await response.json()
             instrument_server_tokens[timestamp] = instrument_server_token
+    log.info("Handshake successful" if success else "Handshake unsuccessful")
     return success
 
 
@@ -1576,6 +1546,10 @@ async def start_multigrid_watcher(
             "crypto_key": "",
         }
         async with aiohttp.ClientSession() as session:
+            log.info(
+                f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher"
+            )
+            log.info(list(instrument_server_tokens.values())[0]["access_token"])
             async with session.post(
                 f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher",
                 json={
@@ -1585,6 +1559,10 @@ async def start_multigrid_watcher(
                     "label": label,
                     "skip_existing_processing": watcher_spec.skip_existing_processing,
                 },
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
             ) as resp:
                 data = await resp.json()
+                log.info(resp.status)
     return data

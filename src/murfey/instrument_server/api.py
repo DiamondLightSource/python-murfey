@@ -2,12 +2,13 @@ import secrets
 import time
 from logging import getLogger
 from pathlib import Path
-from typing import Dict
+from typing import Annotated, Dict
 from urllib.parse import urlparse
 
 import requests
-from fastapi import APIRouter, HTTPException, status
-from jose import jwt
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from murfey.client import read_config
@@ -19,8 +20,6 @@ from murfey.util.instrument_models import MultigridWatcherSpec
 
 logger = getLogger("murfey.instrument_server.api")
 
-router = APIRouter()
-
 watchers: Dict[str, MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
@@ -28,11 +27,39 @@ tokens = {}
 
 config = read_config()
 
+SECRET_KEY = config["Murfey"].get("auth_key", secrets.token_hex(32))
+launch_time = time.time()
+
 encoded_jwt = jwt.encode(
-    {"timestamp": time.time()},
-    config["Murfey"].get("auth_key", secrets.token_hex(32)),
+    {"timestamp": launch_time},
+    SECRET_KEY,
     algorithm=config["Murfey"].get("auth_algorithm", "HS256"),
 )
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    try:
+        decoded_data = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[config["Murfey"].get("auth_algorithm", "HS256")],
+        )
+        if not decoded_data.get("timestamp") == launch_time:
+            raise JWTError
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return None
+
+
+router = APIRouter(dependencies=[Depends(validate_token)])
+handshake_router = APIRouter()
 
 
 def get_machine_config():
@@ -70,7 +97,7 @@ async def murfey_server_handshake(token: str) -> bool:
     return res
 
 
-@router.post("/token")
+@handshake_router.post("/token")
 async def token_handshake(token: Token):
     handshake_success = await murfey_server_handshake(token.access_token)
     if handshake_success:
@@ -84,7 +111,6 @@ async def token_handshake(token: Token):
 @router.post("/sessions/{session_id}/multigrid_watcher")
 def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec):
     label = watcher_spec.label
-    print("tokens", tokens)
     controllers[label] = MultigridController(
         [],
         watcher_spec.visit,

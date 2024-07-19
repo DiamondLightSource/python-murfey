@@ -769,7 +769,7 @@ class SPAModularContext(_SPAContext):
                                 "gain_ref"
                             ),
                             "extract_downscale": environment.data_collection_parameters.get(
-                                "downscale"
+                                "downscale", True
                             ),
                             "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),

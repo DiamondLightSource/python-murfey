@@ -42,7 +42,7 @@ class MultigridController:
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
-            session_id=self.session_id,
+            murfey_session=self.session_id,
             software_versions=machine_data.get("software_versions", {}),
             default_destination=f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
             demo=self.demo,
