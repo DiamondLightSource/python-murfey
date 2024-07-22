@@ -5,7 +5,7 @@ light microscope.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional, Union
 
 import numpy as np
 from tifffile import imwrite
@@ -13,8 +13,16 @@ from tifffile import imwrite
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.images")
 
+# For use by various functions in the script
+valid_dtypes = [
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+]
 
-class UIntError(Exception):
+
+class UnsignedIntegerError(Exception):
     """
     Raised if the bit depth value provided is not one that NumPy can interpret as an
     unsigned integer dtype.
@@ -33,135 +41,97 @@ class UIntError(Exception):
         super().__init__(self.message)
 
 
-def raise_BitDepthError(bit_depth: int):
-    """
-    Raises an exception if the bit depth value provided is not one that NumPy can
-    handle.
-    """
-
-    raise Exception(
-        "The bit depth provided is not a supported NumPy unsigned integer dtype. "
-        "Only 8, 16, 32, and 64-bit dtypes are currently supported. "
-        f"Current bit depth: {bit_depth}"
-    )
-
-
 def get_uint_dtype(value: int) -> str:
     """
     Returns the smallest NumPy unsigned integer dtype that will enclose values up to
     the given bit depth.
     """
 
-    int_dtypes = [8, 16, 32, 64]
+    uint_values = [8, 16, 32, 64]
 
     # Raise error if value is too large
     if value > 64:
-        raise UIntError(value)
+        raise UnsignedIntegerError(value)
 
     # Return string form of NumPy dtype
-    if value in int_dtypes:
+    if value in uint_values:
         return f"uint{value}"
     # Return smallest value that is larger than the specified one
     else:
-        value_new = min(n for n in int_dtypes if n > value)
+        value_new = min(n for n in uint_values if n > value)
         return f"uint{value_new}"
 
 
-def change_bit_depth(
+def stretch_image_contrast(
     array: np.ndarray,
-    target_bit_depth: int,
+    percentile_range: tuple[float, float] = (0.5, 99.5),  # Lower and upper percentiles
 ) -> np.ndarray:
     """
-    Change the bit depth of the array without changing the values (barring rounding).
+    Changes the range of pixel values occupied by the data, rescaling it across the
+    entirety of the array's bit depth.
     """
 
-    # Use shorter terms in function
-    arr = array
-    bit_depth = target_bit_depth
-
-    # NumPy defaults to float64; revert back to unsigned int
-    if bit_depth == 8:
-        arr = arr.astype(np.uint8)
-    elif bit_depth == 16:
-        arr = arr.astype(np.uint16)
-    elif bit_depth == 32:
-        arr = arr.astype(np.uint32)
-    elif bit_depth == 64:
-        arr = arr.astype(np.uint64)
-    else:
-        raise_BitDepthError(bit_depth)
-
-    return arr
-
-
-def rescale_across_channel(
-    array: np.ndarray,
-    bit_depth: int,
-    percentile_range: Optional[Tuple[float, float]],  # Lower and upper percentiles
-    round_to: Optional[int] = 16,  # Round bounds to reasonably granular power of 2
-) -> np.ndarray:
-    """
-    Checks the range of pixel values occupied by the data, then rescales it across the
-    channel's bit depth.
-    """
-
-    # Check that bit depth is valid before processing even begins
-    if bit_depth not in (8, 16, 32, 64):
-        raise_BitDepthError(bit_depth)
+    # Check that dtype is supported by NumPy
+    dtype = str(array.dtype)
+    bit_depth = int("".join([char for char in dtype if char.isdigit()]))
+    if dtype not in valid_dtypes:
+        raise UnsignedIntegerError(bit_depth)
+    max_int = 2**bit_depth - 1
 
     # Use shorter variable names
-    arr = array
+    arr: np.ndarray = array
+    b_lo: Union[float, int] = np.percentile(arr, percentile_range[0])
+    b_up: Union[float, int] = np.percentile(arr, percentile_range[1])
 
-    # Check if percentiles are provided
-    if not percentile_range:
-        logger.warning("No percentile range provided. Returning original array.")
-    else:
-        # Use shorter variables
-        p_lo = percentile_range[0]
-        p_up = percentile_range[1]
+    # Overwrite outliers and stretch values
+    arr[arr < b_lo] = b_lo
+    arr[arr > b_up] = b_up
+    arr = (arr - b_lo) / (b_up - b_lo) * max_int
 
-        # Calculate lower and upper bounds
-        b_lo = np.floor(np.percentile(arr, p_lo) / round_to) * round_to
-        b_up = (np.ceil(np.percentile(arr, p_up) / round_to) * round_to) - 1
-
-        # Rescale across channel bit depth
-        arr[arr < b_lo] = b_lo  # Overwrite lower outliers
-        arr[arr > b_up] = b_up  # Overwrite upper outliers
-        arr = arr - b_lo  # Shift lower bound to zero
-        arr = (arr / (b_up - b_lo)) * (
-            2**bit_depth - 1
-        )  # Ensure data points don't exceed bit depth (max bit is 2**n - 1)
-
-        # Change bit depth back to initial one
-        arr = change_bit_depth(array=arr, target_bit_depth=bit_depth)
+    # Change bit depth back to initial one
+    arr = arr.round(0).astype(dtype)
 
     return arr
 
 
-def rescale_to_bit_depth(
+def convert_to_dtype(
     array: np.ndarray,
-    initial_bit_depth: int,
-    target_bit_depth: int,
+    target_dtype: str,
+    initial_bit_depth: Optional[int] = None,
 ) -> np.ndarray:
     """
-    Rescales the pixel values of the array to fit within the desired channel bit depth.
-    Returns the array and the target bit depth as a tuple.
+    Rescales the pixel values of the array to fit within the desired array bit depth
+    WITHOUT modifying the contrast.
+
+    If the array has a non-standard NumPy dtype, one can be provided
     """
 
     # Use shorter names for variables
     arr = array
-    bit_init = initial_bit_depth
-    bit_final = target_bit_depth
 
-    # Check that target bit depth is allowed
-    if bit_final not in (8, 16, 32, 64):
-        raise_BitDepthError(bit_final)
+    # Validate the final dtype to convert to
+    dtype_final = target_dtype
+    bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
+    if dtype_final not in valid_dtypes:
+        raise UnsignedIntegerError(bit_final)
+
+    # Use initial bit depth if provided
+    if initial_bit_depth is not None:
+        bit_init = initial_bit_depth
+    # Otherwise, just extract it from the array
+    else:
+        dtype_init = str(arr.dtype)
+        bit_init = int("".join([char for char in dtype_init if char.isdigit()]))
+
+    # Get max pixel values of initial and final arrays
+    int_init = int(2**bit_init - 1)
+    int_final = int(2**bit_final - 1)
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
-    arr = (arr / (2**bit_init - 1)) * (2**bit_final - 1)
+    arr = arr / int_init * int_final
 
     # Change to correct unsigned integer type
-    arr = change_bit_depth(array=arr, target_bit_depth=bit_final)
+    arr = arr.round(0).astype(dtype_final)
 
     return arr
 
@@ -170,7 +140,7 @@ def process_img_stk(
     array: np.ndarray,
     initial_bit_depth: int,
     target_bit_depth: int = 8,
-    rescale: bool = False,
+    adjust_contrast: Optional[str] = None,
 ) -> np.ndarray:
     """
     Processes the NumPy array, rescaling intensities and converting to the desired bit
@@ -178,50 +148,53 @@ def process_img_stk(
     """
 
     # Use shorter aliases in function
-    arr = array
+    arr: np.ndarray = array
     bdi = initial_bit_depth
     bdt = target_bit_depth
+
+    if f"uint{bdt}" not in valid_dtypes:
+        raise UnsignedIntegerError(bdt)
 
     if bdi not in (8, 16, 32, 64):
         logger.info(f"{bdi}-bit is not supported by NumPy; converting to 16-bit")
         arr = (
-            rescale_to_bit_depth(array=arr, initial_bit_depth=bdi, target_bit_depth=16)
-            if np.max(arr) > 0
-            else change_bit_depth(
+            convert_to_dtype(
                 array=arr,
-                target_bit_depth=16,
+                target_dtype=f"uint{16}",
+                initial_bit_depth=bdi,
             )
+            if np.max(arr) > 0
+            else arr.astype(f"uint{16}")
         )
         bdi = 16  # Overwrite
 
-    # Rescale intensity values for fluorescent channels
-    if rescale is True:
-        logger.info("Rescaling channel across its bit depth")
-        arr = (
-            rescale_across_channel(
-                array=arr,
-                bit_depth=bdi,
-                percentile_range=(0.5, 99.5),
-                round_to=16,
+    # Rescale intensity values
+    contrast_adustment_methods = [
+        "stretch",
+    ]
+    if adjust_contrast is not None and adjust_contrast in contrast_adustment_methods:
+        if adjust_contrast == "stretch":
+            logger.info("Stretching image contrast across channel range")
+            arr = (
+                stretch_image_contrast(
+                    array=arr,
+                    percentile_range=(0.5, 99.5),
+                )
+                if np.max(arr) > 0
+                else arr
             )
-            if np.max(arr) > 0
-            else arr
-        )
 
     # Convert to desired bit depth
     if not bdi == bdt:
         logger.info(f"Converting to {bdt}-bit image")
         arr = (
-            rescale_to_bit_depth(
+            convert_to_dtype(
                 array=arr,
+                target_dtype=f"uint{bdt}",
                 initial_bit_depth=bdi,
-                target_bit_depth=bdt,
             )
             if np.max(arr) > 0
-            else change_bit_depth(
-                array=arr,
-                target_bit_depth=bdt,
-            )
+            else arr.astype(f"uint{bdt}")
         )
     else:
         logger.info(f"Image is already {bdt}-bit")
@@ -232,38 +205,80 @@ def process_img_stk(
 def write_to_tiff(
     array: np.ndarray,
     save_dir: Path,
-    file_name: str,
-    # Resolution in pixels per unit length
-    x_res: float,
-    y_res: float,
-    z_res: float,
-    units: str,
-    axes: str,
-    image_labels: List[str],
+    series_name: str,
+    # Resolution information
+    x_res: Optional[float] = None,
+    y_res: Optional[float] = None,
+    z_res: Optional[float] = None,
+    units: Optional[str] = None,
+    # Array properties
+    axes: Optional[str] = None,
+    image_labels: Optional[Union[list[str], str]] = None,
+    # Colour properties
+    photometric: Optional[str] = None,  # Valid options listed below
+    color_map: Optional[np.ndarray] = None,
+    extended_metadata: Optional[str] = None,  # Stored as an extended string
 ):
     """
-    Writes the NumPy array as a calibrated greyscale TIFF image stack.
+    Writes the NumPy array as a calibrated, ImageJ-compatible TIFF image stack.
     """
 
     # Use shorter aliases and calculate what is needed
-    arr = array
-    z_size = (1 / z_res) if z_res > 0 else float(0)
+    arr: np.ndarray = array
+
+    # Get resolution
+    if z_res is not None:
+        z_size = (1 / z_res) if z_res > 0 else float(0)
+    else:
+        z_size = None
+
+    if x_res is not None and y_res is not None:
+        resolution = (x_res * 10**6 / 10**6, y_res * 10**6 / 10**6)
+    else:
+        resolution = None
+
+    resolution_unit = 1 if units is not None else None
+
+    # Get photometric
+    valid_photometrics = [
+        "minisblack",
+        "miniswhite",
+        "rgb",
+        "ycbcr",  # Y: Luminance | Cb: Blue chrominance | Cr: Red chrominance
+        "palette",
+    ]
+    if photometric is not None and photometric not in valid_photometrics:
+        photometric = None
+        logger.warning("Incorrect photometric value provided; defaulting to 'None'")
+
+    # Process extended metadata
+    if extended_metadata is None:
+        extended_metadata = ""
 
     # Save as a greyscale TIFF
-    save_name = save_dir.joinpath(file_name + ".tiff")
-    logger.info(f"Saving {file_name} image as {save_name}")
+    save_name = save_dir.joinpath(series_name + ".tiff")
+    logger.info(f"Saving {series_name} image as {save_name}")
     imwrite(
         save_name,
         arr,
-        imagej=True,  # ImageJ compatible
-        photometric="minisblack",  # Greyscale image
-        shape=np.shape(arr),
-        dtype=arr.dtype,
-        resolution=(x_res * 10**6 / 10**6, y_res * 10**6 / 10**6),
+        # Array properties,
+        shape=arr.shape,
+        dtype=str(arr.dtype),
+        resolution=resolution,
+        resolutionunit=resolution_unit,
+        # Colour properties
+        photometric=photometric,  # Greyscale image
+        colormap=color_map,
+        # ImageJ compatibility
+        imagej=True,
         metadata={
-            "spacing": z_size,
-            "unit": units,
             "axes": axes,
+            "unit": units,
+            "spacing": z_size,
+            "loop": False,
+            "min": round(arr.min(), 1),  # Round according to ImageJ precision
+            "max": round(arr.max(), 1),
+            "Info": extended_metadata,
             "Labels": image_labels,
         },
     )
