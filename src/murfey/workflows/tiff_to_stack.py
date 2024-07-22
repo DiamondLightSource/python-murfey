@@ -15,8 +15,8 @@ except AttributeError:
 def zocalo_cluster_request(
     file: Path,
     root_folder: str,
-    metadata: Optional[Path],
-    messenger: TransportManager | None = None,
+    metadata: Optional[Path] = None,
+    messenger: Optional[TransportManager] = None,
 ):
     if messenger:
         # Construct path to session directory
