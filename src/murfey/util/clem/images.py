@@ -18,15 +18,7 @@ logger = logging.getLogger("murfey.util.clem.images")
 valid_bit_depths = (8, 16, 32, 64)
 valid_dtypes = tuple(f"uint{n}" for n in valid_bit_depths)
 
-<<<<<<< HEAD
-
 class UnsignedIntegerError(Exception):
-=======
-class UIntError(Exception):
-    """
-    Raised if the bit depth value provided is not one that NumPy can interpret as an
-    unsigned integer dtype.
-    """
 
     def __init__(
         self,
@@ -41,78 +33,25 @@ class UIntError(Exception):
         super().__init__(self.message)
 
 
-def raise_BitDepthError(bit_depth: int):
->>>>>>> c68c307 (Added custom NumPy DTypeError class; added function to return most appropriate uint dtype)
-    """
-    Raised if the bit depth value provided is not one that NumPy can interpret as an
-    unsigned integer dtype.
-    """
-
-<<<<<<< HEAD
-    def __init__(
-        self,
-        bit_depth: int,
-    ):
-        self.bit_depth = bit_depth
-        self.message = (
-            f"The bit depth provided ({bit_depth}) is not a NumPy-compatible unsigned integer dtype. "
-            "Only 8, 16, 32, and 64 bits are allowed. "
-        )
-        super().__init__(self.message)
-
-
-def estimate_bit_depth(array: np.ndarray) -> int:
-=======
-    raise Exception(
-        "The bit depth provided is not a supported NumPy unsigned integer dtype. "
-        "Only 8, 16, 32, and 64-bit dtypes are currently supported. "
-        f"Current bit depth: {bit_depth}"
-    )
-
-
 def get_uint_dtype(value: int) -> str:
     """
     Returns the smallest NumPy unsigned integer dtype that will enclose values up to
     the given bit depth.
     """
 
-    int_dtypes = [8, 16, 32, 64]
+    uint_values = [8, 16, 32, 64]
 
     # Raise error if value is too large
     if value > 64:
-        raise UIntError(value)
+        raise UnsignedIntegerError(value)
 
     # Return string form of NumPy dtype
-    if value in int_dtypes:
+    if value in uint_values:
         return f"uint{value}"
     # Return smallest value that is larger than the specified one
     else:
-        value_new = min(n for n in int_dtypes if n > value)
+        value_new = min(n for n in uint_values if n > value)
         return f"uint{value_new}"
-
-
-def change_bit_depth(
-    array: np.ndarray,
-    target_bit_depth: int,
-) -> np.ndarray:
->>>>>>> c68c307 (Added custom NumPy DTypeError class; added function to return most appropriate uint dtype)
-    """
-    Returns the smallest bit depth that will enclose the range of values present in
-    an array.
-    """
-
-    bit_depth = np.ceil(np.log2(array.max()))
-    # Raise error if value is too large
-    if bit_depth > 64:
-        raise UnsignedIntegerError(bit_depth)
-
-    # Return bit_depth if corresponding to one of the accepted values
-    if bit_depth in valid_bit_depths:
-        return bit_depth
-    # Return smallest value that is larger than the specified one
-    else:
-        new_bit_depth = min(n for n in valid_bit_depths if n > bit_depth)
-        return new_bit_depth
 
 
 def stretch_image_contrast(
@@ -140,38 +79,48 @@ def stretch_image_contrast(
     arr[arr < b_lo] = b_lo
     arr[arr > b_up] = b_up
     arr = (arr - b_lo) / (b_up - b_lo) * max_int
+    arr: np.ndarray = array
+    b_lo: Union[float, int] = np.percentile(arr, percentile_range[0])
+    b_up: Union[float, int] = np.percentile(arr, percentile_range[1])
 
+    # Overwrite outliers and stretch values
+    arr[arr < b_lo] = b_lo
+    arr[arr > b_up] = b_up
+    arr = (arr - b_lo) / (b_up - b_lo) * max_int
+
+    # Change bit depth back to initial one
+    arr = arr.round(0).astype(dtype)
     # Change bit depth back to initial one
     arr = arr.round(0).astype(dtype)
 
     return arr
 
 
-def convert_array_bit_depth(
+def convert_to_dtype(
     array: np.ndarray,
-    target_bit_depth: int,
+    target_dtype: str,
     initial_bit_depth: Optional[int] = None,
 ) -> np.ndarray:
     """
     Rescales the pixel values of the array to fit within the desired array bit depth
     WITHOUT modifying the contrast.
 
-    If the array has a bit depth not compatible with NumPy, one can be provided
+    If the array has a non-standard NumPy dtype, one can be provided
     """
 
     # Use shorter names for variables
-    arr: np.ndarray = array
-    bit_final: int = target_bit_depth
-    dtype_final = f"uint{bit_final}"
+    arr = array
 
     # Validate the final dtype to convert to
-    if bit_final not in valid_bit_depths:
+    dtype_final = target_dtype
+    bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
+    if dtype_final not in valid_dtypes:
         raise UnsignedIntegerError(bit_final)
 
     # Use initial bit depth if provided
     if initial_bit_depth is not None:
         bit_init = initial_bit_depth
-    # Otherwise, get it from the array
+    # Otherwise, just extract it from the array
     else:
         dtype_init = str(arr.dtype)
         bit_init = int("".join([char for char in dtype_init if char.isdigit()]))
@@ -179,11 +128,16 @@ def convert_array_bit_depth(
     # Get max pixel values of initial and final arrays
     int_init = int(2**bit_init - 1)
     int_final = int(2**bit_final - 1)
+    # Get max pixel values of initial and final arrays
+    int_init = int(2**bit_init - 1)
+    int_final = int(2**bit_final - 1)
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = arr / int_init * int_final
+    arr = arr / int_init * int_final
 
     # Change to correct unsigned integer type
+    arr = arr.round(0).astype(dtype_final)
     arr = arr.round(0).astype(dtype_final)
 
     return arr
@@ -205,16 +159,15 @@ def process_img_stk(
     bdi = initial_bit_depth
     bdt = target_bit_depth
 
-    # Validate that function inputs are correct
-    if bdt not in valid_bit_depths:
+    if f"uint{bdt}" not in valid_dtypes:
         raise UnsignedIntegerError(bdt)
 
-    if bdi not in valid_bit_depths:
+    if bdi not in (8, 16, 32, 64):
         logger.info(f"{bdi}-bit is not supported by NumPy; converting to 16-bit")
         arr = (
-            convert_array_bit_depth(
+            convert_to_dtype(
                 array=arr,
-                target_bit_depth=16,
+                target_dtype=f"uint{16}",
                 initial_bit_depth=bdi,
             )
             if np.max(arr) > 0
@@ -223,9 +176,9 @@ def process_img_stk(
         bdi = 16  # Overwrite
 
     # Rescale intensity values
-    # List of currently implemented methods (can add more as needed)
-    contrast_adustment_methods = ("stretch",)
-
+    contrast_adustment_methods = [
+        "stretch",
+    ]
     if adjust_contrast is not None and adjust_contrast in contrast_adustment_methods:
         if adjust_contrast == "stretch":
             logger.info("Stretching image contrast across channel range")
@@ -242,9 +195,9 @@ def process_img_stk(
     if not bdi == bdt:
         logger.info(f"Converting to {bdt}-bit image")
         arr = (
-            convert_array_bit_depth(
+            convert_to_dtype(
                 array=arr,
-                target_bit_depth=bdt,
+                target_dtype=f"uint{bdt}",
                 initial_bit_depth=bdi,
             )
             if np.max(arr) > 0
@@ -278,6 +231,36 @@ def write_to_tiff(
     """
 
     # Use shorter aliases and calculate what is needed
+    arr: np.ndarray = array
+
+    # Get resolution
+    if z_res is not None:
+        z_size = (1 / z_res) if z_res > 0 else float(0)
+    else:
+        z_size = None
+
+    if x_res is not None and y_res is not None:
+        resolution = (x_res * 10**6 / 10**6, y_res * 10**6 / 10**6)
+    else:
+        resolution = None
+
+    resolution_unit = 1 if units is not None else None
+
+    # Get photometric
+    valid_photometrics = [
+        "minisblack",
+        "miniswhite",
+        "rgb",
+        "ycbcr",  # Y: Luminance | Cb: Blue chrominance | Cr: Red chrominance
+        "palette",
+    ]
+    if photometric is not None and photometric not in valid_photometrics:
+        photometric = None
+        logger.warning("Incorrect photometric value provided; defaulting to 'None'")
+
+    # Process extended metadata
+    if extended_metadata is None:
+        extended_metadata = ""
     arr: np.ndarray = array
 
     # Get resolution
