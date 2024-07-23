@@ -14,12 +14,13 @@ from tifffile import imwrite
 logger = logging.getLogger("murfey.util.clem.images")
 
 # For use by various functions in the script
-valid_dtypes = [
+valid_dtypes = (
     "uint8",
     "uint16",
     "uint32",
     "uint64",
-]
+)
+valid_bit_depths = (8, 16, 32, 64)
 
 
 class UnsignedIntegerError(Exception):
@@ -41,25 +42,24 @@ class UnsignedIntegerError(Exception):
         super().__init__(self.message)
 
 
-def get_uint_dtype(value: int) -> str:
+def estimate_bit_depth(array: np.ndarray) -> int:
     """
-    Returns the smallest NumPy unsigned integer dtype that will enclose values up to
-    the given bit depth.
+    Returns the smallest bit depth that will enclose the range of values present in
+    an array.
     """
 
-    uint_values = [8, 16, 32, 64]
-
+    bit_depth = np.ceil(np.log2(array.max()))
     # Raise error if value is too large
-    if value > 64:
-        raise UnsignedIntegerError(value)
+    if bit_depth > 64:
+        raise UnsignedIntegerError(bit_depth)
 
-    # Return string form of NumPy dtype
-    if value in uint_values:
-        return f"uint{value}"
+    # Return bit_depth if corresponding to one of the accepted values
+    if bit_depth in valid_bit_depths:
+        return bit_depth
     # Return smallest value that is larger than the specified one
     else:
-        value_new = min(n for n in uint_values if n > value)
-        return f"uint{value_new}"
+        new_bit_depth = min(n for n in valid_bit_depths if n > bit_depth)
+        return new_bit_depth
 
 
 def stretch_image_contrast(
@@ -94,9 +94,10 @@ def stretch_image_contrast(
     return arr
 
 
-def convert_to_dtype(
+def convert_array_bit_depth(
     array: np.ndarray,
-    target_dtype: str,
+    target_bit_depth: Optional[int] = None,
+    target_dtype: Optional[str] = None,
     initial_bit_depth: Optional[int] = None,
 ) -> np.ndarray:
     """
@@ -106,19 +107,32 @@ def convert_to_dtype(
     If the array has a non-standard NumPy dtype, one can be provided
     """
 
-    # Use shorter names for variables
-    arr = array
+    # Validate function input
+    # Only one of target bit depth/dtype should be provided
+    if target_bit_depth is not None and target_dtype is not None:
+        raise ValueError(
+            "Only one of 'target_bit_depth' or 'target_dtype' should be provided"
+        )
 
     # Validate the final dtype to convert to
-    dtype_final = target_dtype
-    bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
-    if dtype_final not in valid_dtypes:
-        raise UnsignedIntegerError(bit_final)
+    if target_bit_depth is not None:
+        bit_final: int = target_bit_depth
+        dtype_final = f"uint{bit_final}"
+        if bit_final not in valid_dtypes:
+            raise UnsignedIntegerError(bit_final)
+    elif target_dtype is not None:
+        dtype_final = target_dtype
+        bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
+        if bit_final not in valid_dtypes:
+            raise UnsignedIntegerError(bit_final)
+
+    # Use shorter names for variables
+    arr: np.ndarray = array
 
     # Use initial bit depth if provided
     if initial_bit_depth is not None:
         bit_init = initial_bit_depth
-    # Otherwise, just extract it from the array
+    # Otherwise, get it from the array
     else:
         dtype_init = str(arr.dtype)
         bit_init = int("".join([char for char in dtype_init if char.isdigit()]))
@@ -152,15 +166,16 @@ def process_img_stk(
     bdi = initial_bit_depth
     bdt = target_bit_depth
 
+    # Validate that function inputs are correct
     if f"uint{bdt}" not in valid_dtypes:
         raise UnsignedIntegerError(bdt)
 
-    if bdi not in (8, 16, 32, 64):
+    if bdi not in valid_bit_depths:
         logger.info(f"{bdi}-bit is not supported by NumPy; converting to 16-bit")
         arr = (
-            convert_to_dtype(
+            convert_array_bit_depth(
                 array=arr,
-                target_dtype=f"uint{16}",
+                target_bit_depth=16,
                 initial_bit_depth=bdi,
             )
             if np.max(arr) > 0
@@ -169,9 +184,9 @@ def process_img_stk(
         bdi = 16  # Overwrite
 
     # Rescale intensity values
-    contrast_adustment_methods = [
-        "stretch",
-    ]
+    # List of currently implemented methods (can add more as needed)
+    contrast_adustment_methods = ("stretch",)
+
     if adjust_contrast is not None and adjust_contrast in contrast_adustment_methods:
         if adjust_contrast == "stretch":
             logger.info("Stretching image contrast across channel range")
@@ -188,9 +203,9 @@ def process_img_stk(
     if not bdi == bdt:
         logger.info(f"Converting to {bdt}-bit image")
         arr = (
-            convert_to_dtype(
+            convert_array_bit_depth(
                 array=arr,
-                target_dtype=f"uint{bdt}",
+                target_bit_depth=bdt,
                 initial_bit_depth=bdi,
             )
             if np.max(arr) > 0
