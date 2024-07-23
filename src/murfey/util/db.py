@@ -8,10 +8,11 @@ from typing import Optional
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
-
 """
 GENERAL
 """
+
+
 class MurfeyUser(SQLModel, table=True):  # type: ignore
     username: str = Field(primary_key=True)
     hashed_password: str
@@ -42,9 +43,76 @@ CLEM WORKFLOW
 """
 
 
+class CLEMSession(SQLModel, table=True):  # type: ignore
+    """
+    Database that stores information related to the current CLEM session, and all
+    the data collected and processed therein.
+
+    VVV IDEA NEEDS VERIFYING
+    An instance of this database is created (or requested?) by the CLEM client at the
+    start of a Murfey session on the CLEM PC.
+    """
+
+    id: int = Field(primary_key=True)
+
+    pass
+
+
+class CLEMLIFFile(SQLModel, table=True):  # type: ignore
+    """
+    Database recording the different LIF files acquired during the CLEM session, as
+    well as the different image series stored within them.
+
+    VVV IDEA NEEDS VERIFYING
+    An instance of this database is created (or requested) whenever the client detects
+    a valid LIF file having been passed through the rsync process.
+    """
+
+    id: int = Field(primary_key=True)
+    file_path: str  # Path to the LIF file
+    metadata: str  # Path to the master metadata file generated as part of processing this LIF file
+    children: list["CLEMImageSeries"]  # List of databases associated with this LIF file
+    pass
+
+
+class CLEMImageSeries(SQLModel, table=True):  # type: ignore
+    """
+    Database recording the individual files associated with a series, which are to
+    be processed together as a group.
+
+    Depending on the workflow used, these files could stem from a parent LIF file,
+    or could have been compiled together from individual TIFF files.
+
+    VVV IDEA NEEDS VERIFYING
+    An instance of this databse is created (or requested?) whenever the client has
+    confirmed that all the TIFF files and XLIF files associated with a particular
+    series have pass through the rsync process.
+    """
+
+    id: int = Field(primary_key=True)
+    name: str  # Name of the series, as determined from the metadata
+    metadata: str  # Path to the metadata file associated with this particular series
+    members: list["CLEMImageStack"]  # The image stacks that comprise this series
+    pass
+
+
+class CLEMImageStack(SQLModel, table=True):  # type: ignore
+    """
+    Database to keep track of the processing that has been done on a single image stack
+    """
+
+    id: int = Field(primary_key=True)
+    file_path: str  # Path to the image stack
+    metadata: str  # Path to the metadata file associated with this particular stack
+
+    pass
+
+
 """
 TEM SESSION AND PROCESSING WORKFLOW
 """
+
+
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
@@ -481,6 +549,8 @@ class BFactors(SQLModel, table=True):  # type: ignore
 """
 FUNCTIONS
 """
+
+
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
