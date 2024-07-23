@@ -113,6 +113,9 @@ def convert_array_bit_depth(
         raise ValueError(
             "Only one of 'target_bit_depth' or 'target_dtype' should be provided"
         )
+    # Both can't be empty
+    if target_bit_depth is None and target_dtype is None:
+        raise ValueError("One of 'target_bit_depth' or 'target_dtype' must be provided")
 
     # Validate the final dtype to convert to
     if target_bit_depth is not None:
@@ -120,12 +123,12 @@ def convert_array_bit_depth(
         dtype_final = f"uint{bit_final}"
         if bit_final not in valid_dtypes:
             raise UnsignedIntegerError(bit_final)
-    elif target_dtype is not None:
+
+    if target_dtype is not None:
         dtype_final = target_dtype
         bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
         if bit_final not in valid_dtypes:
             raise UnsignedIntegerError(bit_final)
-    assert isinstance(bit_final, int) is True
 
     # Use shorter names for variables
     arr: np.ndarray = array
