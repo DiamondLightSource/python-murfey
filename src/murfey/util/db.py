@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
@@ -14,7 +14,7 @@ class ClientEnvironment(SQLModel, table=True):  # type: ignore
     visit: str = Field(default="")
     session_id: Optional[int] = Field(foreign_key="session.id")
     connected: bool
-    rsync_instances: List["RsyncInstance"] = Relationship(
+    rsync_instances: list["RsyncInstance"] = Relationship(
         back_populates="client", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -32,19 +32,19 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
-    tilt_series: List["TiltSeries"] = Relationship(
+    tilt_series: list["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    data_collection_groups: List["DataCollectionGroup"] = Relationship(
+    data_collection_groups: list["DataCollectionGroup"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    preprocess_stashes: List["PreprocessStash"] = Relationship(
+    preprocess_stashes: list["PreprocessStash"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    grid_squares: List["GridSquare"] = Relationship(
+    grid_squares: list["GridSquare"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
-    foil_holes: List["FoilHole"] = Relationship(
+    foil_holes: list["FoilHole"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -57,7 +57,7 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
     tilt_series_length: int = -1
     processing_requested: bool = False
     session: Optional[Session] = Relationship(back_populates="tilt_series")
-    tilts: List["Tilt"] = Relationship(
+    tilts: list["Tilt"] = Relationship(
         back_populates="tilt_series", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -77,11 +77,11 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas: str = ""
     sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
-    data_collections: List["DataCollection"] = Relationship(
+    data_collections: list["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    tomography_preprocessing_parameters: List["TomographyPreprocessingParameters"] = (
+    tomography_preprocessing_parameters: list["TomographyPreprocessingParameters"] = (
         Relationship(
             back_populates="data_collection_group",
             sa_relationship_kwargs={"cascade": "delete"},
@@ -96,7 +96,7 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
-    processing_jobs: List["ProcessingJob"] = Relationship(
+    processing_jobs: list["ProcessingJob"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -109,46 +109,46 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
         back_populates="processing_jobs"
     )
 
-    auto_proc_programs: List["AutoProcProgram"] = Relationship(
+    auto_proc_programs: list["AutoProcProgram"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    selection_stash: List["SelectionStash"] = Relationship(
+    selection_stash: list["SelectionStash"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    particle_sizes: List["ParticleSizes"] = Relationship(
+    particle_sizes: list["ParticleSizes"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    spa_parameters: List["SPARelionParameters"] = Relationship(
+    spa_parameters: list["SPARelionParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
+    spa_feedback_parameters: list["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
+    tomography_processing_parameters: list["TomographyProcessingParameters"] = (
         Relationship(
             back_populates="processing_job",
             sa_relationship_kwargs={"cascade": "delete"},
         )
     )
-    ctf_parameters: List["CtfParameters"] = Relationship(
+    ctf_parameters: list["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    class2d_parameters: List["Class2DParameters"] = Relationship(
+    class2d_parameters: list["Class2DParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    class3d_parameters: List["Class3DParameters"] = Relationship(
+    class3d_parameters: list["Class3DParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    refine_parameters: List["RefineParameters"] = Relationship(
+    refine_parameters: list["RefineParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    class2ds: List["Class2D"] = Relationship(
+    class2ds: list["Class2D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    class3ds: List["Class3D"] = Relationship(
+    class3ds: list["Class3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    refine3ds: List["Refine3D"] = Relationship(
+    refine3ds: list["Refine3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -202,7 +202,7 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )
-    murfey_ids: List["MurfeyLedger"] = Relationship(
+    murfey_ids: list["MurfeyLedger"] = Relationship(
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -255,7 +255,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     pixel_size: Optional[float] = None
     image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
-    foil_holes: List["FoilHole"] = Relationship(
+    foil_holes: list["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -277,10 +277,10 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     image: str = ""
     grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
     session: Optional[Session] = Relationship(back_populates="foil_holes")
-    movies: List["Movie"] = Relationship(
+    movies: list["Movie"] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
     )
-    preprocess_stashes: List[PreprocessStash] = Relationship(
+    preprocess_stashes: list[PreprocessStash] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -402,7 +402,7 @@ class Class3DParameters(SQLModel, table=True):  # type: ignore
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="class3d_parameters"
     )
-    # class3ds: List["Class3D"] = Relationship(
+    # class3ds: list["Class3D"] = Relationship(
     #    back_populates="class3d_parameters",
     #    sa_relationship_kwargs={"cascade": "delete"},
     # )
