@@ -129,9 +129,9 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     )
 
     # The parent TIFF files used to build up the image stacks in the series if any
-    tiff_parents: Optional[List[str]] = None
+    tiff_parents: List[str] = []
 
-    metadata_file: Optional[str] = None  # Path to the metadata file for this series
+    metadata_file: str  # Path to the metadata file for this series
 
     # Databases of the image stacks that comprise this series
     members: List["CLEMImageStack"] = Relationship(
@@ -156,7 +156,7 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     Instances of this database should be created alongside the series database.
     """
 
-    id: int = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
 
     # Name of the series this image stack belongs to
     parent_series_id: int = Field(
