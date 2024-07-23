@@ -1,9 +1,17 @@
+"""
+Contains classes that are used to store information on the metadata and status of jobs
+of the sessions that Murfey is overseeing, along with the relationships between them.
+"""
+
 from typing import Optional
 
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 
+"""
+GENERAL
+"""
 class MurfeyUser(SQLModel, table=True):  # type: ignore
     username: str = Field(primary_key=True)
     hashed_password: str
@@ -29,6 +37,14 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
     client: Optional[ClientEnvironment] = Relationship(back_populates="rsync_instances")
 
 
+"""
+CLEM WORKFLOW
+"""
+
+
+"""
+TEM SESSION AND PROCESSING WORKFLOW
+"""
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
@@ -462,6 +478,9 @@ class BFactors(SQLModel, table=True):  # type: ignore
     resolution: float
 
 
+"""
+FUNCTIONS
+"""
 def setup(url: str):
     engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
