@@ -48,14 +48,25 @@ class CLEMSession(SQLModel, table=True):  # type: ignore
     Database that stores information related to the current CLEM session, and all
     the data collected and processed therein.
 
-    VVV IDEA NEEDS VERIFYING
+    VVV NEEDS VERIFYING
     An instance of this database is created (or requested?) by the CLEM client at the
     start of a Murfey session on the CLEM PC.
     """
 
     id: int = Field(primary_key=True)
+    name: Optional[str] = None  # Full name of the session, if set
 
-    pass
+    # Image series associated with this session
+    image_series: list["CLEMImageSeries"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # LIF files associated with this session, if any were acquired
+    lif_files: list["CLEMLIFFile"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
 
 
 class CLEMLIFFile(SQLModel, table=True):  # type: ignore
@@ -63,49 +74,109 @@ class CLEMLIFFile(SQLModel, table=True):  # type: ignore
     Database recording the different LIF files acquired during the CLEM session, as
     well as the different image series stored within them.
 
-    VVV IDEA NEEDS VERIFYING
+    VVV NEEDS VERIFYING
     An instance of this database is created (or requested) whenever the client detects
     a valid LIF file having been passed through the rsync process.
     """
 
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
+
+    # The CLEM session this series belongs to
+    session: "CLEMSession" = Relationship(back_populates="lif_files")
+    session_id: int = Field(foreign_key="clemsession.id")
+
+    # Properties of the LIF file
     file_path: str  # Path to the LIF file
-    metadata: str  # Path to the master metadata file generated as part of processing this LIF file
-    children: list["CLEMImageSeries"]  # List of databases associated with this LIF file
-    pass
+    metadata_file: str  # Path to the master metadata file generated as part of processing this LIF file
+
+    # Offspring
+    children: list["CLEMImageSeries"] = Relationship(
+        back_populates="lif_parent",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )  # List of databases associated with this LIF file
 
 
 class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     """
-    Database recording the individual files associated with a series, which are to
-    be processed together as a group.
+    Database recording the individual files associated with a series, which are to be
+    processed together as a group.
 
-    Depending on the workflow used, these files could stem from a parent LIF file,
-    or could have been compiled together from individual TIFF files.
+    Depending on the workflow used, these files could stem from a parent LIF file, or
+    could have been compiled together from individual TIFF files.
 
-    VVV IDEA NEEDS VERIFYING
-    An instance of this databse is created (or requested?) whenever the client has
-    confirmed that all the TIFF files and XLIF files associated with a particular
-    series have pass through the rsync process.
+    VVV NEEDS VERIFYING
+    When processing starts from disparate TIFF image files, an instance of this
+    database is created (or requested?) whenever the client has confirmed that all the
+    TIFF files and XLIF files associated with a particular series have pass through the
+    rsync process. When starting from a LIF file, instances for each unique series
+    identified in this LIF file are created all at once.
     """
 
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     name: str  # Name of the series, as determined from the metadata
-    metadata: str  # Path to the metadata file associated with this particular series
-    members: list["CLEMImageStack"]  # The image stacks that comprise this series
-    pass
+
+    # The CLEM session this series belongs to
+    session: "CLEMSession" = Relationship(back_populates="image_series")
+    session_id: int = Field(foreign_key="clemsession.id")
+
+    # The parent LIF file this series originates from, if any
+    lif_parent_id: Optional[int] = Field(
+        default=None,
+        foreign_key="clemliffile.id",
+    )
+    lif_parent: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="children",
+    )
+
+    # The parent TIFF files used to build up the image stacks in the series if any
+    tiff_parents: Optional[list[str]] = None
+
+    metadata_file: Optional[str] = None  # Path to the metadata file for this series
+
+    # Databases of the image stacks that comprise this series
+    members: list["CLEMImageStack"] = Relationship(
+        back_populates="parent_series",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Processes for the series as a whole
+    # Verify that image stacks have been aligned to a reference image
+    images_aligned: list[bool] = []
+    # Verify that rgb versions of image stacks have been created
+    rgb_created: list[bool] = []
+    # Verify that colored composite has been created
+    composite_created: bool = False
 
 
 class CLEMImageStack(SQLModel, table=True):  # type: ignore
     """
-    Database to keep track of the processing that has been done on a single image stack
+    Database to keep track of the processing status of a single image stack.
+
+    VVV NEEDS VERIFYING
+    Instances of this database should be created alongside the series database.
     """
 
-    id: int = Field(primary_key=True)
-    file_path: str  # Path to the image stack
-    metadata: str  # Path to the metadata file associated with this particular stack
+    id: int = Field(default=None, primary_key=True)
 
-    pass
+    # Name of the series this image stack belongs to
+    parent_series_id: int = Field(
+        foreign_key="clemimageseries.id",
+    )
+    parent_series: "CLEMImageSeries" = Relationship(
+        back_populates="members",
+    )
+
+    # File paths to use
+    file_path: str  # Path to the image stack
+    metadata_file: str = Field(
+        foreign_key="clemimageseries.metadata_file",
+    )  # Path to the metadata file associated with this particular image stack
+    channel_name: str  # The color corresponding to the channel
+
+    # Processes for each image
+    stack_created: bool = False  # Verify that the stack has been created
+    image_aligned: bool = False  # Verify that image alignment has been done on stack
+    rgb_created: bool = False  # Verify that rgb image has been created
 
 
 """
