@@ -104,7 +104,7 @@ def convert_array_bit_depth(
     Rescales the pixel values of the array to fit within the desired array bit depth
     WITHOUT modifying the contrast.
 
-    If the array has a non-standard NumPy dtype, one can be provided
+    If the array has a bit depth not compatible with NumPy, one can be provided
     """
 
     # Validate function input
@@ -125,6 +125,7 @@ def convert_array_bit_depth(
         bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
         if bit_final not in valid_dtypes:
             raise UnsignedIntegerError(bit_final)
+    assert isinstance(bit_final, int) is True
 
     # Use shorter names for variables
     arr: np.ndarray = array
