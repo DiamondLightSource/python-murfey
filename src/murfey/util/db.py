@@ -210,11 +210,11 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     )
 
     # Processes for the series as a whole
-    # Verify that image stacks have been aligned to a reference image
-    images_aligned: List[bool] = []
-    # Verify that rgb versions of image stacks have been created
-    rgb_created: List[bool] = []
-    # Verify that colored composite has been created
+    # Verify that all image stacks have been aligned to a reference image
+    images_aligned: bool = False
+    # Verify that rgb versions of all image stacks have been created
+    rgbs_created: bool = False
+    # Verify that a final colored composite image has been created
     composite_created: bool = False
 
 
