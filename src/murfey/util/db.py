@@ -56,14 +56,20 @@ class CLEMSession(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: Optional[str] = None  # Full name of the session, if set
 
-    # Image series associated with this session
-    image_series: List["CLEMImageSeries"] = Relationship(
+    # LIF files collected during this session, if any
+    lif_files: List["CLEMLIFFile"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={"cascade": "delete"},
     )
 
-    # LIF files associated with this session, if any were acquired
-    lif_files: List["CLEMLIFFile"] = Relationship(
+    # TIFF files collected during this session, if any
+    tiff_files: List["CLEMTIFFFile"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Image series associated with this session
+    image_series: List["CLEMImageSeries"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -79,21 +85,84 @@ class CLEMLIFFile(SQLModel, table=True):  # type: ignore
     a valid LIF file having been passed through the rsync process.
     """
 
-    id: int = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
+
+    # Properties of the LIF file
+    file_path: str  # Path to the LIF file
+    master_metadata: str  # Path to the master metadata file generated as part of processing this LIF file
 
     # The CLEM session this series belongs to
     session: "CLEMSession" = Relationship(back_populates="lif_files")
     session_id: int = Field(foreign_key="clemsession.id")
 
-    # Properties of the LIF file
-    file_path: str  # Path to the LIF file
-    metadata_file: str  # Path to the master metadata file generated as part of processing this LIF file
-
     # Offspring
-    children: List["CLEMImageSeries"] = Relationship(
-        back_populates="lif_parent",
+    child_metadata: List["CLEMImageMetadata"] = Relationship(
+        back_populates="parent_lif",
         sa_relationship_kwargs={"cascade": "delete"},
-    )  # List of databases associated with this LIF file
+    )
+    child_series: List["CLEMImageSeries"] = Relationship(
+        back_populates="parent_lif",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    child_stacks: List["CLEMImageStack"] = Relationship(
+        back_populates="parent_lif",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
+    """
+    Database to record each raw TIFF file acquired during a CLEM session, which are
+    used to create an image stack
+    """
+
+    id: int = Field(primary_key=True)
+
+    # TIFF file properties
+    file_path: str  # File path to TIFF file on system
+
+    # Metadata associated with this TIFF file
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_tiffs",
+    )
+    metadata_path: str = Field(foreign_key="clemimagemetadata.file_path")
+
+    # CLEM session this series belongs to
+    session: "CLEMSession" = Relationship(back_populates="tiff_files")
+    session_id: int = Field(foreign_key="clemsession.id")
+
+    # Image series it contributes to
+    associated_series: "CLEMImageSeries" = Relationship(back_populates="parent_tiffs")
+    series_name: str = Field(foreign_key="clemimageseries.name")
+    series_id: int = Field(foreign_key="clemimageseries.id")
+
+    # Image stack it contributes to
+    associated_stack: "CLEMImageStack" = Relationship(back_populates="parent_tiffs")
+    stack_name: str = Field(foreign_key="clemimagestack.file_path")
+    stack_id: int = Field(foreign_key="clemimagestack.id")
+
+
+class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True)
+    file_path: str  # Full path to metadata file
+
+    # Associated raw data
+    parent_lif: Optional[CLEMLIFFile] = Relationship(
+        back_populates="child_metadata",
+    )
+    associated_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_metadata",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Associated offspring
+    associated_series: "CLEMImageSeries" = Relationship(
+        back_populates="associated_metadata"
+    )
+    associated_stacks: List["CLEMImageStack"] = Relationship(
+        back_populates="associated_metadata",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
 
 
 class CLEMImageSeries(SQLModel, table=True):  # type: ignore
@@ -112,7 +181,7 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     identified in this LIF file are created all at once.
     """
 
-    id: int = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
     name: str  # Name of the series, as determined from the metadata
 
     # The CLEM session this series belongs to
@@ -120,18 +189,19 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="clemsession.id")
 
     # The parent LIF file this series originates from, if any
-    lif_parent_id: Optional[int] = Field(
-        default=None,
-        foreign_key="clemliffile.id",
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="child_series",
     )
-    lif_parent: Optional["CLEMLIFFile"] = Relationship(
-        back_populates="children",
+    # The parent TIFF files used to build up the image stacks in the series, if any
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_series", sa_relationship_kwargs={"cascade": "delete"}
     )
-
-    # The parent TIFF files used to build up the image stacks in the series if any
-    tiff_parents: List[str] = []
-
-    metadata_file: str  # Path to the metadata file for this series
+    # Metadata file for this series
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_series",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    metadata_path: str = Field(foreign_key="clemimagemetadata.file_path")
 
     # Databases of the image stacks that comprise this series
     members: List["CLEMImageStack"] = Relationship(
@@ -157,21 +227,34 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     """
 
     id: int = Field(primary_key=True)
+    file_path: str  # Full path to the file
 
-    # Name of the series this image stack belongs to
-    parent_series_id: int = Field(
-        foreign_key="clemimageseries.id",
+    # Metadata associated with statck
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_stacks",
     )
+    metadata_path: str = Field(foreign_key="clemimagemetadata.file_path")
+
+    channel_name: str  # The color corresponding to the channel
+
+    # Image series this image stack belongs to
     parent_series: "CLEMImageSeries" = Relationship(
         back_populates="members",
     )
+    parent_series_id: int = Field(
+        foreign_key="clemimageseries.id",
+    )
 
-    # File paths to use
-    file_path: str  # Path to the image stack
-    metadata_file: str = Field(
-        foreign_key="clemimageseries.metadata_file",
-    )  # Path to the metadata file associated with this particular image stack
-    channel_name: str  # The color corresponding to the channel
+    # LIF file this stack originated from
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="child_stacks",
+    )
+
+    # TIFF file this stack was built from
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_stack",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
 
     # Processes for each image
     stack_created: bool = False  # Verify that the stack has been created
