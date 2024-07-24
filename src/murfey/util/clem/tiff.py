@@ -32,7 +32,8 @@ def process_tiff_files(
     """
 
     # Validate metadata
-    if not metadata_file.parents[-2] == tiff_list[0].parents[-2]:
+    # Convert to list for Python 3.9 compatibility
+    if list(metadata_file.parents)[-2] != list(tiff_list[0].parents)[-2]:
         logger.error("The base paths of the metadata and TIFF files do not match")
         return False
 
@@ -128,13 +129,18 @@ def process_tiff_files(
         )
 
         # Rescale intensity values for fluorescent channels
-        rescale = color in (
-            "blue",
-            "cyan",
-            "green",
-            "magenta",
-            "red",
-            "yellow",
+        adjust_contrast = (
+            "stretch"
+            if color
+            in (
+                "blue",
+                "cyan",
+                "green",
+                "magenta",
+                "red",
+                "yellow",
+            )
+            else None
         )
 
         # Process the image stack
@@ -142,20 +148,21 @@ def process_tiff_files(
             array=arr,
             initial_bit_depth=bit_depth,
             target_bit_depth=8,
-            rescale=rescale,
+            adjust_contrast=adjust_contrast,
         )
 
         # Save as a greyscale TIFF
         arr = write_to_tiff(
             array=arr,
             save_dir=save_dir,
-            file_name=color,
+            series_name=color,
             x_res=x_res,
             y_res=y_res,
             z_res=z_res,
             units="micron",
             axes="ZYX",
             image_labels=image_labels,
+            photometric="minisblack",
         )
 
     return True

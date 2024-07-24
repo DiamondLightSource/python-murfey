@@ -35,7 +35,7 @@ def run():
     # Convert to correct object types
     tiff_file = Path(args.tiff_path)
     # Generate list from the single file provided
-    tiff_list = [
+    tiff_list: list[Path] = [
         f.resolve()
         for f in tiff_file.parent.glob("./*")
         if f.suffix in {".tif", ".tiff"}

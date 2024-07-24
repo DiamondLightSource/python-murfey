@@ -129,13 +129,18 @@ def process_lif_file(
         )
 
         # Rescale intensity values for fluorescent channels
-        rescale = color in (
-            "blue",
-            "cyan",
-            "green",
-            "magenta",
-            "red",
-            "yellow",
+        adjust_contrast = (
+            "stretch"
+            if color
+            in (
+                "blue",
+                "cyan",
+                "green",
+                "magenta",
+                "red",
+                "yellow",
+            )
+            else None
         )
 
         # Process the image stack
@@ -143,20 +148,21 @@ def process_lif_file(
             array=arr,
             initial_bit_depth=bit_depth,
             target_bit_depth=8,
-            rescale=rescale,
+            adjust_contrast=adjust_contrast,
         )
 
         # Save as a greyscale TIFF
         arr = write_to_tiff(
             array=arr,
-            save_dir=img_dir,
-            file_name=color,
+            save_dir=save_dir,
+            series_name=color,
             x_res=x_res,
             y_res=y_res,
             z_res=z_res,
             units="micron",
             axes="ZYX",
             image_labels=image_labels,
+            photometric="minisblack",
         )
 
     return True

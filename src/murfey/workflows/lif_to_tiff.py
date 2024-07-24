@@ -4,6 +4,7 @@ The recipe referred to here is stored on GitLab.
 """
 
 from pathlib import Path
+from typing import Optional
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -14,7 +15,7 @@ except AttributeError:
 def zocalo_cluster_request(
     file: Path,
     root_folder: str,
-    messenger: TransportManager | None = None,
+    messenger: Optional[TransportManager] = None,
 ):
     if messenger:
         # Construct path to session directory
