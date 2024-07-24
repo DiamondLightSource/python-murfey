@@ -13,14 +13,10 @@ from tifffile import imwrite
 # Create logger object to output messages with
 logger = logging.getLogger("murfey.util.clem.images")
 
+# Accepted bit depths and corresponding NumPy dtypes
 # For use by various functions in the script
-valid_dtypes = (
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint64",
-)
 valid_bit_depths = (8, 16, 32, 64)
+valid_dtypes = tuple(f"uint{n}" for n in valid_bit_depths)
 
 
 class UnsignedIntegerError(Exception):
@@ -35,9 +31,8 @@ class UnsignedIntegerError(Exception):
     ):
         self.bit_depth = bit_depth
         self.message = (
-            "The bit depth provided is not a NumPy-compatible unsigned integer dtype. "
+            f"The bit depth provided ({bit_depth}) is not a NumPy-compatible unsigned integer dtype. "
             "Only 8, 16, 32, and 64 bits are allowed. "
-            f"Current bit depth: {bit_depth}"
         )
         super().__init__(self.message)
 
@@ -96,8 +91,7 @@ def stretch_image_contrast(
 
 def convert_array_bit_depth(
     array: np.ndarray,
-    target_bit_depth: Optional[int] = None,
-    target_dtype: Optional[str] = None,
+    target_bit_depth: int,
     initial_bit_depth: Optional[int] = None,
 ) -> np.ndarray:
     """
@@ -107,31 +101,14 @@ def convert_array_bit_depth(
     If the array has a bit depth not compatible with NumPy, one can be provided
     """
 
-    # Validate function input
-    # Only one of target bit depth/dtype should be provided
-    if target_bit_depth is not None and target_dtype is not None:
-        raise ValueError(
-            "Only one of 'target_bit_depth' or 'target_dtype' should be provided"
-        )
-    # Both can't be empty
-    if target_bit_depth is None and target_dtype is None:
-        raise ValueError("One of 'target_bit_depth' or 'target_dtype' must be provided")
-
-    # Validate the final dtype to convert to
-    if target_bit_depth is not None:
-        bit_final: int = target_bit_depth
-        dtype_final = f"uint{bit_final}"
-        if bit_final not in valid_dtypes:
-            raise UnsignedIntegerError(bit_final)
-
-    if target_dtype is not None:
-        dtype_final = target_dtype
-        bit_final = int("".join([char for char in dtype_final if char.isdigit()]))
-        if bit_final not in valid_dtypes:
-            raise UnsignedIntegerError(bit_final)
-
     # Use shorter names for variables
     arr: np.ndarray = array
+    bit_final: int = target_bit_depth
+    dtype_final = f"uint{bit_final}"
+
+    # Validate the final dtype to convert to
+    if bit_final not in valid_bit_depths:
+        raise UnsignedIntegerError(bit_final)
 
     # Use initial bit depth if provided
     if initial_bit_depth is not None:
@@ -171,7 +148,7 @@ def process_img_stk(
     bdt = target_bit_depth
 
     # Validate that function inputs are correct
-    if f"uint{bdt}" not in valid_dtypes:
+    if bdt not in valid_bit_depths:
         raise UnsignedIntegerError(bdt)
 
     if bdi not in valid_bit_depths:
