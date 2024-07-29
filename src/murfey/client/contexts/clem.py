@@ -6,14 +6,14 @@ the CLEM workflow should be processed.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
+from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util import capture_post, get_machine_config
-from murfey.util.clem.xml import get_image_elements
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -52,7 +52,40 @@ def _get_source(
     return None
 
 
-# WORK IN PROGRESS
+def _get_image_elements(root: ET.Element) -> List[ET.Element]:
+    """
+    Searches the XML metadata recursively to find the nodes tagged as "Element" that
+    have image-related tags. Some LIF datasets have layers of nested elements, so a
+    recursive approach is needed to avoid certain datasets breaking it.
+    """
+
+    # Nested function which generates list of elements
+    def _find_elements_recursively(
+        node: ET.Element,
+    ) -> Generator[ET.Element, None, None]:
+
+        # Find items labelled "Element" under current node
+        elem_list = node.findall("./Children/Element")
+        if len(elem_list) < 1:  # Try alternative path for top-level of XML tree
+            elem_list = node.findall("./Element")
+
+        # Recursively search for items tagged as Element under child branches
+        for elem in elem_list:
+            yield elem
+            new_node = elem  # New starting point for the search
+            new_elem_list = _find_elements_recursively(new_node)  # Call self
+            for new_elem in new_elem_list:
+                yield new_elem
+
+    # Get initial list of elements
+    elem_list = list(_find_elements_recursively(root))
+
+    # Keep only the element nodes that have image-related tags
+    elem_list = [elem for elem in elem_list if elem.find("./Data/Image")]
+
+    return elem_list
+
+
 class CLEMContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("CLEM", acquisition_software)
@@ -205,7 +238,7 @@ class CLEMContext(Context):
 
                 # Extract metadata to get the expected size of the series
                 metadata = parse(transferred_file).getroot()
-                metadata = get_image_elements(metadata)[0]
+                metadata = _get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
                 channels = metadata.findall(
