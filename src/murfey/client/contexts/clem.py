@@ -294,7 +294,7 @@ class CLEMContext(Context):
             )
 
             # Construct the URL for the Murfey server to communicate with
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_tiff"
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_stack"
             # Type checking to satisfy MyPy
             if not url:
                 logger.warning("No URL found for the environment")

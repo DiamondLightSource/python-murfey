@@ -19,20 +19,20 @@ else:
 router = APIRouter()
 
 
-@router.post("/sessions/{session_id}/lif_to_tiff")  # API posts to this URL
-def lif_to_tiff(
+@router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
+def lif_to_stack(
     session_id: int,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_tiff"
+        group="murfey.workflows", name="lif_to_stack"
     )
 
     # Use entry point if found
     if murfey_workflows:
         murfey_workflows[0].load()(
-            # Match the arguments found in murfey.workflows.lif_to_tiff
+            # Match the arguments found in murfey.workflows.lif_to_stack
             file=lif_info.name,
             root_folder="images",
             messenger=_transport_object,
@@ -52,7 +52,7 @@ def tiff_to_stack(
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_tiff"
+        group="murfey.workflows", name="tiff_to_stack"
     )
 
     # Use entry point if found

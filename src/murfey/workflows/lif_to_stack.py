@@ -1,5 +1,5 @@
 """
-Script to allow Murfey to submit the LIF-to-TIFF job to the cluster.
+Script to allow Murfey to submit the LIF-to-STACK job to the cluster.
 The recipe referred to here is stored on GitLab.
 """
 
@@ -35,7 +35,7 @@ def zocalo_cluster_request(
         messenger.send(
             "processing_recipe",
             {
-                "recipes": ["lif-to-tiff"],
+                "recipes": ["clem-lif-to-stack"],
                 "parameters": {
                     "session_dir": str(session_dir),
                     "lif_path": str(file),

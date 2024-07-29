@@ -41,7 +41,7 @@ def zocalo_cluster_request(
         messenger.send(
             "processing_recipe",
             {
-                "recipes": ["tiff-to-stack"],
+                "recipes": ["clem-tiff-to-stack"],
                 "parameters": {
                     "session_dir": str(session_dir),
                     "tiff_path": str(file),
