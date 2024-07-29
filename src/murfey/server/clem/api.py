@@ -5,7 +5,7 @@ import sys
 from fastapi import APIRouter
 
 from murfey.server import _transport_object
-from murfey.util.clem.lif import convert_lif_to_tiff
+from murfey.util.clem.lif import convert_lif_to_stack
 from murfey.util.clem.tiff import convert_tiff_to_stack
 from murfey.util.models import LifFileInfo, TiffSeriesInfo
 
@@ -39,7 +39,7 @@ def lif_to_stack(
         )
     # Call function directly otherwise
     else:
-        convert_lif_to_tiff(
+        convert_lif_to_stack(
             file=lif_info.name,
             root_folder="images",
         )
