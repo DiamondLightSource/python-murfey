@@ -65,10 +65,8 @@ server = [
     "pillow",
     "prometheus_client",
     "python-jose[cryptography]",
-    "readlif", # Specific to cryo-CLEM workflow
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
-    "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
 ]
