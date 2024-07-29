@@ -5,8 +5,6 @@ import sys
 from fastapi import APIRouter
 
 from murfey.server import _transport_object
-from murfey.util.clem.lif import convert_lif_to_stack
-from murfey.util.clem.tiff import convert_tiff_to_stack
 from murfey.util.models import LifFileInfo, TiffSeriesInfo
 
 # Use backport from importlib_metadata for Python <3.10
@@ -37,12 +35,9 @@ def lif_to_stack(
             root_folder="images",
             messenger=_transport_object,
         )
-    # Call function directly otherwise
+    # Raise error if Murfey workflow not found
     else:
-        convert_lif_to_stack(
-            file=lif_info.name,
-            root_folder="images",
-        )
+        raise RuntimeError("The relevant Murfey workflow was not found")
 
 
 @router.post("/sessions/{session_id}/tiff_to_stack")
@@ -64,10 +59,6 @@ def tiff_to_stack(
             metadata=tiff_info.series_metadata,
             messenger=_transport_object,
         )
-    # Call function directly otherwise
+    # Raise error if Murfey workflow not found
     else:
-        convert_tiff_to_stack(
-            tiff_list=tiff_info.tiff_files,
-            root_folder="images",
-            metadata_file=tiff_info.series_metadata,
-        )
+        raise RuntimeError("The relevant Murfey workflow was not found")
