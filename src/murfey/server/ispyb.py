@@ -59,6 +59,17 @@ class TransportManager:
         self.ispyb = ispyb.open()
         self._connection_callback: Callable | None = None
 
+    def reconnect(self):
+        try:
+            self.transport.disconnect()
+        except Exception:
+            log.warning(
+                "Disconnection of old transport failed when reconnecting",
+                exc_info=True,
+            )
+        self.transport = workflows.transport.lookup(self._transport_type)()
+        self.transport.connect()
+
     def do_insert_data_collection_group(
         self,
         record: DataCollectionGroup,
@@ -82,13 +93,7 @@ class TransportManager:
     def send(self, queue: str, message: dict, new_connection: bool = False):
         if self.transport:
             if not self.transport.is_connected():
-                try:
-                    self.transport.disconnect()
-                except AttributeError:
-                    # If there is not _pika_thread to join on the transport
-                    # then don't need to worry about dicsonnecting
-                    pass
-                self.transport.connect()
+                self.reconnect()
                 if self._connection_callback:
                     self._connection_callback()
             if new_connection:
