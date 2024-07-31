@@ -11,6 +11,29 @@ Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationa
 > it was Murfey who designed the packings that would lubricate the axles with oil, aiding
 > in the reduction of derailments caused by seized axles and bearings.
 
+### Installation
+
+Murfey itself is installable via `pip`. There are separate dependencies for the server and client components:
+
+```bash
+$ pip install murfey[client]
+$ pip install murfey[server]
+```
+
+Murfey uses a database to store transfer information. A [PostgreSQL](https://www.postgresql.org/) server is
+therefore required. Once the server is running and a database has been created the credentials should be stored
+in a YAML file with the following format (items in curly braces should be replaced)
+
+```bash
+username: {username}
+password: {encrypted password}
+host: {database server IP}
+port: {database server port, default 5432 for PostgreSQL}
+database: {name of the database you made}
+```
+
+This credentials file shoud be pointed to from the Murfey machine configuration file under `murfey_db_credentials`.
+
 ### How do I set up a development environment?
 
 We suggest you start with your favourite virtual environment (mamba/conda/python virtualenv/...),
