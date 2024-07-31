@@ -90,13 +90,7 @@ class TransportManager:
     def send(self, queue: str, message: dict, new_connection: bool = False):
         if self.transport:
             if not self.transport.is_connected():
-                try:
-                    self.transport.disconnect()
-                except AttributeError:
-                    # If there is not _pika_thread to join on the transport
-                    # then don't need to worry about dicsonnecting
-                    pass
-                self.transport.connect()
+                self.reconnect()
                 if self._connection_callback:
                     self._connection_callback()
             if new_connection:
