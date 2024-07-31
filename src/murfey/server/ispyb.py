@@ -59,6 +59,14 @@ class TransportManager:
         self.ispyb = ispyb.open()
         self._connection_callback: Callable | None = None
 
+    def reconnect(self):
+        try:
+            self.transport.disconnect()
+        except Exception:
+            pass
+        self.transport = workflows.transport.lookup(self._transport_type)()
+        self.transport.connect()
+
     def do_insert_data_collection_group(
         self,
         record: DataCollectionGroup,
