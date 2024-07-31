@@ -64,7 +64,7 @@ class TransportManager:
             self.transport.disconnect()
         except Exception:
             log.warning(
-                "Disconnection of olf old transport failed when reconnecting",
+                "Disconnection of old transport failed when reconnecting",
                 exc_info=True,
             )
         self.transport = workflows.transport.lookup(self._transport_type)()
