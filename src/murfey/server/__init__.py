@@ -2438,6 +2438,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
 
+            prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             murfey_db.commit()
             murfey_db.close()
             if _transport_object:
