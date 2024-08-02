@@ -1646,6 +1646,8 @@ class ProvidedProcessingParameters(BaseModel):
     dose_per_frame: float
     extract_downscale: bool = True
     particle_diameter: Optional[float] = None
+    symmetry: str = "C1"
+    eer_fractionation: int = 20
 
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
@@ -1654,7 +1656,6 @@ async def pass_proc_params_to_instrument_server(
 ):
     if machine_config["instrument_server_url"]:
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
-        print(instrument_server_tokens)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{machine_config['instrument_server_url']}/processing_parameters",
@@ -1664,6 +1665,8 @@ async def pass_proc_params_to_instrument_server(
                         "dose_per_frame": proc_params.dose_per_frame,
                         "extract_downscale": proc_params.extract_downscale,
                         "particle_diameter": proc_params.particle_diameter,
+                        "symmetry": proc_params.symmetry,
+                        "eer_fractionation": proc_params.eer_fractionation,
                     },
                 },
                 headers={

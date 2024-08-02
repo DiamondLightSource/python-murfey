@@ -154,6 +154,8 @@ class ProcessingParameters(BaseModel):
     dose_per_frame: Optional[float] = None
     extract_downscale: bool = True
     particle_diameter: Optional[float] = None
+    symmetry: str = "C1"
+    eer_fractionation: int = 20
 
 
 class ProcessingParameterBlock(BaseModel):
