@@ -34,6 +34,7 @@ class MultigridController:
     force_mdoc_metadata: bool = True
     rsync_processes: Dict[Path, RSyncer] = field(default_factory=lambda: {})
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
+    data_collection_parameters: dict = field(default_factory=lambda: {})
     token: str = ""
     _machine_config: dict = field(default_factory=lambda: {})
 
@@ -47,6 +48,7 @@ class MultigridController:
             default_destination=f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
             demo=self.demo,
             visit=self.visit,
+            data_collection_parameters=self.data_collection_parameters,
             # processing_only_mode=server_routing_prefix_found,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")

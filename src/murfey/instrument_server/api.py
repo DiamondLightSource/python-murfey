@@ -2,7 +2,7 @@ import secrets
 import time
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Dict
+from typing import Annotated, Dict, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -23,6 +23,7 @@ logger = getLogger("murfey.instrument_server.api")
 watchers: Dict[str, MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
+data_collection_parameters: dict = {}
 tokens = {}
 
 config = read_config()
@@ -120,6 +121,7 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
         processing_enabled=not watcher_spec.skip_existing_processing,
         _machine_config=watcher_spec.configuration.dict(),
         token=tokens.get("token", ""),
+        data_collection_parameters=data_collection_parameters.get(label, {}),
     )
     watchers[label] = MultigridDirWatcher(
         watcher_spec.source,
@@ -146,3 +148,22 @@ def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     controllers[rsyncer_source.label].rsync_processes[
         rsyncer_source.source
     ]._halt_thread = True
+
+
+class ProcessingParameters(BaseModel):
+    dose_per_frame: Optional[float] = None
+    extract_downscale: bool = True
+    particle_diameter: Optional[float] = None
+
+
+class ProcessingParameterBlock(BaseModel):
+    label: str
+    params: ProcessingParameters
+
+
+@router.post("/processing_parameters")
+def register_processing_parameters(proc_param_block: ProcessingParameterBlock):
+    data_collection_parameters[proc_param_block.label] = {}
+    for k, v in proc_param_block.params.dict().items():
+        data_collection_parameters[proc_param_block.label][k] = v
+    return {"success": True}

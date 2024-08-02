@@ -36,6 +36,7 @@ class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
     visit: str = Field(default="")
+    started: bool = Field(default=False)
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )

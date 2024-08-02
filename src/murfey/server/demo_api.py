@@ -40,7 +40,7 @@ from murfey.server import shutdown as _shutdown
 from murfey.server import templates
 from murfey.server.auth import instrument_server_tokens, validate_token
 from murfey.server.auth.api import create_access_token
-from murfey.server.config import from_file
+from murfey.server.config import MachineConfig, from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
     AutoProcProgram,
@@ -49,6 +49,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    MagnificationLookup,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -134,11 +135,11 @@ async def root(request: Request):
 
 @lru_cache(maxsize=1)
 @router.get("/machine/")
-def machine_info():
+def machine_info() -> MachineConfig | None:
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
-        return from_file(settings.murfey_machine_configuration, microscope)
-    return {}
+        return from_file(Path(settings.murfey_machine_configuration), microscope)
+    return None
 
 
 @router.get("/microscope/")
@@ -155,6 +156,18 @@ def get_mic_image():
     if machine_config.get("image_path"):
         return FileResponse(machine_config["image_path"])
     return None
+
+
+@router.get("/mag_table/")
+def get_mag_table(db=murfey_db) -> List[MagnificationLookup]:
+    return db.exec(select(MagnificationLookup)).all()
+
+
+@router.post("/mag_table/")
+def add_to_mag_table(rows: List[MagnificationLookup], db=murfey_db):
+    for r in rows:
+        db.add(r)
+    db.commit()
 
 
 @router.get("/visits/")
@@ -1611,7 +1624,6 @@ async def start_multigrid_watcher(
             log.info(
                 f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher"
             )
-            log.info(list(instrument_server_tokens.values())[0]["access_token"])
             async with session.post(
                 f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher",
                 json={
@@ -1627,4 +1639,36 @@ async def start_multigrid_watcher(
             ) as resp:
                 data = await resp.json()
                 log.info(resp.status)
+    return data
+
+
+class ProvidedProcessingParameters(BaseModel):
+    dose_per_frame: float
+    extract_downscale: bool = True
+    particle_diameter: Optional[float] = None
+
+
+@router.post("/sessions/{session_id}/provided_processing_parameters")
+async def pass_proc_params_to_instrument_server(
+    session_id: int, proc_params: ProvidedProcessingParameters, db=murfey_db
+):
+    if machine_config["instrument_server_url"]:
+        label = db.exec(select(Session).where(Session.id == session_id)).one().name
+        print(instrument_server_tokens)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config['instrument_server_url']}/processing_parameters",
+                json={
+                    "label": label,
+                    "params": {
+                        "dose_per_frame": proc_params.dose_per_frame,
+                        "extract_downscale": proc_params.extract_downscale,
+                        "particle_diameter": proc_params.particle_diameter,
+                    },
+                },
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
     return data
