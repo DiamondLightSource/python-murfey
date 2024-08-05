@@ -9,7 +9,6 @@ from itertools import count
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import aiohttp
 import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
@@ -38,8 +37,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.auth import instrument_server_tokens, validate_token
-from murfey.server.auth.api import create_access_token
+from murfey.server.auth import validate_token
 from murfey.server.config import MachineConfig, from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
@@ -73,7 +71,6 @@ from murfey.util.models import (
     FractionationParameters,
     GainReference,
     GridSquareParameters,
-    MultigridWatcherSetup,
     PostInfo,
     PreprocessingParametersTomo,
     ProcessFile,
@@ -1576,102 +1573,3 @@ def create_session(visit: str, name: str, db=murfey_db) -> int:
     db.commit()
     sid = s.id
     return sid
-
-
-@router.post("/activate_instrument_server")
-async def activate_instrument_server():
-    log.info("Activating instrument server")
-    timestamp = datetime.datetime.now().timestamp()
-    token = create_access_token({"timestamp": timestamp})
-    instrument_server_tokens[timestamp] = None
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{machine_config['instrument_server_url']}/token",
-            json={"access_token": token, "token_type": "bearer"},
-        ) as response:
-            success = response.status == 200
-            instrument_server_token = await response.json()
-            instrument_server_tokens[timestamp] = instrument_server_token
-    log.info("Handshake successful" if success else "Handshake unsuccessful")
-    return success
-
-
-@router.get("/instrument_name/")
-def get_instrument_name():
-    return machine_config.get("instrument_name", "")
-
-
-@router.post("/sessions/{session_id}/multigrid_watcher")
-async def start_multigrid_watcher(
-    session_id: int, watcher_spec: MultigridWatcherSetup, db=murfey_db
-):
-    if machine_config["instrument_server_url"]:
-        session = db.exec(select(Session).where(Session.id == session_id)).one()
-        visit = session.visit
-        label = session.name
-        _config = {
-            "acquisition_software": machine_config["acquisition_software"],
-            "calibrations": machine_config["calibrations"],
-            "data_directories": {
-                str(k): v for k, v in machine_config["data_directories"].items()
-            },
-            "rsync_basepath": str(machine_config["rsync_basepath"]),
-            "murfey_db_credentials": machine_config["murfey_db_credentials"],
-            "visit": visit,
-            "crypto_key": "",
-        }
-        async with aiohttp.ClientSession() as session:
-            log.info(
-                f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher"
-            )
-            async with session.post(
-                f"{machine_config['instrument_server_url']}/sessions/{session_id}/multigrid_watcher",
-                json={
-                    "source": str(watcher_spec.source / visit),
-                    "visit": visit,
-                    "configuration": _config,
-                    "label": label,
-                    "skip_existing_processing": watcher_spec.skip_existing_processing,
-                },
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
-            ) as resp:
-                data = await resp.json()
-                log.info(resp.status)
-    return data
-
-
-class ProvidedProcessingParameters(BaseModel):
-    dose_per_frame: float
-    extract_downscale: bool = True
-    particle_diameter: Optional[float] = None
-    symmetry: str = "C1"
-    eer_fractionation: int = 20
-
-
-@router.post("/sessions/{session_id}/provided_processing_parameters")
-async def pass_proc_params_to_instrument_server(
-    session_id: int, proc_params: ProvidedProcessingParameters, db=murfey_db
-):
-    if machine_config["instrument_server_url"]:
-        label = db.exec(select(Session).where(Session.id == session_id)).one().name
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{machine_config['instrument_server_url']}/processing_parameters",
-                json={
-                    "label": label,
-                    "params": {
-                        "dose_per_frame": proc_params.dose_per_frame,
-                        "extract_downscale": proc_params.extract_downscale,
-                        "particle_diameter": proc_params.particle_diameter,
-                        "symmetry": proc_params.symmetry,
-                        "eer_fractionation": proc_params.eer_fractionation,
-                    },
-                },
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
-            ) as resp:
-                data = await resp.json()
-    return data
