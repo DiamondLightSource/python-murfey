@@ -44,7 +44,6 @@ cicd = [
 client = [
     "procrunner",
     "textual", # ==0.42.0", # importlib-metadata a former dependency of theirs
-    "textual", # ==0.42.0", # importlib-metadata a former dependency of theirs
     "websocket-client",
     "xmltodict",
 ]
@@ -59,6 +58,7 @@ server = [
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
+    "mrcfile",
     "numpy<2",
     "packaging",
     "passlib",
