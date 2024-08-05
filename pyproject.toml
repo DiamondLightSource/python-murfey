@@ -31,6 +31,7 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml", # Used for safely extracting XML elements
+    "importlib-metadata", # Has to be installed explicitly for Python >3.9
     "pydantic<2", # Fixed to <2 by zocalo in [server] dependencies
     "requests",
     "rich",
