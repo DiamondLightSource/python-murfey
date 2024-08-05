@@ -38,6 +38,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 cicd = [
+    "httpx", # Used by FastAPI tests
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
 client = [
