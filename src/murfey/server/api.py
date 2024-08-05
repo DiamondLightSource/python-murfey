@@ -258,6 +258,21 @@ def get_rsyncers_for_client(session_id: int, db=murfey_db):
     return rsync_instances.all()
 
 
+class SessionClients(BaseModel):
+    session: Session
+    clients: List[ClientEnvironment]
+
+
+@router.get("/session/{session_id}")
+async def get_session(session_id: int, db=murfey_db) -> SessionClients:
+    print("session requested", session_id)
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    clients = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+    ).all()
+    return SessionClients(session=session, clients=clients)
+
+
 @router.post("/visits/{visit_name}/increment_rsync_file_count")
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
