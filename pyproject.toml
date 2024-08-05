@@ -30,8 +30,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+<<<<<<< HEAD
     "defusedxml", # For safely parsing XML files
     "importlib-metadata", # Used in both client and server scripts
+=======
+    "defusedxml", # Used for safely extracting XML elements
+>>>>>>> 3891efc (Removed 'importlib-metadata' dependency, as it appears to no longer be needed)
     "pydantic<2", # Fixed to <2 by zocalo in [server] dependencies
     "requests",
     "rich",
