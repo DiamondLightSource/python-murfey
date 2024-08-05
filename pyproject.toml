@@ -38,7 +38,6 @@ dependencies = [
 ]
 [project.optional-dependencies]
 cicd = [
-    "httpx", # Used by FastAPI tests
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
 client = [
@@ -56,7 +55,7 @@ developer = [
 server = [
     # "matplotlib", # For visual statistical analysis of images
     "cryptography",
-    "fastapi",
+    "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
     "mrcfile",
