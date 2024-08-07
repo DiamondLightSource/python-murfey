@@ -52,6 +52,8 @@ class MachineConfig(BaseModel):
     auth_key: str = ""
     auth_algorithm: str = ""
     instrument_server_url: str = "http://localhost:8001"
+    frontend_url: str = "http://localhost:3000"
+    murfey_url: str = "http://localhost:8000"
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
@@ -103,3 +105,14 @@ def get_machine_config() -> MachineConfig:
             Path(settings.murfey_machine_configuration), microscope
         )
     return machine_config
+
+
+@lru_cache(maxsize=1)
+def get_full_machine_config() -> Dict[str, MachineConfig]:
+    res = {}
+    if settings.murfey_machine_configuration:
+        with open(Path(settings.murfey_machine_configuration), "r") as config_stream:
+            config = yaml.safe_load(config_stream)
+        for k, v in config.items():
+            res[k] = MachineConfig(**v)
+    return res
