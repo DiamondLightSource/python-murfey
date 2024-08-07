@@ -19,6 +19,7 @@ import murfey.server.instrument
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
+from murfey.server.config import get_machine_config
 
 if os.getenv("MURFEY_DEMO"):
     from murfey.server.demo_api import router
@@ -37,6 +38,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+machine_config = get_machine_config()
+
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 
 metrics_app = make_asgi_app()
@@ -44,7 +47,7 @@ app.mount("/metrics", metrics_app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8001"],
+    allow_origins=machine_config.allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

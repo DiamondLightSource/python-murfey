@@ -42,6 +42,7 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    allow_origins: List[str] = ["http://localhost:3000", "http://localhost:8001"]
 
     # Find and download upstream directories
     upstream_data_directories: List[Path] = []  # Previous sessions
