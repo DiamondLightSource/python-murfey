@@ -120,3 +120,18 @@ async def pass_proc_params_to_instrument_server(
             ) as resp:
                 data = await resp.json()
     return data
+
+
+@router.get("/instrument_server")
+async def check_instrument_server():
+    data = None
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{machine_config.instrument_server_url}/health",
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
