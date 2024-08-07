@@ -167,6 +167,15 @@ def add_to_mag_table(rows: List[MagnificationLookup], db=murfey_db):
     db.commit()
 
 
+@router.delete("/mag_table/{mag}")
+def remove_mag_table_row(mag: int, db=murfey_db):
+    row = db.exec(
+        select(MagnificationLookup).where(MagnificationLookup.magnification == mag)
+    ).one()
+    db.delete(row)
+    db.commit()
+
+
 @router.get("/visits/")
 def all_visit_info(request: Request):
     microscope = get_microscope()
