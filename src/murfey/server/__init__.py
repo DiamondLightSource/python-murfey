@@ -81,8 +81,8 @@ except Exception:
 
 
 class ExtendedRecord(NamedTuple):
-    record: Base
-    record_params: List[Base]
+    record: Base  # type: ignore
+    record_params: List[Base]  # type: ignore
 
 
 class JobIDs(NamedTuple):
@@ -2908,7 +2908,7 @@ def _register(record, header: dict, **kwargs):
 
 
 @_register.register  # type: ignore
-def _(record: Base, header: dict, **kwargs):
+def _(record: Base, header: dict, **kwargs):  # type: ignore
     if not _transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
