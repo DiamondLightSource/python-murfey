@@ -123,6 +123,7 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
         token=tokens.get("token", ""),
         data_collection_parameters=data_collection_parameters.get(label, {}),
     )
+    watcher_spec.source.mkdir(exist_ok=True)
     watchers[label] = MultigridDirWatcher(
         watcher_spec.source,
         watcher_spec.configuration.dict(),
