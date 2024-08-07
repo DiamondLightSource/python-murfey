@@ -66,6 +66,7 @@ server = [
     "prometheus_client",
     "python-jose[cryptography]",
     "readlif", # Specific to cryo-CLEM workflow
+    "sqlalchemy[postgresql]<2", # Installs psycopg2 dependency
     "sqlmodel",
     "stomp-py", # <=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project # 8.1.2 seems ok
     "tifffile", # Specific to cryo-CLEM workflow
