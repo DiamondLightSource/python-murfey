@@ -278,6 +278,7 @@ class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
     eer: bool = False
+    tag: str = ""
 
 
 class SessionInfo(BaseModel):

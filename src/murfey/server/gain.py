@@ -25,19 +25,31 @@ async def prepare_gain(
     executables: Dict[str, str],
     env: Dict[str, str],
     rescale: bool = True,
+    tag: str = "",
 ) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
         return None, None
     if camera == Camera.FALCON:
         return None, None
     if gain_path.suffix == ".dm4":
-        gain_out = gain_path.parent / "gain.mrc"
-        gain_out_superres = gain_path.parent / "gain_superres.mrc"
+        gain_out = (
+            gain_path.parent / f"gain_{tag}.mrc"
+            if tag
+            else gain_path.parent / "gain.mrc"
+        )
+        gain_out_superres = (
+            gain_path.parent / f"gain_{tag}_superres.mrc"
+            if tag
+            else gain_path.parent / "gain_superres.mrc"
+        )
         if gain_out.is_file():
             return gain_out, gain_out_superres if rescale else gain_out
         for k, v in env.items():
             os.environ[k] = v
-        (gain_path.parent / "gain").mkdir(exist_ok=True)
+        if tag:
+            (gain_path.parent / f"gain_{tag}").mkdir(exist_ok=True)
+        else:
+            (gain_path.parent / "gain").mkdir(exist_ok=True)
         gain_path = _sanitise(gain_path)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
@@ -74,11 +86,13 @@ async def prepare_gain(
 
 
 async def prepare_eer_gain(
-    gain_path: Path, executables: Dict[str, str], env: Dict[str, str]
+    gain_path: Path, executables: Dict[str, str], env: Dict[str, str], tag: str = ""
 ) -> Tuple[Path | None, Path | None]:
     if not executables.get("tif2mrc"):
         return None, None
-    gain_out = gain_path.parent / "gain.mrc"
+    gain_out = (
+        gain_path.parent / f"gain_{tag}.mrc" if tag else gain_path.parent / "gain.mrc"
+    )
     for k, v in env.items():
         os.environ[k] = v
     mrc_convert = await asyncio.create_subprocess_shell(

@@ -1353,10 +1353,13 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
         )
     else:
         return {"gain_ref": None}
+    gain_ref_out = (
+        (filepath / "processing" / f"gain_{gain_reference_params.tag}")
+        if gain_reference_params.tag
+        else (filepath / "processing" / "gain.mrc")
+    )
     return {
-        "gain_ref": (filepath / "processing" / "gain.mrc").relative_to(
-            Path(machine_config["rsync_basepath"])
-        )
+        "gain_ref": gain_ref_out.relative_to(Path(machine_config["rsync_basepath"]))
     }
 
 

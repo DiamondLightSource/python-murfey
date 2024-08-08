@@ -1263,6 +1263,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             filepath / safe_path_name,
             executables,
             env,
+            tag=gain_reference_params.tag,
         )
     else:
         new_gain_ref, new_gain_ref_superres = await prepare_gain(
@@ -1271,6 +1272,7 @@ async def process_gain(visit_name, gain_reference_params: GainReference):
             executables,
             env,
             rescale=gain_reference_params.rescale,
+            tag=gain_reference_params.tag,
         )
     if new_gain_ref and new_gain_ref_superres:
         return {
