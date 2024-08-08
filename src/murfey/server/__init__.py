@@ -159,11 +159,15 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
         core = Path(*Path(mov_path).parts[: visit_idx + 1])
         ppath = Path(mov_path)
         sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+        extra_path = machine_config.processed_extra_directory
         mrc_out = (
             core
             / machine_config.processed_directory_name
             / sub_dataset
+            / extra_path
             / "MotionCorr"
+            / "job002"
+            / "Movies"
             / str(ppath.stem + "_motion_corrected.mrc")
         )
         return str(mrc_out)
@@ -2407,7 +2411,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
-                    / "align_output"
+                    / "Tomograms"
+                    / "job006"
+                    / "tomograms"
                     / f"{relevant_tilt_series.tag}_stack.mrc"
                 )
                 if not stack_file.parent.exists():
