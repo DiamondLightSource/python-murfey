@@ -1,7 +1,16 @@
+"""
+Contains classes that are used to store information on the metadata and status of jobs
+of the sessions that Murfey is overseeing, along with the relationships between them.
+"""
+
 from typing import List, Optional
 
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
+
+"""
+GENERAL
+"""
 
 
 class MurfeyUser(SQLModel, table=True):  # type: ignore
@@ -32,6 +41,36 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
+
+    # CLEM Workflow
+
+    # LIF files collected, if any
+    lif_files: List["CLEMLIFFile"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    # TIFF files collected, if any
+    tiff_files: List["CLEMTIFFFile"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    # Metadata files generated
+    metadata_files: List["CLEMImageMetadata"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    # Image series associated with this session
+    image_series: List["CLEMImageSeries"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    # Image stacks associated with this session
+    image_stacks: List["CLEMImageStack"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # TEM Workflow
+
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -47,6 +86,190 @@ class Session(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+
+
+"""
+CLEM WORKFLOW
+"""
+
+
+class CLEMLIFFile(SQLModel, table=True):  # type: ignore
+    """
+    Database recording the different LIF files acquired during the CLEM session, as
+    well as the different image series stored within them.
+    """
+
+    id: int = Field(primary_key=True)
+    file_path: str  # Path to LIF file
+    master_metadata: str  # Path to master metadata generated from LIF file
+
+    # The CLEM session this series belongs to
+    session: "Session" = Relationship(back_populates="lif_files")
+    session_id: int = Field(foreign_key="session.id")
+
+    # Offspring
+    child_metadata: List["CLEMImageMetadata"] = Relationship(
+        back_populates="parent_lif",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    child_series: List["CLEMImageSeries"] = Relationship(
+        back_populates="parent_lif",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    child_stacks: List["CLEMImageStack"] = Relationship(
+        back_populates="parent_lif",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
+    """
+    Database to record each raw TIFF file acquired during a CLEM session, which are
+    used to create an image stack
+    """
+
+    id: int = Field(primary_key=True)
+    file_path: str  # File path to TIFF file on system
+
+    session: "Session" = Relationship(back_populates="tiff_files")
+    session_id: int = Field(foreign_key="session.id")
+
+    # Metadata associated with this TIFF file
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_tiffs",
+    )
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+
+    # Image series it contributes to
+    associated_series: "CLEMImageSeries" = Relationship(back_populates="parent_tiffs")
+    series_id: int = Field(foreign_key="clemimageseries.id")
+
+    # Image stack it contributes to
+    associated_stack: "CLEMImageStack" = Relationship(back_populates="parent_tiffs")
+    stack_id: int = Field(foreign_key="clemimagestack.id")
+
+
+class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
+
+    id: int = Field(primary_key=True)
+    file_path: str  # Full path to metadata file
+
+    session: "Session" = Relationship(back_populates="metadata_files")
+    session_id: int = Field(foreign_key="session.id")
+
+    # Associated raw data
+    parent_lif: Optional[CLEMLIFFile] = Relationship(
+        back_populates="child_metadata",
+    )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
+    associated_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_metadata",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Associated offspring
+    associated_series: "CLEMImageSeries" = Relationship(
+        back_populates="associated_metadata"
+    )
+    associated_stacks: List["CLEMImageStack"] = Relationship(
+        back_populates="associated_metadata",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class CLEMImageSeries(SQLModel, table=True):  # type: ignore
+    """
+    Database recording the individual files associated with a series, which are to be
+    processed together as a group. These files could stem from a parent LIF file, or
+    have been compiled together from individual TIFF files.
+    """
+
+    id: int = Field(primary_key=True)
+    name: str  # Name of the series, as determined from the metadata
+
+    session: "Session" = Relationship(back_populates="image_series")
+    session_id: int = Field(foreign_key="session.id")
+
+    # The parent LIF file this series originates from, if any
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="child_series",
+    )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
+    # The parent TIFF files used to build up the image stacks in the series, if any
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_series", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    # Metadata file for this series
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_series",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+
+    # Databases of the image stacks that comprise this series
+    members: List["CLEMImageStack"] = Relationship(
+        back_populates="series",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Process checklist for series
+    images_aligned: bool = False  # Image stacks aligned to reference image
+    rgbs_created: bool = False  # Image stacks all colorised
+    composite_created: bool = False  # Composite flattened image created
+    composite_image: Optional[str] = None  # Full path to composite image
+
+
+class CLEMImageStack(SQLModel, table=True):  # type: ignore
+    """
+    Database to keep track of the processing status of a single image stack.
+    """
+
+    id: int = Field(primary_key=True)
+    file_path: str  # Full path to the file
+    channel_name: str  # Color associated with stack
+
+    session: "Session" = Relationship(back_populates="image_stacks")
+    session_id: int = Field(foreign_key="session.id")
+
+    # Metadata associated with statck
+    associated_metadata: "CLEMImageMetadata" = Relationship(
+        back_populates="associated_stacks",
+    )
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+
+    # Image series this image stack belongs to
+    series: "CLEMImageSeries" = Relationship(
+        back_populates="members",
+    )
+    series_id: int = Field(
+        foreign_key="clemimageseries.id",
+    )
+
+    # LIF file this stack originated from
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="child_stacks",
+    )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
+    # TIFF file this stack was built from
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="associated_stack",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+    # Process checklist for each image
+    stack_created: bool = False  # Verify that the stack has been created
+    image_aligned: bool = False  # Verify that image alignment has been done on stack
+    aligned_image: Optional[str] = None  # Full path to aligned image stack
+    rgb_created: bool = False  # Verify that rgb image has been created
+    rgb_image: Optional[str] = None  # Full path to colorised image stack
+
+
+"""
+TEM SESSION AND PROCESSING WORKFLOW
+"""
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
@@ -460,6 +683,11 @@ class BFactors(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     number_of_particles: int
     resolution: float
+
+
+"""
+FUNCTIONS
+"""
 
 
 def setup(url: str):
