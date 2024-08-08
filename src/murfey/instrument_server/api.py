@@ -116,6 +116,7 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
         [],
         watcher_spec.visit,
         session_id,
+        murfey_url=_get_murfey_url(),
         demo=True,
         do_transfer=False,
         processing_enabled=not watcher_spec.skip_existing_processing,

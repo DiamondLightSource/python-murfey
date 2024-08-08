@@ -22,7 +22,6 @@ class InstrumentInfo(BaseModel):
 
 @router.get("/instruments")
 def get_instrumnet_info() -> List[InstrumentInfo]:
-    print(config)
     return [
         InstrumentInfo(
             instrument_name=k, display_name=v.display_name, instrument_url=v.murfey_url
