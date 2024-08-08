@@ -413,7 +413,7 @@ def run():
                     "autoproc_program_id": collected_ids[3].id,
                     "movie": f.file_path,
                     "mrc_out": f.mrc_out,
-                    "pix_size": float(metadata["pixel_size_on_image"]) * 1e10,
+                    "pixel_size": float(metadata["pixel_size_on_image"]) * 1e10,
                     "image_number": f.image_number,
                     "microscope": get_microscope(),
                     "mc_uuid": murfey_ids[2 * i],

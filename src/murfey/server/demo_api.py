@@ -777,7 +777,7 @@ def flush_spa_processing(visit_name: str, client_id: int, tag: Tag, db=murfey_db
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params["angpix"],
+                "pixel_size": proc_params["angpix"],
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[2 * i],

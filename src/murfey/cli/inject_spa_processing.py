@@ -189,7 +189,7 @@ def run():
                     "autoproc_program_id": detached_ids[3],
                     "movie": m.path,
                     "mrc_out": str(mrc_out),
-                    "pix_size": proc_params["angpix"],
+                    "pixel_size": proc_params["angpix"],
                     "image_number": m.image_number,
                     "microscope": get_microscope(),
                     "mc_uuid": m.murfey_id,
