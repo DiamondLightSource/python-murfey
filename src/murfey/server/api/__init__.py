@@ -651,11 +651,15 @@ def register_completed_tilt_series(
                 "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
             )
             sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            extra_path = machine_config.processed_extra_directory
             stack_file = (
                 core
                 / machine_config.processed_directory_name
                 / sub_dataset
-                / "align_output"
+                / extra_path
+                / "Tomograms"
+                / "job006"
+                / "tomograms"
                 / f"{ts.tag}_stack.mrc"
             )
             if not stack_file.parent.exists():
