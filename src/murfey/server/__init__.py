@@ -695,7 +695,7 @@ def _register_picked_particles_use_diameter(
                         "micrographs_file": saved_message.micrographs_file,
                         "coord_list_file": saved_message.coord_list_file,
                         "output_file": saved_message.extract_file,
-                        "pix_size": (
+                        "pixel_size": (
                             relion_options["angpix"]
                             * relion_options["motion_corr_binning"]
                         ),
@@ -731,7 +731,7 @@ def _register_picked_particles_use_diameter(
                     "micrographs_file": params_to_forward["micrographs_file"],
                     "coord_list_file": params_to_forward["coord_list_file"],
                     "output_file": params_to_forward["extract_file"],
-                    "pix_size": (
+                    "pixel_size": (
                         relion_options["angpix"] * relion_options["motion_corr_binning"]
                     ),
                     "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
@@ -847,7 +847,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "micrographs_file": params_to_forward["micrographs_file"],
             "coord_list_file": params_to_forward["coord_list_file"],
             "output_file": params_to_forward["extract_file"],
-            "pix_size": relion_params.angpix * relion_params.motion_corr_binning,
+            "pixel_size": relion_params.angpix * relion_params.motion_corr_binning,
             "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
             "ctf_max_resolution": params_to_forward["ctf_values"]["CtfMaxResolution"],
             "ctf_figure_of_merit": params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -1938,7 +1938,7 @@ def _flush_spa_preprocessing(message: dict):
                 "autoproc_program_id": collected_ids[3].id,
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params.angpix,
+                "pixel_size": proc_params.angpix,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[2 * i],
@@ -2042,7 +2042,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params.pixel_size,
+                "pixel_size": proc_params.pixel_size,
                 "kv": proc_params.voltage,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
@@ -2427,7 +2427,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
-                        "pix_size": preproc_params.pixel_size,
+                        "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
                     },
