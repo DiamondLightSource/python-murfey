@@ -18,6 +18,7 @@ logger = logging.getLogger("murfey.util.clem.images")
 valid_bit_depths = (8, 16, 32, 64)
 valid_dtypes = tuple(f"uint{n}" for n in valid_bit_depths)
 
+
 class UnsignedIntegerError(Exception):
 
     def __init__(
@@ -79,17 +80,7 @@ def stretch_image_contrast(
     arr[arr < b_lo] = b_lo
     arr[arr > b_up] = b_up
     arr = (arr - b_lo) / (b_up - b_lo) * max_int
-    arr: np.ndarray = array
-    b_lo: Union[float, int] = np.percentile(arr, percentile_range[0])
-    b_up: Union[float, int] = np.percentile(arr, percentile_range[1])
 
-    # Overwrite outliers and stretch values
-    arr[arr < b_lo] = b_lo
-    arr[arr > b_up] = b_up
-    arr = (arr - b_lo) / (b_up - b_lo) * max_int
-
-    # Change bit depth back to initial one
-    arr = arr.round(0).astype(dtype)
     # Change bit depth back to initial one
     arr = arr.round(0).astype(dtype)
 
@@ -128,16 +119,11 @@ def convert_to_dtype(
     # Get max pixel values of initial and final arrays
     int_init = int(2**bit_init - 1)
     int_final = int(2**bit_final - 1)
-    # Get max pixel values of initial and final arrays
-    int_init = int(2**bit_init - 1)
-    int_final = int(2**bit_final - 1)
 
     # Rescale (DIVIDE BEFORE MULTIPLY)
     arr = arr / int_init * int_final
-    arr = arr / int_init * int_final
 
     # Change to correct unsigned integer type
-    arr = arr.round(0).astype(dtype_final)
     arr = arr.round(0).astype(dtype_final)
 
     return arr
@@ -261,7 +247,6 @@ def write_to_tiff(
     # Process extended metadata
     if extended_metadata is None:
         extended_metadata = ""
-    arr: np.ndarray = array
 
     # Get resolution
     if z_res is not None:
