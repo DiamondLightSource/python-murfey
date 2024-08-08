@@ -161,6 +161,8 @@ class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
     parent_lif: Optional[CLEMLIFFile] = Relationship(
         back_populates="child_metadata",
     )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
     associated_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="associated_metadata",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -193,6 +195,8 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     parent_lif: Optional["CLEMLIFFile"] = Relationship(
         back_populates="child_series",
     )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
     # The parent TIFF files used to build up the image stacks in the series, if any
     parent_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="associated_series", sa_relationship_kwargs={"cascade": "delete"}
@@ -247,6 +251,8 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     parent_lif: Optional["CLEMLIFFile"] = Relationship(
         back_populates="child_stacks",
     )
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+
     # TIFF file this stack was built from
     parent_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="associated_stack",
