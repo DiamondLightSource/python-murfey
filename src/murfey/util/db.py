@@ -138,7 +138,7 @@ class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
     associated_metadata: "CLEMImageMetadata" = Relationship(
         back_populates="associated_tiffs",
     )
-    metadata_id: str = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
 
     # Image series it contributes to
     associated_series: "CLEMImageSeries" = Relationship(back_populates="parent_tiffs")
@@ -202,7 +202,7 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
         back_populates="associated_series",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    metadata_id: str = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
 
     # Databases of the image stacks that comprise this series
     members: List["CLEMImageStack"] = Relationship(
@@ -233,7 +233,7 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     associated_metadata: "CLEMImageMetadata" = Relationship(
         back_populates="associated_stacks",
     )
-    metadata_id: str = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
 
     # Image series this image stack belongs to
     series: "CLEMImageSeries" = Relationship(
