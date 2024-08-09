@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import aiohttp
 from fastapi import APIRouter
@@ -14,7 +14,7 @@ from murfey.server.auth.api import create_access_token
 from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import Session
-from murfey.util.models import MultigridWatcherSetup
+from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
 router = APIRouter()
@@ -129,6 +129,20 @@ async def check_instrument_server():
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{machine_config.instrument_server_url}/health",
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
+@router.get("/possible_gain_references")
+async def get_possible_gain_references() -> List[File]:
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{machine_config.instrument_server_url}/possible_gain_references",
                 headers={
                     "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
                 },

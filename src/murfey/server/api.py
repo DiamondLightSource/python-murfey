@@ -1242,8 +1242,11 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
             f.write(f"{d}\n")
 
 
-@router.post("/visits/{visit_name}/process_gain")
-async def process_gain(visit_name, gain_reference_params: GainReference):
+@router.post("/sessions/{session_id}/process_gain")
+async def process_gain(
+    session_id: int, gain_reference_params: GainReference, db=murfey_db
+):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     camera = getattr(Camera, machine_config.camera)
     if gain_reference_params.eer:
         executables = machine_config.external_executables_eer

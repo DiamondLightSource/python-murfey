@@ -2,7 +2,7 @@ import secrets
 import time
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Dict, Optional
+from typing import Annotated, Dict, List, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -17,6 +17,7 @@ from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.server.auth.api import Token
 from murfey.util.instrument_models import MultigridWatcherSpec
+from murfey.util.models import File
 
 logger = getLogger("murfey.instrument_server.api")
 
@@ -61,10 +62,6 @@ def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
 
 router = APIRouter(dependencies=[Depends(validate_token)])
 handshake_router = APIRouter()
-
-
-def get_machine_config():
-    return {}
 
 
 @router.get("/health")
@@ -171,3 +168,24 @@ def register_processing_parameters(proc_param_block: ProcessingParameterBlock):
     for k, v in proc_param_block.params.dict().items():
         data_collection_parameters[proc_param_block.label][k] = v
     return {"success": True}
+
+
+@router.get("/possible_gain_references")
+def get_possible_gain_references() -> List[File]:
+    machine_config = requests.get(
+        f"{_get_murfey_url()}/machine/",
+        headers={"Authorization": f"Bearer {tokens['token']}"},
+    ).json()
+    candidates = []
+    for gf in Path(machine_config["gain_reference_directory"]).glob("**/*"):
+        if gf.is_file():
+            candidates.append(
+                File(
+                    name=gf.name,
+                    description="",
+                    size=gf.stat().st_size / 1e6,
+                    timestamp=gf.stat().st_mtime,
+                    full_path=str(gf),
+                )
+            )
+    return candidates

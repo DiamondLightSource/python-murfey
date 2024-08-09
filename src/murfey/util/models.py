@@ -81,7 +81,8 @@ class File(BaseModel):
     name: str
     description: str
     size: int
-    timestamp: float
+    timestamp: datetime
+    full_path: str
 
 
 class LifFileInfo(BaseModel):

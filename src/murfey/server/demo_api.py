@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import logging
 import random
-import time
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
@@ -1342,8 +1341,11 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
     log.info(f"Write to connection file at {filepath}")
 
 
-@router.post("/visits/{visit_name}/process_gain")
-async def process_gain(visit_name, gain_reference_params: GainReference):
+@router.post("/sessions/{session_id}/process_gain")
+async def process_gain(
+    session_id: int, gain_reference_params: GainReference, db=murfey_db
+):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     if machine_config.get("rsync_basepath"):
         filepath = (
             Path(machine_config["rsync_basepath"])
@@ -1563,19 +1565,6 @@ async def get_tiff(visit_name: str, tiff_path: str):
 def failed_client_post(post_info: PostInfo):
     log.info("Post failed")
     return
-
-
-@router.get("/possible_gain_references")
-async def get_possible_gain_references() -> List[File]:
-    return [
-        File(name="K3_example.dm4", description="", size=100e6, timestamp=time.time()),
-        File(
-            name="K3_not_the_real_thing.dm4",
-            description="",
-            size=1e3,
-            timestamp=time.time() - 2000,
-        ),
-    ]
 
 
 @router.post("/visits/{visit}/session/{name}")

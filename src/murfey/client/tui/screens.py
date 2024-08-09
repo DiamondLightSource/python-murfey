@@ -849,7 +849,7 @@ class GainReference(Screen):
                         f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
                     )
             process_gain_response = requests.post(
-                url=f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/process_gain",
+                url=f"{str(self.app._environment.url.geturl())}/sessions/{self.app._environment.murfey_session}/process_gain",
                 json={
                     "gain_ref": str(self._dir_tree._gain_reference),
                     "eer": bool(
