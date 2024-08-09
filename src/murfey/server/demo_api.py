@@ -254,7 +254,6 @@ class SessionClients(BaseModel):
 
 @router.get("/session/{session_id}")
 async def get_session(session_id: int, db=murfey_db) -> SessionClients:
-    print("session requested", session_id)
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     clients = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)

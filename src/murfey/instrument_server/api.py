@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Annotated, Dict, List, Optional
 from urllib.parse import urlparse
 
+import procrunner
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
+from werkzeug.utils import secure_filename
 
 from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
@@ -189,3 +191,25 @@ def get_possible_gain_references() -> List[File]:
                 )
             )
     return candidates
+
+
+class GainReference(BaseModel):
+    gain_path: Path
+    visit_path: str
+    gain_destination_dir: str = "processing"
+
+
+@router.post("/upload_gain_reference")
+def upload_gain_reference(gain_reference: GainReference):
+    cmd = [
+        "rsync",
+        str(gain_reference.gain_path),
+        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{gain_reference.visit_path}/{gain_reference.gain_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
+    ]
+    gain_rsync = procrunner.run(cmd)
+    if gain_rsync.returncode:
+        logger.warning(
+            f"Gain reference file {gain_reference.gain_path} was not successfully transferred to {gain_reference.visit_path}/processing"
+        )
+        return {"success": False}
+    return {"success": True}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from pathlib import Path
 from typing import List, Optional
 
 import aiohttp
@@ -143,6 +144,33 @@ async def get_possible_gain_references() -> List[File]:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{machine_config.instrument_server_url}/possible_gain_references",
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
+class GainReferenceRequest(BaseModel):
+    gain_path: Path
+
+
+@router.post("/sessions/{session_id}/upload_gain_reference")
+async def request_gain_reference_upload(
+    session_id: int, gain_reference_request: GainReferenceRequest, db=murfey_db
+):
+    visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    visit_path = f"{machine_config.rsync_module or 'data'}/{datetime.datetime.now().year}/{visit}"
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config.instrument_server_url}/upload_gain_reference",
+                json={
+                    "gain_path": str(gain_reference_request.gain_path),
+                    "visit_path": visit_path,
+                    "gain_destination_dir": machine_config.gain_directory_name,
+                },
                 headers={
                     "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
                 },
