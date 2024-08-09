@@ -37,6 +37,7 @@ class Session(SQLModel, table=True):  # type: ignore
     name: str
     visit: str = Field(default="")
     started: bool = Field(default=False)
+    current_gain_ref: str = Field(default="")
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )

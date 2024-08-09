@@ -339,3 +339,7 @@ class PostInfo(BaseModel):
 class MultigridWatcherSetup(BaseModel):
     source: Path
     skip_existing_processing: bool = False
+
+
+class CurrentGainRef(BaseModel):
+    path: str

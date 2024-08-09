@@ -76,6 +76,7 @@ from murfey.util.models import (
     ClientInfo,
     ConnectionFileParameters,
     ContextInfo,
+    CurrentGainRef,
     DCGroupParameters,
     DCParameters,
     File,
@@ -1587,3 +1588,13 @@ async def get_tiff(visit_name: str, tiff_path: str):
         return None
 
     return FileResponse(path=test_path)
+
+
+@router.put("/sessions/{session_id}/current_gain_ref")
+def update_current_gain_ref(
+    session_id: int, new_gain_ref: CurrentGainRef, db=murfey_db
+):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session.current_gain_ref = new_gain_ref
+    db.add(session)
+    db.commit()

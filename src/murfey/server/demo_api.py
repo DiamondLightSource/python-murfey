@@ -63,6 +63,7 @@ from murfey.util.models import (
     ClientInfo,
     ConnectionFileParameters,
     ContextInfo,
+    CurrentGainRef,
     DCGroupParameters,
     DCParameters,
     File,
@@ -391,11 +392,16 @@ def register_spa_proc_params(
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
+        current_gain_ref = (
+            db.exec(select(Session).where(Session.id == session_id))
+            .one()
+            .current_gain_ref
+        )
         params = SPARelionParameters(
             pj_id=collected_ids[2].id,
             angpix=proc_params.pixel_size_on_image,
             dose_per_frame=proc_params.dose_per_frame,
-            gain_ref=proc_params.gain_ref,
+            gain_ref=current_gain_ref or proc_params.gain_ref,
             voltage=proc_params.voltage,
             motion_corr_binning=proc_params.motion_corr_binning,
             eer_grouping=proc_params.eer_fractionation,
@@ -1355,7 +1361,7 @@ async def process_gain(
     else:
         return {"gain_ref": None}
     gain_ref_out = (
-        (filepath / "processing" / f"gain_{gain_reference_params.tag}")
+        (filepath / "processing" / f"gain_{gain_reference_params.tag}.mrc")
         if gain_reference_params.tag
         else (filepath / "processing" / "gain.mrc")
     )
@@ -1573,3 +1579,13 @@ def create_session(visit: str, name: str, db=murfey_db) -> int:
     db.commit()
     sid = s.id
     return sid
+
+
+@router.put("/sessions/{session_id}/current_gain_ref")
+def update_current_gain_ref(
+    session_id: int, new_gain_ref: CurrentGainRef, db=murfey_db
+):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session.current_gain_ref = new_gain_ref.path
+    db.add(session)
+    db.commit()
