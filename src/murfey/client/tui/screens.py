@@ -747,7 +747,7 @@ class VisitSelection(SwitchSelection):
 
         if machine_data.get("upstream_data_directories"):
             upstream_downloads = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/upstream_visits"
+                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/upstream_visits"
             ).json()
             self.app.install_screen(
                 UpstreamDownloads(upstream_downloads), "upstream-downloads"

@@ -1528,8 +1528,9 @@ def failed_client_post(post_info: PostInfo):
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
 
 
-@router.get("/visits/{visit_name}/upstream_visits")
-async def find_upstream_visits(visit_name: str):
+@router.get("/visits/{session_id}/upstream_visits")
+async def find_upstream_visits(session_id: int, db=murfey_db):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     upstream_visits = {}
     # Iterates through provided upstream directories
     for p in machine_config.upstream_data_directories:

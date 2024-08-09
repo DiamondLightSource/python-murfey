@@ -1512,8 +1512,9 @@ def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name).set(on)
 
 
-@router.get("/visits/{visit_name}/upstream_visits")
-def find_upstream_visits(visit_name: str):
+@router.get("/sessions/{session_id}/upstream_visits")
+def find_upstream_visits(session_id: int, db=murfey_db):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     upstream_visits = {}
     for p in machine_config["upstream_data_directories"]:
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
