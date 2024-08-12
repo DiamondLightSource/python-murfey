@@ -101,7 +101,7 @@ class CLEMLIFFile(SQLModel, table=True):  # type: ignore
 
     id: int = Field(primary_key=True)
     file_path: str  # Path to LIF file
-    master_metadata: str  # Path to master metadata generated from LIF file
+    master_metadata: str = ""  # Path to master metadata generated from LIF file
 
     # The CLEM session this series belongs to
     session: "Session" = Relationship(back_populates="lif_files")
@@ -135,18 +135,31 @@ class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id")
 
     # Metadata associated with this TIFF file
-    associated_metadata: "CLEMImageMetadata" = Relationship(
+    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
         back_populates="associated_tiffs",
     )
-    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: Optional[int] = Field(
+        foreign_key="clemimagemetadata.id",
+        default=None,
+    )
 
     # Image series it contributes to
-    associated_series: "CLEMImageSeries" = Relationship(back_populates="parent_tiffs")
-    series_id: int = Field(foreign_key="clemimageseries.id")
+    associated_series: Optional["CLEMImageSeries"] = Relationship(
+        back_populates="parent_tiffs"
+    )
+    series_id: Optional[int] = Field(
+        foreign_key="clemimageseries.id",
+        default=None,
+    )
 
     # Image stack it contributes to
-    associated_stack: "CLEMImageStack" = Relationship(back_populates="parent_tiffs")
-    stack_id: int = Field(foreign_key="clemimagestack.id")
+    associated_stack: Optional["CLEMImageStack"] = Relationship(
+        back_populates="parent_tiffs"
+    )
+    stack_id: Optional[int] = Field(
+        foreign_key="clemimagestack.id",
+        default=None,
+    )
 
 
 class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
@@ -169,9 +182,10 @@ class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
     )
 
     # Associated offspring
-    associated_series: "CLEMImageSeries" = Relationship(
+    associated_series: Optional["CLEMImageSeries"] = Relationship(
         back_populates="associated_metadata"
     )
+
     associated_stacks: List["CLEMImageStack"] = Relationship(
         back_populates="associated_metadata",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -195,18 +209,24 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     parent_lif: Optional["CLEMLIFFile"] = Relationship(
         back_populates="child_series",
     )
-    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+    parent_lif_id: Optional[int] = Field(
+        foreign_key="clemliffile.id",
+        default=None,
+    )
 
     # The parent TIFF files used to build up the image stacks in the series, if any
     parent_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="associated_series", sa_relationship_kwargs={"cascade": "delete"}
     )
     # Metadata file for this series
-    associated_metadata: "CLEMImageMetadata" = Relationship(
+    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
         back_populates="associated_series",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: Optional[int] = Field(
+        foreign_key="clemimagemetadata.id",
+        default=None,
+    )
 
     # Databases of the image stacks that comprise this series
     members: List["CLEMImageStack"] = Relationship(
@@ -234,24 +254,28 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id")
 
     # Metadata associated with statck
-    associated_metadata: "CLEMImageMetadata" = Relationship(
+    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
         back_populates="associated_stacks",
     )
-    metadata_id: int = Field(foreign_key="clemimagemetadata.id")
+    metadata_id: Optional[int] = Field(
+        foreign_key="clemimagemetadata.id",
+        default=None,
+    )
 
     # Image series this image stack belongs to
-    series: "CLEMImageSeries" = Relationship(
+    series: Optional["CLEMImageSeries"] = Relationship(
         back_populates="members",
     )
-    series_id: int = Field(
+    series_id: Optional[int] = Field(
         foreign_key="clemimageseries.id",
+        default=None,
     )
 
     # LIF file this stack originated from
     parent_lif: Optional["CLEMLIFFile"] = Relationship(
         back_populates="child_stacks",
     )
-    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id")
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id", default=None)
 
     # TIFF file this stack was built from
     parent_tiffs: List["CLEMTIFFFile"] = Relationship(
