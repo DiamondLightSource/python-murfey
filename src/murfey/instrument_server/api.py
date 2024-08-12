@@ -213,3 +213,29 @@ def upload_gain_reference(gain_reference: GainReference):
         )
         return {"success": False}
     return {"success": True}
+
+
+class UpstreamTiffInfo(BaseModel):
+    download_dir: Path
+
+
+@router.post("/visits/{visit_name}/upstream_tiff_data_request")
+def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo):
+    murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
+    upstream_tiff_info.download_dir.mkdir(exist_ok=True)
+    upstream_tiff_paths = (
+        requests.get(
+            f"{murfey_url.geturl()}/visits/{visit_name}/upstream_tiff_paths",
+            headers={"Authorization": f"Bearer {tokens['token']}"},
+        ).json()
+        or []
+    )
+    for tiff_path in upstream_tiff_paths:
+        tiff_data = requests.get(
+            f"{murfey_url.geturl()}/visits/{visit_name}/upstream_tiff/{tiff_path}",
+            stream=True,
+            headers={"Authorization": f"Bearer {tokens['token']}"},
+        )
+        with open(upstream_tiff_info.download_dir / tiff_path, "wb") as utiff:
+            for chunk in tiff_data.iter_content(chunk_size=32 * 1024**2):
+                utiff.write(chunk)

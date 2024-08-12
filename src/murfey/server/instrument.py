@@ -177,3 +177,20 @@ async def request_gain_reference_upload(
             ) as resp:
                 data = await resp.json()
     return data
+
+
+@router.post("/visits/{visit_name}/upstream_tiff_data_request")
+async def request_upstream_tiff_data_download(visit_name: str):
+    if machine_config.upstream_data_download_directory:
+        download_dir = str(machine_config.upstream_data_download_directory / visit_name)
+        if machine_config.instrument_server_url:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{machine_config.instrument_server_url}/visits/{visit_name}/upstream_tiff_data_request",
+                    json={"download_dir": download_dir},
+                    headers={
+                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    },
+                ) as resp:
+                    data = await resp.json()
+    return data
