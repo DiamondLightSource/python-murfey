@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from fastapi import APIRouter
+from sqlalchemy.exc import NoResultFound
+from sqlmodel import select
 
 from murfey.server import _transport_object
+from murfey.server.murfey_db import murfey_db
 from murfey.util.clem.lif import convert_lif_to_tiff
 from murfey.util.clem.tiff import convert_tiff_to_stack
+from murfey.util.db import (  # CLEMImageMetadata,; CLEMImageSeries,; CLEMImageStack,
+    CLEMLIFFile,
+    CLEMTIFFFile,
+)
 from murfey.util.models import LifFileInfo, TiffSeriesInfo
 
 # Use backport from importlib_metadata for Python <3.10
@@ -17,6 +25,72 @@ else:
 
 # Create APIRouter class object
 router = APIRouter()
+
+
+@router.post("/sessions/{session_id}/clem/lif_files/{lif_file_id}")
+def register_lif_file(
+    session_id: int,
+    # lif_file_id: int,
+    lif_file: Path,
+    db=murfey_db,
+):
+    # Convert incoming file paths into absolute ones
+    lif_file = Path(lif_file) if isinstance(lif_file, str) else lif_file
+    lif_file = lif_file.resolve()
+
+    # Check if the file already exists in the database
+    try:
+        # Returns the file from the database if already present
+        clem_lif_file = db.exec(
+            select(CLEMLIFFile)
+            .where(CLEMLIFFile.session_id == session_id)
+            .where(CLEMLIFFile.file_path == str(lif_file))
+        ).one()
+        return "File already exists; no action needed"
+
+    except NoResultFound:
+        # Creates the entry if it's not present
+        clem_lif_file = CLEMLIFFile()
+        clem_lif_file.file_path = str(lif_file)
+        clem_lif_file.master_metadata = ""
+        clem_lif_file.session_id = session_id
+        clem_lif_file.child_metadata = []
+        clem_lif_file.child_series = []
+        clem_lif_file.child_stacks = []
+
+        db.add(clem_lif_file)
+        db.commit()
+        db.close()
+        return "No result found; added file to database"
+
+
+@router.post("/sessions/{session_id}/clem/tiff_files/{tiff_file_id}")
+def register_tiff_file(
+    session_id: int,
+    # tiff_file_id: int,
+    tiff_file: Path,
+    db=murfey_db,
+):
+    # Convert incoming file paths into absolute ones
+    tiff_file = Path(tiff_file) if isinstance(tiff_file, str) else tiff_file
+    tiff_file = tiff_file.resolve()
+    try:
+        clem_tiff_file = db.exec(
+            select(CLEMTIFFFile)
+            .where(CLEMTIFFFile.session_id == session_id)
+            .where(CLEMTIFFFile.file_path == str(tiff_file))
+        ).one()
+        return "File already exists; no action needed"
+
+    except NoResultFound:
+        clem_tiff_file = CLEMTIFFFile()
+        clem_tiff_file.file_path = str(tiff_file)
+        clem_tiff_file.session_id = session_id
+
+        db.add(clem_tiff_file)
+        db.commit()
+        db.close()
+        return "No result found; added file to database"
 
 
 @router.post("/sessions/{session_id}/lif_to_tiff")  # API posts to this URL
