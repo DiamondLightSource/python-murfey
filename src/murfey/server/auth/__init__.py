@@ -1,3 +1,4 @@
+import importlib.metadata
 import secrets
 from typing import Annotated, Dict
 
@@ -10,6 +11,7 @@ from sqlmodel import Session, create_engine, select
 from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import url
 from murfey.util.db import MurfeyUser as User
+from murfey.util.db import Session as MurfeySession
 
 machine_config = get_machine_config()
 ALGORITHM = machine_config.auth_algorithm or "HS256"
@@ -59,6 +61,15 @@ def validate_instrument_server_token(timestamp: float) -> bool:
     return timestamp in instrument_server_tokens.keys()
 
 
+def validate_visit(visit_name: str) -> bool:
+    if validators := importlib.metadata.entry_points().select(
+        group="murfey.auth.session_validation",
+        name=machine_config.auth.session_validation,
+    ):
+        return validators[0].load()(visit_name)
+    return True
+
+
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
         decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -78,3 +89,22 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return None
+
+
+async def validate_session_access(
+    session_id: int, token: Annotated[str, Depends(oauth2_scheme)]
+):
+    await validate_token(token)
+    with Session(engine) as murfey_db:
+        visit_name = (
+            murfey_db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+            .one()
+            .visit
+        )
+    if not validate_visit(visit_name):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You do not have access to this visit",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return session_id

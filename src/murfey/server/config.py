@@ -10,6 +10,10 @@ import yaml
 from pydantic import BaseModel, BaseSettings
 
 
+class Auth(BaseModel):
+    session_validation: str = ""
+
+
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
@@ -54,6 +58,8 @@ class MachineConfig(BaseModel):
     instrument_server_url: str = "http://localhost:8001"
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
+
+    auth: Auth = Auth()
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:

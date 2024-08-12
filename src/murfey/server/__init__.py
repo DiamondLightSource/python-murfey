@@ -8,12 +8,13 @@ from datetime import datetime
 from functools import partial, singledispatch, wraps
 from pathlib import Path
 from threading import Thread
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple
+from typing import Annotated, Any, Callable, Dict, List, NamedTuple, Tuple
 
 import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from fastapi import Depends
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -39,6 +40,7 @@ import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
+from murfey.server.auth import validate_session_access
 from murfey.server.config import get_hostname, get_machine_config, get_microscope
 from murfey.server.murfey_db import url  # murfey_db
 
@@ -75,6 +77,9 @@ except Exception:
 class ExtendedRecord(NamedTuple):
     record: Base
     record_params: List[Base]
+
+
+MurfeySessionID = Annotated[int, Depends(validate_session_access)]
 
 
 class JobIDs(NamedTuple):

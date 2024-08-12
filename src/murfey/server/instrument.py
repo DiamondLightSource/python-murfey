@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlmodel import select
 
+from murfey.server import MurfeySessionID
 from murfey.server.auth import instrument_server_tokens
 from murfey.server.auth.api import create_access_token
 from murfey.server.config import get_machine_config
@@ -158,7 +159,9 @@ class GainReferenceRequest(BaseModel):
 
 @router.post("/sessions/{session_id}/upload_gain_reference")
 async def request_gain_reference_upload(
-    session_id: int, gain_reference_request: GainReferenceRequest, db=murfey_db
+    session_id: MurfeySessionID,
+    gain_reference_request: GainReferenceRequest,
+    db=murfey_db,
 ):
     visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
     visit_path = f"{machine_config.rsync_module or 'data'}/{datetime.datetime.now().year}/{visit}"
