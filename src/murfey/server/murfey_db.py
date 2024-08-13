@@ -22,7 +22,7 @@ def url(machine_config: MachineConfig | None = None) -> str:
 
 def get_murfey_db_session(
     machine_config: MachineConfig | None = None,
-) -> Session:
+) -> Session:  # type: ignore
     _url = url(machine_config)
     if machine_config and not machine_config.sqlalchemy_pooling:
         engine = create_engine(_url, poolclass=NullPool)
