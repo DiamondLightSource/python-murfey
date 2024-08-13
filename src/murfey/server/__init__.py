@@ -41,14 +41,15 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.auth import validate_session_access
-from murfey.server.config import get_hostname, get_machine_config, get_microscope
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.util.config import get_hostname, get_machine_config, get_microscope
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
 import murfey.util.db as db
+from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
@@ -222,41 +223,6 @@ def respond_with_template(filename: str, parameters: dict[str, Any] | None = Non
     if parameters:
         template_parameters.update(parameters)
     return templates.TemplateResponse(filename, template_parameters)
-
-
-class LogFilter(logging.Filter):
-    """A filter to limit messages going to Graylog"""
-
-    def __repr__(self):
-        return "<murfey.server.LogFilter>"
-
-    def __init__(self):
-        self._filter_levels = {
-            "murfey": logging.DEBUG,
-            "ispyb": logging.DEBUG,
-            "zocalo": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.INFO,
-        }
-
-    @staticmethod
-    def install() -> LogFilter:
-        logfilter = LogFilter()
-        root_logger = logging.getLogger()
-        for handler in root_logger.handlers:
-            handler.addFilter(logfilter)
-        return logfilter
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        logger_name = record.name
-        while True:
-            if logger_name in self._filter_levels:
-                return record.levelno >= self._filter_levels[logger_name]
-            if "." not in logger_name:
-                return False
-            logger_name = logger_name.rsplit(".", maxsplit=1)[0]
 
 
 def run():

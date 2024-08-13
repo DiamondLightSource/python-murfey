@@ -3,7 +3,7 @@ import string
 
 from cryptography.fernet import Fernet
 
-from murfey.server.config import get_machine_config
+from murfey.util.config import get_machine_config
 
 
 def run():

@@ -237,3 +237,38 @@ class Processor:
     def wait(self):
         if self.thread:
             self.thread.join()
+
+
+class LogFilter(logging.Filter):
+    """A filter to limit messages going to Graylog"""
+
+    def __repr__(self):
+        return "<murfey.server.LogFilter>"
+
+    def __init__(self):
+        self._filter_levels = {
+            "murfey": logging.DEBUG,
+            "ispyb": logging.DEBUG,
+            "zocalo": logging.DEBUG,
+            "uvicorn": logging.INFO,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.INFO,
+        }
+
+    @staticmethod
+    def install() -> LogFilter:
+        logfilter = LogFilter()
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            handler.addFilter(logfilter)
+        return logfilter
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        logger_name = record.name
+        while True:
+            if logger_name in self._filter_levels:
+                return record.levelno >= self._filter_levels[logger_name]
+            if "." not in logger_name:
+                return False
+            logger_name = logger_name.rsplit(".", maxsplit=1)[0]

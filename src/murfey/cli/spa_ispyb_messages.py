@@ -19,10 +19,10 @@ from sqlmodel import create_engine, select
 
 from murfey.client.contexts.spa import _get_xml_list_index
 from murfey.server import _murfey_id, _register
-from murfey.server.config import get_machine_config, get_microscope
 from murfey.server.ispyb import Session, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
+from murfey.util.config import get_machine_config, get_microscope
 
 
 def run():

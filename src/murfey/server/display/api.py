@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from murfey.server.config import get_machine_config
+from murfey.util.config import get_machine_config
 
 # Create APIRouter class object
 router = APIRouter(prefix="/display", tags=["display"])

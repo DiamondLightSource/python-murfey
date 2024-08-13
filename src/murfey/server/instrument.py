@@ -13,8 +13,8 @@ from sqlmodel import select
 from murfey.server import MurfeySessionID
 from murfey.server.auth import instrument_server_tokens
 from murfey.server.auth.api import create_access_token
-from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import murfey_db
+from murfey.util.config import get_machine_config
 from murfey.util.db import Session
 from murfey.util.models import File, MultigridWatcherSetup
 

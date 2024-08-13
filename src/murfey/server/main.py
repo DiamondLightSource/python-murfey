@@ -19,7 +19,7 @@ import murfey.server.instrument
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
-from murfey.server.config import get_machine_config
+from murfey.util.config import get_machine_config
 
 if os.getenv("MURFEY_DEMO"):
     from murfey.server.demo_api import router

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from murfey.server.config import MachineConfig
+from murfey.util.config import MachineConfig
 
 
 class MultigridWatcherSpec(BaseModel):

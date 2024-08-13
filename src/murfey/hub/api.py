@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from murfey.server.config import get_full_machine_config
+from murfey.util.config import get_full_machine_config
 
 logger = getLogger("murfey.hub.api")
 

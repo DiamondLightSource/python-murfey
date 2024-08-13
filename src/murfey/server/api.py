@@ -47,9 +47,9 @@ from murfey.server import (
     templates,
 )
 from murfey.server.auth import validate_token
-from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
+from murfey.util.config import from_file, settings
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,

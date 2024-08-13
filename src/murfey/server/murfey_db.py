@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 from fastapi import Depends
 from sqlmodel import Session, create_engine
 
-from murfey.server.config import MachineConfig, get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
 
 
 def url(machine_config: MachineConfig | None = None) -> str:

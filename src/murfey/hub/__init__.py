@@ -5,7 +5,7 @@ import uvicorn
 from rich.logging import RichHandler
 
 import murfey
-from murfey.server import LogFilter
+from murfey.util import LogFilter
 
 logger = logging.getLogger("murfey.hub")
 
