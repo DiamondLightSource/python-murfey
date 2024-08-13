@@ -61,12 +61,12 @@ def validate_instrument_server_token(timestamp: float) -> bool:
     return timestamp in instrument_server_tokens.keys()
 
 
-def validate_visit(visit_name: str) -> bool:
+def validate_visit(visit_name: str, token: str) -> bool:
     if validators := importlib.metadata.entry_points().select(
         group="murfey.auth.session_validation",
         name=machine_config.auth.session_validation,
     ):
-        return validators[0].load()(visit_name)
+        return validators[0].load()(visit_name, token)
     return True
 
 
@@ -101,7 +101,7 @@ async def validate_session_access(
             .one()
             .visit
         )
-    if not validate_visit(visit_name):
+    if not validate_visit(visit_name, token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="You do not have access to this visit",

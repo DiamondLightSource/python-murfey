@@ -4,7 +4,7 @@ import importlib.metadata
 
 from fastapi import APIRouter
 
-from murfey.server import _transport_object
+from murfey.server import MurfeySessionID, _transport_object
 from murfey.util.lif import convert_lif_to_tiff
 from murfey.util.models import LifFileInfo
 
@@ -15,7 +15,7 @@ router = APIRouter()
 # Allow function to be seen as an endpoint by the router
 @router.post("/sessions/{session_id}/lif_to_tiff")
 def lif_to_tiff(
-    session_id: int,  # Used by the decorator
+    session_id: MurfeySessionID,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
     murfey_workflows = importlib.metadata.entry_points().select(

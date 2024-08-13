@@ -24,6 +24,7 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
+    MurfeySessionID,
     _flush_grid_square_records,
     _flush_tomography_preprocessing,
     _murfey_id,
@@ -254,7 +255,7 @@ class SessionClients(BaseModel):
 
 
 @router.get("/session/{session_id}")
-async def get_session(session_id: int, db=murfey_db) -> SessionClients:
+async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClients:
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     clients = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
@@ -325,7 +326,7 @@ class ProcessingDetails(BaseModel):
 
 @router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
-    session_id: int, db=murfey_db
+    session_id: MurfeySessionID, db=murfey_db
 ) -> List[ProcessingDetails] | None:
     params = db.exec(
         select(
@@ -372,7 +373,7 @@ def get_spa_proc_param_details(
 
 @router.post("/sessions/{session_id}/spa_processing_parameters")
 def register_spa_proc_params(
-    session_id: int, proc_params: ProcessingParametersSPA, db=murfey_db
+    session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
     log.info(
         f"Registration request for SPA processing parameters with data: {proc_params.json()}"
@@ -432,7 +433,7 @@ def register_spa_proc_params(
 
 @router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
 def register_tomo_preproc_params(
-    session_id: int, proc_params: PreprocessingParametersTomo, db=murfey_db
+    session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
     log.info(
         f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
@@ -580,7 +581,9 @@ def register_grid_square(
 
 
 @router.get("/sessions/{session_id}/foil_hole/{fh_name}")
-def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]:
+def get_foil_hole(
+    session_id: MurfeySessionID, fh_name: int, db=murfey_db
+) -> Dict[str, int]:
     foil_holes = db.exec(
         select(FoilHole, GridSquare)
         .where(FoilHole.name == fh_name)
@@ -592,7 +595,10 @@ def get_foil_hole(session_id: int, fh_name: int, db=murfey_db) -> Dict[str, int]
 
 @router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
 def register_foil_hole(
-    session_id: int, gs_name: int, foil_hole_params: FoilHoleParameters, db=murfey_db
+    session_id: MurfeySessionID,
+    gs_name: int,
+    foil_hole_params: FoilHoleParameters,
+    db=murfey_db,
 ):
     gsid = (
         db.exec(
@@ -803,7 +809,9 @@ class Tag(BaseModel):
 
 
 @router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
-def flush_spa_processing(visit_name: str, session_id: int, tag: Tag, db=murfey_db):
+def flush_spa_processing(
+    visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
+):
     stashed_files = db.exec(
         select(PreprocessStash).where(PreprocessStash.session_id == session_id)
     ).all()
@@ -884,7 +892,10 @@ def flush_spa_processing(visit_name: str, session_id: int, tag: Tag, db=murfey_d
 
 @router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
-    visit_name: str, session_id: int, proc_file: SPAProcessFile, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    proc_file: SPAProcessFile,
+    db=murfey_db,
 ):
     parts = [secure_filename(p) for p in Path(proc_file.path).parts]
     visit_idx = parts.index(visit_name)
@@ -1150,7 +1161,7 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
-def get_dc_groups(session_id: int, db=murfey_db):
+def get_dc_groups(session_id: MurfeySessionID, db=murfey_db):
     data_collection_groups = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
     ).all()
@@ -1159,7 +1170,10 @@ def get_dc_groups(session_id: int, db=murfey_db):
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
 def register_dc_group(
-    visit_name: str, session_id: int, dcg_params: DCGroupParameters, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    dcg_params: DCGroupParameters,
+    db=murfey_db,
 ):
     log.info(f"Registering data collection group on microscope {get_microscope()}")
     if dcg_murfey := db.exec(
@@ -1241,7 +1255,7 @@ def register_dc_group(
 
 @router.post("/visits/{visit_name}/{session_id}/start_data_collection")
 def start_dc(
-    visit_name: str, session_id: int, dc_params: DCParameters, db=murfey_db
+    visit_name: str, session_id: MurfeySessionID, dc_params: DCParameters, db=murfey_db
 ) -> Optional[DCParameters]:
     dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
     log.info(
@@ -1302,7 +1316,9 @@ def start_dc(
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_processing_job")
-def register_proc(visit_name, session_id: int, proc_params: ProcessingJobParameters):
+def register_proc(
+    visit_name, session_id: MurfeySessionID, proc_params: ProcessingJobParameters
+):
     log.info("Registering processing job")
     if global_state.get("processing_job_ids"):
         assert isinstance(global_state["processing_job_ids"], dict)
@@ -1348,7 +1364,7 @@ def write_conn_file(visit_name, params: ConnectionFileParameters):
 
 @router.post("/sessions/{session_id}/process_gain")
 async def process_gain(
-    session_id: int, gain_reference_params: GainReference, db=murfey_db
+    session_id: MurfeySessionID, gain_reference_params: GainReference, db=murfey_db
 ):
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     if machine_config.get("rsync_basepath"):
@@ -1457,7 +1473,9 @@ def remove_session(client_id: int, db=murfey_db):
 
 
 @router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
-def get_rsyncers_for_session(session_id: int, db=murfey_db) -> List[RsyncInstance]:
+def get_rsyncers_for_session(
+    session_id: MurfeySessionID, db=murfey_db
+) -> List[RsyncInstance]:
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     )
@@ -1465,7 +1483,7 @@ def get_rsyncers_for_session(session_id: int, db=murfey_db) -> List[RsyncInstanc
 
 
 @router.delete("/sessions/{session_id}")
-def remove_session_by_id(session_id: int, db=murfey_db):
+def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     db.delete(session)
     db.commit()
@@ -1513,7 +1531,7 @@ def change_monitoring_status(visit_name: str, on: int):
 
 
 @router.get("/sessions/{session_id}/upstream_visits")
-def find_upstream_visits(session_id: int, db=murfey_db):
+def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     upstream_visits = {}
     for p in machine_config["upstream_data_directories"]:
@@ -1584,7 +1602,7 @@ def create_session(visit: str, name: str, db=murfey_db) -> int:
 
 @router.put("/sessions/{session_id}/current_gain_ref")
 def update_current_gain_ref(
-    session_id: int, new_gain_ref: CurrentGainRef, db=murfey_db
+    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
 ):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     session.current_gain_ref = new_gain_ref.path

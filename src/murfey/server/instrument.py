@@ -50,7 +50,7 @@ def get_instrument_name():
 
 @router.post("/sessions/{session_id}/multigrid_watcher")
 async def start_multigrid_watcher(
-    session_id: int, watcher_spec: MultigridWatcherSetup, db=murfey_db
+    session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
 ):
     if machine_config.instrument_server_url:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
@@ -99,7 +99,7 @@ class ProvidedProcessingParameters(BaseModel):
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
 async def pass_proc_params_to_instrument_server(
-    session_id: int, proc_params: ProvidedProcessingParameters, db=murfey_db
+    session_id: MurfeySessionID, proc_params: ProvidedProcessingParameters, db=murfey_db
 ):
     if machine_config.instrument_server_url:
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
