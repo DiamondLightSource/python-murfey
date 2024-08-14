@@ -3,7 +3,7 @@
 repos:
   # Syntax validation and some basic sanity checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0 # Released 2023-10-09
+    rev: v4.6.0 # Released 2024-04-06
     # rev input based on version tag format in repo (e.g. with or without 'v')
     hooks:
       - id: check-added-large-files
@@ -26,7 +26,7 @@ repos:
 
   # Format the pyproject.toml file
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: 1.7.0 # Released 2024-01-22
+    rev: 1.8.0 # Released 2024-04-17 | Latest version that retains ability to group project keys under sub-tables
     hooks:
       - id: pyproject-fmt
         name: Formatting the pyproject.toml file
@@ -34,7 +34,7 @@ repos:
 
   # Automatic source code formatting
   - repo: https://github.com/psf/black
-    rev: 24.3.0 # Released 2024-03-15
+    rev: 24.8.0 # Released 2024-08-02
     hooks:
       - id: black
         name: Formatting Python scripts according to Black
@@ -69,20 +69,20 @@ repos:
   # Linting
   - repo: https://github.com/PyCQA/flake8
     # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
-    rev: 7.0.0 # Released 2024-01-05
+    rev: 7.1.1 # Released 2024-08-04
     hooks:
       - id: flake8
         name: Running Flake8 linter on Python files
         additional_dependencies: [
-            # Added Flake8-pyproject plugin for .toml compatibility
+            # Added Flake8-pyproject plugin for .toml compatibility | URL: https://github.com/john-hen/Flake8-pyproject
             "Flake8-pyproject==1.2.3", # Released 2023-03-21
             # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
-            "flake8-comprehensions==3.14.0", # Released 2023-07-10
+            "flake8-comprehensions==3.15.0", # Released 2024-06-29
           ]
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0 # Released 2024-03-09
+    rev: v1.11.1 # Released 2024-07-31
     hooks:
       - id: mypy
         name: Checking types in Python scripts using MyPy
