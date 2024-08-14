@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # Check that Python version is supported
     print(f"Python version: {sys.version_info.major}.{sys.version_info.minor}")
     # if sys.hexversion < 0x3080000:
-    if sys.version_info >= (3, 9):  # Use version_info tuple instead
+    if sys.version_info < (3, 9):  # Use version_info tuple instead
         exit(
             "Your python version is too old to support Murfey. "
             "You need at least Python 3.9"
