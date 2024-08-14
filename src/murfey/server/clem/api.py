@@ -9,6 +9,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
+from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import murfey_db
 from murfey.util.clem.lif import convert_lif_to_tiff
 from murfey.util.clem.tiff import convert_tiff_to_stack
@@ -27,8 +28,32 @@ if sys.version_info.major == 3 and sys.version_info.minor < 10:
 else:
     from importlib.metadata import entry_points
 
+
 # Create APIRouter class object
 router = APIRouter()
+
+
+# Use machine configuration to validate file paths used here
+machine_config = get_machine_config()
+
+
+def validate_file(file: Path) -> bool:
+    # Pre-empt accidental string input
+    file = Path(file) if isinstance(file, str) else file
+    file = file.resolve()  # Get full path
+
+    # Fail if file doesn't exist
+    if not file.exists():
+        return False
+
+    # Use path to storage location as reference
+    rsync_basepath = machine_config.rsync_basepath
+
+    # Only accept files with the same root
+    if list(file.parents)[-2] == list(rsync_basepath.parents)[-2]:
+        return True
+    else:
+        return False
 
 
 @router.post("/sessions/{session_id}/clem/lif_files")
@@ -45,7 +70,7 @@ def register_lif_file(
     lif_file = Path(lif_file) if isinstance(lif_file, str) else lif_file
     lif_file = lif_file.resolve()  # Get full path
 
-    if lif_file.exists():
+    if validate_file(lif_file) is True:
         # Return the database entry to update if it already exists
         try:
             clem_lif_file = db.exec(
@@ -82,7 +107,7 @@ def register_lif_file(
             metadata = Path(metadata) if isinstance(metadata, str) else metadata
             metadata = metadata.resolve()  # Get full path
 
-            if metadata.exists():
+            if validate_file(metadata) is True:
                 # Return existing database entry if it already exists
                 try:
                     metadata_db_entry = db.exec(
@@ -141,7 +166,7 @@ def register_lif_file(
             stack = Path(stack) if isinstance(stack, str) else stack
             stack = stack.resolve()  # Get full path
 
-            if stack.exists():
+            if validate_file(stack) is True:
                 # Return exisiting databse entry if it already exists
                 try:
                     stack_db_entry = db.exec(
@@ -189,7 +214,7 @@ def register_tiff_file(
     tiff_file = Path(tiff_file) if isinstance(tiff_file, str) else tiff_file
     tiff_file = tiff_file.resolve() if tiff_file is not None else tiff_file
 
-    if tiff_file.exists():
+    if validate_file(tiff_file) is True:
         # Returns the database entry if already registered
         try:
             clem_tiff_file = db.exec(
@@ -218,7 +243,7 @@ def register_tiff_file(
         )
         associated_metadata = associated_metadata.resolve()
 
-        if associated_metadata.exists():
+        if validate_file(associated_metadata) is True:
             # Return database entry if already registered
             try:
                 metadata_db_entry = db.exec(
@@ -273,7 +298,7 @@ def register_tiff_file(
         )
         associated_stack = associated_stack.resolve()
 
-        if associated_stack.exists():
+        if validate_file(associated_stack) is True:
             # Return database entry if already registered
             try:
                 stack_db_entry = db.exec(
@@ -319,7 +344,7 @@ def register_clem_metadata(
     )
     metadata_file = metadata_file.resolve()
 
-    if metadata_file.exists():
+    if validate_file(metadata_file) is True:
         # Return database entry if it already exists
         try:
             clem_metadata = db.exec(
@@ -343,7 +368,7 @@ def register_clem_metadata(
         parent_lif = Path(parent_lif) if isinstance(parent_lif, str) else parent_lif
         parent_lif = parent_lif.resolve()  # Get full path
 
-        if parent_lif.exists():
+        if validate_file(parent_lif) is True:
             # Return database entry if it exists
             try:
                 lif_file_db_entry = db.exec(
@@ -372,7 +397,7 @@ def register_clem_metadata(
             tiff = Path(tiff) if isinstance(tiff, str) else tiff
             tiff = tiff.resolve()
 
-            if tiff.exists():
+            if validate_file(tiff) is True:
                 # Return database entry if it exists
                 try:
                     tiff_db_entry = db.exec(
@@ -422,7 +447,7 @@ def register_clem_metadata(
             stack = Path(stack) if isinstance(stack, str) else stack
             stack = stack.resolve()
 
-            if stack.exists():
+            if validate_file(stack) is True:
                 # Return database entry if it already exists
                 try:
                     stack_db_entry = db.exec(
