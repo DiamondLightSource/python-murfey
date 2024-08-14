@@ -27,7 +27,6 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "defusedxml", # Used for safely extracting XML elements
@@ -153,11 +152,10 @@ ignore = [
 max-line-length = "88"
 
 [tool.pyproject-fmt]
-inputs = "pyproject.toml"
 check = false
 indent = 4
 keep_full_version = true
-max-supported-python = "3.12"
+max_supported_python = "3.11"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
