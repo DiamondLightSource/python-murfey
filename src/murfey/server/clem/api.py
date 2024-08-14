@@ -11,8 +11,6 @@ from sqlmodel import Session, select
 from murfey.server import _transport_object
 from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import murfey_db
-from murfey.util.clem.lif import convert_lif_to_tiff
-from murfey.util.clem.tiff import convert_tiff_to_stack
 from murfey.util.db import (
     CLEMImageMetadata,
     CLEMImageSeries,
@@ -473,30 +471,27 @@ def register_clem_metadata(
     return clem_metadata
 
 
-@router.post("/sessions/{session_id}/lif_to_tiff")  # API posts to this URL
-def lif_to_tiff(
+@router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
+def lif_to_stack(
     session_id: int,  # Used by the decorator
     lif_info: LifFileInfo,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_tiff"
+        group="murfey.workflows", name="lif_to_stack"
     )
 
     # Use entry point if found
     if murfey_workflows:
         murfey_workflows[0].load()(
-            # Match the arguments found in murfey.workflows.lif_to_tiff
+            # Match the arguments found in murfey.workflows.lif_to_stack
             file=lif_info.name,
             root_folder="images",
             messenger=_transport_object,
         )
-    # Call function directly otherwise
+    # Raise error if Murfey workflow not found
     else:
-        convert_lif_to_tiff(
-            file=lif_info.name,
-            root_folder="images",
-        )
+        raise RuntimeError("The relevant Murfey workflow was not found")
 
 
 @router.post("/sessions/{session_id}/tiff_to_stack")
@@ -506,7 +501,7 @@ def tiff_to_stack(
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_tiff"
+        group="murfey.workflows", name="tiff_to_stack"
     )
 
     # Use entry point if found
@@ -518,10 +513,6 @@ def tiff_to_stack(
             metadata=tiff_info.series_metadata,
             messenger=_transport_object,
         )
-    # Call function directly otherwise
+    # Raise error if Murfey workflow not found
     else:
-        convert_tiff_to_stack(
-            tiff_list=tiff_info.tiff_files,
-            root_folder="images",
-            metadata_file=tiff_info.series_metadata,
-        )
+        raise RuntimeError("The relevant Murfey workflow was not found")
