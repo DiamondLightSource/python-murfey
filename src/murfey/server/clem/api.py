@@ -47,10 +47,8 @@ def validate_file(file: Path) -> bool:
         return False
 
     # Use path to storage location as reference
-    rsync_basepath = machine_config.rsync_basepath
-
-    # Only accept files with the same root
-    if list(file.parents)[-2] == list(rsync_basepath.parents)[-2]:
+    basepath = list(machine_config.rsync_basepath.parents)[-2]
+    if str(file).startswith(str(basepath)):
         return True
     else:
         return False
@@ -67,10 +65,10 @@ def register_lif_file(
     db: Session = murfey_db,
 ):
 
-    lif_file = Path(lif_file) if isinstance(lif_file, str) else lif_file
-    lif_file = lif_file.resolve()  # Get full path
-
     if validate_file(lif_file) is True:
+        lif_file = Path(lif_file) if isinstance(lif_file, str) else lif_file
+        lif_file = lif_file.resolve()  # Get full path
+
         # Return the database entry to update if it already exists
         try:
             clem_lif_file = db.exec(
@@ -88,26 +86,26 @@ def register_lif_file(
         except Exception:
             return "Something went wrong when registering the LIF file"
     else:
-        raise FileNotFoundError
+        raise Exception("The file did not pass the validation check")
 
     # Add metadata information if provided
     if master_metadata is not None:
-        master_metadata = (
-            Path(master_metadata)
-            if isinstance(master_metadata, str)
-            else master_metadata
-        )
         # Add metadata if it exists
-        if master_metadata.exists():
+        if validate_file(master_metadata) is True:
+            master_metadata = (
+                Path(master_metadata)
+                if isinstance(master_metadata, str)
+                else master_metadata
+            )
             clem_lif_file.master_metadata = str(master_metadata.resolve())
 
     # Register child metadata if provided
     if len(child_metadata) > 0:
         for metadata in child_metadata:
-            metadata = Path(metadata) if isinstance(metadata, str) else metadata
-            metadata = metadata.resolve()  # Get full path
-
             if validate_file(metadata) is True:
+                metadata = Path(metadata) if isinstance(metadata, str) else metadata
+                metadata = metadata.resolve()  # Get full path
+
                 # Return existing database entry if it already exists
                 try:
                     metadata_db_entry = db.exec(
@@ -138,7 +136,6 @@ def register_lif_file(
     # Register child image series if provided
     if len(child_series) > 0:
         for series in child_series:
-
             # Return existing database entry if it already exists
             try:
                 series_db_entry = db.exec(
@@ -163,10 +160,10 @@ def register_lif_file(
     # Register child image stacks if provided
     if len(child_stacks) > 0:
         for stack in child_stacks:
-            stack = Path(stack) if isinstance(stack, str) else stack
-            stack = stack.resolve()  # Get full path
-
             if validate_file(stack) is True:
+                stack = Path(stack) if isinstance(stack, str) else stack
+                stack = stack.resolve()  # Get full path
+
                 # Return exisiting databse entry if it already exists
                 try:
                     stack_db_entry = db.exec(
@@ -210,11 +207,10 @@ def register_tiff_file(
     associated_stack: Optional[Path] = None,
     db: Session = murfey_db,
 ):
-    # Convert incoming file paths into absolute ones
-    tiff_file = Path(tiff_file) if isinstance(tiff_file, str) else tiff_file
-    tiff_file = tiff_file.resolve() if tiff_file is not None else tiff_file
-
     if validate_file(tiff_file) is True:
+        tiff_file = Path(tiff_file) if isinstance(tiff_file, str) else tiff_file
+        tiff_file = tiff_file.resolve() if tiff_file is not None else tiff_file
+
         # Returns the database entry if already registered
         try:
             clem_tiff_file = db.exec(
@@ -232,18 +228,17 @@ def register_tiff_file(
         except Exception:
             return "Something went wrong when registering the TIFF file"
     else:
-        raise FileNotFoundError
+        raise Exception("The file did not pass the validation check")
 
     # Add metadata if provided
     if associated_metadata is not None:
-        associated_metadata = (
-            Path(associated_metadata)
-            if isinstance(associated_metadata, str)
-            else associated_metadata
-        )
-        associated_metadata = associated_metadata.resolve()
-
         if validate_file(associated_metadata) is True:
+            associated_metadata = (
+                Path(associated_metadata)
+                if isinstance(associated_metadata, str)
+                else associated_metadata
+            )
+            associated_metadata = associated_metadata.resolve()
             # Return database entry if already registered
             try:
                 metadata_db_entry = db.exec(
@@ -266,7 +261,7 @@ def register_tiff_file(
                     "Something went wrong when registering the associated metadata file"
                 )
         else:
-            print("The file path provided doesn't exist on the file system")
+            print("The file didn't pass the validation check")
 
     # Add series information if provided
     if associated_series is not None:
@@ -291,14 +286,14 @@ def register_tiff_file(
 
     # Add image stack information if provided
     if associated_stack is not None:
-        associated_stack = (
-            Path(associated_stack)
-            if isinstance(associated_stack, str)
-            else associated_stack
-        )
-        associated_stack = associated_stack.resolve()
-
         if validate_file(associated_stack) is True:
+            associated_stack = (
+                Path(associated_stack)
+                if isinstance(associated_stack, str)
+                else associated_stack
+            )
+            associated_stack = associated_stack.resolve()
+
             # Return database entry if already registered
             try:
                 stack_db_entry = db.exec(
@@ -319,7 +314,7 @@ def register_tiff_file(
                     "Something went wrong when registering the associated image stack"
                 )
         else:
-            print("The file path provided doesn't exist on the file system")
+            print("The file didn't pass the validation check")
 
     # Commit to database
     db.add(clem_tiff_file)
@@ -361,14 +356,14 @@ def register_clem_metadata(
         except Exception:
             return "Something went wrong when registering the metadata file"
     else:
-        raise FileNotFoundError
+        raise Exception("The file failed the validation check")
 
     # Register a parent LIF file if provided
     if parent_lif is not None:
-        parent_lif = Path(parent_lif) if isinstance(parent_lif, str) else parent_lif
-        parent_lif = parent_lif.resolve()  # Get full path
-
         if validate_file(parent_lif) is True:
+            parent_lif = Path(parent_lif) if isinstance(parent_lif, str) else parent_lif
+            parent_lif = parent_lif.resolve()  # Get full path
+
             # Return database entry if it exists
             try:
                 lif_file_db_entry = db.exec(
@@ -389,15 +384,15 @@ def register_clem_metadata(
             except Exception:
                 return "Something went wrong when registering the parent LIF file"
         else:
-            print("The file path provided doesn't exist on the file system")
+            print("The file didn't pass the validation check")
 
     # Register associated TIFF files if provided
     if len(associated_tiffs) > 0:
         for tiff in associated_tiffs:
-            tiff = Path(tiff) if isinstance(tiff, str) else tiff
-            tiff = tiff.resolve()
-
             if validate_file(tiff) is True:
+                tiff = Path(tiff) if isinstance(tiff, str) else tiff
+                tiff = tiff.resolve()
+
                 # Return database entry if it exists
                 try:
                     tiff_db_entry = db.exec(
@@ -419,7 +414,7 @@ def register_clem_metadata(
                 db.refresh(tiff_db_entry)
                 clem_metadata.associated_tiffs.append(tiff_db_entry)
             else:
-                print("The file path provided doesn't exist on the file system")
+                print("The file doesn't pass the validation check")
 
     # Register associated image series if provided
     if associated_series is not None:
@@ -444,10 +439,10 @@ def register_clem_metadata(
     # Register associated image stacks if provided
     if len(associated_stacks) > 0:
         for stack in associated_stacks:
-            stack = Path(stack) if isinstance(stack, str) else stack
-            stack = stack.resolve()
-
             if validate_file(stack) is True:
+                stack = Path(stack) if isinstance(stack, str) else stack
+                stack = stack.resolve()
+
                 # Return database entry if it already exists
                 try:
                     stack_db_entry = db.exec(
@@ -469,7 +464,7 @@ def register_clem_metadata(
                 db.refresh(stack_db_entry)
                 clem_metadata.associated_stacks.append(stack_db_entry)
             else:
-                print("The file path provided doesn't exist on the file system")
+                print("The file didn't pass the validation check")
 
     # Commit to database
     db.add(clem_metadata)
