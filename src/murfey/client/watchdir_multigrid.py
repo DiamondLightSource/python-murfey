@@ -63,6 +63,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                                 d.name
                                 in self._machine_config["analyse_created_directories"]
                             ),
+                            tag="atlas",
                         )
                         self._seen_dirs.append(d)
                 else:
@@ -73,6 +74,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                             include_mid_path=False,
                             analyse=True,  # not (first_loop and self._skip_existing_processing),
                             limited=True,
+                            tag="metadata",
                         )
                         self._seen_dirs.append(d)
                     processing_started = False
@@ -88,6 +90,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                                 analyse=not (
                                     first_loop and self._skip_existing_processing
                                 ),
+                                tag="fractions",
                             )
                             self._seen_dirs.append(d02)
                         processing_started = d02 in self._seen_dirs
@@ -104,6 +107,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                                 analyse=not (
                                     first_loop and self._skip_existing_processing
                                 ),
+                                tag="fractions",
                             )
                             self._seen_dirs.append(d02)
 

@@ -123,10 +123,13 @@ class MultigridController:
         )
 
     def _rsyncer_stopped(self, source: Path):
-        stop_url = f"{self.murfey_url}/rsyncer_stopped"
-        capture_post(
-            stop_url, json={"source": str(source), "session_id": self.session_id}
-        )
+        stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"
+        capture_post(stop_url, json={"source": str(source)})
+
+    def _restart_rsyncer(self, source: Path):
+        self.rsync_processes[source].restart()
+        restarted_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
+        capture_post(restarted_url, json={"source": str(source)})
 
     def _start_rsyncer(
         self,
@@ -186,12 +189,12 @@ class MultigridController:
             ),
             secondary=True,
         )
-        url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/rsyncer"
+        url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
         rsyncer_data = {
             "source": str(source),
             "destination": destination,
             "session_id": self.session_id,
-            "transferring": self.do_transfer,
+            "transferring": self.do_transfer or self._environment.demo,
             "tag": tag,
         }
         requests.post(url, json=rsyncer_data)

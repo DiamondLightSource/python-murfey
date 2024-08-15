@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import List, Optional
 
 import aiohttp
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import select
 
 from murfey.server import MurfeySessionID
-from murfey.server.auth import instrument_server_tokens
+from murfey.server.auth import instrument_server_tokens, validate_token
 from murfey.server.auth.api import create_access_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
@@ -19,7 +19,7 @@ from murfey.util.db import Session
 from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(validate_token)])
 machine_config = get_machine_config()
 
 log = logging.getLogger("murfey.server.instrument")
@@ -55,7 +55,7 @@ async def start_multigrid_watcher(
     if machine_config.instrument_server_url:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
-        label = session.name
+        label = session.id
         _config = {
             "acquisition_software": machine_config.acquisition_software,
             "calibrations": machine_config.calibrations,
@@ -196,4 +196,44 @@ async def request_upstream_tiff_data_download(visit_name: str):
                     },
                 ) as resp:
                     data = await resp.json()
+    return data
+
+
+class RsyncerSource(BaseModel):
+    source: str
+
+
+@router.post("/sessions/{session_id}/stop_rsyncer")
+async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/stop_rsyncer",
+                json={
+                    "label": session_id,
+                    "source": rsyncer_source.source,
+                },
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
+@router.post("/sessions/{session_id}/restart_rsyncer")
+async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
+                json={
+                    "label": session_id,
+                    "source": rsyncer_source.source,
+                },
+                headers={
+                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
     return data

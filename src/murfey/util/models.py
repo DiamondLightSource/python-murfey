@@ -58,6 +58,10 @@ class ClientInfo(BaseModel):
     id: int
 
 
+class RsyncerSource(BaseModel):
+    source: str
+
+
 class RsyncerInfo(BaseModel):
     source: str
     destination: str

@@ -144,6 +144,16 @@ class RSyncer(Observer):
         logger.info(f"RSync thread starting for {self}")
         self.thread.start()
 
+    def restart(self):
+        self.thread.join()
+        self._halt_thread = False
+        self.thread = threading.Thread(
+            name=f"RSync {self._basepath}:{self._remote}",
+            target=self._process,
+            daemon=True,
+        )
+        self.start()
+
     def stop(self):
         logger.debug("RSync thread stop requested")
         self._stopping = True

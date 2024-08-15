@@ -23,7 +23,7 @@ from murfey.util.models import File
 
 logger = getLogger("murfey.instrument_server.api")
 
-watchers: Dict[str, MultigridDirWatcher] = {}
+watchers: Dict[str | int, MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
 data_collection_parameters: dict = {}
@@ -149,6 +149,13 @@ def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     controllers[rsyncer_source.label].rsync_processes[
         rsyncer_source.source
     ]._halt_thread = True
+    return {"success": True}
+
+
+@router.post("/sessions/{session_id}/restart_rsyncer")
+def restart_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+    controllers[rsyncer_source.label]._restart_rsyncer(rsyncer_source.source)
+    return {"success": True}
 
 
 class ProcessingParameters(BaseModel):

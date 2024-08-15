@@ -94,6 +94,7 @@ from murfey.util.models import (
     ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
+    RsyncerSource,
     Sample,
     SessionInfo,
     SPAProcessFile,
@@ -209,8 +210,9 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
     return {r[0]: r[1] for r in res}
 
 
-@router.post("/visits/{visit_name}/rsyncer")
-def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
+@router.post("/sessions/{session_id}/rsyncer")
+def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
         session_id=rsyncer_info.session_id,
@@ -250,6 +252,34 @@ def register_rsyncer(visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db):
         rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     return rsyncer_info
+
+
+@router.post("/sessions/{session_id}/rsyncer_stopped")
+def register_stopped_rsyncer(
+    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    rsyncer = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.session_id == session_id)
+        .where(RsyncInstance.source == rsyncer_source.source)
+    ).one()
+    rsyncer.transferring = False
+    db.add(rsyncer)
+    db.commit()
+
+
+@router.post("/sessions/{session_id}/rsyncer_started")
+def register_restarted_rsyncer(
+    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    rsyncer = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.session_id == session_id)
+        .where(RsyncInstance.source == rsyncer_source.source)
+    ).one()
+    rsyncer.transferring = True
+    db.add(rsyncer)
+    db.commit()
 
 
 @router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
