@@ -50,7 +50,7 @@ class RSyncer(Observer):
         basepath_local: Path,
         basepath_remote: Path,
         server_url: ParseResult,
-        stop_callback: Callable = lambda *args: None,
+        stop_callback: Callable = lambda *args, **kwargs: None,
         local: bool = False,
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
@@ -230,7 +230,7 @@ class RSyncer(Observer):
                 self.queue.task_done()
                 continue
 
-        self._stop_callback(self._basepath)
+        self._stop_callback(self._basepath, explicit_stop=self._stopping)
         logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:

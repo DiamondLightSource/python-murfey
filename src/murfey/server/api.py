@@ -254,6 +254,17 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
+@router.delete("/sessions/{session_id}/rsyncer/{source:path}")
+def delete_rsyncer(session_id: int, source: str, db=murfey_db):
+    rsync_instance = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.session_id == session_id)
+        .where(RsyncInstance.source == source)
+    ).one()
+    db.delete(rsync_instance)
+    db.commit()
+
+
 @router.post("/sessions/{session_id}/rsyncer_stopped")
 def register_stopped_rsyncer(
     session_id: int, rsyncer_source: RsyncerSource, db=murfey_db

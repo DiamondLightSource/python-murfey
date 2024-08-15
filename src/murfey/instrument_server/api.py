@@ -152,6 +152,21 @@ def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
+@router.post("/sessions/{session_id}/remove_rsyncer")
+def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+    controllers[rsyncer_source.label]._request_watcher_stop(rsyncer_source.source)
+    controllers[rsyncer_source.label].rsync_processes[
+        rsyncer_source.source
+    ]._stopping = True
+    controllers[rsyncer_source.label].rsync_processes[
+        rsyncer_source.source
+    ]._halt_thread = True
+    controllers[rsyncer_source.label].rsync_processes[rsyncer_source.source].queue.put(
+        None, block=False
+    )
+    return {"success": True}
+
+
 @router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     controllers[rsyncer_source.label]._restart_rsyncer(rsyncer_source.source)
