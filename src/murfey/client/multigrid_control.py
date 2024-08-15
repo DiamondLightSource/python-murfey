@@ -1,4 +1,5 @@
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
@@ -131,6 +132,14 @@ class MultigridController:
         else:
             stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"
             capture_post(stop_url, json={"source": str(source)})
+
+    def _finalise_rsyncer(self, source: Path):
+        finalise_thread = threading.Thread(
+            name=f"Controller finaliser thread ({source})",
+            target=self.rsync_processes[source].finalise,
+            daemon=True,
+        )
+        finalise_thread.start()
 
     def _restart_rsyncer(self, source: Path):
         self.rsync_processes[source].restart()

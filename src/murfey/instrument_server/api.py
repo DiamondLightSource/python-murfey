@@ -167,6 +167,12 @@ def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
+@router.post("/sessions/{session_id}/finalise_rsyncer")
+def finalise_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+    controllers[rsyncer_source.label]._finalise_rsyncer(rsyncer_source.source)
+    return {"success": True}
+
+
 @router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     controllers[rsyncer_source.label]._restart_rsyncer(rsyncer_source.source)
