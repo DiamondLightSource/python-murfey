@@ -27,11 +27,11 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "defusedxml", # Used for safely extracting XML elements
+    "importlib-metadata", # Needed in both client and server for Python >3.9
+    "pydantic<2", # Fixed to <2 by zocalo in [server] dependencies
     "requests",
     "rich",
     "werkzeug",
@@ -42,7 +42,7 @@ cicd = [
 ]
 client = [
     "procrunner",
-    "textual==0.42.0",
+    "textual", # ==0.42.0", # importlib-metadata a former dependency of theirs
     "websocket-client",
     "xmltodict",
 ]
@@ -53,20 +53,20 @@ developer = [
     "pytest", # Test code functionality
 ]
 server = [
-    # "matplotlib", # For visual statistical analysis of images
     "cryptography",
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
     "mrcfile",
-    "numpy",
+    "numpy<2", # Locked numpy to <2 while other dependencies catch up
     "packaging",
     "passlib",
     "pillow",
     "prometheus_client",
     "python-jose[cryptography]",
+    "sqlalchemy[postgresql]<2", # Installs psycopg2 dependency
     "sqlmodel",
-    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py", # <=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project # 8.1.2 seems ok
     "uvicorn[standard]",
     "zocalo",
 ]
@@ -152,11 +152,9 @@ ignore = [
 max-line-length = "88"
 
 [tool.pyproject-fmt]
-inputs = "pyproject.toml"
-check = false
 indent = 4
 keep_full_version = true
-max-supported-python = "3.12"
+max_supported_python = "3.11"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
