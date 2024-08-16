@@ -277,6 +277,18 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     )  # Many to one
     session_id: Optional[int] = Field(foreign_key="session.id")
 
+    # LIF file this stack originated from
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
+        back_populates="child_stacks",
+    )  # Many to one
+    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id", default=None)
+
+    # TIFF files used to build this stack
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
+        back_populates="child_stack",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )  # One to many
+
     # Metadata associated with statck
     associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
         back_populates="associated_stacks",
@@ -294,18 +306,6 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
         foreign_key="clemimageseries.id",
         default=None,
     )
-
-    # LIF file this stack originated from
-    parent_lif: Optional["CLEMLIFFile"] = Relationship(
-        back_populates="child_stacks",
-    )  # Many to one
-    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id", default=None)
-
-    # TIFF files used to build this stack
-    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
-        back_populates="child_stack",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
 
     # Process checklist for each image
     stack_created: bool = False  # Verify that the stack has been created
