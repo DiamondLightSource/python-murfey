@@ -35,16 +35,17 @@ router = APIRouter()
 machine_config = get_machine_config()
 
 
+"""
+ITEM REGISTRATION WITH THE DATABASE
+"""
+
+
 def validate_file(file: Path) -> bool:
     # Pre-empt accidental string input
     file = Path(file) if isinstance(file, str) else file
     file = file.resolve()  # Get full path
 
-    # Fail if file doesn't exist
-    if not file.exists():
-        return False
-
-    # Use path to storage location as reference
+    # Use path to storage location as reference to verify basepath is correct
     basepath = list(machine_config.rsync_basepath.parents)[-2]
     if str(file).startswith(str(basepath)):
         return True
@@ -82,7 +83,7 @@ def register_lif_file(
             )
         # Raise unexpected exceptions
         except Exception:
-            return "Something went wrong when registering the LIF file"
+            return "Something went wrong when registering the LIF file\n" f"{Exception}"
     else:
         raise Exception("The file did not pass the validation check")
 
@@ -117,19 +118,20 @@ def register_lif_file(
                         file_path=str(metadata),
                         session_id=session_id,
                     )
+                    # Register
+                    db.add(metadata_db_entry)
+                    db.commit()
+                    db.refresh(metadata_db_entry)
                 # Raise unexpected exceptions
                 except Exception:
-                    return (
-                        "Something went wrong when registering the child metadata files"
+                    print(
+                        "Something went wrong when registering the child metadata files\n"
+                        f"{Exception}"
                     )
-
-                # Append to database entry
-                db.add(metadata_db_entry)
-                db.commit()
-                db.refresh(metadata_db_entry)
+                # Append to entry
                 clem_lif_file.child_metadata.append(metadata_db_entry)
             else:
-                print("The file path provided doesn't exist on the file system")
+                print("The file failed the validation check")
 
     # Register child image series if provided
     if len(child_series) > 0:
@@ -147,12 +149,17 @@ def register_lif_file(
                     name=series,
                     session_id=session_id,
                 )
+                # Register entry
+                db.add(series_db_entry)
+                db.commit()
+                db.refresh(series_db_entry)
             # Raise unexpected exceptions
             except Exception:
-                return "Something went wrong when registering the child image series"
-
+                print(
+                    "Something went wrong when registering the child image series\n"
+                    f"{Exception}"
+                )
             # Append to database entry
-            # Is there a way to check if the relationship already exists and skip the step?
             clem_lif_file.child_series.append(series_db_entry)
 
     # Register child image stacks if provided
@@ -175,25 +182,26 @@ def register_lif_file(
                         session_id=session_id,
                         file_path=str(stack),
                     )
+                    db.add(stack_db_entry)
+                    db.commit()
+                    db.refresh(stack_db_entry)
                 # Raise unexpected exceptions
                 except Exception:
-                    return (
-                        "Something went wrong when registering the child image stacks"
+                    print(
+                        "Something went wrong when registering the child image stacks\n"
+                        f"{Exception}"
                     )
 
                 # Append to database entry
-                db.add(stack_db_entry)
-                db.commit()
-                db.refresh(stack_db_entry)
                 clem_lif_file.child_stacks.append(stack_db_entry)
             else:
-                print("The file path provided doesn't exist on the file system")
+                print("The file failed the validation check")
 
     # Commit to database
     db.add(clem_lif_file)
     db.commit()
     db.close()
-    return clem_lif_file
+    return True
 
 
 @router.post("/sessions/{session_id}/clem/tiff_files")
@@ -207,7 +215,7 @@ def register_tiff_file(
 ):
     if validate_file(tiff_file) is True:
         tiff_file = Path(tiff_file) if isinstance(tiff_file, str) else tiff_file
-        tiff_file = tiff_file.resolve() if tiff_file is not None else tiff_file
+        tiff_file = tiff_file.resolve()  # Get full file path
 
         # Returns the database entry if already registered
         try:
@@ -224,7 +232,9 @@ def register_tiff_file(
             )
         # Raise unexpected exceptions
         except Exception:
-            return "Something went wrong when registering the TIFF file"
+            return (
+                "Something went wrong when registering the TIFF file\n" f"{Exception}"
+            )
     else:
         raise Exception("The file did not pass the validation check")
 
@@ -237,6 +247,7 @@ def register_tiff_file(
                 else associated_metadata
             )
             associated_metadata = associated_metadata.resolve()
+
             # Return database entry if already registered
             try:
                 metadata_db_entry = db.exec(
@@ -255,11 +266,11 @@ def register_tiff_file(
                 clem_tiff_file.associated_metadata = metadata_db_entry
 
             except Exception:
-                return (
+                print(
                     "Something went wrong when registering the associated metadata file"
                 )
         else:
-            print("The file didn't pass the validation check")
+            print("The file failed the validation check")
 
     # Add series information if provided
     if associated_series is not None:
@@ -275,12 +286,16 @@ def register_tiff_file(
         # Create new entry if no result found
         except NoResultFound:
             series_db_entry = CLEMImageSeries(
-                name=associated_series, session_id=session_id
+                name=associated_series,
+                session_id=session_id,
             )
-            clem_tiff_file.associated_series = series_db_entry
+            clem_tiff_file.child_series = series_db_entry
 
         except Exception:
-            return "Something went wrong when registering the associated image series"
+            print(
+                "Something went wrong when registering the associated image series\n"
+                f"{Exception}"
+            )
 
     # Add image stack information if provided
     if associated_stack is not None:
@@ -305,23 +320,24 @@ def register_tiff_file(
                 stack_db_entry = CLEMImageStack(
                     file_path=str(associated_stack), session_id=session_id
                 )
-                clem_tiff_file.associated_stack = stack_db_entry
+                clem_tiff_file.child_stack = stack_db_entry
 
             except Exception:
-                return (
-                    "Something went wrong when registering the associated image stack"
+                print(
+                    "Something went wrong when registering the associated image stack\n"
+                    f"{Exception}"
                 )
         else:
-            print("The file didn't pass the validation check")
+            print("The file failed the validation check")
 
     # Commit to database
     db.add(clem_tiff_file)
     db.commit()
     db.close()
-    return clem_tiff_file
+    return True
 
 
-@router.post("/sessions/{session_id}/clem/clem_metadata")
+@router.post("/sessions/{session_id}/clem/metadata")
 def register_clem_metadata(
     metadata_file: Path,
     session_id: int,
@@ -331,13 +347,13 @@ def register_clem_metadata(
     associated_stacks: list[Path] = [],
     db: Session = murfey_db,
 ):
-    # Convert incoming file paths into absolute ones
-    metadata_file = (
-        Path(metadata_file) if isinstance(metadata_file, str) else metadata_file
-    )
-    metadata_file = metadata_file.resolve()
-
     if validate_file(metadata_file) is True:
+        # Convert incoming file paths into absolute ones
+        metadata_file = (
+            Path(metadata_file) if isinstance(metadata_file, str) else metadata_file
+        )
+        metadata_file = metadata_file.resolve()
+
         # Return database entry if it already exists
         try:
             clem_metadata = db.exec(
@@ -352,7 +368,10 @@ def register_clem_metadata(
                 session_id=session_id,
             )
         except Exception:
-            return "Something went wrong when registering the metadata file"
+            return (
+                "Something went wrong when registering the metadata file\n"
+                f"{Exception}"
+            )
     else:
         raise Exception("The file failed the validation check")
 
@@ -380,7 +399,10 @@ def register_clem_metadata(
                 # Register entry
                 clem_metadata.parent_lif = lif_file_db_entry
             except Exception:
-                return "Something went wrong when registering the parent LIF file"
+                print(
+                    "Something went wrong when registering the parent LIF file\n"
+                    f"{Exception}"
+                )
         else:
             print("The file didn't pass the validation check")
 
@@ -404,15 +426,20 @@ def register_clem_metadata(
                         session_id=session_id,
                         file_path=str(tiff),
                     )
+                    # Register entry
+                    db.add(tiff_db_entry)
+                    db.commit()
+                    db.refresh(tiff_db_entry)
                 except Exception:
-                    return "Something went wrong when registering the TIFF file"
+                    print(
+                        "Something went wrong when registering the TIFF file\n"
+                        f"{Exception}"
+                    )
+                    continue
                 # Append entry
-                db.add(tiff_db_entry)
-                db.commit()
-                db.refresh(tiff_db_entry)
                 clem_metadata.associated_tiffs.append(tiff_db_entry)
             else:
-                print("The file doesn't pass the validation check")
+                print("The file failed the validation check")
 
     # Register associated image series if provided
     if associated_series is not None:
@@ -423,16 +450,19 @@ def register_clem_metadata(
                 .where(CLEMImageSeries.session_id == session_id)
                 .where(CLEMImageSeries.name == associated_series)
             ).one()
+            clem_metadata.associated_series = series_db_entry
         # Create new entry if no result found
         except NoResultFound:
             series_db_entry = CLEMImageSeries(
                 name=associated_series,
                 session_id=session_id,
             )
+            clem_metadata.associated_series = series_db_entry
         except Exception:
-            return "Something went wrong when registering the associated series"
-        # Register entry
-        clem_metadata.associated_series = series_db_entry
+            print(
+                "Something went wrong when registering the associated series\n"
+                f"{Exception}"
+            )
 
     # Register associated image stacks if provided
     if len(associated_stacks) > 0:
@@ -454,21 +484,199 @@ def register_clem_metadata(
                         file_path=str(stack),
                         session_id=session_id,
                     )
+                    db.add(stack_db_entry)
+                    db.commit()
+                    db.refresh(stack_db_entry)
                 except Exception:
                     return "Something went wrong when registering the associated image stacks"
                 # Append entry
-                db.add(stack_db_entry)
-                db.commit()
-                db.refresh(stack_db_entry)
                 clem_metadata.associated_stacks.append(stack_db_entry)
             else:
-                print("The file didn't pass the validation check")
+                print("The file failed the validation check")
 
     # Commit to database
     db.add(clem_metadata)
     db.commit()
     db.close()
-    return clem_metadata
+    return True
+
+
+@router.post("/sessions/{session_id}/clem/image_series")
+def register_image_series(
+    series_name: str,
+    session_id: int,
+    parent_lif: Optional[Path] = None,
+    parent_tiffs: list[Path] = [],
+    associated_metadata: Optional[Path] = None,
+    child_stacks: list[Path] = [],
+    db: Session = murfey_db,
+):
+    # Register series name if not already present in databaes
+    try:
+        clem_image_series = db.exec(
+            select(CLEMImageSeries)
+            .where(CLEMImageSeries.session_id == session_id)
+            .where(CLEMImageSeries.name == series_name)
+        ).one()
+    # Create new entry if no result found
+    except NoResultFound:
+        clem_image_series = CLEMImageSeries(
+            name=series_name,
+            session_id=session_id,
+        )
+    except Exception:
+        return "Something went wrong when registering the series\n" f"{Exception}"
+
+    # Register parent LIF file
+    if parent_lif is not None:
+        if validate_file(parent_lif) is True:
+            parent_lif = Path(parent_lif) if isinstance(parent_lif, str) else parent_lif
+            parent_lif = parent_lif.resolve()  # Get full path
+
+            # Return database entry if already registered
+            try:
+                lif_db_entry = db.exec(
+                    select(CLEMLIFFile)
+                    .where(CLEMLIFFile.session_id == session_id)
+                    .where(CLEMLIFFile.file_path == str(parent_lif))
+                ).one()
+                clem_image_series.parent_lif_id = lif_db_entry.id
+            # Create new entry if no result found
+            except NoResultFound:
+                lif_db_entry = CLEMLIFFile(
+                    file_path=str(parent_lif),
+                    session_id=session_id,
+                )
+                clem_image_series.parent_lif = lif_db_entry
+            except Exception:
+                print(
+                    "Something went wrong when registering the LIF file\n"
+                    f"{Exception}"
+                )
+        else:
+            print("The file did not pass the validation check")
+
+    # Register parent TIFFs
+    if len(parent_tiffs) > 0:
+        for tiff in parent_tiffs:
+            if validate_file(tiff) is True:
+                tiff = Path(tiff) if isinstance(tiff, str) else tiff
+                tiff = tiff.resolve()
+
+                # Return database entry if it exists
+                try:
+                    tiff_db_entry = db.exec(
+                        select(CLEMTIFFFile)
+                        .where(CLEMTIFFFile.session_id == session_id)
+                        .where(CLEMTIFFFile.file_path == str(tiff))
+                    ).one()
+                # Create new entry if no result found
+                except NoResultFound:
+                    tiff_db_entry = CLEMTIFFFile(
+                        file_path=str(tiff),
+                        session_id=session_id,
+                    )
+                except Exception:
+                    print("Something went wrong when registering the TIFF file")
+                    continue  # Try next item in loop
+                # Append entry
+                db.add(tiff_db_entry)
+                db.commit()
+                db.refresh(tiff_db_entry)
+                clem_image_series.parent_tiffs.append(tiff_db_entry)
+            else:
+                print("The file didn't pass the validation check")
+
+    # Register associated metadata
+    if associated_metadata is not None:
+        if validate_file(associated_metadata) is True:
+            associated_metadata = (
+                Path(associated_metadata)
+                if isinstance(associated_metadata, str)
+                else associated_metadata
+            )
+            associated_metadata = associated_metadata.resolve()  # Get full path
+
+            # Return database entry if it already exists
+            try:
+                metadata_db_entry = db.exec(
+                    select(CLEMImageMetadata)
+                    .where(CLEMImageMetadata.session_id == session_id)
+                    .where(CLEMImageMetadata.file_path == str(associated_metadata))
+                ).one()
+                clem_image_series.metadata_id = metadata_db_entry.id
+            # Create new entry if no result found
+            except NoResultFound:
+                metadata_db_entry = CLEMImageMetadata(
+                    file_path=str(associated_metadata),
+                    session_id=session_id,
+                )
+                clem_image_series.associated_metadata = metadata_db_entry
+            except Exception:
+                print(
+                    "Something went wrong when registering the metadata file\n"
+                    f"{Exception}"
+                )
+
+    # Register child image stacks
+    if len(child_stacks) > 0:
+        for stack in child_stacks:
+            if validate_file(stack) is True:
+                stack = Path(stack) if isinstance(stack, str) else stack
+                stack.resolve()  # Get full path
+
+                # Return database entry if it exists
+                try:
+                    stack_db_entry = db.exec(
+                        select(CLEMImageStack)
+                        .where(CLEMImageStack.session_id == session_id)
+                        .where(CLEMImageStack.file_path == str(stack))
+                    ).one()
+                # Create new entry if no result found
+                except NoResultFound:
+                    stack_db_entry = CLEMImageStack(
+                        file_path=str(stack),
+                        session_id=session_id,
+                    )
+                    db.add(stack_db_entry)
+                    db.commit()
+                    db.refresh(stack_db_entry)
+                except Exception:
+                    print(
+                        "Something went wrong when registering the image stack\n"
+                        f"{Exception}"
+                    )
+                # Append entry
+                clem_image_series.child_stacks.append(stack_db_entry)
+            else:
+                print("The file failed the validation check")
+
+    # Register
+    db.add(clem_image_series)
+    db.commit()
+    db.close()
+
+    return True
+
+
+@router.post("/sessions/{session_id}/clem/image_stacks")
+def register_image_stack():
+    # Register image stack
+
+    # Register associated metadata
+
+    # Register parent series it belongs to
+
+    # Register parent LIF file
+
+    # Register parent TIFF files
+
+    return True
+
+
+"""
+FILE PROCESSING ENDPOINTS
+"""
 
 
 @router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
