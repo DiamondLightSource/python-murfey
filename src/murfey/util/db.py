@@ -218,7 +218,9 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)  # Name of the series, as determined from the metadata
+    series_name: str = Field(
+        index=True
+    )  # Name of the series, as determined from the metadata
 
     session: Optional["Session"] = Relationship(
         back_populates="image_series"
