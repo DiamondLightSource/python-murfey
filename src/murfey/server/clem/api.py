@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import re
 import sys
-from os.path import normpath
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -51,7 +51,7 @@ HELPER FUNCTIONS
 """
 
 
-def validate_file_path(file: Path) -> Path:
+def validate_and_sanitise(file: Path) -> Path:
     """
     Validates the input file paths used for the CLEM workflow, making sure that they
     are safe to be executed and passed on to subsequent stages of the workflow. Returns
@@ -69,13 +69,15 @@ def validate_file_path(file: Path) -> Path:
     if file.suffix not in valid_file_types:
         raise Exception(f"{file!r} is not a valid file type")
 
-    # Try validating with os.path functions
-    full_path = normpath(str(file))
+    # Convert to Posix str and validate
+    full_path = file.as_posix()
+    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
+        raise Exception(f"Unallowed characters present in {file!r}")
 
-    # Use path to storage location as reference to verify basepath is correct
-    base_path = normpath(list(machine_config.rsync_basepath.parents)[-3])
+    # Use path to storage location to verify that path is allowed
+    base_path = list(machine_config.rsync_basepath.parents)[-3].as_posix()
     if str(full_path).startswith(str(base_path)):
-        return Path(full_path).resolve()
+        return Path(full_path)
     else:
         raise Exception(f"{file!r} points to a directory that is not permitted")
 
@@ -112,7 +114,7 @@ def get_db_entry(
     # Validate file path if provided
     if file_path is not None:
         try:
-            file_path = validate_file_path(file_path)
+            file_path = validate_and_sanitise(file_path)
         except Exception:
             raise Exception
 
@@ -182,7 +184,7 @@ def register_lif_file(
     # Add metadata information if provided
     if master_metadata is not None:
         try:
-            master_metadata = validate_file_path(master_metadata)
+            master_metadata = validate_and_sanitise(master_metadata)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             print(Exception)
