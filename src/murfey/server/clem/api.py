@@ -59,27 +59,28 @@ def validate_and_sanitise(file: Path) -> Path:
     """
 
     file = Path(file) if isinstance(file, str) else file
-    file = file.resolve()  # Get full path for inspection
 
-    # Validate file types
-    if not file.exists():
-        raise Exception(f"{file!r} doesn't exist")
-    if not file.is_file():
-        raise Exception(f"{file!r} is not a file")
-    if file.suffix not in valid_file_types:
-        raise Exception(f"{file!r} is not a valid file type")
-
-    # Convert to Posix str and validate
-    full_path = file.as_posix()
+    # Convert to Posix str and check that no forbidden characters are therre
+    full_path = file.resolve().as_posix()
     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
-        raise Exception(f"Unallowed characters present in {file!r}")
+        raise ValueError(f"Unallowed characters present in {file!r}")
 
-    # Use path to storage location to verify that path is allowed
+    # Check that it's not accessing somehwere it's not allowed
     base_path = list(machine_config.rsync_basepath.parents)[-3].as_posix()
-    if str(full_path).startswith(str(base_path)):
-        return Path(full_path)
-    else:
-        raise Exception(f"{file!r} points to a directory that is not permitted")
+    if not str(full_path).startswith(str(base_path)):
+        raise ValueError(f"{file!r} points to a directory that is not permitted")
+
+    valid_file = Path(full_path)
+
+    # Additional checks for file path given
+    if not valid_file.is_file():
+        raise ValueError(f"{file!r} is not a file")
+    if not valid_file.exists():
+        raise FileNotFoundError(f"{file!r} doesn't exist")
+    if valid_file.suffix not in valid_file_types:
+        raise ValueError(f"{file!r} is not a valid file format")
+
+    return valid_file
 
 
 def get_db_entry(
