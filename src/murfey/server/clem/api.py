@@ -96,8 +96,8 @@ def sanitise2(file: Path) -> str:
         raise ValueError(f"{file!r} points to a directory that is not permitted")
 
     # Additional checks
-    if not path.exists(full_path):
-        raise FileNotFoundError("File is not found")
+    # if not path.exists(full_path):
+    #     raise FileNotFoundError("File is not found")
     if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
         raise ValueError("File is not a permitted file format")
 
