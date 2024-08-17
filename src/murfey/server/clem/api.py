@@ -62,6 +62,8 @@ def validate_file_path(file: Path) -> Path:
     file = file.resolve()  # Get full path for inspection
 
     # Validate file types
+    if not file.exists():
+        raise Exception(f"{file!r} doesn't exist")
     if not file.is_file():
         raise Exception(f"{file!r} is not a file")
     if file.suffix not in valid_file_types:
