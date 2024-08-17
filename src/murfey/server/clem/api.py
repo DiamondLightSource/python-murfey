@@ -118,6 +118,11 @@ def get_db_entry(
         except Exception:
             raise Exception
 
+    # Validate string
+    if series_name is not None:
+        if bool(re.fullmatch(r"^[\w\s\.\-]+$", series_name)) is False:
+            raise ValueError("One of more characters in the string are not permitted")
+
     # Return database entry if it exists
     try:
         db_entry = (
