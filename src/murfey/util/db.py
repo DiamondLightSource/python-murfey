@@ -183,7 +183,7 @@ class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
     session: Optional["Session"] = Relationship(back_populates="metadata_files")
     session_id: Optional[int] = Field(foreign_key="session.id")  # Many to one
 
-    # Associated raw data
+    # The parent LIF file this metadata originates from, if any
     parent_lif: Optional[CLEMLIFFile] = Relationship(
         back_populates="child_metadata",
     )  # Many to one
@@ -192,18 +192,19 @@ class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
         default=None,
         unique=False,
     )
-
+    # The TIFF files related to this file
     associated_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="associated_metadata",
         sa_relationship_kwargs={"cascade": "delete"},
     )  # One to many
 
-    # Associated offspring
+    # Associated series
     associated_series: Optional["CLEMImageSeries"] = Relationship(
         back_populates="associated_metadata",
         sa_relationship_kwargs={"cascade": "delete"},
     )  # One to one
 
+    # Associated image stacks
     associated_stacks: List["CLEMImageStack"] = Relationship(
         back_populates="associated_metadata",
         sa_relationship_kwargs={"cascade": "delete"},
