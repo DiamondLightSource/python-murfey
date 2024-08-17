@@ -83,6 +83,27 @@ def validate_and_sanitise(file: Path) -> Path:
     return valid_file
 
 
+def sanitise2(file: Path) -> str:
+    from os import path
+
+    full_path = path.normpath(path.abspath(file))
+    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
+        raise ValueError(f"Unallowed characters present in {file!r}")
+
+    # Check that it's not accessing somehwere it's not allowed
+    base_path = list(machine_config.rsync_basepath.parents)[-3].as_posix()
+    if not str(full_path).startswith(str(base_path)):
+        raise ValueError(f"{file!r} points to a directory that is not permitted")
+
+    # Additional checks
+    if not path.exists(full_path):
+        raise FileNotFoundError("File is not found")
+    if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
+        raise ValueError("File is not a permitted file format")
+
+    return full_path
+
+
 def get_db_entry(
     db: Session,
     table: Type[
@@ -115,7 +136,7 @@ def get_db_entry(
     # Validate file path if provided
     if file_path is not None:
         try:
-            file_path = validate_and_sanitise(file_path)
+            file_path = Path(sanitise2(file_path))
         except Exception:
             raise Exception
 
@@ -190,7 +211,7 @@ def register_lif_file(
     # Add metadata information if provided
     if master_metadata is not None:
         try:
-            master_metadata = validate_and_sanitise(master_metadata)
+            master_metadata = Path(sanitise2(master_metadata))
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             print(Exception)
