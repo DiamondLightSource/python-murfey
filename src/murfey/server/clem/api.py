@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+import traceback
 from os import path
 from pathlib import Path
 from typing import Optional, Type, Union
@@ -187,7 +188,7 @@ def register_lif_file(
             master_metadata = validate_and_sanitise(master_metadata)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register child metadata if provided
     if len(child_metadata) > 0:
@@ -202,7 +203,7 @@ def register_lif_file(
                 # Append to database entry
                 clem_lif_file.child_metadata.append(metadata_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Register child image series if provided
@@ -218,7 +219,7 @@ def register_lif_file(
                 # Append to database entry
                 clem_lif_file.child_series.append(series_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Register child image stacks if provided
@@ -234,7 +235,7 @@ def register_lif_file(
                 # Append to database entry
                 clem_lif_file.child_stacks.append(stack_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Commit to database
@@ -276,7 +277,7 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.associated_metadata = metadata_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Add series information if provided
     if associated_series is not None:
@@ -290,7 +291,7 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_series = series_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Add image stack information if provided
     if associated_stack is not None:
@@ -304,7 +305,7 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_stack = stack_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Commit to database
     db.add(clem_tiff_file)
@@ -347,7 +348,7 @@ def register_clem_metadata(
             # Link database entries
             clem_metadata.parent_lif = lif_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register associated TIFF files if provided
     if len(associated_tiffs) > 0:
@@ -362,7 +363,7 @@ def register_clem_metadata(
                 # Append entry
                 clem_metadata.associated_tiffs.append(tiff_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Register associated image series if provided
@@ -374,9 +375,12 @@ def register_clem_metadata(
                 session_id=session_id,
                 series_name=associated_series,
             )
-            clem_metadata.associated_series = series_db_entry
+            # The link can only be made from series-side; not sure why
+            series_db_entry.associated_metadata = clem_metadata
+            db.add(series_db_entry)
+            db.commit()
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register associated image stacks if provided
     if len(associated_stacks) > 0:
@@ -390,7 +394,7 @@ def register_clem_metadata(
                 )
                 clem_metadata.associated_stacks.append(stack_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Commit to database
@@ -433,7 +437,7 @@ def register_image_series(
             # Link entries
             clem_image_series.parent_lif = lif_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register parent TIFFs if provided
     if len(parent_tiffs) > 0:
@@ -448,7 +452,7 @@ def register_image_series(
                 # Append entry
                 clem_image_series.parent_tiffs.append(tiff_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue  # Try next item in loop
 
     # Register associated metadata if provided
@@ -463,7 +467,7 @@ def register_image_series(
             # Link entries
             clem_image_series.associated_metadata = metadata_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register child image stacks if provided
     if len(child_stacks) > 0:
@@ -478,7 +482,7 @@ def register_image_series(
                 # Append entry
                 clem_image_series.child_stacks.append(stack_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Register
@@ -525,7 +529,7 @@ def register_image_stack(
             )
             clem_image_stack.parent_lif = lif_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register parent TIFF files if provided
     if len(parent_tiffs) > 0:
@@ -540,7 +544,7 @@ def register_image_stack(
                 # Append entry
                 clem_image_stack.parent_tiffs.append(tiff_db_entry)
             except Exception:
-                print(Exception)
+                print(traceback.format_exc())
                 continue
 
     # Register associated metadata if provided
@@ -555,7 +559,7 @@ def register_image_stack(
             # Link entries
             clem_image_stack.associated_metadata = metadata_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register parent series if provided
     if parent_series is not None:
@@ -569,7 +573,7 @@ def register_image_stack(
             # Link entries
             clem_image_stack.parent_series = series_db_entry
         except Exception:
-            print(Exception)
+            print(traceback.format_exc())
 
     # Register updates to entry
     db.add(clem_image_stack)
