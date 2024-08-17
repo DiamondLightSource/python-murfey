@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+from os import path
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -51,41 +52,15 @@ HELPER FUNCTIONS
 """
 
 
-# def validate_and_sanitise(file: Path) -> Path:
-#     """
-#     Validates the input file paths used for the CLEM workflow, making sure that they
-#     are safe to be executed and passed on to subsequent stages of the workflow. Returns
-#     a validated, sanitised version of the file path.
-#     """
+def validate_and_sanitise(file: Path) -> Path:
+    """
+    Performs validation and sanitisation on the incoming file paths, ensuring that
+    no forbidden characters are present and that the the path points only to allowed
+    sections of the file server.
 
-#     file = Path(file) if isinstance(file, str) else file
-
-#     # Convert to Posix str and check that no forbidden characters are therre
-#     full_path = file.resolve().as_posix()
-#     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
-#         raise ValueError(f"Unallowed characters present in {file!r}")
-
-#     # Check that it's not accessing somehwere it's not allowed
-#     base_path = list(machine_config.rsync_basepath.parents)[-3].as_posix()
-#     if not str(full_path).startswith(str(base_path)):
-#         raise ValueError(f"{file!r} points to a directory that is not permitted")
-
-#     valid_file = Path(full_path)
-
-#     # Additional checks for file path given
-#     if not valid_file.is_file():
-#         raise ValueError(f"{file!r} is not a file")
-#     if not valid_file.exists():
-#         raise FileNotFoundError(f"{file!r} doesn't exist")
-#     if valid_file.suffix not in valid_file_types:
-#         raise ValueError(f"{file!r} is not a valid file format")
-
-#     return valid_file
-
-
-def sanitise2(file: Path) -> str:
-    from os import path
-
+    Returns the file path as a sanitised string that can be converted into a Path
+    object again.
+    """
     full_path = path.normpath(path.realpath(file))
     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
         raise ValueError(f"Unallowed characters present in {file!r}")
@@ -96,12 +71,10 @@ def sanitise2(file: Path) -> str:
         raise ValueError(f"{file!r} points to a directory that is not permitted")
 
     # Additional checks
-    # if not path.exists(full_path):
-    #     raise FileNotFoundError("File is not found")
     if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
         raise ValueError("File is not a permitted file format")
 
-    return full_path
+    return Path(full_path)
 
 
 def get_db_entry(
@@ -136,7 +109,7 @@ def get_db_entry(
     # Validate file path if provided
     if file_path is not None:
         try:
-            file_path = Path(sanitise2(file_path))
+            file_path = validate_and_sanitise(file_path)
         except Exception:
             raise Exception
 
@@ -211,7 +184,7 @@ def register_lif_file(
     # Add metadata information if provided
     if master_metadata is not None:
         try:
-            master_metadata = Path(sanitise2(master_metadata))
+            master_metadata = validate_and_sanitise(master_metadata)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             print(Exception)
