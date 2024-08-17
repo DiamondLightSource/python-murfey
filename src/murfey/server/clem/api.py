@@ -110,7 +110,7 @@ def get_db_entry(
             "One of either 'file_path' or 'series_name' has to be provided"
         )
     if file_path is not None and series_name is not None:
-        raise ValueError("Only one of 'file_path' or 'series_name' can be provided")
+        raise ValueError("Only one of 'file_path' or 'series_name' should be provided")
 
     # Validate file path if provided
     if file_path is not None:
@@ -122,7 +122,7 @@ def get_db_entry(
     # Validate string
     if series_name is not None:
         if bool(re.fullmatch(r"^[\w\s\.\-]+$", series_name)) is False:
-            raise ValueError("One of more characters in the string are not permitted")
+            raise ValueError("One or more characters in the string are not permitted")
 
     # Return database entry if it exists
     try:
