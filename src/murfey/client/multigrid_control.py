@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import procrunner
@@ -81,7 +81,7 @@ class MultigridController:
         extra_directory: str = "",
         include_mid_path: bool = True,
         use_suggested_path: bool = True,
-        destination_overrides: Dict[Path, str] | None = None,
+        destination_overrides: Optional[Dict[Path, str]] = None,
         remove_files: bool = False,
         analyse: bool = True,
         tag: str = "",

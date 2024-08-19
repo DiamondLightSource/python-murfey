@@ -51,6 +51,16 @@ developer = [
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
 ]
+instrument = [
+    "fastapi",
+    "procrunner",
+    "python-jose",
+    "pyyaml",
+    "textual==0.42.0",
+    "uvicorn",
+    "websocket-client",
+    "xmltodict",
+]
 server = [
     # "matplotlib", # For visual statistical analysis of images
     "aiohttp",

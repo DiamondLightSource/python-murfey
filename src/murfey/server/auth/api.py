@@ -5,19 +5,14 @@ from logging import getLogger
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
-from pydantic import BaseModel
 from typing_extensions import Annotated
 
 from murfey.server.auth import ALGORITHM, SECRET_KEY, validate_token, validate_user
+from murfey.util.models import Token
 
 logger = getLogger("murfey.server.auth.api")
 
 router = APIRouter()
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
 
 def create_access_token(data: dict):

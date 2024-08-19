@@ -2,7 +2,7 @@ import secrets
 import time
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import procrunner
@@ -17,13 +17,12 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.server.auth.api import Token
 from murfey.util.instrument_models import MultigridWatcherSpec
-from murfey.util.models import File
+from murfey.util.models import File, Token
 
 logger = getLogger("murfey.instrument_server.api")
 
-watchers: Dict[str | int, MultigridDirWatcher] = {}
+watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers = {}
 data_collection_parameters: dict = {}
