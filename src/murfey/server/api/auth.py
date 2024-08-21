@@ -15,18 +15,19 @@ from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import url
 from murfey.util.db import MurfeyUser as User
 
+# Set up logger
 logger = getLogger("murfey.server.api.auth")
 
+# Set up router
 router = APIRouter()
 
-
+# Set up variables used for authentication
 machine_config = get_machine_config()
 ALGORITHM = machine_config.auth_algorithm or "HS256"
 SECRET_KEY = machine_config.auth_key or secrets.token_hex(32)
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 """
 HELPER FUNCTIONS
@@ -41,6 +42,7 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
+# Set up database engine
 try:
     _url = url(get_machine_config())
     engine = create_engine(_url)
