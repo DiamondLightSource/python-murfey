@@ -62,7 +62,17 @@ def validate_and_sanitise(file: Path) -> Path:
     Returns the file path as a sanitised string that can be converted into a Path
     object again.
     """
+
+    # Resolve symlinks and directory changes to get full file path
     full_path = path.normpath(path.realpath(file))
+
+    # Check that full file path doesn't contain unallowed characters
+    # Currently allows only:
+    # - words (alphanumerics and "_"; \w),
+    # - spaces (\s),
+    # - periods,
+    # - dashes,
+    # - forward slashes ("/")
     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
         raise ValueError(f"Unallowed characters present in {file!r}")
 
@@ -71,7 +81,7 @@ def validate_and_sanitise(file: Path) -> Path:
     if not str(full_path).startswith(str(base_path)):
         raise ValueError(f"{file!r} points to a directory that is not permitted")
 
-    # Additional checks
+    # Check that it is of a permitted file type
     if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
         raise ValueError("File is not a permitted file format")
 
@@ -80,6 +90,9 @@ def validate_and_sanitise(file: Path) -> Path:
 
 def get_db_entry(
     db: Session,
+    # With the database search funcion having been moved out of the FastAPI
+    # endpoint, the database now has to be explicitly passed within the FastAPI
+    # endpoint function in order for it to be loaded in the correct state.
     table: Type[
         Union[
             CLEMImageMetadata,
@@ -99,6 +112,12 @@ def get_db_entry(
     CLEMLIFFile,
     CLEMTIFFFile,
 ]:
+    """
+    Searches the CLEM workflow-related tables in the Murfey database for an entry that
+    matches the file path or series name within a given session. Returns the entry if
+    a match is found, otherwise register it as a new entry in the database.
+    """
+
     # Validate that parameters are provided correctly
     if file_path is None and series_name is None:
         raise ValueError(
