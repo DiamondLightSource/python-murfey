@@ -190,7 +190,6 @@ class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
     parent_lif_id: Optional[int] = Field(
         foreign_key="clemliffile.id",
         default=None,
-        unique=False,
     )
     # The TIFF files related to this file
     associated_tiffs: List["CLEMTIFFFile"] = Relationship(
