@@ -19,7 +19,7 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
-import murfey.server.bootstrap
+import murfey.server.api.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
@@ -91,7 +91,7 @@ from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
 
-tags_metadata = [murfey.server.bootstrap.tag]
+tags_metadata = [murfey.server.api.bootstrap.tag]
 
 router = APIRouter(dependencies=[Depends(validate_token)])
 router.raw_count = 2
