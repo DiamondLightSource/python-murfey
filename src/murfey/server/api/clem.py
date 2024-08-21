@@ -38,7 +38,13 @@ router = APIRouter()
 
 # Use machine configuration to validate file paths used here
 machine_config = get_machine_config()
-base_path = list(machine_config.rsync_basepath.parents)[-3].as_posix()
+rsync_basepath = machine_config.rsync_basepath
+try:
+    base_path = list(rsync_basepath.parents)[-2].as_posix()
+except IndexError:
+    # Print to troubleshoot
+    logger.warning(f"Base path {rsync_basepath!r} is too short")
+    base_path = rsync_basepath.as_posix()
 
 # Valid file types
 valid_file_types = (
