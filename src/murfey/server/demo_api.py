@@ -36,7 +36,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.auth import validate_token
+from murfey.server.api.auth import validate_token
 from murfey.server.config import from_file
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import (
