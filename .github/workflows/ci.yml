@@ -46,7 +46,7 @@ jobs:
           EOF
 
           cat <<EOF >Dockerfile
-          FROM rabbitmq:3.12-management
+          FROM rabbitmq:3.13-management
           COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
           EOF
 
