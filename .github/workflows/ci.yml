@@ -46,7 +46,7 @@ jobs:
           EOF
 
           cat <<EOF >Dockerfile
-          FROM rabbitmq:3.9-management
+          FROM rabbitmq:3.12-management
           COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
           EOF
 
@@ -64,6 +64,12 @@ jobs:
         run: |
           set -eux
           pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
+
+      - uses: shogo82148/actions-setup-mysql@v1
+        with:
+          distribution: "mariadb"
+          mysql-version: "11.3"
+          auto-start: false
 
       - name: Set up test database
         run: |
