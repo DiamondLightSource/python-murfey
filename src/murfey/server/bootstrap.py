@@ -35,192 +35,44 @@ tag = {
         "url": "https://www.python.org/dev/peps/pep-0503/",
     },
 }
+
+# Set up API endpoint groups
+version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
+cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
+msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
-cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
-version = APIRouter(prefix="/version", tags=["bootstrap"])
 
+# Set up logger
 log = logging.getLogger("murfey.server.bootstrap")
 
 
-def _validate_package_name(package: str) -> bool:
-    """
-    Check that a package name follows PEP 503 naming conventions, containing only
-    alphanumerics, "_", "-", or "." characters
-    """
-    if re.match(r"^[a-z0-9\-\_\.]+$", package):
-        return True
-    else:
-        return False
+"""
+VERSION-RELATED API ENDPOINTS
+"""
 
 
-def _get_full_path_response(package: str) -> requests.Response:
-    """
-    Validates the package name, sanitises it if valid, and attempts to return a HTTP
-    response from PyPI.
-    """
+@version.get("/")
+def get_version(client_version: str = ""):
+    result = {
+        "server": murfey.__version__,
+        "oldest-supported-client": murfey.__supported_client_version__,
+    }
 
-    if _validate_package_name(package):
-        # Sanitise and normalise package name (PEP 503)
-        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()))
+    if client_version:
+        client = packaging.version.parse(client_version)
+        server = packaging.version.parse(murfey.__version__)
+        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
+        result["client-needs-update"] = minimum_version > client
+        result["client-needs-downgrade"] = client > server
 
-        # Get HTTP response
-        url = f"https://pypi.org/simple/{package_clean}"
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            return response
-        else:
-            raise HTTPException(status_code=response.status_code)
-    else:
-        raise ValueError(f"{package} is not a valid package name")
+    return result
 
 
-@pypi.get("/", response_class=Response)
-def get_pypi_index():
-    """
-    Obtain list of all PyPI packages via the simple API (PEP 503).
-    """
-
-    index = requests.get("https://pypi.org/simple/")
-
-    return Response(
-        content=index.content,
-        media_type=index.headers.get("Content-Type"),
-        status_code=index.status_code,
-    )
-
-
-@pypi.get("/{package}/", response_class=Response)
-def get_pypi_package_downloads_list(package: str) -> Response:
-    """
-    Obtain list of all package downloads from PyPI via the simple API (PEP 503), and
-    rewrite all download URLs to point to this server, under the current directory.
-    """
-
-    def _rewrite_pypi_url(match):
-        """
-        Use regular expression matching to rewrite the URLs. Points them from
-        pythonhosted.org to current server, and removes the hash from the URL as well
-        """
-        # url = match.group(4)  # Original
-        url = match.group(3)
-        return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
-
-    # Validate package and URL
-    full_path_response = _get_full_path_response(package)
-
-    # Process lines related to PyPI packages in response
-    content: bytes = full_path_response.content  # In bytes
-    content_text: str = content.decode("latin1")  # Convert to strings
-    content_text_list = []
-    for line in content_text.splitlines():
-        # Look for lines with hyperlinks
-        if "<a href" in line:
-            # Rewrite URL to point to current proxy server
-            line_new = re.sub(
-                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria
-                _rewrite_pypi_url,  # Search criteria applied to this function
-                line,
-            )
-            content_text_list.append(line_new)
-
-            # Add entry for wheel metadata (PEP 658; see _expose_wheel_metadata)
-            if ".whl" in line_new:
-                line_metadata = line_new.replace(".whl", ".whl.metadata")
-                content_text_list.append(line_metadata)
-        else:
-            # Append other lines as normal
-            content_text_list.append(line)
-
-    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
-    content_new = content_text_new.encode("latin1")  # Convert back to bytes
-
-    return Response(
-        content=content_new,
-        media_type=full_path_response.headers.get("Content-Type"),
-        status_code=full_path_response.status_code,
-    )
-
-
-@pypi.get("/{package}/{filename}", response_class=Response)
-def get_pypi_file(package: str, filename: str):
-    """
-    Obtain and pass through a specific download for a PyPI package.
-    """
-
-    def _expose_wheel_metadata(response_bytes: bytes) -> bytes:
-        """
-        As of pip v22.3 (coinciding with PEP 658), pip expects to find an additonal
-        ".whl.metadata" file based on the URL of the ".whl" file present on the PyPI Simple
-        Index. However, because it is not listed on the webpage itself, it is not copied
-        across to the proxy. This function adds that URL to the proxy explicitly.
-        """
-
-        # Analyse API response line-by-line
-        response_text: str = response_bytes.decode("latin1")  # Convert to text
-        response_text_list = []  # Write line-by-line analysis to here
-
-        for line in response_text.splitlines():
-            # Process URLs
-            if r"<a href=" in line:
-                response_text_list.append(line)  # Add to list
-
-                # Add new line to explicitly call for wheel metadata
-                if ".whl" in line:
-                    # Add ".metadata" to URL and file name
-                    line_new = line.replace(".whl", ".whl.metadata")
-                    response_text_list.append(line_new)  # Add to list
-
-            # Append all other lines as normal
-            else:
-                response_text_list.append(line)
-
-        # Recover original structure
-        response_text_new = str("\n".join(response_text_list))
-        response_bytes_new = bytes(response_text_new, encoding="latin-1")
-
-        return response_bytes_new
-
-    # Validate package and URL
-    full_path_response = _get_full_path_response(package)
-
-    # Get filename in bytes
-    filename_bytes = re.escape(filename.encode("latin1"))
-
-    # Add explicit URLs for ".whl.metadata" files
-    content = _expose_wheel_metadata(full_path_response.content)
-
-    # Find package matching the specified filename
-    selected_package_link = re.search(
-        b'<a href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
-        content,
-    )
-    if not selected_package_link:
-        raise HTTPException(status_code=404, detail="File not found for package")
-    original_url = selected_package_link.group(1)
-    original_file = requests.get(original_url)
-
-    return Response(
-        content=original_file.content,
-        media_type=original_file.headers.get("Content-Type"),
-        status_code=original_file.status_code,
-    )
-
-
-@plugins.get("/{package}", response_class=FileResponse)
-def get_plugin_wheel(package: str):
-
-    machine_config = get_machine_config()
-    wheel_path = machine_config.plugin_packages.get(package)
-
-    if wheel_path is None:
-        return None
-    return FileResponse(
-        wheel_path,
-        headers={"Content-Disposition": "attachment; filename={wheel_path.name}"},
-    )
+"""
+BOOTSTRAP-RELATED API ENDPOINTS
+"""
 
 
 @bootstrap.get("/", response_class=HTMLResponse)
@@ -279,6 +131,11 @@ def get_murfey_wheel():
         )
     newest_version = max(wheels)
     return get_pypi_file(package="murfey", filename=wheels[newest_version])
+
+
+"""
+CYGWIN-RELATED API ENDPOINTS
+"""
 
 
 @cygwin.get("/setup-x86_64.exe", response_class=Response)
@@ -366,18 +223,234 @@ def parse_cygwin_request(request_path: str):
     )
 
 
-@version.get("/")
-def get_version(client_version: str = ""):
-    result = {
-        "server": murfey.__version__,
-        "oldest-supported-client": murfey.__supported_client_version__,
-    }
+"""
+MSYS2-RELATED FUNCTIONS AND ENDPOINTS
+"""
+valid_architectures = ("i686", "x86_64")
 
-    if client_version:
-        client = packaging.version.parse(client_version)
-        server = packaging.version.parse(murfey.__version__)
-        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
-        result["client-needs-update"] = minimum_version > client
-        result["client-needs-downgrade"] = client > server
 
-    return result
+@msys2.get("/msys2/{sys_arch}/", response_class=Response)
+def get_base_package_index(sys_arch: str) -> Response:
+    """
+    Obtain list of all base MSYS2 packages from the main MSYS2 repository.
+    """
+    if sys_arch in valid_architectures:
+        index = requests.get(f"https://repo.msys2.org/msys/{sys_arch}")
+        return Response(
+            content=index.content,
+            media_type=index.headers.get("Content-Type"),
+            status_code=index.status_code,
+        )
+    else:
+        raise ValueError(f"{sys_arch!r} is an invalid system architecture option")
+
+
+@msys2.get("/mingw/x86_64/", response_class=Response)
+def get_mingw64_package_index() -> Response:
+    """
+    Obtain list of all MSYS2 packages specific to the MINGW64 environment.
+    """
+    index = requests.get("https://repo.msys2.org/mingw/x86_64")
+    return Response(
+        content=index.content,
+        media_type=index.headers.get("Content-Type"),
+        status_code=index.status_code,
+    )
+
+
+@msys2.get("/{package}/", response_class=Response)
+def get_msys2_package_downloads_list(package: str) -> Response:
+    """
+    Obtain list of all versions of a specified package from the MSYS2 repositories,
+    and rewrite all download URLS to point to this server.
+    """
+    return True
+
+
+"""
+PYPI-RELATED FUNCTIONS AND ENDPOINTS
+"""
+
+
+def _validate_pypi_package_name(package: str) -> bool:
+    """
+    Check that a package name follows PEP 503 naming conventions, containing only
+    alphanumerics, "_", "-", or "." characters
+    """
+    if re.match(r"^[a-z0-9\-\_\.]+$", package):
+        return True
+    else:
+        return False
+
+
+def _get_full_pypi_path_response(package: str) -> requests.Response:
+    """
+    Validates the package name, sanitises it if valid, and attempts to return a HTTP
+    response from PyPI.
+    """
+
+    if _validate_pypi_package_name(package):
+        # Sanitise and normalise package name (PEP 503)
+        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()))
+
+        # Get HTTP response
+        url = f"https://pypi.org/simple/{package_clean}"
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            return response
+        else:
+            raise HTTPException(status_code=response.status_code)
+    else:
+        raise ValueError(f"{package} is not a valid package name")
+
+
+@pypi.get("/", response_class=Response)
+def get_pypi_index():
+    """
+    Obtain list of all PyPI packages via the simple API (PEP 503).
+    """
+
+    index = requests.get("https://pypi.org/simple/")
+
+    return Response(
+        content=index.content,
+        media_type=index.headers.get("Content-Type"),
+        status_code=index.status_code,
+    )
+
+
+@pypi.get("/{package}/", response_class=Response)
+def get_pypi_package_downloads_list(package: str) -> Response:
+    """
+    Obtain list of all package downloads from PyPI via the simple API (PEP 503), and
+    rewrite all download URLs to point to this server, under the current directory.
+    """
+
+    def _rewrite_pypi_url(match):
+        """
+        Use regular expression matching to rewrite the URLs. Points them from
+        pythonhosted.org to current server, and removes the hash from the URL as well
+        """
+        # url = match.group(4)  # Original
+        url = match.group(3)
+        return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
+
+    # Validate package and URL
+    full_path_response = _get_full_pypi_path_response(package)
+
+    # Process lines related to PyPI packages in response
+    content: bytes = full_path_response.content  # In bytes
+    content_text: str = content.decode("latin1")  # Convert to strings
+    content_text_list = []
+    for line in content_text.splitlines():
+        # Look for lines with hyperlinks
+        if "<a href" in line:
+            # Rewrite URL to point to current proxy server
+            line_new = re.sub(
+                '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria
+                _rewrite_pypi_url,  # Search criteria applied to this function
+                line,
+            )
+            content_text_list.append(line_new)
+
+            # Add entry for wheel metadata (PEP 658; see _expose_wheel_metadata)
+            if ".whl" in line_new:
+                line_metadata = line_new.replace(".whl", ".whl.metadata")
+                content_text_list.append(line_metadata)
+        else:
+            # Append other lines as normal
+            content_text_list.append(line)
+
+    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
+    content_new = content_text_new.encode("latin1")  # Convert back to bytes
+
+    return Response(
+        content=content_new,
+        media_type=full_path_response.headers.get("Content-Type"),
+        status_code=full_path_response.status_code,
+    )
+
+
+@pypi.get("/{package}/{filename}", response_class=Response)
+def get_pypi_file(package: str, filename: str):
+    """
+    Obtain and pass through a specific download for a PyPI package.
+    """
+
+    def _expose_wheel_metadata(response_bytes: bytes) -> bytes:
+        """
+        As of pip v22.3 (coinciding with PEP 658), pip expects to find an additonal
+        ".whl.metadata" file based on the URL of the ".whl" file present on the PyPI Simple
+        Index. However, because it is not listed on the webpage itself, it is not copied
+        across to the proxy. This function adds that URL to the proxy explicitly.
+        """
+
+        # Analyse API response line-by-line
+        response_text: str = response_bytes.decode("latin1")  # Convert to text
+        response_text_list = []  # Write line-by-line analysis to here
+
+        for line in response_text.splitlines():
+            # Process URLs
+            if r"<a href=" in line:
+                response_text_list.append(line)  # Add to list
+
+                # Add new line to explicitly call for wheel metadata
+                if ".whl" in line:
+                    # Add ".metadata" to URL and file name
+                    line_new = line.replace(".whl", ".whl.metadata")
+                    response_text_list.append(line_new)  # Add to list
+
+            # Append all other lines as normal
+            else:
+                response_text_list.append(line)
+
+        # Recover original structure
+        response_text_new = str("\n".join(response_text_list))
+        response_bytes_new = bytes(response_text_new, encoding="latin-1")
+
+        return response_bytes_new
+
+    # Validate package and URL
+    full_path_response = _get_full_pypi_path_response(package)
+
+    # Get filename in bytes
+    filename_bytes = re.escape(filename.encode("latin1"))
+
+    # Add explicit URLs for ".whl.metadata" files
+    content = _expose_wheel_metadata(full_path_response.content)
+
+    # Find package matching the specified filename
+    selected_package_link = re.search(
+        b'<a href="([^">]*)"[^>]*>' + filename_bytes + b"</a>",
+        content,
+    )
+    if not selected_package_link:
+        raise HTTPException(status_code=404, detail="File not found for package")
+    original_url = selected_package_link.group(1)
+    original_file = requests.get(original_url)
+
+    return Response(
+        content=original_file.content,
+        media_type=original_file.headers.get("Content-Type"),
+        status_code=original_file.status_code,
+    )
+
+
+"""
+PYPI API ENDPOINT PLUGINS
+"""
+
+
+@plugins.get("/{package}", response_class=FileResponse)
+def get_plugin_wheel(package: str):
+
+    machine_config = get_machine_config()
+    wheel_path = machine_config.plugin_packages.get(package)
+
+    if wheel_path is None:
+        return None
+    return FileResponse(
+        wheel_path,
+        headers={"Content-Disposition": "attachment; filename={wheel_path.name}"},
+    )
