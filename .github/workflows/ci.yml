@@ -61,11 +61,11 @@ jobs:
           path: dist/
 
       - name: Install package
-        script: |
+        run: |
           set -eux
           pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
 
-            - name: Set up test database
+      - name: Set up test database
         run: |
           set -eu
           cp ".github/workflows/config/my.cnf" .my.cnf
