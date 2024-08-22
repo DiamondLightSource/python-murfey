@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import procrunner
 import requests
 
+import murfey.client.websocket
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -75,6 +76,11 @@ class MultigridController:
                 requests.delete, headers={"Authorization": f"Bearer {self.token}"}
             )
 
+        self.ws = murfey.client.websocket.WSApp(
+            server=self.murfey_url,
+            id=0,
+        )
+
     def _start_rsyncer_multigrid(
         self,
         source: Path,
@@ -122,6 +128,7 @@ class MultigridController:
             tag=tag,
             limited=limited,
         )
+        self.ws.send({"message": "refresh"})
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
