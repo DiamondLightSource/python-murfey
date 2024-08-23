@@ -651,11 +651,15 @@ def register_completed_tilt_series(
                 "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
             )
             sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            extra_path = machine_config.processed_extra_directory
             stack_file = (
                 core
                 / machine_config.processed_directory_name
                 / sub_dataset
-                / "align_output"
+                / extra_path
+                / "Tomograms"
+                / "job006"
+                / "tomograms"
                 / f"{ts.tag}_stack.mrc"
             )
             if not stack_file.parent.exists():
@@ -669,7 +673,7 @@ def register_completed_tilt_series(
                     "dcid": ids.dcid,
                     "appid": ids.appid,
                     "stack_file": str(stack_file),
-                    "pix_size": preproc_params.pixel_size,
+                    "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
                 },
@@ -1011,7 +1015,7 @@ async def request_spa_preprocessing(
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": proc_params["angpix"],
+                "pixel_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
@@ -1060,22 +1064,18 @@ async def request_tomography_preprocessing(
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    extra_path = machine_config.processed_extra_directory
     mrc_out = (
         core
         / machine_config.processed_directory_name
         / sub_dataset
+        / extra_path
         / "MotionCorr"
+        / "job002"
+        / "Movies"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
-    ctf_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / "CTF"
-        / str(ppath.stem + "_ctf.mrc")
-    )
-    ctf_out = Path("/".join(secure_filename(p) for p in ctf_out.parts))
     session_id = (
         db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
@@ -1105,8 +1105,6 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
-        if not ctf_out.parent.exists():
-            ctf_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
@@ -1117,8 +1115,7 @@ async def request_tomography_preprocessing(
                 "autoproc_program_id": appid,
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": (proc_file.pixel_size) * 10**10,
-                "output_image": str(ctf_out),
+                "pixel_size": (proc_file.pixel_size) * 10**10,
                 "image_number": proc_file.image_number,
                 "kv": int(proc_file.voltage),
                 "microscope": get_microscope(),
