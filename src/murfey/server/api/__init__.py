@@ -45,11 +45,11 @@ from murfey.server import (
     sanitise,
     templates,
 )
-from murfey.server.auth import validate_token
+from murfey.server.api.auth import validate_token
+from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.config import from_file, settings
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.server.spa.api import _cryolo_model_path
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,

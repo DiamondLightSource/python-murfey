@@ -3,7 +3,7 @@ import os
 
 from sqlmodel import Session, create_engine
 
-from murfey.server.auth import hash_password
+from murfey.server.api.auth import hash_password
 from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import url
 from murfey.util.db import MurfeyUser as User

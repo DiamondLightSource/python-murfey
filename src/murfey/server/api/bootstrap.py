@@ -44,8 +44,7 @@ msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
-# Set up logger
-log = logging.getLogger("murfey.server.bootstrap")
+log = logging.getLogger("murfey.server.api.bootstrap")
 
 
 """

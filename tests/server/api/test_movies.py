@@ -39,7 +39,7 @@ client = TestClient(app)
 
 def login(test_user):
     with patch(
-        "murfey.server.auth.api.validate_user", return_value=True
+        "murfey.server.api.auth.validate_user", return_value=True
     ) as mock_validate:
         response = client.post("/token", data=test_user)
         assert mock_validate.called_once()
@@ -49,7 +49,7 @@ def login(test_user):
         return token
 
 
-@patch("murfey.server.auth.check_user", return_value=True)
+@patch("murfey.server.api.auth.check_user", return_value=True)
 def test_movie_count(mock_check, test_user):
     token = login(test_user)
     response = client.get("/num_movies", headers={"Authorization": f"Bearer {token}"})
