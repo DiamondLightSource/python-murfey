@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 
-import importlib_metadata
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,13 @@ import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
 
+# Use importlib_metadata based on Python version
+if sys.version_info < (3, 10):
+    from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
+
+# Import Murfey server or demo server based on settings
 if os.getenv("MURFEY_DEMO"):
     from murfey.server.demo_api import router
 else:
@@ -54,15 +61,16 @@ app.mount("/images", StaticFiles(directory=template_files / "images"), name="ima
 
 # Add router endpoints to the API
 app.include_router(router)
+app.include_router(murfey.server.api.bootstrap.version)
 app.include_router(murfey.server.api.bootstrap.bootstrap)
 app.include_router(murfey.server.api.bootstrap.cygwin)
+app.include_router(murfey.server.api.bootstrap.msys2)
 app.include_router(murfey.server.api.bootstrap.pypi)
 app.include_router(murfey.server.api.bootstrap.plugins)
-app.include_router(murfey.server.api.bootstrap.version)
 app.include_router(murfey.server.api.clem.router)
 app.include_router(murfey.server.api.spa.router)
 app.include_router(murfey.server.api.auth.router)
 app.include_router(murfey.server.websocket.ws)
 
-for r in importlib_metadata.entry_points(group="murfey.routers"):
+for r in entry_points(group="murfey.routers"):
     app.include_router(r.load())
