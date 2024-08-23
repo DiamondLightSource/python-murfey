@@ -8,7 +8,7 @@ print("Python", sys.version, "\n")
 
 failures = 0
 
-for base, _, files in os.walk("../../../.azure-pipelines"):
+for base, _, files in os.walk("."):
     for f in files:
         if not f.endswith(".py"):
             continue
