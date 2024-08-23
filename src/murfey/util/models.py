@@ -159,7 +159,6 @@ class LifFileInfo(BaseModel):
     description: str = ""
 
 
-# WORK IN PROGRESS
 class TiffSeriesInfo(BaseModel):
     series_name: str
     tiff_files: List[Path]

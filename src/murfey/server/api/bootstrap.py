@@ -41,7 +41,7 @@ plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 version = APIRouter(prefix="/version", tags=["bootstrap"])
 
-log = logging.getLogger("murfey.server.bootstrap")
+log = logging.getLogger("murfey.server.api.bootstrap")
 
 
 def _validate_package_name(package: str) -> bool:

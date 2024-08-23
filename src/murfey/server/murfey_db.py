@@ -22,7 +22,7 @@ def url(machine_config: MachineConfig | None = None) -> str:
 
 def get_murfey_db_session(
     machine_config: MachineConfig | None = None,
-) -> Session:
+) -> Session:  # type: ignore
     _url = url(machine_config)
     if machine_config and not machine_config.sqlalchemy_pooling:
         engine = create_engine(_url, poolclass=NullPool)
@@ -37,4 +37,4 @@ def get_murfey_db_session(
 
 murfey_db_session = partial(get_murfey_db_session, get_machine_config())
 
-murfey_db = Depends(murfey_db_session)
+murfey_db: Session = Depends(murfey_db_session)
