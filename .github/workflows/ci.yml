@@ -57,11 +57,11 @@ jobs:
           docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 test-rabbitmq
           docker container list -a
 
-      - name: Get pre-built package
+      - name: Get database
         uses: actions/download-artifact@v4
         with:
-          name: package-distributions
-          path: dist/
+          name: database
+          path: database/
 
       - name: Install package
         run: |
@@ -78,7 +78,7 @@ jobs:
         run: |
           set -eu
           cp ".github/workflows/config/my.cnf" .my.cnf
-          tar xfz "dist/ispyb-database.tar.gz"
+          tar xfz "database/ispyb-database.tar.gz"
 
           printf 'Waiting for MySQL database to accept connections'
           until mariadb --defaults-file=.my.cnf -e "SHOW DATABASES" >/dev/null; do printf '.'; sleep 10; done
