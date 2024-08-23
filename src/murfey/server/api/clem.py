@@ -218,52 +218,49 @@ def register_lif_file(
             logger.warning(traceback.format_exc())
 
     # Register child metadata if provided
-    if len(child_metadata) > 0:
-        for metadata in child_metadata:
-            try:
-                metadata_db_entry: CLEMImageMetadata = get_db_entry(
-                    db=db,
-                    table=CLEMImageMetadata,
-                    session_id=session_id,
-                    file_path=metadata,
-                )
-                # Append to database entry
-                clem_lif_file.child_metadata.append(metadata_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for metadata in child_metadata:
+        try:
+            metadata_db_entry: CLEMImageMetadata = get_db_entry(
+                db=db,
+                table=CLEMImageMetadata,
+                session_id=session_id,
+                file_path=metadata,
+            )
+            # Append to database entry
+            clem_lif_file.child_metadata.append(metadata_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Register child image series if provided
-    if len(child_series) > 0:
-        for series in child_series:
-            try:
-                series_db_entry: CLEMImageSeries = get_db_entry(
-                    db=db,
-                    table=CLEMImageSeries,
-                    session_id=session_id,
-                    series_name=series,
-                )
-                # Append to database entry
-                clem_lif_file.child_series.append(series_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for series in child_series:
+        try:
+            series_db_entry: CLEMImageSeries = get_db_entry(
+                db=db,
+                table=CLEMImageSeries,
+                session_id=session_id,
+                series_name=series,
+            )
+            # Append to database entry
+            clem_lif_file.child_series.append(series_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Register child image stacks if provided
-    if len(child_stacks) > 0:
-        for stack in child_stacks:
-            try:
-                stack_db_entry: CLEMImageStack = get_db_entry(
-                    db=db,
-                    table=CLEMImageStack,
-                    session_id=session_id,
-                    file_path=stack,
-                )
-                # Append to database entry
-                clem_lif_file.child_stacks.append(stack_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for stack in child_stacks:
+        try:
+            stack_db_entry: CLEMImageStack = get_db_entry(
+                db=db,
+                table=CLEMImageStack,
+                session_id=session_id,
+                file_path=stack,
+            )
+            # Append to database entry
+            clem_lif_file.child_stacks.append(stack_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Commit to database
     db.add(clem_lif_file)
@@ -380,20 +377,19 @@ def register_clem_metadata(
             logger.warning(traceback.format_exc())
 
     # Register associated TIFF files if provided
-    if len(associated_tiffs) > 0:
-        for tiff in associated_tiffs:
-            try:
-                tiff_db_entry: CLEMTIFFFile = get_db_entry(
-                    db=db,
-                    table=CLEMTIFFFile,
-                    session_id=session_id,
-                    file_path=tiff,
-                )
-                # Append entry
-                clem_metadata.associated_tiffs.append(tiff_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for tiff in associated_tiffs:
+        try:
+            tiff_db_entry: CLEMTIFFFile = get_db_entry(
+                db=db,
+                table=CLEMTIFFFile,
+                session_id=session_id,
+                file_path=tiff,
+            )
+            # Append entry
+            clem_metadata.associated_tiffs.append(tiff_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Register associated image series if provided
     if associated_series is not None:
@@ -412,19 +408,18 @@ def register_clem_metadata(
             logger.warning(traceback.format_exc())
 
     # Register associated image stacks if provided
-    if len(associated_stacks) > 0:
-        for stack in associated_stacks:
-            try:
-                stack_db_entry: CLEMImageStack = get_db_entry(
-                    db=db,
-                    table=CLEMImageStack,
-                    session_id=session_id,
-                    file_path=stack,
-                )
-                clem_metadata.associated_stacks.append(stack_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for stack in associated_stacks:
+        try:
+            stack_db_entry: CLEMImageStack = get_db_entry(
+                db=db,
+                table=CLEMImageStack,
+                session_id=session_id,
+                file_path=stack,
+            )
+            clem_metadata.associated_stacks.append(stack_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Commit to database
     db.add(clem_metadata)
@@ -470,20 +465,19 @@ def register_image_series(
             logger.warning(traceback.format_exc())
 
     # Register parent TIFFs if provided
-    if len(parent_tiffs) > 0:
-        for tiff in parent_tiffs:
-            try:
-                tiff_db_entry: CLEMTIFFFile = get_db_entry(
-                    db=db,
-                    table=CLEMTIFFFile,
-                    session_id=session_id,
-                    file_path=tiff,
-                )
-                # Append entry
-                clem_image_series.parent_tiffs.append(tiff_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue  # Try next item in loop
+    for tiff in parent_tiffs:
+        try:
+            tiff_db_entry: CLEMTIFFFile = get_db_entry(
+                db=db,
+                table=CLEMTIFFFile,
+                session_id=session_id,
+                file_path=tiff,
+            )
+            # Append entry
+            clem_image_series.parent_tiffs.append(tiff_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue  # Try next item in loop
 
     # Register associated metadata if provided
     if associated_metadata is not None:
@@ -500,20 +494,19 @@ def register_image_series(
             logger.warning(traceback.format_exc())
 
     # Register child image stacks if provided
-    if len(child_stacks) > 0:
-        for stack in child_stacks:
-            try:
-                stack_db_entry: CLEMImageStack = get_db_entry(
-                    db=db,
-                    table=CLEMImageStack,
-                    session_id=session_id,
-                    file_path=stack,
-                )
-                # Append entry
-                clem_image_series.child_stacks.append(stack_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for stack in child_stacks:
+        try:
+            stack_db_entry: CLEMImageStack = get_db_entry(
+                db=db,
+                table=CLEMImageStack,
+                session_id=session_id,
+                file_path=stack,
+            )
+            # Append entry
+            clem_image_series.child_stacks.append(stack_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Register
     db.add(clem_image_series)
@@ -563,20 +556,19 @@ def register_image_stack(
             logger.warning(traceback.format_exc())
 
     # Register parent TIFF files if provided
-    if len(parent_tiffs) > 0:
-        for tiff in parent_tiffs:
-            try:
-                tiff_db_entry: CLEMTIFFFile = get_db_entry(
-                    db=db,
-                    table=CLEMTIFFFile,
-                    session_id=session_id,
-                    file_path=tiff,
-                )
-                # Append entry
-                clem_image_stack.parent_tiffs.append(tiff_db_entry)
-            except Exception:
-                logger.warning(traceback.format_exc())
-                continue
+    for tiff in parent_tiffs:
+        try:
+            tiff_db_entry: CLEMTIFFFile = get_db_entry(
+                db=db,
+                table=CLEMTIFFFile,
+                session_id=session_id,
+                file_path=tiff,
+            )
+            # Append entry
+            clem_image_stack.parent_tiffs.append(tiff_db_entry)
+        except Exception:
+            logger.warning(traceback.format_exc())
+            continue
 
     # Register associated metadata if provided
     if associated_metadata is not None:
