@@ -4,6 +4,8 @@ name: Run tests
 
 on:
   workflow_call:
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   test:
