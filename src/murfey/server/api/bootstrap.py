@@ -37,6 +37,7 @@ tag = {
 }
 
 # Set up API endpoint groups
+# NOTE: Routers MUST have prefixes. prefix="" causes an error
 version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
@@ -225,45 +226,131 @@ def parse_cygwin_request(request_path: str):
 """
 MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 """
-valid_architectures = ("i686", "x86_64")
+
+valid_msys = ("i686", "x86_64")
+valid_mingw = (
+    "clang32",
+    "clang64",
+    "clangarm64",
+    "i686",
+    "mingw32",
+    "mingw64",
+    "sources",
+    "ucrt64",
+    "x86_64",
+)
 
 
-@msys2.get("/msys2/{sys_arch}/", response_class=Response)
-def get_base_package_index(sys_arch: str) -> Response:
+@msys2.get("/setup-x86_64.exe", response_class=Response)
+def get_msys2_setup():
     """
-    Obtain list of all base MSYS2 packages from the main MSYS2 repository.
+    Obtain and pass through an MSYS2 installer from an official source.
+    This is used during client bootstrapping, and can download and install the
+    MSYS2 distribution that then remains on the client machines.
     """
-    if sys_arch in valid_architectures:
-        index = requests.get(f"https://repo.msys2.org/msys/{sys_arch}")
-        return Response(
-            content=index.content,
-            media_type=index.headers.get("Content-Type"),
-            status_code=index.status_code,
-        )
-    else:
-        raise ValueError(f"{sys_arch!r} is an invalid system architecture option")
 
-
-@msys2.get("/mingw/x86_64/", response_class=Response)
-def get_mingw64_package_index() -> Response:
-    """
-    Obtain list of all MSYS2 packages specific to the MINGW64 environment.
-    """
-    index = requests.get("https://repo.msys2.org/mingw/x86_64")
+    file_name = "msys2-x86_64-latest.exe"
+    installer = requests.get(f"https://repo.msys2.org/distrib/{file_name}")
     return Response(
-        content=index.content,
-        media_type=index.headers.get("Content-Type"),
-        status_code=index.status_code,
+        content=installer.content,
+        media_type=installer.headers.get("Content-Type"),
+        status_code=installer.status_code,
     )
 
 
-@msys2.get("/{package}/", response_class=Response)
-def get_msys2_package_downloads_list(package: str) -> Response:
+@msys2.get("/{environment}/{architecture}", response_class=Response)
+def get_msys2_package_index(environment: str, architecture: str) -> Response:
     """
-    Obtain list of all versions of a specified package from the MSYS2 repositories,
-    and rewrite all download URLS to point to this server.
+    Obtain a list of all base MSYS2 packages from the main MSYS2 repository.
     """
-    return True
+
+    def _rewrite_url(match):
+        """
+        Use regular expression matching to rewrite the package URLs. Points them explicitly
+        to the MSYS2 repo.
+        """
+        url = (
+            f"{base_url}/{match.group(1)}"
+            if not match.group(1).startswith("https://")
+            else match.group(1)
+        )  # Add base path explicitly to URL
+        return '<a href="' + url + '">' + match.group(2) + "</a>"
+
+    # Validate input
+    if environment == "msys":
+        if architecture not in valid_msys:
+            raise ValueError(f"{architecture} is not a valid msys architecture")
+    elif environment == "mingw":
+        if architecture not in valid_mingw:
+            raise ValueError(f"{architecture} is not a valid mingw architecture")
+    else:
+        raise ValueError(f"{environment} is not a valid msys2 environment")
+
+    # Construct URL to main MSYS repo and get response
+    base_url = f"https://repo.msys2.org/{environment}/{architecture}"
+    index = requests.get(base_url)
+
+    # Parse and rewrite package index content
+    content: bytes = index.content  # Get content in bytes
+    content_text: str = content.decode("latin1")  # Convert to strings
+    content_text_list = []
+    for line in content_text.splitlines():
+        if line.startswith("<a href"):
+            # Rewrite URL to point explicitly to original server
+            line_new = re.sub(
+                '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
+                _rewrite_url,  # Function to apply search criteria to
+                line,
+            )
+            content_text_list.append(line_new)
+        else:
+            content_text_list.append(line)
+
+    # Reconstruct conent
+    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
+    content_new = content_text_new.encode("latin1")  # Convert back to bytes
+    return Response(
+        content=content_new,
+        status_code=index.status_code,
+        media_type=index.headers.get("Content-Type"),
+    )
+
+
+@msys2.get("/{environment}/{architecture}/{package}", response_class=Response)
+def get_msys2_package(
+    environment: str,
+    architecture: str,
+    package: str,
+) -> Response:
+    """
+    Obtain and pass through a specific download for an MSYS2 package.
+    """
+
+    # Validate input
+    if environment == "msys":
+        if architecture not in valid_msys:
+            raise ValueError(f"{architecture} is not a valid msys architecture")
+    elif environment == "mingw":
+        if architecture not in valid_mingw:
+            raise ValueError(f"{architecture} is not a valid mingw architecture")
+    else:
+        raise ValueError(f"{environment} is not a valid msys2 environment")
+
+    if re.match(r"^[a-zA-Z0-9\.\-\_]", package) is False:
+        raise ValueError(f"{package} is not a valid package name")
+
+    # Construct URL to main MSYS repo and get response
+    package_url = f"https://repo.msys2.org/{environment}/{architecture}/{package}"
+    original_file = requests.get(package_url)
+
+    if original_file.status_code == 200:
+        return Response(
+            content=original_file.content,
+            media_type=original_file.headers.get("Content-Type"),
+            status_code=original_file.status_code,
+        )
+    else:
+        raise HTTPException(status_code=original_file.status_code)
 
 
 """
@@ -314,8 +401,8 @@ def get_pypi_index():
 
     return Response(
         content=index.content,
-        media_type=index.headers.get("Content-Type"),
         status_code=index.status_code,
+        media_type=index.headers.get("Content-Type"),
     )
 
 
@@ -348,7 +435,7 @@ def get_pypi_package_downloads_list(package: str) -> Response:
             # Rewrite URL to point to current proxy server
             line_new = re.sub(
                 '^<a href="([^">]*)"([^>]*)>([^<]*)</a>',  # Regex search criteria
-                _rewrite_pypi_url,  # Search criteria applied to this function
+                _rewrite_pypi_url,  # Function to apply search criteria to
                 line,
             )
             content_text_list.append(line_new)
