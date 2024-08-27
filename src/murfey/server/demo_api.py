@@ -118,9 +118,9 @@ if settings.murfey_machine_configuration:
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse(
-        "home.html",
-        {
-            "request": request,
+        request=request,
+        name="home.html",
+        context={
             "hostname": get_hostname(),
             "microscope": get_microscope(),
             "version": murfey.__version__,
@@ -166,8 +166,9 @@ def all_visit_info(request: Request):
     ]  # "Proposal title": visit.proposal_title
 
     return templates.TemplateResponse(
-        "activevisits.html",
-        {"request": request, "info": return_query, "microscope": microscope},
+        request=request,
+        name="activevisits.html",
+        context={"info": return_query, "microscope": microscope},
     )
 
 
@@ -672,8 +673,9 @@ def visit_info(request: Request, visit_name: str):
         == visit_name
     ]  # "Proposal title": id.title
     return templates.TemplateResponse(
-        "visit.html",
-        {"request": request, "visit": return_query},
+        request=request,
+        name="visit.html",
+        context={"visit": return_query},
     )
 
 
