@@ -94,7 +94,7 @@ class ConnectionFileParameters(BaseModel):
 
 
 class SessionInfo(BaseModel):
-    session_id: Optional[int]
+    session_id: Optional[int] = None
     session_name: str = ""
     rescale: bool = True
 
@@ -181,7 +181,7 @@ class Sample(BaseModel):
     sample_group_id: int
     sample_id: int
     subsample_id: int
-    image_path: Optional[Path]
+    image_path: Optional[Path] = None
 
 
 class BLSampleImageParameters(BaseModel):
@@ -312,7 +312,7 @@ class ProcessFile(BaseModel):  # Rename to TomoProcessFile
     path: str
     description: str
     tag: str
-    data_collection_id: Optional[int]
+    data_collection_id: Optional[int] = None
     image_number: int
     pixel_size: float
     dose_per_frame: float
@@ -352,7 +352,7 @@ class CompletedTiltSeries(BaseModel):
 
 class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
-    gain_ref: Optional[str]
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -363,12 +363,12 @@ class PreprocessingParametersTomo(BaseModel):
     file_extension: str
     tag: str
     tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
+    eer_fractionation_file: Optional[str] = None
     eer_fractionation: int
 
     class Base(BaseModel):
         dose_per_frame: float
-        gain_ref: Optional[str]
+        gain_ref: Optional[str] = None
         manual_tilt_offset: float
         eer_fractionation: int
 
