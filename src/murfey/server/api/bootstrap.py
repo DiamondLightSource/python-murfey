@@ -50,6 +50,15 @@ log = logging.getLogger("murfey.server.api.bootstrap")
 
 
 """
+GENERAL HELPER FUNCTIONS
+"""
+
+
+def _sanitise_url(url: str) -> str:
+    return url
+
+
+"""
 VERSION-RELATED API ENDPOINTS
 """
 
@@ -124,6 +133,7 @@ def get_murfey_wheel():
             filename = wheel_file.decode("latin-1") + ".whl"
             version = packaging.version.parse(filename.split("-")[1])
             wheels[version] = filename
+        # Ignore searches that fail to turn up wheels
         except Exception:
             pass
     if not wheels:
@@ -210,7 +220,7 @@ def parse_cygwin_request(request_path: str):
     Forward a Cygwin setup request to an official mirror.
     """
     try:
-        url = f"{find_cygwin_mirror()}{request_path}"
+        url = quote(f"{find_cygwin_mirror()}{request_path}")
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
@@ -288,7 +298,7 @@ def get_msys2_package_index(environment: str, architecture: str) -> Response:
         raise ValueError(f"{environment} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
-    base_url = f"https://repo.msys2.org/{environment}/{architecture}"
+    base_url = quote(f"https://repo.msys2.org/{environment}/{architecture}")
     index = requests.get(base_url)
 
     # Parse and rewrite package index content
@@ -341,7 +351,9 @@ def get_msys2_package(
         raise ValueError(f"{package} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f"https://repo.msys2.org/{environment}/{architecture}/{package}"
+    package_url = quote(
+        f"https://repo.msys2.org/{environment}/{architecture}/{package}"
+    )
     original_file = requests.get(package_url)
 
     if original_file.status_code == 200:
