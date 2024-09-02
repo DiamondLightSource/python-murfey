@@ -1,33 +1,75 @@
 {% extends "base.html" %} {% block title %}Bootstrapping instructions{% endblock
 %} {% block content %}
 <h1>Bootstrapping instructions</h1>
-<h3>Installing Cygwin</h3>
+<h2>Installing Cygwin</h2>
 <p>
   If you already have a Cygwin install, rename it so that it doesn't get
   overwritten (something like "[install name]-old").
 </p>
 <p>
   Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>,
-  and then run the following from a terminal
+  and then run the following from a terminal (both Command Prompt and Windows
+  Powershell work)
 </p>
 <pre style="font-family: monospace">
-    setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
-    </pre
->
+    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
+</pre>
 <p>
   The Cygwin install sometimes hangs even when it is finished, hit Enter to
   return to a command prompt.
 </p>
 
-<h3>Installing Murfey</h3>
+<h2>Installing MSYS2</h2>
+<p>
+  MSYS2 is a lightweight Linux environment which provides compiler support for
+  the more modern programming languages used in the backend of Murfey's package
+  dependencies.
+</p>
+<p>
+  The Murfey server supports the forwarding of download requests to client PCs
+  that cannot access the wider internet. Download the
+  <a href="/msys2/setup-x86_64.exe">MSYS2 setup executable</a>, and run the
+  executable using the default settings.
+</p>
+<p>
+  By default, MSYS2 comes with preset lists of mirrors and servers that it
+  installs its packages from. These will need to be disabled, and replaced with
+  URLs of the same format that point to the Murfey server the client PC is
+  connected to.
+</p>
+<p>
+  These lists can be found in the following folder, if the default installation
+  options were chosen:
+</p>
+<pre style="font-family: monospace">
+    C:\msys64\etc\pacman.d\mirrorlist.{environment}
+</pre>
+<p>This is an example of how the URL to the Murfey server should look like:</p>
+<pre style="font-family: monospace">
+    Server = https://repo.msys2.org/mingw/x86_64/  # Original URL
+    Server = {{ request.url.scheme }}://{{ request.url.netloc }}/mingw/x86_64  # Murfey URL
+</pre>
+<p>
+  MSYS2 comes with multiple environments, but the one used by Murfey is MINGW64.
+  In order for the Murfey client to be able to install and run its dependencies
+  properly, the following packages will need to be installed in the MINGW64
+  environment. This can be achieved using the following commands:
+</p>
+<pre style="font-family: monospace">
+    $ pacman -Syu  # Downloads the package database and searches for updates
+    $ pacman -S rsync
+    $ pacman -S mingw-w64-python-pip
+    $ pacman -S mingw-w64-x86_64-rust
+</pre>
+
+<h2>Installing Murfey</h2>
 <p>
   You can install Murfey on a network-isolated client by running the following
   commands from a Cygwin terminal:
 </p>
 <pre style="font-family: monospace">
-      curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
-      python murfey.whl/murfey/bootstrap {{ request.url.scheme }}://{{ request.url.netloc }}
-      rm murfey.whl
-    </pre
->
+    $ curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
+    $ python murfey.whl/murfey/bootstrap {{ request.url.scheme }}://{{ request.url.netloc }}
+    $ rm murfey.whl
+</pre>
 {% endblock %}

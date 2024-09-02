@@ -2,8 +2,9 @@
 API endpoints related to installing Murfey on a client.
 
 Client machines may not have a direct internet connection, so Murfey allows
-passing through requests to PyPI using the PEP 503 simple API, and download
-requests to the Cygwin website and mirrors.
+passing through download requests for Cygwin and MSYS2 to their respective
+websites, and requests for Python packages to PyPI using the PEP 503 simple
+API.
 
 A static HTML page gives instructions on how to install on a network-isolated
 system that has Python already installed. A previously set up system does not
