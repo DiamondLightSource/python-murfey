@@ -278,22 +278,31 @@ def get_msys2_setup():
 
 
 @msys2.get("/{environment}/{architecture}", response_class=Response)
-def get_msys2_package_index(environment: str, architecture: str) -> Response:
+def get_msys2_package_index(
+    environment: str,
+    architecture: str,
+    request: Request,
+) -> Response:
     """
     Obtain a list of all base MSYS2 packages from the main MSYS2 repository.
     """
 
     def _rewrite_url(match):
         """
-        Use regular expression matching to rewrite the package URLs. Points them explicitly
-        to the MSYS2 repo.
+        Use regular expression matching to rewrite the package URLs and point them
+        explicitly to this current server.
         """
         url = (
-            f"{base_url}/{match.group(1)}"
-            if not match.group(1).startswith("https://")
-            else match.group(1)
-        )  # Add base path explicitly to URL
-        return '<a href="' + url + '">' + match.group(2) + "</a>"
+            f"{base_path}/{match.group(1)}"
+            if not str(match.group(1)).startswith("http")
+            else str(match.group(1))
+        )
+        return f'<a href="{url}">' + match.group(2) + "</a>"
+
+    # Get base path to current FastAPI endpoint
+    domain = str(request.base_url).strip("/")
+    path = request.url.path.strip("/")
+    base_path = f"{domain}/{path}"
 
     # Validate environment
     if environment not in valid_env:
@@ -306,8 +315,8 @@ def get_msys2_package_index(environment: str, architecture: str) -> Response:
         raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Construct URL to main MSYS repo and get response
-    base_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}"
-    index = requests.get(base_url)
+    repo_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}"
+    index = requests.get(repo_url)
 
     # Parse and rewrite package index content
     content: bytes = index.content  # Get content in bytes
@@ -315,7 +324,7 @@ def get_msys2_package_index(environment: str, architecture: str) -> Response:
     content_text_list = []
     for line in content_text.splitlines():
         if line.startswith("<a href"):
-            # Rewrite URL to point explicitly to original server
+            # Rewrite URL to point explicitly to current server
             line_new = re.sub(
                 '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
                 _rewrite_url,  # Function to apply search criteria to
