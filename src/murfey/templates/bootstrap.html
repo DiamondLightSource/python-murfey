@@ -1,7 +1,8 @@
 {% extends "base.html" %} {% block title %}Bootstrapping instructions{% endblock
 %} {% block content %}
 <h1>Bootstrapping instructions</h1>
-<h2>Installing Cygwin</h2>
+<h2>Installing a Linux Terminal</h2>
+<h3>Installing Cygwin</h3>
 <p>
   If you already have a Cygwin install, rename it so that it doesn't get
   overwritten (something like "[install name]-old").
@@ -19,7 +20,7 @@
   return to a command prompt.
 </p>
 
-<h2>Installing MSYS2</h2>
+<h3>Installing MSYS2</h3>
 <p>
   MSYS2 is a lightweight Linux environment which provides compiler support for
   the more modern programming languages used in the backend of Murfey's package
@@ -62,14 +63,27 @@
     $ pacman -S mingw-w64-x86_64-rust --disable-download-timeout
 </pre>
 
-<h2>Installing Murfey</h2>
+<h2>Setting Up Python</h2>
 <p>
-  You can install Murfey on a network-isolated client by running the following
-  commands from a Cygwin terminal:
+  Once Python and pip are installed in the terminal, you have the option to
+  install Murfey in either the base environment or a virtual environment. The
+  base environment is simpler, but uninstallation of the Python packages in the
+  future could potentially interfere with the base environment's functionality.
+</p>
+<h3>Setting Up a Virtual Environment</h3>
+<p>To set up a virtual environment, run the following commands:</p>
+<pre style="font-family: monospace">
+    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
+    $ virtualenv your-env-name  # Create the virtual environment
+    $ source your-env-name/bin/activate  # Activate the virtual environment
+</pre>
+<h3>Installing Murfey</h3>
+<p>
+  You can install Murfey in the Python environment (the base one or a virtual
+  environment) in either the Cygwin or MINGW64 terminal using the following
+  commands:
 </p>
 <pre style="font-family: monospace">
-    $ curl -O {{ request.url.scheme }}://{{ request.url.netloc }}/bootstrap/murfey.whl
-    $ python murfey.whl/murfey/bootstrap {{ request.url.scheme }}://{{ request.url.netloc }}
-    $ rm murfey.whl
+    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
 </pre>
 {% endblock %}
