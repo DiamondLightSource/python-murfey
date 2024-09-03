@@ -54,6 +54,12 @@ GENERAL HELPER FUNCTIONS
 """
 
 
+def _sanitise_str(input: str) -> str:
+    # Remove \r and \n characters from the string
+    input_clean = input.replace("\r", "").replace("\n", "").rstrip()
+    return input_clean
+
+
 def _sanitise_url(url: str) -> str:
     return url
 
@@ -225,7 +231,7 @@ def parse_cygwin_request(request_path: str):
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
         )
-    log.info(f"Forwarding Cygwin download request to {url}")
+    log.info(f"Forwarding Cygwin download request to {url!r}")
     cygwin_data = requests.get(url)
     return Response(
         content=cygwin_data.content,
@@ -238,6 +244,7 @@ def parse_cygwin_request(request_path: str):
 MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 """
 
+valid_env = ("msys", "mingw")
 valid_msys = ("i686", "x86_64")
 valid_mingw = (
     "clang32",
@@ -287,15 +294,15 @@ def get_msys2_package_index(environment: str, architecture: str) -> Response:
         )  # Add base path explicitly to URL
         return '<a href="' + url + '">' + match.group(2) + "</a>"
 
-    # Validate input
-    if environment == "msys":
-        if architecture not in valid_msys:
-            raise ValueError(f"{architecture} is not a valid msys architecture")
-    elif environment == "mingw":
-        if architecture not in valid_mingw:
-            raise ValueError(f"{architecture} is not a valid mingw architecture")
-    else:
-        raise ValueError(f"{environment} is not a valid msys2 environment")
+    # Validate environment
+    if environment not in valid_env:
+        raise ValueError(f"{environment!r} is not a valid msys2 environment")
+
+    # Validate architecture for each environment
+    if environment == "msys" and architecture not in valid_msys:
+        raise ValueError(f"{architecture!r} is not a valid msys architecture")
+    elif environment == "mingw" and architecture not in valid_mingw:
+        raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Construct URL to main MSYS repo and get response
     base_url = quote(f"https://repo.msys2.org/{environment}/{architecture}")
