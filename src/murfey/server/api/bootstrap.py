@@ -226,7 +226,7 @@ def parse_cygwin_request(request_path: str):
         raise ValueError(f"{request_path!r} is not a valid request path")
 
     try:
-        url = f"{find_cygwin_mirror()}{quote(request_path)}"
+        url = f'{find_cygwin_mirror()}{quote(request_path, safe="")}'
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
@@ -314,7 +314,7 @@ def get_msys2_package_index(
         raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Construct URL to main MSYS repo and get response
-    repo_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}"
+    repo_url = f'https://repo.msys2.org/{quote(environment, safe="")}/{quote(architecture, safe="")}'
     index = requests.get(repo_url)
 
     # Parse and rewrite package index content
@@ -368,7 +368,7 @@ def get_msys2_package_file(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}/{quote(package)}"
+    package_url = f'https://repo.msys2.org/{quote(environment, safe="")}/{quote(architecture, safe="")}/{quote(package, safe="")}'
     package_file = requests.get(package_url)
 
     if package_file.status_code == 200:
@@ -405,7 +405,7 @@ def _get_full_pypi_path_response(package: str) -> requests.Response:
 
     if _validate_pypi_package_name(package):
         # Sanitise and normalise package name (PEP 503)
-        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()))
+        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="")
 
         # Get HTTP response
         url = f"https://pypi.org/simple/{package_clean}"
