@@ -14,9 +14,9 @@ import murfey.server
 import murfey.server.api.auth
 import murfey.server.api.bootstrap
 import murfey.server.api.clem
+import murfey.server.api.display
+import murfey.server.api.instrument
 import murfey.server.api.spa
-import murfey.server.display.api
-import murfey.server.instrument.api
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
@@ -67,8 +67,8 @@ app.include_router(murfey.server.api.bootstrap.version)
 app.include_router(murfey.server.api.clem.router)
 app.include_router(murfey.server.api.spa.router)
 app.include_router(murfey.server.api.auth.router)
-app.include_router(murfey.server.display.api.router)
-app.include_router(murfey.server.instrument.api.router)
+app.include_router(murfey.server.api.display.router)
+app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.websocket.ws)
 
 for r in importlib_metadata.entry_points(group="murfey.routers"):
