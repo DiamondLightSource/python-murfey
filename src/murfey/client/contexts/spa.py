@@ -417,7 +417,7 @@ class _SPAContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/machine/"
+                f"{str(environment.url.geturl())}/machine"
             )
             if server_config_response is None:
                 return None

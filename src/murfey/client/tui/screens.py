@@ -81,7 +81,7 @@ def determine_default_destination(
     include_mid_path: bool = True,
     use_suggested_path: bool = True,
 ) -> str:
-    machine_data = requests.get(f"{environment.url.geturl()}/machine/").json()
+    machine_data = requests.get(f"{environment.url.geturl()}/machine").json()
     _default = ""
     if environment.processing_only_mode and environment.sources:
         log.info(f"Processing only mode with sources {environment.sources}")
@@ -273,7 +273,7 @@ class LaunchScreen(Screen):
 
     def compose(self):
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine/"
+            f"{self.app._environment.url.geturl()}/machine"
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
@@ -324,7 +324,7 @@ class LaunchScreen(Screen):
                     return
             self.app._environment.sources.append(source)
             machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine/"
+                f"{self.app._environment.url.geturl()}/machine"
             ).json()
             self.app._default_destinations[source] = (
                 f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
@@ -714,7 +714,7 @@ class VisitSelection(SwitchSelection):
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine/"
+            f"{self.app._environment.url.geturl()}/machine"
         ).json()
 
         if self._switch_status:
@@ -770,7 +770,7 @@ class UpstreamDownloads(Screen):
 
     def on_button_pressed(self, event: Button.Pressed):
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine/"
+            f"{self.app._environment.url.geturl()}/machine"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
             # Create the directory locally to save files to
@@ -956,7 +956,7 @@ class DestinationSelect(Screen):
                             not in machine_config["create_directories"].values()
                         ):
                             machine_data = requests.get(
-                                f"{self.app._environment.url.geturl()}/machine/"
+                                f"{self.app._environment.url.geturl()}/machine"
                             ).json()
                             dest = determine_default_destination(
                                 self.app._visit,

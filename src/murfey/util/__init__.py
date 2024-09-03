@@ -57,7 +57,7 @@ def sanitise(in_string: str) -> str:
 
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
-    return requests.get(f"{url}/machine/").json()
+    return requests.get(f"{url}/machine").json()
 
 
 def _get_visit_list(api_base: ParseResult):

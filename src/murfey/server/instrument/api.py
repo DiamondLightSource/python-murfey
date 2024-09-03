@@ -43,7 +43,7 @@ async def activate_instrument_server():
     return success
 
 
-@router.get("/instrument_name/")
+@router.get("/instrument_name")
 def get_instrument_name():
     return machine_config.instrument_name
 

@@ -927,7 +927,7 @@ class TomographyContext(Context):
             binning_factor = 1
             if environment:
                 server_config = requests.get(
-                    f"{str(environment.url.geturl())}/machine/"
+                    f"{str(environment.url.geturl())}/machine"
                 ).json()
                 if (
                     server_config.get("superres")

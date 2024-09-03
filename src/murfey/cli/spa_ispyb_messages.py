@@ -203,7 +203,7 @@ def run():
         ]
     )
     binning_factor = 1
-    server_config = requests.get(f"{args.url}/machine/").json()
+    server_config = requests.get(f"{args.url}/machine").json()
     if server_config.get("superres"):
         # If camera is capable of superres and collection is in superres
         binning_factor = 2

@@ -155,7 +155,7 @@ class MurfeyTUI(App):
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
+        machine_data = requests.get(f"{self._environment.url.geturl()}/machine").json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:
@@ -274,7 +274,7 @@ class MurfeyTUI(App):
                 limited=limited,
             )
             machine_data = requests.get(
-                f"{self._environment.url.geturl()}/machine/"
+                f"{self._environment.url.geturl()}/machine"
             ).json()
             for data_dir in machine_data["data_directories"].keys():
                 if source.resolve().is_relative_to(Path(data_dir)):

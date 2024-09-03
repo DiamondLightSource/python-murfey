@@ -202,7 +202,7 @@ def register_processing_parameters(proc_param_block: ProcessingParameterBlock):
 @router.get("/possible_gain_references")
 def get_possible_gain_references() -> List[File]:
     machine_config = requests.get(
-        f"{_get_murfey_url()}/machine/",
+        f"{_get_murfey_url()}/machine",
         headers={"Authorization": f"Bearer {tokens['token']}"},
     ).json()
     candidates = []

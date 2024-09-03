@@ -40,7 +40,7 @@ class MultigridController:
     _machine_config: dict = field(default_factory=lambda: {})
 
     def __post_init__(self):
-        machine_data = requests.get(f"{self.murfey_url}/machine/").json()
+        machine_data = requests.get(f"{self.murfey_url}/machine").json()
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
@@ -89,7 +89,7 @@ class MultigridController:
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(f"{self._environment.url.geturl()}/machine/").json()
+        machine_data = requests.get(f"{self._environment.url.geturl()}/machine").json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:

@@ -145,7 +145,7 @@ def connections_check():
 
 
 @lru_cache(maxsize=1)
-@router.get("/machine/")
+@router.get("/machine")
 def machine_info():
     if settings.murfey_machine_configuration:
         microscope = get_microscope()

@@ -133,7 +133,7 @@ async def root(request: Request):
 
 
 @lru_cache(maxsize=1)
-@router.get("/machine/")
+@router.get("/machine")
 def machine_info() -> MachineConfig | None:
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
