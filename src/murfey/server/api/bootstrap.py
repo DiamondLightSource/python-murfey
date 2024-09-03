@@ -222,6 +222,10 @@ def parse_cygwin_request(request_path: str):
     Forward a Cygwin setup request to an official mirror.
     """
 
+    # Validate request path
+    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", request_path)) is False:
+        raise ValueError(f"{request_path!r} is not a valid request path")
+
     try:
         url = quote(f"{find_cygwin_mirror()}{request_path}")
     except Exception:
