@@ -341,18 +341,19 @@ def get_msys2_package(
     Obtain and pass through a specific download for an MSYS2 package.
     """
 
-    # Validate input
-    if environment == "msys":
-        if architecture not in valid_msys:
-            raise ValueError(f"{architecture} is not a valid msys architecture")
-    elif environment == "mingw":
-        if architecture not in valid_mingw:
-            raise ValueError(f"{architecture} is not a valid mingw architecture")
-    else:
-        raise ValueError(f"{environment} is not a valid msys2 environment")
+    # Validate environment
+    if environment not in valid_env:
+        raise ValueError(f"{environment!r} is not a valid msys2 environment")
 
-    if re.match(r"^[a-zA-Z0-9\.\-\_]", package) is False:
-        raise ValueError(f"{package} is not a valid package name")
+    # Validate architecture for each environment
+    if environment == "msys" and architecture not in valid_msys:
+        raise ValueError(f"{architecture!r} is not a valid msys architecture")
+    elif environment == "mingw" and architecture not in valid_mingw:
+        raise ValueError(f"{architecture!r} is not a valid mingw architecture")
+
+    # Validate package name
+    if bool(re.fullmatch(r"^[\w\s\.\-]+$", package)) is False:
+        raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
     package_url = quote(
