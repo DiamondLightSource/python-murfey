@@ -56,10 +56,10 @@
   environment. This can be achieved using the following commands:
 </p>
 <pre style="font-family: monospace">
-    $ pacman -Syu  # Downloads the package database and searches for updates
-    $ pacman -S rsync
-    $ pacman -S mingw-w64-python-pip
-    $ pacman -S mingw-w64-x86_64-rust
+    $ pacman -Syu --disable-download-timeout  # Downloads the package database and searches for updates
+    $ pacman -S rsync --disable-download-timeout
+    $ pacman -S mingw-w64-python-pip --disable-download-timeout
+    $ pacman -S mingw-w64-x86_64-rust --disable-download-timeout
 </pre>
 
 <h2>Installing Murfey</h2>
