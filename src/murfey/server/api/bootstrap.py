@@ -60,10 +60,6 @@ def _sanitise_str(input: str) -> str:
     return input_clean
 
 
-def _sanitise_url(url: str) -> str:
-    return url
-
-
 """
 VERSION-RELATED API ENDPOINTS
 """
@@ -225,13 +221,14 @@ def parse_cygwin_request(request_path: str):
     """
     Forward a Cygwin setup request to an official mirror.
     """
+
     try:
         url = quote(f"{find_cygwin_mirror()}{request_path}")
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
         )
-    log.info(f"Forwarding Cygwin download request to {url!r}")
+    log.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
     cygwin_data = requests.get(url)
     return Response(
         content=cygwin_data.content,
