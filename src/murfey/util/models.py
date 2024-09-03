@@ -6,6 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+"""
+General Models
+==============
+Models used in multiple workflows.
+"""
+
 
 class Visit(BaseModel):
     start: datetime
@@ -28,25 +34,69 @@ class Visit(BaseModel):
         )
 
 
-class Sample(BaseModel):
-    sample_group_id: int
-    sample_id: int
-    subsample_id: int
-    image_path: Optional[Path]
+class SuggestedPathParameters(BaseModel):
+    base_path: Path
+    touch: bool = False
+    extra_directory: str = ""
 
 
-class BLSampleImageParameters(BaseModel):
-    sample_id: int
-    sample_path: Path
+class DCGroupParameters(BaseModel):
+    # DC = Data collection
+    experiment_type: str
+    experiment_type_id: int
+    tag: str
+    atlas: str = ""
+    sample: Optional[int] = None
 
 
-class BLSampleParameters(BaseModel):
-    sample_group_id: int
+class DCParameters(BaseModel):
+    voltage: float
+    pixel_size_on_image: str
+    experiment_type: str
+    image_size_x: int
+    image_size_y: int
+    file_extension: str
+    acquisition_software: str
+    image_directory: str
+    tag: str
+    source: str
+    magnification: float
+    total_exposed_dose: Optional[float] = None
+    c2aperture: Optional[float] = None
+    exposure_time: Optional[float] = None
+    slit_width: Optional[float] = None
+    phase_plate: bool = False
+    data_collection_tag: str = ""
 
 
-class BLSubSampleParameters(BaseModel):
-    sample_id: int
-    image_path: Optional[Path] = None
+class ProcessingJobParameters(BaseModel):
+    tag: str
+    recipe: str
+    parameters: Dict[str, Any] = {}
+    experiment_type: str = "spa"
+
+
+class RegistrationMessage(BaseModel):
+    registration: str
+    params: Optional[Dict[str, Any]] = None
+
+
+class File(BaseModel):
+    name: str
+    description: str
+    size: int
+    timestamp: float
+
+
+class ConnectionFileParameters(BaseModel):
+    filename: str
+    destinations: List[str]
+
+
+class SessionInfo(BaseModel):
+    session_id: Optional[int]
+    session_name: str = ""
+    rescale: bool = True
 
 
 class ContextInfo(BaseModel):
@@ -81,12 +131,26 @@ class ClearanceKeys(BaseModel):
     autoproc_program: List[str]
 
 
-class File(BaseModel):
-    name: str
-    description: str
-    size: int
-    timestamp: datetime
-    full_path: str
+class GainReference(BaseModel):
+    gain_ref: Path
+    rescale: bool = True
+    eer: bool = False
+    tag: str = ""
+
+
+class FractionationParameters(BaseModel):
+    fractionation: int
+    dose_per_frame: float
+    num_frames: int = 0
+    eer_path: Optional[str] = None
+    fractionation_file_name: str = "eer_fractionation.txt"
+
+
+"""
+Cryo-CLEM
+=========
+Models related to the cryo-CLEM workflow.
+"""
 
 
 class LifFileInfo(BaseModel):
@@ -96,27 +160,60 @@ class LifFileInfo(BaseModel):
     description: str = ""
 
 
+class TiffSeriesInfo(BaseModel):
+    series_name: str
+    tiff_files: List[Path]
+    tiff_sizes: List[int]
+    tiff_timestamps: List[float]
+    series_metadata: Path
+    metadata_size: int
+    metadata_timestamp: float
+    description: str = ""
+
+
+"""
+FIB
+===
+Models related to FIB, as part of correlative workflow with TEM.
+"""
+
+
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
+class BLSampleParameters(BaseModel):
+    sample_group_id: int
+
+
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
+
+
+"""
+Single Particle Analysis
+========================
+Models related to the single-particle analysis workflow.
+"""
+
+
 class SPAProcessingParameters(BaseModel):
     job_id: int
-
-
-class ProcessFile(BaseModel):
-    path: str
-    description: str
-    tag: str
-    data_collection_id: Optional[int]
-    image_number: int
-    pixel_size: float
-    dose_per_frame: float
-    processing_job: Optional[int] = None
-    autoproc_program_id: Optional[int] = None
-    mc_uuid: Optional[int] = None
-    voltage: float = 300
-    mc_binning: int = 1
-    gain_ref: Optional[str] = None
-    extract_downscale: int = 1
-    eer_fractionation_file: Optional[str] = None
-    group_tag: Optional[str] = None
 
 
 class SPAProcessFile(BaseModel):
@@ -135,92 +232,6 @@ class SPAProcessFile(BaseModel):
     extract_downscale: bool = True
     eer_fractionation_file: Optional[str] = None
     source: str = ""
-
-
-class TiltInfo(BaseModel):
-    tilt_series_tag: str
-    movie_path: str
-    source: str
-
-
-class TiltSeriesInfo(BaseModel):
-    session_id: int
-    tag: str
-    source: str
-
-
-class TiltSeriesGroupInfo(BaseModel):
-    tags: List[str]
-    source: str
-    tilt_series_lengths: List[int]
-
-
-class CompletedTiltSeries(BaseModel):
-    tilt_series: List[str]
-    rsync_source: str
-
-
-class SuggestedPathParameters(BaseModel):
-    base_path: Path
-    touch: bool = False
-    extra_directory: str = ""
-
-
-class DCGroupParameters(BaseModel):
-    experiment_type: str
-    experiment_type_id: int
-    tag: str
-    atlas: str = ""
-    sample: Optional[int] = None
-
-
-class DCParameters(BaseModel):
-    voltage: float
-    pixel_size_on_image: str
-    experiment_type: str
-    image_size_x: int
-    image_size_y: int
-    file_extension: str
-    acquisition_software: str
-    image_directory: str
-    tag: str
-    source: str
-    magnification: float
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
-    phase_plate: bool = False
-    data_collection_tag: str = ""
-
-
-class PreprocessingParametersTomo(BaseModel):
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    manual_tilt_offset: float
-    file_extension: str
-    tag: str
-    tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
-    eer_fractionation: int
-
-    class Base(BaseModel):
-        dose_per_frame: float
-        gain_ref: Optional[str]
-        manual_tilt_offset: float
-        eer_fractionation: int
-
-
-class ProcessingParametersTomo(BaseModel):
-    manual_tilt_offset: int
-    tag: str
-    tilt_series_tag: str
 
 
 class ProcessingParametersSPA(BaseModel):
@@ -260,50 +271,6 @@ class ProcessingParametersSPA(BaseModel):
         downscale: bool
         small_boxsize: Optional[int]
         eer_fractionation: int
-
-
-class ProcessingJobParameters(BaseModel):
-    tag: str
-    recipe: str
-    parameters: Dict[str, Any] = {}
-    experiment_type: str = "spa"
-
-
-class RegistrationMessage(BaseModel):
-    registration: str
-    params: Optional[Dict[str, Any]] = None
-
-
-class ConnectionFileParameters(BaseModel):
-    filename: str
-    destinations: List[str]
-
-
-class GainReference(BaseModel):
-    gain_ref: Path
-    rescale: bool = True
-    eer: bool = False
-    tag: str = ""
-
-
-class SessionInfo(BaseModel):
-    session_id: Optional[int]
-    session_name: str = ""
-    rescale: bool = True
-
-
-class MillingParameters(BaseModel):
-    lamella_number: int
-    images: List[str]
-    raw_directory: str
-
-
-class FractionationParameters(BaseModel):
-    fractionation: int
-    dose_per_frame: float
-    num_frames: int = 0
-    eer_path: Optional[str] = None
-    fractionation_file_name: str = "eer_fractionation.txt"
 
 
 class GridSquareParameters(BaseModel):
@@ -352,3 +319,81 @@ class CurrentGainRef(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+"""
+Tomography
+==========
+Models related to the tomographic reconstruction workflow.
+"""
+
+
+class ProcessFile(BaseModel):  # Rename to TomoProcessFile
+    path: str
+    description: str
+    tag: str
+    data_collection_id: Optional[int]
+    image_number: int
+    pixel_size: float
+    dose_per_frame: float
+    processing_job: Optional[int] = None
+    autoproc_program_id: Optional[int] = None
+    mc_uuid: Optional[int] = None
+    voltage: float = 300
+    mc_binning: int = 1
+    gain_ref: Optional[str] = None
+    extract_downscale: int = 1
+    eer_fractionation_file: Optional[str] = None
+    group_tag: Optional[str] = None
+
+
+class TiltInfo(BaseModel):
+    tilt_series_tag: str
+    movie_path: str
+    source: str
+
+
+class TiltSeriesInfo(BaseModel):
+    client_id: int
+    tag: str
+    source: str
+
+
+class TiltSeriesGroupInfo(BaseModel):
+    tags: List[str]
+    source: str
+    tilt_series_lengths: List[int]
+
+
+class CompletedTiltSeries(BaseModel):
+    tilt_series: List[str]
+    rsync_source: str
+
+
+class PreprocessingParametersTomo(BaseModel):
+    dose_per_frame: float
+    gain_ref: Optional[str]
+    experiment_type: str
+    voltage: float
+    image_size_x: int
+    image_size_y: int
+    pixel_size_on_image: str
+    motion_corr_binning: int
+    manual_tilt_offset: float
+    file_extension: str
+    tag: str
+    tilt_series_tag: str
+    eer_fractionation_file: Optional[str]
+    eer_fractionation: int
+
+    class Base(BaseModel):
+        dose_per_frame: float
+        gain_ref: Optional[str]
+        manual_tilt_offset: float
+        eer_fractionation: int
+
+
+class ProcessingParametersTomo(BaseModel):
+    manual_tilt_offset: int
+    tag: str
+    tilt_series_tag: str

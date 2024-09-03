@@ -19,7 +19,7 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
-import murfey.server.bootstrap
+import murfey.server.api.bootstrap
 import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
@@ -37,7 +37,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.auth import validate_token
+from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import MachineConfig, from_file
 from murfey.util.db import (
@@ -95,7 +95,7 @@ from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
 
-tags_metadata = [murfey.server.bootstrap.tag]
+tags_metadata = [murfey.server.api.bootstrap.tag]
 
 router = APIRouter(dependencies=[Depends(validate_token)])
 router.raw_count = 2
@@ -910,7 +910,7 @@ def flush_spa_processing(
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params["angpix"],
+                "pixel_size": proc_params["angpix"],
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[2 * i],

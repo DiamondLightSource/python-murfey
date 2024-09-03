@@ -1,3 +1,9 @@
+"""
+Watches the specified directory, crawling through it recursively to identify potential
+files for transfer, and notifies listening processes to perform the transfer on files
+that are ready.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -86,12 +92,17 @@ class DirWatcher(murfey.util.Observer):
             time.sleep(15)
 
     def scan(self, modification_time: float | None = None, transfer_all: bool = False):
+        """
+        Scans the specified directory and its subdirectories recursively for files, and
+        compiles of a list of files to send for transfer.
+        """
         try:
             filelist = self._scan_directory(
                 modification_time=self._modification_overwrite or modification_time
             )
             scan_completion = time.time()
 
+            # Update the timestamps associated with the discovered files
             for entry, entry_info in filelist.items():
                 if self._lastscan is not None and entry_info != self._lastscan.get(
                     entry
@@ -100,6 +111,7 @@ class DirWatcher(murfey.util.Observer):
                         settling_time=scan_completion
                     )
 
+            # Create a list of files sroted based on their timestamps
             files_for_transfer = []
             time_ordered_file_candidates = sorted(
                 self._file_candidates,
@@ -112,8 +124,10 @@ class DirWatcher(murfey.util.Observer):
                 else:
                     ordered_file_candidates.append(x)
 
+            # Check if files are ready, and append them for transfer
             for x in ordered_file_candidates:
                 if x not in filelist:
+                    # Delete file from file candidates list if they're no longer there
                     log.info(f"Previously seen file {x!r} has disappeared")
                     del self._file_candidates[x]
                     continue
@@ -142,9 +156,11 @@ class DirWatcher(murfey.util.Observer):
                                         / Path(x).relative_to(self._basepath).parts[0]
                                     )
                                     if top_level_dir.is_dir():
-                                        # touch the changing directory so that when _modification_overwrite is set
-                                        # we don't potentially catch old directories that aren't changing
-                                        # this means it will only autodetect new directories from this point
+                                        # Touch the changing directory so that we don't
+                                        # potentially catch old directories that aren't
+                                        # changing when _modification_overwrite is set.
+                                        # This means it will only autodetect new
+                                        # directories from this point.
                                         top_level_dir.touch(exist_ok=True)
                                         filelist.update(
                                             self._scan_directory(
@@ -168,12 +184,17 @@ class DirWatcher(murfey.util.Observer):
                         f"Found file {Path(x).name!r} for potential future transfer"
                     )
 
+            # Notify secondary listening processes and add files to scan history
             self.notify(files_for_transfer, secondary=True)
             self._lastscan = filelist
         except Exception as e:
             log.error(f"Exception encountered: {e}")
 
     def _notify_for_transfer(self, file_candidate: str) -> bool:
+        """
+        Perform a Boolean check to see if a file is ready to be transferred, and
+        removes it from the file candidates list.
+        """
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
         if self._statusbar:
             # log.info("Increasing number to be transferred")
@@ -183,9 +204,12 @@ class DirWatcher(murfey.util.Observer):
                     self._statusbar.transferred[1] + 1,
                 ]
 
+        # Check that it's not a hidden file, ".", "..", or still downloading
         transfer_check = not Path(file_candidate).name.startswith(".") and not Path(
             file_candidate
         ).name.endswith("downloading")
+
+        # Notify primary listeners that file is ready, and delete it from candidates list
         if transfer_check:
             self.notify(Path(file_candidate))
         del self._file_candidates[file_candidate]
@@ -194,6 +218,10 @@ class DirWatcher(murfey.util.Observer):
     def _scan_directory(
         self, path: str = "", modification_time: float | None = None
     ) -> dict[str, _FileInfo]:
+        """
+        Explores the specified directory and its subdirectories recursively to identify
+        files for potential transfer, returning them as dictionary entries.
+        """
         result: dict[str, _FileInfo] = {}
         try:
             directory_contents = os.scandir(os.path.join(self._basepath, path))
@@ -212,9 +240,11 @@ class DirWatcher(murfey.util.Observer):
             ):
                 result.update(self._scan_directory(entry_name))
             else:
-                # avoid textual log
+                # Exclude textual log
                 if "textual" in str(entry):
                     continue
+
+                # Get file statistics and append file to dictionary
                 try:
                     file_stat = entry.stat()
                 except FileNotFoundError:

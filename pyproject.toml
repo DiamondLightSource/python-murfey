@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.11.17"
+version = "0.12.3"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -30,7 +30,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "pydantic<2", # Pip hops between installing v2.7 or v1.10 depending on which of the additional dependencies are requested
+    "defusedxml", # For safely parsing XML files
+    "pydantic<2", # Locked to <2 by zocalo
     "requests",
     "rich",
     "werkzeug",
@@ -51,33 +52,22 @@ developer = [
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
 ]
-instrument = [
-    "fastapi",
-    "procrunner",
-    "python-jose",
-    "pyyaml",
-    "textual==0.42.0",
-    "uvicorn",
-    "websocket-client",
-    "xmltodict",
-]
 server = [
     # "matplotlib", # For visual statistical analysis of images
-    "aiohttp",
     "cryptography",
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
+    "mrcfile",
     "numpy",
     "packaging",
     "passlib",
     "pillow",
     "prometheus_client",
     "python-jose[cryptography]",
-    "readlif", # Specific to cryo-CLEM workflow
+    "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
-    "tifffile", # Specific to cryo-CLEM workflow
     "uvicorn[standard]",
     "zocalo",
 ]
@@ -95,7 +85,6 @@ murfey = "murfey.client:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
 "murfey.hub" = "murfey.hub:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
-"murfey.lif_to_tiff" = "murfey.cli.lif_to_tiff:run"
 "murfey.server" = "murfey.server:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
@@ -103,7 +92,8 @@ murfey = "murfey.client:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.workflows"]
-"lif_to_tiff" = "murfey.workflows.lif_to_tiff:zocalo_cluster_request"
+"lif_to_stack" = "murfey.workflows.lif_to_stack:zocalo_cluster_request"
+"tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

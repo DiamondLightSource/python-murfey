@@ -7,7 +7,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List
 
-import packaging.version
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -47,7 +46,8 @@ from murfey.server import (
     sanitise,
     templates,
 )
-from murfey.server.auth import validate_token
+from murfey.server.api.auth import validate_token
+from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import from_file, settings
@@ -613,6 +613,25 @@ def register_tilt_series(
     db.commit()
 
 
+@router.post("/sessions/{session_id}/tilt_series_length")
+def register_tilt_series_length(
+    session_id: int,
+    tilt_series_group: TiltSeriesGroupInfo,
+    db=murfey_db,
+):
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts_index = tilt_series_group.tags.index(ts.tag)
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
+        db.add(ts)
+    db.commit()
+
+
 @router.post("/visits/{visit_name}/{session_id}/completed_tilt_series")
 def register_completed_tilt_series(
     visit_name: str,
@@ -641,6 +660,7 @@ def register_completed_tilt_series(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
                 )
                 .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == tilt_series_group.source)
                 .where(DataCollection.tag == ts.tag)
                 .where(DataCollection.dcg_id == DataCollectionGroup.id)
                 .where(ProcessingJob.dc_id == DataCollection.id)
@@ -662,11 +682,15 @@ def register_completed_tilt_series(
                 "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
             )
             sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            extra_path = machine_config.processed_extra_directory
             stack_file = (
                 core
                 / machine_config.processed_directory_name
                 / sub_dataset
-                / "align_output"
+                / extra_path
+                / "Tomograms"
+                / "job006"
+                / "tomograms"
                 / f"{ts.tag}_stack.mrc"
             )
             if not stack_file.parent.exists():
@@ -680,7 +704,7 @@ def register_completed_tilt_series(
                     "dcid": ids.dcid,
                     "appid": ids.appid,
                     "stack_file": str(stack_file),
-                    "pix_size": preproc_params.pixel_size,
+                    "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
                 },
@@ -985,8 +1009,11 @@ async def request_spa_preprocessing(
             Path(secure_filename(str(mrc_out))).parent.mkdir(
                 parents=True, exist_ok=True
             )
+        recipe_name = machine_config.recipes.get(
+            "em-spa-preprocess", "em-spa-preprocess"
+        )
         zocalo_message = {
-            "recipes": ["em-spa-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
@@ -995,7 +1022,7 @@ async def request_spa_preprocessing(
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": proc_params["angpix"],
+                "pixel_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
@@ -1007,6 +1034,7 @@ async def request_spa_preprocessing(
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "cryolo_model_weights": str(_cryolo_model_path(visit_name)),
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
@@ -1043,22 +1071,18 @@ async def request_tomography_preprocessing(
     core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
     ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
     sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    extra_path = machine_config.processed_extra_directory
     mrc_out = (
         core
         / machine_config.processed_directory_name
         / sub_dataset
+        / extra_path
         / "MotionCorr"
+        / "job002"
+        / "Movies"
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
-    ctf_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / "CTF"
-        / str(ppath.stem + "_ctf.mrc")
-    )
-    ctf_out = Path("/".join(secure_filename(p) for p in ctf_out.parts))
     data_collection = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1081,8 +1105,6 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
-        if not ctf_out.parent.exists():
-            ctf_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
@@ -1093,8 +1115,7 @@ async def request_tomography_preprocessing(
                 "autoproc_program_id": appid,
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pix_size": (proc_file.pixel_size) * 10**10,
-                "output_image": str(ctf_out),
+                "pixel_size": (proc_file.pixel_size) * 10**10,
                 "image_number": proc_file.image_number,
                 "kv": int(proc_file.voltage),
                 "microscope": get_microscope(),
@@ -1132,23 +1153,6 @@ async def request_tomography_preprocessing(
     return proc_file
 
 
-@router.get("/version")
-def get_version(client_version: str = ""):
-    result = {
-        "server": murfey.__version__,
-        "oldest-supported-client": murfey.__supported_client_version__,
-    }
-
-    if client_version:
-        client = packaging.version.parse(client_version)
-        server = packaging.version.parse(murfey.__version__)
-        minimum_version = packaging.version.parse(murfey.__supported_client_version__)
-        result["client-needs-update"] = minimum_version > client
-        result["client-needs-downgrade"] = client > server
-
-    return result
-
-
 @router.post("/visits/{visit_name}/suggested_path")
 def suggest_path(visit_name: str, params: SuggestedPathParameters):
     count: int | None = None
@@ -1164,9 +1168,9 @@ def suggest_path(visit_name: str, params: SuggestedPathParameters):
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir()
+        check_path.mkdir(mode=0o750)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir()
+            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 

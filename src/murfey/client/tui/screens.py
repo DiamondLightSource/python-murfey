@@ -349,6 +349,7 @@ class LaunchScreen(Screen):
                     defd,
                     self.app._environment,
                     self.app.analysers,
+                    touch=True,
                 )
                 visit_path = defd + f"/{text}"
                 if self.app._environment.processing_only_mode:

@@ -11,9 +11,10 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseSettings
 
 import murfey.server
-import murfey.server.auth.api
-import murfey.server.bootstrap
-import murfey.server.clem.api
+import murfey.server.api.auth
+import murfey.server.api.bootstrap
+import murfey.server.api.clem
+import murfey.server.api.spa
 import murfey.server.display.api
 import murfey.server.instrument.api
 import murfey.server.websocket
@@ -29,7 +30,7 @@ else:
 
 log = logging.getLogger("murfey.server.main")
 
-tags_metadata = [murfey.server.bootstrap.tag]
+tags_metadata = [murfey.server.api.bootstrap.tag]
 
 
 class Settings(BaseSettings):
@@ -58,12 +59,14 @@ app.mount("/images", StaticFiles(directory=template_files / "images"), name="ima
 
 # Add router endpoints to the API
 app.include_router(router)
-app.include_router(murfey.server.bootstrap.bootstrap)
-app.include_router(murfey.server.bootstrap.cygwin)
-app.include_router(murfey.server.bootstrap.pypi)
-app.include_router(murfey.server.bootstrap.plugins)
-app.include_router(murfey.server.clem.api.router)
-app.include_router(murfey.server.auth.api.router)
+app.include_router(murfey.server.api.bootstrap.bootstrap)
+app.include_router(murfey.server.api.bootstrap.cygwin)
+app.include_router(murfey.server.api.bootstrap.pypi)
+app.include_router(murfey.server.api.bootstrap.plugins)
+app.include_router(murfey.server.api.bootstrap.version)
+app.include_router(murfey.server.api.clem.router)
+app.include_router(murfey.server.api.spa.router)
+app.include_router(murfey.server.api.auth.router)
 app.include_router(murfey.server.display.api.router)
 app.include_router(murfey.server.instrument.api.router)
 app.include_router(murfey.server.websocket.ws)

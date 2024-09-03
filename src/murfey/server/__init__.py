@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
+import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch, wraps
@@ -10,6 +12,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Annotated, Any, Callable, Dict, List, NamedTuple, Tuple
 
+import mrcfile
 import numpy as np
 import uvicorn
 import workflows
@@ -40,9 +43,14 @@ import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
-from murfey.server.auth import validate_session_access
+from murfey.server.api.auth import validate_session_access
 from murfey.server.murfey_db import url  # murfey_db
-from murfey.util.config import get_hostname, get_machine_config, get_microscope
+from murfey.util.config import (
+    MachineConfig,
+    get_hostname,
+    get_machine_config,
+    get_microscope,
+)
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -157,11 +165,15 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
         core = Path(*Path(mov_path).parts[: visit_idx + 1])
         ppath = Path(mov_path)
         sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+        extra_path = machine_config.processed_extra_directory
         mrc_out = (
             core
             / machine_config.processed_directory_name
             / sub_dataset
+            / extra_path
             / "MotionCorr"
+            / "job002"
+            / "Movies"
             / str(ppath.stem + "_motion_corrected.mrc")
         )
         return str(mrc_out)
@@ -654,7 +666,7 @@ def _register_picked_particles_use_diameter(
                         "micrographs_file": saved_message.micrographs_file,
                         "coord_list_file": saved_message.coord_list_file,
                         "output_file": saved_message.extract_file,
-                        "pix_size": (
+                        "pixel_size": (
                             relion_options["angpix"]
                             * relion_options["motion_corr_binning"]
                         ),
@@ -690,7 +702,7 @@ def _register_picked_particles_use_diameter(
                     "micrographs_file": params_to_forward["micrographs_file"],
                     "coord_list_file": params_to_forward["coord_list_file"],
                     "output_file": params_to_forward["extract_file"],
-                    "pix_size": (
+                    "pixel_size": (
                         relion_options["angpix"] * relion_options["motion_corr_binning"]
                     ),
                     "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
@@ -806,7 +818,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "micrographs_file": params_to_forward["micrographs_file"],
             "coord_list_file": params_to_forward["coord_list_file"],
             "output_file": params_to_forward["extract_file"],
-            "pix_size": relion_params.angpix * relion_params.motion_corr_binning,
+            "pixel_size": relion_params.angpix * relion_params.motion_corr_binning,
             "ctf_image": params_to_forward["ctf_values"]["CtfImage"],
             "ctf_max_resolution": params_to_forward["ctf_values"]["CtfMaxResolution"],
             "ctf_figure_of_merit": params_to_forward["ctf_values"]["CtfFigureOfMerit"],
@@ -1518,6 +1530,102 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
+def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
+    if machine_config.initial_model_search_directory:
+        visit_directory = (
+            machine_config.rsync_basepath
+            / (machine_config.rsync_module or "data")
+            / str(datetime.now().year)
+            / visit
+        )
+        possible_models = [
+            p
+            for p in (
+                visit_directory / machine_config.initial_model_search_directory
+            ).glob("*.mrc")
+            if "rescaled" not in p.name
+        ]
+        if possible_models:
+            return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
+    return None
+
+
+def _downscaled_box_size(
+    particle_diameter: int, pixel_size: float
+) -> Tuple[int, float]:
+    box_size = int(math.ceil(1.2 * particle_diameter))
+    box_size = box_size + box_size % 2
+    for small_box_pix in (
+        48,
+        64,
+        96,
+        128,
+        160,
+        192,
+        256,
+        288,
+        300,
+        320,
+        360,
+        384,
+        400,
+        420,
+        450,
+        480,
+        512,
+        640,
+        768,
+        896,
+        1024,
+    ):
+        # Don't go larger than the original box
+        if small_box_pix > box_size:
+            return box_size, pixel_size
+        # If Nyquist freq. is better than 8.5 A, use this downscaled box, else step size
+        small_box_angpix = pixel_size * box_size / small_box_pix
+        if small_box_angpix < 4.25:
+            return small_box_pix, small_box_angpix
+    raise ValueError(f"Box size is too large: {box_size}")
+
+
+def _resize_intial_model(
+    downscaled_box_size: int,
+    downscaled_pixel_size: float,
+    input_path: Path,
+    output_path: Path,
+    executables: Dict[str, str],
+    env: Dict[str, str],
+) -> None:
+    if executables.get("relion_image_handler"):
+        comp_proc = subprocess.run(
+            [
+                f"{executables['relion_image_handler']}",
+                "--i",
+                str(input_path),
+                "--new_box",
+                str(downscaled_box_size),
+                "--rescale_angpix",
+                str(downscaled_pixel_size),
+                "--o",
+                str(output_path),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        with mrcfile.open(output_path) as rescaled_mrc:
+            rescaled_mrc.header.cella = (
+                downscaled_pixel_size,
+                downscaled_pixel_size,
+                downscaled_pixel_size,
+            )
+        if comp_proc.returncode:
+            logger.error(
+                f"Resizing initial model {input_path} failed \n {comp_proc.stdout}"
+            )
+    return None
+
+
 def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
@@ -1537,6 +1645,61 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         )
     ).one()
     other_options = dict(feedback_params)
+
+    visit_name = (
+        _db.exec(
+            select(db.ClientEnvironment).where(
+                db.ClientEnvironment.session_id == message["session_id"]
+            )
+        )
+        .one()
+        .visit
+    )
+
+    provided_initial_model = _find_initial_model(visit_name, machine_config)
+    if provided_initial_model and not feedback_params.initial_model:
+        rescaled_initial_model_path = (
+            provided_initial_model.parent
+            / f"{provided_initial_model.stem}_rescaled_{pj_id}{provided_initial_model.suffix}"
+        )
+        if not rescaled_initial_model_path.is_file():
+            _resize_intial_model(
+                *_downscaled_box_size(
+                    message["particle_diameter"],
+                    relion_options["angpix"],
+                ),
+                provided_initial_model,
+                rescaled_initial_model_path,
+                machine_config.external_executables,
+                machine_config.external_environment,
+            )
+            feedback_params.initial_model = str(rescaled_initial_model_path)
+            other_options["initial_model"] = str(rescaled_initial_model_path)
+            next_job = feedback_params.next_job
+            class3d_dir = (
+                f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+            )
+            feedback_params.next_job += 1
+            _db.add(feedback_params)
+            _db.commit()
+
+            class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+            class_uuids = _murfey_id(message["program_id"], _db, number=4)
+            class3d_params = db.Class3DParameters(
+                pj_id=pj_id,
+                murfey_id=class3d_grp_uuid,
+                particles_file=class3d_message["particles_file"],
+                class3d_dir=class3d_dir,
+                batch_size=class3d_message["batch_size"],
+            )
+            _db.add(class3d_params)
+            _db.commit()
+            _murfey_class3ds(
+                class_uuids,
+                class3d_message["particles_file"],
+                message["program_id"],
+                _db,
+            )
 
     if feedback_params.hold_class3d:
         # If waiting then save the message
@@ -1644,7 +1807,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += 1
+        feedback_params.hold_class3d = True
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -1738,7 +1901,7 @@ def _flush_spa_preprocessing(message: dict):
                 "autoproc_program_id": collected_ids[3].id,
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params.angpix,
+                "pixel_size": proc_params.angpix,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[2 * i],
@@ -1834,7 +1997,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
                 "mrc_out": f.mrc_out,
-                "pix_size": proc_params.pixel_size,
+                "pixel_size": proc_params.pixel_size,
                 "kv": proc_params.voltage,
                 "image_number": f.image_number,
                 "microscope": get_microscope(),
@@ -2165,6 +2328,20 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.AutoProcProgram.id == message["program_id"])
             ).one()
             session_id = collected_ids[0].session_id
+
+            # Find the autoprocprogram id for the alignment recipe
+            alignment_ids = murfey_db.exec(
+                select(
+                    db.DataCollection,
+                    db.ProcessingJob,
+                    db.AutoProcProgram,
+                )
+                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                .where(db.DataCollection.id == collected_ids[1].id)
+                .where(db.ProcessingJob.recipe == "em-tomo-align")
+            ).one()
+
             relevant_tilt_and_series = murfey_db.exec(
                 select(db.Tilt, db.TiltSeries)
                 .where(db.Tilt.movie_path == message.get("movie"))
@@ -2185,11 +2362,13 @@ def feedback_callback(header: dict, message: dict) -> None:
 
                 machine_config = get_machine_config()
                 tilts = get_all_tilts(relevant_tilt_series.id)
-                ids = get_job_ids(relevant_tilt_series.id, message["program_id"])
+                ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[1]
-                    / "align_output"
+                    / "Tomograms"
+                    / "job006"
+                    / "tomograms"
                     / f"{relevant_tilt_series.tag}_stack.mrc"
                 )
                 if not stack_file.parent.exists():
@@ -2203,7 +2382,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
-                        "pix_size": preproc_params.pixel_size,
+                        "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
                     },
@@ -2220,6 +2399,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
 
+            prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             murfey_db.commit()
             murfey_db.close()
             if _transport_object:
@@ -2437,24 +2617,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_tomography_preprocess":
-            thread = Thread(
-                target=_flush_tomography_preprocessing,
-                args=message,
-                name="tomography_flush",
-                daemon=True,
-            )
-            thread.start()
+            _flush_tomography_preprocessing(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_spa_preprocess":
-            thread = Thread(
-                target=_flush_spa_preprocessing,
-                args=message,
-                name="spa_flush",
-                daemon=True,
-            )
-            thread.start()
+            _flush_spa_preprocessing(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None

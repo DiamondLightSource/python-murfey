@@ -87,7 +87,7 @@ def _get_tilt_series_v5_12(p: Path) -> str:
     angle_idx = _find_angle_index(split_name)
     if split_name[angle_idx - 2].isnumeric():
         return split_name[angle_idx - 2]
-    return "0"
+    return ""
 
 
 def _get_tilt_angle_v5_12(p: Path) -> str:
@@ -119,14 +119,10 @@ tomo_tilt_info = {
 }
 
 
-def _construct_tilt_series_name(
-    tilt_tag: str, tilt_series: str, file_path: Path
-) -> str:
-    if tilt_tag:
-        if f"{tilt_tag}_{tilt_series}" in file_path.name:
-            return f"{tilt_tag}_{tilt_series}"
-        return f"{tilt_tag}{tilt_series}"
-    return tilt_series
+def _construct_tilt_series_name(file_path: Path) -> str:
+    # Assuming files end with _{tiltnumber}_{angle}_{date}_{time}_{fractions}.{suffix}
+    split_name = file_path.name.split("_")
+    return "_".join(split_name[:-5])
 
 
 def _midpoint(angles: List[float]) -> int:
@@ -397,18 +393,13 @@ class TomographyContext(Context):
         if not self._extract_tilt_tag:
             self._extract_tilt_tag = extract_tilt_tag
         try:
-            tilt_series_num = extract_tilt_series(file_path)
             tilt_angle = extract_tilt_angle(file_path)
-            tilt_tag = extract_tilt_tag(file_path)
             try:
-                float(tilt_series_num)
                 float(tilt_angle)
             except ValueError:
-                logger.error(f"whoops, {tilt_series_num}, {tilt_angle}")
+                logger.error(f"whoops, {tilt_angle}")
                 return []
-            tilt_series = _construct_tilt_series_name(
-                tilt_tag, tilt_series_num, file_path
-            )
+            tilt_series = _construct_tilt_series_name(file_path)
 
         except Exception:
             logger.debug(
@@ -557,11 +548,8 @@ class TomographyContext(Context):
 
         res = []
         if self._last_transferred_file:
-            last_tilt_series = (
-                f"{extract_tilt_tag(self._last_transferred_file)}_{extract_tilt_series(self._last_transferred_file)}"
-                if extract_tilt_tag(self._last_transferred_file)
-                else extract_tilt_series(self._last_transferred_file)
-            )
+            last_tilt_series = _construct_tilt_series_name(self._last_transferred_file)
+
             last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
             self._last_transferred_file = file_path
             if (
@@ -740,9 +728,7 @@ class TomographyContext(Context):
                 tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
             tilt_info_extraction = tomo_tilt_info["5.7"]
-        tilt_tag = tilt_info_extraction.tag(file_path)
-        tilt_series_num = tilt_info_extraction.series(file_path)
-        tilt_series = _construct_tilt_series_name(tilt_tag, tilt_series_num, file_path)
+        tilt_series = _construct_tilt_series_name(file_path)
         return self._add_tilt(
             file_path,
             tilt_info_extraction.series,
@@ -835,6 +821,21 @@ class TomographyContext(Context):
                             ),
                             environment=environment,
                         )
+
+                    # Always update the tilt series length in the database after an mdoc
+                    if environment.murfey_session is not None:
+                        length_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tilt_series_length"
+                        capture_post(
+                            length_url,
+                            json={
+                                "tags": [tilt_series],
+                                "source": str(transferred_file.parent),
+                                "tilt_series_lengths": [
+                                    self._tilt_series_sizes[tilt_series]
+                                ],
+                            },
+                        )
+
         if completed_tilts and environment:
             logger.info(
                 f"The following tilt series are considered complete: {completed_tilts} "
@@ -985,7 +986,7 @@ class TomographyContext(Context):
                     metadata_file.parent / data_file
                 )
         except Exception as e:
-            logger.warning(f"Exception encountered in metadata gathering: {str(e)}")
+            logger.error(f"Exception encountered in metadata gathering: {str(e)}")
             return OrderedDict({})
 
         return mdoc_metadata

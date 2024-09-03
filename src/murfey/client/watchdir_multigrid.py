@@ -9,7 +9,7 @@ from typing import List
 
 import murfey.util
 
-log = logging.getLogger("murfey.client.wathdir_multigrid")
+log = logging.getLogger("murfey.client.watchdir_multigrid")
 
 
 class MultigridDirWatcher(murfey.util.Observer):
