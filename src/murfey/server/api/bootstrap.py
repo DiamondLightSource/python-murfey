@@ -227,7 +227,7 @@ def parse_cygwin_request(request_path: str):
         raise ValueError(f"{request_path!r} is not a valid request path")
 
     try:
-        url = quote(f"{find_cygwin_mirror()}{request_path}")
+        url = f"{find_cygwin_mirror()}{quote(request_path)}"
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
@@ -306,7 +306,7 @@ def get_msys2_package_index(environment: str, architecture: str) -> Response:
         raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Construct URL to main MSYS repo and get response
-    base_url = quote(f"https://repo.msys2.org/{environment}/{architecture}")
+    base_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}"
     index = requests.get(base_url)
 
     # Parse and rewrite package index content
@@ -360,9 +360,7 @@ def get_msys2_package(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = quote(
-        f"https://repo.msys2.org/{environment}/{architecture}/{package}"
-    )
+    package_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}/{quote(package)}"
     original_file = requests.get(package_url)
 
     if original_file.status_code == 200:
