@@ -135,9 +135,8 @@ def get_murfey_wheel():
             filename = wheel_file.decode("latin-1") + ".whl"
             version = packaging.version.parse(filename.split("-")[1])
             wheels[version] = filename
-        # Ignore searches that fail to turn up wheels
         except Exception:
-            pass
+            pass  # Ignore searches that fail to return wheels
     if not wheels:
         raise HTTPException(
             status_code=404, detail="Could not identify appropriate version of Murfey"
@@ -345,7 +344,7 @@ def get_msys2_package_index(
 
 
 @msys2.get("/{environment}/{architecture}/{package}", response_class=Response)
-def get_msys2_package(
+def get_msys2_package_file(
     environment: str,
     architecture: str,
     package: str,
@@ -370,16 +369,16 @@ def get_msys2_package(
 
     # Construct URL to main MSYS repo and get response
     package_url = f"https://repo.msys2.org/{quote(environment)}/{quote(architecture)}/{quote(package)}"
-    original_file = requests.get(package_url)
+    package_file = requests.get(package_url)
 
-    if original_file.status_code == 200:
+    if package_file.status_code == 200:
         return Response(
-            content=original_file.content,
-            media_type=original_file.headers.get("Content-Type"),
-            status_code=original_file.status_code,
+            content=package_file.content,
+            media_type=package_file.headers.get("Content-Type"),
+            status_code=package_file.status_code,
         )
     else:
-        raise HTTPException(status_code=original_file.status_code)
+        raise HTTPException(status_code=package_file.status_code)
 
 
 """
