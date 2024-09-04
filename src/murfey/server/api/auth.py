@@ -12,8 +12,8 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlmodel import Session, create_engine, select
 
-from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import url
+from murfey.util.config import get_machine_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
