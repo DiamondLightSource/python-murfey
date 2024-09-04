@@ -17,6 +17,7 @@ import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -221,7 +222,9 @@ def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingPar
     return results
 
 
-def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
+def respond_with_template(
+    request: Request, filename: str, parameters: dict[str, Any] | None = None
+):
     template_parameters = {
         "hostname": get_hostname(),
         "microscope": get_microscope(),
@@ -229,7 +232,9 @@ def respond_with_template(filename: str, parameters: dict[str, Any] | None = Non
     }
     if parameters:
         template_parameters.update(parameters)
-    return templates.TemplateResponse(filename, template_parameters)
+    return templates.TemplateResponse(
+        request=request, name=filename, context=template_parameters
+    )
 
 
 def run():
@@ -2367,7 +2372,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
-                    Path(message["mrc_out"]).parents[1]
+                    Path(message["mrc_out"]).parents[3]
                     / "Tomograms"
                     / "job006"
                     / "tomograms"
