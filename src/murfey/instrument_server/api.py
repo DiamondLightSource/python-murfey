@@ -223,6 +223,7 @@ def get_possible_gain_references() -> List[File]:
                     full_path=str(gf),
                 )
             )
+    candidates.sort(key=lambda x: x.timestamp, reverse=True)
     return candidates
 
 
