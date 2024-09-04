@@ -7,8 +7,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from sqlmodel import select
 
-from murfey.server import get_machine_config
 from murfey.server.murfey_db import murfey_db
+from murfey.util.config import get_machine_config
 from murfey.util.db import ClientEnvironment
 
 # Create APIRouter class object

@@ -13,8 +13,8 @@ from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
-from murfey.server.config import get_machine_config
 from murfey.server.murfey_db import murfey_db
+from murfey.util.config import get_machine_config
 from murfey.util.db import (
     CLEMImageMetadata,
     CLEMImageSeries,
