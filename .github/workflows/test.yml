@@ -1,0 +1,74 @@
+name: Run tests
+
+on: [push, pull_request]
+
+env:
+  DATABASE_SCHEMA: 4.2.1 # released 2024-08-19
+  # Installs from GitHub
+  # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
+  # Previous version(s):
+  # 4.1.0
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Syntax validation
+        run: |
+          python .github/workflows/scripts/syntax-validation.py
+      - name: Flake8 validation
+        run: |
+          pip install flake8
+          python .github/workflows/scripts/flake8-validation.py
+
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build python package
+        run: python3 -m build
+
+  get-database:
+    name: Build package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download ISPyB DB schema v${{ env.DATABASE_SCHEMA }} for tests
+        run: |
+          mkdir database
+          wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v${{ env.DATABASE_SCHEMA }}/ispyb-database-${{ env.DATABASE_SCHEMA }}.tar.gz -O database/ispyb-database.tar.gz
+      - name: Store database artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: database
+          path: database/
+
+  tests:
+    name: Call ci unit tests workflow
+    uses: ./.github/workflows/ci.yml
+    needs:
+      - build
+      - get-database
+      - static
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
