@@ -260,6 +260,12 @@ def run():
         "--temporary",
         action="store_true",
     )
+    parser.add_argument(
+        "--root-path",
+        default="",
+        type=str,
+        help="Uvicorn root path for use in conjunction with a proxy",
+    )
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -322,6 +328,7 @@ def run():
         ws_ping_interval=300,
         ws_ping_timeout=300,
         workers=args.workers,
+        root_path=args.root_path,
     )
 
     _running_server = uvicorn.Server(config=config)
