@@ -1,0 +1,124 @@
+# Contains tasks to be repeated when testing for the different Python versions listed
+# in the "Run unit tests" stage in .github/workflows/test-and-publish.yml
+name: Run tests
+
+on:
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: true
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+    services:
+      mariadb:
+        image: mariadb:11.3.2 # released 2024-05-06
+        # Pulls image from DockerHub
+        # Docker images: https://hub.docker.com/_/mariadb
+        # Previous version(s):
+        # 10.8 # released 2023-06-02
+        env:
+          MARIADB_DATABASE: ispybtest
+          MARIADB_ROOT_PASSWORD: mariadb_root_pwd
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Start RabbitMQ container
+        run: |
+          set -eux
+          mkdir rabbitmq-docker && cd rabbitmq-docker
+
+          cat <<EOF >rabbitmq.conf
+          # Allowing remote connections for default user is highly discouraged
+          # as it dramatically decreases the security of the system. Delete the user
+          # instead and create a new one with generated secure credentials.
+          loopback_users = none
+          EOF
+
+          cat <<EOF >Dockerfile
+          FROM rabbitmq:3.13-management
+          COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
+          EOF
+
+          docker build -t test-rabbitmq .
+          docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 test-rabbitmq
+          docker container list -a
+
+      - name: Get database
+        uses: actions/download-artifact@v4
+        with:
+          name: database
+          path: database/
+
+      - name: Install package
+        run: |
+          set -eux
+          pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
+
+      - uses: shogo82148/actions-setup-mysql@v1
+        with:
+          distribution: "mariadb"
+          mysql-version: "11.3"
+          auto-start: false
+
+      - name: Set up test database
+        run: |
+          set -eu
+          cp ".github/workflows/config/my.cnf" .my.cnf
+          tar xfz "database/ispyb-database.tar.gz"
+
+          printf 'Waiting for MySQL database to accept connections'
+          until mariadb --defaults-file=.my.cnf -e "SHOW DATABASES" >/dev/null; do printf '.'; sleep 10; done
+          printf '\n'
+
+          mariadb --defaults-file=.my.cnf -e "SET GLOBAL log_bin_trust_function_creators = 1;"
+          for f in schemas/ispyb/tables.sql \
+                   schemas/ispyb/lookups.sql \
+                   schemas/ispyb/data.sql \
+                   schemas/ispyb/routines.sql \
+                   grants/ispyb_processing.sql \
+                   grants/ispyb_import.sql; do
+              echo Importing ${f}...
+              mariadb --defaults-file=.my.cnf < $f
+          done
+          mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api@'%' IDENTIFIED BY 'password_1234'; GRANT ispyb_processing to ispyb_api@'%'; GRANT ispyb_import to ispyb_api@'%'; SET DEFAULT ROLE ispyb_processing FOR ispyb_api@'%';"
+          mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_future@'%' IDENTIFIED BY 'password_4321'; GRANT SELECT ON ispybtest.* to ispyb_api_future@'%';"
+          mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_sqlalchemy@'%' IDENTIFIED BY 'password_5678'; GRANT SELECT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT INSERT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT UPDATE ON ispybtest.* to ispyb_api_sqlalchemy@'%';"
+          rm .my.cnf
+
+      - name: Check RabbitMQ is alive
+        run: wget -t 10 -w 1 http://127.0.0.1:15672 -O -
+
+      - name: Run tests
+        run: |
+          export ISPYB_CREDENTIALS=".github/workflows/config/ispyb.cfg"
+          PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          name: ${{ matrix.python-version }}
+          files: coverage.xml
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+        timeout-minutes: 2
+
+      - name: Show RabbitMQ logs
+        if: always()
+        run: |
+          docker logs rabbitmq
+          docker stop rabbitmq

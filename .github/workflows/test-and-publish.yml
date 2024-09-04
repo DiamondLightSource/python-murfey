@@ -1,0 +1,137 @@
+name: Run tests and publish Python distribution to PyPI
+
+on: [push, pull_request]
+
+env:
+  DATABASE_SCHEMA: 4.2.1 # released 2024-08-19
+  # Installs from GitHub
+  # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
+  # Previous version(s):
+  # 4.1.0
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Syntax validation
+        run: |
+          python .github/workflows/scripts/syntax-validation.py
+      - name: Flake8 validation
+        run: |
+          pip install flake8
+          python .github/workflows/scripts/flake8-validation.py
+
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build python package
+        run: python3 -m build
+      - name: Download ISPyB DB schema v${{ env.DATABASE_SCHEMA }} for tests
+        run: |
+          mkdir database
+          wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v${{ env.DATABASE_SCHEMA }}/ispyb-database-${{ env.DATABASE_SCHEMA }}.tar.gz -O database/ispyb-database.tar.gz
+      - name: Store built package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-distributions
+          path: dist/
+      - name: Store database artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: database
+          path: database/
+
+  tests:
+    name: Call ci unit tests workflow
+    uses: ./.github/workflows/ci.yml
+    needs:
+      - build
+      - static
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  publish-to-pypi:
+    name: >-
+      Publish Python distribution to PyPI
+    if: startsWith(github.ref, 'refs/tags/') # only publish to PyPI on tag pushes
+    needs:
+      - tests
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/murfey
+    permissions:
+      id-token: write # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: package-distributions
+          path: dist/
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: >-
+      Sign the Python distribution with Sigstore
+      and upload them to GitHub Release
+    needs:
+      - publish-to-pypi
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # IMPORTANT: mandatory for making GitHub Releases
+      id-token: write # IMPORTANT: mandatory for sigstore
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: package-distributions
+          path: dist/
+      - name: Sign the dists with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create
+          '${{ github.ref_name }}'
+          --repo '${{ github.repository }}'
+          --notes ""
+      - name: Upload artifact signatures to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # Upload to GitHub Release using the `gh` CLI.
+        # `dist/` contains the built packages, and the
+        # sigstore-produced signatures and certificates.
+        run: >-
+          gh release upload
+          '${{ github.ref_name }}' dist/**
+          --repo '${{ github.repository }}'

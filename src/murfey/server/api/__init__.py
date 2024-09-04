@@ -116,9 +116,9 @@ router = APIRouter(dependencies=[Depends(validate_token)])
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse(
-        "home.html",
-        {
-            "request": request,
+        request=request,
+        name="home.html",
+        context={
             "hostname": get_hostname(),
             "microscope": get_microscope(),
             "version": murfey.__version__,
@@ -175,14 +175,16 @@ def all_visit_info(request: Request, db=murfey.server.ispyb.DB):
             f"{len(visits)} visits active for {microscope=}: {', '.join(v.name for v in visits)}"
         )
         return templates.TemplateResponse(
-            "activevisits.html",
-            {"request": request, "info": return_query, "microscope": microscope},
+            request=request,
+            name="activevisits.html",
+            context={"info": return_query, "microscope": microscope},
         )
     else:
         log.debug(f"No visits identified for {microscope=}")
         return templates.TemplateResponse(
-            "activevisits.html",
-            {"request": request, "info": [], "microscope": microscope},
+            request=request,
+            name="activevisits.html",
+            context={"info": [], "microscope": microscope},
         )
 
 
@@ -867,8 +869,9 @@ def visit_info(request: Request, visit_name: str, db=murfey.server.ispyb.DB):
             == visit_name
         ]  # "Proposal title": id.title
         return templates.TemplateResponse(
-            "visit.html",
-            {"request": request, "visit": return_query},
+            request=request,
+            name="visit.html",
+            context={"visit": return_query},
         )
     else:
         return None

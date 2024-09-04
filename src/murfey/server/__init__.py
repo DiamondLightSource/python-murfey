@@ -17,6 +17,7 @@ import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -220,7 +221,9 @@ def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingPar
     return results
 
 
-def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
+def respond_with_template(
+    request: Request, filename: str, parameters: dict[str, Any] | None = None
+):
     template_parameters = {
         "hostname": get_hostname(),
         "microscope": get_microscope(),
@@ -228,7 +231,9 @@ def respond_with_template(filename: str, parameters: dict[str, Any] | None = Non
     }
     if parameters:
         template_parameters.update(parameters)
-    return templates.TemplateResponse(filename, template_parameters)
+    return templates.TemplateResponse(
+        request=request, name=filename, context=template_parameters
+    )
 
 
 class LogFilter(logging.Filter):
