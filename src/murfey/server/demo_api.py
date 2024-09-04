@@ -24,7 +24,6 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
-    MurfeySessionID,
     _flush_grid_square_records,
     _flush_tomography_preprocessing,
     _murfey_id,
@@ -37,6 +36,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
+from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import MachineConfig, from_file
