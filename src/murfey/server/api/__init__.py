@@ -1659,6 +1659,6 @@ def update_current_gain_ref(
     session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
 ):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
-    session.current_gain_ref = new_gain_ref
+    session.current_gain_ref = new_gain_ref.path
     db.add(session)
     db.commit()
