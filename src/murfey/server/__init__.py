@@ -2410,7 +2410,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
-                    Path(message["mrc_out"]).parents[1]
+                    Path(message["mrc_out"]).parents[3]
                     / "Tomograms"
                     / "job006"
                     / "tomograms"
