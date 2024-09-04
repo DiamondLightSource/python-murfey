@@ -1356,6 +1356,14 @@ async def process_gain(
         return {"gain_ref": str(filepath / safe_path_name), "gain_ref_superres": None}
 
 
+@router.delete("/sessions/{session_id}")
+def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    db.delete(session)
+    db.commit()
+    return
+
+
 @router.post("/visits/{visit_name}/eer_fractionation_file")
 async def write_eer_fractionation_file(
     visit_name: str, fractionation_params: FractionationParameters
@@ -1652,6 +1660,15 @@ async def get_tiff(visit_name: str, tiff_path: str):
         return None
 
     return FileResponse(path=test_path)
+
+
+@router.post("/visits/{visit}/session/{name}")
+def create_session(visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit)
+    db.add(s)
+    db.commit()
+    sid = s.id
+    return sid
 
 
 @router.put("/sessions/{session_id}/current_gain_ref")
