@@ -1,9 +1,8 @@
-name: Make new tags and publish Python distribution to PyPI
+name: Publish version
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -12,8 +11,8 @@ jobs:
     name: Get version
     runs-on: ubuntu-latest
     outputs:
-      doTag: ${{ steps.checkTag.outputs.newTag }}
-      newVersion:
+      doTag: ${{ steps.checkTag.outputs.doTag }}
+      newVersion: ${{ steps.checkTag.outputs.newVersion }}
     steps:
       - uses: actions/checkout@v4
       - name: Check current tag
@@ -56,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - get-current-version
-    if: ${{ needs.get-current-version.outputs.newTag == 'true' }}
+    if: ${{ needs.get-current-version.outputs.doTag == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.10
@@ -84,7 +83,7 @@ jobs:
       - get-current-version
       - build
       - make-tag
-    if: ${{ needs.get-current-version.outputs.newTag == 'true' }}
+    if: ${{ needs.get-current-version.outputs.doTag == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -108,7 +107,7 @@ jobs:
     needs:
       - get-current-version
       - publish-to-pypi
-    if: ${{ needs.get-current-version.outputs.newTag == 'true' }}
+    if: ${{ needs.get-current-version.outputs.doTag == 'true' }}
     runs-on: ubuntu-latest
 
     permissions:
