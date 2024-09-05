@@ -1,5 +1,5 @@
 # Contains tasks to be repeated when testing for the different Python versions listed
-# in the "Run unit tests" stage in .github/workflows/test-and-publish.yml
+# in the "Run unit tests" stage in .github/workflows/test.yml
 name: Run tests
 
 on:
