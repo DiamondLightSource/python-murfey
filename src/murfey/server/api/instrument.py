@@ -18,6 +18,7 @@ from murfey.server.api.auth import (
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util import secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import Session
 from murfey.util.models import File, MultigridWatcherSetup
@@ -230,13 +231,14 @@ async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSourc
 
 @router.post("/sessions/{session_id}/finalise_rsyncer")
 async def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    data = {}
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/finalise_rsyncer",
                 json={
                     "label": session_id,
-                    "source": rsyncer_source.source,
+                    "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
                     "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
@@ -256,7 +258,7 @@ async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSou
                     f"{machine_config.instrument_server_url}/sessions/{session_id}/remove_rsyncer",
                     json={
                         "label": session_id,
-                        "source": rsyncer_source.source,
+                        "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
                         "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
@@ -276,7 +278,7 @@ async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSo
                     f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
                     json={
                         "label": session_id,
-                        "source": rsyncer_source.source,
+                        "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
                         "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"

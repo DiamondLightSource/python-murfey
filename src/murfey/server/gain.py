@@ -6,6 +6,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Tuple
 
+from murfey.util import secure_path
+
 
 class Camera(Enum):
     K3_FLIPX = 1
@@ -47,9 +49,9 @@ async def prepare_gain(
         for k, v in env.items():
             os.environ[k] = v
         if tag:
-            (gain_path.parent / f"gain_{tag}").mkdir(exist_ok=True)
+            secure_path(gain_path.parent / f"gain_{tag}").mkdir(exist_ok=True)
         else:
-            (gain_path.parent / "gain").mkdir(exist_ok=True)
+            secure_path(gain_path.parent / "gain").mkdir(exist_ok=True)
         gain_path = _sanitise(gain_path)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")

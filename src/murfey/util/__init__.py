@@ -17,6 +17,7 @@ from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
 import requests
+from werkzeug.utils import secure_filename
 
 from murfey.util.models import Visit
 
@@ -59,6 +60,11 @@ def sanitise_nonpath(in_string: str) -> str:
     for c in ("\r\n", "\n", "/", "\\", ":", ";"):
         in_string = in_string.replace(c, "")
     return in_string
+
+
+def secure_path(in_path: Path) -> Path:
+    secured_parts = [secure_filename(p) for p in in_path.parts]
+    return Path("/".join(secured_parts))
 
 
 @lru_cache(maxsize=1)
