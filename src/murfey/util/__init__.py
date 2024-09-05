@@ -258,6 +258,7 @@ class LogFilter(logging.Filter):
         return "<murfey.server.LogFilter>"
 
     def __init__(self):
+        super().__init__()
         self._filter_levels = {
             "murfey": logging.DEBUG,
             "ispyb": logging.DEBUG,
