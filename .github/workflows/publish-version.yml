@@ -28,6 +28,7 @@ jobs:
           VERSION=$(python -c "import murfey; print(murfey.__version__)")
           echo "newVersion=v$VERSION" >> $GITHUB_OUTPUT
 
+          git fetch --tags
           if [ $(git tag -l v$VERSION) ]; then
             echo "Version is up to date at $VERSION"
             echo "doTag=false" >> $GITHUB_OUTPUT
