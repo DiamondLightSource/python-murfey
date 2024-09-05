@@ -101,7 +101,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
 
 async def validate_session_access(
     session_id: int, token: Annotated[str, Depends(oauth2_scheme)]
-):
+) -> int:
     await validate_token(token)
     with Session(engine) as murfey_db:
         visit_name = (

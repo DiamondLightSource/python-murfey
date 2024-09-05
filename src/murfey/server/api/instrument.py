@@ -262,6 +262,7 @@ async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSou
 
 @router.post("/sessions/{session_id}/restart_rsyncer")
 async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    assert isinstance(session_id, int)
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
