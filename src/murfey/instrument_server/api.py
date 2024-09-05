@@ -242,8 +242,14 @@ def upload_gain_reference(gain_reference: GainReference):
     ]
     gain_rsync = procrunner.run(cmd)
     if gain_rsync.returncode:
+        safe_gain_path = (
+            str(gain_reference.gain_path).replace("\r\n", "").replace("\n", "")
+        )
+        safe_visit_path = gain_reference.visit_path.replace("\r\n", "").replace(
+            "\n", ""
+        )
         logger.warning(
-            f"Gain reference file {gain_reference.gain_path} was not successfully transferred to {gain_reference.visit_path}/processing"
+            f"Gain reference file {safe_gain_path} was not successfully transferred to {safe_visit_path}/processing"
         )
         return {"success": False}
     return {"success": True}
@@ -255,6 +261,7 @@ class UpstreamTiffInfo(BaseModel):
 
 @router.post("/visits/{visit_name}/upstream_tiff_data_request")
 def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo):
+    assert not any(c in visit_name for c in ("/", "\\", ":", ";"))
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     upstream_tiff_info.download_dir.mkdir(exist_ok=True)
     upstream_tiff_paths = (
