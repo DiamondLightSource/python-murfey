@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.10
@@ -38,8 +39,6 @@ jobs:
           git config --global user.email "DiamondLightSource-build-server@users.noreply.github.com"
           git config credential.helper "store --file=.git/credentials"
           echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
-
-          bump2version ${{ inputs.bumpLevel }}
 
           echo "##[section]Creating commit on branch 'version-bump'"
           git checkout -b version-bump
