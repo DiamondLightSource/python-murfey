@@ -17,6 +17,7 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
+from murfey.util import sanitise_nonpath
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
@@ -261,19 +262,20 @@ class UpstreamTiffInfo(BaseModel):
 
 @router.post("/visits/{visit_name}/upstream_tiff_data_request")
 def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo):
+    sanitised_visit_name = sanitise_nonpath(visit_name)
     assert not any(c in visit_name for c in ("/", "\\", ":", ";"))
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     upstream_tiff_info.download_dir.mkdir(exist_ok=True)
     upstream_tiff_paths = (
         requests.get(
-            f"{murfey_url.geturl()}/visits/{visit_name}/upstream_tiff_paths",
+            f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff_paths",
             headers={"Authorization": f"Bearer {tokens['token']}"},
         ).json()
         or []
     )
     for tiff_path in upstream_tiff_paths:
         tiff_data = requests.get(
-            f"{murfey_url.geturl()}/visits/{visit_name}/upstream_tiff/{tiff_path}",
+            f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff/{tiff_path}",
             stream=True,
             headers={"Authorization": f"Bearer {tokens['token']}"},
         )

@@ -426,8 +426,12 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
-        if grid_square_params.image and Path(grid_square_params.image).is_file():
-            jpeg_size = Image.open(grid_square_params.image).size
+        secured_grid_square_image_path = secure_filename(grid_square_params.image)
+        if (
+            secured_grid_square_image_path
+            and Path(secured_grid_square_image_path).is_file()
+        ):
+            jpeg_size = Image.open(secured_grid_square_image_path).size
         else:
             jpeg_size = (0, 0)
         grid_square = GridSquare(
@@ -443,7 +447,7 @@ def register_grid_square(
             thumbnail_size_x=grid_square_params.thumbnail_size_x or jpeg_size[0],
             thumbnail_size_y=grid_square_params.thumbnail_size_y or jpeg_size[1],
             pixel_size=grid_square_params.pixel_size,
-            image=grid_square_params.image,
+            image=secured_grid_square_image_path,
         )
     db.add(grid_square)
     db.commit()
@@ -483,11 +487,12 @@ def register_foil_hole(
         )
     except NoResultFound:
         log.debug(
-            f"Foil hole {foil_hole_params.name} could not be registered as grid square {gs_name} was not found"
+            f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
         )
         return
-    if foil_hole_params.image and Path(foil_hole_params.image).is_file():
-        jpeg_size = Image.open(foil_hole_params.image).size
+    secured_foil_hole_image_path = secure_filename(foil_hole_params.image)
+    if foil_hole_params.image and Path(secured_foil_hole_image_path).is_file():
+        jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
     foil_hole = FoilHole(
@@ -503,7 +508,7 @@ def register_foil_hole(
         thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
         thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
         pixel_size=foil_hole_params.pixel_size,
-        image=foil_hole_params.image,
+        image=secured_foil_hole_image_path,
     )
     db.add(foil_hole)
     db.commit()
@@ -1227,7 +1232,7 @@ def start_dc(visit_name, session_id: MurfeySessionID, dc_params: DCParameters):
     ispyb_visit_number = visit_name.split("-")[-1]
     log.info(
         f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
-        f"with basepath {machine_config.rsync_basepath} and directory {dc_params.image_directory}"
+        f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
     )
     dc_parameters = {
         "visit": visit_name,

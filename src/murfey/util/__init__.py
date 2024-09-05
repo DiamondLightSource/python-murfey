@@ -55,6 +55,12 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
+def sanitise_nonpath(in_string: str) -> str:
+    for c in ("\r\n", "\n", "/", "\\", ":", ";"):
+        in_string = in_string.replace(c, "")
+    return in_string
+
+
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
     return requests.get(f"{url}/machine").json()

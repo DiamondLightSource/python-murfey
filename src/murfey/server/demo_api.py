@@ -219,7 +219,7 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
 
 @router.post("/sessions/{session_id}/rsyncer")
 def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
-    log.info(f"Registering rsync instance {rsyncer_info.source}")
+    log.info(f"Registering rsync instance {sanitise(rsyncer_info.source)}")
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
@@ -1303,7 +1303,7 @@ def start_dc(
 ) -> Optional[DCParameters]:
     dcg_tag = dc_params.source.replace("\r\n", "").replace("\n", "")
     log.info(
-        f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {dc_params.tag}"
+        f"Starting data collection, data collection group tag {dcg_tag} and data collection tag {sanitise(dc_params.tag)}"
     )
     dcg = db.exec(
         select(DataCollectionGroup)
