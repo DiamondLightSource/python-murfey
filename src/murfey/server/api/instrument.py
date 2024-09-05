@@ -265,7 +265,7 @@ async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSou
                     },
                 ) as resp:
                     data = await resp.json()
-        return data
+    return data
 
 
 @router.post("/sessions/{session_id}/restart_rsyncer")
@@ -285,4 +285,4 @@ async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSo
                     },
                 ) as resp:
                     data = await resp.json()
-        return data
+    return data
