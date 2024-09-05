@@ -222,7 +222,7 @@ async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSourc
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/stop_rsyncer",
                 json={
                     "label": session_id,
-                    "source": rsyncer_source.source,
+                    "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
                     "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
