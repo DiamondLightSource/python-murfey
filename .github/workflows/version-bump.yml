@@ -34,6 +34,9 @@ jobs:
           set -eux
           pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
       - name: Run bumpversion and push tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "DiamondLightSource-build-server"
           git config --global user.email "DiamondLightSource-build-server@users.noreply.github.com"
