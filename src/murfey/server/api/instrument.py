@@ -207,7 +207,7 @@ class RsyncerSource(BaseModel):
 
 
 @router.post("/sessions/{session_id}/stop_rsyncer")
-async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+async def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -244,36 +244,37 @@ async def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerS
 
 @router.post("/sessions/{session_id}/remove_rsyncer")
 async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
-    if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/remove_rsyncer",
-                json={
-                    "label": session_id,
-                    "source": rsyncer_source.source,
-                },
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
-            ) as resp:
-                data = await resp.json()
-    return data
+    if isinstance(session_id, int):
+        if machine_config.instrument_server_url:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{machine_config.instrument_server_url}/sessions/{session_id}/remove_rsyncer",
+                    json={
+                        "label": session_id,
+                        "source": rsyncer_source.source,
+                    },
+                    headers={
+                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    },
+                ) as resp:
+                    data = await resp.json()
+        return data
 
 
 @router.post("/sessions/{session_id}/restart_rsyncer")
 async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
-    assert isinstance(session_id, int)
-    if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
-                json={
-                    "label": session_id,
-                    "source": rsyncer_source.source,
-                },
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
-            ) as resp:
-                data = await resp.json()
-    return data
+    if isinstance(session_id, int):
+        if machine_config.instrument_server_url:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
+                    json={
+                        "label": session_id,
+                        "source": rsyncer_source.source,
+                    },
+                    headers={
+                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    },
+                ) as resp:
+                    data = await resp.json()
+        return data
