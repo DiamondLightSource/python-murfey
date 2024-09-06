@@ -88,7 +88,14 @@ def validate_instrument_server_token(timestamp: float) -> bool:
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
         decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if not check_user(decoded_data.get("user")):
+        # also validate against time stamps of successful instrument server connections
+        if decoded_data.get("user"):
+            if not check_user(decoded_data["user"]):
+                raise JWTError
+        elif decoded_data.get("timestamp"):
+            if not validate_instrument_server_token(decoded_data["timestamp"]):
+                raise JWTError
+        else:
             raise JWTError
     except JWTError:
         raise HTTPException(
