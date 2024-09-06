@@ -17,6 +17,7 @@ from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
 import requests
+from werkzeug.utils import secure_filename
 
 from murfey.util.models import Visit
 
@@ -55,9 +56,20 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
+def sanitise_nonpath(in_string: str) -> str:
+    for c in ("\r\n", "\n", "/", "\\", ":", ";"):
+        in_string = in_string.replace(c, "")
+    return in_string
+
+
+def secure_path(in_path: Path) -> Path:
+    secured_parts = [secure_filename(p) for p in in_path.parts]
+    return Path("/".join(secured_parts))
+
+
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
-    return requests.get(f"{url}/machine/").json()
+    return requests.get(f"{url}/machine").json()
 
 
 def _get_visit_list(api_base: ParseResult):
@@ -237,3 +249,39 @@ class Processor:
     def wait(self):
         if self.thread:
             self.thread.join()
+
+
+class LogFilter(logging.Filter):
+    """A filter to limit messages going to Graylog"""
+
+    def __repr__(self):
+        return "<murfey.server.LogFilter>"
+
+    def __init__(self):
+        super().__init__()
+        self._filter_levels = {
+            "murfey": logging.DEBUG,
+            "ispyb": logging.DEBUG,
+            "zocalo": logging.DEBUG,
+            "uvicorn": logging.INFO,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.INFO,
+        }
+
+    @staticmethod
+    def install() -> LogFilter:
+        logfilter = LogFilter()
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            handler.addFilter(logfilter)
+        return logfilter
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        logger_name = record.name
+        while True:
+            if logger_name in self._filter_levels:
+                return record.levelno >= self._filter_levels[logger_name]
+            if "." not in logger_name:
+                return False
+            logger_name = logger_name.rsplit(".", maxsplit=1)[0]

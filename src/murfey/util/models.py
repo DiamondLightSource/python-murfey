@@ -108,15 +108,20 @@ class ClientInfo(BaseModel):
     id: int
 
 
+class RsyncerSource(BaseModel):
+    source: str
+
+
 class RsyncerInfo(BaseModel):
     source: str
     destination: str
-    client_id: int
+    session_id: int
     transferring: bool = True
     increment_count: int = 1
     bytes: int = 0
     increment_data_count: int = 0
     data_bytes: int = 0
+    tag: str = ""
 
 
 class ClearanceKeys(BaseModel):
@@ -130,6 +135,7 @@ class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
     eer: bool = False
+    tag: str = ""
 
 
 class FractionationParameters(BaseModel):
@@ -138,11 +144,6 @@ class FractionationParameters(BaseModel):
     num_frames: int = 0
     eer_path: Optional[str] = None
     fractionation_file_name: str = "eer_fractionation.txt"
-
-
-class PostInfo(BaseModel):
-    url: str
-    data: dict
 
 
 """
@@ -299,6 +300,25 @@ class FoilHoleParameters(BaseModel):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+
+
+class PostInfo(BaseModel):
+    url: str
+    data: dict
+
+
+class MultigridWatcherSetup(BaseModel):
+    source: Path
+    skip_existing_processing: bool = False
+
+
+class CurrentGainRef(BaseModel):
+    path: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 
 """

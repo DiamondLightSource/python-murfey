@@ -10,6 +10,10 @@ import yaml
 from pydantic import BaseModel, BaseSettings
 
 
+class Auth(BaseModel):
+    session_validation: str = ""
+
+
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
@@ -19,6 +23,7 @@ class MachineConfig(BaseModel):
     crypto_key: str
     default_model: Path
     display_name: str = ""
+    instrument_name: str = ""
     image_path: Optional[Path] = None
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
@@ -43,6 +48,7 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    allow_origins: List[str] = ["http://localhost:3000", "http://localhost:8001"]
     recipes: Dict[str, str] = {
         "em-spa-bfactor": "em-spa-bfactor",
         "em-spa-class2d": "em-spa-class2d",
@@ -64,6 +70,11 @@ class MachineConfig(BaseModel):
     failure_queue: str = ""
     auth_key: str = ""
     auth_algorithm: str = ""
+    instrument_server_url: str = "http://localhost:8001"
+    frontend_url: str = "http://localhost:3000"
+    murfey_url: str = "http://localhost:8000"
+
+    auth: Auth = Auth()
 
 
 def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
@@ -116,3 +127,14 @@ def get_machine_config() -> MachineConfig:
             Path(settings.murfey_machine_configuration), microscope
         )
     return machine_config
+
+
+@lru_cache(maxsize=1)
+def get_full_machine_config() -> Dict[str, MachineConfig]:
+    res = {}
+    if settings.murfey_machine_configuration:
+        with open(Path(settings.murfey_machine_configuration), "r") as config_stream:
+            config = yaml.safe_load(config_stream)
+        for k, v in config.items():
+            res[k] = MachineConfig(**v)
+    return res

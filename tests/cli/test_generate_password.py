@@ -4,7 +4,7 @@ import yaml
 from cryptography.fernet import Fernet
 
 from murfey.cli.generate_db_password import run
-from murfey.server.config import get_machine_config
+from murfey.util.config import get_machine_config
 
 
 def test_generate_password(capsys, tmp_path):

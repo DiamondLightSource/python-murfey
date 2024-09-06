@@ -15,7 +15,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import List, NamedTuple
+from typing import Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
 import procrunner
@@ -57,6 +57,7 @@ class RSyncer(Observer):
         basepath_local: Path,
         basepath_remote: Path,
         server_url: ParseResult,
+        stop_callback: Callable = lambda *args, **kwargs: None,
         local: bool = False,
         status_bar: StatusBar | None = None,
         do_transfer: bool = True,
@@ -70,6 +71,7 @@ class RSyncer(Observer):
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal
+        self._stop_callback = stop_callback
         self._local = local
         self._server_url = server_url
         self._notify = notify
@@ -149,6 +151,16 @@ class RSyncer(Observer):
         logger.info(f"RSync thread starting for {self}")
         self.thread.start()
 
+    def restart(self):
+        self.thread.join()
+        self._halt_thread = False
+        self.thread = threading.Thread(
+            name=f"RSync {self._basepath}:{self._remote}",
+            target=self._process,
+            daemon=True,
+        )
+        self.start()
+
     def stop(self):
         logger.debug("RSync thread stop requested")
         self._stopping = True
@@ -161,6 +173,19 @@ class RSyncer(Observer):
             self.queue.put(None)
             self.thread.join()
         logger.debug("RSync thread stop completed")
+
+    def finalise(self):
+        self.stop()
+        self._remove_files = True
+        self._notify = False
+        self.thread = threading.Thread(
+            name=f"RSync finalisation {self._basepath}:{self._remote}",
+            target=self._process,
+            daemon=True,
+        )
+        for f in self._basepath.glob("**/*"):
+            self.queue.put(f)
+        self.stop()
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
@@ -225,6 +250,7 @@ class RSyncer(Observer):
                 self.queue.task_done()
                 continue
 
+        self._stop_callback(self._basepath, explicit_stop=self._stopping)
         logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:

@@ -5,7 +5,7 @@ import yaml
 from cryptography.fernet import Fernet
 
 from murfey.cli.decrypt_db_password import run
-from murfey.server.config import get_machine_config
+from murfey.util.config import get_machine_config
 
 
 def test_decrypt_password(capsys, tmp_path):
