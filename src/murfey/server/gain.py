@@ -44,7 +44,7 @@ async def prepare_gain(
             if tag
             else gain_path.parent / "gain_superres.mrc"
         )
-        if gain_out.is_file():
+        if secure_path(gain_out).is_file():
             return gain_out, gain_out_superres if rescale else gain_out
         for k, v in env.items():
             os.environ[k] = v
@@ -65,7 +65,7 @@ async def prepare_gain(
         if dm4_proc.returncode:
             return None, None
         clip_proc = await asyncio.create_subprocess_shell(
-            f"{executables['clip']} {flip} {gain_path_mrc} {gain_path_superres if rescale else gain_out}",
+            f"{executables['clip']} {flip} {secure_path(gain_path_mrc)} {secure_path(gain_path_superres) if rescale else secure_path(gain_out)}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -74,7 +74,7 @@ async def prepare_gain(
             return None, None
         if rescale:
             newstack_proc = await asyncio.create_subprocess_shell(
-                f"{executables['newstack']} -bin 2 {gain_path_superres} {gain_out}",
+                f"{executables['newstack']} -bin 2 {secure_path(gain_path_superres)} {secure_path(gain_out)}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -82,7 +82,7 @@ async def prepare_gain(
             if newstack_proc.returncode:
                 return None, None
         if rescale:
-            gain_out_superres.symlink_to(gain_path_superres)
+            secure_path(gain_out_superres).symlink_to(secure_path(gain_path_superres))
         return gain_out, gain_out_superres if rescale else gain_out
     return None, None
 
@@ -98,7 +98,7 @@ async def prepare_eer_gain(
     for k, v in env.items():
         os.environ[k] = v
     mrc_convert = await asyncio.create_subprocess_shell(
-        f"{executables['tif2mrc']} {gain_path} {gain_out}"
+        f"{executables['tif2mrc']} {secure_path(gain_path)} {secure_path(gain_out)}"
     )
     await mrc_convert.communicate()
     if mrc_convert.returncode:

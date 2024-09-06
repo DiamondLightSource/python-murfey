@@ -479,7 +479,7 @@ def register_tomo_preproc_params(
     session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
     log.info(
-        f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
+        f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}"
     )
     collected_ids = db.exec(
         select(
