@@ -12,6 +12,10 @@ on:
           - major
           - minor
           - patch
+        bumpClient:
+          description: "Bump supported client?"
+          required: true
+          type: boolean
 
 permissions:
   contents: read
@@ -45,7 +49,12 @@ jobs:
 
           echo "##[section]Creating commit on branch 'version-bump'"
           git checkout -b version-bump
-          bump-my-version bump ${{ inputs.bumpLevel }}
+
+          if [ ${{ inputs.clientBump } = true ]; then
+            bump-my-version bump ${{ inputs.bumpLevel }} src/murfey/__init__.py --search '__supported_client_version__ = "{current_version}"' --replace '__supported_client_version__ = "{new_version}"'
+          else
+            bump-my-version bump ${{ inputs.bumpLevel }}
+          fi
 
           echo "##[section]Creating pull request"
           git push -f --set-upstream origin version-bump
