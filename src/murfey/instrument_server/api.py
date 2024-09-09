@@ -1,5 +1,6 @@
 import secrets
 import time
+from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
@@ -220,7 +221,7 @@ def get_possible_gain_references() -> List[File]:
                     name=gf.name,
                     description="",
                     size=gf.stat().st_size / 1e6,
-                    timestamp=gf.stat().st_mtime,
+                    timestamp=datetime.fromtimestamp(gf.stat().st_mtime),
                     full_path=str(gf),
                 )
             )
