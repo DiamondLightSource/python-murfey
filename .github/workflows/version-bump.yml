@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       bumpLevel:
-        description: "Kind of version bump"
+        description: "Kind of version bump for project"
         required: true
         default: "patch"
         type: choice
@@ -12,10 +12,15 @@ on:
           - major
           - minor
           - patch
+          - none
         bumpClient:
           description: "Bump supported client?"
           required: true
           type: boolean
+        newClientVersion:
+          description: "Version of new client (needed to bump supported client)"
+          required: false
+          type: string
 
 permissions:
   contents: read
@@ -51,8 +56,10 @@ jobs:
           git checkout -b version-bump
 
           if [ ${{ inputs.clientBump } = true ]; then
-            bump-my-version bump ${{ inputs.bumpLevel }} src/murfey/__init__.py --search '__supported_client_version__ = "{current_version}"' --replace '__supported_client_version__ = "{new_version}"'
-          else
+            bump-my-version bump --config-file .bumpclient.toml --new-version ${{ inputs.newClientVersion }}
+          fi
+
+          if [&& ${{ inputs.bumpLevel }} != "none" ]
             bump-my-version bump ${{ inputs.bumpLevel }}
           fi
 
@@ -60,6 +67,8 @@ jobs:
           git push -f --set-upstream origin version-bump
           gh pr create -B main -H version-bump -t "Version update (${{ inputs.bumpLevel }})" -b "
           This is an automated pull request to update the version.
+
+          Does this bump the client version? ${{ inputs.bumpClient }}
 
           After merging this, the \`Publish version\` action will tag this release and publish to pypi.
           "
