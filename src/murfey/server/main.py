@@ -11,11 +11,11 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseSettings
 
 import murfey.server
-import murfey.server.ap.hub
 import murfey.server.api.auth
 import murfey.server.api.bootstrap
 import murfey.server.api.clem
 import murfey.server.api.display
+import murfey.server.api.hub
 import murfey.server.api.instrument
 import murfey.server.api.spa
 import murfey.server.websocket
