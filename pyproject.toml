@@ -47,7 +47,7 @@ client = [
     "xmltodict",
 ]
 developer = [
-    "bump-my-version", # Version control
+    "bump-my-version<0.11.0", # Version control
     "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
