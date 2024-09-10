@@ -766,8 +766,8 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
-@router.get("/visits_raw", response_model=List[Visit])
-def get_current_visits():
+@router.get("/instruments/{instrument_name}visits_raw", response_model=List[Visit])
+def get_current_visits(instrument_name: str):
     return [
         Visit(
             start=datetime.datetime.now(),

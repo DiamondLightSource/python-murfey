@@ -379,12 +379,6 @@ def increment_rsync_transferred_files_prometheus(
     ).inc(rsyncer_info.data_bytes)
 
 
-@router.get("/demo/visits_raw", response_model=List[Visit])
-def get_current_visits_demo(db=murfey.server.ispyb.DB):
-    microscope = "m12"
-    return murfey.server.ispyb.get_all_ongoing_visits(microscope, db)
-
-
 @router.post("/sessions/{session_id}/spa_processing_parameters")
 def register_spa_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
