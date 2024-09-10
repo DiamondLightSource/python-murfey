@@ -494,7 +494,7 @@ class MurfeyTUI(App):
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
-                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/eer_fractionation_file",
+                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/eer_fractionation_file",
                     json={
                         "num_frames": self.app._environment.data_collection_parameters[
                             "num_eer_frames"

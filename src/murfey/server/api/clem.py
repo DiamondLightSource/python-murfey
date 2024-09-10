@@ -22,6 +22,7 @@ from murfey.util.db import (
     CLEMLIFFile,
     CLEMTIFFFile,
 )
+from murfey.util.db import Session as MurfeySession
 from murfey.util.models import LifFileInfo, TiffSeriesInfo
 
 # Use backport from importlib_metadata for Python <3.10
@@ -35,16 +36,6 @@ logger = getLogger("murfey.server.api.clem")
 
 # Create APIRouter class object
 router = APIRouter()
-
-# Use machine configuration to validate file paths used here
-machine_config = get_machine_config()
-rsync_basepath = machine_config.rsync_basepath
-try:
-    base_path = list(rsync_basepath.parents)[-2].as_posix()
-except IndexError:
-    # Print to troubleshoot
-    logger.warning(f"Base path {rsync_basepath!r} is too short")
-    base_path = rsync_basepath.as_posix()
 
 # Valid file types
 valid_file_types = (
@@ -61,7 +52,7 @@ HELPER FUNCTIONS
 """
 
 
-def validate_and_sanitise(file: Path) -> Path:
+def validate_and_sanitise(file: Path, session_id: int) -> Path:
     """
     Performs validation and sanitisation on the incoming file paths, ensuring that
     no forbidden characters are present and that the the path points only to allowed
@@ -73,6 +64,23 @@ def validate_and_sanitise(file: Path) -> Path:
 
     # Resolve symlinks and directory changes to get full file path
     full_path = path.normpath(path.realpath(file))
+
+    instrument_name = (
+        murfey_db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
+    )
+    # Use machine configuration to validate file paths used here
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    rsync_basepath = machine_config.rsync_basepath
+    try:
+        base_path = list(rsync_basepath.parents)[-2].as_posix()
+    except IndexError:
+        # Print to troubleshoot
+        logger.warning(f"Base path {rsync_basepath!r} is too short")
+        base_path = rsync_basepath.as_posix()
 
     # Check that full file path doesn't contain unallowed characters
     # Currently allows only:
@@ -136,7 +144,7 @@ def get_db_entry(
     # Validate file path if provided
     if file_path is not None:
         try:
-            file_path = validate_and_sanitise(file_path)
+            file_path = validate_and_sanitise(file_path, session_id)
         except Exception:
             raise Exception
 
@@ -212,7 +220,7 @@ def register_lif_file(
     # Add metadata information if provided
     if master_metadata is not None:
         try:
-            master_metadata = validate_and_sanitise(master_metadata)
+            master_metadata = validate_and_sanitise(master_metadata, session_id)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             logger.warning(traceback.format_exc())

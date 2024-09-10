@@ -209,12 +209,12 @@ def get_pypi_file(package: str, filename: str):
     )
 
 
-@plugins.get("/{package}", response_class=FileResponse)
-def get_plugin_wheel(package: str):
-
-    machine_config = get_machine_config()
+@plugins.get("/instruments/{instrument_name}/{package}", response_class=FileResponse)
+def get_plugin_wheel(instrument_name: str, package: str):
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     wheel_path = machine_config.plugin_packages.get(package)
-
     if wheel_path is None:
         return None
     return FileResponse(

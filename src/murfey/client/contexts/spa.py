@@ -720,7 +720,7 @@ class SPAModularContext(_SPAContext):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[

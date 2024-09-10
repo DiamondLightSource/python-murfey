@@ -110,7 +110,7 @@ def determine_default_destination(
                                 _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = capture_post(
-                                    url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
+                                    url=f"{str(environment.url.geturl())}/visits/{visit}/{environment.murfey_session}/suggested_path",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
@@ -1126,16 +1126,6 @@ class DestinationSelect(Screen):
                 self.app._start_rsyncer(s, d)
         for k, v in self._user_params.items():
             self.app._environment.data_collection_parameters[k] = v
-        if len(self._transfer_routes) > 1:
-            capture_post(
-                f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
-                json={
-                    "filename": f"murfey-{datetime.now().strftime('%Y-%m-%d-%H_%M_%S')}.txt",
-                    "destinations": [
-                        Path(n).name for n in self._transfer_routes.values()
-                    ],
-                },
-            )
         self.app.pop_screen()
         self.app.push_screen("main")
 

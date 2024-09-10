@@ -11,6 +11,7 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseSettings
 
 import murfey.server
+import murfey.server.ap.hub
 import murfey.server.api.auth
 import murfey.server.api.bootstrap
 import murfey.server.api.clem
@@ -20,7 +21,7 @@ import murfey.server.api.spa
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_security_config
 
 if os.getenv("MURFEY_DEMO"):
     from murfey.server.demo_api import router
@@ -37,9 +38,9 @@ class Settings(BaseSettings):
     murfey_machine_configuration: str = ""
 
 
-settings = Settings()
+security_config = get_security_config()
 
-machine_config = get_machine_config()
+settings = Settings()
 
 app = FastAPI(title="Murfey server", debug=True, openapi_tags=tags_metadata)
 
@@ -48,7 +49,7 @@ app.mount("/metrics", metrics_app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=machine_config.allow_origins,
+    allow_origins=security_config.allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +70,7 @@ app.include_router(murfey.server.api.spa.router)
 app.include_router(murfey.server.api.auth.router)
 app.include_router(murfey.server.api.display.router)
 app.include_router(murfey.server.api.instrument.router)
+app.include_router(murfey.server.api.hub.router)
 app.include_router(murfey.server.websocket.ws)
 
 for r in importlib_metadata.entry_points(group="murfey.routers"):

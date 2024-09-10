@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import random
 from functools import lru_cache
 from itertools import count
@@ -62,7 +63,6 @@ from murfey.util.db import (
 )
 from murfey.util.models import (
     ClientInfo,
-    ConnectionFileParameters,
     ContextInfo,
     CurrentGainRef,
     DCGroupParameters,
@@ -135,19 +135,22 @@ async def root(request: Request):
 @lru_cache(maxsize=1)
 @router.get("/machine")
 def machine_info() -> MachineConfig | None:
-    if settings.murfey_machine_configuration:
-        microscope = get_microscope()
-        return from_file(Path(settings.murfey_machine_configuration), microscope)
+    instrument_name = os.getenv("BEAMLINE")
+    if settings.murfey_machine_configuration and instrument_name:
+        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
+            instrument_name
+        ]
     return None
 
 
-@router.get("/microscope/")
-def get_mic():
-    microscope = get_microscope()
-    return {
-        "microscope": microscope,
-        "display_name": machine_config.get("display_name", ""),
-    }
+@lru_cache(maxsize=1)
+@router.get("/instruments/{instrument_name}/machine")
+def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
+    if settings.murfey_machine_configuration:
+        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
+            instrument_name
+        ]
+    return None
 
 
 @router.get("/microscope_image/")
@@ -178,9 +181,8 @@ def remove_mag_table_row(mag: int, db=murfey_db):
     db.commit()
 
 
-@router.get("/visits/")
-def all_visit_info(request: Request):
-    microscope = get_microscope()
+@router.get("/instruments/{instrument_name}/visits/")
+def all_visit_info(instrument_name: str, request: Request):
     return_query = [
         {
             "Start date": datetime.datetime.now(),
@@ -193,7 +195,7 @@ def all_visit_info(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="activevisits.html",
-        context={"info": return_query, "microscope": microscope},
+        context={"info": return_query, "microscope": instrument_name},
     )
 
 
@@ -1396,16 +1398,6 @@ def register_proc(
     return proc_params
 
 
-@router.post("/visits/{visit_name}/write_connections_file")
-def write_conn_file(visit_name, params: ConnectionFileParameters):
-    filepath = (
-        Path(machine_config["rsync_basepath"])
-        / (machine_config.get("rsync_module") or "data")
-        / str(datetime.datetime.now().year)
-    )
-    log.info(f"Write to connection file at {filepath}")
-
-
 @router.post("/sessions/{session_id}/process_gain")
 async def process_gain(
     session_id: MurfeySessionID, gain_reference_params: GainReference, db=murfey_db
@@ -1534,9 +1526,9 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     return
 
 
-@router.post("/visits/{visit_name}/eer_fractionation_file")
+@router.post("/visits/{visit_name}/{session_id}/eer_fractionation_file")
 async def write_eer_fractionation_file(
-    visit_name: str, fractionation_params: FractionationParameters
+    visit_name: str, session_id: int, fractionation_params: FractionationParameters
 ) -> dict:
     file_path = (
         Path(machine_config["rsync_basepath"])

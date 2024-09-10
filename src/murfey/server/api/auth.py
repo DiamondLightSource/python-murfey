@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, create_engine, select
 
 from murfey.server.murfey_db import url
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_security_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
@@ -24,9 +24,9 @@ logger = getLogger("murfey.server.api.auth")
 router = APIRouter()
 
 # Set up variables used for authentication
-machine_config = get_machine_config()
-ALGORITHM = machine_config.auth_algorithm or "HS256"
-SECRET_KEY = machine_config.auth_key or secrets.token_hex(32)
+security_config = get_security_config()
+ALGORITHM = security_config.auth_algorithm or "HS256"
+SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -48,7 +48,7 @@ def hash_password(password: str) -> str:
 
 # Set up database engine
 try:
-    _url = url(get_machine_config())
+    _url = url(security_config)
     engine = create_engine(_url)
 except Exception:
     engine = None
@@ -66,7 +66,7 @@ def validate_user(username: str, password: str) -> bool:
 def validate_visit(visit_name: str, token: str) -> bool:
     if validators := importlib.metadata.entry_points().select(
         group="murfey.auth.session_validation",
-        name=machine_config.auth.session_validation,
+        name=security_config.session_validation,
     ):
         return validators[0].load()(visit_name, token)
     return True

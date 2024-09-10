@@ -69,7 +69,10 @@ def secure_path(in_path: Path) -> Path:
 
 @lru_cache(maxsize=1)
 def get_machine_config(url: str, demo: bool = False) -> dict:
-    return requests.get(f"{url}/machine").json()
+    instrument_name = os.getenv("BEAMLINE")
+    if not instrument_name:
+        return {}
+    return requests.get(f"{url}/instruments/{instrument_name}/machine").json()
 
 
 def _get_visit_list(api_base: ParseResult):

@@ -10,17 +10,11 @@ import yaml
 from pydantic import BaseModel, BaseSettings
 
 
-class Auth(BaseModel):
-    session_validation: str = ""
-
-
 class MachineConfig(BaseModel):
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
     data_directories: Dict[Path, str]
     rsync_basepath: Path
-    murfey_db_credentials: str
-    crypto_key: str
     default_model: Path
     display_name: str = ""
     instrument_name: str = ""
@@ -43,12 +37,10 @@ class MachineConfig(BaseModel):
     allow_removal: bool = False
     modular_spa: bool = False
     processing_enabled: bool = True
-    sqlalchemy_pooling: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
-    allow_origins: List[str] = ["http://localhost:3000", "http://localhost:8001"]
     recipes: Dict[str, str] = {
         "em-spa-bfactor": "em-spa-bfactor",
         "em-spa-class2d": "em-spa-class2d",
@@ -68,23 +60,40 @@ class MachineConfig(BaseModel):
     initial_model_search_directory: str = "processing/initial_model"
 
     failure_queue: str = ""
-    auth_key: str = ""
-    auth_algorithm: str = ""
     instrument_server_url: str = "http://localhost:8001"
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
 
-    auth: Auth = Auth()
 
-
-def from_file(config_file_path: Path, microscope: str) -> MachineConfig:
+def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
-    return MachineConfig(**config.get(microscope, {}))
+    return {
+        i: MachineConfig(**config[i])
+        for i in config.keys()
+        if not instrument or i == instrument
+    }
+
+
+class Security(BaseModel):
+    session_validation: str
+    murfey_db_credentials: str
+    crypto_key: str
+    auth_key: str = ""
+    auth_algorithm: str = ""
+    sqlalchemy_pooling: bool = True
+    allow_origins: List[str] = ["*"]
+
+
+def security_from_file(config_file_path: Path) -> Security:
+    with open(config_file_path, "r") as config_stream:
+        config = yaml.safe_load(config_stream)
+    return Security(**config)
 
 
 class Settings(BaseSettings):
     murfey_machine_configuration: str = ""
+    murfey_security_configuration: str = ""
 
 
 settings = Settings()
@@ -111,30 +120,35 @@ def get_microscope(machine_config: MachineConfig | None = None) -> str:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config() -> MachineConfig:
-    machine_config: MachineConfig = MachineConfig(
-        acquisition_software=[],
-        calibrations={},
-        data_directories={},
-        rsync_basepath=Path("dls/tmp"),
+def get_security_config() -> Security:
+    if settings.murfey_security_configuration:
+        return security_from_file(Path(settings.murfey_security_configuration))
+    return Security(
+        session_validation="",
         murfey_db_credentials="",
         crypto_key="",
-        default_model="/tmp/weights.h5",
+        auth_key="",
+        auth_algorithm="",
+        sqlalchemy_pooling=True,
     )
+
+
+@lru_cache(maxsize=1)
+def get_machine_config() -> Dict[str, MachineConfig]:
+    machine_config = {
+        "": MachineConfig(
+            acquisition_software=[],
+            calibrations={},
+            data_directories={},
+            rsync_basepath=Path("dls/tmp"),
+            murfey_db_credentials="",
+            crypto_key="",
+            default_model="/tmp/weights.h5",
+        )
+    }
     if settings.murfey_machine_configuration:
-        microscope = get_microscope()
+        microscope = get_microscope() or ""
         machine_config = from_file(
             Path(settings.murfey_machine_configuration), microscope
         )
     return machine_config
-
-
-@lru_cache(maxsize=1)
-def get_full_machine_config() -> Dict[str, MachineConfig]:
-    res = {}
-    if settings.murfey_machine_configuration:
-        with open(Path(settings.murfey_machine_configuration), "r") as config_stream:
-            config = yaml.safe_load(config_stream)
-        for k, v in config.items():
-            res[k] = MachineConfig(**v)
-    return res

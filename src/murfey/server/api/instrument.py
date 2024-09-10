@@ -25,17 +25,19 @@ from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
 router = APIRouter(dependencies=[Depends(validate_token)])
-machine_config = get_machine_config()
 
 log = logging.getLogger("murfey.server.instrument")
 
 
-@router.post("/activate_instrument_server")
-async def activate_instrument_server():
+@router.post("/instrument/{instrument_name}/activate_instrument_server")
+async def activate_instrument_server(instrument_name: str):
     log.info("Activating instrument server")
     timestamp = datetime.datetime.now().timestamp()
     token = create_access_token({"timestamp": timestamp})
-    instrument_server_tokens[timestamp] = None
+    instrument_server_tokens[timestamp] = {}
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{machine_config.instrument_server_url}/token",
@@ -48,16 +50,17 @@ async def activate_instrument_server():
     return success
 
 
-@router.get("/instrument_name")
-def get_instrument_name():
-    return machine_config.instrument_name
-
-
 @router.post("/sessions/{session_id}/multigrid_watcher")
 async def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
 ):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
@@ -105,6 +108,12 @@ async def pass_proc_params_to_instrument_server(
     session_id: MurfeySessionID, proc_params: ProvidedProcessingParameters, db=murfey_db
 ):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
         async with aiohttp.ClientSession() as session:
@@ -128,9 +137,12 @@ async def pass_proc_params_to_instrument_server(
     return data
 
 
-@router.get("/instrument_server")
-async def check_instrument_server():
+@router.get("/instruments/{instrument_name}/instrument_server")
+async def check_instrument_server(instrument_name: str):
     data = None
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -143,9 +155,12 @@ async def check_instrument_server():
     return data
 
 
-@router.get("/possible_gain_references")
-async def get_possible_gain_references() -> List[File]:
+@router.get("/instruments/{instrument_name}/possible_gain_references")
+async def get_possible_gain_references(instrument_name: str) -> List[File]:
     data = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -168,6 +183,12 @@ async def request_gain_reference_upload(
     gain_reference_request: GainReferenceRequest,
     db=murfey_db,
 ):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
     visit_path = f"{machine_config.rsync_module or 'data'}/{datetime.datetime.now().year}/{visit}"
     data = {}
@@ -188,9 +209,17 @@ async def request_gain_reference_upload(
     return data
 
 
-@router.post("/visits/{visit_name}/upstream_tiff_data_request")
-async def request_upstream_tiff_data_download(visit_name: str):
+@router.post("/visits/{visit_name}/{session_id}/upstream_tiff_data_request")
+async def request_upstream_tiff_data_download(
+    visit_name: str, session_id: int, db=murfey_db
+):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.upstream_data_download_directory:
         download_dir = str(
             machine_config.upstream_data_download_directory
@@ -214,8 +243,16 @@ class RsyncerSource(BaseModel):
 
 
 @router.post("/sessions/{session_id}/stop_rsyncer")
-async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+async def stop_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -233,8 +270,16 @@ async def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSourc
 
 
 @router.post("/sessions/{session_id}/finalise_rsyncer")
-async def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+async def finalise_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -252,8 +297,16 @@ async def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerS
 
 
 @router.post("/sessions/{session_id}/remove_rsyncer")
-async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+async def remove_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if isinstance(session_id, int):
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as session:
@@ -272,8 +325,16 @@ async def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSou
 
 
 @router.post("/sessions/{session_id}/restart_rsyncer")
-async def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+async def restart_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
     data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if isinstance(session_id, int):
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as session:
