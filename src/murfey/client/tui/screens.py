@@ -781,7 +781,7 @@ class UpstreamDownloads(Screen):
 
             # Get the paths to the TIFF files generated previously under the same session ID
             upstream_tiff_paths_response = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
+                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff_paths"
             )
             upstream_tiff_paths = upstream_tiff_paths_response.json() or []
 
@@ -790,7 +790,7 @@ class UpstreamDownloads(Screen):
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
                 # Write TIFF to the specified file path
                 stream_response = requests.get(
-                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
+                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff/{tp}",
                     stream=True,
                 )
                 # Write the file chunk-by-chunk to avoid hogging memory
