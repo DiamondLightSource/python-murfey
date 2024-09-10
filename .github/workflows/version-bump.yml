@@ -12,14 +12,15 @@ on:
           - major
           - minor
           - patch
-          - none
+          - client
         bumpClient:
           description: "Bump supported client?"
           required: true
           type: boolean
         newClientVersion:
           description: "Version of new client (needed to bump supported client)"
-          required: false
+          required: true
+          default: "0.0.0"
           type: string
 
 permissions:
@@ -55,11 +56,11 @@ jobs:
           echo "##[section]Creating commit on branch 'version-bump'"
           git checkout -b version-bump
 
-          if [ ${{ inputs.clientBump } = true ]; then
+          if [ ${{ inputs.clientBump } = true && ${{ inputs.newClientVersion }} != "0.0.0" ]; then
             bump-my-version bump --config-file .bumpclient.toml --new-version ${{ inputs.newClientVersion }}
           fi
 
-          if [&& ${{ inputs.bumpLevel }} != "none" ]
+          if [&& ${{ inputs.bumpLevel }} != "client" ]
             bump-my-version bump ${{ inputs.bumpLevel }}
           fi
 
@@ -68,7 +69,8 @@ jobs:
           gh pr create -B main -H version-bump -t "Version update (${{ inputs.bumpLevel }})" -b "
           This is an automated pull request to update the version.
 
-          Does this bump the client version? ${{ inputs.bumpClient }}
+          Bumped supported client client version: ${{ inputs.bumpClient }}
+          If true, the supported client version is now: ${{ inputs.newClientVersion }}
 
           After merging this, the \`Publish version\` action will tag this release and publish to pypi.
           "
