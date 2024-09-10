@@ -1451,11 +1451,13 @@ async def get_sessions(db=murfey_db):
     return res
 
 
-@router.post("/clients/{client_id}/session")
-def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
+@router.post("/instruments/{instrument_name}/clients/{client_id}/session")
+def link_client_to_session(
+    instrument_name: str, client_id: int, sess: SessionInfo, db=murfey_db
+):
     sid = sess.session_id
     if sid is None:
-        s = Session(name=sess.session_name)
+        s = Session(name=sess.session_name, instrument_name=instrument_name)
         db.add(s)
         db.commit()
         sid = s.id
@@ -1627,9 +1629,9 @@ def failed_client_post(post_info: PostInfo):
     return
 
 
-@router.post("/visits/{visit}/session/{name}")
-def create_session(visit: str, name: str, db=murfey_db) -> int:
-    s = Session(name=name, visit=visit)
+@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
+def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit, instrument_name=instrument_name)
     db.add(s)
     db.commit()
     sid = s.id
