@@ -143,7 +143,6 @@ def connections_check():
     return {"connections": list(ws.manager.active_connections.keys())}
 
 
-@lru_cache(maxsize=1)
 @router.get("/machine")
 def machine_info() -> MachineConfig | None:
     instrument_name = os.getenv("BEAMLINE")
@@ -154,7 +153,7 @@ def machine_info() -> MachineConfig | None:
     return None
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=5)
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
     if settings.murfey_machine_configuration:

@@ -27,6 +27,7 @@ log = logging.getLogger("murfey.client.mutligrid_control")
 class MultigridController:
     sources: list[Path]
     visit: str
+    instrument_name: str
     session_id: int
     murfey_url: str = "http://localhost:8000"
     demo: bool = False
@@ -41,7 +42,19 @@ class MultigridController:
     _machine_config: dict = field(default_factory=lambda: {})
 
     def __post_init__(self):
-        machine_data = requests.get(f"{self.murfey_url}/machine").json()
+        if self.token:
+            requests.get = partial(
+                requests.get, headers={"Authorization": f"Bearer {self.token}"}
+            )
+            requests.post = partial(
+                requests.post, headers={"Authorization": f"Bearer {self.token}"}
+            )
+            requests.delete = partial(
+                requests.delete, headers={"Authorization": f"Bearer {self.token}"}
+            )
+        machine_data = requests.get(
+            f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
+        ).json()
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
@@ -51,6 +64,7 @@ class MultigridController:
             demo=self.demo,
             visit=self.visit,
             data_collection_parameters=self.data_collection_parameters,
+            instrument_name=self.instrument_name,
             # processing_only_mode=server_routing_prefix_found,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
@@ -64,17 +78,6 @@ class MultigridController:
         self._register_dc: bool | None = None
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
-
-        if self.token:
-            requests.get = partial(
-                requests.get, headers={"Authorization": f"Bearer {self.token}"}
-            )
-            requests.post = partial(
-                requests.post, headers={"Authorization": f"Bearer {self.token}"}
-            )
-            requests.delete = partial(
-                requests.delete, headers={"Authorization": f"Bearer {self.token}"}
-            )
 
         self.ws = murfey.client.websocket.WSApp(
             server=self.murfey_url,
@@ -95,7 +98,9 @@ class MultigridController:
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(f"{self._environment.url.geturl()}/machine").json()
+        machine_data = requests.get(
+            f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
+        ).json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:

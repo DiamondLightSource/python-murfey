@@ -29,7 +29,7 @@ router = APIRouter(dependencies=[Depends(validate_token)])
 log = logging.getLogger("murfey.server.instrument")
 
 
-@router.post("/instrument/{instrument_name}/activate_instrument_server")
+@router.post("/instruments/{instrument_name}/activate_instrument_server")
 async def activate_instrument_server(instrument_name: str):
     log.info("Activating instrument server")
     timestamp = datetime.datetime.now().timestamp()
@@ -72,18 +72,18 @@ async def start_multigrid_watcher(
                 str(k): v for k, v in machine_config.data_directories.items()
             },
             "rsync_basepath": str(machine_config.rsync_basepath),
-            "murfey_db_credentials": machine_config.murfey_db_credentials,
             "visit": visit,
-            "crypto_key": "",
+            "default_model": str(machine_config.default_model),
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/multigrid_watcher",
                 json={
-                    "source": secure_filename(str(watcher_spec.source / visit)),
+                    "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
                     "configuration": _config,
                     "label": label,
+                    "instrument_name": instrument_name,
                     "skip_existing_processing": watcher_spec.skip_existing_processing,
                 },
                 headers={
@@ -91,7 +91,6 @@ async def start_multigrid_watcher(
                 },
             ) as resp:
                 data = await resp.json()
-                log.info(resp.status)
     return data
 
 
@@ -164,7 +163,7 @@ async def get_possible_gain_references(instrument_name: str) -> List[File]:
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{machine_config.instrument_server_url}/possible_gain_references",
+                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/possible_gain_references",
                 headers={
                     "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
                 },

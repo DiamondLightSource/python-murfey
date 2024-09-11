@@ -76,13 +76,13 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
-    session_validation: str
     murfey_db_credentials: str
     crypto_key: str
     auth_key: str = ""
     auth_algorithm: str = ""
     sqlalchemy_pooling: bool = True
     allow_origins: List[str] = ["*"]
+    session_validation: str = ""
 
 
 def security_from_file(config_file_path: Path) -> Security:
@@ -105,17 +105,10 @@ def get_hostname():
 
 
 def get_microscope(machine_config: MachineConfig | None = None) -> str:
-    try:
-        hostname = get_hostname()
-        microscope_from_hostname = hostname.split(".")[0]
-    except OSError:
-        microscope_from_hostname = "Unknown"
     if machine_config:
-        microscope_name = machine_config.machine_override or os.getenv(
-            "BEAMLINE", microscope_from_hostname
-        )
+        microscope_name = machine_config.machine_override or os.getenv("BEAMLINE", "")
     else:
-        microscope_name = os.getenv("BEAMLINE", microscope_from_hostname)
+        microscope_name = os.getenv("BEAMLINE", "")
     return microscope_name
 
 
@@ -134,7 +127,7 @@ def get_security_config() -> Security:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config() -> Dict[str, MachineConfig]:
+def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
     machine_config = {
         "": MachineConfig(
             acquisition_software=[],
@@ -147,7 +140,7 @@ def get_machine_config() -> Dict[str, MachineConfig]:
         )
     }
     if settings.murfey_machine_configuration:
-        microscope = get_microscope() or ""
+        microscope = instrument_name
         machine_config = from_file(
             Path(settings.murfey_machine_configuration), microscope
         )

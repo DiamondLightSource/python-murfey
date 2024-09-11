@@ -81,7 +81,9 @@ def determine_default_destination(
     include_mid_path: bool = True,
     use_suggested_path: bool = True,
 ) -> str:
-    machine_data = requests.get(f"{environment.url.geturl()}/machine").json()
+    machine_data = requests.get(
+        f"{environment.url.geturl()}/instruments/{environment.instrument_name}/machine"
+    ).json()
     _default = ""
     if environment.processing_only_mode and environment.sources:
         log.info(f"Processing only mode with sources {environment.sources}")

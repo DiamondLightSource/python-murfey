@@ -113,9 +113,7 @@ settings = Settings()
 machine_config: dict = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
-    machine_config = dict(
-        from_file(Path(settings.murfey_machine_configuration), microscope)
-    )
+    machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
 
 
 # This will be the homepage for a given microscope.
@@ -132,7 +130,6 @@ async def root(request: Request):
     )
 
 
-@lru_cache(maxsize=1)
 @router.get("/machine")
 def machine_info() -> MachineConfig | None:
     instrument_name = os.getenv("BEAMLINE")
@@ -143,7 +140,7 @@ def machine_info() -> MachineConfig | None:
     return None
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=5)
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
     if settings.murfey_machine_configuration:
@@ -766,7 +763,7 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
-@router.get("/instruments/{instrument_name}visits_raw", response_model=List[Visit])
+@router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str):
     return [
         Visit(
@@ -954,9 +951,12 @@ async def request_spa_preprocessing(
             break
     else:
         raise ValueError(f"{proc_file.path} does not contain a raw directory")
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
     mrc_out = (
         core
-        / machine_config["processed_directory_name"]
+        / machine_config[instrument_name].processed_directory_name
         / sub_dataset
         / "MotionCorr"
         / "job002"
@@ -1189,11 +1189,16 @@ def shutdown():
     return {"success": True}
 
 
-@router.post("/visits/{visit_name}/suggested_path")
-def suggest_path(visit_name, params: SuggestedPathParameters):
+@router.post("/visits/{visit_name}/{session_id}/suggested_path")
+def suggest_path(
+    visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
+):
     count: int | None = router.raw_count
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
     check_path = (
-        machine_config["rsync_basepath"] / params.base_path
+        machine_config[instrument_name].rsync_basepath / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
@@ -1203,7 +1208,11 @@ def suggest_path(visit_name, params: SuggestedPathParameters):
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     router.raw_count += 1
-    return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
+    return {
+        "suggested_path": check_path.relative_to(
+            machine_config[instrument_name].rsync_basepath
+        )
+    }
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
@@ -1570,18 +1579,22 @@ def change_monitoring_status(visit_name: str, on: int):
 
 @router.get("/sessions/{session_id}/upstream_visits")
 def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
     upstream_visits = {}
-    for p in machine_config["upstream_data_directories"]:
+    for p in machine_config[instrument_name].upstream_data_directories:
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
-            upstream_visits[v.name] = v / machine_config["processed_directory_name"]
+            upstream_visits[v.name] = (
+                v / machine_config[instrument_name].processed_directory_name
+            )
     return upstream_visits
 
 
-def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
+def _get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
     tiff_dirs = []
-    for directory_name in machine_config["upstream_data_tiff_locations"]:
-        for p in machine_config["upstream_data_directories"]:
+    for directory_name in machine_config[instrument_name].upstream_data_tiff_locations:
+        for p in machine_config[instrument_name].upstream_data_directories:
             if (Path(p) / secure_filename(visit_name)).is_dir():
                 processed_dir = Path(p) / secure_filename(visit_name) / directory_name
                 tiff_dirs.append(processed_dir)
@@ -1593,10 +1606,13 @@ def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
     return tiff_dirs
 
 
-@router.get("/visits/{visit_name}/upstream_tiff_paths")
-async def gather_upstream_tiffs(visit_name: str):
+@router.get("/visits/{visit_name}/{session_id}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
     upstream_tiff_paths = []
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
     for tiff_dir in tiff_dirs:
@@ -1605,9 +1621,12 @@ async def gather_upstream_tiffs(visit_name: str):
     return upstream_tiff_paths
 
 
-@router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
-async def get_tiff(visit_name: str, tiff_path: str):
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+@router.get("/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}")
+async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_db):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
 

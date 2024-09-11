@@ -115,6 +115,7 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
     controllers[label] = MultigridController(
         [],
         watcher_spec.visit,
+        watcher_spec.instrument_name,
         session_id,
         murfey_url=_get_murfey_url(),
         demo=True,
@@ -126,7 +127,7 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
-        f"{_get_murfey_url()}/machine",
+        f"{_get_murfey_url()}/instruments/{watcher_spec.instrument_name}/machine",
         headers={"Authorization": f"Bearer {tokens['token']}"},
     ).json()
     for d in machine_config.get("create_directories", {}).values():
@@ -207,10 +208,10 @@ def register_processing_parameters(proc_param_block: ProcessingParameterBlock):
     return {"success": True}
 
 
-@router.get("/possible_gain_references")
-def get_possible_gain_references() -> List[File]:
+@router.get("/instruments/{instrument_name}/possible_gain_references")
+def get_possible_gain_references(instrument_name: str) -> List[File]:
     machine_config = requests.get(
-        f"{_get_murfey_url()}/machine",
+        f"{_get_murfey_url()}/instruments/{instrument_name}/machine",
         headers={"Authorization": f"Bearer {tokens['token']}"},
     ).json()
     candidates = []

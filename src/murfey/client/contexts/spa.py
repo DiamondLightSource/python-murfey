@@ -106,7 +106,9 @@ def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ):
     machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (
@@ -417,7 +419,7 @@ class _SPAContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/machine"
+                f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
             )
             if server_config_response is None:
                 return None
@@ -677,7 +679,9 @@ class SPAModularContext(_SPAContext):
                 if self._acquisition_software == "epu":
                     if environment:
                         machine_config = get_machine_config(
-                            str(environment.url.geturl()), demo=environment.demo
+                            str(environment.url.geturl()),
+                            instrument_name=environment.instrument_name,
+                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}
@@ -863,7 +867,9 @@ class SPAContext(_SPAContext):
         environment.id_tag_registry["processing_job"].append(tag)
         proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
         machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
+            str(environment.url.geturl()),
+            instrument_name=environment.instrument_name,
+            demo=environment.demo,
         )
         image_directory = str(
             Path(machine_config.get("rsync_basepath", "."))
