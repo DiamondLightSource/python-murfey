@@ -178,6 +178,7 @@ class Analyser(Observer):
                 or "[" in file_path.name
                 or "Fractions" in split_file_name[-1]
                 or "fractions" in split_file_name[-1]
+                or "EER" in split_file_name[-1]
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
