@@ -77,7 +77,7 @@ async def start_multigrid_watcher(
             async with session.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/multigrid_watcher",
                 json={
-                    "source": secure_filename(str(watcher_spec.source / visit)),
+                    "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
                     "configuration": _config,
                     "label": label,
