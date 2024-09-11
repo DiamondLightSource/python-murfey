@@ -658,7 +658,7 @@ class SessionSelection(Screen):
             self.app.pop_screen()
         session_name = "Client connection"
         self.app._environment.murfey_session = requests.post(
-            f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+            f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
         ).json()
 
@@ -687,7 +687,7 @@ class SessionSelection(Screen):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -1185,7 +1185,7 @@ class WaitingScreen(Screen):
                 f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/successful_processing"
             )
             requests.delete(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session"
+                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session"
             )
             self.app.exit()
             exit()

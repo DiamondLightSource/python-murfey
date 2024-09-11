@@ -715,7 +715,7 @@ class MurfeyTUI(App):
 
     async def action_remove_session(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -730,7 +730,7 @@ class MurfeyTUI(App):
 
     def clean_up_quit(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
         exit()
@@ -775,7 +775,7 @@ class MurfeyTUI(App):
             f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/successful_processing"
         )
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
         exit()
