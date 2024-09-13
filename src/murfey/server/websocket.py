@@ -22,14 +22,21 @@ log = logging.getLogger("murfey.server.websocket")
 
 class ConnectionManager(Generic[T]):
     def __init__(self, state: State[T]):
-        self.active_connections: Dict[int, WebSocket] = {}
+        self.active_connections: Dict[int | str, WebSocket] = {}
         self._state = state
         self._state.subscribe(self._broadcast_state_update)
 
-    async def connect(self, websocket: WebSocket, client_id: int):
+    async def connect(
+        self, websocket: WebSocket, client_id: int | str, register_client: bool = True
+    ):
         await websocket.accept()
         self.active_connections[client_id] = websocket
-        self._register_new_client(client_id)
+        if register_client:
+            if not isinstance(client_id, int):
+                raise ValueError(
+                    "To register a client the client ID must be an integer"
+                )
+            self._register_new_client(client_id)
         await websocket.send_json({"message": "state-full", "state": self._state.data})
 
     @staticmethod
@@ -40,15 +47,20 @@ class ConnectionManager(Generic[T]):
         murfey_db.commit()
         murfey_db.close()
 
-    def disconnect(self, websocket: WebSocket, client_id: int):
+    def disconnect(
+        self, websocket: WebSocket, client_id: int | str, unregister_client: bool = True
+    ):
         self.active_connections.pop(client_id)
-        murfey_db = next(get_murfey_db_session())
-        client_env = murfey_db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        ).one()
-        murfey_db.delete(client_env)
-        murfey_db.commit()
-        murfey_db.close()
+        if unregister_client:
+            murfey_db = next(get_murfey_db_session())
+            client_env = murfey_db.exec(
+                select(ClientEnvironment).where(
+                    ClientEnvironment.client_id == client_id
+                )
+            ).one()
+            murfey_db.delete(client_env)
+            murfey_db.commit()
+            murfey_db.close()
 
     async def broadcast(self, message: str):
         for connection in self.active_connections:
@@ -101,6 +113,31 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
         await manager.delete_state(f"Client {client_id}")
 
 
+@ws.websocket("/connect/{client_id}")
+async def websocket_connection_endpoint(websocket: WebSocket, client_id: int | str):
+    await manager.connect(websocket, client_id, register_client=False)
+    await manager.broadcast(f"Client {client_id} joined")
+    await manager.set_state(f"Client {client_id}", "joined")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                json_data = json.loads(data)
+                if json_data.get("type") == "log":  # and isinstance(json_data, dict)
+                    json_data.pop("type")
+                    await forward_log(json_data, websocket)
+                elif json_data.get("message") == "refresh":
+                    await manager.broadcast(json.dumps(json_data))
+
+            except Exception:
+                await manager.broadcast(f"Client #{client_id} sent message {data}")
+    except WebSocketDisconnect:
+        log.info(f"Disconnecting Client {client_id}")
+        manager.disconnect(websocket, client_id, unregister_client=False)
+        await manager.broadcast(f"Client #{client_id} disconnected")
+        await manager.delete_state(f"Client {client_id}")
+
+
 async def check_connections(active_connections):
     log.info("Checking connections")
     for connection in active_connections:
@@ -138,4 +175,12 @@ async def close_ws_connection(client_id: int):
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(manager.active_connections[client_id], client_id)
     prom.monitoring_switch.labels(visit=visit_name).set(0)
+    await manager.broadcast(f"Client #{client_id} disconnected")
+
+
+@ws.delete("/connect/{client_id}")
+async def close_unrecorded_ws_connection(client_id: int | str):
+    client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
+    log.info(f"Disconnecting {client_id_str}")
+    manager.disconnect(manager.active_connections[client_id], client_id)
     await manager.broadcast(f"Client #{client_id} disconnected")

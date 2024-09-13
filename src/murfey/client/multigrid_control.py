@@ -1,3 +1,4 @@
+import json
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -81,7 +82,7 @@ class MultigridController:
 
         self.ws = murfey.client.websocket.WSApp(
             server=self.murfey_url,
-            id=0,
+            register_client=False,
         )
 
     def _start_rsyncer_multigrid(
@@ -133,7 +134,7 @@ class MultigridController:
             tag=tag,
             limited=limited,
         )
-        self.ws.send({"message": "refresh"})
+        self.ws.send(json.dumps({"message": "refresh"}))
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
