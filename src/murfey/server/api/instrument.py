@@ -72,12 +72,13 @@ async def start_multigrid_watcher(
             "murfey_db_credentials": machine_config.murfey_db_credentials,
             "visit": visit,
             "crypto_key": "",
+            "default_model": machine_config.default_model,
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/multigrid_watcher",
                 json={
-                    "source": secure_filename(str(watcher_spec.source / visit)),
+                    "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
                     "configuration": _config,
                     "label": label,
