@@ -15,8 +15,12 @@ class Camera(Enum):
     FALCON = 3
 
 
-def _sanitise(gain_path: Path) -> Path:
-    dest = gain_path.parent / "gain" / gain_path.name.replace(" ", "_")
+def _sanitise(gain_path: Path, tag: str = "") -> Path:
+    dest = (
+        gain_path.parent
+        / (f"gain_{tag}" if tag else "gain")
+        / gain_path.name.replace(" ", "_")
+    )
     dest.write_bytes(gain_path.read_bytes())
     return dest
 
