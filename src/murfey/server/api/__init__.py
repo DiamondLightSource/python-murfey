@@ -409,6 +409,73 @@ def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
     return res
 
 
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
+def get_grid_squares_from_dcg(
+    session_id: int, dcgid: int, db=murfey_db
+) -> List[GridSquare]:
+    grid_squares = db.exec(
+        select(GridSquare, DataCollectionGroup)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [gs[0] for gs in grid_squares]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/num_movies"
+)
+def get_number_of_movies_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
+)
+def get_foil_holes_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> List[FoilHole]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare, DataCollectionGroup)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [fh[0] for fh in foil_holes]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
+)
+def get_number_of_movies_from_foil_hole(
+    session_id: int, dcgid: int, gsid: int, fhid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.name == fhid)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: MurfeySessionID,
@@ -1234,11 +1301,23 @@ def suggest_path(
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
-def get_dc_groups(session_id: MurfeySessionID, db=murfey_db):
+def get_dc_groups(
+    session_id: MurfeySessionID, db=murfey_db
+) -> Dict[str, DataCollectionGroup]:
     data_collection_groups = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
     ).all()
     return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
+def get_data_collections(
+    session_id: MurfeySessionID, dcgid: int, db=murfey_db
+) -> List[DataCollection]:
+    data_collections = db.exec(
+        select(DataCollection).where(DataCollection.dcg_id == dcgid)
+    ).all()
+    return data_collections
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")

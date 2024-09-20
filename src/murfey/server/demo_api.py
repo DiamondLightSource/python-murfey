@@ -582,6 +582,73 @@ def get_grid_squares(session_id: int, db=murfey_db):
     return res
 
 
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
+def get_grid_squares_from_dcg(
+    session_id: int, dcgid: int, db=murfey_db
+) -> List[GridSquare]:
+    grid_squares = db.exec(
+        select(GridSquare, DataCollectionGroup)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [gs[0] for gs in grid_squares]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/num_movies"
+)
+def get_number_of_movies_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
+)
+def get_foil_holes_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> List[FoilHole]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare, DataCollectionGroup)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [fh[0] for fh in foil_holes]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
+)
+def get_number_of_movies_from_foil_hole(
+    session_id: int, dcgid: int, gsid: int, fhid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.name == fhid)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: int,
@@ -652,7 +719,10 @@ def register_foil_hole(
         .one()
         .id
     )
-    jpeg_size = Image.open(foil_hole_params.image).size
+    if foil_hole_params.image and Path(foil_hole_params.image).is_file():
+        jpeg_size = Image.open(foil_hole_params.image).size
+    else:
+        jpeg_size = (0, 0)
     foil_hole = FoilHole(
         name=foil_hole_params.name,
         session_id=session_id,
@@ -884,6 +954,9 @@ def flush_spa_processing(
         return
 
     detached_ids = [c.id for c in collected_ids]
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
 
     murfey_ids = _murfey_id(
         detached_ids[3], db, number=2 * len(stashed_files), close=False
@@ -905,8 +978,10 @@ def flush_spa_processing(
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config["feedback_queue"],
-                "node_creator_queue": machine_config["node_creator_queue"],
+                "feedback_queue": machine_config[instrument_name].feedback_queue,
+                "node_creator_queue": machine_config[
+                    instrument_name
+                ].node_creator_queue,
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
@@ -918,7 +993,10 @@ def flush_spa_processing(
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": (
-                    str(machine_config["rsync_basepath"] / proc_params["gain_ref"])
+                    str(
+                        machine_config[instrument_name].rsync_basepath
+                        / proc_params["gain_ref"]
+                    )
                     if proc_params["gain_ref"]
                     else proc_params["gain_ref"]
                 ),
@@ -1208,6 +1286,10 @@ def suggest_path(
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     router.raw_count += 1
+    if params.touch:
+        check_path.mkdir(mode=0o750)
+        if params.extra_directory:
+            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
     return {
         "suggested_path": check_path.relative_to(
             machine_config[instrument_name].rsync_basepath
@@ -1216,11 +1298,23 @@ def suggest_path(
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
-def get_dc_groups(session_id: MurfeySessionID, db=murfey_db):
+def get_dc_groups(
+    session_id: MurfeySessionID, db=murfey_db
+) -> Dict[str, DataCollectionGroup]:
     data_collection_groups = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
     ).all()
     return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
+def get_data_collections(
+    session_id: MurfeySessionID, dcgid: int, db=murfey_db
+) -> List[DataCollection]:
+    data_collections = db.exec(
+        select(DataCollection).where(DataCollection.dcg_id == dcgid)
+    ).all()
+    return data_collections
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
