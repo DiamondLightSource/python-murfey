@@ -245,18 +245,30 @@ MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 # Variables used by the MSYS2 functions below
 msys2_url = "https://repo.msys2.org"
 msys2_setup_file = "msys2-x86_64-latest.exe"
-valid_env = ("msys", "mingw")
-valid_msys = ("i686", "x86_64")
-valid_mingw = (
-    "clang32",
-    "clang64",
-    "clangarm64",
-    "i686",
-    "mingw32",
-    "mingw64",
-    "sources",
-    "ucrt64",
-    "x86_64",
+valid_envs = (  # Environment, then supported compilers/architectures
+    (
+        "msys",  # Cygwin-like
+        (
+            "i686",  # 32-bit
+            "x86_64",  # 64-bit
+        ),
+    ),
+    (
+        "mingw",  # Windows-compatible
+        (
+            "sources",
+            # C-compilers
+            "clang32",
+            "clang64",
+            "clangarm64",
+            "mingw32",
+            "mingw64",
+            "ucrt64",
+            # Architecture
+            "i686",
+            "x86_64",
+        ),
+    ),
 )
 
 
@@ -281,7 +293,7 @@ def get_msys2_main_index(
     request: Request,
 ) -> Response:
     """
-    Returns a simple index displaying valid MSYS2 environments and the latest setup file
+    Returns a simple index displaying valid MSYS2 systems and the latest setup file
     from the main MSYS2 repository.
     """
 
@@ -330,7 +342,7 @@ def get_msys2_main_index(
     for line in content_text.splitlines():
         if line.startswith("<a href"):
             # Mirror only lines related to MSYS2 environments
-            if any(env in line for env in valid_env):
+            if any(env[0] in line for env in valid_envs):
                 line_new = re.sub(
                     '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
                     _rewrite_url,  # Function to apply search criteria to
@@ -340,7 +352,6 @@ def get_msys2_main_index(
 
             # Replace the "distrib/" hyperlink with one to the setup file
             elif "distrib" in line:
-
                 # Set up URL to be requested on the Murfey server
                 mirror_file_name = "setup-x86_64.exe"
                 setup_url = f"{base_path}/{mirror_file_name}"
@@ -375,14 +386,14 @@ def get_msys2_main_index(
     )
 
 
-@msys2.get("/{environment}", response_class=Response)
-def get_msys2_architecture_index(
-    environment: str,
+@msys2.get("/{system}", response_class=Response)
+def get_msys2_environment_index(
+    system: str,
     request: Request,
 ) -> Response:
     """
-    Returns a list of all MSYS2 architectures for a given environment from the main
-    MSYS2 repository.
+    Returns a list of all MSYS2 environments for a given system from the main MSYS2
+    repository.
     """
 
     def _rewrite_url(match):
@@ -402,12 +413,12 @@ def get_msys2_architecture_index(
     path = request.url.path.strip("/")
     base_path = f"{domain}/{path}"
 
-    # Validate environment
-    if environment not in valid_env:
-        raise ValueError(f"{environment!r} is not a valid msys2 environment")
+    # Validate provided system
+    if any(system in env[0] for env in valid_envs) is False:
+        raise ValueError(f"{system!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
-    arch_url = f'{msys2_url}/{quote(environment, safe="")}'
+    arch_url = f'{msys2_url}/{quote(system, safe="")}'
     index = requests.get(arch_url)
 
     # Parse and rewrite package index content
@@ -436,15 +447,15 @@ def get_msys2_architecture_index(
     )
 
 
-@msys2.get("/{environment}/{architecture}", response_class=Response)
+@msys2.get("/{system}/{environment}", response_class=Response)
 def get_msys2_package_index(
+    system: str,
     environment: str,
-    architecture: str,
     request: Request,
 ) -> Response:
     """
-    Obtain a list of all available MSYS2 packages for a given environment and
-    architecture from the main MSYS2 repo.
+    Obtain a list of all available MSYS2 packages for a given environment from the main
+    MSYS2 repo.
     """
 
     def _rewrite_url(match):
@@ -465,18 +476,12 @@ def get_msys2_package_index(
     base_path = f"{domain}/{path}"
 
     # Validate environment
-    if environment not in valid_env:
-        raise ValueError(f"{environment!r} is not a valid msys2 environment")
-
-    # Validate architecture for each environment
-    if environment == "msys" and architecture not in valid_msys:
-        raise ValueError(f"{architecture!r} is not a valid msys architecture")
-    elif environment == "mingw" and architecture not in valid_mingw:
-        raise ValueError(f"{architecture!r} is not a valid mingw architecture")
+    if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
+        raise ValueError(f"{system!r}/{environment!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
     package_list_url = (
-        f'{msys2_url}/{quote(environment, safe="")}/{quote(architecture, safe="")}'
+        f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}'
     )
     index = requests.get(package_list_url)
 
@@ -505,10 +510,10 @@ def get_msys2_package_index(
     )
 
 
-@msys2.get("/{environment}/{architecture}/{package}", response_class=Response)
+@msys2.get("/{system}/{environment}/{package}", response_class=Response)
 def get_msys2_package_file(
+    system: str,
     environment: str,
-    architecture: str,
     package: str,
 ) -> Response:
     """
@@ -516,14 +521,8 @@ def get_msys2_package_file(
     """
 
     # Validate environment
-    if environment not in valid_env:
-        raise ValueError(f"{environment!r} is not a valid msys2 environment")
-
-    # Validate architecture for each environment
-    if environment == "msys" and architecture not in valid_msys:
-        raise ValueError(f"{architecture!r} is not a valid msys architecture")
-    elif environment == "mingw" and architecture not in valid_mingw:
-        raise ValueError(f"{architecture!r} is not a valid mingw architecture")
+    if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
+        raise ValueError(f"{system!r}/{environment!r} is not a valid msys2 environment")
 
     # Validate package name
     ## MSYS2 package names contain alphanumerics (includes "_"; \w), periods (\.),
@@ -532,7 +531,7 @@ def get_msys2_package_file(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f'{msys2_url}/{quote(environment, safe="")}/{quote(architecture, safe="")}/{quote(package, safe="")}'
+    package_url = f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}/{quote(package, safe="")}'
     package_file = requests.get(package_url)
 
     if package_file.status_code == 200:
