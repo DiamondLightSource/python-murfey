@@ -19,10 +19,10 @@ from sqlmodel import create_engine, select
 
 from murfey.client.contexts.spa import _get_xml_list_index
 from murfey.server import _murfey_id, _register
-from murfey.server.config import get_machine_config, get_microscope
 from murfey.server.ispyb import Session, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
+from murfey.util.config import get_machine_config, get_microscope
 
 
 def run():
@@ -203,7 +203,7 @@ def run():
         ]
     )
     binning_factor = 1
-    server_config = requests.get(f"{args.url}/machine/").json()
+    server_config = requests.get(f"{args.url}/machine").json()
     if server_config.get("superres"):
         # If camera is capable of superres and collection is in superres
         binning_factor = 2

@@ -431,7 +431,7 @@ class TomographyContext(Context):
             self._completed_tilt_series.remove(tilt_series)
             rerun_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/rerun_tilt_series"
             rerun_data = {
-                "client_id": environment.client_id,
+                "session_id": environment.murfey_session,
                 "tag": tilt_series,
                 "source": str(file_path.parent),
             }
@@ -445,7 +445,7 @@ class TomographyContext(Context):
             self._tilt_series[tilt_series] = [file_path]
             ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
             ts_data = {
-                "client_id": environment.client_id,
+                "session_id": environment.murfey_session,
                 "tag": tilt_series,
                 "source": str(file_path.parent),
             }
@@ -454,7 +454,7 @@ class TomographyContext(Context):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/start_data_collection"
+                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
                     data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
@@ -491,7 +491,7 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
+                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
                     if (
                         environment.data_collection_group_ids.get(str(self._basepath))
                         is None
@@ -565,7 +565,7 @@ class TomographyContext(Context):
                 )
 
         if environment:
-            tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tilt"
+            tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tilt"
             tilt_data = {
                 "movie_path": str(file_transferred_to),
                 "tilt_series_tag": tilt_series,
@@ -591,7 +591,7 @@ class TomographyContext(Context):
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/tomography_preprocess"
+            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tomography_preprocess"
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
@@ -841,7 +841,7 @@ class TomographyContext(Context):
                 f"The following tilt series are considered complete: {completed_tilts} "
                 f"after {transferred_file}"
             )
-            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/completed_tilt_series"
+            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/completed_tilt_series"
             capture_post(
                 complete_url,
                 json={
@@ -927,7 +927,7 @@ class TomographyContext(Context):
             binning_factor = 1
             if environment:
                 server_config = requests.get(
-                    f"{str(environment.url.geturl())}/machine/"
+                    f"{str(environment.url.geturl())}/machine"
                 ).json()
                 if (
                     server_config.get("superres")

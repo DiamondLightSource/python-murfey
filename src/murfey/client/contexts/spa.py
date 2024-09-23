@@ -417,7 +417,7 @@ class _SPAContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/machine/"
+                f"{str(environment.url.geturl())}/machine"
             )
             if server_config_response is None:
                 return None
@@ -746,7 +746,7 @@ class SPAModularContext(_SPAContext):
                             # try to continue if position information gathering fails so that movie is processed anyway
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
@@ -769,7 +769,7 @@ class SPAModularContext(_SPAContext):
                                 "gain_ref"
                             ),
                             "extract_downscale": environment.data_collection_parameters.get(
-                                "downscale"
+                                "downscale", True
                             ),
                             "eer_fractionation_file": eer_fractionation_file,
                             "tag": str(source),
@@ -861,7 +861,7 @@ class SPAContext(_SPAContext):
         logger.info(f"registering processing job with parameters: {parameters}")
         parameters = parameters or {}
         environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.client_id}/register_processing_job"
+        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
         machine_config = get_machine_config(
             str(environment.url.geturl()), demo=environment.demo
         )

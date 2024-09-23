@@ -95,10 +95,8 @@ def get_bootstrap_instructions(request: Request):
     """
 
     return respond_with_template(
-        "bootstrap.html",
-        {
-            "request": request,
-        },
+        request=request,
+        filename="bootstrap.html",
     )
 
 

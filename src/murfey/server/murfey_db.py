@@ -8,7 +8,7 @@ from fastapi import Depends
 from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
-from murfey.server.config import MachineConfig, get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
 
 
 def url(machine_config: MachineConfig | None = None) -> str:
