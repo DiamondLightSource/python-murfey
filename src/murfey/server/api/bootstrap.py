@@ -245,28 +245,34 @@ MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 # Variables used by the MSYS2 functions below
 msys2_url = "https://repo.msys2.org"
 msys2_setup_file = "msys2-x86_64-latest.exe"
-valid_envs = (  # Environment, then supported compilers/architectures
+valid_envs = (
+    # Tuple of systems and supported libraries/compilers/architectures within
     (
-        "msys",  # Cygwin-like
+        "msys",  # Cygwin-like system
         (
+            # Available environments
             "i686",  # 32-bit
             "x86_64",  # 64-bit
+            "sources",
         ),
     ),
     (
-        "mingw",  # Windows-compatible
+        "mingw",  # Windows-like system
         (
-            "sources",
-            # C-compilers
+            # Available environments
+            # Toolchain: llvm, C library:   ucrt, C++ library:    libc++
             "clang32",
             "clang64",
             "clangarm64",
+            # Toolchain:  gcc, C library:   ucrt, C++ library: libstdc++
+            "ucrt64",
+            # Toolchain:  gcc, C library: msvcrt, C++ library: libstdc++
             "mingw32",
             "mingw64",
-            "ucrt64",
-            # Architecture
-            "i686",
-            "x86_64",
+            # Architecture types
+            "i686",  # 32-bit
+            "x86_64",  # 64-bit
+            "sources",
         ),
     ),
 )
