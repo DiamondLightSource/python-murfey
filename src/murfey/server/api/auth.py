@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib.metadata
 import secrets
+import sys
 from logging import getLogger
 from typing import Annotated, Dict
 
@@ -16,6 +16,11 @@ from murfey.server.murfey_db import url
 from murfey.util.config import get_machine_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
+
+if sys.version_info > (3, 10):
+    from importlib.metadata import entry_points
+else:
+    from importlib_metadata import entry_points
 
 # Set up logger
 logger = getLogger("murfey.server.api.auth")
@@ -64,7 +69,8 @@ def validate_user(username: str, password: str) -> bool:
 
 
 def validate_visit(visit_name: str, token: str) -> bool:
-    if validators := importlib.metadata.entry_points().select(
+    # Entry points have to be handled differently pre-3.9
+    if validators := entry_points().select(
         group="murfey.auth.session_validation",
         name=machine_config.auth.session_validation,
     ):
