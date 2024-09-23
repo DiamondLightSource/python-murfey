@@ -244,6 +244,9 @@ def parse_cygwin_request(request_path: str):
 MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 """
 
+# Variables used by the MSYS2 functions below
+msys2_url = "https://repo.msys2.org"
+msys2_setup_file = "msys2-x86_64-latest.exe"
 valid_env = ("msys", "mingw")
 valid_msys = ("i686", "x86_64")
 valid_mingw = (
@@ -267,12 +270,171 @@ def get_msys2_setup():
     MSYS2 distribution that then remains on the client machines.
     """
 
-    file_name = "msys2-x86_64-latest.exe"
-    installer = requests.get(f"https://repo.msys2.org/distrib/{file_name}")
+    installer = requests.get(f"{msys2_url}/distrib/{msys2_setup_file}")
     return Response(
         content=installer.content,
         media_type=installer.headers.get("Content-Type"),
         status_code=installer.status_code,
+    )
+
+
+@msys2.get("", response_class=Response)
+def get_msys2_main_index(
+    request: Request,
+) -> Response:
+    """
+    Returns a simple index displaying valid MSYS2 environments and the latest setup file
+    from the main MSYS2 repository.
+    """
+
+    def get_msys2_setup_html():
+        """
+        Returns the HTML line for the latest MSYS2 installer for Windows from an official
+        source.
+        """
+        url = f"{msys2_url}/distrib"
+        index = requests.get(url)
+        content: bytes = index.content
+        content_text: str = content.decode("latin1")
+
+        for line in content_text.splitlines():
+            if line.startswith("<a href="):
+                if f'"{msys2_setup_file}"' in line:
+                    return line
+            else:
+                pass
+        return None
+
+    def _rewrite_url(match):
+        """
+        Use regular expression matching to rewrite the package URLs and point them
+        explicitly to this current server.
+        """
+        url = (
+            f"{base_path}/{match.group(1)}"
+            if not str(match.group(1)).startswith("http")
+            else str(match.group(1))
+        )
+        return f'<a href="{url}">' + match.group(2) + "</a>"
+
+    # Get base path to current FastAPI endpoint
+    domain = str(request.base_url).strip("/")
+    path = request.url.path.strip("/")
+    base_path = f"{domain}/{path}"
+
+    env_url = f"{msys2_url}"
+    index = requests.get(env_url)
+
+    # Parse and rewrite package index content
+    content: bytes = index.content  # Get content in bytes
+    content_text: str = content.decode("latin1")  # Convert to strings
+    content_text_list = []
+    for line in content_text.splitlines():
+        if line.startswith("<a href"):
+            # Mirror only lines related to MSYS2 environments
+            if any(env in line for env in valid_env):
+                line_new = re.sub(
+                    '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
+                    _rewrite_url,  # Function to apply search criteria to
+                    line,
+                )
+                content_text_list.append(line_new)
+
+            # Replace the "distrib/" hyperlink with one to the setup file
+            elif "distrib" in line:
+
+                # Set up URL to be requested on the Murfey server
+                mirror_file_name = "setup-x86_64.exe"
+                setup_url = f"{base_path}/{mirror_file_name}"
+
+                # Get request from the "distrib" page and rewrite it
+                setup_html = get_msys2_setup_html()
+                if setup_html is None:
+                    # Skip showing the setup file link if it fails to find it
+                    continue
+
+                line_new = "               ".join(  # Adjust spaces to align columns
+                    re.sub(
+                        '^<a href="([^">]*)">([^"<]*)</a>',
+                        f'<a href="{setup_url}">{mirror_file_name}</a>',
+                        setup_html,
+                    ).split("        ", 1)
+                )
+                content_text_list.append(line_new)
+            # Other URLs don't need to be mirrored
+            else:
+                pass
+        else:
+            content_text_list.append(line)
+
+    # Reconstruct conent
+    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
+    content_new = content_text_new.encode("latin1")  # Convert back to bytes
+    return Response(
+        content=content_new,
+        status_code=index.status_code,
+        media_type=index.headers.get("Content-Type"),
+    )
+
+
+@msys2.get("/{environment}", response_class=Response)
+def get_msys2_architecture_index(
+    environment: str,
+    request: Request,
+) -> Response:
+    """
+    Returns a list of all MSYS2 architectures for a given environment from the main
+    MSYS2 repository.
+    """
+
+    def _rewrite_url(match):
+        """
+        Use regular expression matching to rewrite the package URLs and point them
+        explicitly to this current server.
+        """
+        url = (
+            f"{base_path}/{match.group(1)}"
+            if not str(match.group(1)).startswith("http")
+            else str(match.group(1))
+        )
+        return f'<a href="{url}">' + match.group(2) + "</a>"
+
+    # Get base path to current FastAPI endpoint
+    domain = str(request.base_url).strip("/")
+    path = request.url.path.strip("/")
+    base_path = f"{domain}/{path}"
+
+    # Validate environment
+    if environment not in valid_env:
+        raise ValueError(f"{environment!r} is not a valid msys2 environment")
+
+    # Construct URL to main MSYS repo and get response
+    arch_url = f'{msys2_url}/{quote(environment, safe="")}'
+    index = requests.get(arch_url)
+
+    # Parse and rewrite package index content
+    content: bytes = index.content  # Get content in bytes
+    content_text: str = content.decode("latin1")  # Convert to strings
+    content_text_list = []
+    for line in content_text.splitlines():
+        if line.startswith("<a href="):
+            # Rewrite URL to point explicitly to current server
+            line_new = re.sub(
+                '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
+                _rewrite_url,  # Function to apply search criteria to
+                line,
+            )
+            content_text_list.append(line_new)
+        else:
+            content_text_list.append(line)
+
+    # Reconstruct conent
+    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
+    content_new = content_text_new.encode("latin1")  # Convert back to bytes
+    return Response(
+        content=content_new,
+        status_code=index.status_code,
+        media_type=index.headers.get("Content-Type"),
     )
 
 
@@ -283,7 +445,8 @@ def get_msys2_package_index(
     request: Request,
 ) -> Response:
     """
-    Obtain a list of all base MSYS2 packages from the main MSYS2 repository.
+    Obtain a list of all available MSYS2 packages for a given environment and
+    architecture from the main MSYS2 repo.
     """
 
     def _rewrite_url(match):
@@ -314,16 +477,17 @@ def get_msys2_package_index(
         raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Construct URL to main MSYS repo and get response
-    repo_url = f'https://repo.msys2.org/{quote(environment, safe="")}/{quote(architecture, safe="")}'
-    index = requests.get(repo_url)
+    package_list_url = (
+        f'{msys2_url}/{quote(environment, safe="")}/{quote(architecture, safe="")}'
+    )
+    index = requests.get(package_list_url)
 
     # Parse and rewrite package index content
     content: bytes = index.content  # Get content in bytes
     content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
     for line in content_text.splitlines():
-        if line.startswith("<a href"):
-            # Rewrite URL to point explicitly to current server
+        if line.startswith("<a href="):
             line_new = re.sub(
                 '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
                 _rewrite_url,  # Function to apply search criteria to
@@ -364,11 +528,13 @@ def get_msys2_package_file(
         raise ValueError(f"{architecture!r} is not a valid mingw architecture")
 
     # Validate package name
-    if bool(re.fullmatch(r"^[\w\s\.\-]+$", package)) is False:
+    ## MSYS2 package names contain alphanumerics (includes "_"; \w), periods (\.),
+    ## dashes (\-), and tildes (~)
+    if bool(re.fullmatch(r"^[\w\.\-~]+$", package)) is False:
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f'https://repo.msys2.org/{quote(environment, safe="")}/{quote(architecture, safe="")}/{quote(package, safe="")}'
+    package_url = f'{msys2_url}/{quote(environment, safe="")}/{quote(architecture, safe="")}/{quote(package, safe="")}'
     package_file = requests.get(package_url)
 
     if package_file.status_code == 200:
@@ -386,25 +552,16 @@ PYPI-RELATED FUNCTIONS AND ENDPOINTS
 """
 
 
-def _validate_pypi_package_name(package: str) -> bool:
-    """
-    Check that a package name follows PEP 503 naming conventions, containing only
-    alphanumerics, "_", "-", or "." characters
-    """
-    if re.match(r"^[a-z0-9\-\_\.]+$", package):
-        return True
-    else:
-        return False
-
-
 def _get_full_pypi_path_response(package: str) -> requests.Response:
     """
     Validates the package name, sanitises it if valid, and attempts to return a HTTP
     response from PyPI.
     """
 
-    if _validate_pypi_package_name(package):
-        # Sanitise and normalise package name (PEP 503)
+    # Check that a package name follows PEP 503 naming conventions, containing only
+    # alphanumerics (including underscores; \w), dashes (\-), and periods (\.)
+    if re.match(r"^[\w\-\.]+$", package) is not None:
+        # Sanitise and normalise package name according to PEP 503
         package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="")
 
         # Get HTTP response
