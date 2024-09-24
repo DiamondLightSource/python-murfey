@@ -162,7 +162,7 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
     )
     if image_paths:
         image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path = image_paths[0]
+        image_path = image_paths[-1]
         with open(Path(image_path).with_suffix(".xml")) as gs_xml:
             gs_xml_data = xmltodict.parse(gs_xml.read())
         readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
@@ -177,8 +177,8 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
             session_id=session_id,
             readout_area_x=full_size[0] if image_path else None,
             readout_area_y=full_size[1] if image_path else None,
-            thumbnail_size_x=None,
-            thumbnail_size_y=None,
+            thumbnail_size_x=int((512 / max(full_size)) * full_size[0]),
+            thumbnail_size_y=int((512 / max(full_size)) * full_size[1]),
             pixel_size=float(pixel_size) if image_path else None,
             image=str(image_path),
         )
