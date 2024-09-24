@@ -67,7 +67,7 @@ router = APIRouter(dependencies=[Depends(validate_token)])
 handshake_router = APIRouter()
 
 
-@router.get("/health")
+@handshake_router.get("/health")
 def health():
     return True
 
