@@ -50,6 +50,29 @@ async def activate_instrument_server(instrument_name: str):
     return success
 
 
+@router.post(
+    "/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server"
+)
+async def activate_instrument_server_for_session(instrument_name: str, session_id: int):
+    log.info(f"Activating instrument server for session {session_id}")
+    timestamp = datetime.datetime.now().timestamp()
+    token = create_access_token({"timestamp": timestamp, "session_id": session_id})
+    instrument_server_tokens[timestamp] = {}
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{machine_config.instrument_server_url}/sessions/{session_id}/token",
+            json={"access_token": token, "token_type": "bearer"},
+        ) as response:
+            success = response.status == 200
+            instrument_server_token = await response.json()
+            instrument_server_tokens[timestamp] = instrument_server_token
+    log.info("Handshake successful" if success else "Handshake unsuccessful")
+    return success
+
+
 @router.post("/sessions/{session_id}/multigrid_watcher")
 async def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db

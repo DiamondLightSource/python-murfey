@@ -83,7 +83,7 @@ def _get_murfey_url() -> str:
     return known_server
 
 
-async def murfey_server_handshake(token: str) -> bool:
+async def murfey_server_handshake(token: str, session_id: int | None = None) -> bool:
     # test provided token against Murfey server
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     handshake_response = requests.get(
@@ -94,13 +94,26 @@ async def murfey_server_handshake(token: str) -> bool:
         "valid"
     )
     if res:
-        tokens["token"] = token
+        tokens["token" if session_id is None else session_id] = token
     return res
 
 
 @handshake_router.post("/token")
 async def token_handshake(token: Token):
     handshake_success = await murfey_server_handshake(token.access_token)
+    if handshake_success:
+        return Token(access_token=encoded_jwt, token_type="bearer")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Handshake failure between Murfey servers",
+    )
+
+
+@handshake_router.post("/sessions/{session_id}/token")
+async def token_handshake_for_session(session_id: int, token: Token):
+    handshake_success = await murfey_server_handshake(
+        token.access_token, session_id=session_id
+    )
     if handshake_success:
         return Token(access_token=encoded_jwt, token_type="bearer")
     raise HTTPException(
