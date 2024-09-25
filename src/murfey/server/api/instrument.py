@@ -53,11 +53,16 @@ async def activate_instrument_server(instrument_name: str):
 @router.post(
     "/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server"
 )
-async def activate_instrument_server_for_session(instrument_name: str, session_id: int):
+async def activate_instrument_server_for_session(
+    instrument_name: str, session_id: int, db=murfey_db
+):
     log.info(f"Activating instrument server for session {session_id}")
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     timestamp = datetime.datetime.now().timestamp()
-    token = create_access_token({"timestamp": timestamp, "session_id": session_id})
-    instrument_server_tokens[timestamp] = {}
+    token = create_access_token(
+        {"timestamp": timestamp, "session": session_id, "visit": visit_name}
+    )
+    instrument_server_tokens[session_id] = {}
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -68,7 +73,7 @@ async def activate_instrument_server_for_session(instrument_name: str, session_i
         ) as response:
             success = response.status == 200
             instrument_server_token = await response.json()
-            instrument_server_tokens[timestamp] = instrument_server_token
+            instrument_server_tokens[session_id] = instrument_server_token
     log.info("Handshake successful" if success else "Handshake unsuccessful")
     return success
 
@@ -87,7 +92,6 @@ async def start_multigrid_watcher(
     if machine_config.instrument_server_url:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
-        label = session.id
         _config = {
             "acquisition_software": machine_config.acquisition_software,
             "calibrations": machine_config.calibrations,
@@ -105,12 +109,12 @@ async def start_multigrid_watcher(
                     "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
                     "configuration": _config,
-                    "label": label,
+                    "label": visit,
                     "instrument_name": instrument_name,
                     "skip_existing_processing": watcher_spec.skip_existing_processing,
                 },
                 headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
             ) as resp:
                 data = await resp.json()
@@ -140,7 +144,7 @@ async def pass_proc_params_to_instrument_server(
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{machine_config.instrument_server_url}/processing_parameters",
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/processing_parameters",
                 json={
                     "label": label,
                     "params": {
@@ -152,7 +156,7 @@ async def pass_proc_params_to_instrument_server(
                     },
                 },
                 headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
             ) as resp:
                 data = await resp.json()

@@ -41,7 +41,6 @@ encoded_jwt = jwt.encode(
     algorithm=config["Murfey"].get("auth_algorithm", "HS256"),
 )
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -62,6 +61,28 @@ def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
         )
     return None
 
+
+def validate_session_token(
+    session_id: int, token: Annotated[str, Depends(oauth2_scheme)]
+):
+    try:
+        decoded_data = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[config["Murfey"].get("auth_algorithm", "HS256")],
+        )
+        if not decoded_data.get("session") == session_id:
+            raise JWTError
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return session_id
+
+
+MurfeySessionID = Annotated[int, Depends(validate_session_token)]
 
 router = APIRouter(dependencies=[Depends(validate_token)])
 handshake_router = APIRouter()
@@ -115,17 +136,24 @@ async def token_handshake_for_session(session_id: int, token: Token):
         token.access_token, session_id=session_id
     )
     if handshake_success:
-        return Token(access_token=encoded_jwt, token_type="bearer")
+        session_jwt = jwt.encode(
+            {"session": session_id},
+            SECRET_KEY,
+            algorithm=config["Murfey"].get("auth_algorithm", "HS256"),
+        )
+        return Token(access_token=session_jwt, token_type="bearer")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Handshake failure between Murfey servers",
     )
 
 
-@router.post("/sessions/{session_id}/multigrid_watcher")
-def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec):
+@handshake_router.post("/sessions/{session_id}/multigrid_watcher")
+def start_multigrid_watcher(
+    session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
+):
     label = watcher_spec.label
-    controllers[label] = MultigridController(
+    controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,
         watcher_spec.instrument_name,
@@ -135,23 +163,23 @@ def start_multigrid_watcher(session_id: int, watcher_spec: MultigridWatcherSpec)
         do_transfer=True,
         processing_enabled=not watcher_spec.skip_existing_processing,
         _machine_config=watcher_spec.configuration.dict(),
-        token=tokens.get("token", ""),
+        token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
         f"{_get_murfey_url()}/instruments/{watcher_spec.instrument_name}/machine",
-        headers={"Authorization": f"Bearer {tokens['token']}"},
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     for d in machine_config.get("create_directories", {}).values():
         (watcher_spec.source / d).mkdir(exist_ok=True)
-    watchers[label] = MultigridDirWatcher(
+    watchers[session_id] = MultigridDirWatcher(
         watcher_spec.source,
         watcher_spec.configuration.dict(),
         skip_existing_processing=watcher_spec.skip_existing_processing,
     )
-    watchers[label].subscribe(controllers[label]._start_rsyncer_multigrid)
-    watchers[label].start()
+    watchers[session_id].subscribe(controllers[session_id]._start_rsyncer_multigrid)
+    watchers[session_id].start()
     return {"success": True}
 
 
@@ -167,22 +195,16 @@ class RsyncerSource(BaseModel):
 
 @router.post("/sessions/{session_id}/stop_rsyncer")
 def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
-    controllers[rsyncer_source.label].rsync_processes[
-        rsyncer_source.source
-    ]._halt_thread = True
+    controllers[session_id].rsync_processes[rsyncer_source.source]._halt_thread = True
     return {"success": True}
 
 
 @router.post("/sessions/{session_id}/remove_rsyncer")
 def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
-    controllers[rsyncer_source.label]._request_watcher_stop(rsyncer_source.source)
-    controllers[rsyncer_source.label].rsync_processes[
-        rsyncer_source.source
-    ]._stopping = True
-    controllers[rsyncer_source.label].rsync_processes[
-        rsyncer_source.source
-    ]._halt_thread = True
-    controllers[rsyncer_source.label].rsync_processes[rsyncer_source.source].queue.put(
+    controllers[session_id]._request_watcher_stop(rsyncer_source.source)
+    controllers[session_id].rsync_processes[rsyncer_source.source]._stopping = True
+    controllers[session_id].rsync_processes[rsyncer_source.source]._halt_thread = True
+    controllers[session_id].rsync_processes[rsyncer_source.source].queue.put(
         None, block=False
     )
     return {"success": True}
@@ -190,13 +212,13 @@ def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
 
 @router.post("/sessions/{session_id}/finalise_rsyncer")
 def finalise_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
-    controllers[rsyncer_source.label]._finalise_rsyncer(rsyncer_source.source)
+    controllers[session_id]._finalise_rsyncer(rsyncer_source.source)
     return {"success": True}
 
 
 @router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
-    controllers[rsyncer_source.label]._restart_rsyncer(rsyncer_source.source)
+    controllers[session_id]._restart_rsyncer(rsyncer_source.source)
     return {"success": True}
 
 
@@ -213,8 +235,10 @@ class ProcessingParameterBlock(BaseModel):
     params: ProcessingParameters
 
 
-@router.post("/processing_parameters")
-def register_processing_parameters(proc_param_block: ProcessingParameterBlock):
+@handshake_router.post("/sessions/{session_id}/processing_parameters")
+def register_processing_parameters(
+    session_id: MurfeySessionID, proc_param_block: ProcessingParameterBlock
+):
     data_collection_parameters[proc_param_block.label] = {}
     for k, v in proc_param_block.params.dict().items():
         data_collection_parameters[proc_param_block.label][k] = v

@@ -85,12 +85,27 @@ def validate_instrument_server_token(timestamp: float) -> bool:
     return timestamp in instrument_server_tokens.keys()
 
 
+def validate_instrument_server_session_token(session_id: int, visit: str):
+    with Session(engine) as murfey_db:
+        session_data = murfey_db.exec(
+            select(MurfeySession).where(MurfeySession.id == session_id)
+        ).all()
+    if len(session_data) != 1:
+        return False
+    return visit == session_data[0].visit
+
+
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
         decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         # also validate against time stamps of successful instrument server connections
         if decoded_data.get("user"):
             if not check_user(decoded_data["user"]):
+                raise JWTError
+        elif decoded_data.get("session") is not None:
+            if not validate_instrument_server_session_token(
+                decoded_data["session"], decoded_data["visit"]
+            ):
                 raise JWTError
         elif decoded_data.get("timestamp"):
             if not validate_instrument_server_token(decoded_data["timestamp"]):
