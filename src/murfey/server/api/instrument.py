@@ -288,7 +288,7 @@ async def stop_rsyncer(
                     "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
             ) as resp:
                 data = await resp.json()
@@ -315,7 +315,7 @@ async def finalise_rsyncer(
                     "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
             ) as resp:
                 data = await resp.json()
@@ -343,7 +343,7 @@ async def remove_rsyncer(
                         "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
-                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                     },
                 ) as resp:
                     data = await resp.json()
@@ -371,7 +371,7 @@ async def restart_rsyncer(
                         "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
-                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                     },
                 ) as resp:
                     data = await resp.json()

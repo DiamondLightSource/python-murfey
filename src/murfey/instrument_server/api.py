@@ -193,14 +193,14 @@ class RsyncerSource(BaseModel):
     label: str
 
 
-@router.post("/sessions/{session_id}/stop_rsyncer")
-def stop_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+@handshake_router.post("/sessions/{session_id}/stop_rsyncer")
+def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id].rsync_processes[rsyncer_source.source]._halt_thread = True
     return {"success": True}
 
 
-@router.post("/sessions/{session_id}/remove_rsyncer")
-def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+@handshake_router.post("/sessions/{session_id}/remove_rsyncer")
+def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._request_watcher_stop(rsyncer_source.source)
     controllers[session_id].rsync_processes[rsyncer_source.source]._stopping = True
     controllers[session_id].rsync_processes[rsyncer_source.source]._halt_thread = True
@@ -210,14 +210,14 @@ def remove_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
-@router.post("/sessions/{session_id}/finalise_rsyncer")
-def finalise_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+@handshake_router.post("/sessions/{session_id}/finalise_rsyncer")
+def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._finalise_rsyncer(rsyncer_source.source)
     return {"success": True}
 
 
-@router.post("/sessions/{session_id}/restart_rsyncer")
-def restart_rsyncer(session_id: int, rsyncer_source: RsyncerSource):
+@handshake_router.post("/sessions/{session_id}/restart_rsyncer")
+def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._restart_rsyncer(rsyncer_source.source)
     return {"success": True}
 
