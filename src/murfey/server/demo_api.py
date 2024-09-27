@@ -178,6 +178,13 @@ def remove_mag_table_row(mag: int, db=murfey_db):
     db.commit()
 
 
+@router.get("/instruments/{instrument_name}/instrument_name")
+def get_instrument_display_name(instrument_name: str) -> str:
+    if machine_config.get(instrument_name):
+        return machine_config[instrument_name].display_name
+    return ""
+
+
 @router.get("/instruments/{instrument_name}/visits/")
 def all_visit_info(instrument_name: str, request: Request):
     return_query = [

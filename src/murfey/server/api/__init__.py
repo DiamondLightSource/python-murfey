@@ -163,6 +163,16 @@ def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
     return None
 
 
+@router.get("/instruments/{instrument_name}/instrument_name")
+def get_instrument_display_name(instrument_name: str) -> str:
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.get(instrument_name):
+        return machine_config[instrument_name].display_name
+    return ""
+
+
 @router.get("/instruments/{instrument_name}/visits/")
 def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispyb.DB):
     visits = murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
