@@ -14,7 +14,6 @@ from werkzeug.utils import secure_filename
 
 from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import (
-    Token,
     create_access_token,
     instrument_server_tokens,
     oauth2_scheme,
@@ -392,10 +391,3 @@ async def restart_rsyncer(
                 ) as resp:
                     data = await resp.json()
     return data
-
-
-@router.get("/sessions/{session_id}/token")
-async def mint_session_token(session_id: MurfeySessionID, db=murfey_db):
-    visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
-    token = create_access_token({"session": session_id, "visit": visit})
-    return Token(access_token=token, token_type="bearer")

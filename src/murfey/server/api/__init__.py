@@ -6,7 +6,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Dict, List
+from typing import Dict, List
 
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
@@ -46,7 +46,7 @@ from murfey.server import (
     sanitise,
     templates,
 )
-from murfey.server.api.auth import validate_session_access, validate_token
+from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
@@ -110,8 +110,6 @@ from murfey.util.state import global_state
 log = logging.getLogger("murfey.server.api")
 
 router = APIRouter(dependencies=[Depends(validate_token)])
-
-MurfeySessionID = Annotated[int, Depends(validate_session_access)]
 
 
 # This will be the homepage for a given microscope.

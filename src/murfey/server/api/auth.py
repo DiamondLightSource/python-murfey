@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.metadata
 import secrets
+import time
 from logging import getLogger
 from typing import Annotated, Dict
+from uuid import uuid4
 
 import aiohttp
 import requests
@@ -14,7 +16,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlmodel import Session, create_engine, select
 
-from murfey.server.murfey_db import url
+from murfey.server.murfey_db import murfey_db, url
 from murfey.util.config import get_security_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
@@ -113,6 +115,9 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
         else:
             decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             # also validate against time stamps of successful instrument server connections
+            if expiry_time := decoded_data.get("expiry_time"):
+                if expiry_time < time.time():
+                    raise JWTError
             if decoded_data.get("user"):
                 if not check_user(decoded_data["user"]):
                     raise JWTError
@@ -120,9 +125,6 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
                 if not validate_instrument_server_session_token(
                     decoded_data["session"], decoded_data["visit"]
                 ):
-                    raise JWTError
-            elif decoded_data.get("timestamp"):
-                if not validate_instrument_server_token(decoded_data["timestamp"]):
                     raise JWTError
             else:
                 raise JWTError
@@ -177,6 +179,8 @@ def create_access_token(data: dict, token: str = "") -> str:
     return encoded_jwt
 
 
+MurfeySessionID = Annotated[int, Depends(validate_session_access)]
+
 """
 API ENDPOINTS
 """
@@ -211,6 +215,25 @@ async def generate_token(
             data={"user": form_data.username},
         )
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.get("/sessions/{session_id}/token")
+async def mint_session_token(session_id: MurfeySessionID, db=murfey_db):
+    visit = (
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one().visit
+    )
+    expiry_time = None
+    if security_config.session_token_timeout:
+        expiry_time = time.time() + security_config.session_token_timeout
+    token = create_access_token(
+        {
+            "session": session_id,
+            "visit": visit,
+            "uuid": str(uuid4()),
+            "expiry_time": expiry_time,
+        }
+    )
+    return Token(access_token=token, token_type="bearer")
 
 
 @router.get("/validate_token")
