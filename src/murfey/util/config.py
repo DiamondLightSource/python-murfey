@@ -4,7 +4,7 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, BaseSettings
@@ -86,6 +86,8 @@ class Security(BaseModel):
     session_validation: str = ""
     auth_url: str = ""
     session_token_timeout: int | None = None
+    auth_type: Literal["password", "cookie"] = "password"
+    cookie_key: str = ""
 
 
 def security_from_file(config_file_path: Path) -> Security:

@@ -9,8 +9,8 @@ from uuid import uuid4
 
 import aiohttp
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -28,11 +28,46 @@ logger = getLogger("murfey.server.api.auth")
 router = APIRouter()
 
 
+class CookieScheme(HTTPBearer):
+    def __init__(
+        self,
+        *,
+        description: str | None = None,
+        auto_error: bool = True,
+        cookie_key: str = "cookie_auth",
+    ):
+        """
+        Args:
+            cookie_key: Cookie key to look for in requests
+        """
+        super().__init__(
+            description=description,
+            auto_error=auto_error,
+        )
+
+        self.cookie_key = cookie_key
+
+    async def __call__(self, request: Request):
+        token = request.cookies.get(self.cookie_key)
+        if token is None:
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                )
+            else:
+                return None
+        return token
+
+
 # Set up variables used for authentication
 security_config = get_security_config()
 ALGORITHM = security_config.auth_algorithm or "HS256"
 SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+if security_config.auth_type == "password":
+    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+else:
+    oauth2_scheme = CookieScheme(cookie_key=security_config.cookie_key)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 instrument_server_tokens: Dict[float, dict] = {}
@@ -71,7 +106,7 @@ def validate_user(username: str, password: str) -> bool:
 def validate_visit(visit_name: str, token: str) -> bool:
     if validators := importlib.metadata.entry_points().select(
         group="murfey.auth.session_validation",
-        name=security_config.session_validation,
+        name=security_config.auth_type,
     ):
         return validators[0].load()(visit_name, token)
     return True
@@ -100,32 +135,52 @@ def validate_instrument_server_session_token(session_id: int, visit: str):
     return visit == session_data[0].visit
 
 
+def password_token_validation(token: str):
+    decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    # first check if the token has expired
+    if expiry_time := decoded_data.get("expiry_time"):
+        if expiry_time < time.time():
+            raise JWTError
+    if decoded_data.get("user"):
+        if not check_user(decoded_data["user"]):
+            raise JWTError
+    elif decoded_data.get("session") is not None:
+        if not validate_instrument_server_session_token(
+            decoded_data["session"], decoded_data["visit"]
+        ):
+            raise JWTError
+    else:
+        raise JWTError
+
+
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
         if security_config.auth_url:
-            async with aiohttp.ClientSession() as session:
+            headers = (
+                {}
+                if security_config.auth_type == "cookie"
+                else {"Authorization": f"Bearer {token}"}
+            )
+            cookies = (
+                {security_config.cookie_key: token}
+                if security_config.auth_type == "cookie"
+                else {}
+            )
+            async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
                     f"{security_config.auth_url}/validate_token",
-                    headers={"Authorization": f"Bearer {token}"},
+                    headers=headers,
                 ) as response:
                     success = response.status == 200
                     validation_outcome = await response.json()
             if not (success and validation_outcome.get("valid")):
                 raise JWTError
         else:
-            decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            # also validate against time stamps of successful instrument server connections
-            if expiry_time := decoded_data.get("expiry_time"):
-                if expiry_time < time.time():
-                    raise JWTError
-            if decoded_data.get("user"):
-                if not check_user(decoded_data["user"]):
-                    raise JWTError
-            elif decoded_data.get("session") is not None:
-                if not validate_instrument_server_session_token(
-                    decoded_data["session"], decoded_data["visit"]
-                ):
-                    raise JWTError
+            if validators := importlib.metadata.entry_points().select(
+                group="murfey.auth.token_validation",
+                name=security_config.auth_type,
+            ):
+                validators[0].load()(token)
             else:
                 raise JWTError
     except JWTError:

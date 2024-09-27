@@ -33,29 +33,6 @@ log = logging.getLogger("murfey.server.instrument")
 lock = asyncio.Lock()
 
 
-@router.post("/instruments/{instrument_name}/activate_instrument_server")
-async def activate_instrument_server(
-    instrument_name: str, token_in: Annotated[str, Depends(oauth2_scheme)]
-):
-    log.info("Activating instrument server")
-    timestamp = datetime.datetime.now().timestamp()
-    token = create_access_token({"timestamp": timestamp}, token=token_in)
-    instrument_server_tokens[timestamp] = {}
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{machine_config.instrument_server_url}/token",
-            json={"access_token": token, "token_type": "bearer"},
-        ) as response:
-            success = response.status == 200
-            instrument_server_token = await response.json()
-            instrument_server_tokens[timestamp] = instrument_server_token
-    log.info("Handshake successful" if success else "Handshake unsuccessful")
-    return success
-
-
 @router.post(
     "/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server"
 )
