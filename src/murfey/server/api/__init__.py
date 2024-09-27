@@ -6,7 +6,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
@@ -142,7 +142,7 @@ def connections_check():
 
 
 @router.get("/machine")
-def machine_info() -> MachineConfig | None:
+def machine_info() -> Optional[MachineConfig]:
     instrument_name = os.getenv("BEAMLINE")
     if settings.murfey_machine_configuration and instrument_name:
         return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
