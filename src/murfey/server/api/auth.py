@@ -17,10 +17,10 @@ from murfey.util.config import get_machine_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
-if sys.version_info > (3, 10):
-    from importlib.metadata import entry_points
-else:
+if sys.version_info < (3, 10):
     from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
 
 # Set up logger
 logger = getLogger("murfey.server.api.auth")
