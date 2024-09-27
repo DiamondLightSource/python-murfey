@@ -44,24 +44,6 @@ encoded_jwt = jwt.encode(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
-    try:
-        decoded_data = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[config["Murfey"].get("auth_algorithm", "HS256")],
-        )
-        if not decoded_data.get("timestamp") == launch_time:
-            raise JWTError
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return None
-
-
 def validate_session_token(
     session_id: int, token: Annotated[str, Depends(oauth2_scheme)]
 ):
@@ -84,11 +66,10 @@ def validate_session_token(
 
 MurfeySessionID = Annotated[int, Depends(validate_session_token)]
 
-router = APIRouter(dependencies=[Depends(validate_token)])
-handshake_router = APIRouter()
+router = APIRouter()
 
 
-@handshake_router.get("/health")
+@router.get("/health")
 def health():
     return True
 
@@ -119,7 +100,7 @@ async def murfey_server_handshake(token: str, session_id: int | None = None) -> 
     return res
 
 
-@handshake_router.post("/token")
+@router.post("/token")
 async def token_handshake(token: Token):
     handshake_success = await murfey_server_handshake(token.access_token)
     if handshake_success:
@@ -130,7 +111,7 @@ async def token_handshake(token: Token):
     )
 
 
-@handshake_router.post("/sessions/{session_id}/token")
+@router.post("/sessions/{session_id}/token")
 async def token_handshake_for_session(session_id: int, token: Token):
     handshake_success = await murfey_server_handshake(
         token.access_token, session_id=session_id
@@ -148,7 +129,7 @@ async def token_handshake_for_session(session_id: int, token: Token):
     )
 
 
-@handshake_router.post("/sessions/{session_id}/multigrid_watcher")
+@router.post("/sessions/{session_id}/multigrid_watcher")
 def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
@@ -184,7 +165,7 @@ def start_multigrid_watcher(
 
 
 @router.delete("/sessions/{session_id}/multigrid_watcher/{label}")
-def stop_multigrid_watcher(session_id: int, label: str):
+def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
     watchers[label].request_stop()
 
 
@@ -193,13 +174,13 @@ class RsyncerSource(BaseModel):
     label: str
 
 
-@handshake_router.post("/sessions/{session_id}/stop_rsyncer")
+@router.post("/sessions/{session_id}/stop_rsyncer")
 def stop_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id].rsync_processes[rsyncer_source.source]._halt_thread = True
     return {"success": True}
 
 
-@handshake_router.post("/sessions/{session_id}/remove_rsyncer")
+@router.post("/sessions/{session_id}/remove_rsyncer")
 def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._request_watcher_stop(rsyncer_source.source)
     controllers[session_id].rsync_processes[rsyncer_source.source]._stopping = True
@@ -210,13 +191,13 @@ def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
-@handshake_router.post("/sessions/{session_id}/finalise_rsyncer")
+@router.post("/sessions/{session_id}/finalise_rsyncer")
 def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._finalise_rsyncer(rsyncer_source.source)
     return {"success": True}
 
 
-@handshake_router.post("/sessions/{session_id}/restart_rsyncer")
+@router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._restart_rsyncer(rsyncer_source.source)
     return {"success": True}
@@ -235,7 +216,7 @@ class ProcessingParameterBlock(BaseModel):
     params: ProcessingParameters
 
 
-@handshake_router.post("/sessions/{session_id}/processing_parameters")
+@router.post("/sessions/{session_id}/processing_parameters")
 def register_processing_parameters(
     session_id: MurfeySessionID, proc_param_block: ProcessingParameterBlock
 ):
@@ -245,11 +226,15 @@ def register_processing_parameters(
     return {"success": True}
 
 
-@router.get("/instruments/{instrument_name}/possible_gain_references")
-def get_possible_gain_references(instrument_name: str) -> List[File]:
+@router.get(
+    "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
+)
+def get_possible_gain_references(
+    instrument_name: str, session_id: MurfeySessionID
+) -> List[File]:
     machine_config = requests.get(
         f"{_get_murfey_url()}/instruments/{instrument_name}/machine",
-        headers={"Authorization": f"Bearer {tokens['token']}"},
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     candidates = []
     for gf in Path(machine_config["gain_reference_directory"]).glob("**/*"):
@@ -273,8 +258,8 @@ class GainReference(BaseModel):
     gain_destination_dir: str = "processing"
 
 
-@router.post("/upload_gain_reference")
-def upload_gain_reference(gain_reference: GainReference):
+@router.post("/sessions/{session_id}/upload_gain_reference")
+def upload_gain_reference(session_id: MurfeySessionID, gain_reference: GainReference):
     cmd = [
         "rsync",
         str(gain_reference.gain_path),
@@ -299,8 +284,10 @@ class UpstreamTiffInfo(BaseModel):
     download_dir: Path
 
 
-@router.post("/visits/{visit_name}/upstream_tiff_data_request")
-def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo):
+@router.post("/visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request")
+def gather_upstream_tiffs(
+    visit_name: str, session_id: MurfeySessionID, upstream_tiff_info: UpstreamTiffInfo
+):
     sanitised_visit_name = sanitise_nonpath(visit_name)
     assert not any(c in visit_name for c in ("/", "\\", ":", ";"))
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
@@ -308,7 +295,7 @@ def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo)
     upstream_tiff_paths = (
         requests.get(
             f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff_paths",
-            headers={"Authorization": f"Bearer {tokens['token']}"},
+            headers={"Authorization": f"Bearer {tokens[session_id]}"},
         ).json()
         or []
     )
@@ -316,7 +303,7 @@ def gather_upstream_tiffs(visit_name: str, upstream_tiff_info: UpstreamTiffInfo)
         tiff_data = requests.get(
             f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff/{tiff_path}",
             stream=True,
-            headers={"Authorization": f"Bearer {tokens['token']}"},
+            headers={"Authorization": f"Bearer {tokens[session_id]}"},
         )
         with open(upstream_tiff_info.download_dir / tiff_path, "wb") as utiff:
             for chunk in tiff_data.iter_content(chunk_size=32 * 1024**2):

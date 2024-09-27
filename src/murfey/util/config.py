@@ -83,6 +83,7 @@ class Security(BaseModel):
     sqlalchemy_pooling: bool = True
     allow_origins: List[str] = ["*"]
     session_validation: str = ""
+    auth_url: str = ""
 
 
 def security_from_file(config_file_path: Path) -> Security:

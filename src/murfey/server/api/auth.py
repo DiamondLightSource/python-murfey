@@ -5,6 +5,8 @@ import secrets
 from logging import getLogger
 from typing import Annotated, Dict
 
+import aiohttp
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -22,6 +24,7 @@ logger = getLogger("murfey.server.api.auth")
 
 # Set up router
 router = APIRouter()
+
 
 # Set up variables used for authentication
 security_config = get_security_config()
@@ -97,21 +100,32 @@ def validate_instrument_server_session_token(session_id: int, visit: str):
 
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
-        decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # also validate against time stamps of successful instrument server connections
-        if decoded_data.get("user"):
-            if not check_user(decoded_data["user"]):
-                raise JWTError
-        elif decoded_data.get("session") is not None:
-            if not validate_instrument_server_session_token(
-                decoded_data["session"], decoded_data["visit"]
-            ):
-                raise JWTError
-        elif decoded_data.get("timestamp"):
-            if not validate_instrument_server_token(decoded_data["timestamp"]):
+        if security_config.auth_url:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{security_config.auth_url}/validate_token",
+                    headers={"Authorization": f"Bearer {token}"},
+                ) as response:
+                    success = response.status == 200
+                    validation_outcome = await response.json()
+            if not (success and validation_outcome.get("valid")):
                 raise JWTError
         else:
-            raise JWTError
+            decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            # also validate against time stamps of successful instrument server connections
+            if decoded_data.get("user"):
+                if not check_user(decoded_data["user"]):
+                    raise JWTError
+            elif decoded_data.get("session") is not None:
+                if not validate_instrument_server_session_token(
+                    decoded_data["session"], decoded_data["visit"]
+                ):
+                    raise JWTError
+            elif decoded_data.get("timestamp"):
+                if not validate_instrument_server_token(decoded_data["timestamp"]):
+                    raise JWTError
+            else:
+                raise JWTError
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -145,7 +159,18 @@ class Token(BaseModel):
     token_type: str
 
 
-def create_access_token(data: dict):
+def create_access_token(data: dict, token: str = "") -> str:
+    if security_config.auth_url and data.get("session") is not None:
+        minted_token_response = requests.get(
+            f"{security_config.auth_url}/sessions/{data['session']}/token",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        if minted_token_response.status_code != 200:
+            raise RuntimeError(
+                f"Request received status code {minted_token_response.status_code} when trying to create session token"
+            )
+        return minted_token_response.json()["access_token"]
+
     to_encode = data.copy()
 
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -158,19 +183,33 @@ API ENDPOINTS
 
 
 @router.post("/token")
-def generate_token(
+async def generate_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
-    validated = validate_user(form_data.username, form_data.password)
+    if security_config.auth_url:
+        data = aiohttp.FormData()
+        data.add_field("username", form_data.username)
+        data.add_field("password", form_data.password)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{security_config.auth_url}/token",
+                data=data,
+            ) as response:
+                validated = response.status == 200
+                token = await response.json()
+                access_token = token.get("access_token")
+    else:
+        validated = validate_user(form_data.username, form_data.password)
     if not validated:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(
-        data={"user": form_data.username},
-    )
+    if not security_config.auth_url:
+        access_token = create_access_token(
+            data={"user": form_data.username},
+        )
     return Token(access_token=access_token, token_type="bearer")
 
 

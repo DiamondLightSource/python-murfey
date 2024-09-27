@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import aiohttp
 from fastapi import APIRouter, Depends
@@ -13,8 +14,10 @@ from werkzeug.utils import secure_filename
 
 from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import (
+    Token,
     create_access_token,
     instrument_server_tokens,
+    oauth2_scheme,
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
@@ -28,12 +31,16 @@ router = APIRouter(dependencies=[Depends(validate_token)])
 
 log = logging.getLogger("murfey.server.instrument")
 
+lock = asyncio.Lock()
+
 
 @router.post("/instruments/{instrument_name}/activate_instrument_server")
-async def activate_instrument_server(instrument_name: str):
+async def activate_instrument_server(
+    instrument_name: str, token_in: Annotated[str, Depends(oauth2_scheme)]
+):
     log.info("Activating instrument server")
     timestamp = datetime.datetime.now().timestamp()
-    token = create_access_token({"timestamp": timestamp})
+    token = create_access_token({"timestamp": timestamp}, token=token_in)
     instrument_server_tokens[timestamp] = {}
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -54,27 +61,35 @@ async def activate_instrument_server(instrument_name: str):
     "/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server"
 )
 async def activate_instrument_server_for_session(
-    instrument_name: str, session_id: int, db=murfey_db
+    instrument_name: str,
+    session_id: int,
+    token_in: Annotated[str, Depends(oauth2_scheme)],
+    db=murfey_db,
 ):
     log.info(f"Activating instrument server for session {session_id}")
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     timestamp = datetime.datetime.now().timestamp()
     token = create_access_token(
-        {"timestamp": timestamp, "session": session_id, "visit": visit_name}
+        {"timestamp": timestamp, "session": session_id, "visit": visit_name},
+        token=token_in,
     )
-    instrument_server_tokens[session_id] = {}
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{machine_config.instrument_server_url}/sessions/{session_id}/token",
-            json={"access_token": token, "token_type": "bearer"},
-        ) as response:
-            success = response.status == 200
-            instrument_server_token = await response.json()
-            instrument_server_tokens[session_id] = instrument_server_token
-    log.info("Handshake successful" if success else "Handshake unsuccessful")
+    async with lock:
+        instrument_server_tokens[session_id] = {}
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/token",
+                json={"access_token": token, "token_type": "bearer"},
+            ) as response:
+                success = response.status == 200
+                instrument_server_token = await response.json()
+                instrument_server_tokens[session_id] = instrument_server_token
+    if success:
+        log.info("Handshake successful")
+    else:
+        log.warning("Handshake unsuccessful")
     return success
 
 
@@ -173,27 +188,28 @@ async def check_instrument_server(instrument_name: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{machine_config.instrument_server_url}/health",
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
             ) as resp:
                 data = await resp.json()
     return data
 
 
-@router.get("/instruments/{instrument_name}/possible_gain_references")
-async def get_possible_gain_references(instrument_name: str) -> List[File]:
+@router.get(
+    "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
+)
+async def get_possible_gain_references(
+    instrument_name: str, session_id: MurfeySessionID
+) -> List[File]:
     data = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
     if machine_config.instrument_server_url:
+        async with lock:
+            token = instrument_server_tokens[session_id]["access_token"]
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/possible_gain_references",
-                headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
-                },
+                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references",
+                headers={"Authorization": f"Bearer {token}"},
             ) as resp:
                 data = await resp.json()
     return data
@@ -221,14 +237,14 @@ async def request_gain_reference_upload(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{machine_config.instrument_server_url}/upload_gain_reference",
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/upload_gain_reference",
                 json={
                     "gain_path": str(gain_reference_request.gain_path),
                     "visit_path": visit_path,
                     "gain_destination_dir": machine_config.gain_directory_name,
                 },
                 headers={
-                    "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
             ) as resp:
                 data = await resp.json()
@@ -237,7 +253,7 @@ async def request_gain_reference_upload(
 
 @router.post("/visits/{visit_name}/{session_id}/upstream_tiff_data_request")
 async def request_upstream_tiff_data_download(
-    visit_name: str, session_id: int, db=murfey_db
+    visit_name: str, session_id: MurfeySessionID, db=murfey_db
 ):
     data = {}
     instrument_name = (
@@ -254,10 +270,10 @@ async def request_upstream_tiff_data_download(
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/upstream_tiff_data_request",
+                    f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/sessions/{session_id}/upstream_tiff_data_request",
                     json={"download_dir": download_dir},
                     headers={
-                        "Authorization": f"Bearer {list(instrument_server_tokens.values())[0]['access_token']}"
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                     },
                 ) as resp:
                     data = await resp.json()
@@ -376,3 +392,10 @@ async def restart_rsyncer(
                 ) as resp:
                     data = await resp.json()
     return data
+
+
+@router.get("/sessions/{session_id}/token")
+async def mint_session_token(session_id: MurfeySessionID, db=murfey_db):
+    visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    token = create_access_token({"session": session_id, "visit": visit})
+    return Token(access_token=token, token_type="bearer")
