@@ -9,7 +9,7 @@ from murfey.util.config import get_machine_config
 
 
 def test_decrypt_password(capsys, tmp_path):
-    machine_config = get_machine_config()
+    machine_config = get_machine_config()[""]
     crypto_key = Fernet.generate_key()
     machine_config.crypto_key = crypto_key.decode()
     with open(tmp_path / "config.yaml", "w") as cfg:
