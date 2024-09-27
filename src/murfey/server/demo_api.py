@@ -134,7 +134,7 @@ async def root(request: Request):
 
 @lru_cache(maxsize=1)
 @router.get("/machine")
-def machine_info() -> MachineConfig | None:
+def machine_info() -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
         microscope = get_microscope()
         return from_file(Path(settings.murfey_machine_configuration), microscope)
@@ -370,7 +370,7 @@ class ProcessingDetails(BaseModel):
 @router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
     session_id: MurfeySessionID, db=murfey_db
-) -> List[ProcessingDetails] | None:
+) -> Optional[List[ProcessingDetails]]:
     params = db.exec(
         select(
             DataCollectionGroup,
