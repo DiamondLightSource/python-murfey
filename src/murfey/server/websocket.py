@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Dict, Generic, TypeVar, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import select
@@ -114,7 +114,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
 
 
 @ws.websocket("/connect/{client_id}")
-async def websocket_connection_endpoint(websocket: WebSocket, client_id: int | str):
+async def websocket_connection_endpoint(
+    websocket: WebSocket, client_id: Union[int, str]
+):
     await manager.connect(websocket, client_id, register_client=False)
     await manager.broadcast(f"Client {client_id} joined")
     await manager.set_state(f"Client {client_id}", "joined")
