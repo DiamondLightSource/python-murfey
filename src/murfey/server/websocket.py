@@ -181,7 +181,7 @@ async def close_ws_connection(client_id: int):
 
 
 @ws.delete("/connect/{client_id}")
-async def close_unrecorded_ws_connection(client_id: int | str):
+async def close_unrecorded_ws_connection(client_id: Union[int, str]):
     client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(manager.active_connections[client_id], client_id)
