@@ -85,7 +85,7 @@ class Security(BaseModel):
     allow_origins: List[str] = ["*"]
     session_validation: str = ""
     auth_url: str = ""
-    session_token_timeout: int | None = None
+    session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
 
