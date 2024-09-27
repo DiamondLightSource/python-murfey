@@ -41,6 +41,7 @@ class MachineConfig(BaseModel):
     processed_extra_directory: str = ""
     plugin_packages: Dict[str, Path] = {}
     software_settings_output_directories: Dict[str, List[str]] = {}
+    process_by_default: bool = True
     recipes: Dict[str, str] = {
         "em-spa-bfactor": "em-spa-bfactor",
         "em-spa-class2d": "em-spa-class2d",
