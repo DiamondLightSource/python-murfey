@@ -140,7 +140,6 @@ def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
             data_directories={},
             rsync_basepath=Path("dls/tmp"),
             murfey_db_credentials="",
-            crypto_key="",
             default_model="/tmp/weights.h5",
         )
     }
