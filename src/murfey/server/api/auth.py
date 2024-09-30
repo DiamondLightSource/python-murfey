@@ -16,6 +16,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlmodel import Session, create_engine, select
 
+from murfey.server import sanitise
 from murfey.server.murfey_db import murfey_db, url
 from murfey.util.config import get_security_config
 from murfey.util.db import MurfeyUser as User
@@ -223,7 +224,7 @@ def create_access_token(data: dict, token: str = "") -> str:
             # check the session ID is alphanumeric for security
             raise ValueError("Session ID was invalid (not alphanumeric)")
         minted_token_response = requests.get(
-            f"{security_config.auth_url}/sessions/{session_id}/token",
+            f"{security_config.auth_url}/sessions/{sanitise(str(session_id))}/token",
             headers={"Authorization": f"Bearer {token}"},
         )
         if minted_token_response.status_code != 200:
