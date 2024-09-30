@@ -1292,7 +1292,7 @@ def suggest_path(
     )
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
     check_path_name = check_path.name
-    while check_path.exists():
+    while sanitise_path(check_path).exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     router.raw_count += 1
@@ -1661,13 +1661,14 @@ async def write_eer_fractionation_file(
     if fractionation_params.num_frames:
         num_eer_frames = fractionation_params.num_frames
     elif (
-        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+        fractionation_params.eer_path
+        and sanitise_path(Path(fractionation_params.eer_path)).is_file()
     ):
         num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
     else:
         log.warning(
-            f"EER fractionation unable to find {fractionation_params.eer_path} "
-            f"or use {fractionation_params.num_frames} frames"
+            f"EER fractionation unable to find {sanitise_path(Path(fractionation_params.eer_path)) if fractionation_params.eer_path else None} "
+            f"or use {sanitise(str(fractionation_params.num_frames))} frames"
         )
         return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:

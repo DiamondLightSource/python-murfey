@@ -76,11 +76,13 @@ class ConnectionManager(Generic[T]):
             )
 
     async def set_state(self, attribute: str, value: T):
-        log.info(f"State attribute {attribute!r} set to {value!r}")
+        log.info(
+            f"State attribute {sanitise(attribute)!r} set to {sanitise(str(value))!r}"
+        )
         await self._state.set(attribute, value)
 
     async def delete_state(self, attribute: str):
-        log.info(f"State attribute {attribute!r} removed")
+        log.info(f"State attribute {sanitise(attribute)!r} removed")
         await self._state.delete(attribute)
 
 

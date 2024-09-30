@@ -18,7 +18,7 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import sanitise_nonpath
+from murfey.util import sanitise_nonpath, secure_path
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
@@ -149,7 +149,7 @@ def start_multigrid_watcher(
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
-        f"{_get_murfey_url()}/instruments/{watcher_spec.instrument_name}/machine",
+        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(watcher_spec.instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     for d in machine_config.get("create_directories", {}).values():
@@ -233,11 +233,13 @@ def get_possible_gain_references(
     instrument_name: str, session_id: MurfeySessionID
 ) -> List[File]:
     machine_config = requests.get(
-        f"{_get_murfey_url()}/instruments/{instrument_name}/machine",
+        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     candidates = []
-    for gf in Path(machine_config["gain_reference_directory"]).glob("**/*"):
+    for gf in secure_path(Path(machine_config["gain_reference_directory"])).glob(
+        "**/*"
+    ):
         if gf.is_file():
             candidates.append(
                 File(

@@ -190,7 +190,7 @@ async def get_possible_gain_references(
             token = instrument_server_tokens[session_id]["access_token"]
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references",
+                f"{machine_config.instrument_server_url}/instruments/{sanitise(instrument_name)}/sessions/{sanitise(str(session_id))}/possible_gain_references",
                 headers={"Authorization": f"Bearer {token}"},
             ) as resp:
                 data = await resp.json()
@@ -252,7 +252,7 @@ async def request_upstream_tiff_data_download(
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/sessions/{session_id}/upstream_tiff_data_request",
+                    f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/sessions/{sanitise(str(session_id))}/upstream_tiff_data_request",
                     json={"download_dir": download_dir},
                     headers={
                         "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"

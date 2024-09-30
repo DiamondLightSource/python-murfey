@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import BinaryIO, Literal
+
+from murfey.util import secure_path
 
 
 def _count_ifds(file_stream: BinaryIO) -> int:
@@ -25,6 +28,6 @@ def _count_ifds(file_stream: BinaryIO) -> int:
 
 
 def num_frames(eer_path: os.PathLike) -> int:
-    with open(eer_path, "rb") as eer:
+    with open(secure_path(Path(eer_path)), "rb") as eer:
         n = _count_ifds(eer)
     return n
