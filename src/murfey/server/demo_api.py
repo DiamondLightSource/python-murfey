@@ -675,7 +675,7 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
-        if Path(grid_square_params.image).is_file():
+        if sanitise_path(Path(grid_square_params.image)).is_file():
             jpeg_size = Image.open(grid_square_params.image).size
         else:
             jpeg_size = (0, 0)
@@ -729,7 +729,7 @@ def register_foil_hole(
         .one()
         .id
     )
-    if foil_hole_params.image and Path(foil_hole_params.image).is_file():
+    if foil_hole_params.image and sanitise_path(Path(foil_hole_params.image)).is_file():
         jpeg_size = Image.open(foil_hole_params.image).size
     else:
         jpeg_size = (0, 0)
@@ -1297,7 +1297,7 @@ def suggest_path(
         check_path = check_path.parent / f"{check_path_name}{count}"
     router.raw_count += 1
     if params.touch:
-        check_path.mkdir(mode=0o750)
+        sanitise_path(check_path).mkdir(mode=0o750)
         if params.extra_directory:
             (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
     return {

@@ -46,6 +46,9 @@ async def activate_instrument_server_for_session(
     log.info(
         f"Activating instrument server for session {int(sanitise(str(session_id)))}"
     )
+    if not session_id > 0:
+        log.warning("Invalid session ID")
+        return False
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     timestamp = datetime.datetime.now().timestamp()
     token = create_access_token(
