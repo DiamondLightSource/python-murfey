@@ -10,6 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
+from murfey.server import sanitise
 from murfey.server.murfey_db import get_murfey_db_session
 from murfey.util.db import ClientEnvironment
 from murfey.util.state import State, global_state
@@ -102,7 +103,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
             except Exception:
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
-        log.info(f"Disconnecting Client {client_id}")
+        log.info(f"Disconnecting Client {int(sanitise(str(client_id)))}")
         murfey_db = next(get_murfey_db_session())
         client_env = murfey_db.exec(
             select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)

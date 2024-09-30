@@ -62,7 +62,7 @@ async def activate_instrument_server_for_session(
         ]
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/token",
+                f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/token",
                 json={"access_token": token, "token_type": "bearer"},
             ) as response:
                 success = response.status == 200

@@ -1299,7 +1299,9 @@ def suggest_path(
     if params.touch:
         sanitise_path(check_path).mkdir(mode=0o750)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
+            (sanitise_path(check_path) / secure_filename(params.extra_directory)).mkdir(
+                mode=0o750
+            )
     return {
         "suggested_path": check_path.relative_to(
             machine_config[instrument_name].rsync_basepath
