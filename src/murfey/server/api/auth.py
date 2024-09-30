@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.metadata
 import secrets
 import time
 from logging import getLogger
@@ -9,6 +8,7 @@ from uuid import uuid4
 
 import aiohttp
 import requests
+from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -104,7 +104,7 @@ def validate_user(username: str, password: str) -> bool:
 
 
 def validate_visit(visit_name: str, token: str) -> bool:
-    if validators := importlib.metadata.entry_points().select(
+    if validators := entry_points().select(
         group="murfey.auth.session_validation",
         name=security_config.auth_type,
     ):
@@ -176,7 +176,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             if not (success and validation_outcome.get("valid")):
                 raise JWTError
         else:
-            if validators := importlib.metadata.entry_points().select(
+            if validators := entry_points().select(
                 group="murfey.auth.token_validation",
                 name=security_config.auth_type,
             ):
