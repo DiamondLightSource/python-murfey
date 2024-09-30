@@ -10,8 +10,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
-from murfey.server import sanitise
 from murfey.server.murfey_db import get_murfey_db_session
+from murfey.util import sanitise
 from murfey.util.db import ClientEnvironment
 from murfey.util.state import State, global_state
 
