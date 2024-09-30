@@ -217,7 +217,10 @@ class Token(BaseModel):
 
 
 def create_access_token(data: dict, token: str = "") -> str:
-    if security_config.auth_url and data.get("session") is not None:
+    if security_config.auth_url and data.get("session"):
+        if not data["session"].isalnum():
+            # check the session ID is alphanumeric for security
+            raise ValueError("Session ID was invalid (not alphanumeric)")
         minted_token_response = requests.get(
             f"{security_config.auth_url}/sessions/{data['session']}/token",
             headers={"Authorization": f"Bearer {token}"},

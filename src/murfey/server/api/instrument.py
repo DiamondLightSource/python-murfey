@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+from murfey.server import sanitise
 from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import (
     create_access_token,
@@ -42,7 +43,9 @@ async def activate_instrument_server_for_session(
     token_in: Annotated[str, Depends(oauth2_scheme)],
     db=murfey_db,
 ):
-    log.info(f"Activating instrument server for session {session_id}")
+    log.info(
+        f"Activating instrument server for session {int(sanitise(str(session_id)))}"
+    )
     visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
     timestamp = datetime.datetime.now().timestamp()
     token = create_access_token(

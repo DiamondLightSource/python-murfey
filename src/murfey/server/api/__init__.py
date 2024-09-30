@@ -186,7 +186,7 @@ def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispy
             for visit in visits
         ]  # "Proposal title": visit.proposal_title
         log.debug(
-            f"{len(visits)} visits active for {instrument_name=}: {', '.join(v.name for v in visits)}"
+            f"{len(visits)} visits active for {sanitise(instrument_name)=}: {', '.join(v.name for v in visits)}"
         )
         return templates.TemplateResponse(
             request=request,
@@ -194,7 +194,7 @@ def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispy
             context={"info": return_query, "microscope": instrument_name},
         )
     else:
-        log.debug(f"No visits identified for {instrument_name=}")
+        log.debug(f"No visits identified for {sanitise(instrument_name)=}")
         return templates.TemplateResponse(
             request=request,
             name="activevisits.html",
