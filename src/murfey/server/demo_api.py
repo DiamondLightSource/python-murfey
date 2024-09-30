@@ -131,7 +131,7 @@ async def root(request: Request):
 
 
 @router.get("/machine")
-def machine_info() -> MachineConfig | None:
+def machine_info() -> Optional[MachineConfig]:
     instrument_name = os.getenv("BEAMLINE")
     if settings.murfey_machine_configuration and instrument_name:
         return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
@@ -376,7 +376,7 @@ class ProcessingDetails(BaseModel):
 @router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
     session_id: MurfeySessionID, db=murfey_db
-) -> List[ProcessingDetails] | None:
+) -> Optional[List[ProcessingDetails]]:
     params = db.exec(
         select(
             DataCollectionGroup,

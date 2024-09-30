@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       bumpLevel:
-        description: "Kind of version bump"
+        description: "Kind of version bump for project"
         required: true
         default: "patch"
         type: choice
@@ -12,6 +12,16 @@ on:
           - major
           - minor
           - patch
+          - client
+        bumpClient:
+          description: "Bump supported client?"
+          required: true
+          type: boolean
+        newClientVersion:
+          description: "Version of new client (needed to bump supported client)"
+          required: true
+          default: "0.0.0"
+          type: string
 
 permissions:
   contents: read
@@ -45,12 +55,22 @@ jobs:
 
           echo "##[section]Creating commit on branch 'version-bump'"
           git checkout -b version-bump
-          bump2version ${{ inputs.bumpLevel }}
+
+          if [ ${{ inputs.clientBump } = true && ${{ inputs.newClientVersion }} != "0.0.0" ]; then
+            bump-my-version bump --config-file .bumpclient.toml --new-version ${{ inputs.newClientVersion }}
+          fi
+
+          if [&& ${{ inputs.bumpLevel }} != "client" ]
+            bump-my-version bump ${{ inputs.bumpLevel }}
+          fi
 
           echo "##[section]Creating pull request"
           git push -f --set-upstream origin version-bump
           gh pr create -B main -H version-bump -t "Version update (${{ inputs.bumpLevel }})" -b "
           This is an automated pull request to update the version.
+
+          Bumped supported client client version: ${{ inputs.bumpClient }}
+          If true, the supported client version is now: ${{ inputs.newClientVersion }}
 
           After merging this, the \`Publish version\` action will tag this release and publish to pypi.
           "
