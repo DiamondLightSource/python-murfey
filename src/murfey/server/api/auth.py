@@ -218,7 +218,7 @@ class Token(BaseModel):
 
 def create_access_token(data: dict, token: str = "") -> str:
     if security_config.auth_url and data.get("session"):
-        if not data["session"].isalnum():
+        if not isinstance(data["session"], int) and data["session"] > 0:
             # check the session ID is alphanumeric for security
             raise ValueError("Session ID was invalid (not alphanumeric)")
         minted_token_response = requests.get(
