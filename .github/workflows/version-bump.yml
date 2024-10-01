@@ -13,15 +13,15 @@ on:
           - minor
           - patch
           - client
-        bumpClient:
-          description: "Bump supported client?"
-          required: true
-          type: boolean
-        newClientVersion:
-          description: "Version of new client (needed to bump supported client)"
-          required: true
-          default: "0.0.0"
-          type: string
+      bumpClient:
+        description: "Bump supported client?"
+        required: true
+        type: boolean
+      newClientVersion:
+        description: "Version of new client (needed to bump supported client)"
+        required: true
+        default: "0.0.0"
+        type: string
 
 permissions:
   contents: read
