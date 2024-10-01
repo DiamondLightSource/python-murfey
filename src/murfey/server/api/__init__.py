@@ -1783,7 +1783,7 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
         _transport_object.send(machine_config.feedback_queue, zocalo_message)
 
 
-@router.get("/visits/{session_id}/upstream_visits")
+@router.get("/sessions/{session_id}/upstream_visits")
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
     visit_name = murfey_session.visit
