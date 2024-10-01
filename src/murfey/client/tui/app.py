@@ -494,7 +494,7 @@ class MurfeyTUI(App):
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
-                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/eer_fractionation_file",
+                    f"{str(self.app._environment.url.geturl())}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/eer_fractionation_file",
                     json={
                         "num_frames": self.app._environment.data_collection_parameters[
                             "num_eer_frames"
@@ -715,7 +715,7 @@ class MurfeyTUI(App):
 
     async def action_remove_session(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -730,7 +730,7 @@ class MurfeyTUI(App):
 
     def clean_up_quit(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
         exit()
@@ -775,7 +775,7 @@ class MurfeyTUI(App):
             f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/successful_processing"
         )
         requests.delete(
-            f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
         exit()

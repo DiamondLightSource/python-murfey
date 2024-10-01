@@ -47,6 +47,7 @@ class Session(SQLModel, table=True):  # type: ignore
     visit: str = Field(default="")
     started: bool = Field(default=False)
     current_gain_ref: str = Field(default="")
+    instrument_name: str = Field(default="")
 
     # CLEM Workflow
 

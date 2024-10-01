@@ -10,4 +10,5 @@ class MultigridWatcherSpec(BaseModel):
     configuration: MachineConfig
     label: str
     visit: str
+    instrument_name: str
     skip_existing_processing: bool = False

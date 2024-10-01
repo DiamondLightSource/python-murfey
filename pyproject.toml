@@ -55,6 +55,7 @@ developer = [
 server = [
     # "matplotlib", # For visual statistical analysis of images
     "aiohttp",
+    "backports.entry_points_selectable",
     "cryptography",
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
@@ -84,7 +85,6 @@ murfey = "murfey.client:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
-"murfey.hub" = "murfey.hub:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
 "murfey.server" = "murfey.server:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
@@ -92,6 +92,8 @@ murfey = "murfey.client:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
+[project.entry-points."murfey.auth.token_validation"]
+"password" = "murfey.server.api.auth:password_token_validation"
 [project.entry-points."murfey.workflows"]
 "lif_to_stack" = "murfey.workflows.lif_to_stack:zocalo_cluster_request"
 "tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"

@@ -290,7 +290,7 @@ class TomographyContext(Context):
                 eer_fractionation_file = None
                 if environment.data_collection_parameters.get("num_eer_frames"):
                     response = requests.post(
-                        f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                        f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
                         json={
                             "num_frames": environment.data_collection_parameters[
                                 "num_eer_frames"
@@ -342,7 +342,9 @@ class TomographyContext(Context):
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
     ):
         machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
+            str(environment.url.geturl()),
+            instrument_name=environment.instrument_name,
+            demo=environment.demo,
         )
         if environment.visit in environment.default_destinations[source]:
             return (
@@ -576,7 +578,7 @@ class TomographyContext(Context):
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
-                    f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                    f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
                     json={
                         "num_frames": environment.data_collection_parameters[
                             "num_eer_frames"
@@ -786,7 +788,9 @@ class TomographyContext(Context):
                 if self._acquisition_software == "tomo":
                     if environment:
                         machine_config = get_machine_config(
-                            str(environment.url.geturl()), demo=environment.demo
+                            str(environment.url.geturl()),
+                            instrument_name=environment.instrument_name,
+                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}
@@ -927,7 +931,7 @@ class TomographyContext(Context):
             binning_factor = 1
             if environment:
                 server_config = requests.get(
-                    f"{str(environment.url.geturl())}/machine"
+                    f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
                 ).json()
                 if (
                     server_config.get("superres")

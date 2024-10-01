@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import random
 from functools import lru_cache
 from itertools import count
@@ -62,7 +63,6 @@ from murfey.util.db import (
 )
 from murfey.util.models import (
     ClientInfo,
-    ConnectionFileParameters,
     ContextInfo,
     CurrentGainRef,
     DCGroupParameters,
@@ -113,9 +113,7 @@ settings = Settings()
 machine_config: dict = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
-    machine_config = dict(
-        from_file(Path(settings.murfey_machine_configuration), microscope)
-    )
+    machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
 
 
 # This will be the homepage for a given microscope.
@@ -132,22 +130,24 @@ async def root(request: Request):
     )
 
 
-@lru_cache(maxsize=1)
 @router.get("/machine")
 def machine_info() -> Optional[MachineConfig]:
-    if settings.murfey_machine_configuration:
-        microscope = get_microscope()
-        return from_file(Path(settings.murfey_machine_configuration), microscope)
+    instrument_name = os.getenv("BEAMLINE")
+    if settings.murfey_machine_configuration and instrument_name:
+        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
+            instrument_name
+        ]
     return None
 
 
-@router.get("/microscope/")
-def get_mic():
-    microscope = get_microscope()
-    return {
-        "microscope": microscope,
-        "display_name": machine_config.get("display_name", ""),
-    }
+@lru_cache(maxsize=5)
+@router.get("/instruments/{instrument_name}/machine")
+def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
+    if settings.murfey_machine_configuration:
+        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
+            instrument_name
+        ]
+    return None
 
 
 @router.get("/microscope_image/")
@@ -178,9 +178,15 @@ def remove_mag_table_row(mag: int, db=murfey_db):
     db.commit()
 
 
-@router.get("/visits/")
-def all_visit_info(request: Request):
-    microscope = get_microscope()
+@router.get("/instruments/{instrument_name}/instrument_name")
+def get_instrument_display_name(instrument_name: str) -> str:
+    if machine_config.get(instrument_name):
+        return machine_config[instrument_name].display_name
+    return ""
+
+
+@router.get("/instruments/{instrument_name}/visits/")
+def all_visit_info(instrument_name: str, request: Request):
     return_query = [
         {
             "Start date": datetime.datetime.now(),
@@ -193,7 +199,7 @@ def all_visit_info(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="activevisits.html",
-        context={"info": return_query, "microscope": microscope},
+        context={"info": return_query, "microscope": instrument_name},
     )
 
 
@@ -583,6 +589,73 @@ def get_grid_squares(session_id: int, db=murfey_db):
     return res
 
 
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
+def get_grid_squares_from_dcg(
+    session_id: int, dcgid: int, db=murfey_db
+) -> List[GridSquare]:
+    grid_squares = db.exec(
+        select(GridSquare, DataCollectionGroup)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [gs[0] for gs in grid_squares]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/num_movies"
+)
+def get_number_of_movies_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
+)
+def get_foil_holes_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db=murfey_db
+) -> List[FoilHole]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare, DataCollectionGroup)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [fh[0] for fh in foil_holes]
+
+
+@router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
+)
+def get_number_of_movies_from_foil_hole(
+    session_id: int, dcgid: int, gsid: int, fhid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.name == fhid)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
+
+
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: int,
@@ -602,7 +675,10 @@ def register_grid_square(
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
     except Exception:
-        jpeg_size = Image.open(grid_square_params.image).size
+        if sanitise_path(Path(grid_square_params.image)).is_file():
+            jpeg_size = Image.open(grid_square_params.image).size
+        else:
+            jpeg_size = (0, 0)
         grid_square = GridSquare(
             name=gsid,
             session_id=session_id,
@@ -653,7 +729,10 @@ def register_foil_hole(
         .one()
         .id
     )
-    jpeg_size = Image.open(foil_hole_params.image).size
+    if foil_hole_params.image and sanitise_path(Path(foil_hole_params.image)).is_file():
+        jpeg_size = Image.open(foil_hole_params.image).size
+    else:
+        jpeg_size = (0, 0)
     foil_hole = FoilHole(
         name=foil_hole_params.name,
         session_id=session_id,
@@ -764,8 +843,8 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
-@router.get("/visits_raw", response_model=List[Visit])
-def get_current_visits():
+@router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+def get_current_visits(instrument_name: str):
     return [
         Visit(
             start=datetime.datetime.now(),
@@ -885,6 +964,9 @@ def flush_spa_processing(
         return
 
     detached_ids = [c.id for c in collected_ids]
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
 
     murfey_ids = _murfey_id(
         detached_ids[3], db, number=2 * len(stashed_files), close=False
@@ -906,8 +988,10 @@ def flush_spa_processing(
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config["feedback_queue"],
-                "node_creator_queue": machine_config["node_creator_queue"],
+                "feedback_queue": machine_config[instrument_name].feedback_queue,
+                "node_creator_queue": machine_config[
+                    instrument_name
+                ].node_creator_queue,
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
                 "movie": f.file_path,
@@ -919,7 +1003,10 @@ def flush_spa_processing(
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": (
-                    str(machine_config["rsync_basepath"] / proc_params["gain_ref"])
+                    str(
+                        machine_config[instrument_name].rsync_basepath
+                        / proc_params["gain_ref"]
+                    )
                     if proc_params["gain_ref"]
                     else proc_params["gain_ref"]
                 ),
@@ -952,9 +1039,12 @@ async def request_spa_preprocessing(
             break
     else:
         raise ValueError(f"{proc_file.path} does not contain a raw directory")
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
     mrc_out = (
         core
-        / machine_config["processed_directory_name"]
+        / machine_config[instrument_name].processed_directory_name
         / sub_dataset
         / "MotionCorr"
         / "job002"
@@ -1187,29 +1277,56 @@ def shutdown():
     return {"success": True}
 
 
-@router.post("/visits/{visit_name}/suggested_path")
-def suggest_path(visit_name, params: SuggestedPathParameters):
+@router.post("/visits/{visit_name}/{session_id}/suggested_path")
+def suggest_path(
+    visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
+):
     count: int | None = router.raw_count
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
     check_path = (
-        machine_config["rsync_basepath"] / params.base_path
+        machine_config[instrument_name].rsync_basepath / params.base_path
         if machine_config
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
     check_path_name = check_path.name
-    while check_path.exists():
+    while sanitise_path(check_path).exists():
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     router.raw_count += 1
-    return {"suggested_path": check_path.relative_to(machine_config["rsync_basepath"])}
+    if params.touch:
+        sanitise_path(check_path).mkdir(mode=0o750)
+        if params.extra_directory:
+            (sanitise_path(check_path) / secure_filename(params.extra_directory)).mkdir(
+                mode=0o750
+            )
+    return {
+        "suggested_path": check_path.relative_to(
+            machine_config[instrument_name].rsync_basepath
+        )
+    }
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
-def get_dc_groups(session_id: MurfeySessionID, db=murfey_db):
+def get_dc_groups(
+    session_id: MurfeySessionID, db=murfey_db
+) -> Dict[str, DataCollectionGroup]:
     data_collection_groups = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
     ).all()
     return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
+@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
+def get_data_collections(
+    session_id: MurfeySessionID, dcgid: int, db=murfey_db
+) -> List[DataCollection]:
+    data_collections = db.exec(
+        select(DataCollection).where(DataCollection.dcg_id == dcgid)
+    ).all()
+    return data_collections
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
@@ -1396,16 +1513,6 @@ def register_proc(
     return proc_params
 
 
-@router.post("/visits/{visit_name}/write_connections_file")
-def write_conn_file(visit_name, params: ConnectionFileParameters):
-    filepath = (
-        Path(machine_config["rsync_basepath"])
-        / (machine_config.get("rsync_module") or "data")
-        / str(datetime.datetime.now().year)
-    )
-    log.info(f"Write to connection file at {filepath}")
-
-
 @router.post("/sessions/{session_id}/process_gain")
 async def process_gain(
     session_id: MurfeySessionID, gain_reference_params: GainReference, db=murfey_db
@@ -1459,11 +1566,13 @@ async def get_sessions(db=murfey_db):
     return res
 
 
-@router.post("/clients/{client_id}/session")
-def link_client_to_session(client_id: int, sess: SessionInfo, db=murfey_db):
+@router.post("/instruments/{instrument_name}/clients/{client_id}/session")
+def link_client_to_session(
+    instrument_name: str, client_id: int, sess: SessionInfo, db=murfey_db
+):
     sid = sess.session_id
     if sid is None:
-        s = Session(name=sess.session_name)
+        s = Session(name=sess.session_name, instrument_name=instrument_name)
         db.add(s)
         db.commit()
         sid = s.id
@@ -1534,9 +1643,9 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     return
 
 
-@router.post("/visits/{visit_name}/eer_fractionation_file")
+@router.post("/visits/{visit_name}/{session_id}/eer_fractionation_file")
 async def write_eer_fractionation_file(
-    visit_name: str, fractionation_params: FractionationParameters
+    visit_name: str, session_id: int, fractionation_params: FractionationParameters
 ) -> dict:
     file_path = (
         Path(machine_config["rsync_basepath"])
@@ -1552,13 +1661,14 @@ async def write_eer_fractionation_file(
     if fractionation_params.num_frames:
         num_eer_frames = fractionation_params.num_frames
     elif (
-        fractionation_params.eer_path and Path(fractionation_params.eer_path).is_file()
+        fractionation_params.eer_path
+        and sanitise_path(Path(fractionation_params.eer_path)).is_file()
     ):
         num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
     else:
         log.warning(
-            f"EER fractionation unable to find {fractionation_params.eer_path} "
-            f"or use {fractionation_params.num_frames} frames"
+            f"EER fractionation unable to find {sanitise_path(Path(fractionation_params.eer_path)) if fractionation_params.eer_path else None} "
+            f"or use {sanitise(str(fractionation_params.num_frames))} frames"
         )
         return {"eer_fractionation_file": None}
     with open(file_path, "w") as frac_file:
@@ -1576,18 +1686,22 @@ def change_monitoring_status(visit_name: str, on: int):
 
 @router.get("/sessions/{session_id}/upstream_visits")
 def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
     upstream_visits = {}
-    for p in machine_config["upstream_data_directories"]:
+    for p in machine_config[instrument_name].upstream_data_directories:
         for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
-            upstream_visits[v.name] = v / machine_config["processed_directory_name"]
+            upstream_visits[v.name] = (
+                v / machine_config[instrument_name].processed_directory_name
+            )
     return upstream_visits
 
 
-def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
+def _get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
     tiff_dirs = []
-    for directory_name in machine_config["upstream_data_tiff_locations"]:
-        for p in machine_config["upstream_data_directories"]:
+    for directory_name in machine_config[instrument_name].upstream_data_tiff_locations:
+        for p in machine_config[instrument_name].upstream_data_directories:
             if (Path(p) / secure_filename(visit_name)).is_dir():
                 processed_dir = Path(p) / secure_filename(visit_name) / directory_name
                 tiff_dirs.append(processed_dir)
@@ -1599,10 +1713,13 @@ def _get_upstream_tiff_dirs(visit_name: str) -> List[Path]:
     return tiff_dirs
 
 
-@router.get("/visits/{visit_name}/upstream_tiff_paths")
-async def gather_upstream_tiffs(visit_name: str):
+@router.get("/visits/{visit_name}/{session_id}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
     upstream_tiff_paths = []
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
     for tiff_dir in tiff_dirs:
@@ -1611,9 +1728,12 @@ async def gather_upstream_tiffs(visit_name: str):
     return upstream_tiff_paths
 
 
-@router.get("/visits/{visit_name}/upstream_tiff/{tiff_path:path}")
-async def get_tiff(visit_name: str, tiff_path: str):
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name)
+@router.get("/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}")
+async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_db):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
 
@@ -1635,9 +1755,9 @@ def failed_client_post(post_info: PostInfo):
     return
 
 
-@router.post("/visits/{visit}/session/{name}")
-def create_session(visit: str, name: str, db=murfey_db) -> int:
-    s = Session(name=name, visit=visit)
+@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
+def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit, instrument_name=instrument_name)
     db.add(s)
     db.commit()
     sid = s.id

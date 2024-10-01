@@ -81,7 +81,9 @@ def determine_default_destination(
     include_mid_path: bool = True,
     use_suggested_path: bool = True,
 ) -> str:
-    machine_data = requests.get(f"{environment.url.geturl()}/machine").json()
+    machine_data = requests.get(
+        f"{environment.url.geturl()}/instruments/{environment.instrument_name}/machine"
+    ).json()
     _default = ""
     if environment.processing_only_mode and environment.sources:
         log.info(f"Processing only mode with sources {environment.sources}")
@@ -110,7 +112,7 @@ def determine_default_destination(
                                 _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = capture_post(
-                                    url=f"{str(environment.url.geturl())}/visits/{visit}/suggested_path",
+                                    url=f"{str(environment.url.geturl())}/visits/{visit}/{environment.murfey_session}/suggested_path",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
@@ -658,7 +660,7 @@ class SessionSelection(Screen):
             self.app.pop_screen()
         session_name = "Client connection"
         self.app._environment.murfey_session = requests.post(
-            f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+            f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
         ).json()
 
@@ -687,7 +689,7 @@ class SessionSelection(Screen):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session",
+                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -781,7 +783,7 @@ class UpstreamDownloads(Screen):
 
             # Get the paths to the TIFF files generated previously under the same session ID
             upstream_tiff_paths_response = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff_paths"
+                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff_paths"
             )
             upstream_tiff_paths = upstream_tiff_paths_response.json() or []
 
@@ -790,7 +792,7 @@ class UpstreamDownloads(Screen):
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
                 # Write TIFF to the specified file path
                 stream_response = requests.get(
-                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/upstream_tiff/{tp}",
+                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff/{tp}",
                     stream=True,
                 )
                 # Write the file chunk-by-chunk to avoid hogging memory
@@ -1126,16 +1128,6 @@ class DestinationSelect(Screen):
                 self.app._start_rsyncer(s, d)
         for k, v in self._user_params.items():
             self.app._environment.data_collection_parameters[k] = v
-        if len(self._transfer_routes) > 1:
-            capture_post(
-                f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/write_connections_file",
-                json={
-                    "filename": f"murfey-{datetime.now().strftime('%Y-%m-%d-%H_%M_%S')}.txt",
-                    "destinations": [
-                        Path(n).name for n in self._transfer_routes.values()
-                    ],
-                },
-            )
         self.app.pop_screen()
         self.app.push_screen("main")
 
@@ -1195,7 +1187,7 @@ class WaitingScreen(Screen):
                 f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/successful_processing"
             )
             requests.delete(
-                f"{self.app._environment.url.geturl()}/clients/{self.app._environment.client_id}/session"
+                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session"
             )
             self.app.exit()
             exit()

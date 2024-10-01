@@ -68,12 +68,17 @@ def secure_path(in_path: Path) -> Path:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config(url: str, demo: bool = False) -> dict:
-    return requests.get(f"{url}/machine").json()
+def get_machine_config(url: str, instrument_name: str = "", demo: bool = False) -> dict:
+    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
+    if not _instrument_name:
+        return {}
+    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
 
 
-def _get_visit_list(api_base: ParseResult):
-    get_visits_url = api_base._replace(path="/visits_raw")
+def _get_visit_list(api_base: ParseResult, instrument_name: str):
+    get_visits_url = api_base._replace(
+        path=f"/instruments/{instrument_name}/visits_raw"
+    )
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")

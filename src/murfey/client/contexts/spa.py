@@ -106,7 +106,9 @@ def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ):
     machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (
@@ -160,7 +162,7 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
     )
     if image_paths:
         image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path = image_paths[0]
+        image_path = image_paths[-1]
         with open(Path(image_path).with_suffix(".xml")) as gs_xml:
             gs_xml_data = xmltodict.parse(gs_xml.read())
         readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
@@ -175,8 +177,8 @@ def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> Grid
             session_id=session_id,
             readout_area_x=full_size[0] if image_path else None,
             readout_area_y=full_size[1] if image_path else None,
-            thumbnail_size_x=None,
-            thumbnail_size_y=None,
+            thumbnail_size_x=int((512 / max(full_size)) * full_size[0]),
+            thumbnail_size_y=int((512 / max(full_size)) * full_size[1]),
             pixel_size=float(pixel_size) if image_path else None,
             image=str(image_path),
         )
@@ -417,7 +419,7 @@ class _SPAContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/machine"
+                f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
             )
             if server_config_response is None:
                 return None
@@ -677,7 +679,9 @@ class SPAModularContext(_SPAContext):
                 if self._acquisition_software == "epu":
                     if environment:
                         machine_config = get_machine_config(
-                            str(environment.url.geturl()), demo=environment.demo
+                            str(environment.url.geturl()),
+                            instrument_name=environment.instrument_name,
+                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}
@@ -720,7 +724,7 @@ class SPAModularContext(_SPAContext):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/eer_fractionation_file",
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
@@ -863,7 +867,9 @@ class SPAContext(_SPAContext):
         environment.id_tag_registry["processing_job"].append(tag)
         proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
         machine_config = get_machine_config(
-            str(environment.url.geturl()), demo=environment.demo
+            str(environment.url.geturl()),
+            instrument_name=environment.instrument_name,
+            demo=environment.demo,
         )
         image_directory = str(
             Path(machine_config.get("rsync_basepath", "."))

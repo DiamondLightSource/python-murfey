@@ -5,11 +5,11 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from murfey.util.config import get_full_machine_config
+from murfey.util.config import get_machine_config
 
-logger = getLogger("murfey.hub.api")
+logger = getLogger("murfey.api.hub")
 
-config = get_full_machine_config()
+config = get_machine_config()
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ class InstrumentInfo(BaseModel):
 
 
 @router.get("/instruments")
-def get_instrumnet_info() -> List[InstrumentInfo]:
+def get_instrument_info() -> List[InstrumentInfo]:
     return [
         InstrumentInfo(
             instrument_name=k, display_name=v.display_name, instrument_url=v.murfey_url
