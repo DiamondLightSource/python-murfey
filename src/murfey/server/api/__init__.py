@@ -1293,11 +1293,11 @@ def suggest_path(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    check_path = (
-        machine_config.rsync_basepath / base_path
-        if machine_config
-        else Path(f"/dls/{instrument_name}") / base_path
-    )
+    if not machine_config:
+        raise ValueError(
+            "No machine configuration set when suggesting destination path"
+        )
+    check_path = machine_config.rsync_basepath / base_path
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
