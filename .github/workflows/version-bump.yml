@@ -56,7 +56,7 @@ jobs:
           echo "##[section]Creating commit on branch 'version-bump'"
           git checkout -b version-bump
 
-          if [ ${{ inputs.clientBump } = true && ${{ inputs.newClientVersion }} != "0.0.0" ]; then
+          if [ ${{ inputs.clientBump }} = true && ${{ inputs.newClientVersion }} != "0.0.0" ]; then
             bump-my-version bump --config-file .bumpclient.toml --new-version ${{ inputs.newClientVersion }}
           fi
 
