@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
+from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
@@ -128,13 +129,13 @@ class CLEMContext(Context):
                 logger.warning(f"No source found for file {transferred_file}")
                 return False
 
-            # Get the Path on the DLS file system
-            file_path = _file_transferred_to(
+            # Get the file Path at the destination
+            destination_file = _file_transferred_to(
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
             )
-            if not file_path:
+            if not destination_file:
                 logger.warning(
                     f"File {transferred_file.name!r} not found on the storage system"
                 )
@@ -167,16 +168,22 @@ class CLEMContext(Context):
                 if len(transferred_file.stem.split("--")) == 3:
                     series_name = "/".join(
                         [
-                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
-                            file_path.stem.split("--")[0],
+                            *destination_file.parent.parts[
+                                -2:
+                            ],  # Upper 2 parent directories
+                            destination_file.stem.split("--")[0],
                         ]
                     )
                 # When this a repeated position
                 elif len(transferred_file.stem.split("--")) == 4:
                     series_name = "/".join(
                         [
-                            *file_path.parent.parts[-2:],  # Upper 2 parent directories
-                            "--".join(file_path.stem.split("--")[i] for i in [0, -1]),
+                            *destination_file.parent.parts[
+                                -2:
+                            ],  # Upper 2 parent directories
+                            "--".join(
+                                destination_file.stem.split("--")[i] for i in [0, -1]
+                            ),
                         ]
                     )
                 else:
@@ -196,7 +203,7 @@ class CLEMContext(Context):
                 if series_name not in self._tiff_timestamps.keys():
                     self._tiff_timestamps[series_name] = []
                 # Append information to list
-                self._tiff_series[series_name].append(str(file_path))
+                self._tiff_series[series_name].append(str(destination_file))
                 self._tiff_sizes[series_name].append(transferred_file.stat().st_size)
                 self._tiff_timestamps[series_name].append(
                     transferred_file.stat().st_ctime
@@ -204,6 +211,11 @@ class CLEMContext(Context):
                 logger.debug(
                     f"Created TIFF file dictionary entries for {series_name!r}"
                 )
+
+                # Register the TIFF file in the database
+                post_result = self.register_tiff_file(destination_file, environment)
+                if post_result is False:
+                    return False
 
             # Process XLIF files
             if transferred_file.suffix == ".xlif":
@@ -230,7 +242,7 @@ class CLEMContext(Context):
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "/".join(
-                    [*file_path.parent.parent.parts[-2:], file_path.stem]
+                    [*destination_file.parent.parent.parts[-2:], destination_file.stem]
                 )  # The previous 2 parent directories should be unique enough
                 logger.debug(
                     f"File {transferred_file.name!r} given the series name {series_name!r}"
@@ -262,10 +274,13 @@ class CLEMContext(Context):
 
                 # Update dictionary entries
                 self._files_in_series[series_name] = num_files
-                self._series_metadata[series_name] = str(file_path)
+                self._series_metadata[series_name] = str(destination_file)
                 self._metadata_size[series_name] = transferred_file.stat().st_size
                 self._metadata_timestamp[series_name] = transferred_file.stat().st_ctime
                 logger.debug(f"Created dictionary entries for {series_name!r} metadata")
+
+                # A new copy of the metadata file is created in 'processed', so no need
+                # to register this instance of it
 
             # Post message if all files for the associated series have been collected
             # .get(series_name, 0) returns 0 if no associated key is found
@@ -284,26 +299,20 @@ class CLEMContext(Context):
                     f"Collected expected number of TIFF files for series {series_name!r}; posting job to server"
                 )
 
-                # Construct URL for Murfey server to communicate with
-                url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tiff_to_stack"
-                if not url:
-                    logger.warning("No URL found for the environment")
-                    return True
-
                 # Post the message and log any errors that arise
-                capture_post(
-                    url,
-                    json={
-                        "series_name": series_name,
-                        "tiff_files": self._tiff_series[series_name],
-                        "tiff_sizes": self._tiff_sizes[series_name],
-                        "tiff_timestamps": self._tiff_timestamps[series_name],
-                        "series_metadata": self._series_metadata[series_name],
-                        "metadata_size": self._metadata_size[series_name],
-                        "metadata_timestamp": self._metadata_timestamp[series_name],
-                        "description": "",
-                    },
-                )
+                tiff_dataset = {
+                    "series_name": series_name,
+                    "tiff_files": self._tiff_series[series_name],
+                    "tiff_sizes": self._tiff_sizes[series_name],
+                    "tiff_timestamps": self._tiff_timestamps[series_name],
+                    "series_metadata": self._series_metadata[series_name],
+                    "metadata_size": self._metadata_size[series_name],
+                    "metadata_timestamp": self._metadata_timestamp[series_name],
+                    "description": "",
+                }
+                post_result = self.process_tiff_series(tiff_dataset, environment)
+                if post_result is False:
+                    return False
                 return True
             else:
                 logger.debug(f"TIFF series {series_name!r} is still being processed")
@@ -323,32 +332,142 @@ class CLEMContext(Context):
                 return True
 
             logger.debug(
-                f"File {transferred_file.name!r} is a valid LIF file; posting job to server"
+                f"File {transferred_file.name!r} is a valid LIF file; starting processing"
             )
 
-            # Construct the URL for the Murfey server to communicate with
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_stack"
-            # Type checking to satisfy MyPy
-            if not url:
-                logger.warning("No URL found for the environment")
-                return True
-
-            # Get the Path on the DLS file system
-            file_path = _file_transferred_to(
+            # Get the Path at the destination
+            destination_file = _file_transferred_to(
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
             )
+            if not destination_file:
+                logger.warning(
+                    f"File {transferred_file.name!r} not found on the storage system"
+                )
+                return False
 
-            # Post the message and logs it if there's an error
-            capture_post(
-                url,
-                json={
-                    "name": str(file_path),
-                    "size": transferred_file.stat().st_size,  # File size, in bytes
-                    "timestamp": transferred_file.stat().st_ctime,  # For Unix systems, shows last metadata change
-                    "description": "",
-                },
-            )
+            # Post URL to register LIF file in database
+            post_result = self.register_lif_file(destination_file, environment)
+            if post_result is False:
+                return False
+            logger.debug(f"Registered {destination_file.name!r} in the database")
+
+            # Post URL to trigger job and convert LIF file into image stacks
+            post_result = self.process_lif_file(destination_file, environment)
+            if post_result is False:
+                return False
+            logger.debug(f"Started preprocessing of {destination_file.name!r}")
+
             return True
         return True
+
+    def register_lif_file(
+        self,
+        lif_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Constructs the URL and dictionary to be posted to the server, which will then
+        register the LIF file in the database correctly as part of the CLEM workflow.
+        """
+        try:
+            # Construct URL to post to post the request to
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/lif_files?lif_file={quote(str(lif_file), safe='')}"
+            # Validate
+            if not url:
+                logger.error(
+                    "URL could not be constructed from the environment and file path"
+                )
+                return ValueError
+
+            # Send the message
+            capture_post(url)
+            return True
+
+        except Exception:
+            logger.error(
+                "Error encountered when registering the LIF file in the database"
+            )
+            return False
+
+    def process_lif_file(
+        self,
+        lif_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Constructs the URL and dictionary to be posted to the server, which will then
+        trigger the preprocessing of the LIF file.
+        """
+
+        try:
+            # Construct the URL to post the request to
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/lif_to_stack?lif_file={quote(str(lif_file), safe='')}"
+            # Validate
+            if not url:
+                logger.error(
+                    "URL could not be constructed from the environment and file path"
+                )
+                return ValueError
+
+            # Send the message
+            capture_post(url)
+            return True
+
+        except Exception:
+            logger.error("Error encountered processing LIF file")
+            return False
+
+    def register_tiff_file(
+        self,
+        tiff_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Constructs the URL and dictionary to be posted to the server, which will then
+        register the TIFF file in the database correctly as part of the CLEM workflow.
+        """
+
+        try:
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/tiff_files?tiff_file={quote(str(tiff_file), safe='')}"
+            if not url:
+                logger.error(
+                    "URL could not be constructed from the environment and file path"
+                )
+                return ValueError
+
+            # Send the message
+            capture_post(url)
+            return True
+
+        except Exception:
+            logger.error(
+                "Error encountered when registering the TIFF file in the database"
+            )
+
+    def process_tiff_series(
+        self,
+        tiff_dataset: dict,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Constructs the URL and dictionary to be posted to the server, which will then
+        trigger the preprocessing of this instance of a TIFF series.
+        """
+
+        try:
+            # Construct URL for Murfey server to communicate with
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tiff_to_stack"
+            if not url:
+                logger.error(
+                    "URL could not be constructed from the environment and file path"
+                )
+                return ValueError
+
+            # Send the message
+            capture_post(url, json=tiff_dataset)
+            return True
+
+        except Exception:
+            logger.error("Error encountered processing the TIFF series")
