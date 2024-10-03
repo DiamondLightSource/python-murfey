@@ -4,7 +4,6 @@ import re
 import sys
 import traceback
 from logging import getLogger
-from os import path
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -71,14 +70,14 @@ def validate_and_sanitise(
     """
 
     # Resolve symlinks and directory changes to get full file path
-    full_path = path.normpath(path.realpath(file))
+    full_path = Path(file).resolve()
 
+    # Use machine configuration to validate which file base paths are accepted from
     instrument_name = (
         db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
         .one()
         .instrument_name
     )
-    # Use machine configuration to validate file paths used here
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -89,6 +88,8 @@ def validate_and_sanitise(
         # Print to troubleshoot
         logger.warning(f"Base path {rsync_basepath!r} is too short")
         base_path = rsync_basepath.as_posix()
+    except Exception:
+        raise Exception("Unexpected exception occurred when loading the file base path")
 
     # Check that full file path doesn't contain unallowed characters
     # Currently allows only:
@@ -97,18 +98,22 @@ def validate_and_sanitise(
     # - periods,
     # - dashes,
     # - forward slashes ("/")
-    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
-        raise ValueError(f"Unallowed characters present in {file!r}")
+    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", str(full_path))) is False:
+        raise ValueError(f"Unallowed characters present in {file}")
 
     # Check that it's not accessing somehwere it's not allowed
     if not str(full_path).startswith(str(base_path)):
-        raise ValueError(f"{file!r} points to a directory that is not permitted")
+        raise ValueError(f"{file} points to a directory that is not permitted")
+
+    # Check that it's a file, not a directory
+    if full_path.is_file() is False:
+        raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
-    if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
-        raise ValueError("File is not a permitted file format")
+    if f"{full_path.suffix}" not in valid_file_types:
+        raise ValueError(f"{full_path.suffix} is not a permitted file format")
 
-    return Path(full_path)
+    return full_path
 
 
 def get_db_entry(
