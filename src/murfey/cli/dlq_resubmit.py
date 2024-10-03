@@ -76,7 +76,7 @@ def run():
     if "exported" in purge_stdout:
         for line in purge_stdout.split("\n"):
             if line.strip().startswith("DLQ/"):
-                dlq_dir = "DLQ" + line.split("/")[1]
+                dlq_dir = "DLQ/" + line.split("/")[1]
                 if dlq_dir not in export_directories:
                     print(f"Found messages in {dlq_dir}")
                     export_directories.append(dlq_dir)
