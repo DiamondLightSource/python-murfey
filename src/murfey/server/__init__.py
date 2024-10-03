@@ -1060,6 +1060,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "pixel_size": relion_params.angpix,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
+                "symmetry": relion_params.symmetry,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -2213,7 +2214,12 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.commit()
             _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
 
-            next_job += 5
+            if relion_options["symmetry"] == "C1":
+                # Extra Refine, Mask, PostProcess beyond for determined symmetry
+                next_job += 8
+            else:
+                # Select and Extract particles, then Refine, Mask, PostProcess
+                next_job += 5
             feedback_params.next_job = next_job
 
         zocalo_message = {
@@ -2224,6 +2230,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "pixel_size": relion_options["angpix"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
+                "symmetry": relion_options["symmetry"],
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
@@ -2272,6 +2279,11 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
             db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
+
+    if message["symmetry"] != relion_params.symmetry:
+        # Currently don't do anything with a symmetrised re-run of the refinement
+        logger.info(f"Recieved symmetrised structure of {message['symmetry']}")
+        return True
 
     if not feedback_params.hold_refine:
         logger.warning("B-Factors requested but refine hold is off")
