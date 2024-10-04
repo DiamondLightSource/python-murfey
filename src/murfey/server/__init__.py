@@ -2381,12 +2381,12 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
     if all(resolutions):
         # Calculate b-factor and add to ispyb class table
         bfactor_fitting = np.polyfit(
-            np.log(particle_counts), 1 / np.array(resolutions) ** 2, 2
+            np.log(particle_counts), 1 / np.array(resolutions) ** 2, 1
         )
         refined_class_uuid = message["refined_class_uuid"]
 
         # Request an ispyb insert of the b-factor fitting parameters
-        if False and _transport_object:
+        if _transport_object:
             _transport_object.send(
                 "ispyb_connector",
                 {
@@ -2398,9 +2398,9 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
                         "buffer_command": {
                             "ispyb_command": "insert_particle_classification"
                         },
-                        "bfactor_fit_intercept": str(bfactor_fitting[2]),
-                        "bfactor_fit_linear": str(bfactor_fitting[1]),
-                        "bfactor_fit_quadratic": str(bfactor_fitting[0]),
+                        "program_id": message["program_id"],
+                        "bfactor_fit_intercept": str(bfactor_fitting[1]),
+                        "bfactor_fit_linear": str(bfactor_fitting[0]),
                     },
                     "content": {"dummy": "dummy"},
                 },
