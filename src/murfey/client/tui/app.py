@@ -105,7 +105,9 @@ class MurfeyTUI(App):
         self._strict = strict
         self._skip_existing_processing = skip_existing_processing
         self._machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [
