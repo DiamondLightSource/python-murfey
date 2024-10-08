@@ -100,6 +100,7 @@ def _check_for_updates(
 
 def run():
     config = read_config()
+    instrument_name = config["Murfey"]["instrument_name"]
     try:
         server_routing = config["ServerRouter"]
     except KeyError:
@@ -257,7 +258,7 @@ def run():
                 break
     if not ongoing_visits:
         print("Ongoing visits:")
-        ongoing_visits = _get_visit_list(murfey_url)
+        ongoing_visits = _get_visit_list(murfey_url, instrument_name)
         pprint(ongoing_visits)
         ongoing_visits = [v.name for v in ongoing_visits]
 
@@ -287,12 +288,13 @@ def run():
 
     status_bar = StatusBar()
 
-    machine_data = requests.get(f"{murfey_url.geturl()}/machine/").json()
+    machine_data = requests.get(f"{murfey_url.geturl()}/machine").json()
     gain_ref: Path | None = None
 
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         client_id=ws.id,
+        instrument_name=instrument_name,
         software_versions=machine_data.get("software_versions", {}),
         # sources=[Path(args.source)],
         # watchers=source_watchers,

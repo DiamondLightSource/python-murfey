@@ -73,7 +73,11 @@ class Analyser(Observer):
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (
-            get_machine_config(str(environment.url.geturl()), demo=environment.demo)
+            get_machine_config(
+                str(environment.url.geturl()),
+                instrument_name=environment.instrument_name,
+                demo=environment.demo,
+            )
             if environment
             else {}
         )
@@ -135,6 +139,7 @@ class Analyser(Observer):
             created_directories = set(
                 get_machine_config(
                     str(self._environment.url.geturl()),
+                    instrument_name=self._environment.instrument_name,
                     demo=self._environment.demo,
                 ).get("analyse_created_directories", [])
             )
@@ -154,6 +159,7 @@ class Analyser(Observer):
                         try:
                             cfg = get_machine_config(
                                 str(self._environment.url.geturl()),
+                                instrument_name=self._environment.instrument_name,
                                 demo=self._environment.demo,
                             )
                         except Exception as e:
@@ -178,6 +184,7 @@ class Analyser(Observer):
                 or "[" in file_path.name
                 or "Fractions" in split_file_name[-1]
                 or "fractions" in split_file_name[-1]
+                or "EER" in split_file_name[-1]
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")

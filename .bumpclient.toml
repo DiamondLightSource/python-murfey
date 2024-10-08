@@ -1,0 +1,9 @@
+[tool.bumpversion]
+current_version = "0.14.0"
+commit = true
+tag = false
+
+[[tool.bumpversion.files]]
+filename = "src/murfey/__init__.py"
+search = '__supported_client_version__ = "{current_version}"'
+replace = '__supported_client_version__ = "{new_version}"'

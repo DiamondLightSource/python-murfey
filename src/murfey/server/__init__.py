@@ -17,6 +17,7 @@ import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
@@ -42,19 +43,21 @@ import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
-from murfey.server.config import (
+from murfey.server.murfey_db import url  # murfey_db
+from murfey.util.config import (
     MachineConfig,
     get_hostname,
     get_machine_config,
     get_microscope,
+    get_security_config,
 )
-from murfey.server.murfey_db import url  # murfey_db
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
 import murfey.util.db as db
+from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
 
@@ -73,7 +76,7 @@ _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
 
 try:
-    _url = url(get_machine_config())
+    _url = url(get_security_config())
     engine = create_engine(_url)
     murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
@@ -81,8 +84,8 @@ except Exception:
 
 
 class ExtendedRecord(NamedTuple):
-    record: Base
-    record_params: List[Base]
+    record: Base  # type: ignore
+    record_params: List[Base]  # type: ignore
 
 
 class JobIDs(NamedTuple):
@@ -143,10 +146,19 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
 
 
 def get_all_tilts(tilt_series_id: int) -> List[str]:
-    machine_config = get_machine_config()
-    results = murfey_db.exec(
-        select(db.Tilt).where(db.Tilt.tilt_series_id == tilt_series_id)
-    )
+    complete_results = murfey_db.exec(
+        select(db.Tilt, db.TiltSeries, db.Session)
+        .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
+        .where(db.TiltSeries.id == tilt_series_id)
+        .where(db.TiltSeries.session_id == db.Session.id)
+    ).all()
+    if not complete_results:
+        return []
+    instrument_name = complete_results[0][2].instrument_name
+    results = [r[0] for r in complete_results]
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
 
     def _mc_path(mov_path: Path) -> str:
         for p in mov_path.parts:
@@ -220,7 +232,9 @@ def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingPar
     return results
 
 
-def respond_with_template(filename: str, parameters: dict[str, Any] | None = None):
+def respond_with_template(
+    request: Request, filename: str, parameters: dict[str, Any] | None = None
+):
     template_parameters = {
         "hostname": get_hostname(),
         "microscope": get_microscope(),
@@ -228,42 +242,9 @@ def respond_with_template(filename: str, parameters: dict[str, Any] | None = Non
     }
     if parameters:
         template_parameters.update(parameters)
-    return templates.TemplateResponse(filename, template_parameters)
-
-
-class LogFilter(logging.Filter):
-    """A filter to limit messages going to Graylog"""
-
-    def __repr__(self):
-        return "<murfey.server.LogFilter>"
-
-    def __init__(self):
-        self._filter_levels = {
-            "murfey": logging.DEBUG,
-            "ispyb": logging.DEBUG,
-            "zocalo": logging.DEBUG,
-            "uvicorn": logging.INFO,
-            "fastapi": logging.INFO,
-            "starlette": logging.INFO,
-            "sqlalchemy": logging.INFO,
-        }
-
-    @staticmethod
-    def install() -> LogFilter:
-        logfilter = LogFilter()
-        root_logger = logging.getLogger()
-        for handler in root_logger.handlers:
-            handler.addFilter(logfilter)
-        return logfilter
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        logger_name = record.name
-        while True:
-            if logger_name in self._filter_levels:
-                return record.levelno >= self._filter_levels[logger_name]
-            if "." not in logger_name:
-                return False
-            logger_name = logger_name.rsplit(".", maxsplit=1)[0]
+    return templates.TemplateResponse(
+        request=request, name=filename, context=template_parameters
+    )
 
 
 def run():
@@ -293,6 +274,12 @@ def run():
     parser.add_argument(
         "--temporary",
         action="store_true",
+    )
+    parser.add_argument(
+        "--root-path",
+        default="",
+        type=str,
+        help="Uvicorn root path for use in conjunction with a proxy",
     )
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -356,6 +343,7 @@ def run():
         ws_ping_interval=300,
         ws_ping_timeout=300,
         workers=args.workers,
+        root_path=args.root_path,
     )
 
     _running_server = uvicorn.Server(config=config)
@@ -632,7 +620,14 @@ def _register_picked_particles_use_diameter(
     ).one()
     if picking_db_len > default_spa_parameters.nr_picks_before_diameter:
         # If there are enough particles to get a diameter
-        machine_config = get_machine_config()
+        instrument_name = (
+            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            .one()
+            .instrument_name
+        )
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
         relion_params = _db.exec(
             select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
         ).one()
@@ -792,7 +787,15 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
-    machine_config = get_machine_config()
+
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     pj_id = _pj_id(message["program_id"], _db)
     ctf_params = db.CtfParameters(
         pj_id=pj_id,
@@ -884,7 +887,14 @@ def _release_2d_hold(message: dict, _db=murfey_db):
         first_class2d = _db.exec(
             select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
         ).first()
-        machine_config = get_machine_config()
+        instrument_name = (
+            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            .one()
+            .instrument_name
+        )
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
         zocalo_message = {
             "parameters": {
                 "particles_file": first_class2d.particles_file,
@@ -958,7 +968,14 @@ def _release_3d_hold(message: dict, _db=murfey_db):
         select(db.Class3DParameters).where(db.Class3DParameters.pj_id == pj_id)
     ).one()
     if class3d_params.run:
-        machine_config = get_machine_config()
+        instrument_name = (
+            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            .one()
+            .instrument_name
+        )
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
         zocalo_message = {
             "parameters": {
                 "particles_file": class3d_params.particles_file,
@@ -1027,7 +1044,14 @@ def _release_refine_hold(message: dict, _db=murfey_db):
         select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
     ).one()
     if refine_params.run:
-        machine_config = get_machine_config()
+        instrument_name = (
+            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            .one()
+            .instrument_name
+        )
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
         zocalo_message = {
             "parameters": {
                 "refine_job_dir": refine_params.refine_dir,
@@ -1068,7 +1092,14 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
     logger.info("Registering incomplete particle batch for 2D classification")
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
@@ -1179,7 +1210,14 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
 
 def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received full batch from particle selection service"""
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
@@ -1395,7 +1433,14 @@ def _flush_class2d(
     relion_params: db.SPARelionParameters | None = None,
     feedback_params: db.SPAFeedbackParameters | None = None,
 ):
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     if not relion_params or feedback_params:
         pj_id_params = _pj_id(app_id, _db, recipe="em-spa-preprocess")
     if not relion_params:
@@ -1659,7 +1704,14 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
     assert isinstance(class3d_message, dict)
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class3d")
     relion_params = _db.exec(
@@ -1859,15 +1911,7 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
 
 @record_failure
 def _flush_spa_preprocessing(message: dict):
-    session_id = (
-        murfey_db.exec(
-            select(db.ClientEnvironment).where(
-                db.ClientEnvironment.client_id == message["client_id"]
-            )
-        )
-        .one()
-        .session_id
-    )
+    session_id = message["session_id"]
     stashed_files = murfey_db.exec(
         select(db.PreprocessStash)
         .where(db.PreprocessStash.session_id == session_id)
@@ -1875,7 +1919,14 @@ def _flush_spa_preprocessing(message: dict):
     ).all()
     if not stashed_files:
         return None
-    machine_config = get_machine_config()
+    instrument_name = (
+        murfey_db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     collected_ids = murfey_db.exec(
         select(
             db.DataCollectionGroup,
@@ -1968,16 +2019,15 @@ def _flush_spa_preprocessing(message: dict):
 
 @record_failure
 def _flush_tomography_preprocessing(message: dict):
-    machine_config = get_machine_config()
-    session_id = (
-        murfey_db.exec(
-            select(db.ClientEnvironment).where(
-                db.ClientEnvironment.client_id == message["client_id"]
-            )
-        )
+    session_id = message["session_id"]
+    instrument_name = (
+        murfey_db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
-        .session_id
+        .instrument_name
     )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     stashed_files = murfey_db.exec(
         select(db.PreprocessStash)
         .where(db.PreprocessStash.session_id == session_id)
@@ -2000,7 +2050,7 @@ def _flush_tomography_preprocessing(message: dict):
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
-            f"No tomography processing parameters found for client {sanitise(str(message['client_id']))} on visit {sanitise(visit_name)}"
+            f"No tomography processing parameters found for Murfey session {sanitise(str(message['session_id']))} on visit {sanitise(visit_name)}"
         )
         return
 
@@ -2105,7 +2155,14 @@ def _flush_foil_hole_records(grid_square_id: int, _db=murfey_db, demo: bool = Fa
 
 def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
     """Received class to refine from 3D classification"""
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
     relion_params = _db.exec(
@@ -2194,7 +2251,14 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
 
 def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
     """Received refined class to calculate b-factor"""
-    machine_config = get_machine_config()
+    instrument_name = (
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        .one()
+        .instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
     relion_params = _db.exec(
@@ -2405,12 +2469,21 @@ def feedback_callback(header: dict, message: dict) -> None:
                 relevant_tilt_series.processing_requested = True
                 murfey_db.add(relevant_tilt_series)
 
-                machine_config = get_machine_config()
+                instrument_name = (
+                    murfey_db.exec(
+                        select(db.Session).where(db.Session.id == session_id)
+                    )
+                    .one()
+                    .instrument_name
+                )
+                machine_config = get_machine_config(instrument_name=instrument_name)[
+                    instrument_name
+                ]
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
                 preproc_params = get_tomo_preproc_params(ids.dcgid)
                 stack_file = (
-                    Path(message["mrc_out"]).parents[1]
+                    Path(message["mrc_out"]).parents[3]
                     / "Tomograms"
                     / "job006"
                     / "tomograms"
@@ -2451,11 +2524,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection_group":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
             ispyb_session_id = murfey.server.ispyb.get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
@@ -2465,7 +2533,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )
             if dcg_murfey := murfey_db.exec(
                 select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == client.session_id)
+                .where(db.DataCollectionGroup.session_id == message["session_id"])
                 .where(db.DataCollectionGroup.tag == message.get("tag"))
             ).all():
                 dcgid = dcg_murfey[0].id
@@ -2478,7 +2546,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 dcgid = _register(record, header)
                 murfey_dcg = db.DataCollectionGroup(
                     id=dcgid,
-                    session_id=client.session_id,
+                    session_id=message["session_id"],
                     tag=message.get("tag"),
                 )
                 murfey_db.add(murfey_dcg)
@@ -2503,15 +2571,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
-            murfey_session_id = (
-                murfey_db.exec(
-                    select(db.ClientEnvironment).where(
-                        db.ClientEnvironment.client_id == message["client_id"]
-                    )
-                )
-                .one()
-                .session_id
-            )
+            murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
@@ -2685,12 +2745,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "spa_processing_parameters":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
-            session_id = client.session_id
+            session_id = message["session_id"]
             collected_ids = murfey_db.exec(
                 select(
                     db.DataCollectionGroup,
@@ -2711,7 +2766,16 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.SPARelionParameters.pj_id == pj_id
                 )
             ).all():
-                machine_config = get_machine_config()
+                instrument_name = (
+                    murfey_db.exec(
+                        select(db.Session).where(db.Session.id == session_id)
+                    )
+                    .one()
+                    .instrument_name
+                )
+                machine_config = get_machine_config(instrument_name=instrument_name)[
+                    instrument_name
+                ]
                 params = db.SPARelionParameters(
                     pj_id=collected_ids[2].id,
                     angpix=float(message["pixel_size_on_image"]) * 1e10,
@@ -2756,12 +2820,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "tomography_processing_parameters":
-            client = murfey_db.exec(
-                select(db.ClientEnvironment).where(
-                    db.ClientEnvironment.client_id == message["client_id"]
-                )
-            ).one()
-            session_id = client.session_id
+            session_id = message["session_id"]
             collected_ids = murfey_db.exec(
                 select(
                     db.DataCollectionGroup,
@@ -2913,8 +2972,8 @@ def _register(record, header: dict, **kwargs):
     raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
 
 
-@_register.register  # type: ignore
-def _(record: Base, header: dict, **kwargs):
+@_register.register
+def _(record: Base, header: dict, **kwargs):  # type: ignore
     if not _transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
@@ -2952,7 +3011,7 @@ def _(record: Base, header: dict, **kwargs):
         return None
 
 
-@_register.register  # type: ignore
+@_register.register
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):
     if not _transport_object:
         raise ValueError(

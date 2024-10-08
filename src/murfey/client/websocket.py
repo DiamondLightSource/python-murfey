@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import queue
-import random
 import threading
 import time
 import urllib.parse
+import uuid
 from typing import Optional
 
 import websocket
@@ -19,8 +19,10 @@ log = logging.getLogger("murfey.client.websocket")
 class WSApp:
     environment: MurfeyInstanceEnvironment | None = None
 
-    def __init__(self, *, server: str, id: int | None = None):
-        self.id = random.randint(0, 100) if id is None else id
+    def __init__(
+        self, *, server: str, id: int | str | None = None, register_client: bool = True
+    ):
+        self.id = uuid.uuid4() if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
         url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
@@ -29,8 +31,13 @@ class WSApp:
         self._ready = False
         self._send_queue: queue.Queue[Optional[str]] = queue.Queue()
         self._receive_queue: queue.Queue[Optional[str]] = queue.Queue()
+        ws_url = (
+            url._replace(path=f"/ws/test/{self.id}").geturl()
+            if register_client
+            else url._replace(path=f"/ws/connect/{self.id}").geturl()
+        )
         self._ws = websocket.WebSocketApp(
-            url._replace(path=f"/ws/test/{id}").geturl(),
+            ws_url,
             on_close=self.on_close,
             on_message=self.on_message,
             on_open=self.on_open,

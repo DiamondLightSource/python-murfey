@@ -166,8 +166,8 @@ class RsyncPipe(Processor):
         for stringy_stderr in stderr.decode("utf8", "replace").split("\n"):
             if (
                 stringy_stderr.startswith("rsync: link_stat")
-                and "failed" in stringy_stderr
-            ):
+                or stringy_stderr.startswith("rsync: [sender] link_stat")
+            ) and "failed" in stringy_stderr:
                 failed_msg = stringy_stderr.split()
                 self._failed_tmp.append(
                     failed_msg[failed_msg.index("failed:") - 1].replace('"', "")

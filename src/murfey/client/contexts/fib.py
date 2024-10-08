@@ -98,7 +98,7 @@ class FIBContext(Context):
                     ).name
                     # post gif list to gif making API call
                     requests.post(
-                        f"{str(environment.url.geturl())}/visits/{datetime.now().year}/{environment.visit}/make_milling_gif",
+                        f"{str(environment.url.geturl())}/visits/{datetime.now().year}/{environment.visit}/{environment.murfey_session}/make_milling_gif",
                         json={
                             "lamella_number": lamella_number,
                             "images": gif_list,
