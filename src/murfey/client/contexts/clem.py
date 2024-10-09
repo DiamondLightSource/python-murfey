@@ -93,11 +93,7 @@ class CLEMContext(Context):
         self._basepath = basepath
         # CLEM contexts for "auto-save" acquisition mode
         self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
-        self._tiff_timestamps: Dict[str, List[float]] = {}  # {Series name : Timestamps}
-        self._tiff_sizes: Dict[str, List[int]] = {}  # {Series name : File sizes}
         self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}
-        self._metadata_timestamp: Dict[str, float] = {}  # {Series name : Timestamp}
-        self._metadata_size: Dict[str, int] = {}  # {Series name : File size}
         self._files_in_series: Dict[str, int] = {}  # {Series name : Total TIFFs}
 
     def post_transfer(
@@ -198,16 +194,8 @@ class CLEMContext(Context):
                 # Create key-value pairs containing empty list if not already present
                 if series_name not in self._tiff_series.keys():
                     self._tiff_series[series_name] = []
-                if series_name not in self._tiff_sizes.keys():
-                    self._tiff_sizes[series_name] = []
-                if series_name not in self._tiff_timestamps.keys():
-                    self._tiff_timestamps[series_name] = []
                 # Append information to list
                 self._tiff_series[series_name].append(str(destination_file))
-                self._tiff_sizes[series_name].append(transferred_file.stat().st_size)
-                self._tiff_timestamps[series_name].append(
-                    transferred_file.stat().st_ctime
-                )
                 logger.debug(
                     f"Created TIFF file dictionary entries for {series_name!r}"
                 )
@@ -275,8 +263,6 @@ class CLEMContext(Context):
                 # Update dictionary entries
                 self._files_in_series[series_name] = num_files
                 self._series_metadata[series_name] = str(destination_file)
-                self._metadata_size[series_name] = transferred_file.stat().st_size
-                self._metadata_timestamp[series_name] = transferred_file.stat().st_ctime
                 logger.debug(f"Created dictionary entries for {series_name!r} metadata")
 
                 # A new copy of the metadata file is created in 'processed', so no need
@@ -303,12 +289,7 @@ class CLEMContext(Context):
                 tiff_dataset = {
                     "series_name": series_name,
                     "tiff_files": self._tiff_series[series_name],
-                    "tiff_sizes": self._tiff_sizes[series_name],
-                    "tiff_timestamps": self._tiff_timestamps[series_name],
                     "series_metadata": self._series_metadata[series_name],
-                    "metadata_size": self._metadata_size[series_name],
-                    "metadata_timestamp": self._metadata_timestamp[series_name],
-                    "description": "",
                 }
                 post_result = self.process_tiff_series(tiff_dataset, environment)
                 if post_result is False:
