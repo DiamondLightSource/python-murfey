@@ -379,15 +379,15 @@ class CLEMContext(Context):
                 logger.error(
                     "URL could not be constructed from the environment and file path"
                 )
-                return ValueError
+                return False
 
             # Send the message
             capture_post(url)
             return True
 
-        except Exception:
+        except Exception as e:
             logger.error(
-                "Error encountered when registering the LIF file in the database"
+                f"Error encountered when registering the LIF file in the database: {e}"
             )
             return False
 
@@ -409,14 +409,14 @@ class CLEMContext(Context):
                 logger.error(
                     "URL could not be constructed from the environment and file path"
                 )
-                return ValueError
+                return False
 
             # Send the message
             capture_post(url)
             return True
 
-        except Exception:
-            logger.error("Error encountered processing LIF file")
+        except Exception as e:
+            logger.error(f"Error encountered processing LIF file: {e}")
             return False
 
     def register_tiff_file(
@@ -435,16 +435,17 @@ class CLEMContext(Context):
                 logger.error(
                     "URL could not be constructed from the environment and file path"
                 )
-                return ValueError
+                return False
 
             # Send the message
             capture_post(url)
             return True
 
-        except Exception:
+        except Exception as e:
             logger.error(
-                "Error encountered when registering the TIFF file in the database"
+                f"Error encountered when registering the TIFF file in the database: {e}"
             )
+            return False
 
     def process_tiff_series(
         self,
@@ -463,11 +464,12 @@ class CLEMContext(Context):
                 logger.error(
                     "URL could not be constructed from the environment and file path"
                 )
-                return ValueError
+                return False
 
             # Send the message
             capture_post(url, json=tiff_dataset)
             return True
 
-        except Exception:
-            logger.error("Error encountered processing the TIFF series")
+        except Exception as e:
+            logger.error(f"Error encountered processing the TIFF series: {e}")
+            return False
