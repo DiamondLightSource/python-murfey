@@ -313,7 +313,7 @@ class CLEMContext(Context):
                 post_result = self.process_tiff_series(tiff_dataset, environment)
                 if post_result is False:
                     return False
-                return True
+
             else:
                 logger.debug(f"TIFF series {series_name!r} is still being processed")
 
@@ -322,14 +322,14 @@ class CLEMContext(Context):
             # Type checking to satisfy MyPy
             if not environment:
                 logger.warning("No environment passed in")
-                return True
+                return False
 
             # Location of the file on the client PC
             source = _get_source(transferred_file, environment)
             # Type checking to satisfy MyPy
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
-                return True
+                return False
 
             logger.debug(
                 f"File {transferred_file.name!r} is a valid LIF file; starting processing"
@@ -351,15 +351,15 @@ class CLEMContext(Context):
             post_result = self.register_lif_file(destination_file, environment)
             if post_result is False:
                 return False
-            logger.debug(f"Registered {destination_file.name!r} in the database")
+            logger.info(f"Registered {destination_file.name!r} in the database")
 
             # Post URL to trigger job and convert LIF file into image stacks
             post_result = self.process_lif_file(destination_file, environment)
             if post_result is False:
                 return False
-            logger.debug(f"Started preprocessing of {destination_file.name!r}")
+            logger.info(f"Started preprocessing of {destination_file.name!r}")
 
-            return True
+        # Function has completed as expected
         return True
 
     def register_lif_file(
