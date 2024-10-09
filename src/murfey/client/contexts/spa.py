@@ -673,6 +673,12 @@ class SPAModularContext(_SPAContext):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> bool:
+        super().post_transfer(
+            transferred_file=transferred_file,
+            role=role,
+            environment=environment,
+            **kwargs,
+        )
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
