@@ -44,3 +44,5 @@ def zocalo_cluster_request(
             },
             new_connection=True,
         )
+    else:
+        raise Exception("Unable to find transport manager")

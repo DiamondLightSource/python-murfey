@@ -4,7 +4,6 @@ import re
 import sys
 import traceback
 from logging import getLogger
-from os import path
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -23,13 +22,13 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import LifFileInfo, TiffSeriesInfo
+from murfey.util.models import TiffSeriesInfo
 
 # Use backport from importlib_metadata for Python <3.10
 if sys.version_info.major == 3 and sys.version_info.minor < 10:
-    from importlib_metadata import entry_points
+    from importlib_metadata import EntryPoint, entry_points
 else:
-    from importlib.metadata import entry_points
+    from importlib.metadata import EntryPoint, entry_points
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -52,7 +51,11 @@ HELPER FUNCTIONS
 """
 
 
-def validate_and_sanitise(file: Path, session_id: int) -> Path:
+def validate_and_sanitise(
+    file: Path,
+    session_id: int,
+    db: Session,
+) -> Path:
     """
     Performs validation and sanitisation on the incoming file paths, ensuring that
     no forbidden characters are present and that the the path points only to allowed
@@ -60,17 +63,21 @@ def validate_and_sanitise(file: Path, session_id: int) -> Path:
 
     Returns the file path as a sanitised string that can be converted into a Path
     object again.
+
+    NOTE: Due to the instrument name query, 'db' now needs to be passed as an
+    explicit variable to this function from within a FastAPI endpoint, as using the
+    instance that was imported directly won't load it in the correct state.
     """
 
     # Resolve symlinks and directory changes to get full file path
-    full_path = path.normpath(path.realpath(file))
+    full_path = Path(file).resolve()
 
+    # Use machine configuration to validate which file base paths are accepted from
     instrument_name = (
-        murfey_db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
         .one()
         .instrument_name
     )
-    # Use machine configuration to validate file paths used here
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -81,6 +88,8 @@ def validate_and_sanitise(file: Path, session_id: int) -> Path:
         # Print to troubleshoot
         logger.warning(f"Base path {rsync_basepath!r} is too short")
         base_path = rsync_basepath.as_posix()
+    except Exception:
+        raise Exception("Unexpected exception occurred when loading the file base path")
 
     # Check that full file path doesn't contain unallowed characters
     # Currently allows only:
@@ -89,18 +98,22 @@ def validate_and_sanitise(file: Path, session_id: int) -> Path:
     # - periods,
     # - dashes,
     # - forward slashes ("/")
-    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", full_path)) is False:
-        raise ValueError(f"Unallowed characters present in {file!r}")
+    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", str(full_path))) is False:
+        raise ValueError(f"Unallowed characters present in {file}")
 
     # Check that it's not accessing somehwere it's not allowed
     if not str(full_path).startswith(str(base_path)):
-        raise ValueError(f"{file!r} points to a directory that is not permitted")
+        raise ValueError(f"{file} points to a directory that is not permitted")
+
+    # Check that it's a file, not a directory
+    if full_path.is_file() is False:
+        raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
-    if f".{full_path.rsplit('.', 1)[-1]}" not in valid_file_types:
-        raise ValueError("File is not a permitted file format")
+    if f"{full_path.suffix}" not in valid_file_types:
+        raise ValueError(f"{full_path.suffix} is not a permitted file format")
 
-    return Path(full_path)
+    return full_path
 
 
 def get_db_entry(
@@ -144,13 +157,13 @@ def get_db_entry(
     # Validate file path if provided
     if file_path is not None:
         try:
-            file_path = validate_and_sanitise(file_path, session_id)
+            file_path = validate_and_sanitise(file_path, session_id, db)
         except Exception:
             raise Exception
 
     # Validate series name to use
     if series_name is not None:
-        if bool(re.fullmatch(r"^[\w\s\.\-]+$", series_name)) is False:
+        if bool(re.fullmatch(r"^[\w\s\.\-/]+$", series_name)) is False:
             raise ValueError("One or more characters in the string are not permitted")
 
     # Return database entry if it exists
@@ -220,7 +233,7 @@ def register_lif_file(
     # Add metadata information if provided
     if master_metadata is not None:
         try:
-            master_metadata = validate_and_sanitise(master_metadata, session_id)
+            master_metadata = validate_and_sanitise(master_metadata, session_id, db)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             logger.warning(traceback.format_exc())
@@ -621,7 +634,7 @@ API ENDPOINTS FOR FILE PROCESSING
 @router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
 def lif_to_stack(
     session_id: int,  # Used by the decorator
-    lif_info: LifFileInfo,
+    lif_file: Path,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
@@ -629,13 +642,15 @@ def lif_to_stack(
     )
 
     # Use entry point if found
-    if murfey_workflows:
-        murfey_workflows[0].load()(
+    if len(murfey_workflows) == 1:
+        workflow: EntryPoint = list(murfey_workflows)[0]
+        workflow.load()(
             # Match the arguments found in murfey.workflows.lif_to_stack
-            file=lif_info.name,
+            file=lif_file,
             root_folder="images",
             messenger=_transport_object,
         )
+        return True
     # Raise error if Murfey workflow not found
     else:
         raise RuntimeError("The relevant Murfey workflow was not found")
@@ -653,7 +668,8 @@ def tiff_to_stack(
 
     # Use entry point if found
     if murfey_workflows:
-        murfey_workflows[0].load()(
+        workflow: EntryPoint = list(murfey_workflows)[0]
+        workflow.load()(
             # Match the arguments found in murfey.workflows.tiff_to_stack
             file=tiff_info.tiff_files[0],  # Pass it only one file from the list
             root_folder="images",

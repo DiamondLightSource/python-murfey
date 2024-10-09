@@ -154,22 +154,10 @@ Models related to the cryo-CLEM workflow.
 """
 
 
-class LifFileInfo(BaseModel):
-    name: Path
-    size: int
-    timestamp: float
-    description: str = ""
-
-
 class TiffSeriesInfo(BaseModel):
     series_name: str
     tiff_files: List[Path]
-    tiff_sizes: List[int]
-    tiff_timestamps: List[float]
     series_metadata: Path
-    metadata_size: int
-    metadata_timestamp: float
-    description: str = ""
 
 
 """
