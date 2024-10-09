@@ -9,7 +9,7 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Set
 from urllib.parse import ParseResult
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic_core.core_schema import ValidationInfo
 
 from murfey.client.watchdir import DirWatcher
 
@@ -69,7 +69,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("data_collection_group_ids")
-    def dcg_callback(cls, v, info: FieldValidationInfo):
+    def dcg_callback(cls, v, info: ValidationInfo):
         with global_env_lock:
             for l in info.data.get("listeners", {}).get(
                 "data_collection_group_ids", []
@@ -80,7 +80,7 @@ class MurfeyInstanceEnvironment(BaseModel):
         return v
 
     @field_validator("data_collection_ids")
-    def dc_callback(cls, v, info: FieldValidationInfo):
+    def dc_callback(cls, v, info: ValidationInfo):
         with global_env_lock:
             for l in info.data.get("listeners", {}).get("data_collection_ids", []):
                 for k in v.keys():
@@ -89,7 +89,7 @@ class MurfeyInstanceEnvironment(BaseModel):
         return v
 
     @field_validator("processing_job_ids")
-    def job_callback(cls, v, info: FieldValidationInfo):
+    def job_callback(cls, v, info: ValidationInfo):
         with global_env_lock:
             for l in info.data.get("listeners", {}).get("processing_job_ids", []):
                 for k in v.keys():
@@ -98,7 +98,7 @@ class MurfeyInstanceEnvironment(BaseModel):
         return v
 
     @field_validator("autoproc_program_ids")
-    def app_callback(cls, v, info: FieldValidationInfo):
+    def app_callback(cls, v, info: ValidationInfo):
         with global_env_lock:
             for l in info.data.get("listeners", {}).get("autoproc_program_ids", []):
                 for k in v.keys():
