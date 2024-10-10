@@ -2944,6 +2944,14 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "register_lif_preprocessing_result":
+            # Write a function to register received CLEM LIF processing results
+            if _transport_object:
+                _transport_object.transport.ack(header)
+        elif message["register"] == "register_tiff_preprocessing_result":
+            # Write a function to register received CLEM TIFF processing results
+            if _transport_object:
+                _transport_object.transport.ack(header)
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
