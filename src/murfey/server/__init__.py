@@ -41,7 +41,6 @@ from werkzeug.utils import secure_filename
 
 import murfey
 import murfey.server.prometheus as prom
-import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util.config import (
@@ -322,7 +321,9 @@ def run():
 
     machine_config = get_machine_config()
     if not args.temporary and _transport_object:
-        _transport_object.feedback_queue = machine_config.feedback_queue
+        _transport_object.feedback_queue = (
+            machine_config.feedback_queue
+        )  # BUG: Instrument name needed
     rabbit_thread = Thread(
         target=feedback_listen,
         daemon=True,

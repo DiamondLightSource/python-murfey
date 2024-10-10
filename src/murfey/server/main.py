@@ -18,7 +18,7 @@ import murfey.server.api.display
 import murfey.server.api.hub
 import murfey.server.api.instrument
 import murfey.server.api.spa
-import murfey.server.websocket
+import murfey.server.api.websocket
 import murfey.util.models
 from murfey.server import template_files
 from murfey.util.config import get_security_config
@@ -79,7 +79,7 @@ app.include_router(murfey.server.api.auth.router)
 app.include_router(murfey.server.api.display.router)
 app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.hub.router)
-app.include_router(murfey.server.websocket.ws)
+app.include_router(murfey.server.api.websocket.ws)
 
 for r in entry_points(group="murfey.routers"):
     app.include_router(r.load())

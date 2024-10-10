@@ -271,7 +271,7 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> sqlalchemy.orm.Session:
+def _get_session() -> sqlalchemy.orm.Session:  # type: ignore
     db = Session()
     try:
         yield db
