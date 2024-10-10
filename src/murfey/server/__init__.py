@@ -809,15 +809,15 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
         defocus_v=params_to_forward["ctf_values"]["DefocusV"],
         defocus_angle=params_to_forward["ctf_values"]["DefocusAngle"],
     )
-    murfey_db.add(ctf_params)
-    murfey_db.commit()
-    murfey_db.close()
+    _db.add(ctf_params)
+    _db.commit()
+    _db.close()
 
     # Set particle diameter as zero and send box sizes
-    relion_params = murfey_db.exec(
+    relion_params = _db.exec(
         select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
     ).one()
-    feedback_params = murfey_db.exec(
+    feedback_params = _db.exec(
         select(db.SPAFeedbackParameters).where(db.SPAFeedbackParameters.pj_id == pj_id)
     ).one()
 
@@ -874,6 +874,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
     }
     if _transport_object:
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+    _db.close()
 
 
 def _release_2d_hold(message: dict, _db=murfey_db):
@@ -2127,6 +2128,7 @@ def _flush_tomography_preprocessing(message: dict):
             )
         murfey_db.delete(f)
         murfey_db.commit()
+        murfey_db.close()
 
 
 def _flush_grid_square_records(message: dict, _db=murfey_db, demo: bool = False):
