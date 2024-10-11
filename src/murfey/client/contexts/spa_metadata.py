@@ -35,7 +35,7 @@ def _atlas_destination(
 
 class SPAMetadataContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("SPA metadata", acquisition_software)
+        super().__init__("SPA_metadata", acquisition_software)
         self._basepath = basepath
 
     def post_transfer(
@@ -45,6 +45,13 @@ class SPAMetadataContext(Context):
         environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
+        super().post_transfer(
+            transferred_file=transferred_file,
+            role=role,
+            environment=environment,
+            **kwargs,
+        )
+
         if transferred_file.name == "EpuSession.dm" and environment:
             logger.info("EPU session metadata found")
             with open(transferred_file, "r") as epu_xml:

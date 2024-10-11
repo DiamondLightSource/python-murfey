@@ -86,6 +86,10 @@ class Analyser(Observer):
         """
         Identifies the file extension and stores that information in the class.
         """
+        if "atlas" in file_path.parts:
+            self._extension = file_path.suffix
+            return True
+
         if (
             required_substrings := self._murfey_config.get(
                 "data_required_substrings", {}
@@ -121,6 +125,10 @@ class Analyser(Observer):
         stages of processing. Actions to take for individual files will be determined
         in the Context classes themselves.
         """
+        if "atlas" in file_path.parts:
+            self._role = "detector"
+            self._context = SPAMetadataContext("epu", self._basepath)
+            return True
 
         # CLEM workflow checks
         # Look for LIF and XLIF files
@@ -376,7 +384,10 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if self._role == "detector":
+                        if (
+                            self._role == "detector"
+                            and "atlas" not in transferred_file.parts
+                        ):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
