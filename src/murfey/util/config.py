@@ -64,6 +64,8 @@ class MachineConfig(BaseModel):
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
 
+    security_configuration_path: Optional[Path] = None
+
 
 def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
@@ -121,6 +123,12 @@ def get_microscope(machine_config: MachineConfig | None = None) -> str:
 def get_security_config() -> Security:
     if settings.murfey_security_configuration:
         return security_from_file(Path(settings.murfey_security_configuration))
+    if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
+        machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
+            os.getenv("BEAMLINE", "")
+        ]
+        if machine_config.security_configuration_path:
+            return security_from_file(machine_config.security_configuration_path)
     return Security(
         session_validation="",
         murfey_db_credentials="",
