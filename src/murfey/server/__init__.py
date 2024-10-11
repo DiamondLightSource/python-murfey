@@ -110,7 +110,7 @@ def record_failure(
                     machine_config = get_machine_config()
                     record_queue = (
                         machine_config.failure_queue
-                        or f"dlq.{machine_config.feedback_queue}"
+                        or f"dlq.{_transport_object.feedback_queue}"
                     )
                 _transport_object.send(record_queue, args[0], new_connection=True)
             return None
@@ -685,7 +685,7 @@ def _register_picked_particles_use_diameter(
             for saved_message in ctf_db:
                 # Send on all saved messages to extraction
                 _db.expunge(saved_message)
-                zocalo_message = {
+                zocalo_message: dict = {
                     "parameters": {
                         "micrographs_file": saved_message.micrographs_file,
                         "coord_list_file": saved_message.coord_list_file,
@@ -703,7 +703,6 @@ def _register_picked_particles_use_diameter(
                         "particle_diameter": particle_diameter,
                         "downscale": relion_options["downscale"],
                         "kv": relion_options["voltage"],
-                        "feedback_queue": machine_config.feedback_queue,
                         "node_creator_queue": machine_config.node_creator_queue,
                         "session_id": message["session_id"],
                         "autoproc_program_id": _app_id(
@@ -715,6 +714,9 @@ def _register_picked_particles_use_diameter(
                     "recipes": ["em-spa-extract"],
                 }
                 if _transport_object:
+                    zocalo_message["parameters"][
+                        "feedback_queue"
+                    ] = _transport_object.feedback_queue
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
@@ -742,7 +744,6 @@ def _register_picked_particles_use_diameter(
                     "particle_diameter": particle_diameter,
                     "downscale": relion_options["downscale"],
                     "kv": relion_options["voltage"],
-                    "feedback_queue": machine_config.feedback_queue,
                     "node_creator_queue": machine_config.node_creator_queue,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
@@ -753,6 +754,9 @@ def _register_picked_particles_use_diameter(
                 "recipes": ["em-spa-extract"],
             }
             if _transport_object:
+                zocalo_message["parameters"][
+                    "feedback_queue"
+                ] = _transport_object.feedback_queue
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
@@ -845,7 +849,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             _db.commit()
 
     # Send the message to extraction with the box sizes
-    zocalo_message = {
+    zocalo_message: dict = {
         "parameters": {
             "micrographs_file": params_to_forward["micrographs_file"],
             "coord_list_file": params_to_forward["coord_list_file"],
@@ -862,7 +866,6 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
             "small_boxsize": relion_params.small_boxsize,
             "downscale": relion_params.downscale,
             "kv": relion_params.voltage,
-            "feedback_queue": machine_config.feedback_queue,
             "node_creator_queue": machine_config.node_creator_queue,
             "session_id": message["session_id"],
             "autoproc_program_id": _app_id(
@@ -873,6 +876,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db=murfey_db):
         "recipes": ["em-spa-extract"],
     }
     if _transport_object:
+        zocalo_message["parameters"][
+            "feedback_queue"
+        ] = _transport_object.feedback_queue
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     _db.close()
 
@@ -896,7 +902,7 @@ def _release_2d_hold(message: dict, _db=murfey_db):
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "particles_file": first_class2d.particles_file,
                 "class2d_dir": message["job_dir"],
@@ -926,7 +932,6 @@ def _release_2d_hold(message: dict, _db=murfey_db):
                 .one()
                 .murfey_id,
                 "session_id": message["session_id"],
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
@@ -942,6 +947,9 @@ def _release_2d_hold(message: dict, _db=murfey_db):
         _db.commit()
         _db.close()
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -977,7 +985,7 @@ def _release_3d_hold(message: dict, _db=murfey_db):
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "particles_file": class3d_params.particles_file,
                 "class3d_dir": class3d_params.class3d_dir,
@@ -1010,12 +1018,14 @@ def _release_3d_hold(message: dict, _db=murfey_db):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1053,7 +1063,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": refine_params.class3d_dir,
@@ -1072,11 +1082,13 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
             },
             "recipes": ["em-spa-refine"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1154,42 +1166,44 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
-    zocalo_message = {
-        "parameters": {
-            "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
-            "batch_is_complete": False,
-            "particle_diameter": relion_options["particle_diameter"],
-            "combine_star_job_number": -1,
-            "picker_id": other_options["picker_ispyb_id"],
-            "nr_iter": default_spa_parameters.nr_iter_2d,
-            "batch_size": default_spa_parameters.batch_size_2d,
-            "nr_classes": default_spa_parameters.nr_classes_2d,
-            "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-            "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-            "mask_diameter": 0,
-            "class_uuids": _2d_class_murfey_ids(
-                class2d_message["particles_file"], _app_id(pj_id, _db), _db
-            ),
-            "class2d_grp_uuid": _db.exec(
-                select(db.Class2DParameters).where(
-                    db.Class2DParameters.particles_file
-                    == class2d_message["particles_file"]
-                    and db.Class2DParameters.pj_id == pj_id
+        zocalo_message: dict = {
+            "parameters": {
+                "particles_file": class2d_message["particles_file"],
+                "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+                "batch_is_complete": False,
+                "particle_diameter": relion_options["particle_diameter"],
+                "combine_star_job_number": -1,
+                "picker_id": other_options["picker_ispyb_id"],
+                "nr_iter": default_spa_parameters.nr_iter_2d,
+                "batch_size": default_spa_parameters.batch_size_2d,
+                "nr_classes": default_spa_parameters.nr_classes_2d,
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+                "mask_diameter": 0,
+                "class_uuids": _2d_class_murfey_ids(
+                    class2d_message["particles_file"], _app_id(pj_id, _db), _db
+                ),
+                "class2d_grp_uuid": _db.exec(
+                    select(db.Class2DParameters).where(
+                        db.Class2DParameters.particles_file
+                        == class2d_message["particles_file"]
+                        and db.Class2DParameters.pj_id == pj_id
+                    )
                 )
-            )
-            .one()
-            .murfey_id,
-            "session_id": message["session_id"],
-            "autoproc_program_id": _app_id(
-                _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
-            ),
-            "feedback_queue": machine_config.feedback_queue,
-            "node_creator_queue": machine_config.node_creator_queue,
-        },
-        "recipes": ["em-spa-class2d"],
-    }
+                .one()
+                .murfey_id,
+                "session_id": message["session_id"],
+                "autoproc_program_id": _app_id(
+                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+                ),
+                "node_creator_queue": machine_config.node_creator_queue,
+            },
+            "recipes": ["em-spa-class2d"],
+        }
     if _transport_object:
+        zocalo_message["parameters"][
+            "feedback_queue"
+        ] = _transport_object.feedback_queue
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
         logger.info("2D classification requested")
     if demo:
@@ -1322,7 +1336,7 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 for i, m in enumerate(_murfey_id(_app_id(pj_id, _db), _db, number=50))
             }
             class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
                 "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
@@ -1343,12 +1357,14 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1410,12 +1426,14 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1477,7 +1495,7 @@ def _flush_class2d(
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
         _db.expunge(saved_message)
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "particles_file": saved_message.particles_file,
                 "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
@@ -1498,12 +1516,14 @@ def _flush_class2d(
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "session_id": session_id,
                 "autoproc_program_id": _app_id(pj_id, _db),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class2d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1818,7 +1838,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
         feedback_params.hold_class3d = True
         next_job += 2
         feedback_params.next_job = next_job
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
                 "class3d_dir": class3d_dir,
@@ -1839,12 +1859,14 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1880,12 +1902,14 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": ["em-spa-class3d"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1980,10 +2004,9 @@ def _flush_spa_preprocessing(message: dict):
             foil_hole_id=f.foil_hole_id,
         )
         murfey_db.add(movie)
-        zocalo_message = {
+        zocalo_message: dict = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": collected_ids[1].id,
                 "kv": proc_params.voltage,
@@ -2005,6 +2028,9 @@ def _flush_spa_preprocessing(message: dict):
             },
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -2084,10 +2110,9 @@ def _flush_tomography_preprocessing(message: dict):
             tag=f.tag,
         )
         murfey_db.add(movie)
-        zocalo_message = {
+        zocalo_message: dict = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
                 "autoproc_program_id": detached_ids[3],
@@ -2112,6 +2137,9 @@ def _flush_tomography_preprocessing(message: dict):
             f"Launching tomography preprocessing with Zocalo message: {zocalo_message}"
         )
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -2218,7 +2246,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             next_job += 5
             feedback_params.next_job = next_job
 
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": message["class3d_dir"],
@@ -2237,11 +2265,13 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
             },
             "recipes": ["em-spa-refine"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -2332,7 +2362,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
 
         bfactor_particle_count *= 2
 
-        zocalo_message = {
+        zocalo_message: dict = {
             "parameters": {
                 "bfactor_directory": bfactor_run.bfactor_directory,
                 "class_reference": bfactor_params.class_reference,
@@ -2351,11 +2381,13 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
                 ),
-                "feedback_queue": machine_config.feedback_queue,
             },
             "recipes": ["em-spa-bfactor"],
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
