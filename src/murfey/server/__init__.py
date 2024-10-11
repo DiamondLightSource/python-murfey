@@ -320,9 +320,9 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    machine_config = get_machine_config()
+    security_config = get_security_config()
     if not args.temporary and _transport_object:
-        _transport_object.feedback_queue = machine_config.feedback_queue
+        _transport_object.feedback_queue = security_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
         daemon=True,
