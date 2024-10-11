@@ -29,7 +29,6 @@ class MachineConfig(BaseModel):
     gain_reference_directory: Optional[Path] = None
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
-    feedback_queue: str = "murfey_feedback"
     node_creator_queue: str = "node_creator"
     superres: bool = False
     camera: str = "FALCON"
@@ -88,6 +87,7 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
+    feedback_queue: str = "murfey_feedback"
 
 
 def security_from_file(config_file_path: Path) -> Security:
