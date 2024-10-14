@@ -781,6 +781,13 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> List[str]:
+        super().post_transfer(
+            transferred_file=transferred_file,
+            role=role,
+            environment=environment,
+            **kwargs,
+        )
+
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
         if role == "detector" and "gain" not in transferred_file.name:
