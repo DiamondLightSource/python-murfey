@@ -208,11 +208,16 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     client_env = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
     ).one()
+    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
     if client_env:
         client_env.visit = visit_name
         db.add(client_env)
         db.commit()
-        db.close()
+    if session:
+        session.visit = visit_name
+        db.add(session)
+        db.commit()
+    db.close()
     return client_info
 
 
