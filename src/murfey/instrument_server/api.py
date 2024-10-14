@@ -143,7 +143,7 @@ def start_multigrid_watcher(
         demo=True,
         do_transfer=True,
         processing_enabled=not watcher_spec.skip_existing_processing,
-        _machine_config=watcher_spec.configuration.dict(),
+        _machine_config=watcher_spec.configuration.model_dump(),
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
     )
@@ -156,7 +156,7 @@ def start_multigrid_watcher(
         (watcher_spec.source / d).mkdir(exist_ok=True)
     watchers[session_id] = MultigridDirWatcher(
         watcher_spec.source,
-        watcher_spec.configuration.dict(),
+        watcher_spec.configuration.model_dump(),
         skip_existing_processing=watcher_spec.skip_existing_processing,
     )
     watchers[session_id].subscribe(controllers[session_id]._start_rsyncer_multigrid)
@@ -221,7 +221,7 @@ def register_processing_parameters(
     session_id: MurfeySessionID, proc_param_block: ProcessingParameterBlock
 ):
     data_collection_parameters[proc_param_block.label] = {}
-    for k, v in proc_param_block.params.dict().items():
+    for k, v in proc_param_block.params.model_dump().items():
         data_collection_parameters[proc_param_block.label][k] = v
     return {"success": True}
 
