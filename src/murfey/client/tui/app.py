@@ -129,7 +129,9 @@ class MurfeyTUI(App):
     ):
         log.info(f"Launching multigrid watcher for source {source}")
         machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._multigrid_watcher = MultigridDirWatcher(
             source,
@@ -686,7 +688,9 @@ class MurfeyTUI(App):
 
     async def reset(self):
         machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
@@ -739,7 +743,9 @@ class MurfeyTUI(App):
 
     async def action_clear(self) -> None:
         machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
