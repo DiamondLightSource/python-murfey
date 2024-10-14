@@ -318,7 +318,10 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if self._role == "detector":
+                        if (
+                            self._role == "detector"
+                            and "atlas" not in transferred_file.parts
+                        ):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
