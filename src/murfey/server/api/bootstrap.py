@@ -51,7 +51,9 @@ log = logging.getLogger("murfey.server.api.bootstrap")
 
 
 """
+=======================================================================================
 GENERAL HELPER FUNCTIONS
+=======================================================================================
 """
 
 
@@ -62,7 +64,9 @@ def _sanitise_str(input: str) -> str:
 
 
 """
+=======================================================================================
 VERSION-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -84,7 +88,9 @@ def get_version(client_version: str = ""):
 
 
 """
-BOOTSTRAP-RELATED API ENDPOINTS
+=======================================================================================
+GENERAL BOOTSTRAP-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -145,7 +151,9 @@ def get_murfey_wheel():
 
 
 """
+=======================================================================================
 CYGWIN-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -240,7 +248,9 @@ def parse_cygwin_request(request_path: str):
 
 
 """
+=======================================================================================
 MSYS2-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
 """
 
 # Variables used by the MSYS2 functions below
@@ -532,8 +542,12 @@ def get_msys2_package_file(
         raise ValueError(f"{system!r}/{environment!r} is not a valid msys2 environment")
 
     # Validate package name
-    ## MSYS2 package names contain alphanumerics (includes "_"; \w), periods (\.),
-    ## dashes (\-), and tildes (~)
+    #   MSYS2 package names contain:
+    #   - alphanumerics (includes "_"; \w),
+    #   - periods (\.),
+    #   - dashes (\-),
+    #   - tildes (~), and
+    #   - plus signs (+)
     if bool(re.fullmatch(r"^[\w\.\-\+~]+$", package)) is False:
         raise ValueError(f"{package!r} is not a valid package name")
 
@@ -552,7 +566,9 @@ def get_msys2_package_file(
 
 
 """
+=======================================================================================
 WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
 """
 
 
@@ -575,7 +591,9 @@ def get_windows_terminal_package_file(
 
 
 """
+=======================================================================================
 PYPI-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
 """
 
 
@@ -736,7 +754,9 @@ def get_pypi_file(package: str, filename: str):
 
 
 """
+=======================================================================================
 PYPI API ENDPOINT PLUGINS
+=======================================================================================
 """
 
 
