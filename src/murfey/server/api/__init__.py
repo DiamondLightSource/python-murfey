@@ -1127,7 +1127,9 @@ async def request_spa_preprocessing(
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "cryolo_model_weights": str(_cryolo_model_path(visit_name)),
+                "cryolo_model_weights": str(
+                    _cryolo_model_path(visit_name, instrument_name)
+                ),
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
