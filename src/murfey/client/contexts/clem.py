@@ -27,7 +27,9 @@ def _file_transferred_to(
     Returns the Path of the transferred file on the DLS file system.
     """
     machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     # rsync basepath and modules are set in the microscope's configuration YAML file
     return (
