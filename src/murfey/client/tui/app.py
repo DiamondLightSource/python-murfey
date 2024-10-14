@@ -257,7 +257,7 @@ class MurfeyTUI(App):
             ),
             secondary=True,
         )
-        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/rsyncer"
+        url = f"{str(self._url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
         rsyncer_data = {
             "source": str(source),
             "destination": destination,
