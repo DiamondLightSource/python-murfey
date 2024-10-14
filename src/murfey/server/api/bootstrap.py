@@ -43,6 +43,7 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
+win_terminal = APIRouter(prefix="/win_terminal", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
@@ -549,6 +550,25 @@ def get_msys2_package_file(
     else:
         raise HTTPException(status_code=package_file.status_code)
 
+
+"""
+WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
+"""
+
+@win_terminal.get("/releases", response_class=Response)
+def get_windows_terminal_repository():
+    pass
+
+@win_terminal.get("/releases/{version}", response_class=Response)
+def get_windows_terminal_version_packages(version=str):
+    pass
+
+@win_terminal.get("/releases/{version}/{file_name}", response_class=Response)
+def get_windows_terminal_package_file(
+    version: str,
+    file_name: str,
+):
+    pass
 
 """
 PYPI-RELATED FUNCTIONS AND ENDPOINTS
