@@ -97,7 +97,12 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
             f"{response.status_code}. The reason given was {response.reason}"
         )
         split_url = urlparse(url)
-        failure_url = urlunparse(split_url._replace(path="/failed_client_post"))
+        client_config = read_config()
+        failure_url = urlunparse(
+            split_url._replace(
+                path=f"/instruments/{client_config['Murfey']['instrument_name']}/failed_client_post"
+            )
+        )
         try:
             resend_response = requests.post(
                 failure_url, json={"url": url, "data": json}
