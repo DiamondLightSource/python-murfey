@@ -245,7 +245,7 @@ def test_tomography_context_initialisation_for_serialem(tmp_path):
 def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     mock_post, mock_get, tmp_path
 ):
-    mock_post.post().status_code = 200
+    mock_post().status_code = 200
 
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
