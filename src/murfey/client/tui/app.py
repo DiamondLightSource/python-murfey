@@ -156,6 +156,7 @@ class MurfeyTUI(App):
         remove_files: bool = False,
         analyse: bool = True,
         limited: bool = False,
+        **kwargs,
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
