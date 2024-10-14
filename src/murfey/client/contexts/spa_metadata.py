@@ -19,7 +19,9 @@ def _atlas_destination(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ) -> Path:
     machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (

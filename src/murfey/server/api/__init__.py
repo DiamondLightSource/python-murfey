@@ -208,11 +208,16 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     client_env = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
     ).one()
+    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
     if client_env:
         client_env.visit = visit_name
         db.add(client_env)
         db.commit()
-        db.close()
+    if session:
+        session.visit = visit_name
+        db.add(session)
+        db.commit()
+    db.close()
     return client_info
 
 
@@ -1127,7 +1132,9 @@ async def request_spa_preprocessing(
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "cryolo_model_weights": str(_cryolo_model_path(visit_name)),
+                "cryolo_model_weights": str(
+                    _cryolo_model_path(visit_name, instrument_name)
+                ),
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
