@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 import time
 from logging import getLogger
@@ -18,7 +19,7 @@ from sqlmodel import Session, create_engine, select
 
 from murfey.server import sanitise
 from murfey.server.murfey_db import murfey_db, url
-from murfey.util.config import get_security_config
+from murfey.util.config import get_machine_config, get_security_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
@@ -63,6 +64,12 @@ class CookieScheme(HTTPBearer):
 
 # Set up variables used for authentication
 security_config = get_security_config()
+machine_config = get_machine_config()
+auth_url = (
+    machine_config[os.getenv("BEAMLINE", "")].auth_url
+    if machine_config.get(os.getenv("BEAMLINE", ""))
+    else ""
+)
 ALGORITHM = security_config.auth_algorithm or "HS256"
 SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
 if security_config.auth_type == "password":
@@ -156,7 +163,7 @@ def password_token_validation(token: str):
 
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
-        if security_config.auth_url:
+        if auth_url:
             headers = (
                 {}
                 if security_config.auth_type == "cookie"
@@ -169,7 +176,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             )
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
-                    f"{security_config.auth_url}/validate_token",
+                    f"{auth_url}/validate_token",
                     headers=headers,
                 ) as response:
                     success = response.status == 200
@@ -218,13 +225,13 @@ class Token(BaseModel):
 
 
 def create_access_token(data: dict, token: str = "") -> str:
-    if security_config.auth_url and data.get("session"):
+    if auth_url and data.get("session"):
         session_id = data["session"]
         if not isinstance(session_id, int) and session_id > 0:
             # check the session ID is alphanumeric for security
             raise ValueError("Session ID was invalid (not alphanumeric)")
         minted_token_response = requests.get(
-            f"{security_config.auth_url}/sessions/{sanitise(str(session_id))}/token",
+            f"{auth_url}/sessions/{sanitise(str(session_id))}/token",
             headers={"Authorization": f"Bearer {token}"},
         )
         if minted_token_response.status_code != 200:
@@ -250,13 +257,13 @@ API ENDPOINTS
 async def generate_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
-    if security_config.auth_url:
+    if auth_url:
         data = aiohttp.FormData()
         data.add_field("username", form_data.username)
         data.add_field("password", form_data.password)
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{security_config.auth_url}/token",
+                f"{auth_url}/token",
                 data=data,
             ) as response:
                 validated = response.status == 200
@@ -270,7 +277,7 @@ async def generate_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not security_config.auth_url:
+    if not auth_url:
         access_token = create_access_token(
             data={"user": form_data.username},
         )
