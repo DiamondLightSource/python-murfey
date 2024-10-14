@@ -43,7 +43,7 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
-win_terminal = APIRouter(prefix="/win_terminal", tags=["bootstrap"])
+windows_terminal = APIRouter(prefix="/microsoft/terminal", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
@@ -534,7 +534,7 @@ def get_msys2_package_file(
     # Validate package name
     ## MSYS2 package names contain alphanumerics (includes "_"; \w), periods (\.),
     ## dashes (\-), and tildes (~)
-    if bool(re.fullmatch(r"^[\w\.\-~]+$", package)) is False:
+    if bool(re.fullmatch(r"^[\w\.\-\+~]+$", package)) is False:
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
@@ -555,20 +555,24 @@ def get_msys2_package_file(
 WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
 """
 
-@win_terminal.get("/releases", response_class=Response)
+
+@windows_terminal.get("/releases", response_class=Response)
 def get_windows_terminal_repository():
     pass
 
-@win_terminal.get("/releases/{version}", response_class=Response)
+
+@windows_terminal.get("/releases/{version}", response_class=Response)
 def get_windows_terminal_version_packages(version=str):
     pass
 
-@win_terminal.get("/releases/{version}/{file_name}", response_class=Response)
+
+@windows_terminal.get("/releases/{version}/{file_name}", response_class=Response)
 def get_windows_terminal_package_file(
     version: str,
     file_name: str,
 ):
     pass
+
 
 """
 PYPI-RELATED FUNCTIONS AND ENDPOINTS
