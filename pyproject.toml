@@ -70,7 +70,7 @@ server = [
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "uvicorn[standard]",
-    "zocalo",
+    "zocalo>=1",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
