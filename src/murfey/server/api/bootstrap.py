@@ -623,14 +623,23 @@ def get_github_release_versions(url: str) -> dict[str, str]:
             url + f"?page={p+1}",  # Pagination starts from 1
         )
 
-        # Validate that the response is a JSON blob
-        # This only needs to be done on the first page
-        if p == 0:
-            headers = response.headers
-            if not headers["content-type"].startswith("application/json"):
-                raise HTTPException(
-                    status_code=500, detail="The request returned a non-JSON object"
-                )
+        # Validate the response via its header
+        headers = response.headers
+        # Is the response a JSON blob?
+        if p == 0 and not headers["content-type"].startswith("application/json"):
+            raise HTTPException(
+                status_code=500, detail="The request returned a non-JSON object"
+            )
+        # Has the rate limit been exceeded?
+        if headers["X-RateLimit-Remaining"] == 0:
+            raise HTTPException(
+                status_code=500, detail="Rate limit for accessing GitHub exceeded"
+            )
+        # Is access denied?
+        if "Bad credentials" in response.text:
+            raise HTTPException(
+                status_code=401, detail="Invalid credentials to access GitHub resource"
+            )
 
         # Iterate through each release
         release_list: list[dict] = response.json()
@@ -673,7 +682,6 @@ def get_windows_terminal_releases(request: Request):
             "    <h1>Links for Windows Terminal</h1>",
         )
     )
-    # print(html_head)
 
     link_list = []
     base_url = str(request.base_url).strip("/")
@@ -684,7 +692,6 @@ def get_windows_terminal_releases(request: Request):
         hyperlink = f'<a href="{base_url}/{path}/{version}">{version}</a><br />'
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
-    # print(hyperlinks)
 
     html_tail = "\n".join(
         (
@@ -696,7 +703,6 @@ def get_windows_terminal_releases(request: Request):
 
     # Combine to form HTML document
     content = "\n".join((html_head, hyperlinks, html_tail))
-    # print(content)
 
     # Return FastAPI response
     return Response(
@@ -716,10 +722,21 @@ def get_github_version_assets(url: str) -> dict[str, str]:
         url,
     )
     headers = response.headers
+    # Check that it's a JSON blob
     if not headers["content-type"].startswith("application/json"):
         raise HTTPException(
             status_code=500,
             detail="The request returned a non-JSON object",
+        )
+    # Has the rate limit been exceeded?
+    if headers["X-RateLimit-Remaining"] == 0:
+        raise HTTPException(
+            status_code=500, detail="Rate limite for accessing GitHub exceeded"
+        )
+    # Is access denied?
+    if "Bad credentials" in response.text:
+        raise HTTPException(
+            status_code=401, detail="Invalid credentials to access GitHub resource"
         )
 
     assets = {}
