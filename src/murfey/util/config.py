@@ -65,6 +65,7 @@ class MachineConfig(BaseModel):
     murfey_url: str = "http://localhost:8000"
 
     security_configuration_path: Optional[Path] = None
+    auth_url: str = ""
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
@@ -85,7 +86,6 @@ class Security(BaseModel):
     sqlalchemy_pooling: bool = True
     allow_origins: List[str] = ["*"]
     session_validation: str = ""
-    auth_url: str = ""
     session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
