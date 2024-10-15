@@ -15,6 +15,7 @@ required.
 from __future__ import annotations
 
 import functools
+import html
 import logging
 import random
 import re
@@ -758,10 +759,10 @@ def get_windows_terminal_version_packages(version: str, request: Request):
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            f"    <title>Links for Windows Terminal {version}</title>",
+            f"    <title>Links for Windows Terminal {html.escape(version)}</title>",
             "</head>",
             "<body>",
-            f"    <h1>Links for Windows Terminal {version}</h1>",
+            f"    <h1>Links for Windows Terminal {html.escape(version)}</h1>",
         )
     )
 
