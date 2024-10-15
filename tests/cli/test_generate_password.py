@@ -12,7 +12,7 @@ def test_generate_password(capsys, tmp_path):
     crypto_key = Fernet.generate_key()
     security_config.crypto_key = crypto_key.decode("ascii")
     with open(tmp_path / "config.yaml", "w") as cfg:
-        yaml.dump(security_config.dict(), cfg)
+        yaml.dump(security_config.model_dump(), cfg)
     os.environ["MURFEY_SECURITY_CONFIGURATION"] = str(tmp_path / "config.yaml")
     run()
     captured = capsys.readouterr()

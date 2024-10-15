@@ -31,7 +31,7 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "pydantic>=2",
     "requests",
     "rich",
     "werkzeug",
@@ -41,13 +41,12 @@ cicd = [
     "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
 ]
 client = [
-    "procrunner",
     "textual==0.42.0",
     "websocket-client",
     "xmltodict",
 ]
 developer = [
-    "bump-my-version<0.11.0", # Version control
+    "bump-my-version", # Version control
     "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
@@ -58,7 +57,7 @@ server = [
     "backports.entry_points_selectable",
     "cryptography",
     "fastapi[standard]",
-    "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
+    "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
     "numpy",
@@ -71,7 +70,7 @@ server = [
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "uvicorn[standard]",
-    "zocalo",
+    "zocalo>=1",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"

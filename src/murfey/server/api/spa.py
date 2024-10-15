@@ -20,7 +20,7 @@ def _cryolo_model_path(visit: str, instrument_name: str) -> Path:
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    if machine_config.model_search_directory:
+    if machine_config.picking_model_search_directory:
         visit_directory = (
             machine_config.rsync_basepath
             / (machine_config.rsync_module or "data")
@@ -28,7 +28,9 @@ def _cryolo_model_path(visit: str, instrument_name: str) -> Path:
             / visit
         )
         possible_models = list(
-            (visit_directory / machine_config.model_search_directory).glob("*.h5")
+            (visit_directory / machine_config.picking_model_search_directory).glob(
+                "*.h5"
+            )
         )
         if possible_models:
             return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
