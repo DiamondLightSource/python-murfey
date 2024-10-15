@@ -167,8 +167,8 @@ def get_instrument_display_name(instrument_name: str) -> str:
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    if machine_config.get(instrument_name):
-        return machine_config[instrument_name].display_name
+    if machine_config:
+        return machine_config.display_name
     return ""
 
 
