@@ -43,14 +43,17 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
+windows_terminal = APIRouter(prefix="/microsoft/terminal", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
-log = logging.getLogger("murfey.server.api.bootstrap")
+logger = logging.getLogger("murfey.server.api.bootstrap")
 
 
 """
+=======================================================================================
 GENERAL HELPER FUNCTIONS
+=======================================================================================
 """
 
 
@@ -61,7 +64,9 @@ def _sanitise_str(input: str) -> str:
 
 
 """
+=======================================================================================
 VERSION-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -83,7 +88,9 @@ def get_version(client_version: str = ""):
 
 
 """
-BOOTSTRAP-RELATED API ENDPOINTS
+=======================================================================================
+GENERAL BOOTSTRAP-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -144,7 +151,9 @@ def get_murfey_wheel():
 
 
 """
+=======================================================================================
 CYGWIN-RELATED API ENDPOINTS
+=======================================================================================
 """
 
 
@@ -173,7 +182,7 @@ def find_cygwin_mirror() -> str:
     """
     url = "https://www.cygwin.com/mirrors.lst"
     mirrors = requests.get(url)
-    log.info(
+    logger.info(
         f"Reading mirrors from {url} returned status code {mirrors.status_code} {mirrors.reason}"
     )
 
@@ -203,13 +212,13 @@ def find_cygwin_mirror() -> str:
         if priority == max(mirror_priorities.values())
     ]
     if not elegible_mirrors:
-        log.warning("No valid mirrors identified")
+        logger.warning("No valid mirrors identified")
         assert elegible_mirrors
 
     picked_mirror = random.choice(elegible_mirrors)
     if not picked_mirror.endswith("/"):
         picked_mirror += "/"
-    log.info(f"Picked Cygwin mirror: {picked_mirror}")
+    logger.info(f"Picked Cygwin mirror: {picked_mirror}")
     return picked_mirror
 
 
@@ -229,7 +238,7 @@ def parse_cygwin_request(request_path: str):
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
         )
-    log.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
+    logger.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
     cygwin_data = requests.get(url)
     return Response(
         content=cygwin_data.content,
@@ -239,7 +248,9 @@ def parse_cygwin_request(request_path: str):
 
 
 """
+=======================================================================================
 MSYS2-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
 """
 
 # Variables used by the MSYS2 functions below
@@ -334,15 +345,15 @@ def get_msys2_main_index(
         return f'<a href="{url}">' + match.group(2) + "</a>"
 
     # Get base path to current FastAPI endpoint
-    domain = str(request.base_url).strip("/")
+    base_url = str(request.base_url).strip("/")
     path = request.url.path.strip("/")
-    base_path = f"{domain}/{path}"
+    base_path = f"{base_url}/{path}"
 
     env_url = f"{msys2_url}"
-    index = requests.get(env_url)
+    response = requests.get(env_url)
 
     # Parse and rewrite package index content
-    content: bytes = index.content  # Get content in bytes
+    content: bytes = response.content  # Get content in bytes
     content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
     for line in content_text.splitlines():
@@ -387,8 +398,8 @@ def get_msys2_main_index(
     content_new = content_text_new.encode("latin1")  # Convert back to bytes
     return Response(
         content=content_new,
-        status_code=index.status_code,
-        media_type=index.headers.get("Content-Type"),
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -415,9 +426,9 @@ def get_msys2_environment_index(
         return f'<a href="{url}">' + match.group(2) + "</a>"
 
     # Get base path to current FastAPI endpoint
-    domain = str(request.base_url).strip("/")
+    base_url = str(request.base_url).strip("/")
     path = request.url.path.strip("/")
-    base_path = f"{domain}/{path}"
+    base_path = f"{base_url}/{path}"
 
     # Validate provided system
     if any(system in env[0] for env in valid_envs) is False:
@@ -425,10 +436,10 @@ def get_msys2_environment_index(
 
     # Construct URL to main MSYS repo and get response
     arch_url = f'{msys2_url}/{quote(system, safe="")}'
-    index = requests.get(arch_url)
+    response = requests.get(arch_url)
 
     # Parse and rewrite package index content
-    content: bytes = index.content  # Get content in bytes
+    content: bytes = response.content  # Get content in bytes
     content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
     for line in content_text.splitlines():
@@ -448,8 +459,8 @@ def get_msys2_environment_index(
     content_new = content_text_new.encode("latin1")  # Convert back to bytes
     return Response(
         content=content_new,
-        status_code=index.status_code,
-        media_type=index.headers.get("Content-Type"),
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -477,9 +488,9 @@ def get_msys2_package_index(
         return f'<a href="{url}">' + match.group(2) + "</a>"
 
     # Get base path to current FastAPI endpoint
-    domain = str(request.base_url).strip("/")
+    base_url = str(request.base_url).strip("/")
     path = request.url.path.strip("/")
-    base_path = f"{domain}/{path}"
+    base_path = f"{base_url}/{path}"
 
     # Validate environment
     if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
@@ -489,10 +500,10 @@ def get_msys2_package_index(
     package_list_url = (
         f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}'
     )
-    index = requests.get(package_list_url)
+    response = requests.get(package_list_url)
 
     # Parse and rewrite package index content
-    content: bytes = index.content  # Get content in bytes
+    content: bytes = response.content  # Get content in bytes
     content_text: str = content.decode("latin1")  # Convert to strings
     content_text_list = []
     for line in content_text.splitlines():
@@ -511,8 +522,8 @@ def get_msys2_package_index(
     content_new = content_text_new.encode("latin1")  # Convert back to bytes
     return Response(
         content=content_new,
-        status_code=index.status_code,
-        media_type=index.headers.get("Content-Type"),
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -531,9 +542,13 @@ def get_msys2_package_file(
         raise ValueError(f"{system!r}/{environment!r} is not a valid msys2 environment")
 
     # Validate package name
-    ## MSYS2 package names contain alphanumerics (includes "_"; \w), periods (\.),
-    ## dashes (\-), and tildes (~)
-    if bool(re.fullmatch(r"^[\w\.\-~]+$", package)) is False:
+    #   MSYS2 package names contain:
+    #   - alphanumerics (includes "_"; \w),
+    #   - periods (\.),
+    #   - dashes (\-),
+    #   - tildes (~), and
+    #   - plus signs (+)
+    if bool(re.fullmatch(r"^[\w\.\-\+~]+$", package)) is False:
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
@@ -551,7 +566,222 @@ def get_msys2_package_file(
 
 
 """
+=======================================================================================
+WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
+"""
+
+windows_terminal_url = "https://github.com/microsoft/terminal/releases"
+
+
+def get_number_of_github_pages(url) -> int:
+    """
+    Parses the main GitHub releases page to find the number of pages present in the
+    repository.
+    """
+
+    response = requests.get(url)
+    headers = response.headers
+    if not headers["content-type"].startswith("text/html"):
+        raise HTTPException("Unable to parse non-HTML page for page numbers")
+
+    # Find the number of pages present in this release
+    text = response.text
+    pattern = r'aria-label="Page ([0-9]+)"'
+    matches = re.findall(pattern, text)
+    if len(matches) == 0:
+        raise HTTPException("No page numbers found")
+    pages = [int(item) for item in matches]
+    pages.sort(reverse=True)
+    return pages[0]
+
+
+@windows_terminal.get("/releases", response_class=Response)
+def get_windows_terminal_releases(request: Request):
+    """
+    Returns a list of stable Windows Terminal releases from the GitHub repository.
+    """
+
+    num_pages = get_number_of_github_pages(windows_terminal_url)
+
+    # Get list of release versions
+    versions: list[str] = []
+
+    # RegEx patterns to parse HTML file with
+    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version} leads to a
+    # HTML page with the assets for that particular version
+    release_pattern = (
+        r'src="' + f"{windows_terminal_url}" + r'/expanded_assets/([v0-9\.]+)"'
+    )
+    # Pre-release label follows after link to version tag
+    prerelease_pattern = (
+        r'[\s]*<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">[\w\s\.\-]+</a></span>'
+        r"[\s]*<span>"
+        r'[\s]*<span data-view-component="true" class="Label Label--warning Label--large v-align-text-bottom d-none d-md-inline-block">Pre-release</span>'
+    )
+    # Older packages in the repo are named "Color Tools"; omit them
+    colortool_pattern = r'<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">Color Tool[\w\s]+</a></span>'
+
+    # Iterate through repository pages
+    for p in range(num_pages):
+        url = f"{windows_terminal_url}?page={p + 1}"
+        response = requests.get(url)
+        headers = response.headers
+        if not headers["content-type"].startswith("text/html"):
+            raise HTTPException("Unable to parse non-HTML page for package versions")
+        text = response.text
+
+        # Collect only stable releases
+        releases = re.findall(release_pattern, text)
+        prereleases = re.findall(prerelease_pattern, text)
+        colortool = re.findall(colortool_pattern, text)
+        stable = set(releases) - (set(prereleases) | set(colortool))
+        versions.extend(stable)
+
+    # Construct HTML document for available versions
+    html_head = "\n".join(
+        (
+            "<!DOCTYPE html>",
+            "<html>",
+            "<head>",
+            "    <title>Links to Windows Terminal Versions</title>",
+            "</head>",
+            "<body>",
+            "    <h1>Links to Windows Terminal Versions</h1>",
+        )
+    )
+    # Construct hyperlinks
+    link_list = []
+    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
+    path = request.url.path.strip("/")  # Remove leading '/'
+
+    for v in range(len(versions)):
+        version = versions[v]
+        hyperlink = f'<a href="{base_url}/{path}/{quote(version, safe="")}">{quote(version, safe="")}</a><br />'
+        link_list.append(hyperlink)
+    hyperlinks = "\n".join(link_list)
+
+    html_tail = "\n".join(
+        (
+            "</body>",
+            "</html>",
+        )
+    )
+
+    # Combine
+    content = "\n".join((html_head, hyperlinks, html_tail))
+
+    # Return FastAPI response
+    return Response(
+        content=content.encode("utf-8"),
+        status_code=response.status_code,
+        media_type="text/html",
+    )
+
+
+@windows_terminal.get("/releases/{version}", response_class=Response)
+def get_windows_terminal_version_assets(
+    version: str,
+    request: Request,
+):
+    """
+    Returns a list of packages for the selected version of Windows Terminal.
+    """
+
+    # Validate inputs
+    if bool(re.match(r"^[\w\-\.]+$", version)) is False:
+        raise HTTPException("Invalid version format")
+
+    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version}
+    url = f'{windows_terminal_url}/expanded_assets/{quote(version, safe="")}'
+
+    response = requests.get(url)
+    headers = response.headers
+    if not headers["content-type"].startswith("text/html"):
+        raise HTTPException("Unable to parse non-HTML page for page numbers")
+    text = response.text
+
+    # Find hyperlinks
+    pattern = (
+        r'href="[/\w\.]+/releases/download/'
+        + f'{quote(version, safe="")}'
+        + r'/([\w\.\-]+)"'
+    )
+    assets = re.findall(pattern, text)
+
+    # Construct HTML document for available assets
+    html_head = "\n".join(
+        (
+            "<!DOCTYPE html>",
+            "<html>",
+            "<head>",
+            f'    <title>Links to Windows Terminal {quote(version, safe="")} Assets</title>',
+            "</head>",
+            "<body>",
+            f'    <h1>Links to Windows Terminal {quote(version, safe="")} Assets</h1>',
+        )
+    )
+    # Construct hyperlinks
+    link_list = []
+    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
+    path = request.url.path.strip("/")  # Remove leading '/'
+
+    for a in range(len(assets)):
+        asset = assets[a]
+        hyperlink = f'<a href="{base_url}/{path}/{quote(asset, safe="")}">{quote(asset, safe="")}</a><br />'
+        link_list.append(hyperlink)
+    hyperlinks = "\n".join(link_list)
+
+    html_tail = "\n".join(
+        (
+            "</body>",
+            "</html>",
+        )
+    )
+
+    # Combine
+    content = "\n".join((html_head, hyperlinks, html_tail))
+
+    # Return FastAPI response
+    return Response(
+        content=content.encode("utf-8"),
+        status_code=response.status_code,
+        media_type="text/html",
+    )
+
+
+@windows_terminal.get("/releases/{version}/{file_name}", response_class=Response)
+def get_windows_terminal_package_file(
+    version: str,
+    file_name: str,
+):
+    """
+    Returns a package from the GitHub repository.
+    """
+
+    # Validate version and file names
+    if bool(re.match(r"^[\w\.\-]+$", version)) is False:
+        raise HTTPException("Invalid version format")
+    if bool(re.match(r"^[\w\.\-]+$", file_name)) is False:
+        raise HTTPException("Invalid file name")
+
+    # https://github.com/{owner}/{repo}/releases/download/{version}/{file_name}
+    url = f'{windows_terminal_url}/download/{quote(version, safe="")}/{quote(file_name, safe="")}'
+    response = requests.get(url)
+    if response.status_code == 200:
+        return Response(
+            content=response.content,
+            status_code=response.status_code,
+            headers=response.headers,
+        )
+    else:
+        raise HTTPException(status_code=response.status_code)
+
+
+"""
+=======================================================================================
 PYPI-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
 """
 
 
@@ -712,7 +942,9 @@ def get_pypi_file(package: str, filename: str):
 
 
 """
+=======================================================================================
 PYPI API ENDPOINT PLUGINS
+=======================================================================================
 """
 
 
