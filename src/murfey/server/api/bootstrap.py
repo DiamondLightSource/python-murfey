@@ -633,7 +633,7 @@ def get_github_release_versions(url: str) -> dict[str, str]:
         # Has the rate limit been exceeded?
         if headers["X-RateLimit-Remaining"] == 0:
             raise HTTPException(
-                status_code=500, detail="Rate limit for accessing GitHub exceeded"
+                status_code=429, detail="Rate limit for accessing GitHub exceeded"
             )
         # Is access denied?
         if "Bad credentials" in response.text:
@@ -731,7 +731,7 @@ def get_github_version_assets(url: str) -> dict[str, str]:
     # Has the rate limit been exceeded?
     if headers["X-RateLimit-Remaining"] == 0:
         raise HTTPException(
-            status_code=500, detail="Rate limite for accessing GitHub exceeded"
+            status_code=429, detail="Rate limit for accessing GitHub exceeded"
         )
     # Is access denied?
     if "Bad credentials" in response.text:
