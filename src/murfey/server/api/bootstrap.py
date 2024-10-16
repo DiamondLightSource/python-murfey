@@ -15,7 +15,6 @@ required.
 from __future__ import annotations
 
 import functools
-import html
 import logging
 import random
 import re
@@ -572,105 +571,74 @@ WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
 =======================================================================================
 """
 
-windows_terminal_url = "https://api.github.com/repos/microsoft/terminal/releases"
+windows_terminal_url = "https://github.com/microsoft/terminal/releases"
 
 
-def get_number_of_pages(url: str) -> int:
+def get_number_of_github_pages(url) -> int:
     """
-    Calculates the number of pages present in a GitHub release repo by parsing the
-    header of the HTTP response.
+    Parses the main GitHub releases page to find the number of pages present in the
+    repository.
     """
 
-    # Get first page for the repo
-    response = requests.get(
-        url,
-    )
-
-    # Extract number of pages in repo from the header
+    response = requests.get(url)
     headers = response.headers
-    if headers.get("link") is None:
-        logger.debug(f"{url} only has 1 page of releases")
-        num_pages: int = 1
-    else:
-        links = headers["link"]
-        # Use re.search() to find the url for the last page in that list
-        pattern = r'<[\w\?\=\.\/\:]+\?page=([0-9]+)>; rel="last"'
-        match = re.search(pattern, links)
-        if match is None:
-            logger.warning("Unable to parse header for links")
-            num_pages = 1
-        else:
-            # Get the number of pages
-            num_pages = int(match.group(1))
+    if not headers["content-type"].startswith("text/html"):
+        raise HTTPException("Unable to parse non-HTML page for page numbers")
 
-    return num_pages
-
-
-def get_github_release_versions(url: str) -> dict[str, str]:
-    """
-    Searches the GitHub API for non-draft/prerelease versions of the repository,
-    returning a dictionary of tag names (i.e. version) and corresponding URL to
-    their assets.
-    """
-
-    versions: dict[str, str] = {}
-    num_pages = get_number_of_pages(url)
-
-    # Parse through version releases
-    for p in range(num_pages):
-        # Get release information
-        response = requests.get(
-            url + f"?page={p+1}",  # Pagination starts from 1
-        )
-
-        # Validate the response via its header
-        headers = response.headers
-        # Is the response a JSON blob?
-        if p == 0 and not headers["content-type"].startswith("application/json"):
-            raise HTTPException(
-                status_code=500, detail="The request returned a non-JSON object"
-            )
-        # Has the rate limit been exceeded?
-        if headers["X-RateLimit-Remaining"] == 0:
-            raise HTTPException(
-                status_code=429, detail="Rate limit for accessing GitHub exceeded"
-            )
-        # Is access denied?
-        if "Bad credentials" in response.text:
-            raise HTTPException(
-                status_code=401, detail="Invalid credentials to access GitHub resource"
-            )
-
-        # Iterate through each release
-        release_list: list[dict] = response.json()
-        for r in range(len(release_list)):
-            release = release_list[r]
-
-            # Skip pre-releases and drafts
-            draft: bool = release["draft"]
-            prerelease: bool = release["prerelease"]
-            if draft is True or prerelease is True:
-                continue
-
-            # Add tag name (i.e, version) and assets URL (file download links) to dict
-            version: str = release["tag_name"]
-            assets_url: str = release["assets_url"]
-            versions[version] = assets_url
-
-    return versions
+    # Find the number of pages present in this release
+    text = response.text
+    pattern = r'aria-label="Page ([0-9]+)"'
+    matches = re.findall(pattern, text)
+    if len(matches) == 0:
+        raise HTTPException("No page numbers found")
+    pages = [int(item) for item in matches]
+    pages.sort(reverse=True)
+    return pages[0]
 
 
 @windows_terminal.get("/releases", response_class=Response)
 def get_windows_terminal_releases(request: Request):
     """
-    Display a list of Windows Terminal versions excluding pre-releases and drafts
+    Returns a list of stable Windows Terminal releases from the GitHub repository.
     """
 
-    # Get tag names/versions from dictionary of releases
-    releases = get_github_release_versions(windows_terminal_url)
-    version_list = list(releases.keys())
+    num_pages = get_number_of_github_pages(windows_terminal_url)
 
-    # Construct the HTML document
+    # Get list of release versions
+    versions: list[str] = []
+
+    # RegEx patterns to parse HTML file with
+    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version} leads to a
+    # HTML page with the assets for that particular version
+    release_pattern = (
+        r'src="' + f"{windows_terminal_url}" + r'/expanded_assets/([v0-9\.]+)"'
+    )
+    # Pre-release label follows after link to version tag
+    prerelease_pattern = (
+        r'[\s]*<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">[\w\s\.\-]+</a></span>'
+        r"[\s]*<span>"
+        r'[\s]*<span data-view-component="true" class="Label Label--warning Label--large v-align-text-bottom d-none d-md-inline-block">Pre-release</span>'
+    )
+    # Older packages in the repo are named "Color Tools"; omit them
+    colortool_pattern = r'<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">Color Tool[\w\s]+</a></span>'
+
+    # Iterate through repository pages
+    for p in range(num_pages):
+        url = windows_terminal_url + f"?page={p + 1}"
+        response = requests.get(url)
+        headers = response.headers
+        if not headers["content-type"].startswith("text/html"):
+            raise HTTPException("Unable to parse non-HTML page for package versions")
+        text = response.text
+
+        # Collect only stable releases
+        releases = re.findall(release_pattern, text)
+        prereleases = re.findall(prerelease_pattern, text)
+        colortool = re.findall(colortool_pattern, text)
+        stable = set(releases) - (set(prereleases) | set(colortool))
+        versions.extend(stable)
+
+    # Construct HTML document for available versions
     html_head = "\n".join(
         (
             "<!DOCTYPE html>",
@@ -682,13 +650,13 @@ def get_windows_terminal_releases(request: Request):
             "    <h1>Links for Windows Terminal</h1>",
         )
     )
-
+    # Construct hyperlinks
     link_list = []
-    base_url = str(request.base_url).strip("/")
+    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
     path = request.url.path.strip("/")  # Remove leading '/'
 
-    for v in range(len(version_list)):
-        version = version_list[v]
+    for v in range(len(versions)):
+        version = versions[v]
         hyperlink = f'<a href="{base_url}/{path}/{version}">{version}</a><br />'
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
@@ -699,109 +667,60 @@ def get_windows_terminal_releases(request: Request):
             "</html>",
         )
     )
-    # print(html_tail)
 
-    # Combine to form HTML document
+    # Combine
     content = "\n".join((html_head, hyperlinks, html_tail))
 
     # Return FastAPI response
     return Response(
         content=content.encode("utf-8"),
-        status_code=200,
+        status_code=response.status_code,
         media_type="text/html",
     )
 
 
-def get_github_version_assets(url: str) -> dict[str, str]:
-    """
-    Returns key-value pairs of assets for a particular version release and their
-    corresponding file download links.
-    """
-
-    response = requests.get(
-        url,
-    )
-    headers = response.headers
-    # Check that it's a JSON blob
-    if not headers["content-type"].startswith("application/json"):
-        raise HTTPException(
-            status_code=500,
-            detail="The request returned a non-JSON object",
-        )
-    # Has the rate limit been exceeded?
-    if headers["X-RateLimit-Remaining"] == 0:
-        raise HTTPException(
-            status_code=429, detail="Rate limit for accessing GitHub exceeded"
-        )
-    # Is access denied?
-    if "Bad credentials" in response.text:
-        raise HTTPException(
-            status_code=401, detail="Invalid credentials to access GitHub resource"
-        )
-
-    assets = {}
-    assets_list: list[dict] = response.json()
-    for a in range(len(assets_list)):
-        asset = assets_list[a]
-
-        # TODO: Keep only "arm64", "x86_64", and "x86" architectures
-
-        # Add filename and download link to dict
-        file_name: str = asset["name"]
-        download_url: str = asset["browser_download_url"]
-        assets[file_name] = download_url
-
-    return assets
-
-
 @windows_terminal.get("/releases/{version}", response_class=Response)
-def get_windows_terminal_version_packages(version: str, request: Request):
+def get_windows_terminal_version_assets(
+    version: str,
+    request: Request,
+):
+    """
+    Returns a list of packages for the selected version of Windows Terminal.
+    """
 
-    # Load the dictionary of versions and get asset URL of requested version
-    releases = get_github_release_versions(windows_terminal_url)
-    asset_url = releases.get(version)
-    if asset_url is None:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unable to load assets for {version}",
-        )
+    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version}
+    url = windows_terminal_url + f"/expanded_assets/{version}"
 
-    # Load list of assets associated with this version
-    assets = get_github_version_assets(asset_url)
-    file_list = list(assets.keys())
+    response = requests.get(url)
+    headers = response.headers
+    if not headers["content-type"].startswith("text/html"):
+        raise HTTPException("Unable to parse non-HTML page for page numbers")
+    text = response.text
 
-    # Construct the HTML document
+    # Find hyperlinks
+    pattern = r'href="[/\w\.]+/releases/download/' + f"{version}" + r'/([\w\.\-]+)"'
+    assets = re.findall(pattern, text)
+
+    # Construct HTML document for available assets
     html_head = "\n".join(
         (
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            f"    <title>Links for Windows Terminal {html.escape(version)}</title>",
+            "    <title>Links for Windows Terminal</title>",
             "</head>",
             "<body>",
-            f"    <h1>Links for Windows Terminal {html.escape(version)}</h1>",
+            "    <h1>Links for Windows Terminal</h1>",
         )
     )
-
-    # Construct links
+    # Construct hyperlinks
     link_list = []
-    base_url = str(request.base_url).strip("/")
+    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
     path = request.url.path.strip("/")  # Remove leading '/'
 
-    # Components of a response
-    print(
-        # f"Base URL: {request.base_url} \n"
-        # f"Components: {request.url.components} \n"
-        # f"Fragment: {request.url.fragment} \n"
-        # f"Hostname: {request.url.hostname} \n"
-        # f"Netloc: {request.url.netloc} \n"
-        # f"Path: {request.url.path} \n"
-        # f"Scheme: {request.url.scheme} \n"
-    )
-
-    for f in range(len(file_list)):
-        file_name = file_list[f]
-        hyperlink = f'<a href="{base_url}/{path}/{file_name}">{file_name}</a><br />'
+    for a in range(len(assets)):
+        asset = assets[a]
+        hyperlink = f'<a href="{base_url}/{path}/{asset}">{asset}</a><br />'
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
 
@@ -811,12 +730,14 @@ def get_windows_terminal_version_packages(version: str, request: Request):
             "</html>",
         )
     )
+
+    # Combine
     content = "\n".join((html_head, hyperlinks, html_tail))
 
     # Return FastAPI response
     return Response(
         content=content.encode("utf-8"),
-        status_code=200,
+        status_code=response.status_code,
         media_type="text/html",
     )
 
@@ -826,30 +747,17 @@ def get_windows_terminal_package_file(
     version: str,
     file_name: str,
 ):
-    # Search for the package
-    versions = get_github_release_versions(windows_terminal_url)
-    asset_url = versions.get(version)
-    if asset_url is None:
-        raise HTTPException(
-            status_code=500, detail=f"Unable to load assets for {version}"
-        )
-    assets = get_github_version_assets(asset_url)
-    file_url = assets.get(file_name)
-    if file_url is None:
-        raise HTTPException(
-            status_code=500, detail=f"No download link associated with {file_name}"
-        )
+    """
+    Returns a package from the GitHub repository.
+    """
 
-    # Get HTTP response
-    response = requests.get(
-        file_url,
-    )
-
+    url = windows_terminal_url + f"/download/{version}/{file_name}"
+    response = requests.get(url)
     if response.status_code == 200:
         return Response(
             content=response.content,
-            media_type=response.headers.get("content-type"),
             status_code=response.status_code,
+            headers=response.headers,
         )
     else:
         raise HTTPException(status_code=response.status_code)
