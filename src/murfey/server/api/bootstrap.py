@@ -644,10 +644,10 @@ def get_windows_terminal_releases(request: Request):
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            "    <title>Links for Windows Terminal</title>",
+            "    <title>Links to Windows Terminal Versions</title>",
             "</head>",
             "<body>",
-            "    <h1>Links for Windows Terminal</h1>",
+            "    <h1>Links to Windows Terminal Versions</h1>",
         )
     )
     # Construct hyperlinks
@@ -715,10 +715,10 @@ def get_windows_terminal_version_assets(
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            "    <title>Links for Windows Terminal</title>",
+            f'    <title>Links to Windows Terminal {quote(version, safe="")} Assets</title>',
             "</head>",
             "<body>",
-            "    <h1>Links for Windows Terminal</h1>",
+            f'    <h1>Links to Windows Terminal {quote(version, safe="")} Assets</h1>',
         )
     )
     # Construct hyperlinks
