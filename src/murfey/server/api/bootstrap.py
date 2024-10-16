@@ -657,7 +657,7 @@ def get_windows_terminal_releases(request: Request):
 
     for v in range(len(versions)):
         version = versions[v]
-        hyperlink = f'<a href="{base_url}/{path}/{version}">{version}</a><br />'
+        hyperlink = f'<a href="{base_url}/{path}/{quote(version, safe="")}">{quote(version, safe="")}</a><br />'
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
 
@@ -693,7 +693,7 @@ def get_windows_terminal_version_assets(
         raise HTTPException("Invalid version format")
 
     # https://github.com/{owner}/{repo}/releases/expanded_assets/{version}
-    url = f"{windows_terminal_url}/expanded_assets/{version}"
+    url = f'{windows_terminal_url}/expanded_assets/{quote(version, safe="")}'
 
     response = requests.get(url)
     headers = response.headers
@@ -728,9 +728,7 @@ def get_windows_terminal_version_assets(
 
     for a in range(len(assets)):
         asset = assets[a]
-        hyperlink = (
-            f'<a href="{base_url}/{path}/{asset}">{quote(asset, safe="")}</a><br />'
-        )
+        hyperlink = f'<a href="{base_url}/{path}/{quote(asset, safe="")}">{quote(asset, safe="")}</a><br />'
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
 
