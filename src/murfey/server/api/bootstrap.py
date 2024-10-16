@@ -624,7 +624,7 @@ def get_windows_terminal_releases(request: Request):
 
     # Iterate through repository pages
     for p in range(num_pages):
-        url = windows_terminal_url + f"?page={p + 1}"
+        url = f"{windows_terminal_url}?page={p + 1}"
         response = requests.get(url)
         headers = response.headers
         if not headers["content-type"].startswith("text/html"):
@@ -688,8 +688,12 @@ def get_windows_terminal_version_assets(
     Returns a list of packages for the selected version of Windows Terminal.
     """
 
+    # Validate inputs
+    if bool(re.match(r"^[\w\-\.]+$", version)) is False:
+        raise HTTPException("Invalid version format")
+
     # https://github.com/{owner}/{repo}/releases/expanded_assets/{version}
-    url = windows_terminal_url + f"/expanded_assets/{version}"
+    url = f"{windows_terminal_url}/expanded_assets/{version}"
 
     response = requests.get(url)
     headers = response.headers
@@ -698,7 +702,11 @@ def get_windows_terminal_version_assets(
     text = response.text
 
     # Find hyperlinks
-    pattern = r'href="[/\w\.]+/releases/download/' + f"{version}" + r'/([\w\.\-]+)"'
+    pattern = (
+        r'href="[/\w\.]+/releases/download/'
+        + f'{quote(version, safe="")}'
+        + r'/([\w\.\-]+)"'
+    )
     assets = re.findall(pattern, text)
 
     # Construct HTML document for available assets
@@ -720,7 +728,9 @@ def get_windows_terminal_version_assets(
 
     for a in range(len(assets)):
         asset = assets[a]
-        hyperlink = f'<a href="{base_url}/{path}/{asset}">{asset}</a><br />'
+        hyperlink = (
+            f'<a href="{base_url}/{path}/{asset}">{quote(asset, safe="")}</a><br />'
+        )
         link_list.append(hyperlink)
     hyperlinks = "\n".join(link_list)
 
@@ -751,7 +761,14 @@ def get_windows_terminal_package_file(
     Returns a package from the GitHub repository.
     """
 
-    url = windows_terminal_url + f"/download/{version}/{file_name}"
+    # Validate version and file names
+    if bool(re.match(r"^[\w\.\-]+$", version)) is False:
+        raise HTTPException("Invalid version format")
+    if bool(re.match(r"^[\w\.\-]+$", file_name)) is False:
+        raise HTTPException("Invalid file name")
+
+    # https://github.com/{owner}/{repo}/releases/download/{version}/{file_name}
+    url = f'{windows_terminal_url}/download/{quote(version, safe="")}/{quote(file_name, safe="")}'
     response = requests.get(url)
     if response.status_code == 200:
         return Response(
