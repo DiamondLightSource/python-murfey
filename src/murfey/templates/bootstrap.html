@@ -8,9 +8,9 @@
   overwritten (something like "[install name]-old").
 </p>
 <p>
-  Download the <a href="/cygwin/setup-x86_64.exe">Cygwin setup executable</a>,
-  and then run the following from a terminal (both Command Prompt and Windows
-  Powershell work)
+  Download the Cygwin setup executable using this
+  <a href="/cygwin/setup-x86_64.exe">mirror</a>, and then run the following from
+  a terminal (both Command Prompt and Windows Powershell work)
 </p>
 <pre style="font-family: monospace">
     $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
@@ -28,8 +28,8 @@
 </p>
 <p>
   The Murfey server supports the forwarding of download requests to client PCs
-  that cannot access the wider internet. Download the
-  <a href="/msys2/setup-x86_64.exe">MSYS2 setup executable</a>, and run the
+  that cannot access the wider internet. Download the MSYS2 setup executable
+  using this <a href="/msys2/setup-x86_64.exe">mirror</a>, and run the
   executable using the default settings.
 </p>
 <p>
@@ -51,9 +51,9 @@
     Server = {{ request.url.scheme }}://{{ request.url.netloc }}/msys2/mingw/x86_64  # Murfey URL
 </pre>
 <p>
-  MSYS2 comes with multiple environments, but the one used by Murfey is MINGW64.
-  In order for the Murfey client to be able to install and run its dependencies
-  properly, the following packages will need to be installed in the MINGW64
+  MSYS2 comes with multiple environments, but UCRT64 is the most modern one. In
+  order for the Murfey client to be able to install and run its dependencies
+  properly, the following packages will need to be installed in the UCRT64
   environment. This can be achieved using the following commands:
 </p>
 <pre style="font-family: monospace">
@@ -62,6 +62,80 @@
     $ pacman -S mingw-w64-python-pip --disable-download-timeout
     $ pacman -S mingw-w64-x86_64-rust --disable-download-timeout
 </pre>
+
+<h3>Installing Windows Terminal</h3>
+<p>
+  There is currently a bug with MSYS2 terminals on Windows 10 that prevents its
+  user interface from working properly. Our current solution is to use
+  Microsoft's
+  <a href="https://github.com/microsoft/terminal">Windows Terminal</a> as a
+  wrapper for MSYS2.
+</p>
+<p>
+  The latest release of Windows Terminal can be downloaded directly from
+  <a href="https://github.com/microsoft/terminal/releases">GitHub</a>, or
+  through this <a href="/microsoft/terminal/releases">mirror</a>. This will
+  download a ZIP file, which can be extracted to a directory of your choosing
+  and used out of the box.
+</p>
+<p>
+  In order to run the UCRT64 environment in Windows Terminal, Windows Terminal
+  will need to be directed to it by adding a dictionary entry in its settings
+  JSON file. To do so:
+</p>
+<ol start="1">
+  <li>Open Windows Terminal.</li>
+  <li>
+    Click on the dropdown arrow to the right of the "new tab" button on the
+    title bar.
+  </li>
+  <li>
+    Click "Settings" (alternatively, use the "Ctrl + ," keyboard shortcut).
+  </li>
+  <li>
+    On the bottom left corner of the window, click on the "Open JSON file"
+    option. This will bring up the JSON file managing Windows Terminal's
+    settings in your default code editor.
+  </li>
+  <li>Under "profiles" > "list", Add this dictionary entry for UCRT64:</li>
+</ol>
+<pre style="font-family: monospace">
+      "profiles":
+      {
+          "defaults": {},
+          "list":
+          [
+              {
+                  "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+                  "hidden": false,
+                  "name": "Windows PowerShell"
+              },
+              {
+                  "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+                  "hidden": false,
+                  "name": "Command Prompt"
+              },
+              <span style="color: red; font-family: monospace">{
+                  "guid": "{17da3cac-b318-431e-8a3e-7fcdefe6d114}",
+                  "name": "UCRT64 / MSYS2",
+                  "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64",
+                  "startingDirectory": "C:/msys64/home/%USERNAME%",
+                  "icon": "C:/msys64/ucrt64.ico"
+              }</span>
+          ]
+      },
+</pre>
+<ol start="6">
+  <li>
+    Additionally, if you want Windows Terminal to always start using UCRT64, you
+    can replace the "defaultProfile" key with the "guid" value of UCRT64.
+  </li>
+  <li>Save your changes and close.</li>
+</ol>
+<p>
+  With these changes, you should now be able to run UCRT64 in the Windows
+  Terminal.
+</p>
 
 <h2>Setting Up Python</h2>
 <p>
@@ -80,7 +154,7 @@
 <h3>Installing Murfey</h3>
 <p>
   You can install Murfey in the Python environment (the base one or a virtual
-  environment) in either the Cygwin or MINGW64 terminal using the following
+  environment) in either the Cygwin or UCRT64 terminal using the following
   commands:
 </p>
 <pre style="font-family: monospace">
