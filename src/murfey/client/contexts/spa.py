@@ -19,7 +19,7 @@ from murfey.util import (
     authorised_requests,
     capture_get,
     capture_post,
-    get_machine_config,
+    get_machine_config_client,
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa")
@@ -105,7 +105,7 @@ def _get_grid_square_atlas_positions(
 def _file_transferred_to(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ):
-    machine_config = get_machine_config(
+    machine_config = get_machine_config_client(
         str(environment.url.geturl()),
         instrument_name=environment.instrument_name,
         demo=environment.demo,
@@ -684,7 +684,7 @@ class SPAModularContext(_SPAContext):
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "epu":
                     if environment:
-                        machine_config = get_machine_config(
+                        machine_config = get_machine_config_client(
                             str(environment.url.geturl()),
                             instrument_name=environment.instrument_name,
                             demo=environment.demo,
@@ -872,7 +872,7 @@ class SPAContext(_SPAContext):
         parameters = parameters or {}
         environment.id_tag_registry["processing_job"].append(tag)
         proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(environment.url.geturl()),
             instrument_name=environment.instrument_name,
             demo=environment.demo,

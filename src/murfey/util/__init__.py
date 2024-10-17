@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import shutil
-from functools import partial
+from functools import lru_cache, partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
@@ -38,6 +38,16 @@ def read_config() -> configparser.ConfigParser:
     if "Murfey" not in config:
         config["Murfey"] = {}
     return config
+
+
+@lru_cache(maxsize=1)
+def get_machine_config_client(
+    url: str, instrument_name: str = "", demo: bool = False
+) -> dict:
+    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
+    if not _instrument_name:
+        return {}
+    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
 
 
 def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
