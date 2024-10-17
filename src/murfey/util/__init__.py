@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import shutil
-from functools import lru_cache, partial
+from functools import partial
 from pathlib import Path
 from queue import Queue
 from threading import Thread
@@ -70,14 +70,6 @@ def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
     else:
         secured_parts = [secure_filename(p) for p in in_path.parts]
     return Path("/".join(secured_parts))
-
-
-@lru_cache(maxsize=1)
-def get_machine_config(url: str, instrument_name: str = "", demo: bool = False) -> dict:
-    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
-    if not _instrument_name:
-        return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
 
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
