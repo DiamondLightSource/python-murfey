@@ -56,7 +56,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config, read_config
+from murfey.util import capture_post, get_machine_config_client, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
@@ -262,7 +262,7 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        cfg = get_machine_config(
+        cfg = get_machine_config_client(
             str(self.app._environment.url.geturl()),
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
@@ -898,7 +898,7 @@ class DirectorySelection(SwitchSelection):
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
         self.app._set_default_acquisition_directories(visit_dir)
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(self.app._environment.url.geturl()),
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
@@ -940,7 +940,7 @@ class DestinationSelect(Screen):
             )
             yield RadioButton("Tomography", value=self._context is TomographyContext)
         if self.app._multigrid:
-            machine_config = get_machine_config(
+            machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
                 instrument_name=self.app._environment.instrument_name,
             )
@@ -1000,7 +1000,7 @@ class DestinationSelect(Screen):
                                 )
                             )
         else:
-            machine_config = get_machine_config(
+            machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
                 instrument_name=self.app._environment.instrument_name,
             )
@@ -1031,7 +1031,7 @@ class DestinationSelect(Screen):
                     i = Input(value=val, id=k.name, classes="input-destination")
                 params_bulk.append(i)
                 self._inputs[i] = k.name
-            machine_config = get_machine_config(
+            machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
                 instrument_name=self.app._environment.instrument_name,
                 demo=self.app._environment.demo,
@@ -1083,7 +1083,7 @@ class DestinationSelect(Screen):
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            cfg = get_machine_config(
+            cfg = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
                 instrument_name=self.app._environment.instrument_name,
                 demo=self.app._environment.demo,
