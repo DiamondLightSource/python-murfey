@@ -77,13 +77,13 @@ def _get_tilt_angle_v5_11(p: Path) -> str:
 
 def _find_angle_index(split_name: List[str]) -> int:
     for i, part in enumerate(split_name):
-        if "." in part:
+        if "." in part and part[0].isnumeric():
             return i
-    return 0
+    return -1
 
 
 def _get_tilt_series_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
+    split_name = p.stem.split("_")
     angle_idx = _find_angle_index(split_name)
     if split_name[angle_idx - 2].isnumeric():
         return split_name[angle_idx - 2]
@@ -91,13 +91,15 @@ def _get_tilt_series_v5_12(p: Path) -> str:
 
 
 def _get_tilt_angle_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
+    split_name = p.stem.split("_")
     angle_idx = _find_angle_index(split_name)
+    if angle_idx == -1:
+        return ""
     return split_name[angle_idx]
 
 
 def _get_tilt_tag_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
+    split_name = p.stem.split("_")
     angle_idx = _find_angle_index(split_name)
     if split_name[angle_idx - 2].isnumeric():
         return "_".join(split_name[: angle_idx - 2])
@@ -233,11 +235,7 @@ class TomographyContext(Context):
         pixel_size: Optional[float],
     ):
         if self._extract_tilt_series and self._extract_tilt_tag:
-            tilt_series = (
-                f"{self._extract_tilt_tag(movie_path)}_{self._extract_tilt_series(movie_path)}"
-                if self._extract_tilt_tag(movie_path)
-                else self._extract_tilt_series(movie_path)
-            )
+            tilt_series = _construct_tilt_series_name(movie_path)
         else:
             return
 
