@@ -50,3 +50,16 @@ You can also install a client on a remote machine. This machine only needs to ha
 a minimum Python installation and curl. Open the murfey server website in a browser
 on the client, and navigate to the bootstrap page. Then copy the displayed commands
 into a command line terminal.
+
+### Components
+
+Murfey consists of two main components, one designed to run on the acquisition system which should have visibility of both
+the raw data and metadata produced during data acquisition, and another which should have visibility of the location from
+which the data will be processed and access to any cluster computing resources for processing. There are currently two options
+for the former corresponding to two choices of UI:
+
+1. In terminal UI using [textual](https://github.com/Textualize/textual)
+2. In browser UI which requires setting up a React app
+
+For choice 1 Murfey runs as a simple client that communicates with the server and is closed at the end of a data acquisition
+session. For choice 2 a second server component (referred to as the instrument server) is run on the acquisition system.
