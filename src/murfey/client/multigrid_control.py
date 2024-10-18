@@ -133,6 +133,7 @@ class MultigridController:
             remove_files=remove_files,
             tag=tag,
             limited=limited,
+            transfer=machine_data.get("data_transfer_enabled", True),
         )
         self.ws.send(json.dumps({"message": "refresh"}))
 
