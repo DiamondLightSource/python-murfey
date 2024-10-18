@@ -13,10 +13,10 @@ router = APIRouter(prefix="/display", tags=["display"])
 machine_config = get_machine_config()
 
 
-@router.get("/microscope_image/")
-def get_mic_image():
-    if machine_config.image_path:
-        return FileResponse(machine_config.image_path)
+@router.get("/instruments/{instrument_name}/image/")
+def get_mic_image(instrument_name: str):
+    if machine_config[instrument_name].image_path:
+        return FileResponse(machine_config[instrument_name].image_path)
     return None
 
 
