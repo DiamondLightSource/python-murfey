@@ -25,6 +25,7 @@ from murfey.client.tui.screens import (
     MainScreen,
     ProcessingForm,
     SessionSelection,
+    VisitCreation,
     VisitSelection,
     WaitingScreen,
     determine_default_destination,
@@ -682,8 +683,12 @@ class MurfeyTUI(App):
         exisiting_sessions = requests.get(
             f"{self._environment.url.geturl()}/sessions"
         ).json()
-        self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("visit-select-screen")
+        if self.visits:
+            self.install_screen(VisitSelection(self.visits), "visit-select-screen")
+            self.push_screen("visit-select-screen")
+        else:
+            self.install_screen(VisitCreation(), "visit-creation-screen")
+            self.push_screen("visit-creation-screen")
         if exisiting_sessions:
             self.install_screen(
                 SessionSelection(
