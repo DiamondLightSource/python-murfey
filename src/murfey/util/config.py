@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel):
@@ -56,7 +57,7 @@ class MachineConfig(BaseModel):
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
 
-    model_search_directory: str = "processing"
+    picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
     failure_queue: str = ""

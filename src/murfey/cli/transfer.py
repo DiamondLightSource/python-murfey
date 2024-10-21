@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from rich.console import Console
 from rich.prompt import Confirm
@@ -78,6 +78,6 @@ def run():
         cmd.extend(list(Path(args.source or ".").glob("*")))
         cmd.append(f"{murfey_url.hostname}::{args.destination}")
 
-    result = procrunner.run(cmd)
+    result = subprocess.run(cmd)
     if result.returncode:
         console.print(f"[red]rsync failed returning code {result.returncode}")
