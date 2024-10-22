@@ -678,7 +678,7 @@ class MurfeyTUI(App):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/session",
+                f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
