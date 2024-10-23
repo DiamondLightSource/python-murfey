@@ -343,7 +343,7 @@ class TiltInfo(BaseModel):
 
 
 class TiltSeriesInfo(BaseModel):
-    client_id: int
+    session_id: int
     tag: str
     source: str
 
