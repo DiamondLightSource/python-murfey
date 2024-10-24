@@ -27,6 +27,7 @@ class MachineConfig(BaseModel):
     create_directories: Dict[str, str] = {"atlas": "atlas"}
     analyse_created_directories: List[str] = []
     gain_reference_directory: Optional[Path] = None
+    eer_fractionation_file_template: str = ""
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
     node_creator_queue: str = "node_creator"

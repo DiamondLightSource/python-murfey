@@ -2813,7 +2813,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=(
                         str(machine_config.rsync_basepath / message["gain_ref"])
-                        if message["gain_ref"]
+                        if message["gain_ref"] and machine_config.data_transfer_enabled
                         else message["gain_ref"]
                     ),
                     voltage=message["voltage"],
