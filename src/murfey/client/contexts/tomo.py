@@ -429,11 +429,7 @@ class TomographyContext(Context):
                 and last_tilt_angle != tilt_angle
                 or self._tilt_series_sizes.get(tilt_series)
             ) or self._completed_tilt_series:
-                res = self._check_tilt_series(
-                    tilt_series,
-                    file_transferred_to,
-                    environment=environment,
-                )
+                res = self._check_tilt_series(tilt_series)
 
         if environment:
             tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tilt"
@@ -494,29 +490,17 @@ class TomographyContext(Context):
     def _check_tilt_series(
         self,
         tilt_series: str,
-        file_transferred_to: Path | None,
-        environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         newly_completed_series: List[str] = []
-        if not self._tilt_series:
+        mdoc_tilt_series_size = self._tilt_series_sizes.get(tilt_series, 0)
+        if not self._tilt_series or not mdoc_tilt_series_size:
             return newly_completed_series
-        this_tilt_series_size = len(self._tilt_series.get(tilt_series, []))
-        tilt_series_size_check = (
-            (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
-            if self._tilt_series_sizes.get(tilt_series)
-            else False
-        )
+
+        counted_tilts = len(self._tilt_series.get(tilt_series, []))
+        tilt_series_size_check = counted_tilts >= mdoc_tilt_series_size
         if tilt_series_size_check and tilt_series not in self._completed_tilt_series:
             self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
-        for ts, ta in self._tilt_series.items():
-            if self._tilt_series_sizes.get(ts):
-                completion_test = len(ta) >= self._tilt_series_sizes[ts]
-            else:
-                completion_test = False
-            if ts not in self._completed_tilt_series and completion_test:
-                newly_completed_series.append(ts)
-                self._completed_tilt_series.append(ts)
         return newly_completed_series
 
     def _add_tomo_tilt(
@@ -624,13 +608,7 @@ class TomographyContext(Context):
                 if environment:
                     source = self._get_source(transferred_file, environment)
                     if source:
-                        completed_tilts = self._check_tilt_series(
-                            tilt_series,
-                            self._file_transferred_to(
-                                environment, source, transferred_file
-                            ),
-                            environment=environment,
-                        )
+                        completed_tilts = self._check_tilt_series(tilt_series)
 
                     # Always update the tilt series length in the database after an mdoc
                     if environment.murfey_session is not None:
