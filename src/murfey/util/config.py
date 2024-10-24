@@ -4,18 +4,24 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Mapping, Optional, Union
 
 import yaml
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel, BaseSettings, Field, validator
+from pydantic.errors import NoneIsNotAllowedError
 
 
 class MachineConfig(BaseModel):
-    acquisition_software: List[str]
+    acquisition_software: List[Literal["epu", "tomo", "serialem", "autotem"]]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
     data_directories: Dict[Path, str]
-    rsync_basepath: Path
-    default_model: Path
+    rsync_basepath: Optional[Path] = Field(
+        default=None,
+        description="Path set for the rsync daemon which will need to be prepended to file paths. Required if data_transfer_enabled is True",
+    )
+    default_model: Optional[Path] = Field(
+        default=None, description="Path to the default model used for particle picking"
+    )
     display_name: str = Field(
         default="",
         description="Name of instrument used for display purposes, i.e. Krios I",
@@ -38,7 +44,6 @@ class MachineConfig(BaseModel):
         description="Directories to be created within each visit",
     )
     analyse_created_directories: List[str] = []
-    gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
     gain_reference_directory: Optional[Path] = Field(
         default=None,
@@ -58,7 +63,6 @@ class MachineConfig(BaseModel):
     allow_removal: bool = Field(
         default=False, description="Allow original files to be removed after rsync"
     )
-    modular_spa: bool = False
     data_transfer_enabled: bool = True
     processing_enabled: bool = True
     machine_override: str = ""
@@ -84,13 +88,34 @@ class MachineConfig(BaseModel):
     model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
-    failure_queue: str = ""
+    failure_queue: str = Field(
+        default="",
+        description="Name of RabbitMQ queue where failed API calls will be recorded",
+    )
     instrument_server_url: str = "http://localhost:8001"
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
 
     security_configuration_path: Optional[Path] = None
     auth_url: str = ""
+
+    @validator("rsync_basepath", always=True)
+    def __validate_rsync_basepath_if_transfer_enabled__(
+        cls, v: Optional[str], values: Mapping[str, Any]
+    ) -> Any:
+        if values["data_transfer_enabled"]:
+            if v is None:
+                raise NoneIsNotAllowedError
+        return v
+
+    @validator("default_model", always=True)
+    def __validate_default_model_if_processing_enabled_and_spa_possible__(
+        cls, v: Optional[str], values: Mapping[str, Any]
+    ) -> Any:
+        if values["processing_enabled"] and "epu" in values["acquisition_software"]:
+            if v is None:
+                raise NoneIsNotAllowedError
+        return v
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
