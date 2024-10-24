@@ -302,7 +302,6 @@ class TomographyContext(Context):
         file_path: Path,
         extract_tilt_angle: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
-        required_position_files: List[Path] | None = None,
         required_strings: List[str] | None = None,
     ) -> List[str]:
         if not environment:
@@ -312,7 +311,6 @@ class TomographyContext(Context):
         if not source:
             logger.warning(f"No source found for file {file_path}")
             return []
-        # required_position_files = required_position_files or []
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
@@ -485,7 +483,6 @@ class TomographyContext(Context):
             ) or self._completed_tilt_series:
                 res = self._check_tilt_series(
                     tilt_series,
-                    required_position_files or [],
                     file_transferred_to,
                     environment=environment,
                 )
@@ -549,7 +546,6 @@ class TomographyContext(Context):
     def _check_tilt_series(
         self,
         tilt_series: str,
-        required_position_files: List[Path],
         file_transferred_to: Path | None,
         environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
@@ -562,20 +558,12 @@ class TomographyContext(Context):
             if self._tilt_series_sizes.get(tilt_series)
             else False
         )
-        if tilt_series_size_check and not required_position_files:
-            if tilt_series not in self._completed_tilt_series:
-                self._completed_tilt_series.append(tilt_series)
-                newly_completed_series.append(tilt_series)
+        if tilt_series_size_check and tilt_series not in self._completed_tilt_series:
+            self._completed_tilt_series.append(tilt_series)
+            newly_completed_series.append(tilt_series)
         for ts, ta in self._tilt_series.items():
-            required_position_files_check = (
-                all(_f.is_file() for _f in required_position_files)
-                if required_position_files
-                else True
-            )
             if self._tilt_series_sizes.get(ts):
                 completion_test = len(ta) >= self._tilt_series_sizes[ts]
-                if completion_test:
-                    completion_test = required_position_files_check
             else:
                 completion_test = False
             if ts not in self._completed_tilt_series and completion_test:
@@ -635,7 +623,6 @@ class TomographyContext(Context):
         self,
         file_path: Path,
         environment: MurfeyInstanceEnvironment | None = None,
-        required_position_files: List[Path] | None = None,
         required_strings: List[str] | None = None,
     ) -> List[str]:
         required_strings = (
@@ -654,16 +641,10 @@ class TomographyContext(Context):
                 tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
             tilt_info_extraction = tomo_tilt_info["5.7"]
-        tilt_series = _construct_tilt_series_name(file_path)
         return self._add_tilt(
             file_path,
             tilt_info_extraction,
             environment=environment,
-            required_position_files=(
-                required_position_files
-                if required_position_files is not None
-                else [file_path.parent / (tilt_series + ".mdoc")]
-            ),
             required_strings=required_strings,
         )
 
@@ -729,7 +710,6 @@ class TomographyContext(Context):
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
-                        required_position_files=kwargs.get("required_position_files"),
                         required_strings=kwargs.get("required_strings")
                         or required_strings,
                     )
@@ -746,7 +726,6 @@ class TomographyContext(Context):
                     if source:
                         completed_tilts = self._check_tilt_series(
                             tilt_series,
-                            kwargs.get("required_position_files") or [],
                             self._file_transferred_to(
                                 environment, source, transferred_file
                             ),
