@@ -34,7 +34,7 @@ from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import (
     capture_post,
-    get_machine_config,
+    get_machine_config_client,
     read_config,
     set_default_acquisition_output,
 )
@@ -104,7 +104,7 @@ class MurfeyTUI(App):
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
         self._skip_existing_processing = skip_existing_processing
-        self._machine_config = get_machine_config(
+        self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
@@ -128,7 +128,7 @@ class MurfeyTUI(App):
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
         log.info(f"Launching multigrid watcher for source {source}")
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
@@ -688,7 +688,7 @@ class MurfeyTUI(App):
         self.log_book.write(message.renderable)
 
     async def reset(self):
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
@@ -743,7 +743,7 @@ class MurfeyTUI(App):
         exit()
 
     async def action_clear(self) -> None:
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,

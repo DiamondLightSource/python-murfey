@@ -19,7 +19,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import authorised_requests, capture_post, get_machine_config
+from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
@@ -271,7 +271,7 @@ class TomographyContext(Context):
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
     ):
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(environment.url.geturl()),
             instrument_name=environment.instrument_name,
             demo=environment.demo,
@@ -714,7 +714,7 @@ class TomographyContext(Context):
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
                     if environment:
-                        machine_config = get_machine_config(
+                        machine_config = get_machine_config_client(
                             str(environment.url.geturl()),
                             instrument_name=environment.instrument_name,
                             demo=environment.demo,

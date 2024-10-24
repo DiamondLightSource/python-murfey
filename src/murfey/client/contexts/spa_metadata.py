@@ -8,7 +8,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util import authorised_requests, capture_post, get_machine_config
+from murfey.util import authorised_requests, capture_post, get_machine_config_client
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
@@ -18,7 +18,7 @@ requests.get, requests.post, requests.put, requests.delete = authorised_requests
 def _atlas_destination(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ) -> Path:
-    machine_config = get_machine_config(
+    machine_config = get_machine_config_client(
         str(environment.url.geturl()),
         instrument_name=environment.instrument_name,
         demo=environment.demo,

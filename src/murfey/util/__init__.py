@@ -40,6 +40,16 @@ def read_config() -> configparser.ConfigParser:
     return config
 
 
+@lru_cache(maxsize=1)
+def get_machine_config_client(
+    url: str, instrument_name: str = "", demo: bool = False
+) -> dict:
+    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
+    if not _instrument_name:
+        return {}
+    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
+
+
 def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
     token = read_config()["Murfey"].get("token", "")
     _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
@@ -62,17 +72,14 @@ def sanitise_nonpath(in_string: str) -> str:
     return in_string
 
 
-def secure_path(in_path: Path) -> Path:
-    secured_parts = [secure_filename(p) for p in in_path.parts]
+def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
+    if keep_spaces:
+        secured_parts = [
+            secure_filename(p) if " " not in p else p for p in in_path.parts
+        ]
+    else:
+        secured_parts = [secure_filename(p) for p in in_path.parts]
     return Path("/".join(secured_parts))
-
-
-@lru_cache(maxsize=1)
-def get_machine_config(url: str, instrument_name: str = "", demo: bool = False) -> dict:
-    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
-    if not _instrument_name:
-        return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
 
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
