@@ -103,7 +103,7 @@ class MachineConfig(BaseModel):
     def __validate_rsync_basepath_if_transfer_enabled__(
         cls, v: Optional[str], values: Mapping[str, Any]
     ) -> Any:
-        if values["data_transfer_enabled"]:
+        if values.get("data_transfer_enabled"):
             if v is None:
                 raise NoneIsNotAllowedError
         return v
@@ -112,7 +112,9 @@ class MachineConfig(BaseModel):
     def __validate_default_model_if_processing_enabled_and_spa_possible__(
         cls, v: Optional[str], values: Mapping[str, Any]
     ) -> Any:
-        if values["processing_enabled"] and "epu" in values["acquisition_software"]:
+        if values.get("processing_enabled") and "epu" in values.get(
+            "acquisition_software", []
+        ):
             if v is None:
                 raise NoneIsNotAllowedError
         return v
