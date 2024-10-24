@@ -761,6 +761,8 @@ class VisitSelection(SwitchSelection):
 
 
 class VisitCreation(Screen):
+    # This allows for the manual creation of a visit name when there is no LIMS system to provide it
+    # Shares a lot of code with VisitSelection, should be neatened up at some point
     visit_name: reactive[str] = reactive("")
 
     def __init__(self, *args, **kwargs):
