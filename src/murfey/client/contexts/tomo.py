@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List, Optional, OrderedDict
+from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -110,7 +110,6 @@ class TomographyContext(Context):
         self._tilt_series_sizes: Dict[str, int] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
-        self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
         self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
@@ -155,57 +154,6 @@ class TomographyContext(Context):
                 if process_file:
                     capture_post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
-
-    def _check_for_alignment(
-        self,
-        movie_path: Path,
-        motion_corrected_path: Path,
-        url: str,
-        dcid: int,
-        pjid: int,
-        appid: int,
-        mvid: int,
-        tilt_angles: List,
-        manual_tilt_offset: Optional[float],
-        pixel_size: Optional[float],
-    ):
-        tilt_series = _construct_tilt_series_name(movie_path)
-
-        if self._motion_corrected_tilt_series.get(
-            tilt_series
-        ) and motion_corrected_path not in self._motion_corrected_tilt_series.get(
-            tilt_series, {}
-        ):
-            self._motion_corrected_tilt_series[tilt_series].append(
-                motion_corrected_path
-            )
-        else:
-            self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
-        if tilt_series in self._completed_tilt_series:
-            if (
-                len(self._motion_corrected_tilt_series[tilt_series])
-                == len(self._tilt_series[tilt_series])
-                and len(self._motion_corrected_tilt_series[tilt_series]) > 1
-                and tilt_series not in self._aligned_tilt_series
-            ):
-                try:
-
-                    series_data: dict = {
-                        "name": tilt_series,
-                        "file_tilt_list": str(tilt_angles),
-                        "dcid": dcid,
-                        "processing_job": pjid,
-                        "autoproc_program_id": appid,
-                        "motion_corrected_path": str(motion_corrected_path),
-                        "movie_id": mvid,
-                        "manual_tilt_offset": manual_tilt_offset,
-                        "pixel_size": pixel_size,
-                    }
-                    capture_post(url, json=series_data)
-                    with self._lock:
-                        self._aligned_tilt_series.append(tilt_series)
-                except Exception as e:
-                    logger.warning(f"Data error {e}")
 
     def _complete_process_file(
         self,
@@ -569,54 +517,6 @@ class TomographyContext(Context):
             if ts not in self._completed_tilt_series and completion_test:
                 newly_completed_series.append(ts)
                 self._completed_tilt_series.append(ts)
-                if environment and file_transferred_to:
-                    file_tilt_list = []
-                    movie: str
-                    angle: str
-                    for movie, angle in environment.tilt_angles[ts]:
-                        if environment.motion_corrected_movies.get(Path(movie)):
-                            file_tilt_list.append(
-                                [
-                                    str(
-                                        environment.motion_corrected_movies[
-                                            Path(movie)
-                                        ][0]
-                                    ),
-                                    angle,
-                                    str(
-                                        environment.motion_corrected_movies[
-                                            Path(movie)
-                                        ][1]
-                                    ),
-                                ]
-                            )
-                        if environment.motion_corrected_movies.get(file_transferred_to):
-                            self._check_for_alignment(
-                                file_transferred_to,
-                                Path(
-                                    environment.motion_corrected_movies[  # key error PosixPath
-                                        file_transferred_to
-                                    ][
-                                        0
-                                    ]
-                                ),
-                                environment.url.geturl(),
-                                environment.data_collection_ids[ts],
-                                environment.processing_job_ids[ts]["em-tomo-align"],
-                                environment.autoproc_program_ids[ts]["em-tomo-align"],
-                                int(
-                                    environment.motion_corrected_movies[
-                                        file_transferred_to
-                                    ][1]
-                                ),
-                                file_tilt_list,
-                                environment.data_collection_parameters.get(
-                                    "manual_tilt_offset"
-                                ),
-                                environment.data_collection_parameters.get(
-                                    "pixel_size_on_image"
-                                ),
-                            )
         return newly_completed_series
 
     def _add_tomo_tilt(
