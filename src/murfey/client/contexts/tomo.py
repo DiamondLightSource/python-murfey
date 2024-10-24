@@ -38,7 +38,7 @@ def _get_tilt_angle_v5_11(p: Path) -> str:
 
 def _find_angle_index(split_name: List[str]) -> int:
     for i, part in enumerate(split_name):
-        if "." in part and part[0].isnumeric():
+        if "." in part and part[-1].isnumeric():
             return i
     return -1
 
