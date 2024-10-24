@@ -46,6 +46,12 @@ SessionSelection {
   border: hidden;
 }
 
+VisitCreation {
+  layout: grid;
+  grid-size: 2;
+  border: hidden;
+}
+
 VisitSelection {
   layout: grid;
   grid-size: 4;
@@ -232,6 +238,22 @@ RadioSet {
 }
 
 .btn-visit:focus {
+  background: darkslateblue;
+}
+
+.btn-visit-create {
+  width: 100%;
+  height: 90fr;
+  column-span: 2;
+  background: teal;
+  border: solid black;
+}
+
+.btn-visit-create:hover {
+  background: purple;
+}
+
+.btn-visit-create:focus {
   background: darkslateblue;
 }
 
@@ -466,6 +488,16 @@ RadioSet {
 .input-destination {
   width: 100%;
   background: black;
+}
+
+.input-visit-name {
+  width: 100%;
+  height: 100%;
+  column-span: 2;
+  row-span: 1;
+  content-align: left middle;
+  text-style: bold;
+  background: blueviolet;
 }
 
 #log_book {

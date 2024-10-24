@@ -760,6 +760,72 @@ class VisitSelection(SwitchSelection):
             self.app.push_screen("upstream-downloads")
 
 
+class VisitCreation(Screen):
+    # This allows for the manual creation of a visit name when there is no LIMS system to provide it
+    # Shares a lot of code with VisitSelection, should be neatened up at some point
+    visit_name: reactive[str] = reactive("")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def compose(self):
+        yield Input(placeholder="Visit name", classes="input-visit-name")
+        yield Button("Create visit", classes="btn-visit-create")
+
+    def on_input_changed(self, event):
+        self.visit_name = event.value
+
+    def on_button_pressed(self, event: Button.Pressed):
+        text = str(self.visit_name)
+        self.app._visit = text
+        self.app._environment.visit = text
+        response = requests.post(
+            f"{self.app._environment.url.geturl()}/visits/{text}",
+            json={"id": self.app._environment.client_id},
+        )
+        log.info(f"Posted visit registration: {response.status_code}")
+        machine_data = requests.get(
+            f"{self.app._environment.url.geturl()}/machine"
+        ).json()
+
+        self.app.install_screen(
+            DirectorySelection(
+                [
+                    p[0]
+                    for p in machine_data.get("data_directories", {}).items()
+                    if p[1] == "detector" and Path(p[0]).exists()
+                ]
+            ),
+            "directory-select",
+        )
+        self.app.pop_screen()
+
+        if machine_data.get("gain_reference_directory"):
+            self.app.install_screen(
+                GainReference(
+                    determine_gain_ref(Path(machine_data["gain_reference_directory"])),
+                    True,
+                ),
+                "gain-ref-select",
+            )
+            self.app.push_screen("gain-ref-select")
+        else:
+            if self._switch_status:
+                self.app.push_screen("directory-select")
+            else:
+                self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
+                self.app.push_screen("launcher")
+
+        if machine_data.get("upstream_data_directories"):
+            upstream_downloads = requests.get(
+                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/upstream_visits"
+            ).json()
+            self.app.install_screen(
+                UpstreamDownloads(upstream_downloads), "upstream-downloads"
+            )
+            self.app.push_screen("upstream-downloads")
+
+
 class UpstreamDownloads(Screen):
     def __init__(self, connected_visits: Dict[str, Path], *args, **kwargs):
         super().__init__(*args, **kwargs)

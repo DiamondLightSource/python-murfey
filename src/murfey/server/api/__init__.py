@@ -1232,7 +1232,7 @@ async def request_tomography_preprocessing(
                 "fm_dose": proc_file.dose_per_frame,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_file.gain_ref)
-                    if proc_file.gain_ref
+                    if proc_file.gain_ref and machine_config.data_transfer_enabled
                     else proc_file.gain_ref
                 ),
                 "fm_int_file": proc_file.eer_fractionation_file,
@@ -1509,14 +1509,22 @@ async def write_eer_fractionation_file(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    file_path = (
-        Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
-        / str(datetime.datetime.now().year)
-        / secure_filename(visit_name)
-        / "processing"
-        / secure_filename(fractionation_params.fractionation_file_name)
-    )
+    if machine_config.eer_fractionation_file_template:
+        file_path = Path(
+            machine_config.eer_fractionation_file_template.format(
+                visit=secure_filename(visit_name),
+                year=str(datetime.datetime.now().year),
+            )
+        ) / secure_filename(fractionation_params.fractionation_file_name)
+    else:
+        file_path = (
+            Path(machine_config.rsync_basepath)
+            / (machine_config.rsync_module or "data")
+            / str(datetime.datetime.now().year)
+            / secure_filename(visit_name)
+            / "processing"
+            / secure_filename(fractionation_params.fractionation_file_name)
+        )
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
 
