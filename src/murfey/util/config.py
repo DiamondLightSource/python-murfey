@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 
 
 class MachineConfig(BaseModel):
@@ -16,25 +16,48 @@ class MachineConfig(BaseModel):
     data_directories: Dict[Path, str]
     rsync_basepath: Path
     default_model: Path
-    display_name: str = ""
-    instrument_name: str = ""
-    image_path: Optional[Path] = None
+    display_name: str = Field(
+        default="",
+        description="Name of instrument used for display purposes, i.e. Krios I",
+    )
+    instrument_name: str = Field(
+        default="",
+        description="Computer friendly instrument reference name, i.e. m02. Must not contain special characters or whitespace",
+    )
+    image_path: Optional[Path] = Field(
+        default=None,
+        description="Path to an image of the instrument for display purposes",
+    )
     software_versions: Dict[str, str] = {}
     external_executables: Dict[str, str] = {}
     external_executables_eer: Dict[str, str] = {}
     external_environment: Dict[str, str] = {}
     rsync_module: str = ""
-    create_directories: Dict[str, str] = {"atlas": "atlas"}
+    create_directories: Dict[str, str] = Field(
+        default={"atlas": "atlas"},
+        description="Directories to be created within each visit",
+    )
     analyse_created_directories: List[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
+    gain_reference_directory: Optional[Path] = Field(
+        default=None,
+        description="Directory in which the gain reference is written from the detector",
+    )
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
     node_creator_queue: str = "node_creator"
-    superres: bool = False
-    camera: str = "FALCON"
+    superres: bool = Field(
+        default=False, description="Is the detector on this instrument a GATAN K3?"
+    )
+    camera: Literal["FALCON", "K3", ""] = Field(
+        default="FALCON",
+        description="What camera is the instrument equipped with? Only relevant for TEM instruments. Use the option closest to your case. This is used to determine whether the gain reference needs to be binned down from superres",
+    )
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
-    allow_removal: bool = False
+    allow_removal: bool = Field(
+        default=False, description="Allow original files to be removed after rsync"
+    )
     modular_spa: bool = False
     data_transfer_enabled: bool = True
     processing_enabled: bool = True
