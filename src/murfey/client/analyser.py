@@ -22,7 +22,7 @@ from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
-from murfey.util import Observer, get_machine_config
+from murfey.util import Observer, get_machine_config_client
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -73,7 +73,7 @@ class Analyser(Observer):
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (
-            get_machine_config(
+            get_machine_config_client(
                 str(environment.url.geturl()),
                 instrument_name=environment.instrument_name,
                 demo=environment.demo,
@@ -145,7 +145,7 @@ class Analyser(Observer):
             and self._environment
         ):
             created_directories = set(
-                get_machine_config(
+                get_machine_config_client(
                     str(self._environment.url.geturl()),
                     instrument_name=self._environment.instrument_name,
                     demo=self._environment.demo,
@@ -165,7 +165,7 @@ class Analyser(Observer):
                     logger.info("Acquisition software: EPU")
                     if self._environment:
                         try:
-                            cfg = get_machine_config(
+                            cfg = get_machine_config_client(
                                 str(self._environment.url.geturl()),
                                 instrument_name=self._environment.instrument_name,
                                 demo=self._environment.demo,
