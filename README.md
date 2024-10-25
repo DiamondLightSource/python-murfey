@@ -26,10 +26,10 @@ $ pip install -e .[client,server,developer]
 
 The packages included under the `[developer]` installation key contain some helpful tools to aid you with developing Murfey further:
 
+- `bump-my-version` - Simplifies version control.
 - `ipykernel` - Enables interactive code development via Jupyter Notebooks.
 - `pre-commit` - Allows for the installation and running of hooks to help with linting, formatting, and type checking your code.
 - `pytest` - Used in conjunction with test functions to evaluate the reliability of your code.
-- `bump2version` - A nice little script to simplify version control.
 
 Finally, you may want to set up an ISPyB mock database server and a Zocalo
 development environment. The instructions for this are out of scope here.
