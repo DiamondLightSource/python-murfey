@@ -2745,11 +2745,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if _transport_object:
                     _transport_object.transport.ack(header)
                 return None
-            if app_murfey := murfey_db.exec(
+            if not murfey_db.exec(
                 select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
             ).all():
-                appid = app_murfey[0].id
-            else:
                 if murfey.server.ispyb.Session() is None:
                     murfey_app = db.AutoProcProgram(pj_id=pid)
                 else:
