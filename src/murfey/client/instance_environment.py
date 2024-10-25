@@ -117,7 +117,6 @@ class MurfeyInstanceEnvironment(BaseModel):
         self.autoproc_program_ids = {}
         self.data_collection_parameters = {}
         self.movies = {}
-        self.motion_corrected_movies = {}
         self.listeners = {}
         self.movie_tilt_pair = {}
         self.tilt_angles = {}
