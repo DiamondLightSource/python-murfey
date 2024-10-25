@@ -110,7 +110,6 @@ class TomographyContext(Context):
         self._tilt_series_sizes: Dict[str, int] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
-        self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
@@ -418,19 +417,6 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
-        res = []
-        if self._last_transferred_file:
-            last_tilt_series = _construct_tilt_series_name(self._last_transferred_file)
-
-            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
-            self._last_transferred_file = file_path
-            if (
-                last_tilt_series != tilt_series
-                and last_tilt_angle != tilt_angle
-                or self._tilt_series_sizes.get(tilt_series)
-            ) or self._completed_tilt_series:
-                res = self._check_tilt_series(tilt_series)
-
         if environment:
             tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tilt"
             tilt_data = {
@@ -484,8 +470,7 @@ class TomographyContext(Context):
             }
             capture_post(preproc_url, json=preproc_data)
 
-        self._last_transferred_file = file_path
-        return res
+        return self._check_tilt_series(tilt_series)
 
     def _check_tilt_series(
         self,
