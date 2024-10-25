@@ -2629,7 +2629,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
-                    f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
+                    f"No data collection group ID was found for image directory {sanitise(message['image_directory'])} and source {sanitise(message['source'])}"
                 )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
@@ -2701,7 +2701,9 @@ def feedback_callback(header: dict, message: dict) -> None:
             if dc:
                 _dcid = dc[0][0].id
             else:
-                logger.warning(f"No data collection ID found for {message['tag']}")
+                logger.warning(
+                    f"No data collection ID found for {sanitise(message['tag'])}"
+                )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
                 return None
