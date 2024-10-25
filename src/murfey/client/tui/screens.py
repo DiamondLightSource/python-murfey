@@ -56,7 +56,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config, read_config
+from murfey.util import capture_post, get_machine_config_client, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
@@ -262,8 +262,10 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        cfg = get_machine_config(
-            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        cfg = get_machine_config_client(
+            str(self.app._environment.url.geturl()),
+            instrument_name=self.app._environment.instrument_name,
+            demo=self.app._environment.demo,
         )
         self._context: (
             Type[SPAModularContext] | Type[SPAContext] | Type[TomographyContext]
@@ -660,7 +662,7 @@ class SessionSelection(Screen):
             self.app.pop_screen()
         session_name = "Client connection"
         self.app._environment.murfey_session = requests.post(
-            f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
+            f"{self.app._environment.url.geturl()}/instruments/{self.app._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
             json={"session_id": session_id, "session_name": session_name},
         ).json()
 
@@ -896,8 +898,10 @@ class DirectorySelection(SwitchSelection):
         visit_dir = Path(str(event.button.label)) / self.app._visit
         visit_dir.mkdir(exist_ok=True)
         self.app._set_default_acquisition_directories(visit_dir)
-        machine_config = get_machine_config(
-            str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+        machine_config = get_machine_config_client(
+            str(self.app._environment.url.geturl()),
+            instrument_name=self.app._environment.instrument_name,
+            demo=self.app._environment.demo,
         )
         for dir in machine_config["create_directories"].values():
             (visit_dir / dir).mkdir(exist_ok=True)
@@ -936,7 +940,10 @@ class DestinationSelect(Screen):
             )
             yield RadioButton("Tomography", value=self._context is TomographyContext)
         if self.app._multigrid:
-            machine_config = get_machine_config(str(self.app._environment.url.geturl()))
+            machine_config = get_machine_config_client(
+                str(self.app._environment.url.geturl()),
+                instrument_name=self.app._environment.instrument_name,
+            )
             destinations = []
             if self._destination_overrides:
                 for k, v in self._destination_overrides.items():
@@ -993,7 +1000,10 @@ class DestinationSelect(Screen):
                                 )
                             )
         else:
-            machine_config = get_machine_config(str(self.app._environment.url.geturl()))
+            machine_config = get_machine_config_client(
+                str(self.app._environment.url.geturl()),
+                instrument_name=self.app._environment.instrument_name,
+            )
             for s, d in self._transfer_routes.items():
                 if Path(d).name not in machine_config["create_directories"].values():
                     bulk.append(Label(f"Copy the source {s} to:"))
@@ -1021,8 +1031,10 @@ class DestinationSelect(Screen):
                     i = Input(value=val, id=k.name, classes="input-destination")
                 params_bulk.append(i)
                 self._inputs[i] = k.name
-            machine_config = get_machine_config(
-                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            machine_config = get_machine_config_client(
+                str(self.app._environment.url.geturl()),
+                instrument_name=self.app._environment.instrument_name,
+                demo=self.app._environment.demo,
             )
             if machine_config.get("superres"):
                 params_bulk.append(
@@ -1071,8 +1083,10 @@ class DestinationSelect(Screen):
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            cfg = get_machine_config(
-                str(self.app._environment.url.geturl()), demo=self.app._environment.demo
+            cfg = get_machine_config_client(
+                str(self.app._environment.url.geturl()),
+                instrument_name=self.app._environment.instrument_name,
+                demo=self.app._environment.demo,
             )
             if cfg.get("modular_spa"):
                 self._context = SPAContext

@@ -10,7 +10,7 @@ from sqlmodel import Session, create_engine, select
 
 from murfey.server.ispyb import TransportManager
 from murfey.server.murfey_db import url
-from murfey.util.config import get_machine_config, get_microscope
+from murfey.util.config import get_machine_config, get_microscope, get_security_config
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,
@@ -97,12 +97,13 @@ def run():
         os.environ["BEAMLINE"] = args.microscope
 
     machine_config = get_machine_config()
+    security_config = get_security_config()
     _url = url(machine_config)
     engine = create_engine(_url)
     murfey_db = Session(engine)
 
     _transport_object = TransportManager(args.transport)
-    _transport_object.feedback_queue = machine_config.feedback_queue
+    _transport_object.feedback_queue = security_config.feedback_queue
 
     query = (
         select(Movie)
@@ -182,7 +183,7 @@ def run():
             zocalo_message = {
                 "recipes": ["em-spa-preprocess"],
                 "parameters": {
-                    "feedback_queue": machine_config.feedback_queue,
+                    "feedback_queue": _transport_object.feedback_queue,
                     "node_creator_queue": machine_config.node_creator_queue,
                     "dcid": detached_ids[1],
                     "kv": proc_params["voltage"],
