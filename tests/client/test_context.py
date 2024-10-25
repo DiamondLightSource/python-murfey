@@ -10,7 +10,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 def test_tomography_context_initialisation_for_tomo(tmp_path):
     context = TomographyContext("tomo", tmp_path)
-    assert not context._last_transferred_file
+    assert not context._completed_tilt_series
     assert context._acquisition_software == "tomo"
 
 
@@ -38,10 +38,6 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     assert context._tilt_series == {
         "Position_1": [tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"]
     }
-    assert (
-        context._last_transferred_file
-        == tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"
-    )
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
@@ -101,10 +97,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     assert context._tilt_series == {
         "Position_1": [tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"]
     }
-    assert (
-        context._last_transferred_file
-        == tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"
-    )
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
@@ -195,10 +187,6 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     assert context._tilt_series == {
         "Position_1": [tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"]
     }
-    assert (
-        context._last_transferred_file
-        == tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff"
-    )
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
@@ -236,7 +224,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
 
 def test_tomography_context_initialisation_for_serialem(tmp_path):
     context = TomographyContext("serialem", tmp_path)
-    assert not context._last_transferred_file
+    assert not context._completed_tilt_series
     assert context._acquisition_software == "serialem"
 
 
