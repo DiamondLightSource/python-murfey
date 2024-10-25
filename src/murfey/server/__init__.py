@@ -1167,40 +1167,40 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
-        zocalo_message: dict = {
-            "parameters": {
-                "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
-                "batch_is_complete": False,
-                "particle_diameter": relion_options["particle_diameter"],
-                "combine_star_job_number": -1,
-                "picker_id": other_options["picker_ispyb_id"],
-                "nr_iter": default_spa_parameters.nr_iter_2d,
-                "batch_size": default_spa_parameters.batch_size_2d,
-                "nr_classes": default_spa_parameters.nr_classes_2d,
-                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
-                "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], _app_id(pj_id, _db), _db
-                ),
-                "class2d_grp_uuid": _db.exec(
-                    select(db.Class2DParameters).where(
-                        db.Class2DParameters.particles_file
-                        == class2d_message["particles_file"]
-                        and db.Class2DParameters.pj_id == pj_id
-                    )
+    zocalo_message: dict = {
+        "parameters": {
+            "particles_file": class2d_message["particles_file"],
+            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+            "batch_is_complete": False,
+            "particle_diameter": relion_options["particle_diameter"],
+            "combine_star_job_number": -1,
+            "picker_id": other_options["picker_ispyb_id"],
+            "nr_iter": default_spa_parameters.nr_iter_2d,
+            "batch_size": default_spa_parameters.batch_size_2d,
+            "nr_classes": default_spa_parameters.nr_classes_2d,
+            "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+            "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+            "mask_diameter": 0,
+            "class_uuids": _2d_class_murfey_ids(
+                class2d_message["particles_file"], _app_id(pj_id, _db), _db
+            ),
+            "class2d_grp_uuid": _db.exec(
+                select(db.Class2DParameters).where(
+                    db.Class2DParameters.particles_file
+                    == class2d_message["particles_file"]
+                    and db.Class2DParameters.pj_id == pj_id
                 )
-                .one()
-                .murfey_id,
-                "session_id": message["session_id"],
-                "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
-                ),
-                "node_creator_queue": machine_config.node_creator_queue,
-            },
-            "recipes": ["em-spa-class2d"],
-        }
+            )
+            .one()
+            .murfey_id,
+            "session_id": message["session_id"],
+            "autoproc_program_id": _app_id(
+                _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+            ),
+            "node_creator_queue": machine_config.node_creator_queue,
+        },
+        "recipes": ["em-spa-class2d"],
+    }
     if _transport_object:
         zocalo_message["parameters"][
             "feedback_queue"
