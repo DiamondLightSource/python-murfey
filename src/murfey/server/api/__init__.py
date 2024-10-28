@@ -1759,9 +1759,9 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
     visit_name = murfey_session.visit
-    instrument_server = murfey_session.instrument_server
-    machine_config = get_machine_config(instrument_server=instrument_server)[
-        instrument_server
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
     ]
     upstream_visits = {}
     # Iterates through provided upstream directories
