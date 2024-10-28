@@ -16,7 +16,7 @@ Murfey, the package, is named after [Eliza Murfey, the inventor](https://nationa
 We suggest you start with your favourite virtual environment (mamba/conda/python virtualenv/...),
 then install using the following command.
 
-```bash
+```text
 $ git clone git@github.com:DiamondLightSource/python-murfey.git
 $ cd python-murfey
 $ pip install -e .[client,server,developer]
@@ -36,13 +36,13 @@ development environment. The instructions for this are out of scope here.
 
 You can then start the Murfey server with
 
-```bash
+```text
 $ murfey.server
 ```
 
 and connect the client with
 
-```bash
+```text
 $ murfey --server http://127.0.0.1:8000
 ```
 
