@@ -64,10 +64,10 @@ Next, we will need to create a role in the Murfey database under whose name the 
 (murfey-db)$ psql murfey -U murfey -W
 ```
 
-```sql
+```text
 murfey=# create user murfey_server with password '[password here]' createdb;
-murfey=# grant all privileges on database murfey to murfey_server
-murfey=# grant all privileges on schema public to murfey_server
+murfey=# grant all privileges on database murfey to murfey_server;
+murfey=# grant all privileges on schema public to murfey_server;
 ```
 
 The user 'murfey_server' will be stored under the 'username' key in the database credentials file used for this microscope, and the database name 'murfey' is stored under the 'database' key in that same file. The password you use when creating this role should be the encrypted one set up when creating the credentials file.
