@@ -62,9 +62,6 @@ Next, we will need to create a role in the Murfey database under whose name the 
 
 ```text
 (murfey-db)$ psql murfey -U murfey -W
-```
-
-```text
 murfey=# create user murfey_server with password '[password here]' createdb;
 murfey=# grant all privileges on database murfey to murfey_server;
 murfey=# grant all privileges on schema public to murfey_server;
