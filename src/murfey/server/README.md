@@ -6,7 +6,7 @@ Murfey has been designed to work with PostgreSQL databases to maintain a record 
 
 ### Installing `postgresql`
 
-To start, we will install the `postgresql` Python package hosted on conda-forge. This can be done using either `conda` or `mamba`. In this example, we will create a new Python 3.9 environment named `murfey-db` which will be used to run `postgresql`.
+To start, we will install the `postgresql` package hosted on conda-forge. This can be done using either `conda` or `mamba`. In this example, we will create a new Python 3.9 environment named `murfey-db` which will be used to run `postgresql`.
 
 ```text
 (base)$ mamba create -n murfey-db python==3.9.*
@@ -16,7 +16,7 @@ To start, we will install the `postgresql` Python package hosted on conda-forge.
 
 ### Creating and initialising the database
 
-Next, we need to find a directory for the database to reside in. This can generally be any location in your file system, but for this example, with a Unix OS as reference, we shall create a directory called `murfey` in the default home location of `~`.
+Next, we need to find a directory for the database to reside in. This can generally be any location in your file system, but for this example, we shall create a directory called `murfey` in the default home location of `~`.
 
 ```text
 (murfey-db)$ mkdir -p ~/murfey
@@ -44,7 +44,7 @@ After that, we can proceed with creating the actual database for Murfey within t
 createdb murfey --owner=murfey -U murfey -W
 ```
 
-This wil create a database named 'murfey' owned by the user 'murfey'. This database can then be accessed and inspected by running the following command:
+This will create a database named 'murfey' owned by the user 'murfey'. This database can then be accessed and inspected by running the following command:
 
 ```text
 (murfey-db)$ psql murfey -U murfey -W
@@ -67,7 +67,7 @@ murfey=# grant all privileges on database murfey to murfey_server;
 murfey=# grant all privileges on schema public to murfey_server;
 ```
 
-The user 'murfey_server' will be stored under the 'username' key in the database credentials file used for this microscope, and the database name 'murfey' is stored under the 'database' key in that same file. The password you use when creating this role should be the encrypted one set up when creating the credentials file.
+The user 'murfey_server' will be stored under the 'username' key in the database credentials file used for this microscope, and the database name 'murfey' is stored under the 'database' key in that same file. The password you use when creating this role should be the encrypted one previously set up when creating the credentials file.
 
 ### Configuring Murfey again
 
