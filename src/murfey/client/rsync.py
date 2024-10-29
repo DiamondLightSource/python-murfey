@@ -469,8 +469,8 @@ class RSyncer(Observer):
                 " ".join(rsync_cmd),
             ]
             result = subprocess.run(
-                rsync_cmd,
-                cwd=str(self._basepath),
+                bash_cmd,
+                cwd=self._basepath,
                 capture_output=True,
                 input=rsync_stdin_remove,
             )
