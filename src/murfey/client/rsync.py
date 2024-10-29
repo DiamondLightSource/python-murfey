@@ -464,10 +464,10 @@ class RSyncer(Observer):
         # List out file paths as stored in memory to see if issue is due to file path mismatch
         if len(set(relative_filenames) - transfer_success) != 0:
             logger.debug(
-                f"{len(set(relative_filenames) - transfer_success)} files were not transferred | "
-                f"Files identified for transfer ({len(relative_filenames)}): {relative_filenames!r} | "
-                f"Files successfully transferred ({len(transfer_success)}): {list(transfer_success)!r} | "
-                f"Missing files: {list(set(relative_filenames) - transfer_success)!r}"
+                f"Files identified for transfer ({len(relative_filenames)}): {relative_filenames!r}"
+            )
+            logger.debug(
+                f"Files successfully transferred ({len(transfer_success)}): {list(transfer_success)!r}"
             )
 
         # Compare files from rsync stdout to original list to verify transfer
