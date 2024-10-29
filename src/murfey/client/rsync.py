@@ -381,6 +381,7 @@ class RSyncer(Observer):
             logger.warning(f"rsync stderr: {line!r}")
 
         # Generate list of relative filenames for this batch of transferred files
+        #   Relative filenames will be safe to use on both Windows and Unix
         relative_filenames: List[Path] = []
         for f in files:
             try:
@@ -388,6 +389,7 @@ class RSyncer(Observer):
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
 
+        # Encode files to rsync as bytestring
         if self._remove_files:
             if self._required_substrings_for_removal:
                 rsync_stdin_remove = b"\n".join(
@@ -416,24 +418,36 @@ class RSyncer(Observer):
             rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
 
         # Create and run rsync subprocesses
-        # rsync commands to pass to subprocess
+        # rsync default settings
         rsync_cmd = [
             "rsync",
             "-iiv",
             "--times",
             "--progress",
             "--outbuf=line",
-            "--files-from=-",
-            "-p",  # preserve permissions
-            "--chmod=D0750,F0750",  # 4: Read, 2: Write, 1: Execute | User, Group, Others
+            "--files-from=-",  # '-' indicates reading from standard input
+            # Needed as a pair to trigger permission modifications
+            # Ref: https://serverfault.com/a/796341
+            "-p",
+            "--chmod=D0750,F0750",  # Use extended chmod format
         ]
+        # Add file locations
         rsync_cmd.extend([".", self._remote])
-        result: subprocess.CompletedProcess | None = None
+
+        # Transfer files to destination
+        result: subprocess.CompletedProcess[bytes] | None = None
         success = True
         if rsync_stdin:
+            # Wrap rsync command in a bash command
+            bash_cmd = [
+                "bash",
+                "-c",
+                # rsync command passed in as a single string
+                " ".join(rsync_cmd),
+            ]
             result = subprocess.run(
-                rsync_cmd,
-                cwd=str(self._basepath),
+                bash_cmd,
+                cwd=self._basepath,  # As-is Path is fine
                 capture_output=True,
                 input=rsync_stdin,
             )
@@ -443,15 +457,24 @@ class RSyncer(Observer):
                 parse_stderr(stderr_line)
             success = result.returncode == 0
 
+        # Remove files from source
         if rsync_stdin_remove:
+            # Insert flag file removal flag before locations
             rsync_cmd.insert(-2, "--remove-source-files")
+            # Wrap rsync command in a bash command
+            bash_cmd = [
+                "bash",
+                "-c",
+                # Pass rsync command as single string
+                " ".join(rsync_cmd),
+            ]
             result = subprocess.run(
                 rsync_cmd,
                 cwd=str(self._basepath),
+                capture_output=True,
                 input=rsync_stdin_remove,
             )
-            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
-                parse_stdout(stdout_line)
+            # Only error log should be needed for file removal rsync process
             for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
                 parse_stderr(stderr_line)
 
