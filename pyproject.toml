@@ -95,6 +95,8 @@ murfey = "murfey.client:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.auth.token_validation"]
 "password" = "murfey.server.api.auth:password_token_validation"
+[project.entry-points."murfey.config.extraction"]
+"murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
 "lif_to_stack" = "murfey.workflows.lif_to_stack:zocalo_cluster_request"
 "tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
