@@ -164,7 +164,7 @@ def get_extended_machine_config(
     extension_name: str, instrument_name: str = ""
 ) -> Optional[BaseModel]:
     machine_config = get_machine_config(instrument_name=instrument_name).get(
-        instrument_name
+        instrument_name or get_microscope()
     )
     if not machine_config:
         return None
