@@ -34,7 +34,7 @@ def zocalo_cluster_request(
                 f"Unable to find the root folder {root_folder!r} in the file path {file!r}"
             )
 
-        # Construct the session
+        # Construct the session and job name
         session_dir = "/".join(path_parts[:root_index])
         job_name = "--".join(
             [p.replace(" ", "_") if " " in p else p for p in path_parts][
