@@ -2946,10 +2946,15 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "register_lif_preprocessing_result":
             # Write a function to register received CLEM LIF processing results
+            # _register_lif_preprocessing_results(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
+                #   When a message is received, it goes into unacked
+                #   When it's acked, it gets removed from the queue
+                #   When it's nacked, it eventually ends up in the DLQ
         elif message["register"] == "register_tiff_preprocessing_result":
             # Write a function to register received CLEM TIFF processing results
+            # _register_tiff_preprocessing_results(message0)
             if _transport_object:
                 _transport_object.transport.ack(header)
         if _transport_object:
