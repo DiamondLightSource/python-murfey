@@ -22,49 +22,46 @@ def zocalo_cluster_request(
     messenger: Optional[TransportManager] = None,
 ):
     if messenger:
-        path_parts = list(file.parts)
+        # Use file path parts to construct parameters
+        path_parts = list((file.parent / file.stem).parts)
+        # Replace leading "/" in Unix paths
+        path_parts[0] = "" if path_parts[0] == "/" else path_parts[0]
+        try:
+            # Find the position of the root folder in the list
+            root_index = [p.lower() for p in path_parts].index(root_folder.lower())
+        except ValueError:
+            raise Exception(
+                f"Unable to find the root folder {root_folder!r} in the file path {file!r}"
+            )
 
-        # Construct path to session directory
-        session_dir_parts = []
-        for p in range(len(path_parts)):
-            part = path_parts[p]
-            # Remove leading slash for subsequent rejoining
-            if part == "/":
-                part = ""
-            # Append up to, but not including, root folder
-            if part.lower() == root_folder.lower():
-                break
-            session_dir_parts.append(part)
-        session_dir = Path("/".join(session_dir_parts))
-
-        # Construct the job name
-        job_name_parts = []
-        trigger = False
-        for p in range(len(path_parts)):
-            part = path_parts[p].replace(" ", "_")  # Remove spaces
-            if trigger is True:
-                job_name_parts.append(part)
-            # Start appending at the level below the root folder
-            if part.lower() == root_folder.lower():
-                trigger = True
-        job_name = "--".join(job_name_parts)
+        # Construct the session
+        session_dir = "/".join(path_parts[:root_index])
+        job_name = "--".join(
+            [p.replace(" ", "_") if " " in p else p for p in path_parts][
+                root_index + 1 :
+            ]
+        )
 
         # Load machine config to get the feedback queue
         machine_config = get_machine_config()
         feedback_queue = machine_config[instrument_name].feedback_queue
 
         # Send the message
+        #   The keys under "parameters" will populate all the matching fields in {}
+        #   in the processing recipe
         messenger.send(
             "processing_recipe",
             {
                 "recipes": ["clem-lif-to-stack"],
                 "parameters": {
+                    # Job parameters
+                    "lif_file": str(file),
+                    "root_folder": root_folder,
+                    # Other recipe parameters
                     "session_dir": str(session_dir),
-                    "lif_path": str(file),
-                    "root_dir": root_folder,
+                    "session_id": session_id,
                     "job_name": job_name,
                     "feedback_queue": feedback_queue,
-                    "session_id": session_id,
                 },
             },
             new_connection=True,
