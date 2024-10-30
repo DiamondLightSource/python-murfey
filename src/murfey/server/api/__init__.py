@@ -736,7 +736,11 @@ def register_completed_tilt_series(
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
-        if check_tilt_series_mc(ts.id) and not ts.processing_requested:
+        if (
+            check_tilt_series_mc(ts.id)
+            and not ts.processing_requested
+            and ts.tilt_series_length > 2
+        ):
             ts.processing_requested = True
             db.add(ts)
 
