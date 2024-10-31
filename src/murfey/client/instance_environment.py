@@ -42,16 +42,16 @@ class MurfeyInstanceEnvironment(BaseModel):
     destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
+    data_collection_group_ids: Dict[str, int] = {}
+    data_collection_ids: Dict[str, int] = {}
+    processing_job_ids: Dict[str, Dict[str, int]] = {}
+    autoproc_program_ids: Dict[str, Dict[str, int]] = {}
     id_tag_registry: Dict[str, List[str]] = {
         "data_collection_group": [],
         "data_collection": [],
         "processing_job": [],
         "auto_proc_program": [],
     }
-    data_collection_group_ids: Dict[str, int] = {}
-    data_collection_ids: Dict[str, int] = {}
-    processing_job_ids: Dict[str, Dict[str, int]] = {}
-    autoproc_program_ids: Dict[str, Dict[str, int]] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     listeners: Dict[str, Set[Callable]] = {}
