@@ -143,7 +143,7 @@ def machine_info() -> Optional[MachineConfig]:
 
 @lru_cache(maxsize=5)
 @router.get("/instruments/{instrument_name}/machine")
-def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
+def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
         return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
             instrument_name

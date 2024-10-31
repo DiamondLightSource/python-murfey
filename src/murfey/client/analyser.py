@@ -22,7 +22,7 @@ from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
-from murfey.util import Observer, get_machine_config
+from murfey.util import Observer, get_machine_config_client
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -73,7 +73,7 @@ class Analyser(Observer):
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (
-            get_machine_config(
+            get_machine_config_client(
                 str(environment.url.geturl()),
                 instrument_name=environment.instrument_name,
                 demo=environment.demo,
@@ -86,6 +86,10 @@ class Analyser(Observer):
         """
         Identifies the file extension and stores that information in the class.
         """
+        if "atlas" in file_path.parts:
+            self._extension = file_path.suffix
+            return True
+
         if (
             required_substrings := self._murfey_config.get(
                 "data_required_substrings", {}
@@ -121,6 +125,10 @@ class Analyser(Observer):
         stages of processing. Actions to take for individual files will be determined
         in the Context classes themselves.
         """
+        if "atlas" in file_path.parts:
+            self._role = "detector"
+            self._context = SPAMetadataContext("epu", self._basepath)
+            return True
 
         # CLEM workflow checks
         # Look for LIF and XLIF files
@@ -137,7 +145,7 @@ class Analyser(Observer):
             and self._environment
         ):
             created_directories = set(
-                get_machine_config(
+                get_machine_config_client(
                     str(self._environment.url.geturl()),
                     instrument_name=self._environment.instrument_name,
                     demo=self._environment.demo,
@@ -157,7 +165,7 @@ class Analyser(Observer):
                     logger.info("Acquisition software: EPU")
                     if self._environment:
                         try:
-                            cfg = get_machine_config(
+                            cfg = get_machine_config_client(
                                 str(self._environment.url.geturl()),
                                 instrument_name=self._environment.instrument_name,
                                 demo=self._environment.demo,
@@ -310,7 +318,10 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if self._role == "detector":
+                        if (
+                            self._role == "detector"
+                            and "atlas" not in transferred_file.parts
+                        ):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -376,7 +387,10 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if self._role == "detector":
+                        if (
+                            self._role == "detector"
+                            and "atlas" not in transferred_file.parts
+                        ):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(

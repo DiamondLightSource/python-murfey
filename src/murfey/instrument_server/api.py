@@ -237,9 +237,9 @@ def get_possible_gain_references(
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     candidates = []
-    for gf in secure_path(Path(machine_config["gain_reference_directory"])).glob(
-        "**/*"
-    ):
+    for gf in secure_path(
+        Path(machine_config["gain_reference_directory"]), keep_spaces=True
+    ).glob("**/*"):
         if gf.is_file():
             candidates.append(
                 File(

@@ -760,5 +760,4 @@ def clear(url: str):
     metadata = sqlalchemy.MetaData()
     metadata.create_all(engine)
     metadata.reflect(engine)
-
     metadata.drop_all(engine)
