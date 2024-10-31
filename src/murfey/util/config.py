@@ -8,10 +8,10 @@ from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Extra
 
 
-class MachineConfig(BaseModel):
+class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
     data_directories: Dict[Path, str]
