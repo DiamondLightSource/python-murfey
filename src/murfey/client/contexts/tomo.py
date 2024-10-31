@@ -67,6 +67,8 @@ def _construct_tilt_series_name(file_path: Path) -> str:
 def _midpoint(angles: List[float]) -> int:
     if not angles:
         return 0
+    if len(angles) <= 2:
+        return round(angles[0])
     sorted_angles = sorted(angles)
     return round(
         sorted_angles[len(sorted_angles) // 2]

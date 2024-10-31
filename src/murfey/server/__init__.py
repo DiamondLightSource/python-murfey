@@ -2511,6 +2511,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if (
                 check_tilt_series_mc(relevant_tilt_series.id)
                 and not relevant_tilt_series.processing_requested
+                and relevant_tilt_series.tilt_series_length > 2
             ):
                 relevant_tilt_series.processing_requested = True
                 murfey_db.add(relevant_tilt_series)
