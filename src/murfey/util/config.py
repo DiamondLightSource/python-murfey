@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, BaseSettings
+from backports.entry_points_selectable import entry_points
+from pydantic import BaseModel, BaseSettings, Extra
 
 
-class MachineConfig(BaseModel):
+class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
     data_directories: Dict[Path, str]
@@ -157,3 +158,16 @@ def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
             Path(settings.murfey_machine_configuration), microscope
         )
     return machine_config
+
+
+def get_extended_machine_config(
+    extension_name: str, instrument_name: str = ""
+) -> Optional[BaseModel]:
+    machine_config = get_machine_config(instrument_name=instrument_name).get(
+        instrument_name or get_microscope()
+    )
+    if not machine_config:
+        return None
+    model = entry_points.select(group="murfey.config", name=extension_name)[0].load()
+    data = getattr(machine_config, extension_name, {})
+    return model(data)
