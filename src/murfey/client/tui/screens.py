@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # import contextlib
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -17,7 +18,6 @@ from typing import (
     TypeVar,
 )
 
-import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
@@ -199,7 +199,7 @@ def validate_form(form: dict, model: BaseModel) -> bool:
     try:
         convert = lambda x: None if x == "None" else x
         validated = model(**{k: convert(v) for k, v in form.items()})
-        log.info(validated.dict())
+        log.info(validated.model_dump())
         return True
     except (AttributeError, ValidationError) as e:
         log.warning(f"Form validation failed: {str(e)}")
@@ -848,7 +848,7 @@ class GainReference(Screen):
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
             else:
-                gain_rsync = procrunner.run(cmd)
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
                         f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"

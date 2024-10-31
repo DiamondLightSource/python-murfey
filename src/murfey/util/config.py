@@ -8,7 +8,8 @@ from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra
+from pydantic import BaseModel, Extra
+from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
@@ -57,7 +58,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
 
-    model_search_directory: str = "processing"
+    picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
     failure_queue: str = ""
