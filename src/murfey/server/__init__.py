@@ -100,14 +100,33 @@ def record_failure(
     f: Callable, record_queue: str = "", is_callback: bool = True
 ) -> Callable:
     @wraps(f)
-    def wrapper(*args, **kwargs):
+    def wrapper(
+        *args,
+        record_queue: str = record_queue,
+        is_callback: bool = is_callback,
+        **kwargs,
+    ):
+        try:
+            message = args[0]
+            session_id = message["session_id"]
+            instrument_name = (
+                murfey_db.exec(select(db.Session).where(db.Session.id == session_id))
+                .one()
+                .instrument_name
+            )
+        except Exception:
+            logger.warning(
+                "Could not record message failure as the instrument name could not be determined"
+            )
         try:
             return f(*args, **kwargs)
         except Exception:
             logger.warning(f"Call to {f} failed", exc_info=True)
             if _transport_object and is_callback:
+                machine_config = get_machine_config().get(instrument_name)
+                if not machine_config:
+                    return None
                 if not record_queue:
-                    machine_config = get_machine_config()
                     record_queue = (
                         machine_config.failure_queue
                         or f"dlq.{_transport_object.feedback_queue}"
