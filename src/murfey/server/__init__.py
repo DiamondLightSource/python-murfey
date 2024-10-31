@@ -7,10 +7,10 @@ import os
 import subprocess
 import time
 from datetime import datetime
-from functools import partial, singledispatch, wraps
+from functools import partial, singledispatch
 from pathlib import Path
 from threading import Thread
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 import mrcfile
 import numpy as np
@@ -94,28 +94,6 @@ class JobIDs(NamedTuple):
     pid: int
     appid: int
     client_id: int
-
-
-def record_failure(
-    f: Callable, record_queue: str = "", is_callback: bool = True
-) -> Callable:
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception:
-            logger.warning(f"Call to {f} failed", exc_info=True)
-            if _transport_object and is_callback:
-                if not record_queue:
-                    machine_config = get_machine_config()
-                    record_queue = (
-                        machine_config.failure_queue
-                        or f"dlq.{_transport_object.feedback_queue}"
-                    )
-                _transport_object.send(record_queue, args[0], new_connection=True)
-            return None
-
-    return wrapper
 
 
 def sanitise(in_string: str) -> str:
@@ -1935,7 +1913,6 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
-@record_failure
 def _flush_spa_preprocessing(message: dict):
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
@@ -2045,7 +2022,6 @@ def _flush_spa_preprocessing(message: dict):
     return None
 
 
-@record_failure
 def _flush_tomography_preprocessing(message: dict):
     session_id = message["session_id"]
     instrument_name = (
