@@ -748,7 +748,6 @@ class MurfeyTUI(App):
         if self._multigrid_watcher:
             self._multigrid_watcher.stop()
         self.exit()
-        exit()
 
     async def action_remove_session(self) -> None:
         requests.delete(
@@ -763,14 +762,12 @@ class MurfeyTUI(App):
         if self._multigrid_watcher:
             self._multigrid_watcher.stop()
         self.exit()
-        exit()
 
     def clean_up_quit(self) -> None:
         requests.delete(
             f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
-        exit()
 
     async def action_clear(self) -> None:
         machine_config = get_machine_config_client(
@@ -817,7 +814,6 @@ class MurfeyTUI(App):
             f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
-        exit()
 
     async def action_process(self) -> None:
         self.processing_btn.disabled = False

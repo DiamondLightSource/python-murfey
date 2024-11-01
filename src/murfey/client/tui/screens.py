@@ -1270,7 +1270,6 @@ class WaitingScreen(Screen):
                 f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session"
             )
             self.app.exit()
-            exit()
 
 
 class MainScreen(Screen):
