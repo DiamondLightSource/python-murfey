@@ -24,20 +24,6 @@ from murfey.util.models import Visit
 logger = logging.getLogger("murfey.util")
 
 
-def posix_path(path: Path) -> str:
-    """
-    Converts a Windows-style path into a Posix one. Used primarily when running
-    subproceses in bash terminals, which can only accept Posix paths.
-    """
-    path_parts = list(path.parts)
-    # Check if it's a Windows-style path
-    if path_parts[0].endswith((":/", ":\\")):
-        path_parts[0] = "/" + path_parts[0].strip(":/\\").lower()
-        posix_path = "/".join(path_parts)
-        return posix_path
-    return str(path)
-
-
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
@@ -79,6 +65,22 @@ def sanitise_nonpath(in_string: str) -> str:
 def secure_path(in_path: Path) -> Path:
     secured_parts = [secure_filename(p) for p in in_path.parts]
     return Path("/".join(secured_parts))
+
+
+def posix_path(path: Path) -> str:
+    """
+    Converts a Windows-style path into a Posix one. Used primarily when running
+    subproceses in bash terminals on Windows devices, which can only accept
+    Posix paths.
+    """
+    path_parts = list(path.parts)
+    # Check if it's a Windows-style path and converts it to a Posix one
+    #   e.g.: C:\Users\user -> /c/Users/user
+    if path_parts[0].endswith((":/", ":\\")):
+        path_parts[0] = "/" + path_parts[0].strip(":/\\").lower()
+        posix_path = "/".join(path_parts)
+        return posix_path
+    return str(path)
 
 
 @lru_cache(maxsize=1)
