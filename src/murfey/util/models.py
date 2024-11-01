@@ -160,6 +160,22 @@ class TIFFSeriesInfo(BaseModel):
     series_metadata: Path
 
 
+class LIFPreprocessingResult(BaseModel):
+    image_stack: Path
+    metadata: Path
+    series_name: str
+    color: str
+    parent_lif: Path
+
+
+class TIFFPreprocessingResult(BaseModel):
+    image_stack: Path
+    metadata: Path
+    series_name: str
+    color: str
+    parent_tiffs: List[Path]
+
+
 """
 FIB
 ===
