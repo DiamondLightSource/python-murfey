@@ -913,7 +913,7 @@ class GainReference(Screen):
                 f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             # Encase in bash shell
-            cmd = ["bash", "-c" " ".join(rsync_cmd)]
+            cmd = ["bash", "-c", " ".join(rsync_cmd)]
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
             else:
