@@ -14,7 +14,6 @@ from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Button, Input
 
-from murfey.client import posix_path
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -36,6 +35,7 @@ from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import (
     capture_post,
     get_machine_config,
+    posix_path,
     read_config,
     set_default_acquisition_output,
 )

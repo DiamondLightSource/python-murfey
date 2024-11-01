@@ -46,7 +46,6 @@ from textual.widgets import (
 )
 from werkzeug.utils import secure_filename
 
-from murfey.client import posix_path
 from murfey.client.analyser import Analyser, spa_form_dependencies
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -57,7 +56,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config, read_config
+from murfey.util import capture_post, get_machine_config, posix_path, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")

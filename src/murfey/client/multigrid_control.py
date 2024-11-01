@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 import requests
 
 import murfey.client.websocket
-from murfey.client import posix_path
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -20,7 +19,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post
+from murfey.util import capture_post, posix_path
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
