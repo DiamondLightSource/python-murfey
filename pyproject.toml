@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.14.0"
+version = "0.15.3"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -83,6 +83,7 @@ murfey = "murfey.client:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
+"murfey.dlq_murfey" = "murfey.cli.dlq_resubmit:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
@@ -94,6 +95,8 @@ murfey = "murfey.client:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.auth.token_validation"]
 "password" = "murfey.server.api.auth:password_token_validation"
+[project.entry-points."murfey.config.extraction"]
+"murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
 "lif_to_stack" = "murfey.workflows.lif_to_stack:zocalo_cluster_request"
 "tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"

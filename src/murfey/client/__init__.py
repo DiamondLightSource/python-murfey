@@ -327,7 +327,9 @@ def run():
 
     status_bar = StatusBar()
 
-    machine_data = requests.get(f"{murfey_url.geturl()}/machine").json()
+    machine_data = requests.get(
+        f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+    ).json()
     gain_ref: Path | None = None
 
     instance_environment = MurfeyInstanceEnvironment(

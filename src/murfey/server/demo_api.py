@@ -142,7 +142,7 @@ def machine_info() -> Optional[MachineConfig]:
 
 @lru_cache(maxsize=5)
 @router.get("/instruments/{instrument_name}/machine")
-def machine_info_by_name(instrument_name: str) -> MachineConfig | None:
+def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
         return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
             instrument_name
@@ -843,26 +843,31 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
+# @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+# def get_current_visits(instrument_name: str):
+#     return [
+#         Visit(
+#             start=datetime.datetime.now(),
+#             end=datetime.datetime.now() + datetime.timedelta(days=1),
+#             session_id=1,
+#             name="cm31111-2",
+#             beamline="m12",
+#             proposal_title="Nothing of importance",
+#         ),
+#         Visit(
+#             start=datetime.datetime.now(),
+#             end=datetime.datetime.now() + datetime.timedelta(days=1),
+#             session_id=1,
+#             name="cm31111-3",
+#             beamline="m12",
+#             proposal_title="Nothing of importance",
+#         ),
+#     ]
+
+
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-def get_current_visits(instrument_name: str):
-    return [
-        Visit(
-            start=datetime.datetime.now(),
-            end=datetime.datetime.now() + datetime.timedelta(days=1),
-            session_id=1,
-            name="cm31111-2",
-            beamline="m12",
-            proposal_title="Nothing of importance",
-        ),
-        Visit(
-            start=datetime.datetime.now(),
-            end=datetime.datetime.now() + datetime.timedelta(days=1),
-            session_id=1,
-            name="cm31111-3",
-            beamline="m12",
-            proposal_title="Nothing of importance",
-        ),
-    ]
+def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
 @router.get("/visits/{visit_name}")

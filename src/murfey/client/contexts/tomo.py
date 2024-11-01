@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Callable, Dict, List, NamedTuple, Optional, OrderedDict
+from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
@@ -19,7 +19,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
     global_env_lock,
 )
-from murfey.util import authorised_requests, capture_post, get_machine_config
+from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
@@ -27,47 +27,8 @@ logger = logging.getLogger("murfey.client.contexts.tomo")
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-class TiltInfoExtraction(NamedTuple):
-    series: Callable[[Path], str]
-    angle: Callable[[Path], str]
-    tag: Callable[[Path], str]
-
-
-def _get_tilt_series_v5_7(p: Path) -> str:
-    return p.name.split("_")[1]
-
-
 def _get_tilt_angle_v5_7(p: Path) -> str:
     return p.name.split("[")[1].split("]")[0]
-
-
-def _get_tilt_tag_v5_7(p: Path) -> str:
-    return p.name.split("_")[0]
-
-
-def _get_slice_index_v5_11(tag: str) -> int:
-    slice_index = 0
-    for i, ch in enumerate(tag[::-1]):
-        if not ch.isnumeric():
-            slice_index = -i
-            break
-    if not slice_index:
-        raise ValueError(
-            f"The file tag {tag} does not end in numeric characters or is entirely numeric: cannot parse"
-        )
-    return slice_index
-
-
-def _get_tilt_series_v5_11(p: Path) -> str:
-    tag = p.name.split("_")[0]
-    slice_index = _get_slice_index_v5_11(tag)
-    return tag[slice_index:]
-
-
-def _get_tilt_tag_v5_11(p: Path) -> str:
-    tag = p.name.split("_")[0]
-    slice_index = _get_slice_index_v5_11(tag)
-    return tag[:slice_index]
 
 
 def _get_tilt_angle_v5_11(p: Path) -> str:
@@ -77,45 +38,23 @@ def _get_tilt_angle_v5_11(p: Path) -> str:
 
 def _find_angle_index(split_name: List[str]) -> int:
     for i, part in enumerate(split_name):
-        if "." in part:
+        if "." in part and part[-1].isnumeric():
             return i
-    return 0
-
-
-def _get_tilt_series_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
-    angle_idx = _find_angle_index(split_name)
-    if split_name[angle_idx - 2].isnumeric():
-        return split_name[angle_idx - 2]
-    return ""
+    return -1
 
 
 def _get_tilt_angle_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
+    split_name = p.stem.split("_")
     angle_idx = _find_angle_index(split_name)
+    if angle_idx == -1:
+        return ""
     return split_name[angle_idx]
 
 
-def _get_tilt_tag_v5_12(p: Path) -> str:
-    split_name = p.name.split("_")
-    angle_idx = _find_angle_index(split_name)
-    if split_name[angle_idx - 2].isnumeric():
-        return "_".join(split_name[: angle_idx - 2])
-    return "_".join(split_name[: angle_idx - 1])
-
-
 tomo_tilt_info = {
-    "5.7": TiltInfoExtraction(
-        _get_tilt_series_v5_7, _get_tilt_angle_v5_7, _get_tilt_tag_v5_7
-    ),
-    "5.11": TiltInfoExtraction(
-        _get_tilt_series_v5_11, _get_tilt_angle_v5_11, _get_tilt_tag_v5_11
-    ),
-    "5.12": TiltInfoExtraction(
-        _get_tilt_series_v5_12,
-        _get_tilt_angle_v5_12,
-        _get_tilt_tag_v5_12,
-    ),
+    "5.7": _get_tilt_angle_v5_7,
+    "5.11": _get_tilt_angle_v5_11,
+    "5.12": _get_tilt_angle_v5_12,
 }
 
 
@@ -128,6 +67,8 @@ def _construct_tilt_series_name(file_path: Path) -> str:
 def _midpoint(angles: List[float]) -> int:
     if not angles:
         return 0
+    if len(angles) <= 2:
+        return round(angles[0])
     sorted_angles = sorted(angles)
     return round(
         sorted_angles[len(sorted_angles) // 2]
@@ -171,14 +112,10 @@ class TomographyContext(Context):
         self._tilt_series_sizes: Dict[str, int] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
-        self._motion_corrected_tilt_series: Dict[str, List[Path]] = {}
-        self._last_transferred_file: Path | None = None
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._preprocessing_triggers: dict = {}
         self._lock: RLock = RLock()
-        self._extract_tilt_series: Callable[[Path], str] | None = None
-        self._extract_tilt_tag: Callable[[Path], str] | None = None
 
     def _flush_data_collections(self):
         logger.info(
@@ -218,64 +155,6 @@ class TomographyContext(Context):
                 if process_file:
                     capture_post(tr[0], json=process_file)
             self._preprocessing_triggers.pop(tag)
-
-    def _check_for_alignment(
-        self,
-        movie_path: Path,
-        motion_corrected_path: Path,
-        url: str,
-        dcid: int,
-        pjid: int,
-        appid: int,
-        mvid: int,
-        tilt_angles: List,
-        manual_tilt_offset: Optional[float],
-        pixel_size: Optional[float],
-    ):
-        if self._extract_tilt_series and self._extract_tilt_tag:
-            tilt_series = (
-                f"{self._extract_tilt_tag(movie_path)}_{self._extract_tilt_series(movie_path)}"
-                if self._extract_tilt_tag(movie_path)
-                else self._extract_tilt_series(movie_path)
-            )
-        else:
-            return
-
-        if self._motion_corrected_tilt_series.get(
-            tilt_series
-        ) and motion_corrected_path not in self._motion_corrected_tilt_series.get(
-            tilt_series, {}
-        ):
-            self._motion_corrected_tilt_series[tilt_series].append(
-                motion_corrected_path
-            )
-        else:
-            self._motion_corrected_tilt_series[tilt_series] = [motion_corrected_path]
-        if tilt_series in self._completed_tilt_series:
-            if (
-                len(self._motion_corrected_tilt_series[tilt_series])
-                == len(self._tilt_series[tilt_series])
-                and len(self._motion_corrected_tilt_series[tilt_series]) > 1
-                and tilt_series not in self._aligned_tilt_series
-            ):
-                try:
-
-                    series_data: dict = {
-                        "name": tilt_series,
-                        "file_tilt_list": str(tilt_angles),
-                        "dcid": dcid,
-                        "processing_job": pjid,
-                        "autoproc_program_id": appid,
-                        "motion_corrected_path": str(motion_corrected_path),
-                        "movie_id": mvid,
-                        "manual_tilt_offset": manual_tilt_offset,
-                        "pixel_size": pixel_size,
-                    }
-                    capture_post(url, json=series_data)
-                    with self._lock:
-                        self._aligned_tilt_series.append(tilt_series)
-                except Exception as e:
-                    logger.warning(f"Data error {e}")
 
     def _complete_process_file(
         self,
@@ -341,7 +220,7 @@ class TomographyContext(Context):
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
     ):
-        machine_config = get_machine_config(
+        machine_config = get_machine_config_client(
             str(environment.url.geturl()),
             instrument_name=environment.instrument_name,
             demo=environment.demo,
@@ -370,11 +249,8 @@ class TomographyContext(Context):
     def _add_tilt(
         self,
         file_path: Path,
-        extract_tilt_series: Callable[[Path], str],
         extract_tilt_angle: Callable[[Path], str],
-        extract_tilt_tag: Callable[[Path], str],
         environment: MurfeyInstanceEnvironment | None = None,
-        required_position_files: List[Path] | None = None,
         required_strings: List[str] | None = None,
     ) -> List[str]:
         if not environment:
@@ -384,16 +260,11 @@ class TomographyContext(Context):
         if not source:
             logger.warning(f"No source found for file {file_path}")
             return []
-        # required_position_files = required_position_files or []
         required_strings = (
             ["fractions"] if required_strings is None else required_strings
         )
         if required_strings and not any(r in file_path.name for r in required_strings):
             return []
-        if not self._extract_tilt_series:
-            self._extract_tilt_series = extract_tilt_series
-        if not self._extract_tilt_tag:
-            self._extract_tilt_tag = extract_tilt_tag
         try:
             tilt_angle = extract_tilt_angle(file_path)
             try:
@@ -548,24 +419,6 @@ class TomographyContext(Context):
                 else:
                     self._tilt_series[tilt_series].append(file_path)
 
-        res = []
-        if self._last_transferred_file:
-            last_tilt_series = _construct_tilt_series_name(self._last_transferred_file)
-
-            last_tilt_angle = extract_tilt_angle(self._last_transferred_file)
-            self._last_transferred_file = file_path
-            if (
-                last_tilt_series != tilt_series
-                and last_tilt_angle != tilt_angle
-                or self._tilt_series_sizes.get(tilt_series)
-            ) or self._completed_tilt_series:
-                res = self._check_tilt_series(
-                    tilt_series,
-                    required_position_files or [],
-                    file_transferred_to,
-                    environment=environment,
-                )
-
         if environment:
             tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tilt"
             tilt_data = {
@@ -619,99 +472,28 @@ class TomographyContext(Context):
             }
             capture_post(preproc_url, json=preproc_data)
 
-        self._last_transferred_file = file_path
-        return res
+        return self._check_tilt_series(tilt_series)
 
     def _check_tilt_series(
         self,
         tilt_series: str,
-        required_position_files: List[Path],
-        file_transferred_to: Path | None,
-        environment: MurfeyInstanceEnvironment | None = None,
     ) -> List[str]:
         newly_completed_series: List[str] = []
-        if not self._tilt_series:
+        mdoc_tilt_series_size = self._tilt_series_sizes.get(tilt_series, 0)
+        if not self._tilt_series or not mdoc_tilt_series_size:
             return newly_completed_series
-        this_tilt_series_size = len(self._tilt_series.get(tilt_series, []))
-        tilt_series_size_check = (
-            (this_tilt_series_size == self._tilt_series_sizes.get(tilt_series))
-            if self._tilt_series_sizes.get(tilt_series)
-            else False
-        )
-        if tilt_series_size_check and not required_position_files:
-            if tilt_series not in self._completed_tilt_series:
-                self._completed_tilt_series.append(tilt_series)
-                newly_completed_series.append(tilt_series)
-        for ts, ta in self._tilt_series.items():
-            required_position_files_check = (
-                all(_f.is_file() for _f in required_position_files)
-                if required_position_files
-                else True
-            )
-            if self._tilt_series_sizes.get(ts):
-                completion_test = len(ta) >= self._tilt_series_sizes[ts]
-                if completion_test:
-                    completion_test = required_position_files_check
-            else:
-                completion_test = False
-            if ts not in self._completed_tilt_series and completion_test:
-                newly_completed_series.append(ts)
-                self._completed_tilt_series.append(ts)
-                if environment and file_transferred_to:
-                    file_tilt_list = []
-                    movie: str
-                    angle: str
-                    for movie, angle in environment.tilt_angles[ts]:
-                        if environment.motion_corrected_movies.get(Path(movie)):
-                            file_tilt_list.append(
-                                [
-                                    str(
-                                        environment.motion_corrected_movies[
-                                            Path(movie)
-                                        ][0]
-                                    ),
-                                    angle,
-                                    str(
-                                        environment.motion_corrected_movies[
-                                            Path(movie)
-                                        ][1]
-                                    ),
-                                ]
-                            )
-                        if environment.motion_corrected_movies.get(file_transferred_to):
-                            self._check_for_alignment(
-                                file_transferred_to,
-                                Path(
-                                    environment.motion_corrected_movies[  # key error PosixPath
-                                        file_transferred_to
-                                    ][
-                                        0
-                                    ]
-                                ),
-                                environment.url.geturl(),
-                                environment.data_collection_ids[ts],
-                                environment.processing_job_ids[ts]["em-tomo-align"],
-                                environment.autoproc_program_ids[ts]["em-tomo-align"],
-                                int(
-                                    environment.motion_corrected_movies[
-                                        file_transferred_to
-                                    ][1]
-                                ),
-                                file_tilt_list,
-                                environment.data_collection_parameters.get(
-                                    "manual_tilt_offset"
-                                ),
-                                environment.data_collection_parameters.get(
-                                    "pixel_size_on_image"
-                                ),
-                            )
+
+        counted_tilts = len(self._tilt_series.get(tilt_series, []))
+        tilt_series_size_check = counted_tilts >= mdoc_tilt_series_size
+        if tilt_series_size_check and tilt_series not in self._completed_tilt_series:
+            self._completed_tilt_series.append(tilt_series)
+            newly_completed_series.append(tilt_series)
         return newly_completed_series
 
     def _add_tomo_tilt(
         self,
         file_path: Path,
         environment: MurfeyInstanceEnvironment | None = None,
-        required_position_files: List[Path] | None = None,
         required_strings: List[str] | None = None,
     ) -> List[str]:
         required_strings = (
@@ -730,18 +512,10 @@ class TomographyContext(Context):
                 tilt_info_extraction = tomo_tilt_info["5.7"]
         else:
             tilt_info_extraction = tomo_tilt_info["5.7"]
-        tilt_series = _construct_tilt_series_name(file_path)
         return self._add_tilt(
             file_path,
-            tilt_info_extraction.series,
-            tilt_info_extraction.angle,
-            tilt_info_extraction.tag,
+            tilt_info_extraction,
             environment=environment,
-            required_position_files=(
-                required_position_files
-                if required_position_files is not None
-                else [file_path.parent / (tilt_series + ".mdoc")]
-            ),
             required_strings=required_strings,
         )
 
@@ -767,9 +541,7 @@ class TomographyContext(Context):
 
         return self._add_tilt(
             file_path,
-            _extract_tilt_series,
             lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
-            lambda x: "",
             environment=environment,
             required_strings=[],
         )
@@ -781,13 +553,20 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> List[str]:
+        super().post_transfer(
+            transferred_file=transferred_file,
+            role=role,
+            environment=environment,
+            **kwargs,
+        )
+
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
         if role == "detector" and "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
                     if environment:
-                        machine_config = get_machine_config(
+                        machine_config = get_machine_config_client(
                             str(environment.url.geturl()),
                             instrument_name=environment.instrument_name,
                             demo=environment.demo,
@@ -802,7 +581,6 @@ class TomographyContext(Context):
                     completed_tilts = self._add_tomo_tilt(
                         transferred_file,
                         environment=environment,
-                        required_position_files=kwargs.get("required_position_files"),
                         required_strings=kwargs.get("required_strings")
                         or required_strings,
                     )
@@ -817,14 +595,7 @@ class TomographyContext(Context):
                 if environment:
                     source = self._get_source(transferred_file, environment)
                     if source:
-                        completed_tilts = self._check_tilt_series(
-                            tilt_series,
-                            kwargs.get("required_position_files") or [],
-                            self._file_transferred_to(
-                                environment, source, transferred_file
-                            ),
-                            environment=environment,
-                        )
+                        completed_tilts = self._check_tilt_series(tilt_series)
 
                     # Always update the tilt series length in the database after an mdoc
                     if environment.murfey_session is not None:

@@ -167,8 +167,8 @@ def get_instrument_display_name(instrument_name: str) -> str:
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    if machine_config.get(instrument_name):
-        return machine_config[instrument_name].display_name
+    if machine_config:
+        return machine_config.display_name
     return ""
 
 
@@ -208,11 +208,16 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     client_env = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
     ).one()
+    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
     if client_env:
         client_env.visit = visit_name
         db.add(client_env)
         db.commit()
-        db.close()
+    if session:
+        session.visit = visit_name
+        db.add(session)
+        db.commit()
+    db.close()
     return client_info
 
 
@@ -396,14 +401,8 @@ def register_spa_proc_params(
         **dict(proc_params),
         "session_id": session_id,
     }
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     if _transport_object:
-        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
 
 
 @router.get("/sessions/{session_id}/grid_squares")
@@ -602,14 +601,8 @@ def register_tomo_preproc_params(
         **dict(proc_params),
         "session_id": session_id,
     }
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     if _transport_object:
-        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
 
 
 @router.post("/sessions/{session_id}/tomography_processing_parameters")
@@ -660,14 +653,8 @@ def flush_spa_processing(
         "session_id": session_id,
         "tag": tag.tag,
     }
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     if _transport_object:
-        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
     return
 
 
@@ -685,14 +672,8 @@ def flush_tomography_processing(
         "visit_name": visit_name,
         "data_collection_group_tag": rsync_source.rsync_source,
     }
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     if _transport_object:
-        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
     return
 
 
@@ -755,7 +736,11 @@ def register_completed_tilt_series(
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
-        if check_tilt_series_mc(ts.id) and not ts.processing_requested:
+        if (
+            check_tilt_series_mc(ts.id)
+            and not ts.processing_requested
+            and ts.tilt_series_length > 2
+        ):
             ts.processing_requested = True
             db.add(ts)
 
@@ -1018,12 +1003,9 @@ async def add_file(file: File):
 
 @router.post("/instruments/{instrument_name}/feedback")
 async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     if _transport_object:
         _transport_object.send(
-            machine_config.feedback_queue, {"register": msg.registration}
+            _transport_object.feedback_queue, {"register": msg.registration}
         )
 
 
@@ -1133,10 +1115,9 @@ async def request_spa_preprocessing(
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
-        zocalo_message = {
+        zocalo_message: dict = {
             "recipes": [recipe_name],
             "parameters": {
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
                 "kv": proc_params["voltage"],
@@ -1155,11 +1136,16 @@ async def request_spa_preprocessing(
                 "particle_diameter": proc_params["particle_diameter"] or 0,
                 "fm_int_file": proc_file.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "cryolo_model_weights": str(_cryolo_model_path(visit_name)),
+                "cryolo_model_weights": str(
+                    _cryolo_model_path(visit_name, instrument_name)
+                ),
             },
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             log.error(
@@ -1232,10 +1218,9 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
-        zocalo_message = {
+        zocalo_message: dict = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config.feedback_queue,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": dcid,
                 # "timestamp": datetime.datetime.now(),
@@ -1251,13 +1236,16 @@ async def request_tomography_preprocessing(
                 "fm_dose": proc_file.dose_per_frame,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_file.gain_ref)
-                    if proc_file.gain_ref
+                    if proc_file.gain_ref and machine_config.data_transfer_enabled
                     else proc_file.gain_ref
                 ),
                 "fm_int_file": proc_file.eer_fractionation_file,
             },
         }
         if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             log.error(
@@ -1339,9 +1327,6 @@ def register_dc_group(
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
     log.info(f"Registering data collection group on microscope {instrument_name}")
     if dcg_murfey := db.exec(
         select(DataCollectionGroup)
@@ -1363,7 +1348,7 @@ def register_dc_group(
 
         if _transport_object:
             _transport_object.send(
-                machine_config.feedback_queue, {"register": "data_collection_group", **dcg_parameters, "microscope": instrument_name, "proposal_code": ispyb_proposal_code, "proposal_number": ispyb_proposal_number, "visit_number": ispyb_visit_number}  # type: ignore
+                _transport_object.feedback_queue, {"register": "data_collection_group", **dcg_parameters, "microscope": instrument_name, "proposal_code": ispyb_proposal_code, "proposal_number": ispyb_proposal_number, "visit_number": ispyb_visit_number}  # type: ignore
             )
     return dcg_params
 
@@ -1411,7 +1396,7 @@ def start_dc(
 
     if _transport_object:
         _transport_object.send(
-            machine_config.feedback_queue,
+            _transport_object.feedback_queue,
             {
                 "register": "data_collection",
                 **dc_parameters,
@@ -1442,16 +1427,10 @@ def register_proc(
             k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
         },
     }
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
 
     if _transport_object:
         _transport_object.send(
-            machine_config.feedback_queue,
+            _transport_object.feedback_queue,
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
@@ -1534,14 +1513,22 @@ async def write_eer_fractionation_file(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    file_path = (
-        Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
-        / str(datetime.datetime.now().year)
-        / secure_filename(visit_name)
-        / "processing"
-        / secure_filename(fractionation_params.fractionation_file_name)
-    )
+    if machine_config.eer_fractionation_file_template:
+        file_path = Path(
+            machine_config.eer_fractionation_file_template.format(
+                visit=secure_filename(visit_name),
+                year=str(datetime.datetime.now().year),
+            )
+        ) / secure_filename(fractionation_params.fractionation_file_name)
+    else:
+        file_path = (
+            Path(machine_config.rsync_basepath)
+            / (machine_config.rsync_module or "data")
+            / str(datetime.datetime.now().year)
+            / secure_filename(visit_name)
+            / "processing"
+            / secure_filename(fractionation_params.fractionation_file_name)
+        )
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
 
@@ -1777,19 +1764,16 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
         "json": post_info.data,
     }
     if _transport_object:
-        machine_config = get_machine_config(instrument_name=instrument_name)[
-            instrument_name
-        ]
-        _transport_object.send(machine_config.feedback_queue, zocalo_message)
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
 
 
 @router.get("/sessions/{session_id}/upstream_visits")
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
     visit_name = murfey_session.visit
-    instrument_server = murfey_session.instrument_server
-    machine_config = get_machine_config(instrument_server=instrument_server)[
-        instrument_server
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
     ]
     upstream_visits = {}
     # Iterates through provided upstream directories
