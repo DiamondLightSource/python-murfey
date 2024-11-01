@@ -87,6 +87,9 @@ def posix_path(path: Path) -> str:
     Converts a Windows-style path into a Posix one. Used primarily when running
     subproceses in bash terminals on Windows devices, which can only accept
     Posix paths.
+
+    Returns it as a string because this path won't be recognised as an existing
+    path when converted to a Path object.
     """
     path_parts = list(path.parts)
     # Check if it's a Windows-style path and converts it to a Posix one
