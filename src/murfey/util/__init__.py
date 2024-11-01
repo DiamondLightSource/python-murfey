@@ -82,6 +82,25 @@ def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
     return Path("/".join(secured_parts))
 
 
+def posix_path(path: Path) -> str:
+    """
+    Converts a Windows-style path into a Posix one. Used primarily when running
+    subproceses in bash terminals on Windows devices, which can only accept
+    Posix paths.
+
+    Returns it as a string because this path won't be recognised as an existing
+    path when converted to a Path object.
+    """
+    path_parts = list(path.parts)
+    # Check if it's a Windows-style path and converts it to a Posix one
+    #   e.g.: C:\Users\user -> /c/Users/user
+    if path_parts[0].endswith((":/", ":\\")):
+        path_parts[0] = "/" + path_parts[0].strip(":/\\").lower()
+        posix_path = "/".join(path_parts)
+        return posix_path
+    return str(path)
+
+
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
     get_visits_url = api_base._replace(
         path=f"/instruments/{instrument_name}/visits_raw"
