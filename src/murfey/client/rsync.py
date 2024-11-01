@@ -378,7 +378,8 @@ class RSyncer(Observer):
                 return
 
         def parse_stderr(line: str):
-            logger.warning(f"rsync stderr: {line!r}")
+            if line.strip():
+                logger.warning(f"rsync stderr: {line!r}")
 
         # Generate list of relative filenames for this batch of transferred files
         #   Relative filenames will be safe to use on both Windows and Unix
@@ -451,10 +452,11 @@ class RSyncer(Observer):
                 capture_output=True,
                 input=rsync_stdin,
             )
-            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
-                parse_stdout(stdout_line)
-            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
-                parse_stderr(stderr_line)
+            # Parse outputs
+            for line in result.stdout.decode("utf8", "replace").split("\n"):
+                parse_stdout(line)
+            for line in result.stderr.decode("utf8", "replace").split("\n"):
+                parse_stderr(line)
             success = result.returncode == 0
 
         # Remove files from source
@@ -474,12 +476,14 @@ class RSyncer(Observer):
                 capture_output=True,
                 input=rsync_stdin_remove,
             )
-            # Only error log should be needed for file removal rsync process
-            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
-                parse_stderr(stderr_line)
-
+            # Parse outputs
+            for line in result.stdout.decode("utf8", "replace").split("\n"):
+                parse_stdout(line)
+            for line in result.stderr.decode("utf8", "replace").split("\n"):
+                parse_stderr(line)
+            # Leave it as a failure if the previous rsync subprocess failed
             if success:
-                success = result.returncode == 0 if result else False
+                success = result.returncode == 0
 
         self.notify(successful_updates, secondary=True)
 
