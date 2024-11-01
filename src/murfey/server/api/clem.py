@@ -22,7 +22,7 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import TiffSeriesInfo
+from murfey.util.models import TIFFSeriesInfo
 
 # Use backport from importlib_metadata for Python <3.10
 if sys.version_info.major == 3 and sys.version_info.minor < 10:
@@ -639,7 +639,7 @@ def lif_to_stack(
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_stack"
+        group="murfey.workflows.clem", name="lif_to_stack"
     )
 
     # Use entry point if found
@@ -672,11 +672,11 @@ def lif_to_stack(
 @router.post("/sessions/{session_id}/tiff_to_stack")
 def tiff_to_stack(
     session_id: int,  # Used by the decorator
-    tiff_info: TiffSeriesInfo,
+    tiff_info: TIFFSeriesInfo,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="tiff_to_stack"
+        group="murfey.workflows.clem", name="tiff_to_stack"
     )
 
     # Use entry point if found

@@ -154,7 +154,7 @@ Models related to the cryo-CLEM workflow.
 """
 
 
-class TiffSeriesInfo(BaseModel):
+class TIFFSeriesInfo(BaseModel):
     series_name: str
     tiff_files: List[Path]
     series_metadata: Path
