@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -8,12 +9,12 @@ from queue import Queue
 from typing import Awaitable, Callable, Dict, List, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Button, Input
 
+from murfey.client import posix_path
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -203,16 +204,23 @@ class MurfeyTUI(App):
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
-                gain_rsync = procrunner.run(
-                    [
-                        "rsync",
-                        str(self._environment.gain_ref),
-                        f"{self._url.hostname}::{visit_path}/processing",
-                    ]
-                )
+                # Set up rsync command
+                rsync_cmd = [
+                    "rsync",
+                    f"{posix_path(self._environment.gain_ref)!r}",
+                    f"{self._url.hostname}::{visit_path}/processing",
+                ]
+                # Encase in bash shell
+                cmd = [
+                    "bash",
+                    "-c",
+                    " ".join(rsync_cmd),
+                ]
+                # Run rsync subprocess
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(self._environment.gain_ref)!r} was not successfully transferred to {visit_path}/processing"
                     )
         self.rsync_processes[source] = RSyncer(
             source,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # import contextlib
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -17,7 +18,6 @@ from typing import (
     TypeVar,
 )
 
-import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
@@ -46,6 +46,7 @@ from textual.widgets import (
 )
 from werkzeug.utils import secure_filename
 
+from murfey.client import posix_path
 from murfey.client.analyser import Analyser, spa_form_dependencies
 from murfey.client.contexts.spa import SPAContext, SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -838,18 +839,22 @@ class GainReference(Screen):
             if event.button.id == "suggested-gain-ref":
                 self._dir_tree._gain_reference = self._gain_reference
             visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
-            cmd = [
+            # Set up rsync command
+            rsync_cmd = [
                 "rsync",
-                str(self._dir_tree._gain_reference),
+                f"{posix_path(self._dir_tree._gain_reference)!r}",
                 f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
+            # Encase in bash shell
+            cmd = ["bash", "-c" " ".join(rsync_cmd)]
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
             else:
-                gain_rsync = procrunner.run(cmd)
+                # Run rsync subprocess
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(self._dir_tree._gain_reference)!r} was not successfully transferred to {visit_path}/processing"
                     )
             process_gain_response = requests.post(
                 url=f"{str(self.app._environment.url.geturl())}/sessions/{self.app._environment.murfey_session}/process_gain",

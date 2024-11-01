@@ -440,46 +440,46 @@ class RSyncer(Observer):
         success = True
         if rsync_stdin:
             # Wrap rsync command in a bash command
-            bash_cmd = [
+            cmd = [
                 "bash",
                 "-c",
                 # rsync command passed in as a single string
                 " ".join(rsync_cmd),
             ]
             result = subprocess.run(
-                bash_cmd,
+                cmd,
                 cwd=self._basepath,  # As-is Path is fine
                 capture_output=True,
                 input=rsync_stdin,
             )
             # Parse outputs
-            for line in result.stdout.decode("utf8", "replace").split("\n"):
+            for line in result.stdout.decode("utf-8", "replace").split("\n"):
                 parse_stdout(line)
-            for line in result.stderr.decode("utf8", "replace").split("\n"):
+            for line in result.stderr.decode("utf-8", "replace").split("\n"):
                 parse_stderr(line)
             success = result.returncode == 0
 
         # Remove files from source
         if rsync_stdin_remove:
-            # Insert flag file removal flag before locations
+            # Insert file removal flag before locations
             rsync_cmd.insert(-2, "--remove-source-files")
             # Wrap rsync command in a bash command
-            bash_cmd = [
+            cmd = [
                 "bash",
                 "-c",
                 # Pass rsync command as single string
                 " ".join(rsync_cmd),
             ]
             result = subprocess.run(
-                bash_cmd,
+                cmd,
                 cwd=self._basepath,
                 capture_output=True,
                 input=rsync_stdin_remove,
             )
             # Parse outputs
-            for line in result.stdout.decode("utf8", "replace").split("\n"):
+            for line in result.stdout.decode("utf-8", "replace").split("\n"):
                 parse_stdout(line)
-            for line in result.stderr.decode("utf8", "replace").split("\n"):
+            for line in result.stderr.decode("utf-8", "replace").split("\n"):
                 parse_stderr(line)
             # Leave it as a failure if the previous rsync subprocess failed
             if success:
