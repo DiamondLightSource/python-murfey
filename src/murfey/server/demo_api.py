@@ -21,8 +21,8 @@ from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server.api.bootstrap
+import murfey.server.api.websocket as ws
 import murfey.server.prometheus as prom
-import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
     _flush_grid_square_records,
@@ -1072,7 +1072,7 @@ async def request_spa_preprocessing(
             .where(SPARelionParameters.pj_id == collected_ids[2].id)
             .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
-        proc_params: dict | None = dict(params[0])
+        proc_params: Optional[dict] = dict(params[0])
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
@@ -1286,7 +1286,7 @@ def shutdown():
 def suggest_path(
     visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
 ):
-    count: int | None = router.raw_count
+    count: Optional[int] = router.raw_count
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )

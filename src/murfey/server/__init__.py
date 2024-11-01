@@ -41,7 +41,6 @@ from werkzeug.utils import secure_filename
 
 import murfey
 import murfey.server.prometheus as prom
-import murfey.server.websocket
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util.config import (

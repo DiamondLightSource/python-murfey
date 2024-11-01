@@ -272,7 +272,7 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> sqlalchemy.orm.Session:
+def _get_session() -> sqlalchemy.orm.Session:  # type: ignore
     db = Session()
     if db is None:
         yield None

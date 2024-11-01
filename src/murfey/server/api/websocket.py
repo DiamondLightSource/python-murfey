@@ -18,7 +18,7 @@ from murfey.util.state import State, global_state
 T = TypeVar("T")
 
 ws = APIRouter(prefix="/ws", tags=["websocket"])
-log = logging.getLogger("murfey.server.websocket")
+log = logging.getLogger("murfey.server.api.websocket")
 
 
 class ConnectionManager(Generic[T]):

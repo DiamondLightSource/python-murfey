@@ -27,12 +27,12 @@ from sqlalchemy.exc import NoResultFound, OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
+import murfey.server.api.websocket as ws
 import murfey.server.ispyb
 import murfey.server.prometheus as prom
-import murfey.server.websocket as ws
 import murfey.util.eer
+from murfey.client.contexts.tomo import _midpoint
 from murfey.server import (
-    _midpoint,
     _murfey_id,
     _transport_object,
     check_tilt_series_mc,
