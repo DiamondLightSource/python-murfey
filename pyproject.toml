@@ -94,9 +94,11 @@ murfey = "murfey.client:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.auth.token_validation"]
 "password" = "murfey.server.api.auth:password_token_validation"
-[project.entry-points."murfey.workflows"]
-"lif_to_stack" = "murfey.workflows.lif_to_stack:zocalo_cluster_request"
-"tiff_to_stack" = "murfey.workflows.tiff_to_stack:zocalo_cluster_request"
+[project.entry-points."murfey.workflows.clem"]
+"lif_to_stack" = "murfey.workflows.clem.lif_to_stack:zocalo_cluster_request"
+"register_lif_preprocessing_result" = "murfey.workflows.clem.register_results:register_lif_preprocessing_result"
+"register_tiff_preprocessing_result" = "murfey.workflows.clem.register_results:register_tiff_preprocessing_result"
+"tiff_to_stack" = "murfey.workflows.clem.tiff_to_stack:zocalo_cluster_request"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
