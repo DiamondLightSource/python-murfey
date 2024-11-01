@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 from typing import Callable, List, Optional
 
 import ispyb
@@ -36,7 +37,7 @@ try:
         bind=sqlalchemy.create_engine(url(), connect_args={"use_pure": True})
     )
 except AttributeError:
-    Session = None
+    Session = lambda: None
 
 
 def _send_using_new_connection(transport_type: str, queue: str, message: dict) -> None:
@@ -56,7 +57,7 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = ispyb.open()
+        self.ispyb = ispyb.open() if os.getenv("ISYPB_CREDENTIALS") else None
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
@@ -273,6 +274,9 @@ class TransportManager:
 
 def _get_session() -> sqlalchemy.orm.Session:
     db = Session()
+    if db is None:
+        yield None
+        return
     try:
         yield db
     finally:
@@ -288,8 +292,10 @@ def get_session_id(
     proposal_code: str,
     proposal_number: str,
     visit_number: str,
-    db: sqlalchemy.orm.Session,
-) -> int:
+    db: sqlalchemy.orm.Session | None,
+) -> int | None:
+    if db is None:
+        return None
     query = (
         db.query(BLSession)
         .join(Proposal)
@@ -347,7 +353,11 @@ def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[S
     return res
 
 
-def get_all_ongoing_visits(microscope: str, db: sqlalchemy.orm.Session) -> list[Visit]:
+def get_all_ongoing_visits(
+    microscope: str, db: sqlalchemy.orm.Session | None
+) -> list[Visit]:
+    if db is None:
+        return []
     query = (
         db.query(BLSession)
         .join(Proposal)
