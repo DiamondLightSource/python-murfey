@@ -13,13 +13,11 @@ from pathlib import Path
 from queue import Queue
 from threading import Thread
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
-from urllib.parse import ParseResult, urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
 import requests
 from werkzeug.utils import secure_filename
-
-from murfey.util.models import Visit
 
 logger = logging.getLogger("murfey.util")
 
@@ -96,24 +94,6 @@ def posix_path(path: Path) -> str:
         posix_path = "/".join(path_parts)
         return posix_path
     return str(path)
-
-
-@lru_cache(maxsize=1)
-def get_machine_config(url: str, instrument_name: str = "", demo: bool = False) -> dict:
-    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
-    if not _instrument_name:
-        return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
-
-
-def _get_visit_list(api_base: ParseResult, instrument_name: str):
-    get_visits_url = api_base._replace(
-        path=f"/instruments/{instrument_name}/visits_raw"
-    )
-    server_reply = requests.get(get_visits_url.geturl())
-    if server_reply.status_code != 200:
-        raise ValueError(f"Server unreachable ({server_reply.status_code})")
-    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
