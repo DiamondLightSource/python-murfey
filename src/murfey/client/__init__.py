@@ -42,20 +42,6 @@ from murfey.util import _get_visit_list
 log = logging.getLogger("murfey.client")
 
 
-def posix_path(path: Path) -> str:
-    """
-    Converts a Windows-style path into a Posix one. Used primarily when running
-    subproceses in bash terminals, which can only accept Posix paths.
-    """
-    path_parts = list(path.parts)
-    # Check if it's a Windows-style path
-    if path_parts[0].endswith((":/", ":\\")):
-        path_parts[0] = "/" + path_parts[0].strip(":/\\").lower()
-        posix_path = "/".join(path_parts)
-        return posix_path
-    return str(path)
-
-
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     try:
