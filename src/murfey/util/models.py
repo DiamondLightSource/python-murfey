@@ -165,6 +165,7 @@ class LIFPreprocessingResult(BaseModel):
     metadata: Path
     series_name: str
     channel: str
+    number_of_members: int
     parent_lif: Path
 
 
@@ -173,6 +174,7 @@ class TIFFPreprocessingResult(BaseModel):
     metadata: Path
     series_name: str
     channel: str
+    number_of_members: int
     parent_tiffs: List[Path]
 
 

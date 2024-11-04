@@ -275,6 +275,7 @@ def register_lif_preprocessing_result(
 
         clem_img_series.associated_metadata = clem_metadata
         clem_img_series.parent_lif = clem_lif_file
+        clem_img_series.number_of_members = result.number_of_members
         db.add(clem_img_series)
         db.commit()
         db.refresh()
