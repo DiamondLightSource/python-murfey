@@ -2952,13 +2952,12 @@ def feedback_callback(header: dict, message: dict) -> None:
             register_lif_preprocessing_result(message, murfey_db)
             if _transport_object:
                 _transport_object.transport.ack(header)
-                #   When a message is received, it goes into unacked
-                #   When it's acked, it gets removed from the queue
-                #   When it's nacked, it eventually ends up in the DLQ
+            return None
         elif message["register"] == "register_tiff_preprocessing_result":
             register_tiff_preprocessing_result(message, murfey_db)
             if _transport_object:
                 _transport_object.transport.ack(header)
+            return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
