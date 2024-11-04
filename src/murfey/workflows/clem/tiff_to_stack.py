@@ -36,6 +36,11 @@ def zocalo_cluster_request(
             )
         # Construct the session and job name
         session_dir = "/".join(path_parts[:root_index])
+        job_name = "--".join(
+            [p.replace(" ", "_") if " " in p else p for p in path_parts][
+                root_index + 1 :
+            ]
+        )
 
         # If no metadata file provided, generate path to one
         if metadata is None:
@@ -52,14 +57,14 @@ def zocalo_cluster_request(
                 "recipes": ["clem-tiff-to-stack"],
                 "parameters": {
                     # Job parameters
-                    "tiff_list": str([str(file) for file in tiff_list]),
+                    "tiff_list": "null",
                     "root_folder": root_folder,
-                    "metadata": str(metadata),
-                    "tiff_file": "null",
+                    "metadata": f"{str(metadata)!r}",
+                    "tiff_file": f"{str(tiff_list[0])!r}",
                     # Other recipe parameters
-                    "session_dir": str(session_dir),
+                    "session_dir": f"{str(session_dir)!r}",
                     "session_id": session_id,
-                    "job_name": series_name,
+                    "job_name": job_name,
                     "feedback_queue": feedback_queue,
                 },
             },
