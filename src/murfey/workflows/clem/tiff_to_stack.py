@@ -52,7 +52,7 @@ def zocalo_cluster_request(
                 "recipes": ["clem-tiff-to-stack"],
                 "parameters": {
                     # Job parameters
-                    "tiff_list": tiff_list,
+                    "tiff_list": str([str(file) for file in tiff_list]),
                     "root_folder": root_folder,
                     "metadata": str(metadata),
                     "tiff_file": "null",
