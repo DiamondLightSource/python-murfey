@@ -631,7 +631,9 @@ API ENDPOINTS FOR FILE PROCESSING
 """
 
 
-@router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
+@router.post(
+    "/sessions/{session_id}/clem/preprocessing/lif_to_stack"
+)  # API posts to this URL
 def lif_to_stack(
     session_id: int,  # Used by the decorator
     lif_file: Path,
@@ -669,7 +671,7 @@ def lif_to_stack(
         raise RuntimeError("The relevant Murfey workflow was not found")
 
 
-@router.post("/sessions/{session_id}/tiff_to_stack")
+@router.post("/sessions/{session_id}/clem/preprocessing/tiff_to_stack")
 def tiff_to_stack(
     session_id: int,  # Used by the decorator
     tiff_info: TIFFSeriesInfo,
