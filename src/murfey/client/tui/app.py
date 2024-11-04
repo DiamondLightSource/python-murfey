@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -8,7 +9,6 @@ from queue import Queue
 from typing import Awaitable, Callable, Dict, List, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from textual.app import App
 from textual.reactive import reactive
@@ -25,6 +25,7 @@ from murfey.client.tui.screens import (
     MainScreen,
     ProcessingForm,
     SessionSelection,
+    VisitCreation,
     VisitSelection,
     WaitingScreen,
     determine_default_destination,
@@ -34,7 +35,8 @@ from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import (
     capture_post,
-    get_machine_config,
+    get_machine_config_client,
+    posix_path,
     read_config,
     set_default_acquisition_output,
 )
@@ -104,8 +106,10 @@ class MurfeyTUI(App):
         self._force_mdoc_metadata = force_mdoc_metadata
         self._strict = strict
         self._skip_existing_processing = skip_existing_processing
-        self._machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+        self._machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [
@@ -126,8 +130,10 @@ class MurfeyTUI(App):
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
         log.info(f"Launching multigrid watcher for source {source}")
-        machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+        machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._multigrid_watcher = MultigridDirWatcher(
             source,
@@ -152,6 +158,7 @@ class MurfeyTUI(App):
         remove_files: bool = False,
         analyse: bool = True,
         limited: bool = False,
+        **kwargs,
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
@@ -187,6 +194,7 @@ class MurfeyTUI(App):
             analyse=analyse,
             remove_files=remove_files,
             limited=limited,
+            transfer=machine_data.get("data_transfer_enabled", True),
         )
 
     def _start_rsyncer(
@@ -198,71 +206,81 @@ class MurfeyTUI(App):
         analyse: bool = True,
         remove_files: bool = False,
         limited: bool = False,
+        transfer: bool = True,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
-                gain_rsync = procrunner.run(
-                    [
-                        "rsync",
-                        str(self._environment.gain_ref),
-                        f"{self._url.hostname}::{visit_path}/processing",
-                    ]
-                )
+                # Set up rsync command
+                rsync_cmd = [
+                    "rsync",
+                    f"{posix_path(self._environment.gain_ref)!r}",
+                    f"{self._url.hostname}::{visit_path}/processing",
+                ]
+                # Encase in bash shell
+                cmd = [
+                    "bash",
+                    "-c",
+                    " ".join(rsync_cmd),
+                ]
+                # Run rsync subprocess
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(self._environment.gain_ref)!r} was not successfully transferred to {visit_path}/processing"
                     )
-        self.rsync_processes[source] = RSyncer(
-            source,
-            basepath_remote=Path(destination),
-            server_url=self._url,
-            # local=self._environment.demo,
-            status_bar=self._statusbar,
-            do_transfer=self._do_transfer,
-            required_substrings_for_removal=self._data_substrings,
-            remove_files=remove_files,
-        )
-
-        def rsync_result(update: RSyncerUpdate):
-            if not update.base_path:
-                raise ValueError("No base path from rsyncer update")
-            if not self.rsync_processes.get(update.base_path):
-                raise ValueError("TUI rsync process does not exist")
-            if update.outcome is TransferResult.SUCCESS:
-                log.debug(
-                    f"Succesfully transferred file {str(update.file_path)!r} ({update.file_size} bytes)"
-                )
-                # pass
-            else:
-                log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-                self.rsync_processes[update.base_path].enqueue(update.file_path)
-
-        self.rsync_processes[source].subscribe(rsync_result)
-        self.rsync_processes[source].subscribe(
-            partial(
-                self._increment_transferred_files_prometheus,
-                destination=destination,
-                source=str(source),
+        if transfer:
+            self.rsync_processes[source] = RSyncer(
+                source,
+                basepath_remote=Path(destination),
+                server_url=self._url,
+                # local=self._environment.demo,
+                status_bar=self._statusbar,
+                do_transfer=self._do_transfer,
+                required_substrings_for_removal=self._data_substrings,
+                remove_files=remove_files,
             )
-        )
-        self.rsync_processes[source].subscribe(
-            partial(
-                self._increment_transferred_files,
-                destination=destination,
-                source=str(source),
-            ),
-            secondary=True,
-        )
-        url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/rsyncer"
-        rsyncer_data = {
-            "source": str(source),
-            "destination": destination,
-            "session_id": self._environment.murfey_session,
-            "transferring": self._do_transfer,
-        }
-        requests.post(url, json=rsyncer_data)
+
+            def rsync_result(update: RSyncerUpdate):
+                if not update.base_path:
+                    raise ValueError("No base path from rsyncer update")
+                if not self.rsync_processes.get(update.base_path):
+                    raise ValueError("TUI rsync process does not exist")
+                if update.outcome is TransferResult.SUCCESS:
+                    log.debug(
+                        f"Succesfully transferred file {str(update.file_path)!r} ({update.file_size} bytes)"
+                    )
+                    # pass
+                else:
+                    log.warning(f"Failed to transfer file {str(update.file_path)!r}")
+                    self.rsync_processes[update.base_path].enqueue(update.file_path)
+
+            self.rsync_processes[source].subscribe(rsync_result)
+            self.rsync_processes[source].subscribe(
+                partial(
+                    self._increment_transferred_files_prometheus,
+                    destination=destination,
+                    source=str(source),
+                )
+            )
+            self.rsync_processes[source].subscribe(
+                partial(
+                    self._increment_transferred_files,
+                    destination=destination,
+                    source=str(source),
+                ),
+                secondary=True,
+            )
+            url = f"{str(self._url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+            rsyncer_data = {
+                "source": str(source),
+                "destination": destination,
+                "session_id": self._environment.murfey_session,
+                "transferring": self._do_transfer,
+            }
+            requests.post(url, json=rsyncer_data)
+
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:
@@ -290,15 +308,36 @@ class MurfeyTUI(App):
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
             self.analysers[source].start()
-            self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
+            if transfer:
+                self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
 
-        self.rsync_processes[source].start()
+        if transfer:
+            self.rsync_processes[source].start()
 
         if self._environment:
             if self._environment.watchers.get(source):
-                self._environment.watchers[source].subscribe(
-                    self.rsync_processes[source].enqueue
-                )
+                if transfer:
+                    self._environment.watchers[source].subscribe(
+                        self.rsync_processes[source].enqueue
+                    )
+                else:
+
+                    def _rsync_update_converter(p: Path) -> None:
+                        self.analysers[source].enqueue(
+                            RSyncerUpdate(
+                                file_path=p,
+                                file_size=0,
+                                outcome=TransferResult.SUCCESS,
+                                transfer_total=0,
+                                queue_size=0,
+                                base_path=source,
+                            )
+                        )
+                        return None
+
+                    self._environment.watchers[source].subscribe(
+                        _rsync_update_converter
+                    )
                 self._environment.watchers[source].subscribe(
                     partial(
                         self._increment_file_count,
@@ -652,8 +691,12 @@ class MurfeyTUI(App):
         exisiting_sessions = requests.get(
             f"{self._environment.url.geturl()}/sessions"
         ).json()
-        self.install_screen(VisitSelection(self.visits), "visit-select-screen")
-        self.push_screen("visit-select-screen")
+        if self.visits:
+            self.install_screen(VisitSelection(self.visits), "visit-select-screen")
+            self.push_screen("visit-select-screen")
+        else:
+            self.install_screen(VisitCreation(), "visit-creation-screen")
+            self.push_screen("visit-creation-screen")
         if exisiting_sessions:
             self.install_screen(
                 SessionSelection(
@@ -673,7 +716,7 @@ class MurfeyTUI(App):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/session",
+                f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -683,8 +726,10 @@ class MurfeyTUI(App):
         self.log_book.write(message.renderable)
 
     async def reset(self):
-        machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+        machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
@@ -711,7 +756,6 @@ class MurfeyTUI(App):
         if self._multigrid_watcher:
             self._multigrid_watcher.stop()
         self.exit()
-        exit()
 
     async def action_remove_session(self) -> None:
         requests.delete(
@@ -726,18 +770,18 @@ class MurfeyTUI(App):
         if self._multigrid_watcher:
             self._multigrid_watcher.stop()
         self.exit()
-        exit()
 
     def clean_up_quit(self) -> None:
         requests.delete(
             f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
-        exit()
 
     async def action_clear(self) -> None:
-        machine_config = get_machine_config(
-            str(self._environment.url.geturl()), demo=self._environment.demo
+        machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
@@ -778,7 +822,6 @@ class MurfeyTUI(App):
             f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
         )
         self.exit()
-        exit()
 
     async def action_process(self) -> None:
         self.processing_btn.disabled = False

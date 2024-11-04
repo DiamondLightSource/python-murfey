@@ -760,7 +760,7 @@ def setup(url: str):
 
 def clear(url: str):
     engine = create_engine(url)
-    metadata = sqlalchemy.MetaData(engine)
-    metadata.reflect()
-
+    metadata = sqlalchemy.MetaData()
+    metadata.create_all(engine)
+    metadata.reflect(engine)
     metadata.drop_all(engine)

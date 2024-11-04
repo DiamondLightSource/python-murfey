@@ -14,7 +14,7 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config
+from murfey.util import capture_post, get_machine_config_client
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -26,8 +26,10 @@ def _file_transferred_to(
     """
     Returns the Path of the transferred file on the DLS file system.
     """
-    machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+    machine_config = get_machine_config_client(
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     # rsync basepath and modules are set in the microscope's configuration YAML file
     return (

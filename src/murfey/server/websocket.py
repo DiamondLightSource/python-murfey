@@ -137,7 +137,7 @@ async def websocket_connection_endpoint(
             except Exception:
                 await manager.broadcast(f"Client #{client_id} sent message {data}")
     except WebSocketDisconnect:
-        log.info(f"Disconnecting Client {int(sanitise(str(client_id)))}")
+        log.info(f"Disconnecting Client {sanitise(str(client_id))}")
         manager.disconnect(websocket, client_id, unregister_client=False)
         await manager.broadcast(f"Client #{client_id} disconnected")
         await manager.delete_state(f"Client {client_id}")

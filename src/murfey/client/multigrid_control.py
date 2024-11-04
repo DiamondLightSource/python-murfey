@@ -1,5 +1,6 @@
 import json
 import logging
+import subprocess
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 
 import murfey.client.websocket
@@ -19,7 +19,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post
+from murfey.util import capture_post, posix_path
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -133,6 +133,7 @@ class MultigridController:
             remove_files=remove_files,
             tag=tag,
             limited=limited,
+            transfer=machine_data.get("data_transfer_enabled", True),
         )
         self.ws.send(json.dumps({"message": "refresh"}))
 
@@ -173,63 +174,72 @@ class MultigridController:
         remove_files: bool = False,
         tag: str = "",
         limited: bool = False,
+        transfer: bool = True,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
-                gain_rsync = procrunner.run(
-                    [
-                        "rsync",
-                        str(self._environment.gain_ref),
-                        f"{self._environment.url.hostname}::{visit_path}/processing",
-                    ]
-                )
+                # Set up rsync command
+                rsync_cmd = [
+                    "rsync",
+                    f"{posix_path(self._environment.gain_ref)!r}",  # '!r' will print strings in ''
+                    f"{self._environment.url.hostname}::{visit_path}/processing",
+                ]
+                # Wrap in bash shell
+                cmd = [
+                    "bash",
+                    "-c",
+                    " ".join(rsync_cmd),
+                ]
+                # Run rsync subprocess
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._environment.gain_ref} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(self._environment.gain_ref)!r} was not successfully transferred to {visit_path}/processing"
                     )
-        self.rsync_processes[source] = RSyncer(
-            source,
-            basepath_remote=Path(destination),
-            server_url=self._environment.url,
-            stop_callback=self._rsyncer_stopped,
-            do_transfer=self.do_transfer,
-            remove_files=remove_files,
-        )
+        if transfer:
+            self.rsync_processes[source] = RSyncer(
+                source,
+                basepath_remote=Path(destination),
+                server_url=self._environment.url,
+                stop_callback=self._rsyncer_stopped,
+                do_transfer=self.do_transfer,
+                remove_files=remove_files,
+            )
 
-        def rsync_result(update: RSyncerUpdate):
-            if not update.base_path:
-                raise ValueError("No base path from rsyncer update")
-            if not self.rsync_processes.get(update.base_path):
-                raise ValueError("TUI rsync process does not exist")
-            if update.outcome is TransferResult.SUCCESS:
-                # log.info(
-                #     f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
-                # )
-                pass
-            else:
-                log.warning(f"Failed to transfer file {str(update.file_path)!r}")
-                self.rsync_processes[update.base_path].enqueue(update.file_path)
+            def rsync_result(update: RSyncerUpdate):
+                if not update.base_path:
+                    raise ValueError("No base path from rsyncer update")
+                if not self.rsync_processes.get(update.base_path):
+                    raise ValueError("TUI rsync process does not exist")
+                if update.outcome is TransferResult.SUCCESS:
+                    # log.info(
+                    #     f"File {str(update.file_path)!r} successfully transferred ({update.file_size} bytes)"
+                    # )
+                    pass
+                else:
+                    log.warning(f"Failed to transfer file {str(update.file_path)!r}")
+                    self.rsync_processes[update.base_path].enqueue(update.file_path)
 
-        self.rsync_processes[source].subscribe(rsync_result)
-        self.rsync_processes[source].subscribe(
-            partial(
-                self._increment_transferred_files,
-                destination=destination,
-                source=str(source),
-            ),
-            secondary=True,
-        )
-        url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
-        rsyncer_data = {
-            "source": str(source),
-            "destination": destination,
-            "session_id": self.session_id,
-            "transferring": self.do_transfer or self._environment.demo,
-            "tag": tag,
-        }
-        requests.post(url, json=rsyncer_data)
+            self.rsync_processes[source].subscribe(rsync_result)
+            self.rsync_processes[source].subscribe(
+                partial(
+                    self._increment_transferred_files,
+                    destination=destination,
+                    source=str(source),
+                ),
+                secondary=True,
+            )
+            url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+            rsyncer_data = {
+                "source": str(source),
+                "destination": destination,
+                "session_id": self.session_id,
+                "transferring": self.do_transfer or self._environment.demo,
+                "tag": tag,
+            }
+            requests.post(url, json=rsyncer_data)
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:
@@ -254,15 +264,36 @@ class MultigridController:
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
             self.analysers[source].start()
-            self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
+            if transfer:
+                self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
 
-        self.rsync_processes[source].start()
+        if transfer:
+            self.rsync_processes[source].start()
 
         if self._environment:
             if self._environment.watchers.get(source):
-                self._environment.watchers[source].subscribe(
-                    self.rsync_processes[source].enqueue
-                )
+                if transfer:
+                    self._environment.watchers[source].subscribe(
+                        self.rsync_processes[source].enqueue
+                    )
+                else:
+                    # the watcher and rsyncer don't notify with the same object so conversion required here
+                    def _rsync_update_converter(p: Path) -> None:
+                        self.analysers[source].enqueue(
+                            RSyncerUpdate(
+                                file_path=p,
+                                file_size=0,
+                                outcome=TransferResult.SUCCESS,
+                                transfer_total=0,
+                                queue_size=0,
+                                base_path=source,
+                            )
+                        )
+                        return None
+
+                    self._environment.watchers[source].subscribe(
+                        _rsync_update_converter
+                    )
                 self._environment.watchers[source].subscribe(
                     partial(
                         self._increment_file_count,

@@ -40,6 +40,16 @@ def read_config() -> configparser.ConfigParser:
     return config
 
 
+@lru_cache(maxsize=1)
+def get_machine_config_client(
+    url: str, instrument_name: str = "", demo: bool = False
+) -> dict:
+    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
+    if not _instrument_name:
+        return {}
+    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
+
+
 def authorised_requests() -> Tuple[Callable, Callable, Callable, Callable]:
     token = read_config()["Murfey"].get("token", "")
     _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
@@ -62,17 +72,33 @@ def sanitise_nonpath(in_string: str) -> str:
     return in_string
 
 
-def secure_path(in_path: Path) -> Path:
-    secured_parts = [secure_filename(p) for p in in_path.parts]
+def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
+    if keep_spaces:
+        secured_parts = [
+            secure_filename(p) if " " not in p else p for p in in_path.parts
+        ]
+    else:
+        secured_parts = [secure_filename(p) for p in in_path.parts]
     return Path("/".join(secured_parts))
 
 
-@lru_cache(maxsize=1)
-def get_machine_config(url: str, instrument_name: str = "", demo: bool = False) -> dict:
-    _instrument_name: str | None = instrument_name or os.getenv("BEAMLINE")
-    if not _instrument_name:
-        return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
+def posix_path(path: Path) -> str:
+    """
+    Converts a Windows-style path into a Posix one. Used primarily when running
+    subproceses in bash terminals on Windows devices, which can only accept
+    Posix paths.
+
+    Returns it as a string because this path won't be recognised as an existing
+    path when converted to a Path object.
+    """
+    path_parts = list(path.parts)
+    # Check if it's a Windows-style path and converts it to a Posix one
+    #   e.g.: C:\Users\user -> /c/Users/user
+    if path_parts[0].endswith((":/", ":\\")):
+        path_parts[0] = "/" + path_parts[0].strip(":/\\").lower()
+        posix_path = "/".join(path_parts)
+        return posix_path
+    return str(path)
 
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
@@ -97,7 +123,12 @@ def capture_post(url: str, json: dict | list = {}) -> requests.Response | None:
             f"{response.status_code}. The reason given was {response.reason}"
         )
         split_url = urlparse(url)
-        failure_url = urlunparse(split_url._replace(path="/failed_client_post"))
+        client_config = read_config()
+        failure_url = urlunparse(
+            split_url._replace(
+                path=f"/instruments/{client_config['Murfey']['instrument_name']}/failed_client_post"
+            )
+        )
         try:
             resend_response = requests.post(
                 failure_url, json={"url": url, "data": json}

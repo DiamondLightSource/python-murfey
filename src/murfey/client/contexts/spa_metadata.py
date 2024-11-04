@@ -8,7 +8,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util import authorised_requests, capture_post, get_machine_config
+from murfey.util import authorised_requests, capture_post, get_machine_config_client
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
@@ -18,8 +18,10 @@ requests.get, requests.post, requests.put, requests.delete = authorised_requests
 def _atlas_destination(
     environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
 ) -> Path:
-    machine_config = get_machine_config(
-        str(environment.url.geturl()), demo=environment.demo
+    machine_config = get_machine_config_client(
+        str(environment.url.geturl()),
+        instrument_name=environment.instrument_name,
+        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (
@@ -35,7 +37,7 @@ def _atlas_destination(
 
 class SPAMetadataContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("SPA metadata", acquisition_software)
+        super().__init__("SPA_metadata", acquisition_software)
         self._basepath = basepath
 
     def post_transfer(
@@ -45,6 +47,13 @@ class SPAMetadataContext(Context):
         environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
+        super().post_transfer(
+            transferred_file=transferred_file,
+            role=role,
+            environment=environment,
+            **kwargs,
+        )
+
         if transferred_file.name == "EpuSession.dm" and environment:
             logger.info("EPU session metadata found")
             with open(transferred_file, "r") as epu_xml:

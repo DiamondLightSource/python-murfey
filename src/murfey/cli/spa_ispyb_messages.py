@@ -22,7 +22,7 @@ from murfey.server import _murfey_id, _register
 from murfey.server.ispyb import Session, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
-from murfey.util.config import get_machine_config, get_microscope
+from murfey.util.config import get_machine_config, get_microscope, get_security_config
 
 
 def run():
@@ -341,6 +341,7 @@ def run():
         .where(db.ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
     machine_config = get_machine_config()
+    security_config = get_security_config()
     params = db.SPARelionParameters(
         pj_id=collected_ids[2].id,
         angpix=float(metadata["pixel_size_on_image"]) * 1e10,
@@ -377,7 +378,7 @@ def run():
 
     if args.flush_preprocess:
         _transport_object = TransportManager(args.transport)
-        _transport_object.feedback_queue = machine_config.feedback_queue
+        _transport_object.feedback_queue = security_config.feedback_queue
         stashed_files = murfey_db.exec(
             select(db.PreprocessStash)
             .where(db.PreprocessStash.session_id == args.session_id)
@@ -407,7 +408,7 @@ def run():
             zocalo_message = {
                 "recipes": ["em-spa-preprocess"],
                 "parameters": {
-                    "feedback_queue": machine_config.feedback_queue,
+                    "feedback_queue": _transport_object.feedback_queue,
                     "dcid": collected_ids[1].id,
                     "kv": metadata["voltage"],
                     "autoproc_program_id": collected_ids[3].id,
