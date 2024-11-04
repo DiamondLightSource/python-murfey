@@ -72,11 +72,12 @@ def _validate_and_sanitise(
     try:
         base_path = list(rsync_basepath.parents)[-2].as_posix()
     except IndexError:
-        # Print to troubleshoot
         logger.warning(f"Base path {rsync_basepath!r} is too short")
         base_path = rsync_basepath.as_posix()
-    except Exception:
-        raise Exception("Unexpected exception occurred when loading the file base path")
+    except Exception as e:
+        raise Exception(
+            f"Unexpected exception encountered when loading the file base path: {e}"
+        )
 
     # Check that full file path doesn't contain unallowed characters
     # Currently allows only:
@@ -262,7 +263,7 @@ def register_lif_preprocessing_result(
             file_path=result.parent_lif,
         )
 
-        # Link entries to one another
+        # Link tables to one another and populate fields
         clem_img_stk.associated_metadata = clem_metadata
         clem_img_stk.parent_lif = clem_lif_file
         clem_img_stk.parent_series = clem_img_series
@@ -271,6 +272,19 @@ def register_lif_preprocessing_result(
         db.add(clem_img_stk)
         db.commit()
         db.refresh()
+
+        clem_img_series.associated_metadata = clem_metadata
+        clem_img_series.parent_lif = clem_lif_file
+        db.add(clem_img_series)
+        db.commit()
+        db.refresh()
+
+        clem_metadata.parent_lif = clem_lif_file
+        db.add(clem_metadata)
+        db.commit()
+        db.refresh()
+
+        logger.info(f"LIF preprocessing results registered for {result.series_name}")
 
         return True
 
