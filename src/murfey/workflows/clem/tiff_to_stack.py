@@ -58,11 +58,11 @@ def zocalo_cluster_request(
                 "parameters": {
                     # Job parameters
                     "tiff_list": "null",
-                    "tiff_file": f"{str(tiff_list[0])!r}",
+                    "tiff_file": f"{str(tiff_list[0])}",
                     "root_folder": root_folder,
-                    "metadata": f"{str(metadata)!r}",
+                    "metadata": f"{str(metadata)}",
                     # Other recipe parameters
-                    "session_dir": f"{str(session_dir)!r}",
+                    "session_dir": f"{str(session_dir)}",
                     "session_id": session_id,
                     "job_name": job_name,
                     "feedback_queue": feedback_queue,

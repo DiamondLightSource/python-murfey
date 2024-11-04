@@ -55,10 +55,10 @@ def zocalo_cluster_request(
                 "recipes": ["clem-lif-to-stack"],
                 "parameters": {
                     # Job parameters
-                    "lif_file": f"{str(file)!r}",
+                    "lif_file": f"{str(file)}",
                     "root_folder": root_folder,
                     # Other recipe parameters
-                    "session_dir": f"{str(session_dir)!r}",
+                    "session_dir": f"{str(session_dir)}",
                     "session_id": session_id,
                     "job_name": job_name,
                     "feedback_queue": feedback_queue,
