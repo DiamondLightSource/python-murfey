@@ -643,7 +643,7 @@ def lif_to_stack(
     )
 
     # Use entry point if found
-    if len(murfey_workflows) == 1:
+    if murfey_workflows:
 
         # Get instrument name from the database
         # This is needed in order to load the correct config file
@@ -673,6 +673,7 @@ def lif_to_stack(
 def tiff_to_stack(
     session_id: int,  # Used by the decorator
     tiff_info: TIFFSeriesInfo,
+    db: Session = murfey_db,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
@@ -681,14 +682,26 @@ def tiff_to_stack(
 
     # Use entry point if found
     if murfey_workflows:
+
+        # Load instrument name from database
+        row: MurfeySession = db.exec(
+            select(MurfeySession).where(MurfeySession.id == session_id)
+        ).one()
+        instrument_name = row.instrument_name
+
+        # Pass arguments to correct workflow
         workflow: EntryPoint = list(murfey_workflows)[0]
         workflow.load()(
             # Match the arguments found in murfey.workflows.tiff_to_stack
             file=tiff_info.tiff_files[0],  # Pass it only one file from the list
             root_folder="images",
+            session_id=session_id,
+            instrument_name=instrument_name,
             metadata=tiff_info.series_metadata,
             messenger=_transport_object,
         )
+        return True
+
     # Raise error if Murfey workflow not found
     else:
         raise RuntimeError("The relevant Murfey workflow was not found")
