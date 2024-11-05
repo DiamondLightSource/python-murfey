@@ -695,7 +695,7 @@ def tiff_to_stack(
         workflow: EntryPoint = list(murfey_workflows)[0]
         workflow.load()(
             # Match the arguments found in murfey.workflows.tiff_to_stack
-            file=tiff_info.tiff_files[0],  # Pass it only one file from the list
+            tiff_list=tiff_info.tiff_files,
             root_folder="images",
             session_id=session_id,
             instrument_name=instrument_name,
