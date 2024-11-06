@@ -323,6 +323,7 @@ def register_tiff_preprocessing_result(
         except Exception:
             logger.error(traceback.format_exc())
             logger.error("Exception encountered when parsing TIFF preprocessing result")
+            return False
     else:
         logger.error(
             f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
