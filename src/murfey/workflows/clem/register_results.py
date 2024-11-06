@@ -310,15 +310,87 @@ def register_tiff_preprocessing_result(
         else message["session_id"]
     )
     if isinstance(message["result"], str):
-        json_obj: dict = json.loads(message["result"])
-        result = TIFFPreprocessingResult(**json_obj)
+        try:
+            json_obj: dict = json.loads(message["result"])
+            result = TIFFPreprocessingResult(**json_obj)
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error("Exception encountered when parsing TIFF preprocessing result")
+            return False
     elif isinstance(message["result"], dict):
-        result = TIFFPreprocessingResult(**message["result"])
+        try:
+            result = TIFFPreprocessingResult(**message["result"])
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error("Exception encountered when parsing TIFF preprocessing result")
     else:
-        logger.error("Invalid type for TIFF preprocessing result")
+        logger.error(
+            f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
+        )
         return False
 
-    if result and session_id:
-        pass
+    # Register items in database if not already present
+    try:
+        clem_img_stk: CLEMImageStack = get_db_entry(
+            db=db,
+            table=CLEMImageStack,
+            session_id=session_id,
+            file_path=result.image_stack,
+        )
+        clem_img_series: CLEMImageSeries = get_db_entry(
+            db=db,
+            table=CLEMImageSeries,
+            session_id=session_id,
+            series_name=result.series_name,
+        )
+        clem_metadata: CLEMImageMetadata = get_db_entry(
+            db=db,
+            table=CLEMImageMetadata,
+            session_id=session_id,
+            file_path=result.metadata,
+        )
 
-    return True
+        # Link tables to one another and populate fields
+        # Register TIFF files and populate them iteratively first
+        for file in result.parent_tiffs:
+            clem_tiff_file: CLEMTIFFFile = get_db_entry(
+                db=db,
+                table=CLEMTIFFFile,
+                session_id=session_id,
+                file_path=file,
+            )
+            clem_tiff_file.associated_metadata = clem_metadata
+            clem_tiff_file.child_series = clem_img_series
+            clem_tiff_file.child_stack = clem_img_stk
+            db.add(clem_tiff_file)
+            db.commit()
+            db.refresh(clem_tiff_file)
+
+        clem_img_stk.associated_metadata = clem_metadata
+        clem_img_stk.parent_series = clem_img_series
+        clem_img_stk.channel_name = result.channel
+        clem_img_stk.stack_created = True
+        db.add(clem_img_stk)
+        db.commit()
+        db.refresh(clem_img_stk)
+
+        clem_img_series.associated_metadata = clem_metadata
+        clem_img_series.number_of_members = result.number_of_members
+        db.add(clem_img_series)
+        db.commit()
+        db.refresh(clem_img_series)
+
+        logger.info(
+            f"TIFF preprocessing results registered for {result.series_name!r} {result.channel!r} image stack"
+        )
+        return True
+
+    except Exception:
+        logger.error(traceback.format_exc())
+        logger.error(
+            f"Exception encountered when registering TIFF preprocessing result for {result.series_name!r} {result.channel!r} image stack"
+        )
+        return False
+
+    finally:
+        db.close()
