@@ -386,7 +386,7 @@ class CLEMContext(Context):
 
         try:
             # Construct the URL to post the request to
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/lif_to_stack?lif_file={quote(str(lif_file), safe='')}"
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_lifs?lif_file={quote(str(lif_file), safe='')}"
             # Validate
             if not url:
                 logger.error(
@@ -442,7 +442,7 @@ class CLEMContext(Context):
 
         try:
             # Construct URL for Murfey server to communicate with
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/tiff_to_stack"
+            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_tiffs"
             if not url:
                 logger.error(
                     "URL could not be constructed from the environment and file path"

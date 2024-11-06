@@ -632,16 +632,16 @@ API ENDPOINTS FOR FILE PROCESSING
 
 
 @router.post(
-    "/sessions/{session_id}/clem/preprocessing/lif_to_stack"
+    "/sessions/{session_id}/clem/preprocessing/process_raw_lifs"
 )  # API posts to this URL
-def lif_to_stack(
+def process_raw_lifs(
     session_id: int,  # Used by the decorator
     lif_file: Path,
     db: Session = murfey_db,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows.clem", name="lif_to_stack"
+        group="murfey.workflows.clem", name="process_raw_lifs"
     )
 
     # Use entry point if found
@@ -657,7 +657,7 @@ def lif_to_stack(
         # Pass arguments along to the correct workflow
         workflow: EntryPoint = list(murfey_workflows)[0]
         workflow.load()(
-            # Match the arguments found in murfey.workflows.lif_to_stack
+            # Match the arguments found in murfey.workflows.process_raw_lifs
             file=lif_file,
             root_folder="images",
             session_id=session_id,
@@ -671,15 +671,15 @@ def lif_to_stack(
         raise RuntimeError("The relevant Murfey workflow was not found")
 
 
-@router.post("/sessions/{session_id}/clem/preprocessing/tiff_to_stack")
-def tiff_to_stack(
+@router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
+def process_raw_tiffs(
     session_id: int,  # Used by the decorator
     tiff_info: TIFFSeriesInfo,
     db: Session = murfey_db,
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows.clem", name="tiff_to_stack"
+        group="murfey.workflows.clem", name="process_raw_tiffs"
     )
 
     # Use entry point if found
@@ -694,7 +694,7 @@ def tiff_to_stack(
         # Pass arguments to correct workflow
         workflow: EntryPoint = list(murfey_workflows)[0]
         workflow.load()(
-            # Match the arguments found in murfey.workflows.tiff_to_stack
+            # Match the arguments found in murfey.workflows.process_raw_tiffs
             tiff_list=tiff_info.tiff_files,
             root_folder="images",
             session_id=session_id,
