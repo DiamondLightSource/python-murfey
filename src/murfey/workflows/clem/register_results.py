@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import traceback
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -214,18 +215,16 @@ def register_lif_preprocessing_result(
         try:
             json_obj: dict = json.loads(message["result"])
             result = LIFPreprocessingResult(**json_obj)
-        except Exception as e:
-            logger.error(
-                f"Exception encountered when parsing LIF preprocessing result: {e}"
-            )
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error("Exception encountered when parsing LIF preprocessing result")
             return False
     elif isinstance(message["result"], dict):
         try:
             result = LIFPreprocessingResult(**message["result"])
-        except Exception as e:
-            logger.error(
-                f"Exception encountered when parsing LIF preprocessing result: {e}"
-            )
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error("Exception encountered when parsing LIF preprocessing result")
             return False
     else:
         logger.error(
@@ -271,27 +270,29 @@ def register_lif_preprocessing_result(
         clem_img_stk.stack_created = True
         db.add(clem_img_stk)
         db.commit()
-        db.refresh()
+        db.refresh(clem_img_stk)
 
         clem_img_series.associated_metadata = clem_metadata
         clem_img_series.parent_lif = clem_lif_file
         clem_img_series.number_of_members = result.number_of_members
         db.add(clem_img_series)
         db.commit()
-        db.refresh()
+        db.refresh(clem_img_series)
 
         clem_metadata.parent_lif = clem_lif_file
         db.add(clem_metadata)
         db.commit()
-        db.refresh()
+        db.refresh(clem_metadata)
 
-        logger.info(f"LIF preprocessing results registered for {result.series_name}")
-
+        logger.info(
+            f"LIF preprocessing results registered for {result.series_name!r} {result.channel!r} image stack"
+        )
         return True
 
-    except Exception as e:
+    except Exception:
+        logger.error(traceback.format_exc())
         logger.error(
-            f"Exception encountered when registering LIF preprocessing result: {e}"
+            f"Exception encountered when registering LIF preprocessing result for {result.series_name!r} {result.channel!r} image stack"
         )
         return False
 
