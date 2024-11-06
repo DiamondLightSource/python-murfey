@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from ast import literal_eval
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 """
 General Models
@@ -175,7 +176,23 @@ class TIFFPreprocessingResult(BaseModel):
     series_name: str
     channel: str
     number_of_members: int
-    parent_tiffs: List[Path]
+    parent_tiffs: list[Path]
+
+    @validator(
+        "parent_tiffs",
+        pre=True,
+    )
+    def parse_stringified_list(cls, value):
+        if isinstance(value, str):
+            try:
+                eval_result = literal_eval(value)
+                if isinstance(eval_result, list):
+                    parent_tiffs = [Path(p) for p in eval_result]
+                    return parent_tiffs
+            except (SyntaxError, ValueError):
+                raise ValueError("Unable to parse input")
+        # Return value as-is; if it fails, it fails
+        return value
 
 
 """
