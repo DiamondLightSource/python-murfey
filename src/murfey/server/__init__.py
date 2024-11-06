@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime
 from functools import partial, singledispatch
@@ -51,10 +52,6 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
-from murfey.workflows.clem.register_results import (
-    register_lif_preprocessing_result,
-    register_tiff_preprocessing_result,
-)
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -64,6 +61,12 @@ import murfey.util.db as db
 from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
+
+# Import entry_points depending on Python version
+if sys.version_info < (3, 10):
+    from importlib_metadata import EntryPoint, entry_points
+else:
+    from importlib.metadata import EntryPoint, entry_points
 
 try:
     from importlib.resources import files  # type: ignore
@@ -2968,15 +2971,28 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
-        elif message["register"] == "register_lif_preprocessing_result":
-            register_lif_preprocessing_result(message, murfey_db)
-            if _transport_object:
-                _transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "register_tiff_preprocessing_result":
-            register_tiff_preprocessing_result(message, murfey_db)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+        elif message["register"] in (
+            "register_lif_preprocessing_result",
+            "register_tiff_preprocessing_result",
+        ):
+            murfey_workflows = list(
+                entry_points().select(
+                    group="murfey.workflows.clem", name=message["register"]
+                )
+            )
+            # Run the workflow if a match is found
+            if len(murfey_workflows) > 0:
+                workflow: EntryPoint = murfey_workflows[0]
+                workflow.load()(
+                    message=message,
+                    db=murfey_db,
+                )
+                if _transport_object:
+                    _transport_object.transport.ack(header)
+            # Nack message if no workflow found for message
+            else:
+                if _transport_object:
+                    _transport_object.transport.nack(header)
             return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
