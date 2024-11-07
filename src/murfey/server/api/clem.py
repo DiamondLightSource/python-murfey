@@ -641,7 +641,7 @@ def process_raw_lifs(
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows.clem", name="process_raw_lifs"
+        group="murfey.workflows", name="process_raw_lifs"
     )
 
     # Use entry point if found
@@ -679,7 +679,7 @@ def process_raw_tiffs(
 ):
     # Get command line entry point
     murfey_workflows = entry_points().select(
-        group="murfey.workflows.clem", name="process_raw_tiffs"
+        group="murfey.workflows", name="process_raw_tiffs"
     )
 
     # Use entry point if found

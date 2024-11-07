@@ -2972,13 +2972,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif (
-            message["register"]
-            in entry_points().select(group="murfey.workflows.clem").names
+            message["register"] in entry_points().select(group="murfey.workflows").names
         ):
             # Run the workflow if a match is found
             workflow: EntryPoint = list(  # Returns a list of either 1 or 0
                 entry_points().select(
-                    group="murfey.workflows.clem", name=message["register"]
+                    group="murfey.workflows", name=message["register"]
                 )
             )[0]
             result = workflow.load()(

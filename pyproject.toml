@@ -97,7 +97,7 @@ murfey = "murfey.client:run"
 "password" = "murfey.server.api.auth:password_token_validation"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
-[project.entry-points."murfey.workflows.clem"]
+[project.entry-points."murfey.workflows"]
 "process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
 "process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
 "register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
