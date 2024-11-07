@@ -649,10 +649,10 @@ def process_raw_lifs(
 
         # Get instrument name from the database
         # This is needed in order to load the correct config file
-        row: MurfeySession = db.exec(
+        session_row: MurfeySession = db.exec(
             select(MurfeySession).where(MurfeySession.id == session_id)
         ).one()
-        instrument_name = row.instrument_name
+        instrument_name = session_row.instrument_name
 
         # Pass arguments along to the correct workflow
         workflow: EntryPoint = list(murfey_workflows)[0]
@@ -686,10 +686,10 @@ def process_raw_tiffs(
     if murfey_workflows:
 
         # Load instrument name from database
-        row: MurfeySession = db.exec(
+        session_row: MurfeySession = db.exec(
             select(MurfeySession).where(MurfeySession.id == session_id)
         ).one()
-        instrument_name = row.instrument_name
+        instrument_name = session_row.instrument_name
 
         # Pass arguments to correct workflow
         workflow: EntryPoint = list(murfey_workflows)[0]
