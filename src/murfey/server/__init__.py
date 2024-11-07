@@ -2988,7 +2988,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if result:
                     _transport_object.transport.ack(header)
                 else:
-                    _transport_object.transport.nack(header)
+                    # Send it directly to DLQ without trying to rerun it
+                    _transport_object.transport.nack(header, requeue=False)
             return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
