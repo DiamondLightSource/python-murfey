@@ -639,36 +639,30 @@ def process_raw_lifs(
     lif_file: Path,
     db: Session = murfey_db,
 ):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="process_raw_lifs"
-    )
-
-    # Use entry point if found
-    if murfey_workflows:
-
-        # Get instrument name from the database
-        # This is needed in order to load the correct config file
-        session_row: MurfeySession = db.exec(
-            select(MurfeySession).where(MurfeySession.id == session_id)
-        ).one()
-        instrument_name = session_row.instrument_name
-
-        # Pass arguments along to the correct workflow
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.process_raw_lifs
-            file=lif_file,
-            root_folder="images",
-            session_id=session_id,
-            instrument_name=instrument_name,
-            messenger=_transport_object,
-        )
-        return True
-
-    # Raise error if Murfey workflow not found
-    else:
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="process_raw_lifs")
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments along to the correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_lifs
+        file=lif_file,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        messenger=_transport_object,
+    )
+    return True
 
 
 @router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
@@ -677,33 +671,28 @@ def process_raw_tiffs(
     tiff_info: TIFFSeriesInfo,
     db: Session = murfey_db,
 ):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="process_raw_tiffs"
-    )
-
-    # Use entry point if found
-    if murfey_workflows:
-
-        # Load instrument name from database
-        session_row: MurfeySession = db.exec(
-            select(MurfeySession).where(MurfeySession.id == session_id)
-        ).one()
-        instrument_name = session_row.instrument_name
-
-        # Pass arguments to correct workflow
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.process_raw_tiffs
-            tiff_list=tiff_info.tiff_files,
-            root_folder="images",
-            session_id=session_id,
-            instrument_name=instrument_name,
-            metadata=tiff_info.series_metadata,
-            messenger=_transport_object,
-        )
-        return True
-
-    # Raise error if Murfey workflow not found
-    else:
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="process_raw_tiffs")
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_tiffs
+        tiff_list=tiff_info.tiff_files,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        metadata=tiff_info.series_metadata,
+        messenger=_transport_object,
+    )
+    return True
