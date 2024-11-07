@@ -2971,27 +2971,25 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
-        elif message["register"] in (
-            "register_lif_preprocessing_result",
-            "register_tiff_preprocessing_result",
+        elif (
+            message["register"]
+            in entry_points().select(group="murfey.workflows.clem").names
         ):
-            murfey_workflows = list(
+            # Run the workflow if a match is found
+            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
                 entry_points().select(
                     group="murfey.workflows.clem", name=message["register"]
                 )
+            )[0]
+            result = workflow.load()(
+                message=message,
+                db=murfey_db,
             )
-            # Run the workflow if a match is found
-            if len(murfey_workflows) > 0:
-                workflow: EntryPoint = murfey_workflows[0]
-                workflow.load()(
-                    message=message,
-                    db=murfey_db,
-                )
-                if _transport_object:
+            print(f"Workflow returned {result}")
+            if _transport_object:
+                if result:
                     _transport_object.transport.ack(header)
-            # Nack message if no workflow found for message
-            else:
-                if _transport_object:
+                else:
                     _transport_object.transport.nack(header)
             return None
         if _transport_object:
