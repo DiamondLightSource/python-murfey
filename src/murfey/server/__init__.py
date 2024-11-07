@@ -2985,7 +2985,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 message=message,
                 db=murfey_db,
             )
-            print(f"Workflow returned {result}")
             if _transport_object:
                 if result:
                     _transport_object.transport.ack(header)
