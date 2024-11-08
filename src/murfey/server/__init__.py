@@ -5,7 +5,6 @@ import logging
 import math
 import os
 import subprocess
-import sys
 import time
 from datetime import datetime
 from functools import partial, singledispatch
@@ -57,16 +56,13 @@ try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
+from backports.entry_points_selectable import entry_points
+from importlib_metadata import EntryPoint  # For type hinting only
+
 import murfey.util.db as db
 from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
-
-# Import entry_points depending on Python version
-if sys.version_info < (3, 10):
-    from importlib_metadata import EntryPoint, entry_points
-else:
-    from importlib.metadata import EntryPoint, entry_points
 
 try:
     from importlib.resources import files  # type: ignore
