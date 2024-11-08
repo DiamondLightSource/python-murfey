@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import re
-import sys
 import traceback
+from importlib.metadata import EntryPoint  # type hinting only
 from logging import getLogger
 from pathlib import Path
 from typing import Optional, Type, Union
 
+from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
@@ -23,12 +24,6 @@ from murfey.util.db import (
 )
 from murfey.util.db import Session as MurfeySession
 from murfey.util.models import TIFFSeriesInfo
-
-# Use backport from importlib_metadata for Python <3.10
-if sys.version_info.major == 3 and sys.version_info.minor < 10:
-    from importlib_metadata import EntryPoint, entry_points
-else:
-    from importlib.metadata import EntryPoint, entry_points
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
