@@ -56,16 +56,12 @@ try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
+from importlib.resources import files
+
 import murfey.util.db as db
 from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
-
-try:
-    from importlib.resources import files  # type: ignore
-except ImportError:
-    # Fallback for Python 3.8
-    from importlib_resources import files  # type: ignore
 
 logger = logging.getLogger("murfey.server")
 
