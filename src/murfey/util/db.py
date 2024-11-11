@@ -269,9 +269,12 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     )  # One to many
 
     # Process checklist for series
-    images_aligned: bool = False  # Image stacks aligned to reference image
-    rgbs_created: bool = False  # Image stacks all colorised
-    composite_created: bool = False  # Composite flattened image created
+    number_of_members: int = (
+        0  # Expected number of image stacks belonging to this series
+    )
+    images_aligned: bool = False  # Have all members been aligned?
+    rgbs_created: bool = False  # Have all members been colourised?
+    composite_created: bool = False  # Has a composite image been created?
     composite_image: Optional[str] = None  # Full path to composite image
 
 

@@ -56,6 +56,9 @@ try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
+from backports.entry_points_selectable import entry_points
+from importlib_metadata import EntryPoint  # For type hinting only
+
 import murfey.util.db as db
 from murfey.util import LogFilter
 from murfey.util.spa_params import default_spa_parameters
@@ -2963,6 +2966,26 @@ def feedback_callback(header: dict, message: dict) -> None:
             _save_bfactor(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
+            return None
+        elif (
+            message["register"] in entry_points().select(group="murfey.workflows").names
+        ):
+            # Run the workflow if a match is found
+            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+                entry_points().select(
+                    group="murfey.workflows", name=message["register"]
+                )
+            )[0]
+            result = workflow.load()(
+                message=message,
+                db=murfey_db,
+            )
+            if _transport_object:
+                if result:
+                    _transport_object.transport.ack(header)
+                else:
+                    # Send it directly to DLQ without trying to rerun it
+                    _transport_object.transport.nack(header, requeue=False)
             return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)

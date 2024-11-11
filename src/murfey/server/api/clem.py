@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import re
-import sys
 import traceback
+from importlib.metadata import EntryPoint  # type hinting only
 from logging import getLogger
 from pathlib import Path
 from typing import Optional, Type, Union
 
+from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
@@ -22,13 +23,7 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import TiffSeriesInfo
-
-# Use backport from importlib_metadata for Python <3.10
-if sys.version_info.major == 3 and sys.version_info.minor < 10:
-    from importlib_metadata import EntryPoint, entry_points
-else:
-    from importlib.metadata import EntryPoint, entry_points
+from murfey.util.models import TIFFSeriesInfo
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -81,23 +76,15 @@ def validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    rsync_basepath = machine_config.rsync_basepath
-    try:
-        base_path = list(rsync_basepath.parents)[-2].as_posix()
-    except IndexError:
-        # Print to troubleshoot
-        logger.warning(f"Base path {rsync_basepath!r} is too short")
-        base_path = rsync_basepath.as_posix()
-    except Exception:
-        raise Exception("Unexpected exception occurred when loading the file base path")
+    base_path = machine_config.rsync_basepath.as_posix()
 
     # Check that full file path doesn't contain unallowed characters
-    # Currently allows only:
-    # - words (alphanumerics and "_"; \w),
-    # - spaces (\s),
-    # - periods,
-    # - dashes,
-    # - forward slashes ("/")
+    #   Currently allows only:
+    #   - words (alphanumerics and "_"; \w),
+    #   - spaces (\s),
+    #   - periods,
+    #   - dashes,
+    #   - forward slashes ("/")
     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", str(full_path))) is False:
         raise ValueError(f"Unallowed characters present in {file}")
 
@@ -631,51 +618,68 @@ API ENDPOINTS FOR FILE PROCESSING
 """
 
 
-@router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
-def lif_to_stack(
+@router.post(
+    "/sessions/{session_id}/clem/preprocessing/process_raw_lifs"
+)  # API posts to this URL
+def process_raw_lifs(
     session_id: int,  # Used by the decorator
     lif_file: Path,
+    db: Session = murfey_db,
 ):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_stack"
-    )
-
-    # Use entry point if found
-    if len(murfey_workflows) == 1:
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.lif_to_stack
-            file=lif_file,
-            root_folder="images",
-            messenger=_transport_object,
-        )
-        return True
-    # Raise error if Murfey workflow not found
-    else:
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="process_raw_lifs")
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
 
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
 
-@router.post("/sessions/{session_id}/tiff_to_stack")
-def tiff_to_stack(
+    # Pass arguments along to the correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_lifs
+        file=lif_file,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        messenger=_transport_object,
+    )
+    return True
+
+
+@router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
+def process_raw_tiffs(
     session_id: int,  # Used by the decorator
-    tiff_info: TiffSeriesInfo,
+    tiff_info: TIFFSeriesInfo,
+    db: Session = murfey_db,
 ):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="tiff_to_stack"
-    )
-
-    # Use entry point if found
-    if murfey_workflows:
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.tiff_to_stack
-            file=tiff_info.tiff_files[0],  # Pass it only one file from the list
-            root_folder="images",
-            metadata=tiff_info.series_metadata,
-            messenger=_transport_object,
-        )
-    # Raise error if Murfey workflow not found
-    else:
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="process_raw_tiffs")
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_tiffs
+        tiff_list=tiff_info.tiff_files,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        metadata=tiff_info.series_metadata,
+        messenger=_transport_object,
+    )
+    return True
