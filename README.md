@@ -29,7 +29,7 @@ The packages included under the `[developer]` installation key contain some help
 - `pre-commit` - Allows for the installation and running of hooks to help with linting, formatting, and type checking your code.
 - `pytest` - Used in conjunction with test functions to evaluate the reliability of your code.
 
-Instructions for setting up the database for Murfey to register files to can be found [here](src/murfey/server/MURFEY_DB.md).
+Instructions for setting up the database for Murfey to register files to can be found [here](src/murfey/server/README.md).
 
 Finally, you may want to set up an ISPyB mock database server and a Zocalo
 development environment. The instructions for this are out of scope here.
