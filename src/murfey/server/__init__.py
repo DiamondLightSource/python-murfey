@@ -8,6 +8,7 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.resources import files
 from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NamedTuple, Tuple
@@ -17,8 +18,10 @@ import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
     Base,
@@ -42,8 +45,10 @@ from werkzeug.utils import secure_filename
 import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
+import murfey.util.db as db
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
     get_hostname,
@@ -51,24 +56,14 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
+from murfey.util.spa_params import default_spa_parameters
+from murfey.util.state import global_state
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
-from backports.entry_points_selectable import entry_points
-from importlib_metadata import EntryPoint  # For type hinting only
 
-import murfey.util.db as db
-from murfey.util import LogFilter
-from murfey.util.spa_params import default_spa_parameters
-from murfey.util.state import global_state
-
-try:
-    from importlib.resources import files  # type: ignore
-except ImportError:
-    # Fallback for Python 3.8
-    from importlib_resources import files  # type: ignore
 
 logger = logging.getLogger("murfey.server")
 

@@ -30,6 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
     "pydantic<2", # Locked to <2 by zocalo
     "requests",
@@ -55,7 +56,6 @@ developer = [
 server = [
     # "matplotlib", # For visual statistical analysis of images
     "aiohttp",
-    "backports.entry_points_selectable",
     "cryptography",
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
