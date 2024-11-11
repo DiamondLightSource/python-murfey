@@ -41,7 +41,7 @@ class Context:
         self.name = name
 
     def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
-        # Search other packages in this environment for additional hooks to include in Murfey
+        # Search external packages for additional hooks to include in Murfey
         for h in entry_points(group="murfey.post_transfer_hooks"):
             if h.name == self.name:
                 h.load()(transferred_file, role=role, **kwargs)

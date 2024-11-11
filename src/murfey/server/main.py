@@ -76,6 +76,6 @@ app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.hub.router)
 app.include_router(murfey.server.websocket.ws)
 
-# Search other packages in this environment for additional routers to include in Murfey
+# Search external packages for additional routers to include in Murfey
 for r in entry_points(group="murfey.routers"):
     app.include_router(r.load())
