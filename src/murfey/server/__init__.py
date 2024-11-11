@@ -8,6 +8,7 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.resources import files
 from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NamedTuple, Tuple
@@ -17,8 +18,10 @@ import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
     Base,
@@ -42,8 +45,10 @@ from werkzeug.utils import secure_filename
 import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
+import murfey.util.db as db
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
     get_hostname,
@@ -51,17 +56,14 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
+from murfey.util.spa_params import default_spa_parameters
+from murfey.util.state import global_state
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
-from importlib.resources import files
 
-import murfey.util.db as db
-from murfey.util import LogFilter
-from murfey.util.spa_params import default_spa_parameters
-from murfey.util.state import global_state
 
 logger = logging.getLogger("murfey.server")
 
@@ -2959,6 +2961,26 @@ def feedback_callback(header: dict, message: dict) -> None:
             _save_bfactor(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
+            return None
+        elif (
+            message["register"] in entry_points().select(group="murfey.workflows").names
+        ):
+            # Run the workflow if a match is found
+            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+                entry_points().select(
+                    group="murfey.workflows", name=message["register"]
+                )
+            )[0]
+            result = workflow.load()(
+                message=message,
+                db=murfey_db,
+            )
+            if _transport_object:
+                if result:
+                    _transport_object.transport.ack(header)
+                else:
+                    # Send it directly to DLQ without trying to rerun it
+                    _transport_object.transport.nack(header, requeue=False)
             return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
