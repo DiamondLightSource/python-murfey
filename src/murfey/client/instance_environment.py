@@ -53,7 +53,6 @@ class MurfeyInstanceEnvironment(BaseModel):
     }
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
-    motion_corrected_movies: Dict[Path, List[str]] = {}
     listeners: Dict[str, Set[Callable]] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
@@ -118,7 +117,6 @@ class MurfeyInstanceEnvironment(BaseModel):
         self.autoproc_program_ids = {}
         self.data_collection_parameters = {}
         self.movies = {}
-        self.motion_corrected_movies = {}
         self.listeners = {}
         self.movie_tilt_pair = {}
         self.tilt_angles = {}

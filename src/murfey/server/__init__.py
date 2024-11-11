@@ -7,18 +7,21 @@ import os
 import subprocess
 import time
 from datetime import datetime
-from functools import partial, singledispatch, wraps
+from functools import partial, singledispatch
+from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 import mrcfile
 import numpy as np
 import uvicorn
 import workflows
 import zocalo.configuration
+from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     AutoProcProgram,
     Base,
@@ -42,8 +45,10 @@ from werkzeug.utils import secure_filename
 import murfey
 import murfey.server.prometheus as prom
 import murfey.server.websocket
+import murfey.util.db as db
 from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
     get_hostname,
@@ -51,21 +56,14 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
+from murfey.util.spa_params import default_spa_parameters
+from murfey.util.state import global_state
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
-import murfey.util.db as db
-from murfey.util import LogFilter
-from murfey.util.spa_params import default_spa_parameters
-from murfey.util.state import global_state
 
-try:
-    from importlib.resources import files  # type: ignore
-except ImportError:
-    # Fallback for Python 3.8
-    from importlib_resources import files  # type: ignore
 
 logger = logging.getLogger("murfey.server")
 
@@ -94,28 +92,6 @@ class JobIDs(NamedTuple):
     pid: int
     appid: int
     client_id: int
-
-
-def record_failure(
-    f: Callable, record_queue: str = "", is_callback: bool = True
-) -> Callable:
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception:
-            logger.warning(f"Call to {f} failed", exc_info=True)
-            if _transport_object and is_callback:
-                if not record_queue:
-                    machine_config = get_machine_config()
-                    record_queue = (
-                        machine_config.failure_queue
-                        or f"dlq.{_transport_object.feedback_queue}"
-                    )
-                _transport_object.send(record_queue, args[0], new_connection=True)
-            return None
-
-    return wrapper
 
 
 def sanitise(in_string: str) -> str:
@@ -1071,6 +1047,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "pixel_size": relion_params.angpix,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
+                "symmetry": relion_params.symmetry,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
@@ -1166,40 +1143,40 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
-        zocalo_message: dict = {
-            "parameters": {
-                "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
-                "batch_is_complete": False,
-                "particle_diameter": relion_options["particle_diameter"],
-                "combine_star_job_number": -1,
-                "picker_id": other_options["picker_ispyb_id"],
-                "nr_iter": default_spa_parameters.nr_iter_2d,
-                "batch_size": default_spa_parameters.batch_size_2d,
-                "nr_classes": default_spa_parameters.nr_classes_2d,
-                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "mask_diameter": 0,
-                "class_uuids": _2d_class_murfey_ids(
-                    class2d_message["particles_file"], _app_id(pj_id, _db), _db
-                ),
-                "class2d_grp_uuid": _db.exec(
-                    select(db.Class2DParameters).where(
-                        db.Class2DParameters.particles_file
-                        == class2d_message["particles_file"]
-                        and db.Class2DParameters.pj_id == pj_id
-                    )
+    zocalo_message: dict = {
+        "parameters": {
+            "particles_file": class2d_message["particles_file"],
+            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+            "batch_is_complete": False,
+            "particle_diameter": relion_options["particle_diameter"],
+            "combine_star_job_number": -1,
+            "picker_id": other_options["picker_ispyb_id"],
+            "nr_iter": default_spa_parameters.nr_iter_2d,
+            "batch_size": default_spa_parameters.batch_size_2d,
+            "nr_classes": default_spa_parameters.nr_classes_2d,
+            "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+            "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+            "mask_diameter": 0,
+            "class_uuids": _2d_class_murfey_ids(
+                class2d_message["particles_file"], _app_id(pj_id, _db), _db
+            ),
+            "class2d_grp_uuid": _db.exec(
+                select(db.Class2DParameters).where(
+                    db.Class2DParameters.particles_file
+                    == class2d_message["particles_file"]
+                    and db.Class2DParameters.pj_id == pj_id
                 )
-                .one()
-                .murfey_id,
-                "session_id": message["session_id"],
-                "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
-                ),
-                "node_creator_queue": machine_config.node_creator_queue,
-            },
-            "recipes": ["em-spa-class2d"],
-        }
+            )
+            .one()
+            .murfey_id,
+            "session_id": message["session_id"],
+            "autoproc_program_id": _app_id(
+                _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+            ),
+            "node_creator_queue": machine_config.node_creator_queue,
+        },
+        "recipes": ["em-spa-class2d"],
+    }
     if _transport_object:
         zocalo_message["parameters"][
             "feedback_queue"
@@ -1627,6 +1604,8 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
 
 def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
     if machine_config.initial_model_search_directory:
+        if not machine_config.rsync_basepath:
+            return None
         visit_directory = (
             machine_config.rsync_basepath
             / (machine_config.rsync_module or "data")
@@ -1934,7 +1913,6 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
-@record_failure
 def _flush_spa_preprocessing(message: dict):
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
@@ -2044,7 +2022,6 @@ def _flush_spa_preprocessing(message: dict):
     return None
 
 
-@record_failure
 def _flush_tomography_preprocessing(message: dict):
     session_id = message["session_id"]
     instrument_name = (
@@ -2243,7 +2220,12 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.commit()
             _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
 
-            next_job += 5
+            if relion_options["symmetry"] == "C1":
+                # Extra Refine, Mask, PostProcess beyond for determined symmetry
+                next_job += 8
+            else:
+                # Select and Extract particles, then Refine, Mask, PostProcess
+                next_job += 5
             feedback_params.next_job = next_job
 
         zocalo_message: dict = {
@@ -2254,6 +2236,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "pixel_size": relion_options["angpix"],
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
+                "symmetry": relion_options["symmetry"],
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
@@ -2304,6 +2287,11 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
             db.SPAFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
+
+    if message["symmetry"] != relion_params.symmetry:
+        # Currently don't do anything with a symmetrised re-run of the refinement
+        logger.info(f"Recieved symmetrised structure of {message['symmetry']}")
+        return True
 
     if not feedback_params.hold_refine:
         logger.warning("B-Factors requested but refine hold is off")
@@ -2499,6 +2487,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if (
                 check_tilt_series_mc(relevant_tilt_series.id)
                 and not relevant_tilt_series.processing_requested
+                and relevant_tilt_series.tilt_series_length > 2
             ):
                 relevant_tilt_series.processing_requested = True
                 murfey_db.add(relevant_tilt_series)
@@ -2629,7 +2618,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
-                    f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
+                    f"No data collection group ID was found for image directory {sanitise(message['image_directory'])} and source {sanitise(message['source'])}"
                 )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
@@ -2701,7 +2690,9 @@ def feedback_callback(header: dict, message: dict) -> None:
             if dc:
                 _dcid = dc[0][0].id
             else:
-                logger.warning(f"No data collection ID found for {message['tag']}")
+                logger.warning(
+                    f"No data collection ID found for {sanitise(message['tag'])}"
+                )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
                 return None
@@ -2743,11 +2734,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 if _transport_object:
                     _transport_object.transport.ack(header)
                 return None
-            if app_murfey := murfey_db.exec(
+            if not murfey_db.exec(
                 select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
             ).all():
-                appid = app_murfey[0].id
-            else:
                 if murfey.server.ispyb.Session() is None:
                     murfey_app = db.AutoProcProgram(pj_id=pid)
                 else:
@@ -2974,6 +2963,26 @@ def feedback_callback(header: dict, message: dict) -> None:
             _save_bfactor(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
+            return None
+        elif (
+            message["register"] in entry_points().select(group="murfey.workflows").names
+        ):
+            # Run the workflow if a match is found
+            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+                entry_points().select(
+                    group="murfey.workflows", name=message["register"]
+                )
+            )[0]
+            result = workflow.load()(
+                message=message,
+                db=murfey_db,
+            )
+            if _transport_object:
+                if result:
+                    _transport_object.transport.ack(header)
+                else:
+                    # Send it directly to DLQ without trying to rerun it
+                    _transport_object.transport.nack(header, requeue=False)
             return None
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)

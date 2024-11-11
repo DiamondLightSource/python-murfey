@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # import contextlib
 import logging
+import subprocess
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -17,7 +18,6 @@ from typing import (
     TypeVar,
 )
 
-import procrunner
 import requests
 from pydantic import BaseModel, ValidationError
 from rich.box import SQUARE
@@ -56,7 +56,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config_client, read_config
+from murfey.util import capture_post, get_machine_config_client, posix_path, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")
@@ -906,18 +906,22 @@ class GainReference(Screen):
             if event.button.id == "suggested-gain-ref":
                 self._dir_tree._gain_reference = self._gain_reference
             visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
-            cmd = [
+            # Set up rsync command
+            rsync_cmd = [
                 "rsync",
-                str(self._dir_tree._gain_reference),
+                f"{posix_path(self._dir_tree._gain_reference)!r}",
                 f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
+            # Encase in bash shell
+            cmd = ["bash", "-c", " ".join(rsync_cmd)]
             if self.app._environment.demo:
                 log.info(f"Would perform {' '.join(cmd)}")
             else:
-                gain_rsync = procrunner.run(cmd)
+                # Run rsync subprocess
+                gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {self._dir_tree._gain_reference} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(self._dir_tree._gain_reference)!r} was not successfully transferred to {visit_path}/processing"
                     )
             process_gain_response = requests.post(
                 url=f"{str(self.app._environment.url.geturl())}/sessions/{self.app._environment.murfey_session}/process_gain",
@@ -1270,7 +1274,6 @@ class WaitingScreen(Screen):
                 f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session"
             )
             self.app.exit()
-            exit()
 
 
 class MainScreen(Screen):

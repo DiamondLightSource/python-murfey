@@ -736,7 +736,11 @@ def register_completed_tilt_series(
         db.add(ts)
     db.commit()
     for ts in tilt_series_db:
-        if check_tilt_series_mc(ts.id) and not ts.processing_requested:
+        if (
+            check_tilt_series_mc(ts.id)
+            and not ts.processing_requested
+            and ts.tilt_series_length > 2
+        ):
             ts.processing_requested = True
             db.add(ts)
 
@@ -1767,9 +1771,9 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
     visit_name = murfey_session.visit
-    instrument_server = murfey_session.instrument_server
-    machine_config = get_machine_config(instrument_server=instrument_server)[
-        instrument_server
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
     ]
     upstream_visits = {}
     # Iterates through provided upstream directories
