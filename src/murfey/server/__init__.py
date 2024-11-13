@@ -283,7 +283,9 @@ def run():
     LogFilter.install()
 
     zc.add_command_line_options(parser)
-    workflows.transport.add_command_line_options(parser, transport_argument=True)
+
+    security_config = get_security_config()
+    workflows.transport.load_configuration_file(security_config.rabbitmq_credentials)
 
     args = parser.parse_args()
 
@@ -296,7 +298,6 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    security_config = get_security_config()
     if not args.temporary and _transport_object:
         _transport_object.feedback_queue = security_config.feedback_queue
     rabbit_thread = Thread(

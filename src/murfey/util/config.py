@@ -82,6 +82,7 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
+    rabbitmq_credentials: str
     murfey_db_credentials: str
     crypto_key: str
     auth_key: str = ""
