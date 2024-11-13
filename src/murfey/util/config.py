@@ -8,7 +8,7 @@ from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra
+from pydantic import BaseModel, BaseSettings, Extra, validator
 
 
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
@@ -94,6 +94,16 @@ class Security(BaseModel):
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
     feedback_queue: str = "murfey_feedback"
+    graylog_host: str = ""
+    graylog_port: Optional[int] = None
+
+    @validator("graylog_port")
+    def check_port_present_if_host_is(
+        cls, v: Optional[int], values: dict, **kwargs
+    ) -> Optional[int]:
+        if values["graylog_host"] and v is None:
+            raise ValueError("The Graylog port must be set if the Graylog host is")
+        return v
 
 
 def security_from_file(config_file_path: Path) -> Security:
