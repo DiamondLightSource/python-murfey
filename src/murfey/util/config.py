@@ -13,8 +13,10 @@ from pydantic.errors import NoneIsNotAllowedError
 
 
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
+    """
+    General information about the instrument being supported
+    """
 
-    # General info about the instrument
     display_name: str = Field(
         default="",
         description="Name of instrument used for display purposes, i.e. Krios I.",
@@ -39,8 +41,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         ),
     )
 
-    """"""
-    # Instrument hardware/software-related information
+    """
+    Information about the hardware and software on the instrument machine
+    """
     camera: str = Field(
         default="FALCON",
         description=(
@@ -104,7 +107,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         ),
     )
 
-    """"""
     # Instrument-side file paths
     data_directories: dict[Path, str] = Field(
         default={},
@@ -157,7 +159,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     )  # Only if Falcon is used
     # To avoid others having to follow the {year}/{visit} format we are doing
 
-    """"""
+    """
+    Data transfer-related settings
+    """
     # rsync-related settings (only if rsync is used)
     data_transfer_enabled: bool = Field(
         default=True,
@@ -211,7 +215,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         # files in different locations according to the workflows they correspond to
     )
 
-    """"""
+    """
+    Data processing-related settings
+    """
     # Processing-related keys
     processing_enabled: bool = Field(
         default=True,
@@ -288,7 +294,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         ),
     )
 
-    # Phase-contrast related processing workflows
+    # TEM-related processing workflows
     recipes: dict[str, str] = Field(
         default={
             "em-spa-bfactor": "em-spa-bfactor",
@@ -316,7 +322,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     )
 
     # Particle picking settings
-    # machine_learning_model
     default_model: Optional[Path] = Field(
         default=None,
         description=(
@@ -329,7 +334,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "Relative path to where user-uploaded machine learning models are stored. "
             "Murfey will look for the folders under the current visit."
         ),
-    )  # User-uploaded models
+    )
 
     initial_model_search_directory: str = Field(
         default="processing/initial_model",  # User-uploaded electron density models
@@ -339,7 +344,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         ),
     )
 
-    """"""
+    """
+    Server and network-related configurations
+    """
     # Network connections
     frontend_url: str = Field(
         default="http://localhost:3000",
@@ -355,7 +362,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     )
 
     # Security-related keys
-    security_configuration_path: Optional[Path] = Field(
+    global_configuration_path: Optional[Path] = Field(
         default=None,
         description=(
             "Full file path to the YAML file containing the configurations for the "
@@ -439,7 +446,7 @@ def machine_config_from_file(
     }
 
 
-class ServerConfig(BaseModel):
+class GlobalConfig(BaseModel):
     # Database connection settings
     murfey_db_credentials: str
     sqlalchemy_pooling: bool = True
@@ -461,15 +468,15 @@ class ServerConfig(BaseModel):
     allow_origins: List[str] = ["*"]  # Restrict to only certain hostnames
 
 
-def server_config_from_file(config_file_path: Path) -> ServerConfig:
+def global_config_from_file(config_file_path: Path) -> GlobalConfig:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
-    return ServerConfig(**config)
+    return GlobalConfig(**config)
 
 
 class Settings(BaseSettings):
     murfey_machine_configuration: str = ""
-    murfey_security_configuration: str = ""
+    murfey_global_configuration: str = ""
 
 
 settings = Settings()
@@ -491,16 +498,16 @@ def get_microscope(machine_config: MachineConfig | None = None) -> str:
 
 
 @lru_cache(maxsize=1)
-def get_security_config() -> ServerConfig:
-    if settings.murfey_security_configuration:
-        return server_config_from_file(Path(settings.murfey_security_configuration))
+def get_global_config() -> GlobalConfig:
+    if settings.murfey_global_configuration:
+        return global_config_from_file(Path(settings.murfey_global_configuration))
     if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
         machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
             os.getenv("BEAMLINE", "")
         ]
-        if machine_config.security_configuration_path:
-            return server_config_from_file(machine_config.security_configuration_path)
-    return ServerConfig(
+        if machine_config.global_configuration_path:
+            return global_config_from_file(machine_config.global_configuration_path)
+    return GlobalConfig(
         session_validation="",
         murfey_db_credentials="",
         crypto_key="",

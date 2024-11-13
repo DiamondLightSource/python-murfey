@@ -51,10 +51,10 @@ from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
+    get_global_config,
     get_hostname,
     get_machine_config,
     get_microscope,
-    get_security_config,
 )
 from murfey.util.spa_params import default_spa_parameters
 from murfey.util.state import global_state
@@ -74,7 +74,7 @@ _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
 
 try:
-    _url = url(get_security_config())
+    _url = url(get_global_config())
     engine = create_engine(_url)
     murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
@@ -296,9 +296,9 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    security_config = get_security_config()
+    global_config = get_global_config()
     if not args.temporary and _transport_object:
-        _transport_object.feedback_queue = security_config.feedback_queue
+        _transport_object.feedback_queue = global_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
         daemon=True,

@@ -8,23 +8,23 @@ from fastapi import Depends
 from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
-from murfey.util.config import ServerConfig, get_security_config
+from murfey.util.config import GlobalConfig, get_global_config
 
 
-def url(security_config: ServerConfig | None = None) -> str:
-    security_config = security_config or get_security_config()
-    with open(security_config.murfey_db_credentials, "r") as stream:
+def url(global_config: GlobalConfig | None = None) -> str:
+    global_config = global_config or get_global_config()
+    with open(global_config.murfey_db_credentials, "r") as stream:
         creds = yaml.safe_load(stream)
-    f = Fernet(security_config.crypto_key.encode("ascii"))
+    f = Fernet(global_config.crypto_key.encode("ascii"))
     p = f.decrypt(creds["password"].encode("ascii"))
     return f"postgresql+psycopg2://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
 def get_murfey_db_session(
-    security_config: ServerConfig | None = None,
+    global_config: GlobalConfig | None = None,
 ) -> Session:  # type: ignore
-    _url = url(security_config)
-    if security_config and not security_config.sqlalchemy_pooling:
+    _url = url(global_config)
+    if global_config and not global_config.sqlalchemy_pooling:
         engine = create_engine(_url, poolclass=NullPool)
     else:
         engine = create_engine(_url)
@@ -37,7 +37,7 @@ def get_murfey_db_session(
 
 murfey_db_session = partial(
     get_murfey_db_session,
-    get_security_config(),
+    get_global_config(),
 )
 
 murfey_db: Session = Depends(murfey_db_session)

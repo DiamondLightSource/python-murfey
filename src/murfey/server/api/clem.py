@@ -76,6 +76,8 @@ def validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    if not machine_config.rsync_basepath:
+        raise ValueError("rsync basepath not set")
     base_path = machine_config.rsync_basepath.as_posix()
 
     # Check that full file path doesn't contain unallowed characters

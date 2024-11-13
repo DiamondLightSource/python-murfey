@@ -19,7 +19,7 @@ from sqlmodel import Session, create_engine, select
 
 from murfey.server import sanitise
 from murfey.server.murfey_db import murfey_db, url
-from murfey.util.config import get_machine_config, get_security_config
+from murfey.util.config import get_global_config, get_machine_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
@@ -63,19 +63,19 @@ class CookieScheme(HTTPBearer):
 
 
 # Set up variables used for authentication
-security_config = get_security_config()
+global_config = get_global_config()
 machine_config = get_machine_config()
 auth_url = (
     machine_config[os.getenv("BEAMLINE", "")].auth_url
     if machine_config.get(os.getenv("BEAMLINE", ""))
     else ""
 )
-ALGORITHM = security_config.auth_algorithm or "HS256"
-SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
-if security_config.auth_type == "password":
+ALGORITHM = global_config.auth_algorithm or "HS256"
+SECRET_KEY = global_config.auth_key or secrets.token_hex(32)
+if global_config.auth_type == "password":
     oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 else:
-    oauth2_scheme = CookieScheme(cookie_key=security_config.cookie_key)
+    oauth2_scheme = CookieScheme(cookie_key=global_config.cookie_key)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 instrument_server_tokens: Dict[float, dict] = {}
@@ -96,7 +96,7 @@ def hash_password(password: str) -> str:
 
 # Set up database engine
 try:
-    _url = url(security_config)
+    _url = url(global_config)
     engine = create_engine(_url)
 except Exception:
     engine = None
@@ -114,7 +114,7 @@ def validate_user(username: str, password: str) -> bool:
 def validate_visit(visit_name: str, token: str) -> bool:
     if validators := entry_points().select(
         group="murfey.auth.session_validation",
-        name=security_config.auth_type,
+        name=global_config.auth_type,
     ):
         return validators[0].load()(visit_name, token)
     return True
@@ -166,12 +166,12 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
         if auth_url:
             headers = (
                 {}
-                if security_config.auth_type == "cookie"
+                if global_config.auth_type == "cookie"
                 else {"Authorization": f"Bearer {token}"}
             )
             cookies = (
-                {security_config.cookie_key: token}
-                if security_config.auth_type == "cookie"
+                {global_config.cookie_key: token}
+                if global_config.auth_type == "cookie"
                 else {}
             )
             async with aiohttp.ClientSession(cookies=cookies) as session:
@@ -186,7 +186,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
         else:
             if validators := entry_points().select(
                 group="murfey.auth.token_validation",
-                name=security_config.auth_type,
+                name=global_config.auth_type,
             ):
                 validators[0].load()(token)
             else:
@@ -290,8 +290,8 @@ async def mint_session_token(session_id: MurfeySessionID, db=murfey_db):
         db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one().visit
     )
     expiry_time = None
-    if security_config.session_token_timeout:
-        expiry_time = time.time() + security_config.session_token_timeout
+    if global_config.session_token_timeout:
+        expiry_time = time.time() + global_config.session_token_timeout
     token = create_access_token(
         {
             "session": session_id,
