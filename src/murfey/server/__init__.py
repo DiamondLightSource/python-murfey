@@ -1667,13 +1667,13 @@ def _resize_intial_model(
     downscaled_pixel_size: float,
     input_path: Path,
     output_path: Path,
-    executables: Dict[str, str],
+    executables: Dict[str, Path],
     env: Dict[str, str],
 ) -> None:
     if executables.get("relion_image_handler"):
         comp_proc = subprocess.run(
             [
-                f"{executables['relion_image_handler']}",
+                f"{str(executables['relion_image_handler'])}",
                 "--i",
                 str(input_path),
                 "--new_box",
