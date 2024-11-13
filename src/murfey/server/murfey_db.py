@@ -8,10 +8,10 @@ from fastapi import Depends
 from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
-from murfey.util.config import Security, get_security_config
+from murfey.util.config import ServerConfig, get_security_config
 
 
-def url(security_config: Security | None = None) -> str:
+def url(security_config: ServerConfig | None = None) -> str:
     security_config = security_config or get_security_config()
     with open(security_config.murfey_db_credentials, "r") as stream:
         creds = yaml.safe_load(stream)
@@ -21,7 +21,7 @@ def url(security_config: Security | None = None) -> str:
 
 
 def get_murfey_db_session(
-    security_config: Security | None = None,
+    security_config: ServerConfig | None = None,
 ) -> Session:  # type: ignore
     _url = url(security_config)
     if security_config and not security_config.sqlalchemy_pooling:

@@ -437,7 +437,7 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
     }
 
 
-class Security(BaseModel):
+class ServerConfig(BaseModel):
     # Database connection settings
     murfey_db_credentials: str
     sqlalchemy_pooling: bool = True
@@ -459,10 +459,10 @@ class Security(BaseModel):
     allow_origins: List[str] = ["*"]  # Restrict to only certain hostnames
 
 
-def security_from_file(config_file_path: Path) -> Security:
+def security_from_file(config_file_path: Path) -> ServerConfig:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
-    return Security(**config)
+    return ServerConfig(**config)
 
 
 class Settings(BaseSettings):
@@ -489,7 +489,7 @@ def get_microscope(machine_config: MachineConfig | None = None) -> str:
 
 
 @lru_cache(maxsize=1)
-def get_security_config() -> Security:
+def get_security_config() -> ServerConfig:
     if settings.murfey_security_configuration:
         return security_from_file(Path(settings.murfey_security_configuration))
     if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
@@ -498,7 +498,7 @@ def get_security_config() -> Security:
         ]
         if machine_config.security_configuration_path:
             return security_from_file(machine_config.security_configuration_path)
-    return Security(
+    return ServerConfig(
         session_validation="",
         murfey_db_credentials="",
         crypto_key="",
