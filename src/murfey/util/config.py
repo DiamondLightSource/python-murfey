@@ -461,7 +461,7 @@ class ServerConfig(BaseModel):
     allow_origins: List[str] = ["*"]  # Restrict to only certain hostnames
 
 
-def security_from_file(config_file_path: Path) -> ServerConfig:
+def server_config_from_file(config_file_path: Path) -> ServerConfig:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
     return ServerConfig(**config)
@@ -493,13 +493,13 @@ def get_microscope(machine_config: MachineConfig | None = None) -> str:
 @lru_cache(maxsize=1)
 def get_security_config() -> ServerConfig:
     if settings.murfey_security_configuration:
-        return security_from_file(Path(settings.murfey_security_configuration))
+        return server_config_from_file(Path(settings.murfey_security_configuration))
     if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
         machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
             os.getenv("BEAMLINE", "")
         ]
         if machine_config.security_configuration_path:
-            return security_from_file(machine_config.security_configuration_path)
+            return server_config_from_file(machine_config.security_configuration_path)
     return ServerConfig(
         session_validation="",
         murfey_db_credentials="",
