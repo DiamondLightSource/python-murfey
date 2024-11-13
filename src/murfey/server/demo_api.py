@@ -40,7 +40,7 @@ from murfey.server import templates
 from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
-from murfey.util.config import MachineConfig, from_file
+from murfey.util.config import MachineConfig, machine_config_from_file
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,
@@ -113,7 +113,9 @@ settings = Settings()
 machine_config: dict = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
-    machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
+    machine_config = machine_config_from_file(
+        Path(settings.murfey_machine_configuration), microscope
+    )
 
 
 # This will be the homepage for a given microscope.
@@ -134,9 +136,9 @@ async def root(request: Request):
 def machine_info() -> Optional[MachineConfig]:
     instrument_name = os.getenv("BEAMLINE")
     if settings.murfey_machine_configuration and instrument_name:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
+        return machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )[instrument_name]
     return None
 
 
@@ -144,9 +146,9 @@ def machine_info() -> Optional[MachineConfig]:
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
+        return machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )[instrument_name]
     return None
 
 
