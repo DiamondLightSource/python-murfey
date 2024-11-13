@@ -144,6 +144,7 @@ def get_security_config() -> Security:
         if machine_config.security_configuration_path:
             return security_from_file(machine_config.security_configuration_path)
     return Security(
+        rabbitmq_credentials="",
         session_validation="",
         murfey_db_credentials="",
         crypto_key="",
