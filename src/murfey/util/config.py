@@ -67,7 +67,8 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     flip_gain: Literal["x", "y", ""] = Field(
         default="",
         description=(
-            "State if the gain reference needs to be flipped along a specific axis."
+            "State if the gain reference needs to be flipped along a specific axis. "
+            "Options are 'x', 'y', or ''."
         ),
         # NOTE: This is a placeholder for a key that will be implemented in the future
     )
