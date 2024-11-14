@@ -460,9 +460,10 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _d
     _db.close()
 
 
-def _murfey_refine(murfey_id: int, refine_dir: str, app_id: int, _db):
+def _murfey_refine(murfey_id: int, refine_dir: str, tag: str, app_id: int, _db):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-refine")
     refine3d = db.Refine3D(
+        tag=tag,
         refine_dir=refine_dir,
         pj_id=pj_id,
         murfey_id=murfey_id,
@@ -1072,7 +1073,7 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                     _app_id(pj_id, _db),
                     _db,
                 ),
-                "symmetry_refined_grp_uuid": refine_params.symmetry_murfey_id,
+                "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
@@ -2230,15 +2231,14 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             next_job = feedback_params.next_job
             refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
-            symmetry_refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
+            symmetry_refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             symmetry_refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
 
             refine_params = db.RefineParameters(
                 tag="first",
                 pj_id=pj_id,
                 murfey_id=refined_grp_uuid,
-                symmetry_murfey_id=symmetry_refined_grp_uuid,
                 refine_dir=refine_dir,
                 class3d_dir=message["class3d_dir"],
                 class_number=message["best_class"],
@@ -2254,10 +2254,13 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.add(refine_params)
             _db.add(symmetry_refine_params)
             _db.commit()
-            _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
+            _murfey_refine(
+                refined_class_uuid, refine_dir, "first", message["program_id"], _db
+            )
             _murfey_refine(
                 symmetry_refined_class_uuid,
-                f"{refine_dir}/symmetry",
+                refine_dir,
+                "symmetry",
                 message["program_id"],
                 _db,
             )

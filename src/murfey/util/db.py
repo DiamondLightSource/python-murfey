@@ -723,6 +723,7 @@ class RefineParameters(SQLModel, table=True):  # type: ignore
 
 
 class Refine3D(SQLModel, table=True):  # type: ignore
+    tag: str = Field(primary_key=True)
     refine_dir: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
