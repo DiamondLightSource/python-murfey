@@ -710,6 +710,7 @@ class RefineParameters(SQLModel, table=True):  # type: ignore
     refine_dir: str = Field(primary_key=True)
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
+    symmetry_murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     class_number: int
     run: bool = False
