@@ -49,7 +49,8 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         description=(
             "Name of the camera used by the TEM. This is only relevant for TEMs to "
             "determine how the gain reference needs to be processed, e.g., if it has "
-            "to be binned down from superres or flipped along the x-/y-axis."
+            "to be binned down from superres or flipped along the x- or y-axis. "
+            "Options: 'FALCON', 'K3_FLIPX', 'K3_FLIPY'"
         ),
         # NOTE:
         #   Supported options: Falcon 4, Falcon 4I, K2, K3 (superres)
@@ -68,7 +69,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         default="",
         description=(
             "State if the gain reference needs to be flipped along a specific axis. "
-            "Options are 'x', 'y', or ''."
+            "Options: 'x', 'y', or ''."
         ),
         # NOTE: This is a placeholder for a key that will be implemented in the future
     )
@@ -78,7 +79,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "Nested dictionary containing the calibrations for this microscope. "
             "E.g., 'magnification' would be a valid dictionary, in which the "
             "field-of-view at each magnfication level is provided as a key-value "
-            "pair."
+            "pair. Options: 'magnification'"
         ),
     )
 
@@ -98,7 +99,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "key-value pairs."
         ),
     )
-    software_settings_output_directories: dict[str, list[Path]] = Field(
+    software_settings_output_directories: dict[str, list[str]] = Field(
         default={},
         description=(
             "A dictionary in which the keys are the full file paths to the settings "
@@ -109,14 +110,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     )
 
     # Instrument-side file paths
-    data_directories: dict[Path, str] = Field(
-        default={},
-        description=(
-            "Dictionary of key-value pairs, where the keys are full paths to where "
-            "data is stored on the client machine, and the value denotes the type "
-            "of data stored at that path."
-        ),
-    )
     data_required_substrings: dict[str, dict[str, list[str]]] = Field(
         default={},
         description=(
@@ -124,6 +117,14 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "processing workflow for a given software package, and subsequently the "
             "key phrases to search for within the file name for it to be selected for "
             "processing."
+        ),
+    )
+    data_directories: dict[str, str] = Field(
+        default={},
+        description=(
+            "Dictionary of key-value pairs, where the keys are full paths to where "
+            "data is stored on the client machine, and the value denotes the type "
+            "of data stored at that path."
         ),
     )
     create_directories: dict[str, str] = Field(
@@ -157,8 +158,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "be a string, with '{visit}' and '{year}' being optional arguments that "
             "can be embedded in the string. E.g.: /home/user/data/{year}/{visit}"
         ),
-    )  # Only if Falcon is used
-    # To avoid others having to follow the {year}/{visit} format we are doing
+        # Only if Falcon is used
+        # To avoid others having to follow the {year}/{visit} format we are doing
+    )
 
     """
     Data transfer-related settings
@@ -260,41 +262,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         # users to add more processing options to their workflow
     )
 
-    # Extra plugins for data acquisition(?)
-    external_executables: dict[str, Path] = Field(
-        default={},
-        description=(
-            "Dictionary containing additional software packages to be used as part of "
-            "the processing workflow. The keys are the names of the packages and the "
-            "values are the full paths to where the executables are located."
-        ),
-    )
-    external_executables_eer: dict[str, Path] = Field(
-        default={},
-        description=(
-            "A similar dictionary, but for the executables associated with processing "
-            "EER files."
-        ),
-        # NOTE: Both external_executables variables should be combined into one. The
-        # EER ones could be their own key, where different software packages are
-        # provided for different file types in different workflows.
-    )
-    external_environment: dict[str, str] = Field(
-        default={},
-        description=(
-            "Dictionary containing full paths to supporting files and executables that "
-            "are needed to run the executables to be used. These paths will be added "
-            "to the $PATH environment variable."
-        ),
-    )
-    plugin_packages: dict[str, Path] = Field(
-        default={},
-        description=(
-            "Dictionary containing full paths to additional plugins for Murfey that "
-            "help support the workflow."
-        ),
-    )
-
     # TEM-related processing workflows
     recipes: dict[str, str] = Field(
         default={
@@ -342,6 +309,41 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         description=(
             "Relative path to where user-uploaded electron density models are stored. "
             "Murfey will look for the folders under the current visit."
+        ),
+    )
+
+    # Extra plugins for data acquisition(?)
+    external_executables: dict[str, Path] = Field(
+        default={},
+        description=(
+            "Dictionary containing additional software packages to be used as part of "
+            "the processing workflow. The keys are the names of the packages and the "
+            "values are the full paths to where the executables are located."
+        ),
+    )
+    external_executables_eer: dict[str, Path] = Field(
+        default={},
+        description=(
+            "A similar dictionary, but for the executables associated with processing "
+            "EER files."
+        ),
+        # NOTE: Both external_executables variables should be combined into one. The
+        # EER ones could be their own key, where different software packages are
+        # provided for different file types in different workflows.
+    )
+    external_environment: dict[str, str] = Field(
+        default={},
+        description=(
+            "Dictionary containing full paths to supporting files and executables that "
+            "are needed to run the executables to be used. These paths will be added "
+            "to the $PATH environment variable."
+        ),
+    )
+    plugin_packages: dict[str, Path] = Field(
+        default={},
+        description=(
+            "Dictionary containing full paths to additional plugins for Murfey that "
+            "help support the data collection and processing workflow."
         ),
     )
 
