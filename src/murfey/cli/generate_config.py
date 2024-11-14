@@ -1,27 +1,562 @@
+import json
+import re
+from pathlib import Path
+from typing import Optional
+
+import yaml
 from pydantic import ValidationError
-from pydantic.fields import UndefinedType
-from rich.pretty import pprint
-from rich.prompt import Prompt
+from pydantic.fields import ModelField, UndefinedType
+from rich.console import Console
 
 from murfey.util.config import MachineConfig
+
+# Create a console object for pretty printing
+console = Console()
+
+
+def prompt(message: str, style: str = "") -> str:
+    """
+    Helper function to pretty print the prompt message and add the actual prompt on a
+    newline.
+    """
+    console.print(message, style=style)
+    return input("> ")
+
+
+def print_field_info(field: ModelField):
+    console.print(field.name, style="bold cyan")
+    console.print(field.field_info.description, style="cyan")
+    if not isinstance(field.field_info.default, UndefinedType):
+        console.print(f"Default: {field.field_info.default!r}", style="cyan")
+
+
+def ask_for_input(category: str, again: bool = False):
+    """
+    Short while loop when to facilitate adding more than one value to a field in the
+    config.
+    """
+    message = (
+        "Would you like to add " + ("another" if again else "a") + f" {category}? (y/n)"
+    )
+    while True:
+        answer = (
+            prompt(
+                message,
+            )
+            .lower()
+            .strip()
+        )
+        if answer in ("y", "yes"):
+            return True
+        elif answer in ("n", "no"):
+            return False
+        else:
+            console.print("Invalid input. Please try again.", style="red")
+
+
+def confirm_overwrite(key: str):
+    """
+    Check whether a key should be overwritten if a duplicate is detected
+    """
+    message = f"{key!r} already exists; do you wish to overwrite it? (y/n)"
+    while True:
+        answer = (
+            prompt(
+                message,
+            )
+            .lower()
+            .strip()
+        )
+        if answer in ("y", "yes"):
+            return True
+        elif answer in ("n", "no"):
+            return False
+        else:
+            console.print("Invalid input. Please try again.", style="red")
+
+
+def populate_field(key: str, field: ModelField):
+    """
+    General function for inputting and validating the value of a single field against
+    its Pydantic model.
+    """
+
+    # Display information on the field to be filled
+    print_field_info(field)
+    message = "Please provide a value (press Enter to leave it blank as '')."
+    while True:
+        # Validate fields as you key them in
+        value, error = field.validate(
+            prompt(message),
+            {},
+            loc=key,
+        )
+        if not error:
+            console.print(
+                f"{key!r} validated as {type(value)}: {value!r}", style="green"
+            )
+            return value
+        else:
+            console.print("Invalid input. Please try again.", style="red")
+
+
+def add_calibrations(key: str, field: ModelField) -> dict:
+    """
+    Populate the 'calibrations' field with dictionaries.
+    """
+
+    def get_calibration():
+        # Request for a file to read settings from
+        calibration_file = Path(
+            prompt(
+                "What is the full file path to the calibration file? This should be a "
+                "JSON file.",
+            )
+        )
+        try:
+            with open(calibration_file, "r") as file:
+                calibration_values: dict = json.load(file)
+                return calibration_values
+        except Exception as e:
+            console.print(
+                f"Error opening the provided file: {e}",
+                style="red",
+            )
+            if ask_for_input("calibration file", True) is True:
+                return get_calibration()
+            else:
+                return {}
+
+    # Settings
+    known_calibraions = ("magnification",)
+
+    # Start of add_calibrations
+    print_field_info(field)
+    category = "calibration setting"
+    calibrations: dict = {}
+    add_calibration = ask_for_input(category, False)
+    while add_calibration is True:
+        calibration_type = prompt(
+            "What type of calibration settings are you providing?",
+        ).lower()
+        # Check if it's a known type of calibration
+        if calibration_type not in known_calibraions:
+            console.print(
+                f"{calibration_type} is not a known type of calibration",
+                style="red",
+            )
+            add_calibration = ask_for_input(category, True)
+            continue
+        # Handle duplicate keys
+        if calibration_type in calibrations.keys():
+            if confirm_overwrite(calibration_type) is False:
+                add_calibration = ask_for_input(category, True)
+                continue
+        # Skip failed inputs
+        calibration_values = get_calibration()
+        if not calibration_values:
+            add_calibration = ask_for_input(category, True)
+            continue
+
+        # Add calibration to master dict
+        calibrations[calibration_type] = calibration_values
+        console.print(
+            f"Added {calibration_type} to the calibrations field: {calibration_values}",
+            style="green",
+        )
+
+        # Check if any more calibrations need to be added
+        add_calibration = ask_for_input(category="calibration setting", again=True)
+
+    # Validate the nested dictionary structure
+    validated_calibrations, error = field.validate(calibrations, {}, loc=field)
+    if not error:
+        console.print(
+            f"{key!r} validated as {type(validated_calibrations)}: {validated_calibrations!r}",
+            style="green",
+        )
+        return validated_calibrations
+    else:
+        console.print(
+            f"Failed to validate the provided calibrations: {error}", style="red"
+        )
+        console.print("Returning an empty dictionary")
+        return {}
+
+
+def add_software_packages(config: dict):
+    def ask_about_xml_path() -> bool:
+        message = (
+            "Does this software package have a settings file that needs modification? "
+            "(y/n)"
+        )
+        answer = prompt(message).lower().strip()
+
+        # Validate
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        console.print("Invalid input.", style="red")
+        return ask_about_xml_path()
+
+    def get_software_name() -> str:
+        name = (
+            prompt(
+                "What is the name of the software package? Supported options: 'autotem', "
+                "'epu', 'leica', 'serialem', 'tomo'",
+            )
+            .lower()
+            .strip()
+        )
+        # Validate name against "acquisition_software" field
+        field = MachineConfig.__fields__["acquisition_software"]
+        validated_name, error = field.validate([name], {}, loc="acquisition_software")
+        if not error:
+            return validated_name[0]
+        console.print(
+            "Invalid software name.",
+            style="red",
+        )
+        if ask_for_input("software package", True) is True:
+            return get_software_name()
+        return ""
+
+    def get_xml_file() -> Optional[Path]:
+        xml_file = Path(
+            prompt(
+                "What is the full file path of the settings file? This should be an "
+                "XML file.",
+            )
+        )
+        # Validate
+        if xml_file.suffix:
+            return xml_file
+        console.print(
+            "The path entered does not point to a file.",
+            style="red",
+        )
+        if ask_for_input("settings file", True) is True:
+            return get_xml_file()
+        return None
+
+    def get_xml_tree_path() -> str:
+        xml_tree_path = prompt(
+            "What is the path through the XML file to the node to overwrite?",
+        )
+        # Possibly some validation checks later
+        return xml_tree_path
+
+    def get_extensions_and_substrings() -> dict[str, list[str]]:
+        def get_file_extension() -> str:
+            extension = prompt(
+                "Please enter the extension of a file produced by this package "
+                "that is to be analysed (e.g., '.tiff', '.eer', etc.).",
+            ).strip()
+            # Validate
+            if not (extension.startswith(".") and extension.replace(".", "").isalnum()):
+                console.print(
+                    "This is an invalid file extension. Please try again. ",
+                    style="red",
+                )
+                return get_file_extension()
+            if extension in unsorted_dict.keys():
+                console.print("This extension has already been provided")
+                return ""
+            return extension
+
+        def get_file_substring() -> str:
+            substring = prompt(
+                "Please enter a keyword that will be present in files with this "
+                "extension. This field is case-sensitive.",
+            ).strip()
+            # Validate
+            if bool(re.fullmatch(r"[\w\s\-]*", substring)) is False:
+                console.print(
+                    "Invalid characters are present in this substring. Please "
+                    "try again. ",
+                    style="red",
+                )
+                return get_file_substring()
+            if substring in substrings:
+                console.print("This substring has already been provided.")
+                return ""
+            return substring
+
+        # Start of get_extensions_and_substrings
+        unsorted_dict: dict = {}
+        add_extension = ask_for_input("file extension", False)
+        while add_extension is True:
+            extension = get_file_extension()
+            if not extension:
+                add_extension = ask_for_input("file extension", True)
+                continue
+            substrings: list[str] = []
+            add_substring = ask_for_input("file substring", False)
+            while add_substring is True:
+                substring = get_file_substring()
+                if not substring:
+                    add_substring = ask_for_input("file substring", True)
+                    continue
+                substrings.append(substring)
+                add_substring = ask_for_input("file substring", True)
+            unsorted_dict[extension] = sorted(substrings)
+            add_extension = ask_for_input("file extension", True)
+
+        sorted_dict: dict = {}
+        for key in sorted(unsorted_dict.keys()):
+            sorted_dict[key] = unsorted_dict[key]
+        return sorted_dict
+
+    # Start of add_software_packages
+    category = "software package"
+    add_input = ask_for_input(category, again=False)
+    package_info: dict = {}
+    while add_input:
+        # Collect inputs
+        console.print("acquisition_software", style="bold cyan")
+        console.print(
+            "This is where aquisition software packages present on the instrument "
+            "machine can be set.",
+            style="cyan",
+        )
+        console.print(
+            "Options: 'epu', 'tomo', 'serialem', 'autotem', 'leica'",
+            style="cyan",
+        )
+        name = get_software_name()
+        if name in package_info.keys():
+            if confirm_overwrite(name) is False:
+                add_input(category, False)
+                continue
+
+        version = prompt(
+            "What is the version number of this software package? Press Enter to leave "
+            "it blank if you're unsure.",
+        )
+
+        console.print("software_settings_output_directories", style="bold cyan")
+        console.print(
+            "Some software packages will have settings files that require modification "
+            "in order to ensure files are saved to the desired folders.",
+            style="cyan",
+        )
+        if ask_about_xml_path() is True:
+            xml_file = get_xml_file()
+            xml_tree_path = get_xml_tree_path()
+        else:
+            xml_file = None
+            xml_tree_path = ""
+
+        console.print("data_required_substrings", style="bold cyan")
+        console.print(
+            "Different software packages will generate different output files. Only "
+            "files with certain extensions and keywords in their filenames are needed "
+            "for data processing. They are listed out here.",
+            style="cyan",
+        )
+        file_ext_ss = get_extensions_and_substrings()
+
+        # Compile keys for this package as a dict
+        package_info[name] = {
+            "version": version,
+            "xml_file": xml_file,
+            "xml_tree_path": xml_tree_path,
+            "extensions_and_substrings": file_ext_ss,
+        }
+        add_input = ask_for_input(category, again=True)
+
+    # Re-pack keys and values according to the current config field structures
+    console.print("Compiling and validating inputs...")
+    acquisition_software: list = []
+    software_versions: dict = {}
+    software_settings_output_directories: dict = {}
+    data_required_substrings: dict = {}
+
+    # Add keys after sorting
+    for key in sorted(package_info.keys()):
+        acquisition_software.append(key)
+        if package_info[key]["version"]:
+            software_versions[key] = package_info[key]["version"]
+        if package_info[key]["xml_file"]:
+            software_settings_output_directories[str(package_info[key]["xml_file"])] = (
+                package_info[key]["xml_tree_path"]
+            )
+        if package_info[key]["extensions_and_substrings"]:
+            data_required_substrings[key] = package_info[key][
+                "extensions_and_substrings"
+            ]
+
+    # Validate against their respective fields
+    to_validate = (
+        ("acquisition_software", acquisition_software),
+        ("software_versions", software_versions),
+        ("software_settings_output_directories", software_settings_output_directories),
+        ("data_required_substrings", data_required_substrings),
+    )
+    for field_name, value in to_validate:
+        field = MachineConfig.__fields__[field_name]
+        validated_value, error = field.validate(value, {}, loc=field_name)
+        if not error:
+            config[field_name] = validated_value
+            console.print(
+                f"{field_name!r} validated as {type(validated_value)}: {validated_value!r}",
+                style="green",
+            )
+        else:
+            console.print(
+                f"Validation failed due to the following error: {error}",
+                style="red",
+            )
+            console.print("Please try again.", style="red")
+            return add_software_packages(config)
+
+    # Return updated dictionary
+    return config
+
+
+def set_up_data_transfer(config: dict) -> dict:
+    return config
+
+
+def set_up_data_processing(config: dict) -> dict:
+    return config
+
+
+def set_up_external_executables(config: dict) -> dict:
+    return config
 
 
 def run():
     new_config = {}
-    for k, field in MachineConfig.__fields__.items():
-        pprint(field.name)
-        pprint(field.field_info.description)
-        if isinstance(field.field_info.default, UndefinedType):
-            value = Prompt.ask("Please provide a value")
-        else:
-            value = Prompt.ask(
-                "Please provide a value", default=field.field_info.default
-            )
-        new_config[k] = value
+    for key, field in MachineConfig.__fields__.items():
+        """
+        Logic for complicated or related fields
+        """
+        if key == "superres":
+            camera: str = new_config["camera"]
+            new_config[key] = True if camera.lower().startswith("gatan") else False
+            continue
+        if key == "calibrations":
+            new_config[key] = add_calibrations(key, field)
+            continue
 
-        try:
-            MachineConfig.validate(new_config)
-        except ValidationError as exc:
-            for ve in exc.errors():
-                if ve["type"] != "value_error.missing":
-                    print("Validation failed")
+        # Acquisition software block
+        if key == "acquisition_software":
+            new_config = add_software_packages(new_config)
+            continue
+        if key in (
+            "software_versions",
+            "software_settings_output_directories",
+            "data_required_substrings",
+        ):
+            continue
+        # End of software block
+
+        if key == "data_directories":
+            # TODO
+            continue
+        if key == "create_directories":
+            # TODO
+            continue
+        if key == "analyse_created_directories":
+            # TODO
+            continue
+
+        # Data transfer block
+        if key == "data_transfer_enabled":
+            # TODO: Set up data transfer settings in a separate function
+            new_config = set_up_data_transfer(new_config)
+            continue
+        if key in (
+            "allow_removal",
+            "rsync_basepath",
+            "rsync_module",
+            "upstream_data_directories",
+            "upstream_data_download_directory",
+            "upstream_data_tiff_locations",
+        ):
+            continue
+        # End of data transfer block
+
+        # Data processing block
+        if key == "processing_enabled":
+            new_config = set_up_data_processing(new_config)
+            continue
+        if key in (
+            "process_by_default",
+            "gain_directory_name",
+            "processed_directory_name",
+            "processed_extra_directory",
+            "recipes",
+            "modular_spa",
+            "default_model",
+            "model_search_directory",
+            "initial_model_search_directory",
+        ):
+            continue
+        # End of data processing block
+
+        # External plugins and executables block
+        if key == "external_executables":
+            # TODO: Set up external plugins and exectuables
+            new_config = set_up_external_executables(new_config)
+            continue
+        if key in ("external_executables_eer", "external_environment"):
+            continue
+        # End of external executables block
+
+        if key == "plugin_packages":
+            # TODO
+            continue
+
+        """
+        Standard method of inputting values
+        """
+
+        new_config[key] = populate_field(key, field)
+
+    # Validate the entire config one last time
+    try:
+        MachineConfig.validate(new_config)
+    except ValidationError as exc:
+        for ve in exc.errors():
+            if ve["type"] != "value_error.missing":
+                print("Validation failed")
+        exit()
+
+    # Save the config
+    config_name = prompt(
+        "Machine config successfully validated. What would you like to name the file? "
+        "(E.g. 'my_machine_config')"
+    )
+    config_path = Path(prompt("Where would you like to save this config?"))
+    config_file = config_path / f"{config_name}.yaml"
+    # Create save directory
+    config_path.mkdir(parents=True, exist_ok=True)
+
+    # Check if config file already exists at the location
+    if config_file.exists():
+        # Check if the settings at this machine already exist
+        with open(config_file) as existing_file:
+            try:
+                old_config: dict[str, dict] = yaml.safe_load(existing_file)
+            except yaml.YAMLError as error:
+                console.print(error, style="red")
+                exit()
+        for key in new_config.keys():
+            if key in old_config.keys():
+                if confirm_overwrite() is False:
+                    old_config[key].update(new_config[key])
+                else:
+                    old_config[key] = new_config[key]
+            else:
+                old_config[key] = new_config[key]
+        # Overwrite
+        new_config = old_config
+    with open(config_file, "w") as save_file:
+        yaml.dump(new_config, save_file, default_flow_style=False)
+    console.print(
+        f"Machine config file successfully created at {str(config_path)}", styel="green"
+    )
+    console.print("Machine config setup complete", style="green")
