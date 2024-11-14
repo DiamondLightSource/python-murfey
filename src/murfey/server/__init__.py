@@ -501,7 +501,7 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
+def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> Dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -511,6 +511,7 @@ def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
         select(db.Refine3D)
         .where(db.Refine3D.refine_dir == refine_dir)
         .where(db.Refine3D.pj_id == pj_id)
+        .where(db.Refine3D.tag == tag)
     ).one()
     return refined_class.murfey_id
 
@@ -1028,7 +1029,14 @@ def _release_refine_hold(message: dict, _db=murfey_db):
         )
     ).one()
     refine_params = _db.exec(
-        select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+        select(db.RefineParameters)
+        .where(db.RefineParameters.pj_id == pj_id)
+        .where(db.RefineParameters.tag == "first")
+    ).one()
+    symmetry_refine_params = _db.exec(
+        select(db.RefineParameters)
+        .where(db.RefineParameters.pj_id == pj_id)
+        .where(db.RefineParameters.tag == "symmetry")
     ).one()
     if refine_params.run:
         instrument_name = (
@@ -1052,11 +1060,17 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                    refine_params.refine_dir,
+                    refine_params.tag,
+                    _app_id(pj_id, _db),
+                    _db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
                 "symmetry_refined_class_uuid": _refine_murfey_id(
-                    f"{refine_params.refine_dir}/symmetry", _app_id(pj_id, _db), _db
+                    symmetry_refine_params.refine_dir,
+                    symmetry_refine_params.tag,
+                    _app_id(pj_id, _db),
+                    _db,
                 ),
                 "symmetry_refined_grp_uuid": refine_params.symmetry_murfey_id,
                 "session_id": message["session_id"],
@@ -2203,7 +2217,14 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
         # Send all other messages on to a container
         try:
             refine_params = _db.exec(
-                select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+                select(db.RefineParameters)
+                .where(db.RefineParameters.pj_id == pj_id)
+                .where(db.RefineParameters.tag == "first")
+            ).one()
+            symmetry_refine_params = _db.exec(
+                select(db.RefineParameters)
+                .where(db.RefineParameters.pj_id == pj_id)
+                .where(db.RefineParameters.tag == "symmetry")
             ).one()
         except SQLAlchemyError:
             next_job = feedback_params.next_job
@@ -2214,6 +2235,7 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             symmetry_refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
 
             refine_params = db.RefineParameters(
+                tag="first",
                 pj_id=pj_id,
                 murfey_id=refined_grp_uuid,
                 symmetry_murfey_id=symmetry_refined_grp_uuid,
@@ -2221,7 +2243,16 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 class3d_dir=message["class3d_dir"],
                 class_number=message["best_class"],
             )
+            symmetry_refine_params = db.RefineParameters(
+                tag="symmetry",
+                pj_id=pj_id,
+                murfey_id=symmetry_refined_grp_uuid,
+                refine_dir=refine_dir,
+                class3d_dir=message["class3d_dir"],
+                class_number=message["best_class"],
+            )
             _db.add(refine_params)
+            _db.add(symmetry_refine_params)
             _db.commit()
             _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
             _murfey_refine(
@@ -2252,13 +2283,19 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                    refine_params.refine_dir,
+                    refine_params.tag,
+                    _app_id(pj_id, _db),
+                    _db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
                 "symmetry_refined_class_uuid": _refine_murfey_id(
-                    f"{refine_params.refine_dir}/symmetry", _app_id(pj_id, _db), _db
+                    symmetry_refine_params.refine_dir,
+                    symmetry_refine_params.tag,
+                    _app_id(pj_id, _db),
+                    _db,
                 ),
-                "symmetry_refined_grp_uuid": refine_params.symmetry_murfey_id,
+                "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
