@@ -1061,17 +1061,17 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir,
-                    refine_params.tag,
-                    _app_id(pj_id, _db),
-                    _db,
+                    refine_dir=refine_params.refine_dir,
+                    tag=refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
                 "symmetry_refined_class_uuid": _refine_murfey_id(
-                    symmetry_refine_params.refine_dir,
-                    symmetry_refine_params.tag,
-                    _app_id(pj_id, _db),
-                    _db,
+                    refine_dir=symmetry_refine_params.refine_dir,
+                    tag=symmetry_refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
@@ -2205,7 +2205,9 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
     if feedback_params.hold_refine:
         # If waiting then save the message
         refine_params = _db.exec(
-            select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+            select(db.RefineParameters)
+            .where(db.RefineParameters.pj_id == pj_id)
+            .where(db.RefineParameters.tag == "first")
         ).one()
         # refine_params.refine_dir is not set as it will be the same as before
         refine_params.run = True
@@ -2255,14 +2257,18 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             _db.add(symmetry_refine_params)
             _db.commit()
             _murfey_refine(
-                refined_class_uuid, refine_dir, "first", message["program_id"], _db
+                murfey_id=refined_class_uuid,
+                refine_dir=refine_dir,
+                tag="first",
+                app_id=message["program_id"],
+                _db=_db,
             )
             _murfey_refine(
-                symmetry_refined_class_uuid,
-                refine_dir,
-                "symmetry",
-                message["program_id"],
-                _db,
+                murfey_id=symmetry_refined_class_uuid,
+                refine_dir=refine_dir,
+                tag="symmetry",
+                app_id=message["program_id"],
+                _db=_db,
             )
 
             if relion_options["symmetry"] == "C1":
@@ -2286,17 +2292,17 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir,
-                    refine_params.tag,
-                    _app_id(pj_id, _db),
-                    _db,
+                    refine_dir=refine_params.refine_dir,
+                    tag=refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
                 "symmetry_refined_class_uuid": _refine_murfey_id(
-                    symmetry_refine_params.refine_dir,
-                    symmetry_refine_params.tag,
-                    _app_id(pj_id, _db),
-                    _db,
+                    refine_dir=symmetry_refine_params.refine_dir,
+                    tag=symmetry_refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
