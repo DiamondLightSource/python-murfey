@@ -309,21 +309,22 @@ def add_software_packages(config: dict):
         return sorted_dict
 
     # Start of add_software_packages
+    console.print("acquisition_software", style="bold cyan")
+    console.print(
+        "This is where aquisition software packages present on the instrument "
+        "machine can be set.",
+        style="cyan",
+    )
+    console.print(
+        "Options: 'epu', 'tomo', 'serialem', 'autotem', 'leica'",
+        style="cyan",
+    )
+    package_info: dict = {}
     category = "software package"
     add_input = ask_for_input(category, again=False)
-    package_info: dict = {}
     while add_input:
         # Collect inputs
         console.print("acquisition_software", style="bold cyan")
-        console.print(
-            "This is where aquisition software packages present on the instrument "
-            "machine can be set.",
-            style="cyan",
-        )
-        console.print(
-            "Options: 'epu', 'tomo', 'serialem', 'autotem', 'leica'",
-            style="cyan",
-        )
         name = get_software_name()
         if name in package_info.keys():
             if confirm_overwrite(name) is False:
@@ -516,17 +517,24 @@ def run():
 
         new_config[key] = populate_field(key, field)
 
-    # Validate the entire config one last time
+    # Validate the entire config again and convert into JSON/YAML-safe dict
     try:
-        MachineConfig.validate(new_config)
-    except ValidationError as exc:
-        for ve in exc.errors():
-            if ve["type"] != "value_error.missing":
-                print("Validation failed")
+        new_config_json = MachineConfig(**new_config).json()
+        new_config_safe = json.loads(new_config_json)
+    except ValidationError as exception:
+        # Print out validation errors found
+        console.print("Validation failed", style="red")
+        for error in exception.errors():
+            console.print(f"{error}", style="red")
+        # Offer to redo the setup, otherwise quit setup
+        if ask_for_input("machine configuration", True) is True:
+            return run()
         exit()
 
     # Save config under its instrument name
-    master_config: dict[str, dict] = {new_config["instrument_name"]: new_config}
+    master_config: dict[str, dict] = {
+        new_config_safe["instrument_name"]: new_config_safe
+    }
 
     # Create save path for config
     config_name = prompt(
@@ -551,11 +559,10 @@ def run():
                 exit()
         # Check if settings already exist for this machine
         for key in master_config.keys():
-            if key in old_config.keys():
-                if confirm_overwrite(key) is False:
-                    old_config[key].update(new_config[key])
-                else:
-                    old_config[key] = new_config[key]
+            # Check if overwriting of existing config is needed
+            if key in old_config.keys() and confirm_overwrite(key) is False:
+                old_config[key].update(new_config[key])
+            # Add new machine config
             else:
                 old_config[key] = new_config[key]
         # Overwrite
