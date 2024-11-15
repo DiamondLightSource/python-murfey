@@ -327,7 +327,7 @@ def add_software_packages(config: dict):
         name = get_software_name()
         if name in package_info.keys():
             if confirm_overwrite(name) is False:
-                add_input(category, False)
+                add_input = ask_for_input(category, False)
                 continue
 
         version = prompt(
@@ -525,38 +525,52 @@ def run():
                 print("Validation failed")
         exit()
 
-    # Save the config
+    # Save config under its instrument name
+    master_config: dict[str, dict] = {new_config["instrument_name"]: new_config}
+
+    # Create save path for config
     config_name = prompt(
         "Machine config successfully validated. What would you like to name the file? "
         "(E.g. 'my_machine_config')"
     )
     config_path = Path(prompt("Where would you like to save this config?"))
     config_file = config_path / f"{config_name}.yaml"
-    # Create save directory
     config_path.mkdir(parents=True, exist_ok=True)
 
     # Check if config file already exists at the location
     if config_file.exists():
-        # Check if the settings at this machine already exist
         with open(config_file) as existing_file:
             try:
                 old_config: dict[str, dict] = yaml.safe_load(existing_file)
             except yaml.YAMLError as error:
                 console.print(error, style="red")
+                # Provide option to quit or try again
+                if ask_for_input("machine configuration", True) is True:
+                    return run()
+                console.print("Exiting machine configuration setup guide")
                 exit()
-        for key in new_config.keys():
+        # Check if settings already exist for this machine
+        for key in master_config.keys():
             if key in old_config.keys():
-                if confirm_overwrite() is False:
+                if confirm_overwrite(key) is False:
                     old_config[key].update(new_config[key])
                 else:
                     old_config[key] = new_config[key]
             else:
                 old_config[key] = new_config[key]
         # Overwrite
-        new_config = old_config
+        master_config = old_config
     with open(config_file, "w") as save_file:
-        yaml.dump(new_config, save_file, default_flow_style=False)
+        yaml.dump(master_config, save_file, default_flow_style=False)
     console.print(
-        f"Machine config file successfully created at {str(config_path)}", styel="green"
+        f"Machine configuration for {new_config['instrument_name']!r} "
+        f"successfully saved as {str(config_file)!r}",
+        style="green",
     )
-    console.print("Machine config setup complete", style="green")
+    console.print("Machine configuration complete", style="green")
+
+    # Provide option to set up another machine configuration
+    if ask_for_input("machine configuration", True) is True:
+        return run()
+    console.print("Exiting machine configuration setup guide")
+    exit()
