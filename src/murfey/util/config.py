@@ -8,11 +8,19 @@ from typing import Any, Dict, List, Literal, Mapping, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra, Field, root_validator, validator
+from pydantic import (
+    BaseConfig,
+    BaseModel,
+    BaseSettings,
+    Extra,
+    Field,
+    root_validator,
+    validator,
+)
 from pydantic.errors import NoneIsNotAllowedError
 
 
-class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
+class MachineConfig(BaseModel):
     """
     General information about the instrument being supported
     """
@@ -167,19 +175,18 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     """
     # rsync-related settings (only if rsync is used)
     data_transfer_enabled: bool = Field(
-        default=True,
+        default=False,
         description=("Toggle whether to enable data transfer via rsync."),
         # NOTE: Only request input for this code block if data transfer is enabled
     )
-    allow_removal: bool = Field(
-        default=False, description="Allow original files to be removed after rsync."
-    )
-    rsync_basepath: Optional[Path] = Field(
-        default=None,
+    rsync_basepath: Path = Field(
+        default=Path("/"),
         description=(
             "Full path on the storage server that the rsync daemon will append the "
             "relative paths of the transferred files to."
         ),
+        # If rsync is disabled, rsync_basepath works out to be "/".
+        # Must always be set.
     )
     rsync_module: Optional[str] = Field(
         default=None,
@@ -190,6 +197,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             "machines are transferring to the same storage server, as you can specify "
             "different sub-folders to save the data to."
         ),
+    )
+    allow_removal: bool = Field(
+        default=False, description="Allow original files to be removed after rsync."
     )
 
     # Related visits and data
@@ -223,7 +233,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     """
     # Processing-related keys
     processing_enabled: bool = Field(
-        default=True,
+        default=False,
         description="Toggle whether to enable data processing.",
         # NOTE: Only request input for this code block if processing is enabled
     )
@@ -389,8 +399,16 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         ),
     )
 
+    class Config(BaseConfig):
+        """
+        Additional settings for how this Pydantic model behaves
+        """
+
+        extra = Extra.allow
+        json_encoders = {Path: str}
+
     @validator("camera", always=True, pre=True)
-    def _validate_camera_model(cls, value: str):
+    def __validate_camera_model__(cls, value: str):
         # Let non-strings fail validation naturally
         if not isinstance(value, str):
             return value
@@ -411,7 +429,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
             )
 
     @root_validator(pre=False)
-    def _validate_superres(cls, model: dict):
+    def __validate_superres__(cls, model: dict):
         camera: str = model.get("camera", "")
         model["superres"] = True if camera.startswith("K3") else False
         return model
@@ -420,6 +438,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     def __validate_rsync_basepath_if_transfer_enabled__(
         cls, v: Optional[str], values: Mapping[str, Any]
     ) -> Any:
+        """
+        If data transfer is enabled, an rsync basepath must be provided.
+        """
         if values.get("data_transfer_enabled"):
             if v is None:
                 raise NoneIsNotAllowedError
@@ -429,6 +450,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     def __validate_default_model_if_processing_enabled_and_spa_possible__(
         cls, v: Optional[str], values: Mapping[str, Any]
     ) -> Any:
+        """
+        If data processing is enabled, a machine learning model must be provided.
+        """
         if values.get("processing_enabled") and "epu" in values.get(
             "acquisition_software", []
         ):
