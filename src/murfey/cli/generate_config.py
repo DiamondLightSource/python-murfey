@@ -1,3 +1,4 @@
+import argparse
 import json
 import re
 from pathlib import Path
@@ -12,6 +13,8 @@ from murfey.util.config import MachineConfig
 
 # Create a console object for pretty printing
 console = Console()
+
+# Compile types for each key present in MachineConfig
 machine_config_types: dict = get_type_hints(MachineConfig)
 
 
@@ -69,7 +72,7 @@ def confirm_overwrite(key: str):
         console.print("Invalid input. Please try again.", style="red")
 
 
-def populate_field(key: str, field: ModelField):
+def populate_field(key: str, field: ModelField, debug: bool = False):
     """
     General function for inputting and validating the value of a single field against
     its Pydantic model.
@@ -90,16 +93,18 @@ def populate_field(key: str, field: ModelField):
 
         validated_value, error = field.validate(value, {}, loc=key)
         if not error:
-            console.print(
-                f"{key!r} validated as {type(validated_value)}: {validated_value!r}",
-                style="bright_green",
-            )
+            console.print(f"{key!r} successfully validated", style="bright_green")
+            if debug:
+                console.print(
+                    f"{type(validated_value)}\n{validated_value!r}",
+                    style="bright_green",
+                )
             return validated_value
         else:
             console.print("Invalid input. Please try again.", style="red")
 
 
-def add_calibrations(key: str, field: ModelField) -> dict:
+def add_calibrations(key: str, field: ModelField, debug: bool = False) -> dict:
     """
     Populate the 'calibrations' field with dictionaries.
     """
@@ -110,6 +115,7 @@ def add_calibrations(key: str, field: ModelField) -> dict:
             prompt(
                 "What is the full file path to the calibration file? This should be a "
                 "JSON file.",
+                style="yellow",
             )
         )
         try:
@@ -137,6 +143,7 @@ def add_calibrations(key: str, field: ModelField) -> dict:
     while add_calibration is True:
         calibration_type = prompt(
             "What type of calibration settings are you providing?",
+            style="yellow",
         ).lower()
         # Check if it's a known type of calibration
         if calibration_type not in known_calibraions:
@@ -160,9 +167,11 @@ def add_calibrations(key: str, field: ModelField) -> dict:
         # Add calibration to master dict
         calibrations[calibration_type] = calibration_values
         console.print(
-            f"Added {calibration_type} to the calibrations field: {calibration_values}",
+            f"Added {calibration_type} to the calibrations field",
             style="bright_green",
         )
+        if debug:
+            console.print(f"{calibration_values}", style="bright_green")
 
         # Check if any more calibrations need to be added
         add_calibration = ask_for_input(category="calibration setting", again=True)
@@ -170,26 +179,28 @@ def add_calibrations(key: str, field: ModelField) -> dict:
     # Validate the nested dictionary structure
     validated_calibrations, error = field.validate(calibrations, {}, loc=field)
     if not error:
-        console.print(
-            f"{key!r} validated as {type(validated_calibrations)}: {validated_calibrations!r}",
-            style="bright_green",
-        )
+        console.print(f"{key!r} validated successfully", style="bright_green")
+        if debug:
+            console.print(
+                f"{type(validated_calibrations)}\n{validated_calibrations!r}",
+                style="bright_green",
+            )
         return validated_calibrations
     else:
         console.print(
             f"Failed to validate the provided calibrations: {error}", style="red"
         )
-        console.print("Returning an empty dictionary")
+        console.print("Returning an empty dictionary", style="red")
         return {}
 
 
-def add_software_packages(config: dict):
+def add_software_packages(config: dict, debug: bool = False):
     def ask_about_xml_path() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
             "(y/n)"
         )
-        answer = prompt(message).lower().strip()
+        answer = prompt(message, style="yellow").lower().strip()
 
         # Validate
         if answer in ("y", "yes"):
@@ -226,6 +237,7 @@ def add_software_packages(config: dict):
             prompt(
                 "What is the full file path of the settings file? This should be an "
                 "XML file.",
+                style="yellow",
             )
         )
         # Validate
@@ -242,6 +254,7 @@ def add_software_packages(config: dict):
     def get_xml_tree_path() -> str:
         xml_tree_path = prompt(
             "What is the path through the XML file to the node to overwrite?",
+            style="yellow",
         )
         # Possibly some validation checks later
         return xml_tree_path
@@ -251,6 +264,7 @@ def add_software_packages(config: dict):
             extension = prompt(
                 "Please enter the extension of a file produced by this package "
                 "that is to be analysed (e.g., '.tiff', '.eer', etc.).",
+                style="yellow",
             ).strip()
             # Validate
             if not (extension.startswith(".") and extension.replace(".", "").isalnum()):
@@ -268,6 +282,7 @@ def add_software_packages(config: dict):
             substring = prompt(
                 "Please enter a keyword that will be present in files with this "
                 "extension. This field is case-sensitive.",
+                style="yellow",
             ).strip()
             # Validate
             if bool(re.fullmatch(r"[\w\s\-]*", substring)) is False:
@@ -333,6 +348,7 @@ def add_software_packages(config: dict):
         version = prompt(
             "What is the version number of this software package? Press Enter to leave "
             "it blank if you're unsure.",
+            style="yellow",
         )
 
         console.print("software_settings_output_directories", style="bold bright_cyan")
@@ -400,9 +416,13 @@ def add_software_packages(config: dict):
         if not error:
             config[field_name] = validated_value
             console.print(
-                f"{field_name!r} validated as {type(validated_value)}: {validated_value!r}",
-                style="bright_green",
+                f"{field_name!r} validated successfully", style="bright_green"
             )
+            if debug:
+                console.print(
+                    f"{type(validated_value)}\n{validated_value!r}",
+                    style="bright_green",
+                )
         else:
             console.print(
                 f"Validation failed due to the following error: {error}",
@@ -415,20 +435,23 @@ def add_software_packages(config: dict):
     return config
 
 
-def set_up_data_transfer(config: dict) -> dict:
+def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
     return config
 
 
-def set_up_data_processing(config: dict) -> dict:
+def set_up_data_processing(config: dict, debug: bool = False) -> dict:
     return config
 
 
-def set_up_external_executables(config: dict) -> dict:
+def set_up_external_executables(config: dict, debug: bool = False) -> dict:
     return config
 
 
-def run():
-    new_config = {}
+def set_up_machine_config(debug: bool = False):
+    """
+    Main function which runs through the setup process.
+    """
+    new_config: dict = {}
     for key, field in MachineConfig.__fields__.items():
         """
         Logic for complicated or related fields
@@ -438,12 +461,12 @@ def run():
             new_config[key] = True if camera.lower().startswith("gatan") else False
             continue
         if key == "calibrations":
-            new_config[key] = add_calibrations(key, field)
+            new_config[key] = add_calibrations(key, field, debug)
             continue
 
         # Acquisition software block
         if key == "acquisition_software":
-            new_config = add_software_packages(new_config)
+            new_config = add_software_packages(new_config, debug)
             continue
         if key in (
             "software_versions",
@@ -466,7 +489,7 @@ def run():
         # Data transfer block
         if key == "data_transfer_enabled":
             # TODO: Set up data transfer settings in a separate function
-            new_config = set_up_data_transfer(new_config)
+            new_config = set_up_data_transfer(new_config, debug)
             continue
         if key in (
             "allow_removal",
@@ -481,7 +504,7 @@ def run():
 
         # Data processing block
         if key == "processing_enabled":
-            new_config = set_up_data_processing(new_config)
+            new_config = set_up_data_processing(new_config, debug)
             continue
         if key in (
             "process_by_default",
@@ -500,7 +523,7 @@ def run():
         # External plugins and executables block
         if key == "external_executables":
             # TODO: Set up external plugins and exectuables
-            new_config = set_up_external_executables(new_config)
+            new_config = set_up_external_executables(new_config, debug)
             continue
         if key in ("external_executables_eer", "external_environment"):
             continue
@@ -514,7 +537,7 @@ def run():
         Standard method of inputting values
         """
 
-        new_config[key] = populate_field(key, field)
+        new_config[key] = populate_field(key, field, debug)
 
     # Validate the entire config again and convert into JSON/YAML-safe dict
     try:
@@ -535,11 +558,14 @@ def run():
     }
 
     # Create save path for config
+    console.print("Machine config successfully validated.", style="green")
     config_name = prompt(
-        "Machine config successfully validated. What would you like to name the file? "
-        "(E.g. 'my_machine_config')"
+        "What would you like to name the file? (E.g. 'my_machine_config')",
+        style="yellow",
     )
-    config_path = Path(prompt("Where would you like to save this config?"))
+    config_path = Path(
+        prompt("Where would you like to save this config?", style="yellow")
+    )
     config_file = config_path / f"{config_name}.yaml"
     config_path.mkdir(parents=True, exist_ok=True)
 
@@ -579,3 +605,18 @@ def run():
         return run()
     console.print("Exiting machine configuration setup guide", style="bright_green")
     exit()
+
+
+def run():
+    # Set up arg parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Prints additional messages to show setup progress.",
+    )
+    args = parser.parse_args()
+
+    set_up_machine_config(args.debug)
+
+    pass
