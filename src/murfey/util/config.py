@@ -52,7 +52,7 @@ class MachineConfig(BaseModel):
     """
     Information about the hardware and software on the instrument machine
     """
-    camera: str = Field(
+    camera: Literal["FALCON", "K3_FLIPX", "K3_FLIPY"] = Field(
         default="FALCON",
         description=(
             "Name of the camera used by the TEM. This is only relevant for TEMs to "
@@ -61,10 +61,11 @@ class MachineConfig(BaseModel):
             "Options: 'FALCON', 'K3_FLIPX', 'K3_FLIPY'"
         ),
         # NOTE:
-        #   Supported options: Falcon 4, Falcon 4I, K2, K3 (superres)
-        #   _FLIPX/_FLIPY is to tell it what to do with the gain reference
-        #   Will need to create a new key to record whether the gain reference image
-        #   needs to be flippedflip_gain: X, Y, None
+        #   Eventually need to support Falcon 4, Falcon 4I, K2, K3 (superres)
+        #   _FLIPX/_FLIPY is to tell it what to do with the gain reference.
+        #   -   These will eventually be removed, leaving only the camera name
+        #   -   Will need to create a new key to record whether the gain reference
+        #       image needs to be flippedflip_gain: X, Y, None
     )
     superres: bool = Field(
         default=False,
