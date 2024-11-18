@@ -549,8 +549,8 @@ def set_up_machine_config(debug: bool = False):
             console.print(f"{error}", style="red")
         # Offer to redo the setup, otherwise quit setup
         if ask_for_input("machine configuration", True) is True:
-            return run()
-        exit()
+            return set_up_machine_config(debug)
+        return False
 
     # Save config under its instrument name
     master_config: dict[str, dict] = {
@@ -578,7 +578,7 @@ def set_up_machine_config(debug: bool = False):
                 console.print(error, style="red")
                 # Provide option to quit or try again
                 if ask_for_input("machine configuration", True) is True:
-                    return run()
+                    return set_up_machine_config(debug)
                 console.print("Exiting machine configuration setup guide")
                 exit()
         # Check if settings already exist for this machine
@@ -602,9 +602,9 @@ def set_up_machine_config(debug: bool = False):
 
     # Provide option to set up another machine configuration
     if ask_for_input("machine configuration", True) is True:
-        return run()
+        return set_up_machine_config(debug)
     console.print("Exiting machine configuration setup guide", style="bright_green")
-    exit()
+    return True
 
 
 def run():
@@ -618,5 +618,3 @@ def run():
     args = parser.parse_args()
 
     set_up_machine_config(args.debug)
-
-    pass
