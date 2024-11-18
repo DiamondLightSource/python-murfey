@@ -2,7 +2,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Optional, get_type_hints
+from typing import Any, Optional, get_type_hints
 
 import yaml
 from pydantic import ValidationError
@@ -104,7 +104,9 @@ def populate_field(key: str, field: ModelField, debug: bool = False):
             console.print("Invalid input. Please try again.", style="red")
 
 
-def add_calibrations(key: str, field: ModelField, debug: bool = False) -> dict:
+def add_calibrations(
+    key: str, field: ModelField, debug: bool = False
+) -> dict[str, dict]:
     """
     Populate the 'calibrations' field with dictionaries.
     """
@@ -194,7 +196,7 @@ def add_calibrations(key: str, field: ModelField, debug: bool = False) -> dict:
         return {}
 
 
-def add_software_packages(config: dict, debug: bool = False):
+def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     def ask_about_xml_path() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
@@ -215,6 +217,7 @@ def add_software_packages(config: dict, debug: bool = False):
             prompt(
                 "What is the name of the software package? Supported options: 'autotem', "
                 "'epu', 'leica', 'serialem', 'tomo'",
+                style="yellow",
             )
             .lower()
             .strip()
@@ -297,7 +300,9 @@ def add_software_packages(config: dict, debug: bool = False):
                 return ""
             return substring
 
-        # Start of get_extensions_and_substrings
+        """
+        Start of get_extensions_and_substrings
+        """
         unsorted_dict: dict = {}
         add_extension = ask_for_input("file extension", False)
         while add_extension is True:
@@ -322,40 +327,62 @@ def add_software_packages(config: dict, debug: bool = False):
             sorted_dict[key] = unsorted_dict[key]
         return sorted_dict
 
-    # Start of add_software_packages
-    console.print("acquisition_software", style="bold bright_cyan")
+    """
+    Start of add_software_packages
+    """
     console.print(
-        "This is where aquisition software packages present on the instrument "
-        "machine can be set.",
-        style="bright_cyan",
+        "Acquisition Software (acquisition_software)",
+        style="bold bright_cyan",
     )
     console.print(
-        "Options: 'epu', 'tomo', 'serialem', 'autotem', 'leica'",
-        style="bright_cyan",
+        "This is where aquisition software packages present on the instrument machine "
+        "can be specified, along with the output file names and extensions that are of "
+        "interest.",
+        style="italic bright_cyan",
     )
     package_info: dict = {}
     category = "software package"
     add_input = ask_for_input(category, again=False)
     while add_input:
         # Collect inputs
-        console.print("acquisition_software", style="bold bright_cyan")
+        console.print(
+            "Acquisition Software (acquisition_software)",
+            style="bold bright_cyan",
+        )
+        console.print(
+            "Name of the acquisition software installed on this instrument.",
+            style="italic bright_cyan",
+        )
+        console.print(
+            "Options: 'autotem', 'epu', 'leica', 'serialem', 'tomo'",
+            style="bright_cyan",
+        )
         name = get_software_name()
         if name in package_info.keys():
             if confirm_overwrite(name) is False:
                 add_input = ask_for_input(category, False)
                 continue
 
+        console.print(
+            "Software Versions (software_versions)",
+            style="bold bright_cyan",
+        )
         version = prompt(
             "What is the version number of this software package? Press Enter to leave "
             "it blank if you're unsure.",
             style="yellow",
         )
 
-        console.print("software_settings_output_directories", style="bold bright_cyan")
+        console.print(
+            "Software Settings Output Directories (software_settings_output_directories)",
+            style="bold bright_cyan",
+        )
         console.print(
             "Some software packages will have settings files that require modification "
-            "in order to ensure files are saved to the desired folders.",
-            style="bright_cyan",
+            "in order to ensure files are saved to the desired folders. The paths to "
+            "the files and the path to the nodes in the settings files both need to be "
+            "provided.",
+            style="italic bright_cyan",
         )
         if ask_about_xml_path() is True:
             xml_file = get_xml_file()
@@ -364,12 +391,15 @@ def add_software_packages(config: dict, debug: bool = False):
             xml_file = None
             xml_tree_path = ""
 
-        console.print("data_required_substrings", style="bold bright_cyan")
+        console.print(
+            "Data Required Substrings (data_required_substrings)",
+            style="bold bright_cyan",
+        )
         console.print(
             "Different software packages will generate different output files. Only "
             "files with certain extensions and keywords in their filenames are needed "
             "for data processing. They are listed out here.",
-            style="bright_cyan",
+            style="italic bright_cyan",
         )
         file_ext_ss = get_extensions_and_substrings()
 
@@ -435,6 +465,73 @@ def add_software_packages(config: dict, debug: bool = False):
     return config
 
 
+def add_data_directories(
+    key: str, field: ModelField, debug: bool = False
+) -> dict[str, str]:
+    def get_directory() -> Optional[Path]:
+        answer = prompt(
+            "What is the full file path to the data directory you wish to add?",
+            style="yellow",
+        )
+        # Convert "" into None
+        if not answer:
+            return None
+        return Path(answer)
+
+    def get_directory_type():
+        answer = prompt(
+            "What type of data is stored in this directory? Options: 'microscope', "
+            "'detector'",
+            style="yellow",
+        ).lower()
+        if answer not in ("microscope", "detector"):
+            console.print("Invalid directory type.", style="red")
+            if ask_for_input("directory type", True) is True:
+                return get_directory_type()
+            return ""
+        return answer
+
+    """
+    Start of add_data_directories
+    """
+    print_field_info(field)
+    data_directories: dict[str, str] = {}
+    category = "data directory"
+    add_directory = ask_for_input(category, False)
+    while add_directory is True:
+        directory = get_directory()
+        # Move on to next loop or exit if no directory provided
+        if not directory:
+            console.print("No directory added", style="red")
+            add_directory = ask_for_input(category, True)
+            continue
+
+        # Get the directory type
+        directory_type = get_directory_type()
+        if not directory_type:
+            console.print("No directory type provided", style="red")
+
+        # Add to dictionary
+        data_directories[str(directory)] = directory_type
+
+        # Check if more need to be added
+        add_directory = ask_for_input(category, True)
+        continue
+
+    # Validate and return
+    validated_data_directories, error = field.validate(data_directories, {}, loc=key)
+    if not error:
+        console.print(f"Validated {key!r} successfully", style="bright_green")
+        if debug:
+            console.print(f"{type(validated_data_directories)}")
+            console.print(f"{validated_data_directories}")
+        return data_directories
+    console.print(f"Failed to validate {key!r}", style="red")
+    if ask_for_input(category, True) is True:
+        return add_data_directories(key, field, debug)
+    return {}
+
+
 def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
     return config
 
@@ -478,6 +575,7 @@ def set_up_machine_config(debug: bool = False):
 
         if key == "data_directories":
             # TODO
+            new_config[key] = add_data_directories(key, field, debug)
             continue
         if key == "create_directories":
             # TODO
