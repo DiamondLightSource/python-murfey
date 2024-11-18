@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, get_type_hints
 
 import yaml
 from pydantic import ValidationError
@@ -12,6 +12,7 @@ from murfey.util.config import MachineConfig
 
 # Create a console object for pretty printing
 console = Console()
+machine_config_types: dict = get_type_hints(MachineConfig)
 
 
 def prompt(message: str, style: str = "") -> str:
@@ -24,55 +25,48 @@ def prompt(message: str, style: str = "") -> str:
 
 
 def print_field_info(field: ModelField):
-    console.print(field.name, style="bold cyan")
-    console.print(field.field_info.description, style="cyan")
+    """
+    Helper function to print out the name of the key being set up, along with a short
+    description of what purpose the key serves.
+    """
+    console.print(
+        f"{field.name.replace('_', ' ').title()} ({field.name})",
+        style="bold bright_cyan",
+    )
+    console.print(field.field_info.description, style="italic bright_cyan")
     if not isinstance(field.field_info.default, UndefinedType):
-        console.print(f"Default: {field.field_info.default!r}", style="cyan")
+        console.print(f"Default: {field.field_info.default!r}", style="bright_cyan")
 
 
 def ask_for_input(category: str, again: bool = False):
     """
-    Short while loop when to facilitate adding more than one value to a field in the
-    config.
+    Perform a Boolean check to see if another value is to be appended to the current
+    parameter being set up.
     """
     message = (
         "Would you like to add " + ("another" if again else "a") + f" {category}? (y/n)"
     )
     while True:
-        answer = (
-            prompt(
-                message,
-            )
-            .lower()
-            .strip()
-        )
+        answer = prompt(message, style="yellow").lower().strip()
         if answer in ("y", "yes"):
             return True
-        elif answer in ("n", "no"):
+        if answer in ("n", "no"):
             return False
-        else:
-            console.print("Invalid input. Please try again.", style="red")
+        console.print("Invalid input. Please try again.", style="red")
 
 
 def confirm_overwrite(key: str):
     """
-    Check whether a key should be overwritten if a duplicate is detected
+    Check whether a key should be overwritten if a duplicate is detected.
     """
     message = f"{key!r} already exists; do you wish to overwrite it? (y/n)"
     while True:
-        answer = (
-            prompt(
-                message,
-            )
-            .lower()
-            .strip()
-        )
+        answer = prompt(message, style="yellow").lower().strip()
         if answer in ("y", "yes"):
             return True
-        elif answer in ("n", "no"):
+        if answer in ("n", "no"):
             return False
-        else:
-            console.print("Invalid input. Please try again.", style="red")
+        console.print("Invalid input. Please try again.", style="red")
 
 
 def populate_field(key: str, field: ModelField):
@@ -85,17 +79,22 @@ def populate_field(key: str, field: ModelField):
     print_field_info(field)
     message = "Please provide a value (press Enter to leave it blank as '')."
     while True:
-        # Validate fields as you key them in
-        value, error = field.validate(
-            prompt(message),
-            {},
-            loc=key,
+        # Get value
+        answer = prompt(message, style="yellow")
+        # Translate empty string into None for fields that take Path values
+        value = (
+            None
+            if (not answer and machine_config_types.get(key) in (Path, Optional[Path]))
+            else answer
         )
+
+        validated_value, error = field.validate(value, {}, loc=key)
         if not error:
             console.print(
-                f"{key!r} validated as {type(value)}: {value!r}", style="green"
+                f"{key!r} validated as {type(validated_value)}: {validated_value!r}",
+                style="bright_green",
             )
-            return value
+            return validated_value
         else:
             console.print("Invalid input. Please try again.", style="red")
 
@@ -162,7 +161,7 @@ def add_calibrations(key: str, field: ModelField) -> dict:
         calibrations[calibration_type] = calibration_values
         console.print(
             f"Added {calibration_type} to the calibrations field: {calibration_values}",
-            style="green",
+            style="bright_green",
         )
 
         # Check if any more calibrations need to be added
@@ -173,7 +172,7 @@ def add_calibrations(key: str, field: ModelField) -> dict:
     if not error:
         console.print(
             f"{key!r} validated as {type(validated_calibrations)}: {validated_calibrations!r}",
-            style="green",
+            style="bright_green",
         )
         return validated_calibrations
     else:
@@ -309,22 +308,22 @@ def add_software_packages(config: dict):
         return sorted_dict
 
     # Start of add_software_packages
-    console.print("acquisition_software", style="bold cyan")
+    console.print("acquisition_software", style="bold bright_cyan")
     console.print(
         "This is where aquisition software packages present on the instrument "
         "machine can be set.",
-        style="cyan",
+        style="bright_cyan",
     )
     console.print(
         "Options: 'epu', 'tomo', 'serialem', 'autotem', 'leica'",
-        style="cyan",
+        style="bright_cyan",
     )
     package_info: dict = {}
     category = "software package"
     add_input = ask_for_input(category, again=False)
     while add_input:
         # Collect inputs
-        console.print("acquisition_software", style="bold cyan")
+        console.print("acquisition_software", style="bold bright_cyan")
         name = get_software_name()
         if name in package_info.keys():
             if confirm_overwrite(name) is False:
@@ -336,11 +335,11 @@ def add_software_packages(config: dict):
             "it blank if you're unsure.",
         )
 
-        console.print("software_settings_output_directories", style="bold cyan")
+        console.print("software_settings_output_directories", style="bold bright_cyan")
         console.print(
             "Some software packages will have settings files that require modification "
             "in order to ensure files are saved to the desired folders.",
-            style="cyan",
+            style="bright_cyan",
         )
         if ask_about_xml_path() is True:
             xml_file = get_xml_file()
@@ -349,12 +348,12 @@ def add_software_packages(config: dict):
             xml_file = None
             xml_tree_path = ""
 
-        console.print("data_required_substrings", style="bold cyan")
+        console.print("data_required_substrings", style="bold bright_cyan")
         console.print(
             "Different software packages will generate different output files. Only "
             "files with certain extensions and keywords in their filenames are needed "
             "for data processing. They are listed out here.",
-            style="cyan",
+            style="bright_cyan",
         )
         file_ext_ss = get_extensions_and_substrings()
 
@@ -402,7 +401,7 @@ def add_software_packages(config: dict):
             config[field_name] = validated_value
             console.print(
                 f"{field_name!r} validated as {type(validated_value)}: {validated_value!r}",
-                style="green",
+                style="bright_green",
             )
         else:
             console.print(
@@ -519,8 +518,7 @@ def run():
 
     # Validate the entire config again and convert into JSON/YAML-safe dict
     try:
-        new_config_json = MachineConfig(**new_config).json()
-        new_config_safe = json.loads(new_config_json)
+        new_config_safe: dict = json.loads(MachineConfig(**new_config).json())
     except ValidationError as exception:
         # Print out validation errors found
         console.print("Validation failed", style="red")
@@ -561,23 +559,23 @@ def run():
         for key in master_config.keys():
             # Check if overwriting of existing config is needed
             if key in old_config.keys() and confirm_overwrite(key) is False:
-                old_config[key].update(new_config[key])
+                old_config[key].update(master_config[key])
             # Add new machine config
             else:
-                old_config[key] = new_config[key]
+                old_config[key] = master_config[key]
         # Overwrite
         master_config = old_config
     with open(config_file, "w") as save_file:
         yaml.dump(master_config, save_file, default_flow_style=False)
     console.print(
-        f"Machine configuration for {new_config['instrument_name']!r} "
+        f"Machine configuration for {new_config_safe['instrument_name']!r} "
         f"successfully saved as {str(config_file)!r}",
-        style="green",
+        style="bright_green",
     )
-    console.print("Machine configuration complete", style="green")
+    console.print("Machine configuration complete", style="bright_green")
 
     # Provide option to set up another machine configuration
     if ask_for_input("machine configuration", True) is True:
         return run()
-    console.print("Exiting machine configuration setup guide")
+    console.print("Exiting machine configuration setup guide", style="bright_green")
     exit()
