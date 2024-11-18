@@ -188,8 +188,8 @@ class MachineConfig(BaseModel):
         # If rsync is disabled, rsync_basepath works out to be "/".
         # Must always be set.
     )
-    rsync_module: Optional[str] = Field(
-        default=None,
+    rsync_module: str = Field(
+        default="",
         description=(
             "Name of the rsync module the files are being transferred with. The module "
             "will be appended to the rsync base path, and the relative paths will be "
