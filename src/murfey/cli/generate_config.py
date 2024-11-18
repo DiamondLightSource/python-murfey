@@ -469,21 +469,22 @@ def add_data_directories(
     key: str, field: ModelField, debug: bool = False
 ) -> dict[str, str]:
     def get_directory() -> Optional[Path]:
+        message = "What is the full file path to the data directory you wish to add?"
         answer = prompt(
-            "What is the full file path to the data directory you wish to add?",
+            message,
             style="yellow",
-        )
+        ).strip()
         # Convert "" into None
         if not answer:
             return None
         return Path(answer)
 
     def get_directory_type():
-        answer = prompt(
+        message = (
             "What type of data is stored in this directory? Options: 'microscope', "
-            "'detector'",
-            style="yellow",
-        ).lower()
+            "'detector'"
+        )
+        answer = prompt(message, style="yellow").lower().strip()
         if answer not in ("microscope", "detector"):
             console.print("Invalid directory type.", style="red")
             if ask_for_input("directory type", True) is True:
@@ -532,6 +533,70 @@ def add_data_directories(
     return {}
 
 
+def add_create_directories(
+    key: str, field: ModelField, debug: bool = False
+) -> dict[str, str]:
+    def get_folder() -> str:
+        message = (
+            "Please input the name of the folder for Murfey to create. Press Enter "
+            "to skip this."
+        )
+        answer = prompt(message, style="yellow").lower().strip()
+        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
+            console.print(
+                "There are unsafe characters present in this folder name. Please "
+                "use a different one.",
+                style="red",
+            )
+            if ask_for_input("folder name", True) is True:
+                return get_folder()
+            return ""
+        return answer
+
+    def get_folder_alias() -> str:
+        message = "Please enter the name you want to map this folder to within Murfey."
+        answer = prompt(message, style="yellow").lower().strip()
+        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
+            console.print(
+                "There are unsafe characters present in this folder name. Please "
+                "use a different one.",
+                style="red",
+            )
+            if ask_for_input("folder alias", True) is True:
+                return get_folder_alias()
+            return ""
+        return answer
+
+    """
+    Start of add_create_directories
+    """
+    print_field_info(field)
+    directories_to_create: dict[str, str] = {}
+    category = "directory for Murfey to create"
+    add_directory: bool = ask_for_input(category, False)
+    while add_directory is True:
+        folder_name = get_folder()
+        if not folder_name:
+            console.print(
+                "No folder name provided",
+                style="red",
+            )
+            add_directory = ask_for_input(category, True)
+            continue
+        folder_alias = get_folder_alias()
+        if not folder_alias:
+            console.print(
+                "No folder alias provided",
+                style="red",
+            )
+            add_directory = ask_for_input(category, True)
+            continue
+        directories_to_create[folder_alias] = folder_name
+        add_directory = ask_for_input(category, True)
+        continue
+    return directories_to_create
+
+
 def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
     return config
 
@@ -574,10 +639,10 @@ def set_up_machine_config(debug: bool = False):
         # End of software block
 
         if key == "data_directories":
-            # TODO
             new_config[key] = add_data_directories(key, field, debug)
             continue
         if key == "create_directories":
+            new_config[key] = add_create_directories(key, field, debug)
             # TODO
             continue
         if key == "analyse_created_directories":
