@@ -197,21 +197,6 @@ def add_calibrations(
 
 
 def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
-    def ask_about_xml_path() -> bool:
-        message = (
-            "Does this software package have a settings file that needs modification? "
-            "(y/n)"
-        )
-        answer = prompt(message, style="yellow").lower().strip()
-
-        # Validate
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        console.print("Invalid input.", style="red")
-        return ask_about_xml_path()
-
     def get_software_name() -> str:
         name = (
             prompt(
@@ -234,6 +219,21 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         if ask_for_input("software package", True) is True:
             return get_software_name()
         return ""
+
+    def ask_about_xml_path() -> bool:
+        message = (
+            "Does this software package have a settings file that needs modification? "
+            "(y/n)"
+        )
+        answer = prompt(message, style="yellow").lower().strip()
+
+        # Validate
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        console.print("Invalid input.", style="red")
+        return ask_about_xml_path()
 
     def get_xml_file() -> Optional[Path]:
         xml_file = Path(
@@ -525,7 +525,7 @@ def add_data_directories(
         console.print(f"Validated {key!r} successfully", style="bright_green")
         if debug:
             console.print(f"{type(validated_data_directories)}")
-            console.print(f"{validated_data_directories}")
+            console.print(f"{validated_data_directories!r}")
         return data_directories
     console.print(f"Failed to validate {key!r}", style="red")
     if ask_for_input(category, True) is True:
@@ -537,10 +537,7 @@ def add_create_directories(
     key: str, field: ModelField, debug: bool = False
 ) -> dict[str, str]:
     def get_folder() -> str:
-        message = (
-            "Please input the name of the folder for Murfey to create. Press Enter "
-            "to skip this."
-        )
+        message = "Please enter the name of the folder for Murfey to create."
         answer = prompt(message, style="yellow").lower().strip()
         if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
             console.print(
@@ -554,7 +551,7 @@ def add_create_directories(
         return answer
 
     def get_folder_alias() -> str:
-        message = "Please enter the name you want to map this folder to within Murfey."
+        message = "Please enter the name Murfey should map this folder to."
         answer = prompt(message, style="yellow").lower().strip()
         if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
             console.print(
@@ -571,8 +568,8 @@ def add_create_directories(
     Start of add_create_directories
     """
     print_field_info(field)
-    directories_to_create: dict[str, str] = {}
-    category = "directory for Murfey to create"
+    folders_to_create: dict[str, str] = {}
+    category = "folder for Murfey to create"
     add_directory: bool = ask_for_input(category, False)
     while add_directory is True:
         folder_name = get_folder()
@@ -591,10 +588,69 @@ def add_create_directories(
             )
             add_directory = ask_for_input(category, True)
             continue
-        directories_to_create[folder_alias] = folder_name
+        folders_to_create[folder_alias] = folder_name
         add_directory = ask_for_input(category, True)
         continue
-    return directories_to_create
+
+    # Validate and return
+    validated_folders, errors = field.validate(folders_to_create, {}, loc=key)
+    if not errors:
+        console.print(f"{key!r} validated successfully", style="bright_green")
+        if debug:
+            console.print(f"{type(validated_folders)}", style="bright_green")
+            console.print(f"{validated_folders!r}", style="bright_green")
+        return folders_to_create
+    console.print(f"Failed to validate {key!r}")
+    if ask_for_input(category, True) is True:
+        return add_create_directories(key, field, debug)
+    return {}
+
+
+def add_analyse_created_directories(
+    key: str, field: ModelField, debug: bool = False
+) -> list[str]:
+    def get_folder() -> str:
+        message = "Please enter the name of the folder that Murfey is to analyse."
+        answer = prompt(message, style="yellow").lower().strip()
+        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
+            console.print(
+                "There are unsafe characters present in the folder name. Please "
+                "use a different folder.",
+                style="red",
+            )
+            if ask_for_input("folder name", True) is True:
+                return get_folder()
+            return ""
+        return answer
+
+    """
+    Start of add_analyse_created_directories
+    """
+    folders_to_create: list[str] = []
+    category = "folder for Murfey to analyse"
+    add_folder = ask_for_input(category, False)
+    while add_folder is True:
+        folder_name = get_folder()
+        if not folder_name:
+            console.print("No folder name provided", style="red")
+            add_folder = ask_for_input(category, True)
+            continue
+        folders_to_create.append(folder_name)
+        add_folder = ask_for_input(category, True)
+        continue
+
+    # Validate and return
+    validated_folders, errors = field.validate(folders_to_create, {}, loc=key)
+    if not errors:
+        console.print(f"{key!r} validated successfully", style="bright_green")
+        if debug:
+            console.print(f"{type(validated_folders)}", style="bright_green")
+            console.print(f"{validated_folders!r}", style="bright_green")
+        return sorted(validated_folders)
+    console.print(f"Failed to validate {key!r}", style="red")
+    if ask_for_input(category, True) is True:
+        return add_analyse_created_directories(key, field, debug)
+    return []
 
 
 def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
@@ -643,9 +699,9 @@ def set_up_machine_config(debug: bool = False):
             continue
         if key == "create_directories":
             new_config[key] = add_create_directories(key, field, debug)
-            # TODO
             continue
         if key == "analyse_created_directories":
+            new_config[key] = add_analyse_created_directories(key, field, debug)
             # TODO
             continue
 
