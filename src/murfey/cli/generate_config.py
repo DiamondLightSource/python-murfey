@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+from ast import literal_eval
 from pathlib import Path
 from typing import Any, Optional, get_type_hints
 
@@ -20,8 +21,8 @@ machine_config_types: dict = get_type_hints(MachineConfig)
 
 def prompt(message: str, style: str = "") -> str:
     """
-    Helper function to pretty print the prompt message and add the actual prompt on a
-    newline.
+    Helper function to pretty print a message and have the user input their response
+    on a new line.
     """
     console.print(message, style=style)
     return input("> ")
@@ -41,35 +42,154 @@ def print_field_info(field: ModelField):
         console.print(f"Default: {field.field_info.default!r}", style="bright_cyan")
 
 
-def ask_for_input(category: str, again: bool = False):
+def ask_for_permission(message: str) -> bool:
     """
-    Perform a Boolean check to see if another value is to be appended to the current
-    parameter being set up.
+    Helper function to generate a Boolean based on user input
+    """
+    while True:
+        answer = prompt(message, style="yellow").lower().strip()
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        console.print("Invalid input. Please try again.", style="red")
+        continue
+
+
+def ask_for_input(parameter: str, again: bool = False):
+    """
+    Asks the user if another value should be entered into the current data structure.
     """
     message = (
-        "Would you like to add " + ("another" if again else "a") + f" {category}? (y/n)"
+        "Would you like to add "
+        + (
+            "another"
+            if again
+            else (
+                "an" if parameter.lower().startswith(("a", "e", "i", "o", "u")) else "a"
+            )
+        )
+        + f" {parameter}? (y/n)"
     )
-    while True:
-        answer = prompt(message, style="yellow").lower().strip()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        console.print("Invalid input. Please try again.", style="red")
+    return ask_for_permission(message)
 
 
-def confirm_overwrite(key: str):
+def confirm_overwrite(value: str):
     """
-    Check whether a key should be overwritten if a duplicate is detected.
+    Asks the user if a value that already exists should be overwritten.
     """
-    message = f"{key!r} already exists; do you wish to overwrite it? (y/n)"
-    while True:
-        answer = prompt(message, style="yellow").lower().strip()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        console.print("Invalid input. Please try again.", style="red")
+    message = f"{value!r} already exists; do you wish to overwrite it? (y/n)"
+    return ask_for_permission(message)
+
+
+def confirm_duplicate(value: str):
+    """
+    Asks the user if a duplicate value should be allowed.
+    """
+    message = f"{value!r} already exists; do you want to add a duplicate? (y/n)"
+    return ask_for_permission(message)
+
+
+def construct_list(
+    list_name: str,
+    prompt_message: str,
+    allow_empty: bool = False,
+    allow_eval: bool = True,
+    many_types: bool = True,
+    debug: bool = False,
+) -> list[Any]:
+    """
+    Helper function to facilitate interactive construction of a list to be stored
+    under the current parameter.
+    """
+    lst: list = []
+    add_entry = ask_for_input(list_name, False)
+    message = prompt_message
+    while add_entry is True:
+        value = prompt(message, style="yellow").strip()
+        # Reject empty inputs if set
+        if not value and not allow_empty:
+            console.print("No value provided.", style="red")
+            add_entry = ask_for_input(list_name, True)
+            continue
+        # Convert numericals if set
+        try:
+            eval_value = (
+                literal_eval(value)
+                if allow_eval and isinstance(literal_eval(value), (int, float, complex))
+                else value
+            )
+        except Exception:
+            eval_value = value
+        # Confirm if duplicate entry should be added
+        if eval_value in lst and confirm_duplicate(str(eval_value)) is False:
+            add_entry = ask_for_input(list_name, True)
+            continue
+        lst.append(eval_value)
+        # Reject list with multiple types if set
+        if not many_types and len({type(item) for item in lst}) > 1:
+            console.print(
+                "The provided value is of a different type to the other members. \n"
+                "It won't be added to the list.",
+                style="red",
+            )
+            lst = lst[:-1]
+        add_entry = ask_for_input(list_name, True)
+        continue
+    return lst
+
+
+def construct_dict(
+    dict_name: str,
+    key_name: str,
+    value_name: str,
+    allow_empty_key: bool = True,
+    allow_empty_value: bool = True,
+    allow_eval: bool = True,
+    sort_keys: bool = True,
+    debug: bool = False,
+) -> dict[str, Any]:
+    """
+    Helper function to facilitate interative construction of a dictionary.
+    """
+    dct: dict = {}
+    add_entry = ask_for_input(dict_name, False)
+    key_message = f"Please enter a {key_name}"
+    value_message = f"Please enter a {value_name}"
+    while add_entry is True:
+        key = prompt(key_message, style="yellow").strip().lower()
+        # Reject empty keys if set
+        if not allow_empty_key and not key:
+            console.print(f"No {key_name} provided.")
+            add_entry = ask_for_input(dict_name, True)
+            continue
+        # Confirm overwrite key on duplicate
+        if key in dct.keys():
+            if confirm_overwrite(key) is False:
+                add_entry = ask_for_input(dict_name, True)
+                continue
+        value = prompt(value_message, style="yellow").strip()
+        # Reject empty values if set
+        if not allow_empty_value and not value:
+            console.print("No value provided", style="red")
+            add_entry = ask_for_input(dict_name, True)
+            continue
+        # Convert values to numericals if set
+        try:
+            eval_value = (
+                literal_eval(value)
+                if allow_eval and isinstance(literal_eval(value), (int, float, complex))
+                else value
+            )
+        except Exception:
+            eval_value = value
+        dct[key] = eval_value
+        add_entry = ask_for_input(dict_name, True)
+        continue
+
+    # Sort keys if set
+    dct = {key: dct[key] for key in sorted(dct.keys())} if sort_keys else dct
+    return dct
 
 
 def validate_value(value: Any, key: str, field: ModelField, debug: bool = False) -> Any:
@@ -187,7 +307,7 @@ def add_calibrations(
             console.print(f"{calibration_values}", style="bright_green")
 
         # Check if any more calibrations need to be added
-        add_calibration = ask_for_input(category="calibration setting", again=True)
+        add_calibration = ask_for_input("calibration setting", again=True)
 
     # Validate the nested dictionary structure
     try:
