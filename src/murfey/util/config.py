@@ -87,8 +87,8 @@ class MachineConfig(BaseModel):
         description=(
             "Nested dictionary containing the calibrations for this microscope. "
             "E.g., 'magnification' would be a valid dictionary, in which the "
-            "field-of-view at each magnfication level is provided as a key-value "
-            "pair. Options: 'magnification'"
+            "pixel size (in angstroms) at each magnfication level is provided as a "
+            "key-value pair. Options: 'magnification'"
         ),
     )
 
