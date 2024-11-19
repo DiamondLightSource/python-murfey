@@ -72,7 +72,21 @@ def confirm_overwrite(key: str):
         console.print("Invalid input. Please try again.", style="red")
 
 
-def populate_field(key: str, field: ModelField, debug: bool = False):
+def validate_value(value: Any, key: str, field: ModelField, debug: bool = False) -> Any:
+    """
+    Helper function to validate the value of the desired field for a Pydantic model.
+    """
+    validated_value, errors = field.validate(value, {}, loc=key)
+    if errors:
+        raise ValidationError(errors, MachineConfig)
+    console.print(f"{key!r} validated successfully.", style="bright_green")
+    if debug:
+        console.print(f"Type: {type(validated_value)}", style="bright_green")
+        console.print(f"{validated_value!r}", style="bright_green")
+    return validated_value
+
+
+def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
     """
     General function for inputting and validating the value of a single field against
     its Pydantic model.
@@ -91,17 +105,14 @@ def populate_field(key: str, field: ModelField, debug: bool = False):
             else answer
         )
 
-        validated_value, error = field.validate(value, {}, loc=key)
-        if not error:
-            console.print(f"{key!r} successfully validated", style="bright_green")
+        # Validate and return
+        try:
+            return validate_value(value, key, field, debug)
+        except ValidationError as error:
             if debug:
-                console.print(
-                    f"{type(validated_value)}\n{validated_value!r}",
-                    style="bright_green",
-                )
-            return validated_value
-        else:
-            console.print("Invalid input. Please try again.", style="red")
+                console.print(error, style="red")
+            console.print(f"Invalid input for {key!r}. Please try again")
+            continue
 
 
 def add_calibrations(
@@ -179,70 +190,53 @@ def add_calibrations(
         add_calibration = ask_for_input(category="calibration setting", again=True)
 
     # Validate the nested dictionary structure
-    validated_calibrations, error = field.validate(calibrations, {}, loc=field)
-    if not error:
-        console.print(f"{key!r} validated successfully", style="bright_green")
+    try:
+        return validate_value(calibrations, key, field, debug)
+    except ValidationError as error:
         if debug:
-            console.print(
-                f"{type(validated_calibrations)}\n{validated_calibrations!r}",
-                style="bright_green",
-            )
-        return validated_calibrations
-    else:
-        console.print(
-            f"Failed to validate the provided calibrations: {error}", style="red"
-        )
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}", style="red")
         console.print("Returning an empty dictionary", style="red")
         return {}
 
 
 def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     def get_software_name() -> str:
-        name = (
-            prompt(
-                "What is the name of the software package? Supported options: 'autotem', "
-                "'epu', 'leica', 'serialem', 'tomo'",
-                style="yellow",
-            )
-            .lower()
-            .strip()
+        message = (
+            "What is the name of the software package? Supported options: 'autotem', "
+            "'epu', 'leica', 'serialem', 'tomo'"
         )
+        name = prompt(message, style="yellow").lower().strip()
         # Validate name against "acquisition_software" field
-        field = MachineConfig.__fields__["acquisition_software"]
-        validated_name, error = field.validate([name], {}, loc="acquisition_software")
-        if not error:
-            return validated_name[0]
-        console.print(
-            "Invalid software name.",
-            style="red",
-        )
-        if ask_for_input("software package", True) is True:
-            return get_software_name()
-        return ""
+        try:
+            field = MachineConfig.__fields__["acquisition_software"]
+            return validate_value([name], "acquisition_software", field, False)[0]
+        except ValidationError:
+            console.print("Invalid software name.", style="red")
+            if ask_for_input("software package", True) is True:
+                return get_software_name()
+            return ""
 
     def ask_about_xml_path() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
             "(y/n)"
         )
-        answer = prompt(message, style="yellow").lower().strip()
-
-        # Validate
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        console.print("Invalid input.", style="red")
-        return ask_about_xml_path()
+        while True:
+            answer = prompt(message, style="yellow").lower().strip()
+            # Validate
+            if answer in ("y", "yes"):
+                return True
+            if answer in ("n", "no"):
+                return False
+            console.print("Invalid input.", style="red")
 
     def get_xml_file() -> Optional[Path]:
-        xml_file = Path(
-            prompt(
-                "What is the full file path of the settings file? This should be an "
-                "XML file.",
-                style="yellow",
-            )
+        message = (
+            "What is the full file path of the settings file? This should be an "
+            "XML file."
         )
+        xml_file = Path(prompt(message, style="yellow").strip())
         # Validate
         if xml_file.suffix:
             return xml_file
@@ -255,20 +249,18 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         return None
 
     def get_xml_tree_path() -> str:
-        xml_tree_path = prompt(
-            "What is the path through the XML file to the node to overwrite?",
-            style="yellow",
-        )
-        # Possibly some validation checks later
+        message = "What is the path through the XML file to the node to overwrite?"
+        xml_tree_path = prompt(message, style="yellow").strip()
+        # TODO: Currently no test cases for this method
         return xml_tree_path
 
     def get_extensions_and_substrings() -> dict[str, list[str]]:
         def get_file_extension() -> str:
-            extension = prompt(
+            message = (
                 "Please enter the extension of a file produced by this package "
-                "that is to be analysed (e.g., '.tiff', '.eer', etc.).",
-                style="yellow",
-            ).strip()
+                "that is to be analysed (e.g., '.tiff', '.eer', etc.)."
+            )
+            extension = prompt(message, style="yellow").strip().lower()
             # Validate
             if not (extension.startswith(".") and extension.replace(".", "").isalnum()):
                 console.print(
@@ -282,15 +274,15 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             return extension
 
         def get_file_substring() -> str:
-            substring = prompt(
+            message = (
                 "Please enter a keyword that will be present in files with this "
-                "extension. This field is case-sensitive.",
-                style="yellow",
-            ).strip()
+                "extension. This field is case-sensitive."
+            )
+            substring = prompt(message, style="yellow").strip()
             # Validate
             if bool(re.fullmatch(r"[\w\s\-]*", substring)) is False:
                 console.print(
-                    "Invalid characters are present in this substring. Please "
+                    "Unsafe characters are present in this substring. Please "
                     "try again. ",
                     style="red",
                 )
@@ -441,23 +433,13 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         ("data_required_substrings", data_required_substrings),
     )
     for field_name, value in to_validate:
-        field = MachineConfig.__fields__[field_name]
-        validated_value, error = field.validate(value, {}, loc=field_name)
-        if not error:
-            config[field_name] = validated_value
-            console.print(
-                f"{field_name!r} validated successfully", style="bright_green"
-            )
+        try:
+            field = MachineConfig.__fields__[field_name]
+            config[field_name] = validate_value(value, field_name, field, debug)
+        except ValidationError as error:
             if debug:
-                console.print(
-                    f"{type(validated_value)}\n{validated_value!r}",
-                    style="bright_green",
-                )
-        else:
-            console.print(
-                f"Validation failed due to the following error: {error}",
-                style="red",
-            )
+                console.print(error, style="red")
+            console.print(f"Failed to validate {field_name!r}", style="red")
             console.print("Please try again.", style="red")
             return add_software_packages(config)
 
@@ -470,10 +452,7 @@ def add_data_directories(
 ) -> dict[str, str]:
     def get_directory() -> Optional[Path]:
         message = "What is the full file path to the data directory you wish to add?"
-        answer = prompt(
-            message,
-            style="yellow",
-        ).strip()
+        answer = prompt(message, style="yellow").strip()
         # Convert "" into None
         if not answer:
             return None
@@ -520,17 +499,15 @@ def add_data_directories(
         continue
 
     # Validate and return
-    validated_data_directories, error = field.validate(data_directories, {}, loc=key)
-    if not error:
-        console.print(f"Validated {key!r} successfully", style="bright_green")
+    try:
+        return validate_value(data_directories, key, field, debug)
+    except ValidationError as error:
         if debug:
-            console.print(f"{type(validated_data_directories)}")
-            console.print(f"{validated_data_directories!r}")
-        return data_directories
-    console.print(f"Failed to validate {key!r}", style="red")
-    if ask_for_input(category, True) is True:
-        return add_data_directories(key, field, debug)
-    return {}
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}", style="red")
+        if ask_for_input(category, True) is True:
+            return add_data_directories(key, field, debug)
+        return {}
 
 
 def add_create_directories(
@@ -593,17 +570,15 @@ def add_create_directories(
         continue
 
     # Validate and return
-    validated_folders, errors = field.validate(folders_to_create, {}, loc=key)
-    if not errors:
-        console.print(f"{key!r} validated successfully", style="bright_green")
+    try:
+        return validate_value(folders_to_create, key, field, debug)
+    except ValidationError as error:
         if debug:
-            console.print(f"{type(validated_folders)}", style="bright_green")
-            console.print(f"{validated_folders!r}", style="bright_green")
-        return folders_to_create
-    console.print(f"Failed to validate {key!r}")
-    if ask_for_input(category, True) is True:
-        return add_create_directories(key, field, debug)
-    return {}
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}", style="red")
+        if ask_for_input(category, True) is True:
+            return add_create_directories(key, field, debug)
+        return {}
 
 
 def add_analyse_created_directories(
@@ -626,7 +601,7 @@ def add_analyse_created_directories(
     """
     Start of add_analyse_created_directories
     """
-    folders_to_create: list[str] = []
+    folders_to_analyse: list[str] = []
     category = "folder for Murfey to analyse"
     add_folder = ask_for_input(category, False)
     while add_folder is True:
@@ -635,22 +610,20 @@ def add_analyse_created_directories(
             console.print("No folder name provided", style="red")
             add_folder = ask_for_input(category, True)
             continue
-        folders_to_create.append(folder_name)
+        folders_to_analyse.append(folder_name)
         add_folder = ask_for_input(category, True)
         continue
 
     # Validate and return
-    validated_folders, errors = field.validate(folders_to_create, {}, loc=key)
-    if not errors:
-        console.print(f"{key!r} validated successfully", style="bright_green")
+    try:
+        return sorted(validate_value(folders_to_analyse, key, field, debug))
+    except ValidationError as error:
         if debug:
-            console.print(f"{type(validated_folders)}", style="bright_green")
-            console.print(f"{validated_folders!r}", style="bright_green")
-        return sorted(validated_folders)
-    console.print(f"Failed to validate {key!r}", style="red")
-    if ask_for_input(category, True) is True:
-        return add_analyse_created_directories(key, field, debug)
-    return []
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}", style="red")
+        if ask_for_input(category, True) is True:
+            return add_analyse_created_directories(key, field, debug)
+        return []
 
 
 def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
