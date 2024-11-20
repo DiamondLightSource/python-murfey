@@ -5,7 +5,7 @@ import json
 import re
 from ast import literal_eval
 from pathlib import Path
-from typing import Any, Optional, Type, get_type_hints
+from typing import Any, Callable, Optional, Type, get_type_hints
 
 import yaml
 from pydantic import ValidationError
@@ -95,7 +95,8 @@ def confirm_duplicate(value: str):
 
 def construct_list(
     value_name: str,
-    prompt_message: str,
+    value_method: Optional[Callable] = None,
+    value_method_args: dict = {},
     allow_empty: bool = False,
     allow_eval: bool = True,
     many_types: bool = True,
@@ -108,9 +109,17 @@ def construct_list(
     """
     lst: list = []
     add_entry = ask_for_input(value_name, False)
-    message = prompt_message
     while add_entry is True:
-        value = prompt(message, style="yellow").strip()
+        value = (
+            prompt(
+                "Please enter "
+                + ("an" if value_name.startswith(("a", "e", "i", "o", "u")) else "a")
+                + f" {value_name}",
+                style="yellow",
+            )
+            if value_method is None
+            else value_method(**value_method_args)
+        )
         # Reject empty inputs if set
         if not value and not allow_empty:
             console.print("No value provided.", style="red")
@@ -172,6 +181,10 @@ def construct_dict(
     key_name: str,
     value_name: str,
     allow_empty_key: bool = True,
+    key_method: Optional[Callable] = None,
+    key_method_args: dict = {},
+    value_method: Optional[Callable] = None,
+    value_method_args: dict = {},
     allow_empty_value: bool = True,
     allow_eval: bool = True,
     sort_keys: bool = True,
@@ -201,10 +214,15 @@ def construct_dict(
     key_message = f"Please enter the {key_name}"
     value_message = f"Please enter the {value_name}"
     while add_entry is True:
-        key = prompt(key_message, style="yellow").strip().lower()
+        # Add key
+        key = (
+            prompt(key_message, style="yellow").strip()
+            if key_method is None
+            else key_method(**key_method_args)
+        )
         # Reject empty keys if set
         if not allow_empty_key and not key:
-            console.print(f"No {key_name} provided.")
+            console.print(f"No {key_name} provided.", style="red")
             add_entry = ask_for_input(dict_name, True)
             continue
         # Confirm overwrite key on duplicate
@@ -212,7 +230,12 @@ def construct_dict(
             if confirm_overwrite(key) is False:
                 add_entry = ask_for_input(dict_name, True)
                 continue
-        value = prompt(value_message, style="yellow").strip()
+        # Add value
+        value = (
+            prompt(value_message, style="yellow").strip()
+            if value_method is None
+            else value_method(**value_method_args)
+        )
         # Reject empty values if set
         if not allow_empty_value and not value:
             console.print("No value provided", style="red")
@@ -465,7 +488,6 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
                 continue
             substrings: list[str] = construct_list(
                 "file substring",
-                "Please enter a file substring associated with this extension",
                 allow_empty=False,
                 allow_eval=False,
                 many_types=False,
