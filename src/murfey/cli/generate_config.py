@@ -9,6 +9,7 @@ from typing import Any, Optional, Type, get_type_hints
 
 import yaml
 from pydantic import ValidationError
+from pydantic.error_wrappers import ErrorWrapper
 from pydantic.fields import ModelField, UndefinedType
 from rich.console import Console
 
@@ -103,8 +104,7 @@ def construct_list(
     debug: bool = False,
 ) -> list[Any]:
     """
-    Helper function to facilitate interactive construction of a list to be stored
-    under the current parameter.
+    Helper function to facilitate interactive construction of a list.
     """
     lst: list = []
     add_entry = ask_for_input(value_name, False)
@@ -269,7 +269,9 @@ def validate_value(value: Any, key: str, field: ModelField, debug: bool = False)
     """
     validated_value, errors = field.validate(value, {}, loc=key)
     if errors:
-        raise ValidationError(errors, MachineConfig)
+        raise ValidationError(
+            ([errors] if isinstance(errors, ErrorWrapper) else errors), MachineConfig
+        )
     console.print(f"{key!r} validated successfully.", style="bright_green")
     if debug:
         console.print(f"Type: {type(validated_value)}", style="bright_green")
@@ -314,6 +316,7 @@ def add_calibrations(
     """
     # Known calibrations and what to call their keys and values
     known_calibrations: dict[str, tuple[str, str]] = {
+        # Calibration type | Key name | Value name
         "magnification": ("magnification", "pixel size (in angstroms)")
     }
 
@@ -342,7 +345,7 @@ def add_calibrations(
                 continue
         # Skip failed inputs
         calibration_values = construct_dict(
-            f"{calibration_type} setting",
+            f"{calibration_type} calibration",
             known_calibrations[calibration_type][0],
             known_calibrations[calibration_type][1],
             allow_empty_key=False,
@@ -445,56 +448,38 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
                     style="red",
                 )
                 return get_file_extension()
-            if extension in unsorted_dict.keys():
+            if extension in extension_dict.keys():
                 console.print("This extension has already been provided")
                 return ""
             return extension
 
-        def get_file_substring() -> str:
-            message = (
-                "Please enter a keyword that will be present in files with this "
-                "extension. This field is case-sensitive."
-            )
-            substring = prompt(message, style="yellow").strip()
-            # Validate
-            if bool(re.fullmatch(r"[\w\s\-]*", substring)) is False:
-                console.print(
-                    "Unsafe characters are present in this substring. Please "
-                    "try again. ",
-                    style="red",
-                )
-                return get_file_substring()
-            if substring in substrings:
-                console.print("This substring has already been provided.")
-                return ""
-            return substring
-
         """
         Start of get_extensions_and_substrings
         """
-        unsorted_dict: dict = {}
+        extension_dict: dict = {}
         add_extension = ask_for_input("file extension", False)
         while add_extension is True:
             extension = get_file_extension()
             if not extension:
                 add_extension = ask_for_input("file extension", True)
                 continue
-            substrings: list[str] = []
-            add_substring = ask_for_input("file substring", False)
-            while add_substring is True:
-                substring = get_file_substring()
-                if not substring:
-                    add_substring = ask_for_input("file substring", True)
-                    continue
-                substrings.append(substring)
-                add_substring = ask_for_input("file substring", True)
-            unsorted_dict[extension] = sorted(substrings)
+            substrings: list[str] = construct_list(
+                "file substring",
+                "Please enter a file substring associated with this extension",
+                allow_empty=False,
+                allow_eval=False,
+                many_types=False,
+                restrict_to_types=str,
+                sort_values=True,
+            )
+            extension_dict[extension] = substrings
             add_extension = ask_for_input("file extension", True)
+            continue
 
-        sorted_dict: dict = {}
-        for key in sorted(unsorted_dict.keys()):
-            sorted_dict[key] = unsorted_dict[key]
-        return sorted_dict
+        extension_dict = {
+            key: extension_dict[key] for key in sorted(extension_dict.keys())
+        }
+        return extension_dict
 
     """
     Start of add_software_packages
@@ -513,7 +498,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     category = "software package"
     add_input = ask_for_input(category, again=False)
     while add_input:
-        # Collect inputs
+        # Collect software name
         console.print(
             "Acquisition Software (acquisition_software)",
             style="bold bright_cyan",
@@ -532,6 +517,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
                 add_input = ask_for_input(category, False)
                 continue
 
+        # Collect version info
         console.print(
             "Software Versions (software_versions)",
             style="bold bright_cyan",
@@ -542,6 +528,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             style="yellow",
         )
 
+        # Collect settings files and modifications
         console.print(
             "Software Settings Output Directories (software_settings_output_directories)",
             style="bold bright_cyan",
@@ -560,6 +547,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             xml_file = None
             xml_tree_path = ""
 
+        # Collect extensions and filename substrings
         console.print(
             "Data Required Substrings (data_required_substrings)",
             style="bold bright_cyan",
@@ -580,6 +568,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "extensions_and_substrings": file_ext_ss,
         }
         add_input = ask_for_input(category, again=True)
+        continue
 
     # Re-pack keys and values according to the current config field structures
     console.print("Compiling and validating inputs...")
@@ -627,53 +616,21 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
 def add_data_directories(
     key: str, field: ModelField, debug: bool = False
 ) -> dict[str, str]:
-    def get_directory() -> Optional[Path]:
-        message = "What is the full file path to the data directory you wish to add?"
-        answer = prompt(message, style="yellow").strip()
-        # Convert "" into None
-        if not answer:
-            return None
-        return Path(answer)
-
-    def get_directory_type():
-        message = (
-            "What type of data is stored in this directory? Options: 'microscope', "
-            "'detector'"
-        )
-        answer = prompt(message, style="yellow").lower().strip()
-        if answer not in ("microscope", "detector"):
-            console.print("Invalid directory type.", style="red")
-            if ask_for_input("directory type", True) is True:
-                return get_directory_type()
-            return ""
-        return answer
-
     """
-    Start of add_data_directories
+    Function to facilitate populating the data_directories field.
     """
     print_field_info(field)
-    data_directories: dict[str, str] = {}
     category = "data directory"
-    add_directory = ask_for_input(category, False)
-    while add_directory is True:
-        directory = get_directory()
-        # Move on to next loop or exit if no directory provided
-        if not directory:
-            console.print("No directory added", style="red")
-            add_directory = ask_for_input(category, True)
-            continue
-
-        # Get the directory type
-        directory_type = get_directory_type()
-        if not directory_type:
-            console.print("No directory type provided", style="red")
-
-        # Add to dictionary
-        data_directories[str(directory)] = directory_type
-
-        # Check if more need to be added
-        add_directory = ask_for_input(category, True)
-        continue
+    data_directories: dict[str, str] = construct_dict(
+        category,
+        "full file path to the data directory",
+        "data type",
+        allow_empty_key=False,
+        allow_empty_value=False,
+        allow_eval=False,
+        sort_keys=True,
+        restrict_to_types=str,
+    )
 
     # Validate and return
     try:
