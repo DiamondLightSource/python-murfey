@@ -188,7 +188,18 @@ def construct_dict(
         continue
 
     # Sort keys if set
-    dct = {key: dct[key] for key in sorted(dct.keys())} if sort_keys else dct
+    dct = (
+        {
+            key: dct[key]
+            for key in sorted(
+                dct.keys(),
+                # Sort numeric keys as numerals and alphanumeric keys alphabetically
+                key=(lambda k: (0, float(k) if str(k).isdigit() else (1, str(k)))),
+            )
+        }
+        if sort_keys
+        else dct
+    )
     return dct
 
 
