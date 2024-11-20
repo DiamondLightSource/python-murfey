@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import argparse
 import json
 import re
 from ast import literal_eval
 from pathlib import Path
-from typing import Any, Optional, get_type_hints
+from typing import Any, Optional, Type, get_type_hints
 
 import yaml
 from pydantic import ValidationError
@@ -91,11 +93,13 @@ def confirm_duplicate(value: str):
 
 
 def construct_list(
-    list_name: str,
+    value_name: str,
     prompt_message: str,
     allow_empty: bool = False,
     allow_eval: bool = True,
     many_types: bool = True,
+    restrict_to_types: Optional[Type[Any] | tuple[Type[Any]]] = None,
+    sort_values: bool = True,
     debug: bool = False,
 ) -> list[Any]:
     """
@@ -103,38 +107,62 @@ def construct_list(
     under the current parameter.
     """
     lst: list = []
-    add_entry = ask_for_input(list_name, False)
+    add_entry = ask_for_input(value_name, False)
     message = prompt_message
     while add_entry is True:
         value = prompt(message, style="yellow").strip()
         # Reject empty inputs if set
         if not value and not allow_empty:
             console.print("No value provided.", style="red")
-            add_entry = ask_for_input(list_name, True)
+            add_entry = ask_for_input(value_name, True)
             continue
-        # Convert numericals if set
+        # Convert values if set
         try:
-            eval_value = (
-                literal_eval(value)
-                if allow_eval and isinstance(literal_eval(value), (int, float, complex))
-                else value
-            )
+            eval_value = literal_eval(value)
         except Exception:
             eval_value = value
+        # Check if it's a permitted type (continue to allow None as value)
+        if restrict_to_types is not None:
+            allowed_types = (
+                (restrict_to_types,)
+                if not isinstance(restrict_to_types, (list, tuple))
+                else restrict_to_types
+            )
+            if not isinstance(eval_value, allowed_types):
+                console.print(
+                    f"The provided value ({type(eval_value)}) is not an allowed type.",
+                    style="red",
+                )
+                add_entry = ask_for_input(value_name, True)
+                continue
         # Confirm if duplicate entry should be added
         if eval_value in lst and confirm_duplicate(str(eval_value)) is False:
-            add_entry = ask_for_input(list_name, True)
+            add_entry = ask_for_input(value_name, True)
             continue
         lst.append(eval_value)
         # Reject list with multiple types if set
         if not many_types and len({type(item) for item in lst}) > 1:
             console.print(
-                "The provided value is of a different type to the other members. \n"
-                "It won't be added to the list.",
+                "The provided value is of a different type to the other members. It "
+                "won't be added to the list.",
                 style="red",
             )
             lst = lst[:-1]
-        add_entry = ask_for_input(list_name, True)
+        # Sort values if set
+        # Sort numeric values differently from alphanumeric ones
+        lst = (
+            sorted(
+                lst,
+                key=lambda v: (
+                    (0, float(v))
+                    if isinstance(v, (int, float))
+                    else (1, abs(v), v.real) if isinstance(v, complex) else (2, str(v))
+                ),
+            )
+            if sort_values
+            else lst
+        )
+        add_entry = ask_for_input(value_name, True)
         continue
     return lst
 
@@ -151,6 +179,21 @@ def construct_dict(
 ) -> dict[str, Any]:
     """
     Helper function to facilitate interative construction of a dictionary.
+    """
+
+    def is_type(value: str, instance: Type[Any] | tuple[Type[Any], ...]) -> bool:
+        """
+        Checks if the string provided evaluates to one of the desired types
+        """
+        instance = (instance,) if not isinstance(instance, (list, tuple)) else instance
+        try:
+            eval_value = literal_eval(value)
+        except Exception:
+            eval_value = value
+        return isinstance(eval_value, instance)
+
+    """
+    Start of construct_dict
     """
     dct: dict = {}
     add_entry = ask_for_input(dict_name, False)
@@ -176,11 +219,7 @@ def construct_dict(
             continue
         # Convert values to numericals if set
         try:
-            eval_value = (
-                literal_eval(value)
-                if allow_eval and isinstance(literal_eval(value), (int, float, complex))
-                else value
-            )
+            eval_value = literal_eval(value)
         except Exception:
             eval_value = value
         dct[key] = eval_value
@@ -188,13 +227,21 @@ def construct_dict(
         continue
 
     # Sort keys if set
+    # Sort numeric keys separately from alphanumeric ones
     dct = (
         {
             key: dct[key]
             for key in sorted(
                 dct.keys(),
-                # Sort numeric keys as numerals and alphanumeric keys alphabetically
-                key=(lambda k: (0, float(k) if str(k).isdigit() else (1, str(k)))),
+                key=lambda k: (
+                    (0, float(k))
+                    if is_type(k, (int, float))
+                    else (
+                        (1, abs(complex(k)), complex(k).real)
+                        if is_type(k, complex)
+                        else (2, str(k))
+                    )
+                ),
             )
         }
         if sort_keys
