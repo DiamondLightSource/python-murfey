@@ -112,9 +112,7 @@ def get_folder_name(message: Optional[str] = None) -> str:
         continue
 
 
-def get_folder_path(
-    message: Optional[str] = None, as_path: bool = True
-) -> str | Path | None:
+def get_folder_path(message: Optional[str] = None) -> Path | None:
     """
     Helper function to interactively generate, validate, and return the full path
     to a folder.
@@ -128,7 +126,7 @@ def get_folder_path(
             return None
         try:
             path = Path(value).resolve()
-            return path if as_path is True else path.as_posix()
+            return path
         except Exception:
             console.print("Unable to resolve provided file path", style="red")
             if ask_for_input("file path", True) is False:
@@ -136,9 +134,7 @@ def get_folder_path(
             continue
 
 
-def get_file_path(
-    message: Optional[str] = None, as_path: bool = True
-) -> str | Path | None:
+def get_file_path(message: Optional[str] = None) -> Path | None:
     """
     Helper function to interactively generate, validate, and return the full path
     to a file.
@@ -152,7 +148,7 @@ def get_file_path(
             return None
         file = Path(value).resolve()
         if file.suffix:
-            return file if as_path is True else file.as_posix()
+            return file
         console.print(f"{str(file)!r} doesn't appear to be a file", style="red")
         if ask_for_input("file", True) is False:
             return None
@@ -258,7 +254,7 @@ def construct_dict(
     debug: bool = False,
 ) -> dict[str, Any]:
     """
-    Helper function to facilitate interative construction of a dictionary.
+    Helper function to facilitate the interative construction of a dictionary.
     """
 
     def is_type(value: str, instance: Type[Any] | tuple[Type[Any], ...]) -> bool:
@@ -272,9 +268,6 @@ def construct_dict(
             eval_value = value
         return isinstance(eval_value, instance)
 
-    """
-    Start of construct_dict
-    """
     dct: dict = {}
     add_entry = ask_for_input(dict_name, False)
     key_message = f"Please enter the {key_name}"
@@ -354,7 +347,7 @@ def construct_dict(
 
 def validate_value(value: Any, key: str, field: ModelField, debug: bool = False) -> Any:
     """
-    Helper function to validate the value of the desired field for a Pydantic model.
+    Helper function to validate the value of a field in the Pydantic model.
     """
     validated_value, errors = field.validate(value, {}, loc=key)
     if errors:
@@ -490,31 +483,14 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
                 return get_software_name()
             return ""
 
-    def ask_about_xml_path() -> bool:
+    def ask_about_settings_file() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
             "(y/n)"
         )
         return ask_for_permission(message)
 
-    def get_xml_file() -> Optional[Path]:
-        message = (
-            "What is the full file path of the settings file? This should be an "
-            "XML file."
-        )
-        xml_file = Path(prompt(message, style="yellow").strip())
-        # Validate
-        if xml_file.suffix:
-            return xml_file
-        console.print(
-            "The path entered does not point to a file.",
-            style="red",
-        )
-        if ask_for_input("settings file", True) is True:
-            return get_xml_file()
-        return None
-
-    def get_xml_tree_path() -> str:
+    def get_settings_tree_path() -> str:
         message = "What is the path through the XML file to the node to overwrite?"
         xml_tree_path = prompt(message, style="yellow").strip()
         # TODO: Currently no test cases for this method
@@ -579,12 +555,16 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "provided.",
             style="italic bright_cyan",
         )
-        if ask_about_xml_path() is True:
-            xml_file = get_xml_file()
-            xml_tree_path = get_xml_tree_path()
-        else:
-            xml_file = None
-            xml_tree_path = ""
+        settings_file: Optional[Path] = (
+            get_file_path(
+                "What is the full path to the settings file? This is usually an XML file."
+            )
+            if ask_about_settings_file() is True
+            else None
+        )
+        settings_tree_path = (
+            get_settings_tree_path().split("/") if settings_file else []
+        )
 
         # Collect extensions and filename substrings
         console.print(
@@ -597,7 +577,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "for data processing. They are listed out here.",
             style="italic bright_cyan",
         )
-        extensions_and_substrings = construct_dict(
+        extensions_and_substrings: dict[str, list[str]] = construct_dict(
             dict_name="file extension configuration",
             key_name="file extension",
             value_name="file substrings",
@@ -620,8 +600,8 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         # Compile keys for this package as a dict
         package_info[name] = {
             "version": version,
-            "xml_file": xml_file,
-            "xml_tree_path": xml_tree_path,
+            "settings_file": settings_file,
+            "settings_tree_path": settings_tree_path,
             "extensions_and_substrings": extensions_and_substrings,
         }
         add_input = ask_for_input(category, again=True)
@@ -639,10 +619,10 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         acquisition_software.append(key)
         if package_info[key]["version"]:
             software_versions[key] = package_info[key]["version"]
-        if package_info[key]["xml_file"]:
-            software_settings_output_directories[str(package_info[key]["xml_file"])] = (
-                package_info[key]["xml_tree_path"]
-            )
+        if package_info[key]["settings_file"]:
+            software_settings_output_directories[
+                str(package_info[key]["settings_file"])
+            ] = package_info[key]["settings_tree_path"]
         if package_info[key]["extensions_and_substrings"]:
             data_required_substrings[key] = package_info[key][
                 "extensions_and_substrings"
@@ -704,36 +684,8 @@ def add_data_directories(
 def add_create_directories(
     key: str, field: ModelField, debug: bool = False
 ) -> dict[str, str]:
-    def get_folder() -> str:
-        message = "Please enter the name of the folder for Murfey to create."
-        answer = prompt(message, style="yellow").lower().strip()
-        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
-            console.print(
-                "There are unsafe characters present in this folder name. Please "
-                "use a different one.",
-                style="red",
-            )
-            if ask_for_input("folder name", True) is True:
-                return get_folder()
-            return ""
-        return answer
-
-    def get_folder_alias() -> str:
-        message = "Please enter the name Murfey should map this folder to."
-        answer = prompt(message, style="yellow").lower().strip()
-        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
-            console.print(
-                "There are unsafe characters present in this folder name. Please "
-                "use a different one.",
-                style="red",
-            )
-            if ask_for_input("folder alias", True) is True:
-                return get_folder_alias()
-            return ""
-        return answer
-
     """
-    Start of add_create_directories
+    Function to populate the create_directories field.
     """
     print_field_info(field)
     category = "folder for Murfey to create"
@@ -741,8 +693,14 @@ def add_create_directories(
         dict_name=category,
         key_name="folder alias",
         value_name="folder name",
-        key_method=get_folder_alias,
-        value_method=get_folder,
+        key_method=get_folder_name,
+        key_method_args={
+            "message": "Please enter the name Murfey should map the folder to.",
+        },
+        value_method=get_folder_name,
+        value_method_args={
+            "message": "Please enter the name of the folder for Murfey to create.",
+        },
         allow_empty_key=False,
         allow_empty_value=False,
         allow_eval=False,
@@ -765,35 +723,23 @@ def add_create_directories(
 def add_analyse_created_directories(
     key: str, field: ModelField, debug: bool = False
 ) -> list[str]:
-    def get_folder() -> str:
-        message = "Please enter the name of the folder that Murfey is to analyse."
-        answer = prompt(message, style="yellow").lower().strip()
-        if bool(re.fullmatch(r"[\w\s\-]*", answer)) is False:
-            console.print(
-                "There are unsafe characters present in the folder name. Please "
-                "use a different folder.",
-                style="red",
-            )
-            if ask_for_input("folder name", True) is True:
-                return get_folder()
-            return ""
-        return answer
-
     """
-    Start of add_analyse_created_directories
+    Function to populate the analyse_created_directories field
     """
-    folders_to_analyse: list[str] = []
+    print_field_info(field)
     category = "folder for Murfey to analyse"
-    add_folder = ask_for_input(category, False)
-    while add_folder is True:
-        folder_name = get_folder()
-        if not folder_name:
-            console.print("No folder name provided", style="red")
-            add_folder = ask_for_input(category, True)
-            continue
-        folders_to_analyse.append(folder_name)
-        add_folder = ask_for_input(category, True)
-        continue
+    folders_to_analyse: list[str] = construct_list(
+        value_name=category,
+        value_method=get_folder_name,
+        value_method_args={
+            "message": "Please enter the name of the folder that Murfey is to analyse."
+        },
+        allow_empty=False,
+        allow_eval=False,
+        many_types=False,
+        restrict_to_types=str,
+        sort_values=True,
+    )
 
     # Validate and return
     try:
