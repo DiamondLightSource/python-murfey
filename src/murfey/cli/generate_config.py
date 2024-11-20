@@ -457,52 +457,6 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         # TODO: Currently no test cases for this method
         return xml_tree_path
 
-    def get_extensions_and_substrings() -> dict[str, list[str]]:
-        def get_file_extension() -> str:
-            message = (
-                "Please enter the extension of a file produced by this package "
-                "that is to be analysed (e.g., '.tiff', '.eer', etc.)."
-            )
-            extension = prompt(message, style="yellow").strip().lower()
-            # Validate
-            if not (extension.startswith(".") and extension.replace(".", "").isalnum()):
-                console.print(
-                    "This is an invalid file extension. Please try again. ",
-                    style="red",
-                )
-                return get_file_extension()
-            if extension in extension_dict.keys():
-                console.print("This extension has already been provided")
-                return ""
-            return extension
-
-        """
-        Start of get_extensions_and_substrings
-        """
-        extension_dict: dict = {}
-        add_extension = ask_for_input("file extension", False)
-        while add_extension is True:
-            extension = get_file_extension()
-            if not extension:
-                add_extension = ask_for_input("file extension", True)
-                continue
-            substrings: list[str] = construct_list(
-                "file substring",
-                allow_empty=False,
-                allow_eval=False,
-                many_types=False,
-                restrict_to_types=str,
-                sort_values=True,
-            )
-            extension_dict[extension] = substrings
-            add_extension = ask_for_input("file extension", True)
-            continue
-
-        extension_dict = {
-            key: extension_dict[key] for key in sorted(extension_dict.keys())
-        }
-        return extension_dict
-
     """
     Start of add_software_packages
     """
@@ -580,14 +534,32 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "for data processing. They are listed out here.",
             style="italic bright_cyan",
         )
-        file_ext_ss = get_extensions_and_substrings()
+        extensions_and_substrings = construct_dict(
+            dict_name="file extension configuration",
+            key_name="file extension",
+            value_name="file substrings",
+            value_method=construct_list,
+            value_method_args={
+                "value_name": "file substring",
+                "allow_empty": False,
+                "allow_eval": False,
+                "many_types": False,
+                "restrict_to_types": str,
+                "sort_values": True,
+            },
+            allow_empty_key=False,
+            allow_empty_value=False,
+            allow_eval=False,
+            sort_keys=True,
+            restrict_to_types=list,
+        )
 
         # Compile keys for this package as a dict
         package_info[name] = {
             "version": version,
             "xml_file": xml_file,
             "xml_tree_path": xml_tree_path,
-            "extensions_and_substrings": file_ext_ss,
+            "extensions_and_substrings": extensions_and_substrings,
         }
         add_input = ask_for_input(category, again=True)
         continue
