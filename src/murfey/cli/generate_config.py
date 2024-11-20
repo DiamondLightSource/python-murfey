@@ -93,6 +93,72 @@ def confirm_duplicate(value: str):
     return ask_for_permission(message)
 
 
+def get_folder_name(message: Optional[str] = None) -> str:
+    """
+    Helper function to interactively generate, validate, and return a folder name.
+    """
+    while True:
+        message = "Please enter the folder name." if message is None else message
+        value = prompt(message, style="yellow").strip()
+        if bool(re.fullmatch(r"[\w\s\-]*", value)) is True:
+            return value
+        console.print(
+            "There are unsafe characters present in this folder name. Please "
+            "use a different one.",
+            style="red",
+        )
+        if ask_for_input("folder name", True) is False:
+            return ""
+        continue
+
+
+def get_folder_path(
+    message: Optional[str] = None, as_path: bool = True
+) -> str | Path | None:
+    """
+    Helper function to interactively generate, validate, and return the full path
+    to a folder.
+    """
+    while True:
+        message = (
+            "Please enter the full path to the folder." if message is None else message
+        )
+        value = prompt(message, style="yellow").strip()
+        if not value:
+            return None
+        try:
+            path = Path(value).resolve()
+            return path if as_path is True else path.as_posix()
+        except Exception:
+            console.print("Unable to resolve provided file path", style="red")
+            if ask_for_input("file path", True) is False:
+                return None
+            continue
+
+
+def get_file_path(
+    message: Optional[str] = None, as_path: bool = True
+) -> str | Path | None:
+    """
+    Helper function to interactively generate, validate, and return the full path
+    to a file.
+    """
+    while True:
+        message = (
+            "Please enter the full path to the file." if message is None else message
+        )
+        value = prompt(message, style="yellow").strip()
+        if not value:
+            return None
+        file = Path(value).resolve()
+        if file.suffix:
+            return file if as_path is True else file.as_posix()
+        console.print(f"{str(file)!r} doesn't appear to be a file", style="red")
+        if ask_for_input("file", True) is False:
+            return None
+        continue
+
+
 def construct_list(
     value_name: str,
     value_method: Optional[Callable] = None,
@@ -405,6 +471,10 @@ def add_calibrations(
 
 def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     def get_software_name() -> str:
+        """
+        Function to interactively generate, validate, and return the name of a
+        supported software package.
+        """
         message = (
             "What is the name of the software package? Supported options: 'autotem', "
             "'epu', 'leica', 'serialem', 'tomo'"
