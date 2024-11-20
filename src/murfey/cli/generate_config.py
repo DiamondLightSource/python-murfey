@@ -175,7 +175,7 @@ def construct_dict(
     allow_empty_value: bool = True,
     allow_eval: bool = True,
     sort_keys: bool = True,
-    restrict_values_to_types: Optional[Type[Any] | tuple[Type[Any], ...]] = None,
+    restrict_to_types: Optional[Type[Any] | tuple[Type[Any], ...]] = None,
     debug: bool = False,
 ) -> dict[str, Any]:
     """
@@ -218,11 +218,23 @@ def construct_dict(
             console.print("No value provided", style="red")
             add_entry = ask_for_input(dict_name, True)
             continue
-        # Convert values to numericals if set
+        # Convert values if set
         try:
             eval_value = literal_eval(value) if allow_eval else value
         except Exception:
             eval_value = value
+        # Reject incorrect value types if set
+        if restrict_to_types is not None:
+            allowed_types = (
+                (restrict_to_types,)
+                if not isinstance(restrict_to_types, (tuple, list))
+                else restrict_to_types
+            )
+            if not isinstance(eval_value, allowed_types):
+                console.print("The value is not of an allowed type.", style="red")
+                add_entry = ask_for_input(dict_name, True)
+                continue
+        # Assign value to key
         dct[key] = eval_value
         add_entry = ask_for_input(dict_name, True)
         continue
