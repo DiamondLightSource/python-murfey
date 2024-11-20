@@ -154,8 +154,8 @@ def construct_dict(
     """
     dct: dict = {}
     add_entry = ask_for_input(dict_name, False)
-    key_message = f"Please enter a {key_name}"
-    value_message = f"Please enter a {value_name}"
+    key_message = f"Please enter the {key_name}"
+    value_message = f"Please enter the {value_name}"
     while add_entry is True:
         key = prompt(key_message, style="yellow").strip().lower()
         # Reject empty keys if set
@@ -241,32 +241,10 @@ def add_calibrations(
     """
     Populate the 'calibrations' field with dictionaries.
     """
-
-    def get_calibration():
-        # Request for a file to read settings from
-        calibration_file = Path(
-            prompt(
-                "What is the full file path to the calibration file? This should be a "
-                "JSON file.",
-                style="yellow",
-            )
-        )
-        try:
-            with open(calibration_file, "r") as file:
-                calibration_values: dict = json.load(file)
-                return calibration_values
-        except Exception as e:
-            console.print(
-                f"Error opening the provided file: {e}",
-                style="red",
-            )
-            if ask_for_input("calibration file", True) is True:
-                return get_calibration()
-            else:
-                return {}
-
-    # Settings
-    known_calibraions = ("magnification",)
+    # Known calibrations and what to call their keys and values
+    known_calibrations: dict[str, tuple[str, str]] = {
+        "magnification": ("magnification", "pixel size (in angstroms)")
+    }
 
     # Start of add_calibrations
     print_field_info(field)
@@ -279,7 +257,7 @@ def add_calibrations(
             style="yellow",
         ).lower()
         # Check if it's a known type of calibration
-        if calibration_type not in known_calibraions:
+        if calibration_type not in known_calibrations.keys():
             console.print(
                 f"{calibration_type} is not a known type of calibration",
                 style="red",
@@ -292,7 +270,15 @@ def add_calibrations(
                 add_calibration = ask_for_input(category, True)
                 continue
         # Skip failed inputs
-        calibration_values = get_calibration()
+        calibration_values = construct_dict(
+            f"{calibration_type} setting",
+            known_calibrations[calibration_type][0],
+            known_calibrations[calibration_type][1],
+            allow_empty_key=False,
+            allow_empty_value=False,
+            allow_eval=True,
+            sort_keys=True,
+        )
         if not calibration_values:
             add_calibration = ask_for_input(category, True)
             continue
