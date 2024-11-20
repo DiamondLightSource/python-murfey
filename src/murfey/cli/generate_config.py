@@ -180,11 +180,11 @@ def construct_dict(
     dict_name: str,
     key_name: str,
     value_name: str,
-    allow_empty_key: bool = True,
     key_method: Optional[Callable] = None,
     key_method_args: dict = {},
     value_method: Optional[Callable] = None,
     value_method_args: dict = {},
+    allow_empty_key: bool = True,
     allow_empty_value: bool = True,
     allow_eval: bool = True,
     sort_keys: bool = True,
@@ -425,14 +425,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "Does this software package have a settings file that needs modification? "
             "(y/n)"
         )
-        while True:
-            answer = prompt(message, style="yellow").lower().strip()
-            # Validate
-            if answer in ("y", "yes"):
-                return True
-            if answer in ("n", "no"):
-                return False
-            console.print("Invalid input.", style="red")
+        return ask_for_permission(message)
 
     def get_xml_file() -> Optional[Path]:
         message = (
@@ -673,29 +666,19 @@ def add_create_directories(
     Start of add_create_directories
     """
     print_field_info(field)
-    folders_to_create: dict[str, str] = {}
     category = "folder for Murfey to create"
-    add_directory: bool = ask_for_input(category, False)
-    while add_directory is True:
-        folder_name = get_folder()
-        if not folder_name:
-            console.print(
-                "No folder name provided",
-                style="red",
-            )
-            add_directory = ask_for_input(category, True)
-            continue
-        folder_alias = get_folder_alias()
-        if not folder_alias:
-            console.print(
-                "No folder alias provided",
-                style="red",
-            )
-            add_directory = ask_for_input(category, True)
-            continue
-        folders_to_create[folder_alias] = folder_name
-        add_directory = ask_for_input(category, True)
-        continue
+    folders_to_create: dict[str, str] = construct_dict(
+        dict_name=category,
+        key_name="folder alias",
+        value_name="folder name",
+        key_method=get_folder_alias,
+        value_method=get_folder,
+        allow_empty_key=False,
+        allow_empty_value=False,
+        allow_eval=False,
+        sort_keys=True,
+        restrict_to_types=str,
+    )
 
     # Validate and return
     try:
