@@ -118,7 +118,7 @@ def construct_list(
             continue
         # Convert values if set
         try:
-            eval_value = literal_eval(value)
+            eval_value = literal_eval(value) if allow_eval else value
         except Exception:
             eval_value = value
         # Check if it's a permitted type (continue to allow None as value)
@@ -175,6 +175,7 @@ def construct_dict(
     allow_empty_value: bool = True,
     allow_eval: bool = True,
     sort_keys: bool = True,
+    restrict_values_to_types: Optional[Type[Any] | tuple[Type[Any], ...]] = None,
     debug: bool = False,
 ) -> dict[str, Any]:
     """
@@ -219,7 +220,7 @@ def construct_dict(
             continue
         # Convert values to numericals if set
         try:
-            eval_value = literal_eval(value)
+            eval_value = literal_eval(value) if allow_eval else value
         except Exception:
             eval_value = value
         dct[key] = eval_value
