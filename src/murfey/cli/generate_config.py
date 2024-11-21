@@ -917,8 +917,94 @@ def set_up_data_processing(config: dict, debug: bool = False) -> dict:
     return config
 
 
-def set_up_external_executables(config: dict, debug: bool = False) -> dict:
-    return config
+def add_external_executables(
+    key: str, field: ModelField, debug: bool = False
+) -> dict[str, Path]:
+    print_field_info(field)
+    category = "external executable"
+    external_executables = construct_dict(
+        dict_name=category,
+        key_name="name of the executable",
+        value_name="full file path to the executable",
+        value_method=get_folder_path,
+        value_method_args={
+            "message": ("Please enter the full file path to the executable"),
+        },
+        allow_empty_key=False,
+        allow_empty_value=False,
+        allow_eval=False,
+        sort_keys=True,
+        restrict_to_types=Path,
+    )
+    try:
+        return validate_value(external_executables, key, field, debug)
+    except ValidationError as error:
+        if debug:
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
+        if ask_for_input(category, True) is True:
+            return add_external_executables(key, field, debug)
+        console.print("Returning an empty dictionary.", style="red")
+        return {}
+
+
+def add_external_environment(
+    key: str, field: ModelField, debug: bool = False
+) -> dict[str, str]:
+    print_field_info(field)
+    category = "external environment"
+    external_environment = construct_dict(
+        dict_name=category,
+        key_name="name of the environment",
+        value_name="full path to the folder",
+        allow_empty_key=False,
+        allow_empty_value=False,
+        allow_eval=False,
+        sort_keys=True,
+        restrict_to_types=str,
+    )
+    try:
+        return validate_value(external_environment, key, field, debug)
+    except ValidationError as error:
+        if debug:
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
+        if ask_for_input(category, True) is True:
+            return add_external_environment(key, field, debug)
+        console.print("Returning an empty dictionary.", style="red")
+        return {}
+
+
+def add_murfey_plugins(key: str, field: ModelField, debug: bool = False) -> dict:
+    """
+    Helper function to set up the Murfey plugins field in the config.
+    """
+    print_field_info(field)
+    category = "Murfey plugin package"
+    plugins = construct_dict(
+        dict_name=category,
+        key_name="name of the plugin",
+        value_name="full file path to the plugin",
+        value_method=get_file_path,
+        value_method_args={
+            "message": "Please enter the full file path to the plugin.",
+        },
+        allow_empty_key=False,
+        allow_empty_value=False,
+        allow_eval=False,
+        sort_keys=True,
+        restrict_to_types=Path,
+    )
+    try:
+        return validate_value(plugins, key, field, debug)
+    except ValidationError as error:
+        if debug:
+            console.print(error, style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
+        if ask_for_input(category, True) is True:
+            return add_murfey_plugins(key, field, debug)
+        console.print("Returning an empty dictionary.", style="red")
+        return {}
 
 
 def set_up_machine_config(debug: bool = False):
@@ -994,16 +1080,17 @@ def set_up_machine_config(debug: bool = False):
         # End of data processing block
 
         # External plugins and executables block
-        if key == "external_executables":
-            # TODO: Set up external plugins and exectuables
-            new_config = set_up_external_executables(new_config, debug)
+        if key in ("external_executables", "external_executables_eer"):
+            new_config[key] = add_external_executables(key, field, debug)
             continue
-        if key in ("external_executables_eer", "external_environment"):
+        if key == "external_environment":
+            new_config[key] = add_external_environment(key, field, debug)
             continue
         # End of external executables block
 
         if key == "plugin_packages":
-            # TODO
+            # TODO:
+            new_config[key] = add_murfey_plugins(key, field, debug)
             continue
 
         """
@@ -1064,7 +1151,7 @@ def set_up_machine_config(debug: bool = False):
         # Overwrite
         master_config = old_config
     with open(config_file, "w") as save_file:
-        yaml.dump(master_config, save_file, default_flow_style=False)
+        yaml.dump(master_config, save_file, default_flow_style=False, sort_keys=False)
     console.print(
         f"Machine configuration for {new_config_safe['instrument_name']!r} "
         f"successfully saved as {str(config_file)!r}",
