@@ -369,6 +369,7 @@ class MachineConfig(BaseModel):
             "Full file path to the YAML file containing the configurations for the "
             "Murfey server."
         ),
+        alias="security_configuration_path",
     )
     # Network connections
     frontend_url: str = Field(
