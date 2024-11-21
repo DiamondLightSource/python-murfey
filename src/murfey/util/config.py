@@ -215,8 +215,8 @@ class MachineConfig(BaseModel):
     upstream_data_download_directory: Optional[Path] = Field(
         default=None,
         description=(
-            "Name of the folder on the instrument machine to transfer files of the same "
-            "visit from other instruments to."
+            "Path to the folder on this instrument machine to transfer files from other "
+            "machines to."
         ),
     )
     upstream_data_tiff_locations: list[str] = Field(
