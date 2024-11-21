@@ -225,9 +225,13 @@ def construct_list(
             sorted(
                 lst,
                 key=lambda v: (
-                    (0, float(v))
+                    (0, float(v), 0)
                     if isinstance(v, (int, float))
-                    else (1, abs(v), v.real) if isinstance(v, complex) else (2, str(v))
+                    else (
+                        (1, abs(v), v.real)
+                        if isinstance(v, complex)
+                        else (2, str(v), "")
+                    )
                 ),
             )
             if sort_values
@@ -329,12 +333,12 @@ def construct_dict(
             for key in sorted(
                 dct.keys(),
                 key=lambda k: (
-                    (0, float(k))
+                    (0, float(k), 0)
                     if is_type(k, (int, float))
                     else (
                         (1, abs(complex(k)), complex(k).real)
                         if is_type(k, complex)
-                        else (2, str(k))
+                        else (2, str(k), "")
                     )
                 ),
             )
