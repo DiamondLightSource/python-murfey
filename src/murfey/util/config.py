@@ -314,7 +314,6 @@ class MachineConfig(BaseModel):
             "Murfey will look for the folders under the current visit."
         ),
     )
-
     initial_model_search_directory: str = Field(
         default="processing/initial_model",  # User-uploaded electron density models
         description=(
@@ -345,9 +344,11 @@ class MachineConfig(BaseModel):
     external_environment: dict[str, str] = Field(
         default={},
         description=(
-            "Dictionary containing full paths to supporting files and executables that "
-            "are needed to run the executables to be used. These paths will be added "
-            "to the $PATH environment variable."
+            "Dictionary containing full paths to folders containing the supporting "
+            "software needed to run the executables to be used. These paths will be "
+            "appended to the $PATH environment variable, so if multiple paths are "
+            "associated with a single executable, they need to be provided as colon-"
+            "separated strings. E.g. /this/is/one/folder:/this/is/another/one"
         ),
     )
     plugin_packages: dict[str, Path] = Field(
