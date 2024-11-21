@@ -1089,7 +1089,6 @@ def set_up_machine_config(debug: bool = False):
         # End of external executables block
 
         if key == "plugin_packages":
-            # TODO:
             new_config[key] = add_murfey_plugins(key, field, debug)
             continue
 
