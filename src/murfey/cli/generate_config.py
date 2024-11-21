@@ -1147,8 +1147,8 @@ def set_up_machine_config(debug: bool = False):
             # Add new machine config
             else:
                 old_config[key] = master_config[key]
-        # Overwrite
-        master_config = old_config
+        # Regenerate dictionary and store machine configs alphabetically
+        master_config = {key: old_config[key] for key in sorted(old_config.keys())}
     with open(config_file, "w") as save_file:
         yaml.dump(master_config, save_file, default_flow_style=False, sort_keys=False)
     console.print(
