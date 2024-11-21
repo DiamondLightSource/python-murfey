@@ -207,9 +207,9 @@ class MachineConfig(BaseModel):
     upstream_data_directories: list[Path] = Field(
         default=[],
         description=(
-            "List of file paths on other instruments for Murfey to look for the current "
-            "visit under. This is primarily used for multi-instrument workflows that "
-            "use processed data from other instruments as input."
+            "List of full paths to folders on other machines for Murfey to look for the "
+            "current visit in. This is primarily used for multi-instrument workflows "
+            "that use processed data from other instruments as input."
         ),
     )
     upstream_data_download_directory: Optional[Path] = Field(
