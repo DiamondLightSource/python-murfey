@@ -12,6 +12,8 @@ from pydantic import ValidationError
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.fields import ModelField, UndefinedType
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from murfey.util.config import MachineConfig
 
@@ -31,18 +33,42 @@ def prompt(message: str, style: str = "") -> str:
     return input("> ")
 
 
+def print_welcome_message():
+    welcome_message = Text(
+        "Welcome to the Murfey configuration setup tool!", style="bold bright_magenta"
+    )
+    panel_content = Text()
+    panel_content.append(
+        "This tool will walk you through the process of setting up Murfey's "
+        "configuration file for your instrument, allowing you to supercharge "
+        "your data processing pipeline with Murfey's capacity for automated "
+        "data transfer and data processing coordination across devices.",
+        style="bright_white",
+    )
+    panel = Panel(
+        panel_content,
+        expand=True,
+    )
+    console.rule(welcome_message)
+    console.print(panel, justify="center")
+    console.rule()
+
+    prompt("Press any key to begin the setup")
+
+
 def print_field_info(field: ModelField):
     """
     Helper function to print out the name of the key being set up, along with a short
     description of what purpose the key serves.
     """
+    console.print()
     console.print(
         f"{field.name.replace('_', ' ').title()} ({field.name})",
         style="bold bright_cyan",
     )
-    console.print(field.field_info.description, style="italic bright_cyan")
+    console.print(field.field_info.description, style="bright_white")
     if not isinstance(field.field_info.default, UndefinedType):
-        console.print(f"Default: {field.field_info.default!r}", style="bright_cyan")
+        console.print(f"Default: {field.field_info.default!r}", style="bold white")
 
 
 def ask_for_permission(message: str) -> bool:
@@ -50,12 +76,12 @@ def ask_for_permission(message: str) -> bool:
     Helper function to generate a Boolean based on user input
     """
     while True:
-        answer = prompt(message, style="yellow").lower().strip()
+        answer = prompt(message, style="bright_yellow").lower().strip()
         if answer in ("y", "yes"):
             return True
         if answer in ("n", "no"):
             return False
-        console.print("Invalid input. Please try again.", style="red")
+        console.print("Invalid input. Please try again.", style="bright_red")
         continue
 
 
@@ -99,13 +125,13 @@ def get_folder_name(message: Optional[str] = None) -> str:
     """
     while True:
         message = "Please enter the folder name." if message is None else message
-        value = prompt(message, style="yellow").strip()
+        value = prompt(message, style="bright_yellow").strip()
         if bool(re.fullmatch(r"[\w\s\-]*", value)) is True:
             return value
         console.print(
             "There are unsafe characters present in this folder name. Please "
             "use a different one.",
-            style="red",
+            style="bright_red",
         )
         if ask_for_input("folder name", True) is False:
             return ""
@@ -121,14 +147,14 @@ def get_folder_path(message: Optional[str] = None) -> Path | None:
         message = (
             "Please enter the full path to the folder." if message is None else message
         )
-        value = prompt(message, style="yellow").strip()
+        value = prompt(message, style="bright_yellow").strip()
         if not value:
             return None
         try:
             path = Path(value).resolve()
             return path
         except Exception:
-            console.print("Unable to resolve provided file path", style="red")
+            console.print("Unable to resolve provided file path", style="bright_red")
             if ask_for_input("file path", True) is False:
                 return None
             continue
@@ -143,13 +169,13 @@ def get_file_path(message: Optional[str] = None) -> Path | None:
         message = (
             "Please enter the full path to the file." if message is None else message
         )
-        value = prompt(message, style="yellow").strip()
+        value = prompt(message, style="bright_yellow").strip()
         if not value:
             return None
         file = Path(value).resolve()
         if file.suffix:
             return file
-        console.print(f"{str(file)!r} doesn't appear to be a file", style="red")
+        console.print(f"{str(file)!r} doesn't appear to be a file", style="bright_red")
         if ask_for_input("file", True) is False:
             return None
         continue
@@ -177,14 +203,14 @@ def construct_list(
                 "Please enter "
                 + ("an" if value_name.startswith(("a", "e", "i", "o", "u")) else "a")
                 + f" {value_name}",
-                style="yellow",
+                style="bright_yellow",
             )
             if value_method is None
             else value_method(**value_method_args)
         )
         # Reject empty inputs if set
         if not value and not allow_empty:
-            console.print("No value provided.", style="red")
+            console.print("No value provided.", style="bright_red")
             add_entry = ask_for_input(value_name, True)
             continue
         # Convert values if set
@@ -202,7 +228,7 @@ def construct_list(
             if not isinstance(eval_value, allowed_types):
                 console.print(
                     f"The provided value ({type(eval_value)}) is not an allowed type.",
-                    style="red",
+                    style="bright_red",
                 )
                 add_entry = ask_for_input(value_name, True)
                 continue
@@ -216,7 +242,7 @@ def construct_list(
             console.print(
                 "The provided value is of a different type to the other members. It "
                 "won't be added to the list.",
-                style="red",
+                style="bright_red",
             )
             lst = lst[:-1]
         # Sort values if set
@@ -279,13 +305,13 @@ def construct_dict(
     while add_entry is True:
         # Add key
         key = str(
-            prompt(key_message, style="yellow").strip()
+            prompt(key_message, style="bright_yellow").strip()
             if key_method is None
             else key_method(**key_method_args)
         )
         # Reject empty keys if set
         if not allow_empty_key and not key:
-            console.print(f"No {key_name} provided.", style="red")
+            console.print(f"No {key_name} provided.", style="bright_red")
             add_entry = ask_for_input(dict_name, True)
             continue
         # Confirm overwrite key on duplicate
@@ -295,13 +321,13 @@ def construct_dict(
                 continue
         # Add value
         value = (
-            prompt(value_message, style="yellow").strip()
+            prompt(value_message, style="bright_yellow").strip()
             if value_method is None
             else value_method(**value_method_args)
         )
         # Reject empty values if set
         if not allow_empty_value and not value:
-            console.print("No value provided", style="red")
+            console.print("No value provided", style="bright_red")
             add_entry = ask_for_input(dict_name, True)
             continue
         # Convert values if set
@@ -317,7 +343,9 @@ def construct_dict(
                 else restrict_to_types
             )
             if not isinstance(eval_value, allowed_types):
-                console.print("The value is not of an allowed type.", style="red")
+                console.print(
+                    "The value is not of an allowed type.", style="bright_red"
+                )
                 add_entry = ask_for_input(dict_name, True)
                 continue
         # Assign value to key
@@ -376,7 +404,7 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
     message = "Please provide a value (press Enter to leave it blank as '')."
     while True:
         # Get value
-        answer = prompt(message, style="yellow")
+        answer = prompt(message, style="bright_yellow")
         # Translate empty string into None for fields that take Path values
         value = (
             None
@@ -389,7 +417,7 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
             return validate_value(value, key, field, debug)
         except ValidationError as error:
             if debug:
-                console.print(error, style="red")
+                console.print(error, style="bright_red")
             console.print(f"Invalid input for {key!r}. Please try again")
             continue
 
@@ -414,13 +442,13 @@ def add_calibrations(
     while add_calibration is True:
         calibration_type = prompt(
             "What type of calibration settings are you providing?",
-            style="yellow",
+            style="bright_yellow",
         ).lower()
         # Check if it's a known type of calibration
         if calibration_type not in known_calibrations.keys():
             console.print(
                 f"{calibration_type} is not a known type of calibration",
-                style="red",
+                style="bright_red",
             )
             add_calibration = ask_for_input(category, True)
             continue
@@ -460,11 +488,11 @@ def add_calibrations(
         return validate_value(calibrations, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_calibrations(key, field, debug)
-        console.print("Returning an empty dictionary", style="red")
+        console.print("Returning an empty dictionary", style="bright_red")
         return {}
 
 
@@ -478,16 +506,16 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "What is the name of the software package? Supported options: 'autotem', "
             "'epu', 'leica', 'serialem', 'tomo'"
         )
-        name = prompt(message, style="yellow").lower().strip()
+        name = prompt(message, style="bright_yellow").lower().strip()
         # Validate name against "acquisition_software" field
         try:
             field = MachineConfig.__fields__["acquisition_software"]
             return validate_value([name], "acquisition_software", field, False)[0]
         except ValidationError:
-            console.print("Invalid software name.", style="red")
+            console.print("Invalid software name.", style="bright_red")
             if ask_for_input("software package", True) is True:
                 return get_software_name()
-            console.print("Returning an empty string.", style="red")
+            console.print("Returning an empty string.", style="bright_red")
             return ""
 
     def ask_about_settings_file() -> bool:
@@ -499,7 +527,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
 
     def get_settings_tree_path() -> str:
         message = "What is the path through the XML file to the node to overwrite?"
-        xml_tree_path = prompt(message, style="yellow").strip()
+        xml_tree_path = prompt(message, style="bright_yellow").strip()
         # TODO: Currently no test cases for this method
         return xml_tree_path
 
@@ -547,7 +575,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         version = prompt(
             "What is the version number of this software package? Press Enter to leave "
             "it blank if you're unsure.",
-            style="yellow",
+            style="bright_yellow",
         )
 
         # Collect settings files and modifications
@@ -648,11 +676,11 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             config[field_name] = validate_value(value, field_name, field, debug)
         except ValidationError as error:
             if debug:
-                console.print(error, style="red")
-            console.print(f"Failed to validate {field_name!r}", style="red")
+                console.print(error, style="bright_red")
+            console.print(f"Failed to validate {field_name!r}", style="bright_red")
             if ask_for_input("software package configuration", True) is True:
                 return add_software_packages(config)
-            console.print(f"Skipped adding {field_name!r}.", style="red")
+            console.print(f"Skipped adding {field_name!r}.", style="bright_red")
 
     # Return updated dictionary
     return config
@@ -682,11 +710,11 @@ def add_data_directories(
         return validate_value(data_directories, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_data_directories(key, field, debug)
-        console.print("Returning an empty dictionary.", style="red")
+        console.print("Returning an empty dictionary.", style="bright_red")
         return {}
 
 
@@ -722,11 +750,11 @@ def add_create_directories(
         return validate_value(folders_to_create, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_create_directories(key, field, debug)
-        console.print("Returning an empty dictionary.", style="red")
+        console.print("Returning an empty dictionary.", style="bright_red")
         return {}
 
 
@@ -757,11 +785,11 @@ def add_analyse_created_directories(
         return sorted(validate_value(folders_to_analyse, key, field, debug))
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_analyse_created_directories(key, field, debug)
-        console.print("Returning an empty list.", style="red")
+        console.print("Returning an empty list.", style="bright_red")
         return []
 
 
@@ -794,11 +822,11 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
             return validate_value(upstream_data_directories, key, field, debug)
         except ValidationError as error:
             if debug:
-                console.print(error, style="red")
-            console.print(f"Failed to validate {key!r}.", style="red")
+                console.print(error, style="bright_red")
+            console.print(f"Failed to validate {key!r}.", style="bright_red")
             if ask_for_input(category, True) is True:
                 return get_upstream_data_directories(key, field, debug)
-            console.print("Returning an empty list.", style="red")
+            console.print("Returning an empty list.", style="bright_red")
             return []
 
     def get_upstream_data_tiff_locations(
@@ -825,11 +853,11 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
             return validate_value(upstream_data_tiff_locations, key, field, debug)
         except ValidationError as error:
             if debug:
-                console.print(error, style="red")
-            console.print(f"Failed to validate {key!r}.", style="red")
+                console.print(error, style="bright_red")
+            console.print(f"Failed to validate {key!r}.", style="bright_red")
             if ask_for_input(category, True) is True:
                 return get_upstream_data_tiff_locations(key, field, debug)
-            console.print("Returning an empty list.", style="red")
+            console.print("Returning an empty list.", style="bright_red")
             return []
 
     """
@@ -882,11 +910,11 @@ def set_up_data_processing(config: dict, debug: bool = False) -> dict:
             return validate_value(recipes, key, field, debug)
         except ValidationError as error:
             if debug:
-                console.print(error, style="red")
-            console.print(f"Failed to validate {key!r}.", style="red")
+                console.print(error, style="bright_red")
+            console.print(f"Failed to validate {key!r}.", style="bright_red")
             if ask_for_input(category, True) is True:
                 return add_recipes(key, field, debug)
-            console.print("Returning an empty dictionary.", style="red")
+            console.print("Returning an empty dictionary.", style="bright_red")
             return {}
 
     """
@@ -940,11 +968,11 @@ def add_external_executables(
         return validate_value(external_executables, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_external_executables(key, field, debug)
-        console.print("Returning an empty dictionary.", style="red")
+        console.print("Returning an empty dictionary.", style="bright_red")
         return {}
 
 
@@ -967,11 +995,11 @@ def add_external_environment(
         return validate_value(external_environment, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_external_environment(key, field, debug)
-        console.print("Returning an empty dictionary.", style="red")
+        console.print("Returning an empty dictionary.", style="bright_red")
         return {}
 
 
@@ -999,11 +1027,11 @@ def add_murfey_plugins(key: str, field: ModelField, debug: bool = False) -> dict
         return validate_value(plugins, key, field, debug)
     except ValidationError as error:
         if debug:
-            console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}.", style="red")
+            console.print(error, style="bright_red")
+        console.print(f"Failed to validate {key!r}.", style="bright_red")
         if ask_for_input(category, True) is True:
             return add_murfey_plugins(key, field, debug)
-        console.print("Returning an empty dictionary.", style="red")
+        console.print("Returning an empty dictionary.", style="bright_red")
         return {}
 
 
@@ -1011,6 +1039,9 @@ def set_up_machine_config(debug: bool = False):
     """
     Main function which runs through the setup process.
     """
+
+    print_welcome_message()
+
     new_config: dict = {}
     for key, field in MachineConfig.__fields__.items():
         """
@@ -1102,9 +1133,9 @@ def set_up_machine_config(debug: bool = False):
         new_config_safe: dict = json.loads(MachineConfig(**new_config).json())
     except ValidationError as exception:
         # Print out validation errors found
-        console.print("Validation failed", style="red")
+        console.print("Validation failed", style="bright_red")
         for error in exception.errors():
-            console.print(f"{error}", style="red")
+            console.print(f"{error}", style="bright_red")
         # Offer to redo the setup, otherwise quit setup
         if ask_for_input("machine configuration", True) is True:
             return set_up_machine_config(debug)
@@ -1119,10 +1150,10 @@ def set_up_machine_config(debug: bool = False):
     console.print("Machine config successfully validated.", style="green")
     config_name = prompt(
         "What would you like to name the file? (E.g. 'my_machine_config')",
-        style="yellow",
+        style="bright_yellow",
     )
     config_path = Path(
-        prompt("Where would you like to save this config?", style="yellow")
+        prompt("Where would you like to save this config?", style="bright_yellow")
     )
     config_file = config_path / f"{config_name}.yaml"
     config_path.mkdir(parents=True, exist_ok=True)
@@ -1133,7 +1164,7 @@ def set_up_machine_config(debug: bool = False):
             try:
                 old_config: dict[str, dict] = yaml.safe_load(existing_file)
             except yaml.YAMLError as error:
-                console.print(error, style="red")
+                console.print(error, style="bright_red")
                 # Provide option to quit or try again
                 if ask_for_input("machine configuration", True) is True:
                     return set_up_machine_config(debug)

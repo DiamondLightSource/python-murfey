@@ -348,7 +348,7 @@ class MachineConfig(BaseModel):
             "software needed to run the executables to be used. These paths will be "
             "appended to the $PATH environment variable, so if multiple paths are "
             "associated with a single executable, they need to be provided as colon-"
-            "separated strings. E.g. /this/is/one/folder:/this/is/another/one"
+            "separated strings. E.g. '/this/is/one/folder:/this/is/another/one'"
         ),
     )
     plugin_packages: dict[str, Path] = Field(
