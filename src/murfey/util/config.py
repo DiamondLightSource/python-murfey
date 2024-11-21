@@ -180,6 +180,9 @@ class MachineConfig(BaseModel):
         description=("Toggle whether to enable data transfer via rsync."),
         # NOTE: Only request input for this code block if data transfer is enabled
     )
+    allow_removal: bool = Field(
+        default=False, description="Allow original files to be removed after rsync."
+    )
     rsync_basepath: Path = Field(
         default=Path("/"),
         description=(
@@ -198,9 +201,6 @@ class MachineConfig(BaseModel):
             "machines are transferring to the same storage server, as you can specify "
             "different sub-folders to save the data to."
         ),
-    )
-    allow_removal: bool = Field(
-        default=False, description="Allow original files to be removed after rsync."
     )
 
     # Related visits and data
@@ -361,6 +361,14 @@ class MachineConfig(BaseModel):
     """
     Server and network-related configurations
     """
+    # Security-related keys
+    global_configuration_path: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Full file path to the YAML file containing the configurations for the "
+            "Murfey server."
+        ),
+    )
     # Network connections
     frontend_url: str = Field(
         default="http://localhost:3000",
@@ -373,15 +381,6 @@ class MachineConfig(BaseModel):
     instrument_server_url: str = Field(
         default="http://localhost:8001",
         description="URL to the instrument server.",
-    )
-
-    # Security-related keys
-    global_configuration_path: Optional[Path] = Field(
-        default=None,
-        description=(
-            "Full file path to the YAML file containing the configurations for the "
-            "Murfey server."
-        ),
     )
     auth_url: str = Field(
         default="",
