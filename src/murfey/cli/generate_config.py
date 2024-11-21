@@ -462,6 +462,8 @@ def add_calibrations(
         if debug:
             console.print(error, style="red")
         console.print(f"Failed to validate {key!r}.", style="red")
+        if ask_for_input(category, True) is True:
+            return add_calibrations(key, field, debug)
         console.print("Returning an empty dictionary", style="red")
         return {}
 
@@ -485,6 +487,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             console.print("Invalid software name.", style="red")
             if ask_for_input("software package", True) is True:
                 return get_software_name()
+            console.print("Returning an empty string.", style="red")
             return ""
 
     def ask_about_settings_file() -> bool:
@@ -647,8 +650,9 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             if debug:
                 console.print(error, style="red")
             console.print(f"Failed to validate {field_name!r}", style="red")
-            console.print("Please try again.", style="red")
-            return add_software_packages(config)
+            if ask_for_input("software package configuration", True) is True:
+                return add_software_packages(config)
+            console.print(f"Skipped adding {field_name!r}.", style="red")
 
     # Return updated dictionary
     return config
@@ -682,6 +686,7 @@ def add_data_directories(
         console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_data_directories(key, field, debug)
+        console.print("Returning an empty dictionary.", style="red")
         return {}
 
 
@@ -721,6 +726,7 @@ def add_create_directories(
         console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_create_directories(key, field, debug)
+        console.print("Returning an empty dictionary.", style="red")
         return {}
 
 
@@ -755,6 +761,7 @@ def add_analyse_created_directories(
         console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_analyse_created_directories(key, field, debug)
+        console.print("Returning an empty list.", style="red")
         return []
 
 
@@ -791,6 +798,7 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
             console.print(f"Failed to validate {key!r}.", style="red")
             if ask_for_input(category, True) is True:
                 return get_upstream_data_directories(key, field, debug)
+            console.print("Returning an empty list.", style="red")
             return []
 
     def get_upstream_data_tiff_locations(
@@ -821,6 +829,7 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
             console.print(f"Failed to validate {key!r}.", style="red")
             if ask_for_input(category, True) is True:
                 return get_upstream_data_tiff_locations(key, field, debug)
+            console.print("Returning an empty list.", style="red")
             return []
 
     """
@@ -836,21 +845,15 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
         "upstream_data_tiff_locations",
     ):
         field = MachineConfig.__fields__[key]
-        # Use populate field to process simpler keys
-        if key in (
-            "data_transfer_enabled",
-            "rsync_basepath",
-            "rsync_module",
-            "allow_removal",
-            "upstream_data_download_directory",
-        ):
-            validated_value = populate_field(key, field, debug)
-
         # Construct more complicated data structures
         if key == "upstream_data_directories":
-            validated_value = get_upstream_data_directories(key, field, debug)
-        if key == "upstream_data_tiff_locations":
+            validated_value: Any = get_upstream_data_directories(key, field, debug)
+        elif key == "upstream_data_tiff_locations":
             validated_value = get_upstream_data_tiff_locations(key, field, debug)
+        # Use populate field to process simpler keys
+        else:
+            validated_value = populate_field(key, field, debug)
+
         # Add to config
         config[key] = validated_value
 
