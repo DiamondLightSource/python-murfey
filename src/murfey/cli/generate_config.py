@@ -274,7 +274,7 @@ def construct_dict(
     value_message = f"Please enter the {value_name}"
     while add_entry is True:
         # Add key
-        key = (
+        key = str(
             prompt(key_message, style="yellow").strip()
             if key_method is None
             else key_method(**key_method_args)
@@ -457,7 +457,7 @@ def add_calibrations(
     except ValidationError as error:
         if debug:
             console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}", style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
         console.print("Returning an empty dictionary", style="red")
         return {}
 
@@ -675,7 +675,7 @@ def add_data_directories(
     except ValidationError as error:
         if debug:
             console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}", style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_data_directories(key, field, debug)
         return {}
@@ -695,7 +695,7 @@ def add_create_directories(
         value_name="folder name",
         key_method=get_folder_name,
         key_method_args={
-            "message": "Please enter the name Murfey should map the folder to.",
+            "message": "Please enter the name Murfey should remember the folder as.",
         },
         value_method=get_folder_name,
         value_method_args={
@@ -714,7 +714,7 @@ def add_create_directories(
     except ValidationError as error:
         if debug:
             console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}", style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_create_directories(key, field, debug)
         return {}
@@ -728,6 +728,7 @@ def add_analyse_created_directories(
     """
     print_field_info(field)
     category = "folder for Murfey to analyse"
+
     folders_to_analyse: list[str] = construct_list(
         value_name=category,
         value_method=get_folder_name,
@@ -747,13 +748,108 @@ def add_analyse_created_directories(
     except ValidationError as error:
         if debug:
             console.print(error, style="red")
-        console.print(f"Failed to validate {key!r}", style="red")
+        console.print(f"Failed to validate {key!r}.", style="red")
         if ask_for_input(category, True) is True:
             return add_analyse_created_directories(key, field, debug)
         return []
 
 
 def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
+    """
+    Helper function to set up the data transfer fields in the configuration
+    """
+
+    def get_upstream_data_directories(
+        key: str, field: ModelField, debug: bool = False
+    ) -> list[Path]:
+        print_field_info(field)
+        category = "upstream data directory"
+        upstream_data_directories = construct_list(
+            category,
+            value_method=get_folder_path,
+            value_method_args={
+                "message": (
+                    "Please enter the full path to the data directory "
+                    "you wish to search for files in."
+                ),
+            },
+            allow_empty=False,
+            allow_eval=False,
+            many_types=False,
+            restrict_to_types=Path,
+            sort_values=True,
+        )
+        try:
+            return validate_value(upstream_data_directories, key, field, debug)
+        except ValidationError as error:
+            if debug:
+                console.print(error, style="red")
+            console.print(f"Failed to validate {key!r}.", style="red")
+            if ask_for_input(category, True) is True:
+                return get_upstream_data_directories(key, field, debug)
+            return []
+
+    def get_upstream_data_tiff_locations(
+        key: str, field: ModelField, debug: bool = False
+    ) -> list[str]:
+        print_field_info(field)
+        category = "remote folder containing TIFF files"
+        upstream_data_tiff_locations = construct_list(
+            category,
+            value_method=get_folder_name,
+            value_method_args={
+                "message": (
+                    "Please enter the name of the folder on the remote machines "
+                    "in which to search for TIFF files."
+                )
+            },
+            allow_empty=False,
+            allow_eval=False,
+            many_types=False,
+            restrict_to_types=str,
+            sort_values=True,
+        )
+        try:
+            return validate_value(upstream_data_tiff_locations, key, field, debug)
+        except ValidationError as error:
+            if debug:
+                console.print(error, style="red")
+            console.print(f"Failed to validate {key!r}.", style="red")
+            if ask_for_input(category, True) is True:
+                return get_upstream_data_tiff_locations(key, field, debug)
+            return []
+
+    """
+    Start of set_up_data_transfer
+    """
+    for key in (
+        "data_transfer_enabled",
+        "rsync_basepath",
+        "rsync_module",
+        "allow_removal",
+        "upstream_data_directories",
+        "upstream_data_download_directory",
+        "upstream_data_tiff_locations",
+    ):
+        field = MachineConfig.__fields__[key]
+        # Use populate field to process simpler keys
+        if key in (
+            "data_transfer_enabled",
+            "rsync_basepath",
+            "rsync_module",
+            "allow_removal",
+            "upstream_data_download_directory",
+        ):
+            validated_value = populate_field(key, field, debug)
+
+        # Construct more complicated data structures
+        if key == "upstream_data_directories":
+            validated_value = get_upstream_data_directories(key, field, debug)
+        if key == "upstream_data_tiff_locations":
+            validated_value = get_upstream_data_tiff_locations(key, field, debug)
+        # Add to config
+        config[key] = validated_value
+
     return config
 
 
@@ -802,12 +898,10 @@ def set_up_machine_config(debug: bool = False):
             continue
         if key == "analyse_created_directories":
             new_config[key] = add_analyse_created_directories(key, field, debug)
-            # TODO
             continue
 
         # Data transfer block
         if key == "data_transfer_enabled":
-            # TODO: Set up data transfer settings in a separate function
             new_config = set_up_data_transfer(new_config, debug)
             continue
         if key in (
@@ -855,7 +949,6 @@ def set_up_machine_config(debug: bool = False):
         """
         Standard method of inputting values
         """
-
         new_config[key] = populate_field(key, field, debug)
 
     # Validate the entire config again and convert into JSON/YAML-safe dict
