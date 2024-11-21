@@ -861,6 +861,59 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
 
 
 def set_up_data_processing(config: dict, debug: bool = False) -> dict:
+    """
+    Helper function to set up the data processing fields in the config.
+    """
+
+    def add_recipes(key: str, field: ModelField, debug: bool = False) -> dict[str, str]:
+        print_field_info(field)
+        category = "processing recipe"
+        recipes = construct_dict(
+            category,
+            key_name="name of the recipe",
+            value_name="name of the recipe file",
+            allow_empty_key=False,
+            allow_empty_value=False,
+            allow_eval=False,
+            sort_keys=True,
+            restrict_to_types=str,
+        )
+        try:
+            return validate_value(recipes, key, field, debug)
+        except ValidationError as error:
+            if debug:
+                console.print(error, style="red")
+            console.print(f"Failed to validate {key!r}.", style="red")
+            if ask_for_input(category, True) is True:
+                return add_recipes(key, field, debug)
+            console.print("Returning an empty dictionary.", style="red")
+            return {}
+
+    """
+    Start of set_up_data_processing
+    """
+    # Process in order
+    for key in (
+        "processing_enabled",
+        "process_by_default",
+        "gain_directory_name",
+        "processed_directory_name",
+        "processed_extra_directory",
+        "recipes",
+        "modular_spa",
+        "default_model",
+        "model_search_directory",
+        "initial_model_search_directory",
+    ):
+        field = MachineConfig.__fields__[key]
+        # Handle complex keys
+        if key == "recipes":
+            validated_value: Any = add_recipes(key, field, debug)
+        # Populate fields of simple keys
+        else:
+            validated_value = populate_field(key, field, debug)
+        config[key] = validated_value
+
     return config
 
 
