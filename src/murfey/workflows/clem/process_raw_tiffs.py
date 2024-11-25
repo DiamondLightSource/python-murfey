@@ -24,7 +24,9 @@ def zocalo_cluster_request(
 ):
     if messenger:
         # Construct path to session directory
-        path_parts = list(tiff_list[0].parts)
+        path_parts = list(
+            (tiff_list[0].parent / (tiff_list[0].stem.split("--")[0])).parts
+        )
         # Replace leading "/" in Unix paths
         path_parts[0] = "" if path_parts[0] == "/" else path_parts[0]
         try:
