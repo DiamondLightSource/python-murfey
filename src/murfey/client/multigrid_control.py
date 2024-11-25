@@ -399,6 +399,7 @@ class MultigridController:
                     "em-spa-extract",
                     "em-spa-class2d",
                     "em-spa-class3d",
+                    "em-spa-refine",
                 ):
                     capture_post(
                         f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_processing_job",
