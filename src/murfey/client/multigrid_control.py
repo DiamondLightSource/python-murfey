@@ -257,13 +257,6 @@ class MultigridController:
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
             )
-            for data_dir in self._machine_config["data_directories"].keys():
-                if source.resolve().is_relative_to(Path(data_dir)):
-                    self.analysers[source]._role = self._machine_config[
-                        "data_directories"
-                    ][data_dir]
-                    log.info(f"role found for {source}")
-                    break
             if force_metadata:
                 self.analysers[source].subscribe(
                     partial(self._start_dc, from_form=True)

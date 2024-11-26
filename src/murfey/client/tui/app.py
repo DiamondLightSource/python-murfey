@@ -120,12 +120,6 @@ class MurfeyTUI(App):
         ]
         self.install_screen(MainScreen(), "main")
 
-    @property
-    def role(self) -> str:
-        if self.analyser:
-            return self.analyser._role
-        return ""
-
     def _launch_multigrid_watcher(
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
     ):
@@ -291,16 +285,6 @@ class MurfeyTUI(App):
                 force_mdoc_metadata=self._force_mdoc_metadata,
                 limited=limited,
             )
-            machine_data = requests.get(
-                f"{self._environment.url.geturl()}/machine"
-            ).json()
-            for data_dir in machine_data["data_directories"].keys():
-                if source.resolve().is_relative_to(Path(data_dir)):
-                    self.analysers[source]._role = machine_data["data_directories"][
-                        data_dir
-                    ]
-                    log.info(f"role found for {source}")
-                    break
             if force_metadata:
                 self.analysers[source].subscribe(
                     partial(self._start_dc, from_form=True)

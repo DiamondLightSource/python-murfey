@@ -40,14 +40,14 @@ class Context:
         self._acquisition_software = acquisition_software
         self.name = name
 
-    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
+    def post_transfer(self, transferred_file: Path, **kwargs):
         # Search external packages for additional hooks to include in Murfey
         for h in entry_points(group="murfey.post_transfer_hooks"):
             if h.name == self.name:
-                h.load()(transferred_file, role=role, **kwargs)
+                h.load()(transferred_file, **kwargs)
 
-    def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
-        self.post_transfer(transferred_file, role=role, **kwargs)
+    def post_first_transfer(self, transferred_file: Path, **kwargs):
+        self.post_transfer(transferred_file, **kwargs)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None

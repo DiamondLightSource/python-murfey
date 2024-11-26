@@ -43,13 +43,11 @@ class SPAMetadataContext(Context):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
         super().post_transfer(
             transferred_file=transferred_file,
-            role=role,
             environment=environment,
             **kwargs,
         )

@@ -92,8 +92,6 @@ def determine_default_destination(
         for data_dir in machine_data["data_directories"].keys():
             if source.resolve() == Path(data_dir):
                 _default = destination + f"/{visit}"
-                if analysers.get(source):
-                    analysers[source]._role = machine_data["data_directories"][data_dir]
                 break
             else:
                 try:
@@ -127,10 +125,6 @@ def determine_default_destination(
                                 environment.destination_registry[source_name] = _default
                     else:
                         _default = f"{destination}/{visit}/{mid_path if include_mid_path else source.name}"
-                    if analysers.get(source):
-                        analysers[source]._role = machine_data["data_directories"][
-                            data_dir
-                        ]
                     break
                 except (ValueError, KeyError):
                     _default = ""

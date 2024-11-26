@@ -549,67 +549,67 @@ class TomographyContext(Context):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> List[str]:
         super().post_transfer(
             transferred_file=transferred_file,
-            role=role,
             environment=environment,
             **kwargs,
         )
 
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if role == "detector" and "gain" not in transferred_file.name:
-            if transferred_file.suffix in data_suffixes:
-                if self._acquisition_software == "tomo":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            instrument_name=environment.instrument_name,
-                            demo=environment.demo,
-                        )
-                    else:
-                        machine_config = {}
-                    required_strings = (
-                        machine_config.get("data_required_substrings", {})
-                        .get("tomo", {})
-                        .get(transferred_file.suffix, ["fractions"])
-                    )
-                    completed_tilts = self._add_tomo_tilt(
-                        transferred_file,
-                        environment=environment,
-                        required_strings=kwargs.get("required_strings")
-                        or required_strings,
-                    )
-                elif self._acquisition_software == "serialem":
-                    completed_tilts = self._add_serialem_tilt(
-                        transferred_file, environment=environment
-                    )
-            if transferred_file.suffix == ".mdoc":
-                with open(transferred_file, "r") as md:
-                    tilt_series = transferred_file.stem
-                    self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
-                if environment:
-                    source = self._get_source(transferred_file, environment)
-                    if source:
-                        completed_tilts = self._check_tilt_series(tilt_series)
 
-                    # Always update the tilt series length in the database after an mdoc
-                    if environment.murfey_session is not None:
-                        length_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tilt_series_length"
-                        capture_post(
-                            length_url,
-                            json={
-                                "tags": [tilt_series],
-                                "source": str(transferred_file.parent),
-                                "tilt_series_lengths": [
-                                    self._tilt_series_sizes[tilt_series]
-                                ],
-                            },
-                        )
+        if "gain" in transferred_file.name:
+            return []
+
+        if transferred_file.suffix in data_suffixes:
+            if self._acquisition_software == "tomo":
+                if environment:
+                    machine_config = get_machine_config_client(
+                        str(environment.url.geturl()),
+                        instrument_name=environment.instrument_name,
+                        demo=environment.demo,
+                    )
+                else:
+                    machine_config = {}
+                required_strings = (
+                    machine_config.get("data_required_substrings", {})
+                    .get("tomo", {})
+                    .get(transferred_file.suffix, ["fractions"])
+                )
+                completed_tilts = self._add_tomo_tilt(
+                    transferred_file,
+                    environment=environment,
+                    required_strings=kwargs.get("required_strings") or required_strings,
+                )
+            elif self._acquisition_software == "serialem":
+                completed_tilts = self._add_serialem_tilt(
+                    transferred_file, environment=environment
+                )
+        if transferred_file.suffix == ".mdoc":
+            with open(transferred_file, "r") as md:
+                tilt_series = transferred_file.stem
+                self._tilt_series_sizes[tilt_series] = get_num_blocks(md)
+            if environment:
+                source = self._get_source(transferred_file, environment)
+                if source:
+                    completed_tilts = self._check_tilt_series(tilt_series)
+
+                # Always update the tilt series length in the database after an mdoc
+                if environment.murfey_session is not None:
+                    length_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tilt_series_length"
+                    capture_post(
+                        length_url,
+                        json={
+                            "tags": [tilt_series],
+                            "source": str(transferred_file.parent),
+                            "tilt_series_lengths": [
+                                self._tilt_series_sizes[tilt_series]
+                            ],
+                        },
+                    )
 
         if completed_tilts and environment:
             logger.info(
@@ -632,13 +632,10 @@ class TomographyContext(Context):
     def post_first_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        self.post_transfer(
-            transferred_file, role=role, environment=environment, **kwargs
-        )
+        self.post_transfer(transferred_file, environment=environment, **kwargs)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None

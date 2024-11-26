@@ -57,7 +57,6 @@ class Analyser(Observer):
         self._limited = limited
         self._experiment_type = ""
         self._acquisition_software = ""
-        self._role = ""
         self._extension: str = ""
         self._unseen_xml: list = []
         self._context: Context | None = None
@@ -126,14 +125,12 @@ class Analyser(Observer):
         in the Context classes themselves.
         """
         if "atlas" in file_path.parts:
-            self._role = "detector"
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
 
         # CLEM workflow checks
         # Look for LIF and XLIF files
         if file_path.suffix in (".lif", ".xlif"):
-            self._role = "detector"
             self._context = CLEMContext("leica", self._basepath)
             return True
         # Look for TIFF files associated with CLEM workflow
@@ -152,7 +149,6 @@ class Analyser(Observer):
                 ).get("analyse_created_directories", [])
             )
             if created_directories.intersection(set(file_path.parts)):
-                self._role = "detector"
                 self._context = CLEMContext("leica", self._basepath)
                 return True
 
@@ -181,9 +177,6 @@ class Analyser(Observer):
                         else SPAContext("epu", self._basepath)
                     )
                 self.parameters_model = ProcessingParametersSPA
-                # Assign it the detector attribute if not already present
-                if not self._role:
-                    self._role = "detector"
                 return True
 
             # Files starting with "Position" belong to the standard tomography workflow
@@ -198,9 +191,6 @@ class Analyser(Observer):
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
                     self.parameters_model = PreprocessingParametersTomo
-                # Assign role if not already present
-                if not self._role:
-                    self._role = "detector"
                 return True
 
             # Files with these suffixes belong to the serial EM tomography workflow
@@ -225,8 +215,6 @@ class Analyser(Observer):
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = PreprocessingParametersTomo
-                if not self._role:
-                    self._role = "detector"
                 return True
         return False
 
@@ -234,7 +222,7 @@ class Analyser(Observer):
         try:
             if self._context:
                 self._context.post_transfer(
-                    transferred_file, role=self._role, environment=self._environment
+                    transferred_file, environment=self._environment
                 )
         except Exception as e:
             logger.error(f"An exception was encountered post transfer: {e}")
@@ -292,19 +280,17 @@ class Analyser(Observer):
                         self.queue.task_done()
                         continue
                     elif self._extension:
-                        logger.info(f"Context found successfully: {self._role}")
+                        logger.info(
+                            f"Context found successfully for {transferred_file}"
+                        )
                         try:
                             self._context.post_first_transfer(
                                 transferred_file,
-                                role=self._role,
                                 environment=self._environment,
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if (
-                            self._role == "detector"
-                            and "atlas" not in transferred_file.parts
-                        ):
+                        if "atlas" not in transferred_file.parts:
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -360,20 +346,16 @@ class Analyser(Observer):
                     self._find_extension(transferred_file)
                     if self._extension:
                         logger.info(
-                            f"Context found successfully: {self._role}, {transferred_file}"
+                            f"Extension found successfully for {transferred_file}"
                         )
                         try:
                             self._context.post_first_transfer(
                                 transferred_file,
-                                role=self._role,
                                 environment=self._environment,
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if (
-                            self._role == "detector"
-                            and "atlas" not in transferred_file.parts
-                        ):
+                        if "atlas" not in transferred_file.parts:
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
