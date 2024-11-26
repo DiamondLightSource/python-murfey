@@ -200,21 +200,7 @@ class Analyser(Observer):
                     self.parameters_model = PreprocessingParametersTomo
                 # Assign role if not already present
                 if not self._role:
-                    # Fractions files attributed to the detector
-                    if (
-                        "Fractions" in split_file_name[-1]
-                        or "fractions" in split_file_name[-1]
-                    ):
-                        self._role = "detector"
-                    # MDOC files attributed to the microscope
-                    elif (
-                        file_path.suffix == ".mdoc"
-                        or file_path.with_suffix(".mdoc").is_file()
-                    ):
-                        self._role = "microscope"
-                    # Attribute all other files to the detector
-                    else:
-                        self._role = "detector"
+                    self._role = "detector"
                 return True
 
             # Files with these suffixes belong to the serial EM tomography workflow
@@ -240,10 +226,7 @@ class Analyser(Observer):
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = PreprocessingParametersTomo
                 if not self._role:
-                    if "Frames" in file_path.parts:
-                        self._role = "detector"
-                    else:
-                        self._role = "microscope"
+                    self._role = "detector"
                 return True
         return False
 
