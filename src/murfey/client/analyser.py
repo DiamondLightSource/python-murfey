@@ -408,8 +408,8 @@ class Analyser(Observer):
         if not self._environment:
             return data_file.with_suffix(".xml")
         file_name = f"{'_'.join(p for p in data_file.stem.split('_')[:-1])}.xml"
-        data_directories = self._murfey_config.get("data_directories", {})
-        for dd in data_directories.keys():
+        data_directories = self._murfey_config.get("data_directories", [])
+        for dd in data_directories:
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)
                 mid_dir = data_file.relative_to(dd).parent

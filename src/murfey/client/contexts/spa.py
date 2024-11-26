@@ -136,9 +136,9 @@ def _foil_hole_from_file(f: Path) -> int:
 
 
 def _grid_square_metadata_file(
-    f: Path, data_directories: Dict[Path, str], visit: str, grid_square: int
+    f: Path, data_directories: List[Path], visit: str, grid_square: int
 ) -> Path:
-    for dd in data_directories.keys():
+    for dd in data_directories:
         if str(f).startswith(str(dd)):
             base_dir = dd
             mid_dir = f.relative_to(dd).parent
@@ -542,7 +542,7 @@ class SPAModularContext(_SPAContext):
         grid_square = _grid_square_from_file(transferred_file)
         grid_square_metadata_file = _grid_square_metadata_file(
             transferred_file,
-            {Path(d): l for d, l in machine_config["data_directories"].items()},
+            machine_config["data_directories"],
             environment.visit,
             grid_square,
         )

@@ -14,7 +14,7 @@ from pydantic import BaseModel, BaseSettings, Extra
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
-    data_directories: Dict[Path, str]
+    data_directories: List[Path]
     rsync_basepath: Path
     default_model: Path
     display_name: str = ""
@@ -148,7 +148,7 @@ def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
         "": MachineConfig(
             acquisition_software=[],
             calibrations={},
-            data_directories={},
+            data_directories=[],
             rsync_basepath=Path("dls/tmp"),
             murfey_db_credentials="",
             default_model="/tmp/weights.h5",
