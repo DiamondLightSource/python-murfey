@@ -171,7 +171,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
             db.ProcessingJob,
             db.DataCollection,
             db.DataCollectionGroup,
-            db.ClientEnvironment,
+            db.Session,
         )
         .where(db.TiltSeries.id == tilt_series_id)
         .where(db.DataCollection.tag == db.TiltSeries.tag)
@@ -179,7 +179,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
         .where(db.AutoProcProgram.id == appid)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.DataCollectionGroup.id == db.DataCollection.dcg_id)
-        .where(db.ClientEnvironment.session_id == db.TiltSeries.session_id)
+        .where(db.Session.id == db.TiltSeries.session_id)
     ).all()
     return JobIDs(
         dcgid=results[0][4].id,
@@ -1745,11 +1745,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     other_options = dict(feedback_params)
 
     visit_name = (
-        _db.exec(
-            select(db.ClientEnvironment).where(
-                db.ClientEnvironment.session_id == message["session_id"]
-            )
-        )
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
         .one()
         .visit
     )
@@ -2739,6 +2735,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "processing_job":
+            murfey_session_id = message["session_id"]
             logger.info("registering processing job")
             assert isinstance(global_state["data_collection_ids"], dict)
             dc = murfey_db.exec(
