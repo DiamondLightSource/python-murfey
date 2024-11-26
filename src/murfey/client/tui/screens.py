@@ -272,9 +272,7 @@ class LaunchScreen(Screen):
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
-            data_directories=(
-                machine_data.get("data_directories", []) if self.app._strict else []
-            ),
+            data_directories=machine_data.get("data_directories", []),
             id="dir-select",
         )
 

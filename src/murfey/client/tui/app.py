@@ -74,7 +74,6 @@ class MurfeyTUI(App):
         gain_ref: Path | None = None,
         redirected_logger=None,
         force_mdoc_metadata: bool = False,
-        strict: bool = False,
         processing_enabled: bool = True,
         skip_existing_processing: bool = False,
         **kwargs,
@@ -104,7 +103,6 @@ class MurfeyTUI(App):
         self._processing_enabled = processing_enabled
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
-        self._strict = strict
         self._skip_existing_processing = skip_existing_processing
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
