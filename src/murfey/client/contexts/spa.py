@@ -678,120 +678,118 @@ class SPAModularContext(_SPAContext):
             **kwargs,
         )
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
-        if "gain" in transferred_file.name:
-            return True
-
-        if transferred_file.suffix in data_suffixes:
-            if self._acquisition_software == "epu":
-                if environment:
-                    machine_config = get_machine_config_client(
-                        str(environment.url.geturl()),
-                        instrument_name=environment.instrument_name,
-                        demo=environment.demo,
-                    )
-                else:
-                    machine_config = {}
-                required_strings = (
-                    machine_config.get("data_required_substrings", {})
-                    .get("epu", {})
-                    .get(transferred_file.suffix, ["fractions"])
-                )
-
-                if not environment:
-                    logger.warning("No environment passed in")
-                    return True
-                source = _get_source(transferred_file, environment)
-                if not source:
-                    logger.warning(f"No source found for file {transferred_file}")
-                    return True
-
-                if required_strings and not any(
-                    r in transferred_file.name for r in required_strings
-                ):
-                    return True
-
-                if environment:
-                    file_transferred_to = _file_transferred_to(
-                        environment, source, transferred_file
-                    )
-                    if not environment.movie_counters.get(str(source)):
-                        movie_counts_get = capture_get(
-                            f"{str(environment.url.geturl())}/num_movies",
+        if "gain" not in transferred_file.name:
+            if transferred_file.suffix in data_suffixes:
+                if self._acquisition_software == "epu":
+                    if environment:
+                        machine_config = get_machine_config_client(
+                            str(environment.url.geturl()),
+                            instrument_name=environment.instrument_name,
+                            demo=environment.demo,
                         )
-                        if movie_counts_get is not None:
-                            environment.movie_counters[str(source)] = count(
-                                movie_counts_get.json().get(str(source), 0) + 1
-                            )
-                    environment.movies[file_transferred_to] = MovieTracker(
-                        movie_number=next(environment.movie_counters[str(source)]),
-                        motion_correction_uuid=next(MurfeyID),
+                    else:
+                        machine_config = {}
+                    required_strings = (
+                        machine_config.get("data_required_substrings", {})
+                        .get("epu", {})
+                        .get(transferred_file.suffix, ["fractions"])
                     )
 
-                    eer_fractionation_file = None
-                    if file_transferred_to.suffix == ".eer":
-                        response = capture_post(
-                            f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                    if not environment:
+                        logger.warning("No environment passed in")
+                        return True
+                    source = _get_source(transferred_file, environment)
+                    if not source:
+                        logger.warning(f"No source found for file {transferred_file}")
+                        return True
+
+                    if required_strings and not any(
+                        r in transferred_file.name for r in required_strings
+                    ):
+                        return True
+
+                    if environment:
+                        file_transferred_to = _file_transferred_to(
+                            environment, source, transferred_file
+                        )
+                        if not environment.movie_counters.get(str(source)):
+                            movie_counts_get = capture_get(
+                                f"{str(environment.url.geturl())}/num_movies",
+                            )
+                            if movie_counts_get is not None:
+                                environment.movie_counters[str(source)] = count(
+                                    movie_counts_get.json().get(str(source), 0) + 1
+                                )
+                        environment.movies[file_transferred_to] = MovieTracker(
+                            movie_number=next(environment.movie_counters[str(source)]),
+                            motion_correction_uuid=next(MurfeyID),
+                        )
+
+                        eer_fractionation_file = None
+                        if file_transferred_to.suffix == ".eer":
+                            response = capture_post(
+                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                                json={
+                                    "eer_path": str(file_transferred_to),
+                                    "fractionation": environment.data_collection_parameters[
+                                        "eer_fractionation"
+                                    ],
+                                    "dose_per_frame": environment.data_collection_parameters[
+                                        "dose_per_frame"
+                                    ],
+                                    "fractionation_file_name": "eer_fractionation_spa.txt",
+                                },
+                            )
+                            if response is None:
+                                return False
+                            eer_fractionation_file = response.json()[
+                                "eer_fractionation_file"
+                            ]
+
+                        try:
+                            foil_hole: Optional[int] = self._position_analysis(
+                                transferred_file, environment, source, machine_config
+                            )
+                        except Exception:
+                            # try to continue if position information gathering fails so that movie is processed anyway
+                            foil_hole = None
+
+                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
+                        preproc_data = {
+                            "path": str(file_transferred_to),
+                            "description": "",
+                            "processing_job": None,
+                            "data_collection_id": None,
+                            "image_number": environment.movies[
+                                file_transferred_to
+                            ].movie_number,
+                            "pixel_size": environment.data_collection_parameters.get(
+                                "pixel_size_on_image"
+                            ),
+                            "autoproc_program_id": None,
+                            "dose_per_frame": environment.data_collection_parameters.get(
+                                "dose_per_frame"
+                            ),
+                            "mc_binning": environment.data_collection_parameters.get(
+                                "motion_corr_binning", 1
+                            ),
+                            "gain_ref": environment.data_collection_parameters.get(
+                                "gain_ref"
+                            ),
+                            "extract_downscale": environment.data_collection_parameters.get(
+                                "downscale", True
+                            ),
+                            "eer_fractionation_file": eer_fractionation_file,
+                            "tag": str(source),
+                            "foil_hole_id": foil_hole,
+                        }
+                        capture_post(
+                            preproc_url,
                             json={
-                                "eer_path": str(file_transferred_to),
-                                "fractionation": environment.data_collection_parameters[
-                                    "eer_fractionation"
-                                ],
-                                "dose_per_frame": environment.data_collection_parameters[
-                                    "dose_per_frame"
-                                ],
-                                "fractionation_file_name": "eer_fractionation_spa.txt",
+                                k: None if v == "None" else v
+                                for k, v in preproc_data.items()
                             },
                         )
-                        if response is None:
-                            return False
-                        eer_fractionation_file = response.json()[
-                            "eer_fractionation_file"
-                        ]
-
-                    try:
-                        foil_hole: Optional[int] = self._position_analysis(
-                            transferred_file, environment, source, machine_config
-                        )
-                    except Exception:
-                        # try to continue if position information gathering fails so that movie is processed anyway
-                        foil_hole = None
-
-                    preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
-                    preproc_data = {
-                        "path": str(file_transferred_to),
-                        "description": "",
-                        "processing_job": None,
-                        "data_collection_id": None,
-                        "image_number": environment.movies[
-                            file_transferred_to
-                        ].movie_number,
-                        "pixel_size": environment.data_collection_parameters.get(
-                            "pixel_size_on_image"
-                        ),
-                        "autoproc_program_id": None,
-                        "dose_per_frame": environment.data_collection_parameters.get(
-                            "dose_per_frame"
-                        ),
-                        "mc_binning": environment.data_collection_parameters.get(
-                            "motion_corr_binning", 1
-                        ),
-                        "gain_ref": environment.data_collection_parameters.get(
-                            "gain_ref"
-                        ),
-                        "extract_downscale": environment.data_collection_parameters.get(
-                            "downscale", True
-                        ),
-                        "eer_fractionation_file": eer_fractionation_file,
-                        "tag": str(source),
-                        "foil_hole_id": foil_hole,
-                    }
-                    capture_post(
-                        preproc_url,
-                        json={
-                            k: None if v == "None" else v
-                            for k, v in preproc_data.items()
-                        },
-                    )
 
         return True
 
