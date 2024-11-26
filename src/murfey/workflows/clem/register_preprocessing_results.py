@@ -17,6 +17,7 @@ from typing import Optional, Type, Union
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
+from murfey.server import _transport_object
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     CLEMImageMetadata,
@@ -27,6 +28,7 @@ from murfey.util.db import (
 )
 from murfey.util.db import Session as MurfeySession
 from murfey.util.models import LIFPreprocessingResult, TIFFPreprocessingResult
+from murfey.workflows.clem.align_and_merge import submit_cluster_request
 
 logger = logging.getLogger("murfey.workflows.clem.register_results")
 
@@ -232,69 +234,129 @@ def register_lif_preprocessing_result(
         )
         return False
 
-    # Register items in database if not already present
+    # Outer try-finally block for tidying up database-related section of function
     try:
-        clem_img_stk: CLEMImageStack = get_db_entry(
-            db=db,
-            table=CLEMImageStack,
-            session_id=session_id,
-            file_path=result.image_stack,
-        )
+        # Register items in database if not already present
+        try:
+            clem_img_stk: CLEMImageStack = get_db_entry(
+                db=db,
+                table=CLEMImageStack,
+                session_id=session_id,
+                file_path=result.image_stack,
+            )
 
-        clem_img_series: CLEMImageSeries = get_db_entry(
-            db=db,
-            table=CLEMImageSeries,
+            clem_img_series: CLEMImageSeries = get_db_entry(
+                db=db,
+                table=CLEMImageSeries,
+                session_id=session_id,
+                series_name=result.series_name,
+            )
+
+            clem_metadata: CLEMImageMetadata = get_db_entry(
+                db=db,
+                table=CLEMImageMetadata,
+                session_id=session_id,
+                file_path=result.metadata,
+            )
+
+            clem_lif_file: CLEMLIFFile = get_db_entry(
+                db=db,
+                table=CLEMLIFFile,
+                session_id=session_id,
+                file_path=result.parent_lif,
+            )
+
+            # Link tables to one another and populate fields
+            clem_img_stk.associated_metadata = clem_metadata
+            clem_img_stk.parent_lif = clem_lif_file
+            clem_img_stk.parent_series = clem_img_series
+            clem_img_stk.channel_name = result.channel
+            clem_img_stk.stack_created = True
+            db.add(clem_img_stk)
+            db.commit()
+            db.refresh(clem_img_stk)
+
+            clem_img_series.associated_metadata = clem_metadata
+            clem_img_series.parent_lif = clem_lif_file
+            clem_img_series.number_of_members = result.number_of_members
+            db.add(clem_img_series)
+            db.commit()
+            db.refresh(clem_img_series)
+
+            clem_metadata.parent_lif = clem_lif_file
+            db.add(clem_metadata)
+            db.commit()
+            db.refresh(clem_metadata)
+
+            logger.info(
+                f"LIF preprocessing results registered for {result.series_name!r} "
+                f"{result.channel!r} image stack"
+            )
+
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error(
+                "Exception encountered when registering LIF preprocessing result for "
+                f"{result.series_name!r} {result.channel!r} image stack"
+            )
+            return False
+
+        # Load all image stacks associated with current series from database
+        try:
+            image_stacks = [
+                Path(row)
+                for row in db.exec(
+                    select(CLEMImageStack.file_path).where(
+                        CLEMImageStack.series_id == clem_img_series.id
+                    )
+                ).all()
+            ]
+            logger.debug(
+                f"Found the following images: {[str(file) for file in image_stacks]}"
+            )
+            instrument_name = (
+                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+                .one()
+                .instrument_name
+            )
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error(
+                f"Error requesting data from database for {result.series_name!r} series"
+            )
+            return False
+
+        # Check if all image stacks for this series are accounted for
+        if not len(image_stacks) == clem_img_series.number_of_members:
+            logger.info(
+                f"Members of the series {result.series_name!r} are still missing; "
+                "the next stage of processing will not be triggered yet"
+            )
+            return True
+
+        # Request for next stage of processing if all members are present
+        cluster_response = submit_cluster_request(
             session_id=session_id,
+            instrument_name=instrument_name,
             series_name=result.series_name,
+            images=image_stacks,
+            metadata=result.metadata,
+            align_self=None,
+            flatten="mean",
+            align_across=None,
+            messenger=_transport_object,
         )
-
-        clem_metadata: CLEMImageMetadata = get_db_entry(
-            db=db,
-            table=CLEMImageMetadata,
-            session_id=session_id,
-            file_path=result.metadata,
-        )
-
-        clem_lif_file: CLEMLIFFile = get_db_entry(
-            db=db,
-            table=CLEMLIFFile,
-            session_id=session_id,
-            file_path=result.parent_lif,
-        )
-
-        # Link tables to one another and populate fields
-        clem_img_stk.associated_metadata = clem_metadata
-        clem_img_stk.parent_lif = clem_lif_file
-        clem_img_stk.parent_series = clem_img_series
-        clem_img_stk.channel_name = result.channel
-        clem_img_stk.stack_created = True
-        db.add(clem_img_stk)
-        db.commit()
-        db.refresh(clem_img_stk)
-
-        clem_img_series.associated_metadata = clem_metadata
-        clem_img_series.parent_lif = clem_lif_file
-        clem_img_series.number_of_members = result.number_of_members
-        db.add(clem_img_series)
-        db.commit()
-        db.refresh(clem_img_series)
-
-        clem_metadata.parent_lif = clem_lif_file
-        db.add(clem_metadata)
-        db.commit()
-        db.refresh(clem_metadata)
-
+        if cluster_response is False:
+            logger.error(
+                "Error requesting align-and-merge processing job for "
+                f"{result.series_name!r} series"
+            )
+            return False
         logger.info(
-            f"LIF preprocessing results registered for {result.series_name!r} {result.channel!r} image stack"
+            "Successfully requested align-and-merge processing job for "
+            f"{result.series_name!r} series"
         )
         return True
-
-    except Exception:
-        logger.error(traceback.format_exc())
-        logger.error(
-            f"Exception encountered when registering LIF preprocessing result for {result.series_name!r} {result.channel!r} image stack"
-        )
-        return False
 
     finally:
         db.close()
@@ -330,68 +392,128 @@ def register_tiff_preprocessing_result(
         )
         return False
 
-    # Register items in database if not already present
+    # Outer try-finally block for tidying up database-related section of function
     try:
-        clem_img_stk: CLEMImageStack = get_db_entry(
-            db=db,
-            table=CLEMImageStack,
-            session_id=session_id,
-            file_path=result.image_stack,
-        )
-        clem_img_series: CLEMImageSeries = get_db_entry(
-            db=db,
-            table=CLEMImageSeries,
-            session_id=session_id,
-            series_name=result.series_name,
-        )
-        clem_metadata: CLEMImageMetadata = get_db_entry(
-            db=db,
-            table=CLEMImageMetadata,
-            session_id=session_id,
-            file_path=result.metadata,
-        )
-
-        # Link tables to one another and populate fields
-        # Register TIFF files and populate them iteratively first
-        for file in result.parent_tiffs:
-            clem_tiff_file: CLEMTIFFFile = get_db_entry(
+        # Register items in database if not already present
+        try:
+            clem_img_stk: CLEMImageStack = get_db_entry(
                 db=db,
-                table=CLEMTIFFFile,
+                table=CLEMImageStack,
                 session_id=session_id,
-                file_path=file,
+                file_path=result.image_stack,
             )
-            clem_tiff_file.associated_metadata = clem_metadata
-            clem_tiff_file.child_series = clem_img_series
-            clem_tiff_file.child_stack = clem_img_stk
-            db.add(clem_tiff_file)
+            clem_img_series: CLEMImageSeries = get_db_entry(
+                db=db,
+                table=CLEMImageSeries,
+                session_id=session_id,
+                series_name=result.series_name,
+            )
+            clem_metadata: CLEMImageMetadata = get_db_entry(
+                db=db,
+                table=CLEMImageMetadata,
+                session_id=session_id,
+                file_path=result.metadata,
+            )
+
+            # Link tables to one another and populate fields
+            # Register TIFF files and populate them iteratively first
+            for file in result.parent_tiffs:
+                clem_tiff_file: CLEMTIFFFile = get_db_entry(
+                    db=db,
+                    table=CLEMTIFFFile,
+                    session_id=session_id,
+                    file_path=file,
+                )
+                clem_tiff_file.associated_metadata = clem_metadata
+                clem_tiff_file.child_series = clem_img_series
+                clem_tiff_file.child_stack = clem_img_stk
+                db.add(clem_tiff_file)
+                db.commit()
+                db.refresh(clem_tiff_file)
+
+            clem_img_stk.associated_metadata = clem_metadata
+            clem_img_stk.parent_series = clem_img_series
+            clem_img_stk.channel_name = result.channel
+            clem_img_stk.stack_created = True
+            db.add(clem_img_stk)
             db.commit()
-            db.refresh(clem_tiff_file)
+            db.refresh(clem_img_stk)
 
-        clem_img_stk.associated_metadata = clem_metadata
-        clem_img_stk.parent_series = clem_img_series
-        clem_img_stk.channel_name = result.channel
-        clem_img_stk.stack_created = True
-        db.add(clem_img_stk)
-        db.commit()
-        db.refresh(clem_img_stk)
+            clem_img_series.associated_metadata = clem_metadata
+            clem_img_series.number_of_members = result.number_of_members
+            db.add(clem_img_series)
+            db.commit()
+            db.refresh(clem_img_series)
 
-        clem_img_series.associated_metadata = clem_metadata
-        clem_img_series.number_of_members = result.number_of_members
-        db.add(clem_img_series)
-        db.commit()
-        db.refresh(clem_img_series)
+            logger.info(
+                f"TIFF preprocessing results registered for {result.series_name!r} "
+                f"{result.channel!r} image stack"
+            )
 
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error(
+                "Exception encountered when registering TIFF preprocessing result for "
+                f"{result.series_name!r} {result.channel!r} image stack"
+            )
+            return False
+
+        # Load all image stacks associated with current series from database
+        try:
+            image_stacks = [
+                Path(row)
+                for row in db.exec(
+                    select(CLEMImageStack.file_path).where(
+                        CLEMImageStack.series_id == clem_img_series.id
+                    )
+                ).all()
+            ]
+            logger.debug(
+                f"Found the following images: {[str(file) for file in image_stacks]}"
+            )
+            instrument_name = (
+                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+                .one()
+                .instrument_name
+            )
+        except Exception:
+            logger.error(traceback.format_exc())
+            logger.error(
+                f"Error requesting data from database for {result.series_name!r} series"
+            )
+            return False
+
+        # Check if all image stacks for this series are accounted for
+        if not len(image_stacks) == clem_img_series.number_of_members:
+            logger.info(
+                f"Members of the series {result.series_name!r} are still missing; "
+                "the next stage of processing will not be triggered yet"
+            )
+            return True
+
+        # Request for next stage of processing if all members are present
+        cluster_response = submit_cluster_request(
+            session_id=session_id,
+            instrument_name=instrument_name,
+            series_name=result.series_name,
+            images=image_stacks,
+            metadata=result.metadata,
+            align_self=None,
+            flatten="mean",
+            align_across=None,
+            messenger=_transport_object,
+        )
+        if cluster_response is False:
+            logger.error(
+                "Error requesting align-and-merge processing job for "
+                f"{result.series_name!r} series"
+            )
+            return False
         logger.info(
-            f"TIFF preprocessing results registered for {result.series_name!r} {result.channel!r} image stack"
+            "Successfully requested align-and-merge processing job for "
+            f"{result.series_name!r} series"
         )
         return True
-
-    except Exception:
-        logger.error(traceback.format_exc())
-        logger.error(
-            f"Exception encountered when registering TIFF preprocessing result for {result.series_name!r} {result.channel!r} image stack"
-        )
-        return False
 
     finally:
         db.close()
