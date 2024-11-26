@@ -28,7 +28,7 @@ from murfey.util.db import Session as MurfeySession
 from murfey.workflows.clem import get_db_entry
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
 
-logger = logging.getLogger("murfey.workflows.clem.register_results")
+logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
 
 class LIFPreprocessingResult(BaseModel):
