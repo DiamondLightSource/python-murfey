@@ -164,7 +164,7 @@ class CLEMContext(Context):
                 # Create a unique name for the series
                 # For standard file name
                 if len(transferred_file.stem.split("--")) == 3:
-                    series_name = "/".join(
+                    series_name = "--".join(
                         [
                             *destination_file.parent.parts[
                                 -2:
@@ -174,7 +174,7 @@ class CLEMContext(Context):
                     )
                 # When this a repeated position
                 elif len(transferred_file.stem.split("--")) == 4:
-                    series_name = "/".join(
+                    series_name = "--".join(
                         [
                             *destination_file.parent.parts[
                                 -2:
@@ -217,7 +217,8 @@ class CLEMContext(Context):
                     )
                     return True
 
-                # Skip processing of "IOManagerConfiguation.xlif" files (yes, the typo IS part of the file name)
+                # Skip processing of "IOManagerConfiguation.xlif" files
+                #   YES, the 'Configuation' typo IS part of the file name
                 if "IOManagerConfiguation" in transferred_file.stem:
                     logger.debug(
                         f"File {transferred_file.name!r} is a Leica configuration file; skipping processing"
@@ -231,7 +232,7 @@ class CLEMContext(Context):
                 # Create series name for XLIF file
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
-                series_name = "/".join(
+                series_name = "--".join(
                     [*destination_file.parent.parent.parts[-2:], destination_file.stem]
                 )  # The previous 2 parent directories should be unique enough
                 logger.debug(
