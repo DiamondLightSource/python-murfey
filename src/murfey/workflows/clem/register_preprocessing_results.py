@@ -11,9 +11,11 @@ import json
 import logging
 import re
 import traceback
+from ast import literal_eval
 from pathlib import Path
 from typing import Optional, Type, Union
 
+from pydantic import BaseModel, validator
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -27,7 +29,6 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import LIFPreprocessingResult, TIFFPreprocessingResult
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
 
 logger = logging.getLogger("murfey.workflows.clem.register_results")
@@ -192,6 +193,15 @@ def get_db_entry(
         raise Exception
 
     return db_entry
+
+
+class LIFPreprocessingResult(BaseModel):
+    image_stack: Path
+    metadata: Path
+    series_name: str
+    channel: str
+    number_of_members: int
+    parent_lif: Path
 
 
 def register_lif_preprocessing_result(
@@ -360,6 +370,31 @@ def register_lif_preprocessing_result(
 
     finally:
         db.close()
+
+
+class TIFFPreprocessingResult(BaseModel):
+    image_stack: Path
+    metadata: Path
+    series_name: str
+    channel: str
+    number_of_members: int
+    parent_tiffs: list[Path]
+
+    @validator(
+        "parent_tiffs",
+        pre=True,
+    )
+    def parse_stringified_list(cls, value):
+        if isinstance(value, str):
+            try:
+                eval_result = literal_eval(value)
+                if isinstance(eval_result, list):
+                    parent_tiffs = [Path(p) for p in eval_result]
+                    return parent_tiffs
+            except (SyntaxError, ValueError):
+                raise ValueError("Unable to parse input")
+        # Return value as-is; if it fails, it fails
+        return value
 
 
 def register_tiff_preprocessing_result(
