@@ -91,7 +91,6 @@ class JobIDs(NamedTuple):
     dcid: int
     pid: int
     appid: int
-    client_id: int
 
 
 def sanitise(in_string: str) -> str:
@@ -186,7 +185,6 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
         dcid=results[0][3].id,
         pid=results[0][2].id,
         appid=results[0][1].id,
-        client_id=results[0][5].client_id,
     )
 
 
