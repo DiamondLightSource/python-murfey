@@ -269,10 +269,6 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     )  # One to many
 
     # Process checklist for series
-    # FIXME: Columns need to be updated now that workflow is clearer
-    #   - Image alignment to happen in two stages:
-    #       1. Align to self, then
-    #       2. Align to a reference stack
     number_of_members: int = (
         0  # Expected number of image stacks belonging to this series
     )
@@ -327,11 +323,6 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
     )
 
     # Process checklist for each image
-    # FIXME: Columns need to be updated now that workflow is clearer
-    #   - Image registration to happen in two stages:
-    #       1. Align to itself, then
-    #       2. Align to a reference image
-    #   - Individual RGB images don't need to be created; columns can be removed
     stack_created: bool = False  # Verify that the stack has been created
     image_aligned: bool = False  # Verify that image alignment has been done on stack
     aligned_image: Optional[str] = None  # Full path to aligned image stack
