@@ -629,7 +629,9 @@ def process_raw_lifs(
     try:
         # Try and load relevant Murfey workflow
         workflow: EntryPoint = list(
-            entry_points().select(group="murfey.workflows", name="process_raw_lifs")
+            entry_points().select(
+                group="murfey.workflows", name="clem.process_raw_lifs"
+            )
         )[0]
     except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
@@ -661,7 +663,9 @@ def process_raw_tiffs(
     try:
         # Try and load relevant Murfey workflow
         workflow: EntryPoint = list(
-            entry_points().select(group="murfey.workflows", name="process_raw_tiffs")
+            entry_points().select(
+                group="murfey.workflows", name="clem.process_raw_tiffs"
+            )
         )[0]
     except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")

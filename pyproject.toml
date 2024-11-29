@@ -98,10 +98,12 @@ murfey = "murfey.client:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
-"process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
-"process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
-"register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
-"register_tiff_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_tiff_preprocessing_result"
+"clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:submit_cluster_request"
+"clem.process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
+"clem.process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
+"clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
+"clem.register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
+"clem.register_tiff_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_tiff_preprocessing_result"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
