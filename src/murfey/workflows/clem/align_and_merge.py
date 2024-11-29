@@ -64,9 +64,9 @@ def submit_cluster_request(
                 "series_name": series_name,
                 "images": [str(file) for file in images],
                 "metadata": str(metadata),
-                "align_self": ("null" if align_self is None else align_self),
-                "flatten": ("null" if flatten is None else flatten),
-                "align_across": ("null" if align_across is None else align_across),
+                "align_self": align_self,
+                "flatten": flatten,
+                "align_across": align_across,
                 # Other recipe parameters
                 "session_dir": str(session_dir),
                 "session_id": session_id,
