@@ -745,7 +745,9 @@ class TomographyContext(Context):
             mdoc_metadata["tag"] = str(self._basepath)
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
             mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
-            mdoc_metadata["slit_width"] = float(mdoc_data_block["FilterSlitAndLoss"][0])
+            slit_width = mdoc_data_block["FilterSlitAndLoss"][0]
+            if slit_width.lower() != "nan":
+                mdoc_metadata["slit_width"] = float(slit_width)
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )
