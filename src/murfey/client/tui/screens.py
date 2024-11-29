@@ -89,19 +89,14 @@ def determine_default_destination(
         log.info(f"Processing only mode with sources {environment.sources}")
         _default = str(environment.sources[0].resolve()) or str(Path.cwd())
     elif machine_data.get("data_directories"):
-        for data_dir in machine_data["data_directories"].keys():
+        for data_dir in machine_data["data_directories"]:
             if source.resolve() == Path(data_dir):
                 _default = destination + f"/{visit}"
-                if analysers.get(source):
-                    analysers[source]._role = machine_data["data_directories"][data_dir]
                 break
             else:
                 try:
                     mid_path = source.resolve().relative_to(data_dir)
-                    if (
-                        machine_data["data_directories"][data_dir] == "detector"
-                        and use_suggested_path
-                    ):
+                    if use_suggested_path:
                         with global_env_lock:
                             source_name = (
                                 source.name
@@ -127,10 +122,6 @@ def determine_default_destination(
                                 environment.destination_registry[source_name] = _default
                     else:
                         _default = f"{destination}/{visit}/{mid_path if include_mid_path else source.name}"
-                    if analysers.get(source):
-                        analysers[source]._role = machine_data["data_directories"][
-                            data_dir
-                        ]
                     break
                 except (ValueError, KeyError):
                     _default = ""
@@ -209,10 +200,10 @@ def validate_form(form: dict, model: BaseModel) -> bool:
 class _DirectoryTree(DirectoryTree):
     valid_selection = reactive(False)
 
-    def __init__(self, *args, data_directories: dict | None = None, **kwargs):
+    def __init__(self, *args, data_directories: List[Path] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._selected_path = self.path
-        self._data_directories = data_directories or {}
+        self._data_directories = data_directories or []
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         event.stop()
@@ -281,9 +272,7 @@ class LaunchScreen(Screen):
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
-            data_directories=(
-                machine_data.get("data_directories", {}) if self.app._strict else {}
-            ),
+            data_directories=machine_data.get("data_directories", []),
             id="dir-select",
         )
 
@@ -295,7 +284,7 @@ class LaunchScreen(Screen):
 
         text_log.write("Selected directories:\n")
         btn_disabled = True
-        for d in machine_data.get("data_directories", {}).keys():
+        for d in machine_data.get("data_directories", []):
             if (
                 Path(self._dir_tree._selected_path).resolve().is_relative_to(d)
                 or self.app._environment.processing_only_mode
@@ -724,11 +713,7 @@ class VisitSelection(SwitchSelection):
         if self._switch_status:
             self.app.install_screen(
                 DirectorySelection(
-                    [
-                        p[0]
-                        for p in machine_data.get("data_directories", {}).items()
-                        if p[1] == "detector" and Path(p[0]).exists()
-                    ]
+                    [p for p in machine_data.get("data_directories", []) if p.exists()]
                 ),
                 "directory-select",
             )
@@ -790,11 +775,7 @@ class VisitCreation(Screen):
 
         self.app.install_screen(
             DirectorySelection(
-                [
-                    p[0]
-                    for p in machine_data.get("data_directories", {}).items()
-                    if p[1] == "detector" and Path(p[0]).exists()
-                ]
+                [p for p in machine_data.get("data_directories", []) if p.exists()]
             ),
             "directory-select",
         )
