@@ -104,10 +104,11 @@ class MultigridController:
             f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
         ).json()
         if destination_overrides.get(source):
-            if str(source) in self.rsync_restarts:
-                destination = destination_overrides[source]
-            else:
-                destination = destination_overrides[source] + f"/{extra_directory}"
+            destination = (
+                destination_overrides[source]
+                if str(source) in self.rsync_restarts
+                else destination_overrides[source] + f"/{extra_directory}"
+            )
         else:
             for k, v in destination_overrides.items():
                 if Path(v).name in source.parts:
