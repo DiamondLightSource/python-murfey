@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import time
 from datetime import datetime
+from functools import partial
 from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
@@ -28,7 +29,7 @@ logger = getLogger("murfey.instrument_server.api")
 
 watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
-controllers = {}
+controllers: Dict[int, MultigridController] = {}
 data_collection_parameters: dict = {}
 tokens = {}
 
@@ -131,10 +132,17 @@ async def token_handshake_for_session(session_id: int, token: Token):
     )
 
 
+@router.get("/sessions/{session_id}/check_token")
+def check_token(session_id: MurfeySessionID):
+    return {"token_valid": True}
+
+
 @router.post("/sessions/{session_id}/multigrid_watcher")
 def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
+    if controllers.get(session_id) is not None:
+        return {"success": True}
     label = watcher_spec.label
     controllers[session_id] = MultigridController(
         [],
@@ -148,6 +156,7 @@ def start_multigrid_watcher(
         _machine_config=watcher_spec.configuration.dict(),
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
+        rsync_restarts=watcher_spec.rsync_restarts,
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
@@ -161,7 +170,12 @@ def start_multigrid_watcher(
         watcher_spec.configuration.dict(),
         skip_existing_processing=watcher_spec.skip_existing_processing,
     )
-    watchers[session_id].subscribe(controllers[session_id]._start_rsyncer_multigrid)
+    watchers[session_id].subscribe(
+        partial(
+            controllers[session_id]._start_rsyncer_multigrid,
+            destination_overrides=watcher_spec.destination_overrides,
+        )
+    )
     watchers[session_id].start()
     return {"success": True}
 

@@ -36,6 +36,7 @@ class MultigridController:
     do_transfer: bool = True
     dummy_dc: bool = False
     force_mdoc_metadata: bool = True
+    rsync_restarts: List[str] = field(default_factory=lambda: [])
     rsync_processes: Dict[Path, RSyncer] = field(default_factory=lambda: {})
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
     data_collection_parameters: dict = field(default_factory=lambda: {})
@@ -103,7 +104,10 @@ class MultigridController:
             f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
         ).json()
         if destination_overrides.get(source):
-            destination = destination_overrides[source] + f"/{extra_directory}"
+            if str(source) in self.rsync_restarts:
+                destination = destination_overrides[source]
+            else:
+                destination = destination_overrides[source] + f"/{extra_directory}"
         else:
             for k, v in destination_overrides.items():
                 if Path(v).name in source.parts:
@@ -134,6 +138,7 @@ class MultigridController:
             tag=tag,
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
+            restarted=str(source) in self.rsync_restarts,
         )
         self.ws.send(json.dumps({"message": "refresh"}))
 
@@ -175,6 +180,7 @@ class MultigridController:
         tag: str = "",
         limited: bool = False,
         transfer: bool = True,
+        restarted: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -238,15 +244,21 @@ class MultigridController:
                 ),
                 secondary=True,
             )
-            url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
-            rsyncer_data = {
-                "source": str(source),
-                "destination": destination,
-                "session_id": self.session_id,
-                "transferring": self.do_transfer or self._environment.demo,
-                "tag": tag,
-            }
-            requests.post(url, json=rsyncer_data)
+            if restarted:
+                restarted_url = (
+                    f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
+                )
+                capture_post(restarted_url, json={"source": str(source)})
+            else:
+                url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+                rsyncer_data = {
+                    "source": str(source),
+                    "destination": destination,
+                    "session_id": self.session_id,
+                    "transferring": self.do_transfer or self._environment.demo,
+                    "tag": tag,
+                }
+                requests.post(url, json=rsyncer_data)
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:

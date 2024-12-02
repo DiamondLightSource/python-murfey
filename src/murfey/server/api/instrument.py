@@ -75,6 +75,24 @@ async def activate_instrument_server_for_session(
     return success
 
 
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/active")
+async def check_if_session_is_active(instrument_name: str, session_id: int):
+    if instrument_server_tokens.get(session_id) is None:
+        return {"active": False}
+    async with lock:
+        async with aiohttp.ClientSession() as session:
+            machine_config = get_machine_config(instrument_name=instrument_name)[
+                instrument_name
+            ]
+            async with session.get(
+                f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/check_token",
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as response:
+                return {"active": response.status == 200}
+
+
 @router.post("/sessions/{session_id}/multigrid_watcher")
 async def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
@@ -109,6 +127,10 @@ async def start_multigrid_watcher(
                     "label": visit,
                     "instrument_name": instrument_name,
                     "skip_existing_processing": watcher_spec.skip_existing_processing,
+                    "destination_overrides": {
+                        str(k): v for k, v in watcher_spec.destination_overrides.items()
+                    },
+                    "rsync_restarts": watcher_spec.rsync_restarts,
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
