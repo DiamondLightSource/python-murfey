@@ -316,7 +316,6 @@ async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClien
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    print(rsyncer_info.source, rsyncer_info.destination, rsyncer_info.session_id)
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
