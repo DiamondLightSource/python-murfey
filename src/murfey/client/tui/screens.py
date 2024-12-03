@@ -462,7 +462,7 @@ class ProcessingForm(Screen):
         if self._form.get("motion_corr_binning") == "2":
             self._vert = VerticalScroll(
                 *inputs,
-                Label("Collected in super resoultion mode unbinned:"),
+                Label("Collected in counting mode:"),
                 Switch(id="superres", value=True, classes="input"),
                 confirm_btn,
                 id="input-form",
