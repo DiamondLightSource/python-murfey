@@ -129,7 +129,11 @@ def determine_default_destination(
             _default = ""
     else:
         _default = destination + f"/{visit}"
-    return _default + f"/{extra_directory}"
+    return (
+        _default + f"/{extra_directory}"
+        if not _default.endswith("/")
+        else _default + f"{extra_directory}"
+    )
 
 
 class InputResponse(NamedTuple):

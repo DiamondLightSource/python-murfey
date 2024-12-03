@@ -299,6 +299,8 @@ class PostInfo(BaseModel):
 class MultigridWatcherSetup(BaseModel):
     source: Path
     skip_existing_processing: bool = False
+    destination_overrides: Dict[Path, str] = {}
+    rsync_restarts: List[str] = []
 
 
 class CurrentGainRef(BaseModel):
