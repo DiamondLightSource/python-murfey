@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import re
 import traceback
+from ast import literal_eval
 from importlib.metadata import EntryPoint  # type hinting only
 from logging import getLogger
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import Literal, Optional, Type, Union
 
 from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
+from pydantic import BaseModel, validator
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -23,7 +25,6 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import TIFFSeriesInfo
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -622,7 +623,7 @@ API ENDPOINTS FOR FILE PROCESSING
     "/sessions/{session_id}/clem/preprocessing/process_raw_lifs"
 )  # API posts to this URL
 def process_raw_lifs(
-    session_id: int,  # Used by the decorator
+    session_id: int,
     lif_file: Path,
     db: Session = murfey_db,
 ):
@@ -654,9 +655,15 @@ def process_raw_lifs(
     return True
 
 
+class TIFFSeriesInfo(BaseModel):
+    series_name: str
+    tiff_files: list[Path]
+    series_metadata: Path
+
+
 @router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
 def process_raw_tiffs(
-    session_id: int,  # Used by the decorator
+    session_id: int,
     tiff_info: TIFFSeriesInfo,
     db: Session = murfey_db,
 ):
