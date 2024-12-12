@@ -187,9 +187,9 @@ def register_lif_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            align_self=None,
+            align_self="enabled",
             flatten="mean",
-            align_across=None,
+            align_across="enabled",
             messenger=_transport_object,
         )
         if cluster_response is False:
@@ -369,9 +369,9 @@ def register_tiff_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            align_self=None,
+            align_self="enabled",
             flatten="mean",
-            align_across=None,
+            align_across="enabled",
             messenger=_transport_object,
         )
         if cluster_response is False:
