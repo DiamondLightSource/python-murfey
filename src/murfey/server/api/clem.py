@@ -694,3 +694,70 @@ def process_raw_tiffs(
         messenger=_transport_object,
     )
     return True
+
+
+class AlignAndMergeParams(BaseModel):
+    # Processing parameters
+    series_name: str
+    images: list[Path]
+    metadata: Path
+    # Optional processing parameters
+    align_self: Optional[str] = None
+    flatten: Optional[Literal["min", "max", "mean"]] = "mean"
+    align_across: Optional[str] = None
+
+    @validator(
+        "images",
+        pre=True,
+    )
+    def parse_stringified_list(cls, value):
+        if isinstance(value, str):
+            try:
+                eval_result = literal_eval(value)
+                if isinstance(eval_result, list):
+                    parent_tiffs = [Path(p) for p in eval_result]
+                    return parent_tiffs
+            except (SyntaxError, ValueError):
+                raise ValueError("Unable to parse input")
+        # Return value as-is; if it fails, it fails
+        return value
+
+
+@router.post("/sessions/{session_id}/clem/preprocessing/align_and_merge_stacks")
+def align_and_merge_stacks(
+    session_id: int,
+    align_and_merge_params: AlignAndMergeParams,
+    db: Session = murfey_db,
+):
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="clem.align_and_merge")
+        )[0]
+    except IndexError:
+        raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.align_and_merge
+        # Session parameters
+        session_id=session_id,
+        instrument_name=instrument_name,
+        # Processing parameters
+        series_name=align_and_merge_params.series_name,
+        images=align_and_merge_params.images,
+        metadata=align_and_merge_params.metadata,
+        # Optional processing parameters
+        align_self=align_and_merge_params.align_self,
+        flatten=align_and_merge_params.flatten,
+        align_across=align_and_merge_params.align_across,
+        # Optional session parameters
+        messenger=_transport_object,
+    )
+    return True
