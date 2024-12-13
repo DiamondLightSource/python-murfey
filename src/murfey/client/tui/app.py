@@ -187,6 +187,7 @@ class MurfeyTUI(App):
             remove_files=remove_files,
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
+            rsync_url=machine_data.get("rsync_url", ""),
         )
 
     def _start_rsyncer(
@@ -199,6 +200,7 @@ class MurfeyTUI(App):
         remove_files: bool = False,
         limited: bool = False,
         transfer: bool = True,
+        rsync_url: str = "",
     ):
         log.info(f"starting rsyncer: {source}")
         if self._environment:
@@ -226,7 +228,7 @@ class MurfeyTUI(App):
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
-                server_url=self._url,
+                server_url=urlparse(rsync_url) if rsync_url else self._url,
                 # local=self._environment.demo,
                 status_bar=self._statusbar,
                 do_transfer=self._do_transfer,

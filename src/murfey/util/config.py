@@ -66,6 +66,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     instrument_server_url: str = "http://localhost:8001"
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
+    rsync_url: str = ""
 
     security_configuration_path: Optional[Path] = None
     auth_url: str = ""

@@ -31,6 +31,7 @@ class MultigridController:
     instrument_name: str
     session_id: int
     murfey_url: str = "http://localhost:8000"
+    rsync_url: str = ""
     demo: bool = False
     processing_enabled: bool = True
     do_transfer: bool = True
@@ -57,6 +58,7 @@ class MultigridController:
         machine_data = requests.get(
             f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
         ).json()
+        self.rsync_url = machine_data.get("rsync_url", "")
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
@@ -209,7 +211,11 @@ class MultigridController:
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
-                server_url=self._environment.url,
+                server_url=(
+                    urlparse(self.rsync_url)
+                    if self.rsync_url
+                    else self._environment.url
+                ),
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
