@@ -724,7 +724,7 @@ class AlignAndMergeParams(BaseModel):
         return value
 
 
-@router.post("/sessions/{session_id}/clem/preprocessing/align_and_merge_stacks")
+@router.post("/sessions/{session_id}/clem/processing/align_and_merge_stacks")
 def align_and_merge_stacks(
     session_id: int,
     align_and_merge_params: AlignAndMergeParams,
