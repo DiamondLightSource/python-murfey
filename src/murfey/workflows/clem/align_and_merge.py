@@ -25,6 +25,7 @@ def submit_cluster_request(
     images: list[Path],
     metadata: Path,
     # Optional processing parameters
+    crop_to_n_frames: Optional[int] = None,
     align_self: Optional[str] = None,
     flatten: Optional[Literal["min", "max", "mean"]] = "mean",
     align_across: Optional[str] = None,
@@ -64,6 +65,7 @@ def submit_cluster_request(
                 "series_name": series_name,
                 "images": [str(file) for file in images],
                 "metadata": str(metadata),
+                "crop_to_n_frames": crop_to_n_frames,
                 "align_self": align_self,
                 "flatten": flatten,
                 "align_across": align_across,

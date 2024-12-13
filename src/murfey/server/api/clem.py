@@ -702,6 +702,7 @@ class AlignAndMergeParams(BaseModel):
     images: list[Path]
     metadata: Path
     # Optional processing parameters
+    crop_to_n_frames: Optional[int] = None
     align_self: Optional[str] = None
     flatten: Optional[Literal["min", "max", "mean"]] = "mean"
     align_across: Optional[str] = None
@@ -754,6 +755,7 @@ def align_and_merge_stacks(
         images=align_and_merge_params.images,
         metadata=align_and_merge_params.metadata,
         # Optional processing parameters
+        crop_to_n_frames=align_and_merge_params.crop_to_n_frames,
         align_self=align_and_merge_params.align_self,
         flatten=align_and_merge_params.flatten,
         align_across=align_and_merge_params.align_across,
