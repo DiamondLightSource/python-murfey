@@ -1297,6 +1297,24 @@ def suggest_path(
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
+@router.post("/{session_id}/make_rsyncer_destination")
+def make_rsyncer_destination(session_id: int, destination: Path, db=murfey_db):
+    secure_path_parts = [secure_filename(p) for p in destination.parts]
+    destination_path = "/".join(secure_path_parts)
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if not machine_config:
+        raise ValueError("No machine configuration set when making rsyncer destination")
+    full_destination_path = machine_config.rsync_basepath / destination_path
+    for parent_path in full_destination_path.parents:
+        parent_path.mkdir(mode=0o750, exist_ok=True)
+    return destination
+
+
 @router.get("/sessions/{session_id}/data_collection_groups")
 def get_dc_groups(
     session_id: MurfeySessionID, db=murfey_db

@@ -203,6 +203,10 @@ class MurfeyTUI(App):
         rsync_url: str = "",
     ):
         log.info(f"starting rsyncer: {source}")
+        if transfer:
+            # Always make sure the destination directory exists
+            make_directory_url = f"{str(self._url.geturl())}/sessions/{str(self._environment.murfey_session)}/make_rsyncer_destination"
+            capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
