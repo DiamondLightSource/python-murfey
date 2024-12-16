@@ -43,7 +43,7 @@ cicd = [
 ]
 client = [
     "procrunner",
-    "textual==0.42.0",
+    "textual==1.0.0",
     "websocket-client",
     "xmltodict",
 ]
