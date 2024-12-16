@@ -186,6 +186,12 @@ class MultigridController:
         restarted: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
+        if transfer:
+            # Always make sure the destination directory exists
+            make_directory_url = (
+                f"{self.murfey_url}/sessions/{self.session_id}/make_rsyncer_destination"
+            )
+            capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
