@@ -116,7 +116,8 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
     ).all()
     return (
         all(r[0].motion_corrected for r in results)
-        and len(results) == results[0][1].tilt_series_length
+        and len(results) >= results[0][1].tilt_series_length
+        and results[0][1].tilt_series_length > 0
     )
 
 
