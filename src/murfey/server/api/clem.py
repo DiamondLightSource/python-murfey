@@ -703,9 +703,9 @@ class AlignAndMergeParams(BaseModel):
     metadata: Path
     # Optional processing parameters
     crop_to_n_frames: Optional[int] = None
-    align_self: Optional[str] = None
-    flatten: Optional[Literal["min", "max", "mean"]] = "mean"
-    align_across: Optional[str] = None
+    align_self: Literal["enabled", ""] = ""
+    flatten: Literal["mean", "min", "max", ""] = ""
+    align_across: Literal["enabled", ""] = ""
 
     @validator(
         "images",

@@ -26,9 +26,9 @@ def submit_cluster_request(
     metadata: Path,
     # Optional processing parameters
     crop_to_n_frames: Optional[int] = None,
-    align_self: Optional[str] = None,
-    flatten: Optional[Literal["min", "max", "mean"]] = "mean",
-    align_across: Optional[str] = None,
+    align_self: Literal["enabled", ""] = "",
+    flatten: Literal["mean", "min", "max", ""] = "mean",
+    align_across: Literal["enabled", ""] = "",
     # Optional session parameters
     messenger: Optional[TransportManager] = None,
 ):
