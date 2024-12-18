@@ -165,7 +165,7 @@ class MachineConfig(BaseModel):
             "File path template that can be provided if the EER fractionation files "
             "are saved in a location separate from the rest of the data. This will "
             "be a string, with '{visit}' and '{year}' being optional arguments that "
-            "can be embedded in the string. E.g.: /home/user/data/{year}/{visit}"
+            "can be embedded in the string. E.g.: '/home/user/data/{year}/{visit}'"
         ),
         # Only if Falcon is used
         # To avoid others having to follow the {year}/{visit} format we are doing

@@ -98,7 +98,7 @@ def ask_for_input(parameter: str, again: bool = False):
                 "an" if parameter.lower().startswith(("a", "e", "i", "o", "u")) else "a"
             )
         )
-        + f" {parameter}? (y/n)"
+        + f" {parameter}? [bold cyan](y/n)[/bold cyan]"
     )
     return ask_for_permission(message)
 
@@ -107,7 +107,7 @@ def confirm_overwrite(value: str):
     """
     Asks the user if a value that already exists should be overwritten.
     """
-    message = f"{value!r} already exists; do you wish to overwrite it? (y/n)"
+    message = f"{value!r} already exists; do you wish to overwrite it? [bold cyan](y/n)[/bold cyan]"
     return ask_for_permission(message)
 
 
@@ -115,7 +115,7 @@ def confirm_duplicate(value: str):
     """
     Asks the user if a duplicate value should be allowed.
     """
-    message = f"{value!r} already exists; do you want to add a duplicate? (y/n)"
+    message = f"{value!r} already exists; do you want to add a duplicate? [bold cyan](y/n)[/bold cyan]"
     return ask_for_permission(message)
 
 
@@ -521,7 +521,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     def ask_about_settings_file() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
-            "(y/n)"
+            "[bold cyan](y/n)[/bold cyan]"
         )
         return ask_for_permission(message)
 
