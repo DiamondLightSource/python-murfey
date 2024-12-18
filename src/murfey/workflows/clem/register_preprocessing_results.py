@@ -12,6 +12,7 @@ import logging
 import traceback
 from ast import literal_eval
 from pathlib import Path
+from typing import Literal, Optional
 
 from pydantic import BaseModel, validator
 from sqlmodel import Session, select
@@ -29,6 +30,13 @@ from murfey.workflows.clem import get_db_entry
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
+
+
+# Define align and merge parameters here
+crop_to_n_frames: Optional[int] = 50
+align_self: Literal["enabled", ""] = "enabled"
+flatten: Literal["mean", "min", "max", ""] = "mean"
+align_across: Literal["enabled", ""] = "enabled"
 
 
 class LIFPreprocessingResult(BaseModel):
@@ -187,10 +195,10 @@ def register_lif_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            crop_to_n_frames=50,
-            align_self="enabled",
-            flatten="mean",
-            align_across="enabled",
+            crop_to_n_frames=crop_to_n_frames,
+            align_self=align_self,
+            flatten=flatten,
+            align_across=align_across,
             messenger=_transport_object,
         )
         if cluster_response is False:
@@ -370,10 +378,10 @@ def register_tiff_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            crop_to_n_frames=50,
-            align_self="enabled",
-            flatten="mean",
-            align_across="enabled",
+            crop_to_n_frames=crop_to_n_frames,
+            align_self=align_self,
+            flatten=flatten,
+            align_across=align_across,
             messenger=_transport_object,
         )
         if cluster_response is False:
