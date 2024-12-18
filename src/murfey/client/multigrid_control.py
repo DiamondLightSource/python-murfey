@@ -31,11 +31,13 @@ class MultigridController:
     instrument_name: str
     session_id: int
     murfey_url: str = "http://localhost:8000"
+    rsync_url: str = ""
     demo: bool = False
     processing_enabled: bool = True
     do_transfer: bool = True
     dummy_dc: bool = False
     force_mdoc_metadata: bool = True
+    rsync_restarts: List[str] = field(default_factory=lambda: [])
     rsync_processes: Dict[Path, RSyncer] = field(default_factory=lambda: {})
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
     data_collection_parameters: dict = field(default_factory=lambda: {})
@@ -56,6 +58,7 @@ class MultigridController:
         machine_data = requests.get(
             f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
         ).json()
+        self.rsync_url = machine_data.get("rsync_url", "")
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
@@ -103,7 +106,11 @@ class MultigridController:
             f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
         ).json()
         if destination_overrides.get(source):
-            destination = destination_overrides[source] + f"/{extra_directory}"
+            destination = (
+                destination_overrides[source]
+                if str(source) in self.rsync_restarts
+                else destination_overrides[source] + f"/{extra_directory}"
+            )
         else:
             for k, v in destination_overrides.items():
                 if Path(v).name in source.parts:
@@ -134,6 +141,7 @@ class MultigridController:
             tag=tag,
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
+            restarted=str(source) in self.rsync_restarts,
         )
         self.ws.send(json.dumps({"message": "refresh"}))
 
@@ -175,8 +183,15 @@ class MultigridController:
         tag: str = "",
         limited: bool = False,
         transfer: bool = True,
+        restarted: bool = False,
     ):
         log.info(f"starting rsyncer: {source}")
+        if transfer:
+            # Always make sure the destination directory exists
+            make_directory_url = (
+                f"{self.murfey_url}/sessions/{self.session_id}/make_rsyncer_destination"
+            )
+            capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
@@ -202,7 +217,11 @@ class MultigridController:
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
-                server_url=self._environment.url,
+                server_url=(
+                    urlparse(self.rsync_url)
+                    if self.rsync_url
+                    else self._environment.url
+                ),
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
@@ -225,21 +244,34 @@ class MultigridController:
             self.rsync_processes[source].subscribe(rsync_result)
             self.rsync_processes[source].subscribe(
                 partial(
+                    self._increment_transferred_files_prometheus,
+                    destination=destination,
+                    source=str(source),
+                )
+            )
+            self.rsync_processes[source].subscribe(
+                partial(
                     self._increment_transferred_files,
                     destination=destination,
                     source=str(source),
                 ),
                 secondary=True,
             )
-            url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
-            rsyncer_data = {
-                "source": str(source),
-                "destination": destination,
-                "session_id": self.session_id,
-                "transferring": self.do_transfer or self._environment.demo,
-                "tag": tag,
-            }
-            requests.post(url, json=rsyncer_data)
+            if restarted:
+                restarted_url = (
+                    f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
+                )
+                capture_post(restarted_url, json={"source": str(source)})
+            else:
+                url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+                rsyncer_data = {
+                    "source": str(source),
+                    "destination": destination,
+                    "session_id": self.session_id,
+                    "transferring": self.do_transfer or self._environment.demo,
+                    "tag": tag,
+                }
+                requests.post(url, json=rsyncer_data)
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:
@@ -250,13 +282,6 @@ class MultigridController:
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
             )
-            for data_dir in self._machine_config["data_directories"].keys():
-                if source.resolve().is_relative_to(Path(data_dir)):
-                    self.analysers[source]._role = self._machine_config[
-                        "data_directories"
-                    ][data_dir]
-                    log.info(f"role found for {source}")
-                    break
             if force_metadata:
                 self.analysers[source].subscribe(
                     partial(self._start_dc, from_form=True)
@@ -399,6 +424,7 @@ class MultigridController:
                     "em-spa-extract",
                     "em-spa-class2d",
                     "em-spa-class3d",
+                    "em-spa-refine",
                 ):
                     capture_post(
                         f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_processing_job",
@@ -464,6 +490,33 @@ class MultigridController:
             "increment_data_count": num_data_files,
         }
         requests.post(url, json=data)
+
+    # Prometheus can handle higher traffic so update for every transferred file rather
+    # than batching as we do for the Murfey database updates in _increment_transferred_files
+    def _increment_transferred_files_prometheus(
+        self, update: RSyncerUpdate, source: str, destination: str
+    ):
+        if update.outcome is TransferResult.SUCCESS:
+            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_transferred_files_prometheus"
+            data_files = (
+                [update]
+                if update.file_path.suffix in self._data_suffixes
+                and any(
+                    substring in update.file_path.name
+                    for substring in self._data_substrings
+                )
+                else []
+            )
+            data = {
+                "source": source,
+                "destination": destination,
+                "session_id": self.session_id,
+                "increment_count": 1,
+                "bytes": update.file_size,
+                "increment_data_count": len(data_files),
+                "data_bytes": sum(f.file_size for f in data_files),
+            }
+            requests.post(url, json=data)
 
     def _increment_transferred_files(
         self, updates: List[RSyncerUpdate], source: str, destination: str

@@ -17,7 +17,7 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
     services:
       mariadb:
-        image: mariadb:11.3.2 # released 2024-05-06
+        image: mariadb:11.6.2 # released 2024-05-06
         # Pulls image from DockerHub
         # Docker images: https://hub.docker.com/_/mariadb
         # Previous version(s):
@@ -108,7 +108,7 @@ jobs:
           PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           name: ${{ matrix.python-version }}
           files: coverage.xml

@@ -44,13 +44,10 @@ class FIBContext(Context):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        super().post_transfer(
-            transferred_file, role=role, environment=environment, **kwargs
-        )
+        super().post_transfer(transferred_file, environment=environment, **kwargs)
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":

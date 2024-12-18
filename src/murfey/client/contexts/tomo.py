@@ -549,20 +549,19 @@ class TomographyContext(Context):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> List[str]:
         super().post_transfer(
             transferred_file=transferred_file,
-            role=role,
             environment=environment,
             **kwargs,
         )
 
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         completed_tilts = []
-        if role == "detector" and "gain" not in transferred_file.name:
+
+        if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
                     if environment:
@@ -632,13 +631,10 @@ class TomographyContext(Context):
     def post_first_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ):
-        self.post_transfer(
-            transferred_file, role=role, environment=environment, **kwargs
-        )
+        self.post_transfer(transferred_file, environment=environment, **kwargs)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -745,7 +741,9 @@ class TomographyContext(Context):
             mdoc_metadata["tag"] = str(self._basepath)
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
             mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
-            mdoc_metadata["slit_width"] = float(mdoc_data_block["FilterSlitAndLoss"][0])
+            slit_width = mdoc_data_block["FilterSlitAndLoss"][0]
+            if slit_width.lower() != "nan":
+                mdoc_metadata["slit_width"] = float(slit_width)
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )

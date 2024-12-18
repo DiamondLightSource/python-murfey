@@ -136,9 +136,9 @@ def _foil_hole_from_file(f: Path) -> int:
 
 
 def _grid_square_metadata_file(
-    f: Path, data_directories: Dict[Path, str], visit: str, grid_square: int
+    f: Path, data_directories: List[Path], visit: str, grid_square: int
 ) -> Path:
-    for dd in data_directories.keys():
+    for dd in data_directories:
         if str(f).startswith(str(dd)):
             base_dir = dd
             mid_dir = f.relative_to(dd).parent
@@ -542,7 +542,7 @@ class SPAModularContext(_SPAContext):
         grid_square = _grid_square_from_file(transferred_file)
         grid_square_metadata_file = _grid_square_metadata_file(
             transferred_file,
-            {Path(d): l for d, l in machine_config["data_directories"].items()},
+            machine_config["data_directories"],
             environment.visit,
             grid_square,
         )
@@ -669,18 +669,16 @@ class SPAModularContext(_SPAContext):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> bool:
         super().post_transfer(
             transferred_file=transferred_file,
-            role=role,
             environment=environment,
             **kwargs,
         )
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
-        if role == "detector" and "gain" not in transferred_file.name:
+        if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "epu":
                     if environment:
@@ -856,7 +854,6 @@ class SPAContext(_SPAContext):
     def post_transfer(
         self,
         transferred_file: Path,
-        role: str = "",
         environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> bool:

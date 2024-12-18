@@ -36,10 +36,8 @@ def run():
     murfey_url = urlparse(args.server, allow_fragments=False)
 
     machine_data = requests.get(f"{murfey_url.geturl()}/machine").json()
-    if Path(args.source or ".").resolve() in machine_data.data_directories.keys():
-        console.print(
-            f"[red]Source directory is the base directory for the {machine_data.data_directories[Path(args.source or '.').resolve()]}, exiting"
-        )
+    if Path(args.source or ".").resolve() in machine_data.data_directories:
+        console.print("[red]Source directory is the base directory, exiting")
         return
 
     cmd = [

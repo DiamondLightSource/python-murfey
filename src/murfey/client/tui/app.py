@@ -74,7 +74,6 @@ class MurfeyTUI(App):
         gain_ref: Path | None = None,
         redirected_logger=None,
         force_mdoc_metadata: bool = False,
-        strict: bool = False,
         processing_enabled: bool = True,
         skip_existing_processing: bool = False,
         **kwargs,
@@ -104,7 +103,6 @@ class MurfeyTUI(App):
         self._processing_enabled = processing_enabled
         self._multigrid_watcher: MultigridDirWatcher | None = None
         self._force_mdoc_metadata = force_mdoc_metadata
-        self._strict = strict
         self._skip_existing_processing = skip_existing_processing
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
@@ -119,12 +117,6 @@ class MurfeyTUI(App):
             for s in ds
         ]
         self.install_screen(MainScreen(), "main")
-
-    @property
-    def role(self) -> str:
-        if self.analyser:
-            return self.analyser._role
-        return ""
 
     def _launch_multigrid_watcher(
         self, source: Path, destination_overrides: Dict[Path, str] | None = None
@@ -195,6 +187,7 @@ class MurfeyTUI(App):
             remove_files=remove_files,
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
+            rsync_url=machine_data.get("rsync_url", ""),
         )
 
     def _start_rsyncer(
@@ -207,8 +200,13 @@ class MurfeyTUI(App):
         remove_files: bool = False,
         limited: bool = False,
         transfer: bool = True,
+        rsync_url: str = "",
     ):
         log.info(f"starting rsyncer: {source}")
+        if transfer:
+            # Always make sure the destination directory exists
+            make_directory_url = f"{str(self._url.geturl())}/sessions/{str(self._environment.murfey_session)}/make_rsyncer_destination"
+            capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
             if self._environment.gain_ref and visit_path:
@@ -234,7 +232,7 @@ class MurfeyTUI(App):
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
-                server_url=self._url,
+                server_url=urlparse(rsync_url) if rsync_url else self._url,
                 # local=self._environment.demo,
                 status_bar=self._statusbar,
                 do_transfer=self._do_transfer,
@@ -291,16 +289,6 @@ class MurfeyTUI(App):
                 force_mdoc_metadata=self._force_mdoc_metadata,
                 limited=limited,
             )
-            machine_data = requests.get(
-                f"{self._environment.url.geturl()}/machine"
-            ).json()
-            for data_dir in machine_data["data_directories"].keys():
-                if source.resolve().is_relative_to(Path(data_dir)):
-                    self.analysers[source]._role = machine_data["data_directories"][
-                        data_dir
-                    ]
-                    log.info(f"role found for {source}")
-                    break
             if force_metadata:
                 self.analysers[source].subscribe(
                     partial(self._start_dc, from_form=True)

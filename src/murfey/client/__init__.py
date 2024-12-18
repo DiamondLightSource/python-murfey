@@ -216,12 +216,6 @@ def run():
         help="Remove source files immediately after their transfer",
     )
     parser.add_argument(
-        "--relax",
-        action="store_true",
-        default=False,
-        help="Relax the condition that the source directory needs to be recognised from the configuration",
-    )
-    parser.add_argument(
         "--name",
         type=str,
         default="",
@@ -344,7 +338,6 @@ def run():
         gain_ref=gain_ref,
         redirected_logger=rich_handler,
         force_mdoc_metadata=not args.ignore_mdoc_metadata,
-        strict=not args.relax,
         processing_enabled=machine_data.get("processing_enabled", True),
         skip_existing_processing=args.skip_existing_processing,
     )

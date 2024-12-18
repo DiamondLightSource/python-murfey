@@ -388,6 +388,13 @@ class MachineConfig(BaseModel):
         default="",
         description="URL to where users can authenticate their Murfey sessions.",
     )
+    rsync_url: str = Field(
+        default="",
+        description=(
+            "URL to a remote rsync daemon. By default, the rsync daemon will be "
+            "running on the client machine, and this defaults to an empty string."
+        ),
+    )
 
     # RabbitMQ-specifc keys
     failure_queue: str = Field(
@@ -552,7 +559,7 @@ def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
         "": MachineConfig(
             acquisition_software=[],
             calibrations={},
-            data_directories={},
+            data_directories=[],
             rsync_basepath=Path("dls/tmp"),
             murfey_db_credentials="",
             default_model="/tmp/weights.h5",
