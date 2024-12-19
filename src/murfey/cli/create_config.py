@@ -5,7 +5,7 @@ import json
 import re
 from ast import literal_eval
 from pathlib import Path
-from typing import Any, Callable, Optional, Type, get_type_hints
+from typing import Any, Callable, Optional, Type
 
 import yaml
 from pydantic import ValidationError
@@ -19,9 +19,6 @@ from murfey.util.config import MachineConfig
 
 # Create a console object for pretty printing
 console = Console()
-
-# Compile types for each key present in MachineConfig
-machine_config_types: dict = get_type_hints(MachineConfig)
 
 
 def prompt(message: str, style: str = "") -> str:
