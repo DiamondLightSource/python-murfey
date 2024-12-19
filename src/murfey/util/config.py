@@ -272,7 +272,18 @@ class MachineConfig(BaseModel):
     )
 
     # TEM-related processing workflows
-    recipes: dict[str, str] = Field(
+    recipes: dict[
+        Literal[
+            "em-spa-bfactor",
+            "em-spa-class2d",
+            "em-spa-class3d",
+            "em-spa-preprocess",
+            "em-spa-refine",
+            "em-tomo-preprocess",
+            "em-tomo-align",
+        ],
+        str,
+    ] = Field(
         default={
             "em-spa-bfactor": "em-spa-bfactor",
             "em-spa-class2d": "em-spa-class2d",
