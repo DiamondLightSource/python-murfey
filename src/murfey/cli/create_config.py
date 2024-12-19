@@ -53,7 +53,7 @@ def print_welcome_message():
     console.print(panel, justify="center")
     console.rule()
 
-    prompt("Press any key to begin the setup")
+    input("Press 'Enter' to begin the setup")
 
 
 def print_field_info(field: ModelField):
@@ -109,9 +109,9 @@ def ask_to_use_default(field: ModelField):
     default value.
     """
     message = (
-        "Would you like to use the default value for this field? \n"
-        f"Default: {field.field_info.default!r} \n"
-        "[bold bright_magenta](y/n)[/bold bright_magenta]"
+        "Would you like to use the default value for this field? "
+        "[bold bright_magenta](y/n)[/bold bright_magenta] \n"
+        f"{field.field_info.default!r}"
     )
     return ask_for_permission(message)
 
