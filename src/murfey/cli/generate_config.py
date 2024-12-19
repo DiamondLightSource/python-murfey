@@ -98,7 +98,7 @@ def ask_for_input(parameter: str, again: bool = False):
                 "an" if parameter.lower().startswith(("a", "e", "i", "o", "u")) else "a"
             )
         )
-        + f" {parameter}? [bold cyan](y/n)[/bold cyan]"
+        + f" {parameter}? [bold bright_magenta](y/n)[/bold bright_magenta]"
     )
     return ask_for_permission(message)
 
@@ -107,7 +107,7 @@ def confirm_overwrite(value: str):
     """
     Asks the user if a value that already exists should be overwritten.
     """
-    message = f"{value!r} already exists; do you wish to overwrite it? [bold cyan](y/n)[/bold cyan]"
+    message = f"{value!r} already exists; do you wish to overwrite it? [bold bright_magenta](y/n)[/bold bright_magenta]"
     return ask_for_permission(message)
 
 
@@ -115,7 +115,7 @@ def confirm_duplicate(value: str):
     """
     Asks the user if a duplicate value should be allowed.
     """
-    message = f"{value!r} already exists; do you want to add a duplicate? [bold cyan](y/n)[/bold cyan]"
+    message = f"{value!r} already exists; do you want to add a duplicate? [bold bright_magenta](y/n)[/bold bright_magenta]"
     return ask_for_permission(message)
 
 
@@ -418,7 +418,9 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
         except ValidationError as error:
             if debug:
                 console.print(error, style="bright_red")
-            console.print(f"Invalid input for {key!r}. Please try again")
+            console.print(
+                f"Invalid input for {key!r}. Please try again", style="bright_red"
+            )
             continue
 
 
@@ -521,7 +523,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     def ask_about_settings_file() -> bool:
         message = (
             "Does this software package have a settings file that needs modification? "
-            "[bold cyan](y/n)[/bold cyan]"
+            "[bold bright_magenta](y/n)[/bold bright_magenta]"
         )
         return ask_for_permission(message)
 
@@ -542,7 +544,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         "This is where aquisition software packages present on the instrument machine "
         "can be specified, along with the output file names and extensions that are of "
         "interest.",
-        style="italic bright_cyan",
+        style="bright_white",
     )
     package_info: dict = {}
     category = "software package"
@@ -555,7 +557,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
         )
         console.print(
             "Name of the acquisition software installed on this instrument.",
-            style="italic bright_cyan",
+            style="bright_white",
         )
         console.print(
             "Options: 'autotem', 'epu', 'leica', 'serialem', 'tomo'",
@@ -588,7 +590,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "in order to ensure files are saved to the desired folders. The paths to "
             "the files and the path to the nodes in the settings files both need to be "
             "provided.",
-            style="italic bright_cyan",
+            style="bright_white",
         )
         settings_file: Optional[Path] = (
             get_file_path(
@@ -610,7 +612,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
             "Different software packages will generate different output files. Only "
             "files with certain extensions and keywords in their filenames are needed "
             "for data processing. They are listed out here.",
-            style="italic bright_cyan",
+            style="bright_white",
         )
         extensions_and_substrings: dict[str, list[str]] = construct_dict(
             dict_name="file extension configuration",
@@ -873,6 +875,9 @@ def set_up_data_transfer(config: dict, debug: bool = False) -> dict:
         "upstream_data_tiff_locations",
     ):
         field = MachineConfig.__fields__[key]
+        # Skip everything in this section if data transfer is set to False
+        if config.get("data_transfer_enabled", None) is False:
+            continue
         # Construct more complicated data structures
         if key == "upstream_data_directories":
             validated_value: Any = get_upstream_data_directories(key, field, debug)
@@ -934,6 +939,9 @@ def set_up_data_processing(config: dict, debug: bool = False) -> dict:
         "initial_model_search_directory",
     ):
         field = MachineConfig.__fields__[key]
+        # Skip this section of processing is disabled
+        if config.get("processing_enabled", None) is False:
+            continue
         # Handle complex keys
         if key == "recipes":
             validated_value: Any = add_recipes(key, field, debug)
