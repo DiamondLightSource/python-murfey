@@ -52,13 +52,13 @@ class MachineConfig(BaseModel):
     """
     Information about the hardware and software on the instrument machine
     """
-    camera: Literal["FALCON", "K3_FLIPX", "K3_FLIPY"] = Field(
-        default="FALCON",
+    camera: Literal["FALCON", "K3_FLIPX", "K3_FLIPY", ""] = Field(
+        default="",
         description=(
             "Name of the camera used by the TEM. This is only relevant for TEMs to "
             "determine how the gain reference needs to be processed, e.g., if it has "
             "to be binned down from superres or flipped along the x- or y-axis. "
-            "Options: 'FALCON', 'K3_FLIPX', 'K3_FLIPY'"
+            "Options: 'FALCON', 'K3_FLIPX', 'K3_FLIPY', ''"
         ),
         # NOTE:
         #   Eventually need to support Falcon 4, Falcon 4I, K2, K3 (superres)
@@ -128,12 +128,10 @@ class MachineConfig(BaseModel):
             "processing."
         ),
     )
-    data_directories: dict[str, str] = Field(
-        default={},
+    data_directories: list[Path] = Field(
+        default=[],
         description=(
-            "Dictionary of key-value pairs, where the keys are full paths to where "
-            "data is stored on the client machine, and the value denotes the type "
-            "of data stored at that path."
+            "List of full paths to where data is stored on the instrument machine."
         ),
     )
     create_directories: dict[str, str] = Field(
