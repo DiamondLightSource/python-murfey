@@ -103,6 +103,19 @@ def ask_for_input(parameter: str, again: bool = False):
     return ask_for_permission(message)
 
 
+def ask_to_use_default(field: ModelField):
+    """
+    Asks the user if they want to populate the current configuration key with the
+    default value.
+    """
+    message = (
+        "Would you like to use the default value for this field? \n"
+        f"Default: {field.field_info.default!r} \n"
+        "[bold bright_magenta](y/n)[/bold bright_magenta]"
+    )
+    return ask_for_permission(message)
+
+
 def confirm_overwrite(value: str):
     """
     Asks the user if a value that already exists should be overwritten.
@@ -410,8 +423,16 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
         # Get value
         answer = prompt(message, style="bright_yellow")
 
-        # Convert empty console input into default values
-        value = field.field_info.default if not answer else answer
+        # Convert empty console input into default values if they are None-like
+        if not field.field_info.default:
+            value = field.field_info.default if not answer else answer
+        # Convert inverted commas into empty strings if defaults are not None-like
+        else:
+            value = (
+                ""
+                if answer in ("''", '""') and isinstance(field.field_info.default, str)
+                else answer
+            )
 
         # Validate and return
         try:
@@ -691,21 +712,27 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
 
 def add_data_directories(
     key: str, field: ModelField, debug: bool = False
-) -> dict[str, str]:
+) -> list[Path]:
     """
     Function to facilitate populating the data_directories field.
     """
     print_field_info(field)
-    category = "data directory"
-    data_directories: dict[str, str] = construct_dict(
-        category,
-        "full file path to the data directory",
-        "data type",
-        allow_empty_key=False,
-        allow_empty_value=False,
+    description = "data directory path"
+    data_directories: list[Path] = construct_list(
+        description,
+        value_method=get_folder_path,
+        value_method_args={
+            "message": (
+                "Please enter the full path to the data directory "
+                "where the files are stored."
+            ),
+        },
+        allow_empty=False,
         allow_eval=False,
-        sort_keys=True,
-        restrict_to_types=str,
+        many_types=False,
+        restrict_to_types=Path,
+        sort_values=True,
+        debug=debug,
     )
 
     # Validate and return
@@ -715,10 +742,10 @@ def add_data_directories(
         if debug:
             console.print(error, style="bright_red")
         console.print(f"Failed to validate {key!r}.", style="bright_red")
-        if ask_for_input(category, True) is True:
+        if ask_for_input(description, True) is True:
             return add_data_directories(key, field, debug)
         console.print("Returning an empty dictionary.", style="bright_red")
-        return {}
+        return []
 
 
 def add_create_directories(
@@ -728,24 +755,30 @@ def add_create_directories(
     Function to populate the create_directories field.
     """
     print_field_info(field)
-    category = "folder for Murfey to create"
-    folders_to_create: dict[str, str] = construct_dict(
-        dict_name=category,
-        key_name="folder alias",
-        value_name="folder name",
-        key_method=get_folder_name,
-        key_method_args={
-            "message": "Please enter the name Murfey should remember the folder as.",
-        },
-        value_method=get_folder_name,
-        value_method_args={
-            "message": "Please enter the name of the folder for Murfey to create.",
-        },
-        allow_empty_key=False,
-        allow_empty_value=False,
-        allow_eval=False,
-        sort_keys=True,
-        restrict_to_types=str,
+
+    # Manually enter fields if default value is not used
+    description = "folder for Murfey to create"
+    folders_to_create: dict[str, str] = (
+        field.field_info.default
+        if ask_to_use_default(field) is True
+        else construct_dict(
+            dict_name=description,
+            key_name="folder alias",
+            value_name="folder name",
+            key_method=get_folder_name,
+            key_method_args={
+                "message": "Please enter the name Murfey should remember the folder as.",
+            },
+            value_method=get_folder_name,
+            value_method_args={
+                "message": "Please enter the name of the folder for Murfey to create.",
+            },
+            allow_empty_key=False,
+            allow_empty_value=False,
+            allow_eval=False,
+            sort_keys=True,
+            restrict_to_types=str,
+        )
     )
 
     # Validate and return
@@ -755,7 +788,7 @@ def add_create_directories(
         if debug:
             console.print(error, style="bright_red")
         console.print(f"Failed to validate {key!r}.", style="bright_red")
-        if ask_for_input(category, True) is True:
+        if ask_for_input(description, True) is True:
             return add_create_directories(key, field, debug)
         console.print("Returning an empty dictionary.", style="bright_red")
         return {}
@@ -901,16 +934,22 @@ def set_up_data_processing(config: dict, debug: bool = False) -> dict:
 
     def add_recipes(key: str, field: ModelField, debug: bool = False) -> dict[str, str]:
         print_field_info(field)
+
+        # Manually construct the dictionary if the default value is not used
         category = "processing recipe"
-        recipes = construct_dict(
-            category,
-            key_name="name of the recipe",
-            value_name="name of the recipe file",
-            allow_empty_key=False,
-            allow_empty_value=False,
-            allow_eval=False,
-            sort_keys=True,
-            restrict_to_types=str,
+        recipes = (
+            field.field_info.default
+            if ask_to_use_default(field) is True
+            else construct_dict(
+                category,
+                key_name="name of the recipe",
+                value_name="name of the recipe file",
+                allow_empty_key=False,
+                allow_empty_value=False,
+                allow_eval=False,
+                sort_keys=True,
+                restrict_to_types=str,
+            )
         )
         try:
             return validate_value(recipes, key, field, debug)
