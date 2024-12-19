@@ -4,7 +4,7 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Mapping, Optional, Union
+from typing import Any, Literal, Mapping, Optional
 
 import yaml
 from backports.entry_points_selectable import entry_points
@@ -82,7 +82,7 @@ class MachineConfig(BaseModel):
         ),
         # NOTE: This is a placeholder for a key that will be implemented in the future
     )
-    calibrations: dict[str, dict[str, Union[dict, float]]] = Field(
+    calibrations: dict[str, dict[str, dict | float]] = Field(
         default={},
         description=(
             "Nested dictionary containing the calibrations for this microscope. "
@@ -405,7 +405,7 @@ class MachineConfig(BaseModel):
         description="URL to where users can authenticate their Murfey sessions.",
     )
 
-    # RabbitMQ-specifc keys
+    # RabbitMQ-specific keys
     failure_queue: str = Field(
         default="",
         description="Name of RabbitMQ queue where failed API calls will be recorded.",
@@ -481,7 +481,7 @@ class MachineConfig(BaseModel):
 
 def machine_config_from_file(
     config_file_path: Path, instrument: str = ""
-) -> Dict[str, MachineConfig]:
+) -> dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
     return {
@@ -510,7 +510,7 @@ class GlobalConfig(BaseModel):
     session_token_timeout: Optional[int] = (
         None  # seconds; typically the length of a microscope session plus a bit
     )
-    allow_origins: List[str] = ["*"]  # Restrict to only certain hostnames
+    allow_origins: list[str] = ["*"]  # Restrict to only certain hostnames
 
 
 def global_config_from_file(config_file_path: Path) -> GlobalConfig:
@@ -563,7 +563,7 @@ def get_global_config() -> GlobalConfig:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
+def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
     machine_config = {
         "": MachineConfig(
             acquisition_software=[],
