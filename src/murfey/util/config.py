@@ -200,6 +200,13 @@ class MachineConfig(BaseModel):
             "different sub-folders to save the data to."
         ),
     )
+    rsync_url: str = Field(
+        default="",
+        description=(
+            "URL to a remote rsync daemon. By default, the rsync daemon will be "
+            "running on the client machine, and this defaults to an empty string."
+        ),
+    )
 
     # Related visits and data
     upstream_data_directories: list[Path] = Field(
@@ -396,13 +403,6 @@ class MachineConfig(BaseModel):
     auth_url: str = Field(
         default="",
         description="URL to where users can authenticate their Murfey sessions.",
-    )
-    rsync_url: str = Field(
-        default="",
-        description=(
-            "URL to a remote rsync daemon. By default, the rsync daemon will be "
-            "running on the client machine, and this defaults to an empty string."
-        ),
     )
 
     # RabbitMQ-specifc keys
