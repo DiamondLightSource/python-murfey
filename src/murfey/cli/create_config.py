@@ -401,16 +401,17 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
 
     # Display information on the field to be filled
     print_field_info(field)
-    message = "Please provide a value (press Enter to leave it blank as '')."
+
+    message = (
+        "Please provide a value (press Enter to use the default value of "
+        f"{field.field_info.default!r})."
+    )
     while True:
         # Get value
         answer = prompt(message, style="bright_yellow")
-        # Translate empty string into None for fields that take Path values
-        value = (
-            None
-            if (not answer and machine_config_types.get(key) in (Path, Optional[Path]))
-            else answer
-        )
+
+        # Convert empty console input into default values
+        value = field.field_info.default if not answer else answer
 
         # Validate and return
         try:
@@ -449,7 +450,7 @@ def add_calibrations(
         # Check if it's a known type of calibration
         if calibration_type not in known_calibrations.keys():
             console.print(
-                f"{calibration_type} is not a known type of calibration",
+                f"{calibration_type!r} is not a known type of calibration",
                 style="bright_red",
             )
             add_calibration = ask_for_input(category, True)
