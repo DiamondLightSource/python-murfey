@@ -14,7 +14,7 @@ def test_decrypt_password(capsys, tmp_path):
     global_config.crypto_key = crypto_key.decode("ascii")
     with open(tmp_path / "config.yaml", "w") as cfg:
         yaml.dump(global_config.dict(), cfg)
-    os.environ["MURFEY_global_configURATION"] = str(tmp_path / "config.yaml")
+    os.environ["MURFEY_GLOBAL_CONFIGURATION"] = str(tmp_path / "config.yaml")
     password = "abcd"
     f = Fernet(crypto_key)
     encrypted_password = f.encrypt(password.encode("ascii")).decode()
