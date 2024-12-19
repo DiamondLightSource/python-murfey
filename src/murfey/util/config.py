@@ -4,7 +4,7 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal, Mapping, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
@@ -82,7 +82,7 @@ class MachineConfig(BaseModel):
         ),
         # NOTE: This is a placeholder for a key that will be implemented in the future
     )
-    calibrations: dict[str, dict[str, dict | float]] = Field(
+    calibrations: dict[str, dict[str, Union[dict, float]]] = Field(
         default={},
         description=(
             "Nested dictionary containing the calibrations for this microscope. "
