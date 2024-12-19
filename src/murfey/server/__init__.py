@@ -56,7 +56,7 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 
 try:

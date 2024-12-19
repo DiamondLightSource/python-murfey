@@ -25,6 +25,9 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
+from murfey.util.processing_params import (
+    default_clem_align_and_merge_parameters as processing_params,
+)
 from murfey.workflows.clem import get_db_entry
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
 
@@ -187,9 +190,10 @@ def register_lif_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            align_self=None,
-            flatten="mean",
-            align_across=None,
+            crop_to_n_frames=processing_params.crop_to_n_frames,
+            align_self=processing_params.align_self,
+            flatten=processing_params.flatten,
+            align_across=processing_params.align_across,
             messenger=_transport_object,
         )
         if cluster_response is False:
@@ -369,9 +373,10 @@ def register_tiff_preprocessing_result(
             series_name=result.series_name,
             images=image_stacks,
             metadata=result.metadata,
-            align_self=None,
-            flatten="mean",
-            align_across=None,
+            crop_to_n_frames=processing_params.crop_to_n_frames,
+            align_self=processing_params.align_self,
+            flatten=processing_params.flatten,
+            align_across=processing_params.align_across,
             messenger=_transport_object,
         )
         if cluster_response is False:

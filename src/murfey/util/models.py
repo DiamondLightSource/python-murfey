@@ -148,19 +148,6 @@ class FractionationParameters(BaseModel):
 
 
 """
-Cryo-CLEM
-=========
-Models related to the cryo-CLEM workflow.
-"""
-
-
-class TIFFSeriesInfo(BaseModel):
-    series_name: str
-    tiff_files: List[Path]
-    series_metadata: Path
-
-
-"""
 FIB
 ===
 Models related to FIB, as part of correlative workflow with TEM.

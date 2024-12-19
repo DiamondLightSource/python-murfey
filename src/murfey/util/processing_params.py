@@ -1,4 +1,16 @@
+from typing import Literal, Optional
+
 from pydantic import BaseModel
+
+
+class CLEMAlignAndMergeParameters(BaseModel):
+    crop_to_n_frames: Optional[int] = 50
+    align_self: Literal["enabled", ""] = "enabled"
+    flatten: Literal["mean", "min", "max", ""] = "mean"
+    align_across: Literal["enabled", ""] = "enabled"
+
+
+default_clem_align_and_merge_parameters = CLEMAlignAndMergeParameters()
 
 
 class SPAParameters(BaseModel):

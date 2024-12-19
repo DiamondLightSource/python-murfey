@@ -21,7 +21,7 @@ from murfey.util.db import (
     SPAFeedbackParameters,
     SPARelionParameters,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 
 
 def run():
