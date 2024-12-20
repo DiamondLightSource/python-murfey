@@ -500,7 +500,14 @@ class GlobalConfig(BaseModel):
             "This is typically a YAML file."
         ),
     )
-    sqlalchemy_pooling: bool = True
+    sqlalchemy_pooling: bool = Field(
+        default=True,
+        description=(
+            "Toggles connection pooling functionality in the SQL database. If 'True', "
+            "clients will connect to the database using an existing pool of connections "
+            "instead of creating a new one every time."
+        ),
+    )
     crypto_key: str
 
     # RabbitMQ settings
