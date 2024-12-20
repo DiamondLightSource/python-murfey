@@ -517,7 +517,15 @@ class GlobalConfig(BaseModel):
     )
 
     # RabbitMQ settings
-    feedback_queue: str = "murfey_feedback"
+    feedback_queue: str = Field(
+        default="murfey_feedback",
+        description=(
+            "The name of the RabbitMQ queue that will receive instructions and "
+            "the results of processing jobs on behalf of Murfey. This queue can be "
+            "by multiple server instances, which is why it's stored here instead of "
+            "in the machine configuration."
+        ),
+    )
 
     # Server authentication settings
     auth_type: Literal["password", "cookie"] = "password"
