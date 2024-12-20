@@ -528,7 +528,14 @@ class GlobalConfig(BaseModel):
     )
 
     # Server authentication settings
-    auth_type: Literal["password", "cookie"] = "password"
+    auth_type: Literal["password", "cookie"] = Field(
+        default="password",
+        description=(
+            "Choose how Murfey will authenticate new connections that it receives. "
+            "This can be done at present via password authentication or exchanging "
+            "cookies."
+        ),
+    )
     auth_key: str = ""
     auth_algorithm: str = ""
     cookie_key: str = ""
