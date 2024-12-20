@@ -2,7 +2,7 @@ import argparse
 
 from cryptography.fernet import Fernet
 
-from murfey.util.config import get_security_config
+from murfey.util.config import get_global_config
 
 
 def run():
@@ -12,6 +12,6 @@ def run():
 
     args = parser.parse_args()
 
-    security_config = get_security_config()
-    f = Fernet(security_config.crypto_key.encode("ascii"))
+    global_config = get_global_config()
+    f = Fernet(global_config.crypto_key.encode("ascii"))
     print(f.decrypt(args.password.encode("ascii")).decode())
