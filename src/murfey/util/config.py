@@ -560,7 +560,7 @@ def get_global_config() -> GlobalConfig:
             return global_config_from_file(machine_config.global_configuration_path)
     return GlobalConfig(
         session_validation="",
-        murfey_db_credentials="",
+        murfey_db_credentials=None,
         crypto_key="",
         auth_key="",
         auth_algorithm="",
@@ -576,7 +576,6 @@ def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
             calibrations={},
             data_directories=[],
             rsync_basepath=Path("dls/tmp"),
-            murfey_db_credentials="",
             default_model="/tmp/weights.h5",
         )
     }
