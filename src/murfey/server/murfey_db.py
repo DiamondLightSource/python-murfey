@@ -13,6 +13,10 @@ from murfey.util.config import GlobalConfig, get_global_config
 
 def url(global_config: GlobalConfig | None = None) -> str:
     global_config = global_config or get_global_config()
+    if global_config.murfey_db_credentials is None:
+        raise ValueError(
+            "No database credentials file was provided for this instance of Murfey"
+        )
     with open(global_config.murfey_db_credentials, "r") as stream:
         creds = yaml.safe_load(stream)
     f = Fernet(global_config.crypto_key.encode("ascii"))

@@ -493,7 +493,13 @@ def machine_config_from_file(
 
 class GlobalConfig(BaseModel):
     # Database connection settings
-    murfey_db_credentials: str
+    murfey_db_credentials: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Full file path to where Murfey's SQL database credentials are stored. "
+            "This is typically a YAML file."
+        ),
+    )
     sqlalchemy_pooling: bool = True
     crypto_key: str
 
