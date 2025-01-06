@@ -1502,6 +1502,26 @@ async def process_gain(
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
+
+    # Check under previous year if the folder doesn't exist
+    if not filepath.exists():
+        filepath_prev = filepath
+        filepath = (
+            Path(machine_config.rsync_basepath)
+            / (machine_config.rsync_module or "data")
+            / str(datetime.datetime.now().year - 1)
+            / secure_filename(visit_name)
+            / machine_config.gain_directory_name
+        )
+        # If it's not in the previous year, it's a genuine error
+        if not filepath.exists():
+            log_message = (
+                "Unable to find gain reference directory under "
+                f"{str(filepath_prev)!r} or {str(filepath)}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     if gain_reference_params.eer:
         new_gain_ref, new_gain_ref_superres = await prepare_eer_gain(
             filepath / safe_path_name,
