@@ -155,5 +155,8 @@ class SPAMetadataContext(Context):
                                     "y_location": pos_data[1],
                                     "x_stage_position": pos_data[2],
                                     "y_stage_position": pos_data[3],
+                                    "width": pos_data[4],
+                                    "height": pos_data[5],
+                                    "angle": pos_data[6],
                                 },
                             )

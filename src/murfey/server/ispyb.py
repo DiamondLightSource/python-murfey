@@ -22,6 +22,7 @@ from ispyb.sqlalchemy import (
     BLSubSample,
     DataCollection,
     DataCollectionGroup,
+    GridSquare,
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
@@ -29,7 +30,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
-from murfey.util.models import Sample, Visit
+from murfey.util.models import GridSquareParameters, Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -122,6 +123,39 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Updating Atlas entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_grid_square(
+        self,
+        atlas_id: int,
+        grid_square_id: int,
+        grid_square_parameters: GridSquareParameters,
+    ):
+        record = GridSquare(
+            atlasId=atlas_id,
+            gridSquareLabel=grid_square_id,
+            gridSquareImage=grid_square_parameters.image,
+            pixelLocationX=grid_square_parameters.x_location,
+            pixelLocationY=grid_square_parameters.y_location,
+            height=grid_square_parameters.height,
+            weight=grid_square_parameters.width,
+            angle=grid_square_parameters.angle,
+            stageLocationX=grid_square_parameters.x_stage_position,
+            stageLocationY=grid_square_parameters.y_stage_position,
+            pixelSize=grid_square_parameters.pixel_size,
+        )
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created GridSquare {record.gridSquareId}")
+                return {"success": True, "return_value": record.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting GridSquare entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )

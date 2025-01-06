@@ -491,6 +491,13 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
+    if _transport_object:
+        dcg = db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == grid_square_params.tag)
+        ).one()
+        _transport_object.do_insert_grid_square(dcg.atlas_id, gsid, grid_square_params)
     try:
         grid_square = db.exec(
             select(GridSquare)

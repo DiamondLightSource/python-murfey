@@ -59,9 +59,18 @@ class GridSquare(NamedTuple):
     tag: str = ""
 
 
-def _get_grid_square_atlas_positions(
-    xml_path: Path, grid_square: str = ""
-) -> Dict[str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]]:
+def _get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> Dict[
+    str,
+    Tuple[
+        Optional[int],
+        Optional[int],
+        Optional[float],
+        Optional[float],
+        Optional[int],
+        Optional[int],
+        Optional[float],
+    ],
+]:
     with open(
         xml_path,
         "r",
@@ -71,7 +80,16 @@ def _get_grid_square_atlas_positions(
         "TileXml"
     ]
     gs_pix_positions: Dict[
-        str, Tuple[Optional[int], Optional[int], Optional[float], Optional[float]]
+        str,
+        Tuple[
+            Optional[int],
+            Optional[int],
+            Optional[float],
+            Optional[float],
+            Optional[int],
+            Optional[int],
+            Optional[float],
+        ],
     ] = {}
     for ti in tile_info:
         try:
@@ -96,6 +114,13 @@ def _get_grid_square_atlas_positions(
                     * 1e9,
                     float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
                     * 1e9,
+                    int(
+                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Size"]["d:width"])
+                    ),
+                    int(
+                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Size"]["d:height"])
+                    ),
+                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Rotation"]),
                 )
                 if grid_square:
                     break
@@ -557,7 +582,10 @@ class SPAModularContext(_SPAContext):
                 Optional[int],
                 Optional[float],
                 Optional[float],
-            ] = (None, None, None, None)
+                Optional[int],
+                Optional[int],
+                Optional[float],
+            ] = (None, None, None, None, None, None, None)
             data_collection_group = (
                 requests.get(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
@@ -611,6 +639,9 @@ class SPAModularContext(_SPAContext):
                     "y_location": gs_pix_position[1],
                     "x_stage_position": gs_pix_position[2],
                     "y_stage_position": gs_pix_position[3],
+                    "width": gs_pix_position[4],
+                    "height": gs_pix_position[5],
+                    "angle": gs_pix_position[6],
                 },
             )
         foil_hole = _foil_hole_from_file(transferred_file)

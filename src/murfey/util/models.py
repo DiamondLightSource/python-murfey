@@ -273,8 +273,11 @@ class GridSquareParameters(BaseModel):
     readout_area_y: Optional[int] = None
     thumbnail_size_x: Optional[int] = None
     thumbnail_size_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    angle: Optional[float] = None
 
 
 class FoilHoleParameters(BaseModel):
