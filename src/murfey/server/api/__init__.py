@@ -1335,8 +1335,20 @@ def register_dc_group(
     ).all():
         dcg_murfey[0].atlas = dcg_params.atlas
         dcg_murfey[0].sample = dcg_params.sample
+        dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
         db.add(dcg_murfey[0])
         db.commit()
+        if _transport_object:
+            _transport_object.send(
+                _transport_object.feedback_queue,
+                {
+                    "register": "atlas_update",
+                    "atlas_id": dcg_murfey.atlas_id,
+                    "atlas": dcg_params.atlas,
+                    "sample": dcg_params.sample,
+                    "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                },
+            )
     else:
         dcg_parameters = {
             "start_time": str(datetime.datetime.now()),
@@ -1344,6 +1356,9 @@ def register_dc_group(
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
             "session_id": session_id,
+            "atlas": dcg_params.atlas,
+            "sample": dcg_params.sample,
+            "atlas_pixel_size": dcg_params.atlas_pixel_size,
         }
 
         if _transport_object:

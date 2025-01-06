@@ -47,6 +47,7 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas: str = ""
     sample: Optional[int] = None
+    atlas_pixel_size: int = 0
 
 
 class DCParameters(BaseModel):

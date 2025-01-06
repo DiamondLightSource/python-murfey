@@ -4,6 +4,7 @@ from typing import Optional
 
 import requests
 import xmltodict
+from PIL import Image
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
@@ -64,6 +65,38 @@ class SPAMetadataContext(Context):
             visitless_path = Path(
                 str(transferred_file).replace(f"/{environment.visit}", "")
             )
+            visit_index_of_transferred_file = transferred_file.parts.index(
+                environment.visit
+            )
+            atlas_xml_path = list(
+                (
+                    Path(
+                        "/".join(
+                            transferred_file.parts[
+                                : visit_index_of_transferred_file + 1
+                            ]
+                        )
+                    )
+                    / partial_path
+                ).parent.glob("Atlas_*.xml")
+            )[0]
+            with open(atlas_xml_path, "rb") as atlas_xml:
+                atlas_xml_data = xmltodict.parse(atlas_xml)
+                atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
+                    "SpatialScale"
+                ]["pixelSize"]["x"]["numericValue"]
+                readout_width = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
+
+            # need to calculate the pixel size of the downscaled image
+            atlas_im = Image.open(atlas_xml_path.with_suffix(".jpg"))
+            atlas_pixel_size = atlas_original_pixel_size * (
+                readout_width / atlas_im.width
+            )
+
             source = _get_source(
                 visitless_path.parent / "Images-Disc1" / visitless_path.name,
                 environment,
@@ -90,6 +123,7 @@ class SPAMetadataContext(Context):
                         / environment.samples[source].atlas
                     ),
                     "sample": environment.samples[source].sample,
+                    "atlas_pixel_size": atlas_pixel_size,
                 }
                 capture_post(url, json=dcg_data)
                 registered_grid_squares = (

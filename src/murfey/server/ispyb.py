@@ -12,6 +12,7 @@ import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 from ispyb.sqlalchemy import (
+    Atlas,
     AutoProcProgram,
     BLSample,
     BLSampleGroup,
@@ -86,6 +87,41 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection Group entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_atlas(self, record: Atlas):
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created Atlas {record.atlasId}")
+                return {"success": True, "return_value": record.atlasId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting Atlas entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_atlas(
+        self, atlas_id: int, atlas_image: str, pixel_size: float, slot: int
+    ):
+        try:
+            with Session() as db:
+                atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
+                atlas.atlasImage = atlas_image
+                atlas.pixelSize = pixel_size
+                atlas.cassetteSlot = slot
+                db.add(atlas)
+                db.commit()
+                return {"success": True, "return_value": atlas.atlasId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating Atlas entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
