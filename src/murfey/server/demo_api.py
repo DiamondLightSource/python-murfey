@@ -110,7 +110,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-machine_config: dict = {}
+machine_config: dict[str, MachineConfig] = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
     machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
@@ -1290,12 +1290,18 @@ def suggest_path(
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
-    check_path = (
-        machine_config[instrument_name].rsync_basepath / params.base_path
+    rsync_basepath = (
+        machine_config[instrument_name].rsync_basepath
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / params.base_path
+        else Path(f"/dls/{get_microscope()}")
     )
+    check_path = rsync_basepath / params.base_path
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+    check_path = check_path.resolve()
+
+    # Check for path traversal attempt
+    if not str(check_path).startswith(str(rsync_basepath)):
+        raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
 
     # Check previous year to account for the year rolling over during data collection
     if not sanitise_path(check_path).exists():
@@ -1307,16 +1313,17 @@ def suggest_path(
                 base_path_parts[year_idx] = str(int(part) - 1)
         base_path = "/".join(base_path_parts)
         check_path_prev = check_path
-        check_path = (
-            machine_config[instrument_name].rsync_basepath / base_path
-            if machine_config
-            else Path(f"/dls/{get_microscope()}") / base_path
-        )
+        check_path = rsync_basepath / base_path
         check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+        check_path = check_path.resolve()
+
+        # Check for path traversal attempt
+        if not str(check_path).startswith(str(rsync_basepath)):
+            raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
 
         # If visit is not in the previous year either, it's a genuine error
         if not check_path.exists():
-            log_message = (
+            log_message = sanitise(
                 "Unable to find current visit folder under "
                 f"{str(check_path_prev)!r} or {str(check_path)!r}"
             )
