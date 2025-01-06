@@ -1296,6 +1296,33 @@ def suggest_path(
         else Path(f"/dls/{get_microscope()}") / params.base_path
     )
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+
+    # Check previous year to account for the year rolling over during data collection
+    if not sanitise_path(check_path).exists():
+        base_path_parts = list(params.base_path.parts)
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = (
+            machine_config[instrument_name].rsync_basepath / base_path
+            if machine_config
+            else Path(f"/dls/{get_microscope()}") / base_path
+        )
+        check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+
+        # If visit is not in the previous year either, it's a genuine error
+        if not check_path.exists():
+            log_message = (
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while sanitise_path(check_path).exists():
         count = count + 1 if count else 2

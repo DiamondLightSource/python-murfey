@@ -1285,7 +1285,31 @@ def suggest_path(
         raise ValueError(
             "No machine configuration set when suggesting destination path"
         )
+
+    # Construct the full path to where the dataset is to be saved
     check_path = machine_config.rsync_basepath / base_path
+
+    # Check previous year to account for the year rolling over during data collection
+    if not check_path.exists():
+        base_path_parts = base_path.split("/")
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = machine_config.rsync_basepath / base_path
+
+        # If it's not in the previous year either, it's a genuine error
+        if not check_path.exists():
+            log_message = (
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
