@@ -1152,6 +1152,7 @@ async def request_spa_preprocessing(
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
+                "foil_hole_id": foil_hole_id,
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": proc_params["gain_ref"],
