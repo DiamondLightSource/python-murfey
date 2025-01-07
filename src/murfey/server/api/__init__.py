@@ -1291,8 +1291,6 @@ def suggest_path(
         raise ValueError(
             "No machine configuration set when suggesting destination path"
         )
-    if not machine_config.rsync_basepath:
-        raise ValueError("No rsync basepath set")
 
     # Construct the full path to where the dataset is to be saved
     check_path = machine_config.rsync_basepath / base_path
@@ -1416,8 +1414,6 @@ def start_dc(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    if not machine_config.rsync_basepath:
-        raise ValueError("No rsync basepath set")
     log.info(
         f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
         f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
@@ -1505,8 +1501,6 @@ async def process_gain(
         executables = machine_config.external_executables
     env = machine_config.external_environment
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
-    if not machine_config.rsync_basepath:
-        raise ValueError("No rsync basepath set")
     filepath = (
         machine_config.rsync_basepath
         / (machine_config.rsync_module or "data")
@@ -1595,8 +1589,6 @@ async def write_eer_fractionation_file(
             )
         ) / secure_filename(fractionation_params.fractionation_file_name)
     else:
-        if not machine_config.rsync_basepath:
-            raise ValueError("rsync basepath not set")
         file_path = (
             machine_config.rsync_basepath
             / (machine_config.rsync_module or "data")
@@ -1642,8 +1634,6 @@ async def make_gif(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    if not machine_config.rsync_basepath:
-        raise ValueError("rsync basepath not set")
     output_dir = (
         machine_config.rsync_basepath
         / (machine_config.rsync_module or "data")

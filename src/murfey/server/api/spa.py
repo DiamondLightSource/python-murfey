@@ -21,8 +21,6 @@ def _cryolo_model_path(visit: str, instrument_name: str) -> Path:
         instrument_name
     ]
     # Raise error if relevant keys weren't set in MachineConfig
-    if not machine_config.rsync_basepath:
-        raise ValueError("Unable to find crYOLO model; rsync_basepath was not set")
     if not machine_config.default_model:
         raise ValueError("No default crYOLO model was set")
 
