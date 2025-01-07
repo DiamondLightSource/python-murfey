@@ -160,7 +160,7 @@ class TransportManager:
                     / grid_square_parameters.readout_area_x
                 )
             )
-            grid_square_parameters.angle *= (
+            grid_square_parameters.pixel_size *= (
                 grid_square_parameters.readout_area_x
                 / grid_square_parameters.thumbnail_size_x
             )
@@ -224,6 +224,7 @@ class TransportManager:
     def do_insert_foil_hole(
         self,
         grid_square_id: int,
+        scale_factor: float,
         foil_hole_parameters: FoilHoleParameters,
     ):
         if (
@@ -233,11 +234,7 @@ class TransportManager:
             and foil_hole_parameters.pixel_size is not None
         ):
             foil_hole_parameters.diameter = int(
-                foil_hole_parameters.diameter
-                * (
-                    foil_hole_parameters.thumbnail_size_x
-                    / foil_hole_parameters.readout_area_x
-                )
+                foil_hole_parameters.diameter * scale_factor
             )
             foil_hole_parameters.pixel_size *= (
                 foil_hole_parameters.readout_area_x
@@ -269,7 +266,10 @@ class TransportManager:
         return {"success": False, "return_value": None}
 
     def do_update_foil_hole(
-        self, foil_hole_id: int, foil_hole_parameters: FoilHoleParameters
+        self,
+        foil_hole_id: int,
+        scale_factor: float,
+        foil_hole_parameters: FoilHoleParameters,
     ):
         try:
             with Session() as db:
@@ -279,10 +279,22 @@ class TransportManager:
                 foil_hole.foilHoleImage = foil_hole_parameters.image
                 foil_hole.pixelLocationX = foil_hole_parameters.x_location
                 foil_hole.pixelLocationY = foil_hole_parameters.y_location
-                foil_hole.diameter = foil_hole_parameters.diameter
+                foil_hole.diameter = (
+                    foil_hole_parameters.diameter * scale_factor
+                    if foil_hole_parameters.diameter is not None
+                    else None
+                )
                 foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
                 foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
-                foil_hole.pixelSize = foil_hole_parameters.pixel_size
+                if (
+                    foil_hole_parameters.readout_area_x is not None
+                    and foil_hole_parameters.thumbnail_size_x is not None
+                    and foil_hole_parameters.pixel_size is not None
+                ):
+                    foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
+                        foil_hole_parameters.readout_area_x
+                        / foil_hole_parameters.thumbnail_size_x
+                    )
                 db.add(foil_hole)
                 db.commit()
                 return {"success": True, "return_value": foil_hole.foilHoleId}

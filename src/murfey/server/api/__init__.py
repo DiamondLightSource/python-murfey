@@ -570,18 +570,14 @@ def register_foil_hole(
     foil_hole_params: FoilHoleParameters,
     db=murfey_db,
 ):
-    # need to sort out foil hole update in ISPyB !!!
     try:
-        gsid = (
-            db.exec(
-                select(GridSquare)
-                .where(GridSquare.tag == foil_hole_params.tag)
-                .where(GridSquare.session_id == session_id)
-                .where(GridSquare.name == gs_name)
-            )
-            .one()
-            .id
-        )
+        gs = db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == foil_hole_params.tag)
+            .where(GridSquare.session_id == session_id)
+            .where(GridSquare.name == gs_name)
+        ).one()
+        gsid = gs.id
     except NoResultFound:
         log.debug(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
@@ -609,11 +605,13 @@ def register_foil_hole(
         foil_hole.thumbnail_size_y = foil_hole_params.thumbnail_size_y or jpeg_size[1]
         foil_hole.pixel_size = foil_hole_params.pixel_size
         if _transport_object:
-            _transport_object.do_update_foil_hole(foil_hole.id, foil_hole_params)
+            _transport_object.do_update_foil_hole(
+                foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+            )
     except Exception:
         if _transport_object:
             fh_ispyb_response = _transport_object.do_insert_foil_hole(
-                gsid.id, foil_hole_params
+                gsid.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
         else:
             fh_ispyb_response = {"success": False, "return_value": None}
