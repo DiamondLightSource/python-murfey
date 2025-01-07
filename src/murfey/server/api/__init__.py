@@ -497,7 +497,12 @@ def register_grid_square(
             .where(DataCollectionGroup.session_id == session_id)
             .where(DataCollectionGroup.tag == grid_square_params.tag)
         ).one()
-        _transport_object.do_insert_grid_square(dcg.atlas_id, gsid, grid_square_params)
+        gs_ispyb_response = _transport_object.do_insert_grid_square(
+            dcg.atlas_id, gsid, grid_square_params
+        )
+    else:
+        # mock up response so that below still works
+        gs_ispyb_response = {"success": False, "return_value": None}
     try:
         grid_square = db.exec(
             select(GridSquare)
@@ -519,6 +524,11 @@ def register_grid_square(
         else:
             jpeg_size = (0, 0)
         grid_square = GridSquare(
+            id=(
+                gs_ispyb_response["return_value"]
+                if gs_ispyb_response["success"]
+                else None
+            ),
             name=gsid,
             session_id=session_id,
             tag=grid_square_params.tag,
@@ -569,6 +579,8 @@ def register_foil_hole(
             .one()
             .id
         )
+        if _transport_object:
+            _transport_object.do_insert_foil_hole(gsid.id, foil_hole_params)
     except NoResultFound:
         log.debug(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"

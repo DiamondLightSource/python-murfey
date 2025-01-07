@@ -41,6 +41,7 @@ class FoilHole(NamedTuple):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    diameter: Optional[float] = None
 
 
 class GridSquare(NamedTuple):
@@ -246,6 +247,7 @@ def _foil_hole_data(
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
+            diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
             if int(fh_block["b:key"]) == foil_hole:
                 return FoilHole(
                     id=foil_hole,
@@ -261,6 +263,7 @@ def _foil_hole_data(
                     thumbnail_size_y=None,
                     pixel_size=float(pixel_size) if image_path else None,
                     image=str(image_path),
+                    diameter=diameter,
                 )
     logger.warning(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
@@ -682,6 +685,7 @@ class SPAModularContext(_SPAContext):
                         "thumbnail_size_x": fh.thumbnail_size_x,
                         "thumbnail_size_y": fh.thumbnail_size_y,
                         "pixel_size": fh.pixel_size,
+                        "diameter": fh.diameter,
                         "tag": str(source),
                         "image": str(image_path),
                     },

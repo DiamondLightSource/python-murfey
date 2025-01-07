@@ -293,6 +293,7 @@ class FoilHoleParameters(BaseModel):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    diameter: Optional[float] = None
 
 
 class PostInfo(BaseModel):

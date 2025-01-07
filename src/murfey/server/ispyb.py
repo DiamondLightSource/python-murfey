@@ -22,6 +22,7 @@ from ispyb.sqlalchemy import (
     BLSubSample,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
     GridSquare,
     ProcessingJob,
     ProcessingJobParameter,
@@ -30,7 +31,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
-from murfey.util.models import GridSquareParameters, Sample, Visit
+from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -134,6 +135,7 @@ class TransportManager:
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
     ):
+        # need to correct height and weight by pixel ratio !!!!!
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareLabel=grid_square_id,
@@ -156,6 +158,36 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting GridSquare entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_foil_hole(
+        self,
+        grid_square_id: int,
+        foil_hole_parameters: FoilHoleParameters,
+    ):
+        record = FoilHole(
+            gridSquareId=grid_square_id,
+            foilHoleLabel=foil_hole_parameters.name,
+            foilHoleImage=foil_hole_parameters.image,
+            pixelLocationX=foil_hole_parameters.x_location,
+            pixelLocationY=foil_hole_parameters.y_location,
+            diameter=foil_hole_parameters.diameter,
+            stageLocationX=foil_hole_parameters.x_stage_position,
+            stageLocationY=foil_hole_parameters.y_stage_position,
+            pixelSize=foil_hole_parameters.pixel_size,
+        )
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created FoilHole {record.gridSquareId}")
+                return {"success": True, "return_value": record.foilHoleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting FoilHole entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
