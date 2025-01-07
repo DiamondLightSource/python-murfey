@@ -105,7 +105,7 @@ from murfey.util.models import (
     TiltSeriesInfo,
     Visit,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.api")
@@ -1293,7 +1293,31 @@ def suggest_path(
         )
     if not machine_config.rsync_basepath:
         raise ValueError("No rsync basepath set")
+
+    # Construct the full path to where the dataset is to be saved
     check_path = machine_config.rsync_basepath / base_path
+
+    # Check previous year to account for the year rolling over during data collection
+    if not check_path.exists():
+        base_path_parts = base_path.split("/")
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = machine_config.rsync_basepath / base_path
+
+        # If it's not in the previous year either, it's a genuine error
+        if not check_path.exists():
+            log_message = (
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
@@ -1490,6 +1514,26 @@ async def process_gain(
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
+
+    # Check under previous year if the folder doesn't exist
+    if not filepath.exists():
+        filepath_prev = filepath
+        filepath = (
+            Path(machine_config.rsync_basepath)
+            / (machine_config.rsync_module or "data")
+            / str(datetime.datetime.now().year - 1)
+            / secure_filename(visit_name)
+            / machine_config.gain_directory_name
+        )
+        # If it's not in the previous year, it's a genuine error
+        if not filepath.exists():
+            log_message = (
+                "Unable to find gain reference directory under "
+                f"{str(filepath_prev)!r} or {str(filepath)}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     if gain_reference_params.eer:
         new_gain_ref, new_gain_ref_superres = await prepare_eer_gain(
             filepath / safe_path_name,

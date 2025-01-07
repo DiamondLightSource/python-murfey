@@ -90,7 +90,7 @@ from murfey.util.models import (
     TiltSeriesInfo,
     Visit,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -110,7 +110,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-machine_config: dict = {}
+machine_config: dict[str, MachineConfig] = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
     machine_config = machine_config_from_file(
@@ -1292,12 +1292,46 @@ def suggest_path(
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
-    check_path = (
-        machine_config[instrument_name].rsync_basepath / params.base_path
+    rsync_basepath = (
+        machine_config[instrument_name].rsync_basepath
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / params.base_path
+        else Path(f"/dls/{get_microscope()}")
     )
+    check_path = rsync_basepath / params.base_path
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+    check_path = check_path.resolve()
+
+    # Check for path traversal attempt
+    if not str(check_path).startswith(str(rsync_basepath)):
+        raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
+
+    # Check previous year to account for the year rolling over during data collection
+    if not sanitise_path(check_path).exists():
+        base_path_parts = list(params.base_path.parts)
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = rsync_basepath / base_path
+        check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+        check_path = check_path.resolve()
+
+        # Check for path traversal attempt
+        if not str(check_path).startswith(str(rsync_basepath)):
+            raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
+
+        # If visit is not in the previous year either, it's a genuine error
+        if not check_path.exists():
+            log_message = sanitise(
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while sanitise_path(check_path).exists():
         count = count + 1 if count else 2

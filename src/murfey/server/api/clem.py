@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import re
 import traceback
+from ast import literal_eval
 from importlib.metadata import EntryPoint  # type hinting only
 from logging import getLogger
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import Literal, Optional, Type, Union
 
 from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
+from pydantic import BaseModel, validator
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -23,7 +25,6 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import TIFFSeriesInfo
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -624,7 +625,7 @@ API ENDPOINTS FOR FILE PROCESSING
     "/sessions/{session_id}/clem/preprocessing/process_raw_lifs"
 )  # API posts to this URL
 def process_raw_lifs(
-    session_id: int,  # Used by the decorator
+    session_id: int,
     lif_file: Path,
     db: Session = murfey_db,
 ):
@@ -656,9 +657,15 @@ def process_raw_lifs(
     return True
 
 
+class TIFFSeriesInfo(BaseModel):
+    series_name: str
+    tiff_files: list[Path]
+    series_metadata: Path
+
+
 @router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
 def process_raw_tiffs(
-    session_id: int,  # Used by the decorator
+    session_id: int,
     tiff_info: TIFFSeriesInfo,
     db: Session = murfey_db,
 ):
@@ -686,6 +693,75 @@ def process_raw_tiffs(
         session_id=session_id,
         instrument_name=instrument_name,
         metadata=tiff_info.series_metadata,
+        messenger=_transport_object,
+    )
+    return True
+
+
+class AlignAndMergeParams(BaseModel):
+    # Processing parameters
+    series_name: str
+    images: list[Path]
+    metadata: Path
+    # Optional processing parameters
+    crop_to_n_frames: Optional[int] = None
+    align_self: Literal["enabled", ""] = ""
+    flatten: Literal["mean", "min", "max", ""] = ""
+    align_across: Literal["enabled", ""] = ""
+
+    @validator(
+        "images",
+        pre=True,
+    )
+    def parse_stringified_list(cls, value):
+        if isinstance(value, str):
+            try:
+                eval_result = literal_eval(value)
+                if isinstance(eval_result, list):
+                    parent_tiffs = [Path(p) for p in eval_result]
+                    return parent_tiffs
+            except (SyntaxError, ValueError):
+                raise ValueError("Unable to parse input")
+        # Return value as-is; if it fails, it fails
+        return value
+
+
+@router.post("/sessions/{session_id}/clem/processing/align_and_merge_stacks")
+def align_and_merge_stacks(
+    session_id: int,
+    align_and_merge_params: AlignAndMergeParams,
+    db: Session = murfey_db,
+):
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="clem.align_and_merge")
+        )[0]
+    except IndexError:
+        raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.align_and_merge
+        # Session parameters
+        session_id=session_id,
+        instrument_name=instrument_name,
+        # Processing parameters
+        series_name=align_and_merge_params.series_name,
+        images=align_and_merge_params.images,
+        metadata=align_and_merge_params.metadata,
+        # Optional processing parameters
+        crop_to_n_frames=align_and_merge_params.crop_to_n_frames,
+        align_self=align_and_merge_params.align_self,
+        flatten=align_and_merge_params.flatten,
+        align_across=align_and_merge_params.align_across,
+        # Optional session parameters
         messenger=_transport_object,
     )
     return True
