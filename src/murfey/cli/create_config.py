@@ -1101,17 +1101,10 @@ def set_up_machine_config(debug: bool = False):
             new_config[key] = add_calibrations(key, field, debug)
             continue
 
-        # Acquisition software block
+        # Acquisition software section
         if key == "acquisition_software":
             new_config = add_software_packages(new_config, debug)
             continue
-        if key in (
-            "software_versions",
-            "software_settings_output_directories",
-            "data_required_substrings",
-        ):
-            continue
-        # End of software block
 
         if key == "data_directories":
             new_config[key] = add_data_directories(key, field, debug)
@@ -1123,11 +1116,35 @@ def set_up_machine_config(debug: bool = False):
             new_config[key] = add_analyse_created_directories(key, field, debug)
             continue
 
-        # Data transfer block
+        # Data transfer section
         if key == "data_transfer_enabled":
             new_config = set_up_data_transfer(new_config, debug)
             continue
+
+        # Data processing section
+        if key == "processing_enabled":
+            new_config = set_up_data_processing(new_config, debug)
+            continue
+
+        # External plugins and executables section
+        if key in ("external_executables", "external_executables_eer"):
+            new_config[key] = add_external_executables(key, field, debug)
+            continue
+        if key == "external_environment":
+            new_config[key] = add_external_environment(key, field, debug)
+            continue
+
+        if key == "plugin_packages":
+            new_config[key] = add_murfey_plugins(key, field, debug)
+            continue
+
+        # All the keys that can be skipped
         if key in (
+            # Acquisition software section
+            "software_versions",
+            "software_settings_output_directories",
+            "data_required_substrings",
+            # Data transfer section
             "allow_removal",
             "rsync_basepath",
             "rsync_module",
@@ -1135,15 +1152,7 @@ def set_up_machine_config(debug: bool = False):
             "upstream_data_directories",
             "upstream_data_download_directory",
             "upstream_data_tiff_locations",
-        ):
-            continue
-        # End of data transfer block
-
-        # Data processing block
-        if key == "processing_enabled":
-            new_config = set_up_data_processing(new_config, debug)
-            continue
-        if key in (
+            # Data processing section
             "process_by_default",
             "gain_directory_name",
             "processed_directory_name",
@@ -1155,27 +1164,13 @@ def set_up_machine_config(debug: bool = False):
             "initial_model_search_directory",
         ):
             continue
-        # End of data processing block
-
-        # External plugins and executables block
-        if key in ("external_executables", "external_executables_eer"):
-            new_config[key] = add_external_executables(key, field, debug)
-            continue
-        if key == "external_environment":
-            new_config[key] = add_external_environment(key, field, debug)
-            continue
-        # End of external executables block
-
-        if key == "plugin_packages":
-            new_config[key] = add_murfey_plugins(key, field, debug)
-            continue
 
         """
         Standard method of inputting values
         """
         new_config[key] = populate_field(key, field, debug)
 
-    # Validate the entire config again and convert into JSON/YAML-safe dict
+    # Validate the entire config and convert into JSON/YAML-safe dict
     try:
         new_config_safe: dict = json.loads(MachineConfig(**new_config).json())
     except ValidationError as exception:
