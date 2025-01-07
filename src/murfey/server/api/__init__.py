@@ -502,7 +502,8 @@ def register_grid_square(
         grid_square.y_location = grid_square_params.y_location
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
-        # need to update ISPyB grid square here !!!!
+        if _transport_object:
+            _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
         if _transport_object:
             dcg = db.exec(
@@ -569,6 +570,7 @@ def register_foil_hole(
     foil_hole_params: FoilHoleParameters,
     db=murfey_db,
 ):
+    # need to sort out foil hole update in ISPyB !!!
     try:
         gsid = (
             db.exec(
@@ -580,12 +582,6 @@ def register_foil_hole(
             .one()
             .id
         )
-        if _transport_object:
-            fh_ispyb_response = _transport_object.do_insert_foil_hole(
-                gsid.id, foil_hole_params
-            )
-        else:
-            fh_ispyb_response = {"success": False, "return_value": None}
     except NoResultFound:
         log.debug(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
@@ -596,22 +592,51 @@ def register_foil_hole(
         jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
-    foil_hole = FoilHole(
-        id=fh_ispyb_response["return_value"] if fh_ispyb_response["success"] else None,
-        name=foil_hole_params.name,
-        session_id=session_id,
-        grid_square_id=gsid,
-        x_location=foil_hole_params.x_location,
-        y_location=foil_hole_params.y_location,
-        x_stage_position=foil_hole_params.x_stage_position,
-        y_stage_position=foil_hole_params.y_stage_position,
-        readout_area_x=foil_hole_params.readout_area_x,
-        readout_area_y=foil_hole_params.readout_area_y,
-        thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
-        thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
-        pixel_size=foil_hole_params.pixel_size,
-        image=secured_foil_hole_image_path,
-    )
+    try:
+        foil_hole = db.exec(
+            select(FoilHole)
+            .where(FoilHole.name == foil_hole_params.name)
+            .where(FoilHole.grid_square_id == gsid)
+            .where(FoilHole.session_id == session_id)
+        ).one()
+        foil_hole.x_location = foil_hole_params.x_location
+        foil_hole.y_location = foil_hole_params.y_location
+        foil_hole.x_stage_position = foil_hole_params.x_stage_position
+        foil_hole.y_stage_position = foil_hole_params.y_stage_position
+        foil_hole.readout_area_x = foil_hole_params.readout_area_x
+        foil_hole.readout_area_y = foil_hole_params.readout_area_y
+        foil_hole.thumbnail_size_x = foil_hole_params.thumbnail_size_x or jpeg_size[0]
+        foil_hole.thumbnail_size_y = foil_hole_params.thumbnail_size_y or jpeg_size[1]
+        foil_hole.pixel_size = foil_hole_params.pixel_size
+        if _transport_object:
+            _transport_object.do_update_foil_hole(foil_hole.id, foil_hole_params)
+    except Exception:
+        if _transport_object:
+            fh_ispyb_response = _transport_object.do_insert_foil_hole(
+                gsid.id, foil_hole_params
+            )
+        else:
+            fh_ispyb_response = {"success": False, "return_value": None}
+        foil_hole = FoilHole(
+            id=(
+                fh_ispyb_response["return_value"]
+                if fh_ispyb_response["success"]
+                else None
+            ),
+            name=foil_hole_params.name,
+            session_id=session_id,
+            grid_square_id=gsid,
+            x_location=foil_hole_params.x_location,
+            y_location=foil_hole_params.y_location,
+            x_stage_position=foil_hole_params.x_stage_position,
+            y_stage_position=foil_hole_params.y_stage_position,
+            readout_area_x=foil_hole_params.readout_area_x,
+            readout_area_y=foil_hole_params.readout_area_y,
+            thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
+            thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
+            pixel_size=foil_hole_params.pixel_size,
+            image=secured_foil_hole_image_path,
+        )
     db.add(foil_hole)
     db.commit()
     db.close()

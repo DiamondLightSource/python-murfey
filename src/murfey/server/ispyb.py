@@ -135,6 +135,7 @@ class TransportManager:
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
     ):
+        # most of this is for mypy
         if (
             grid_square_parameters.height is not None
             and grid_square_parameters.width is not None
@@ -190,6 +191,36 @@ class TransportManager:
             )
         return {"success": False, "return_value": None}
 
+    def do_update_grid_square(
+        self, grid_square_id: int, grid_square_parameters: GridSquareParameters
+    ):
+        try:
+            with Session() as db:
+                grid_square = (
+                    db.query(GridSquare)
+                    .filter(GridSquare.gridSquareId == grid_square_id)
+                    .one()
+                )
+                grid_square.gridSquareImage = grid_square_parameters.image
+                grid_square.pixelLocationX = grid_square_parameters.x_location
+                grid_square.pixelLocationY = grid_square_parameters.y_location
+                grid_square.height = grid_square_parameters.height
+                grid_square.width = grid_square_parameters.width
+                grid_square.angle = grid_square_parameters.angle
+                grid_square.stageLocationX = grid_square_parameters.x_stage_position
+                grid_square.stageLocationY = grid_square_parameters.y_stage_position
+                grid_square.pixelSize = grid_square_parameters.pixel_size
+                db.add(grid_square)
+                db.commit()
+                return {"success": True, "return_value": grid_square.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating GridSquare entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
     def do_insert_foil_hole(
         self,
         grid_square_id: int,
@@ -232,6 +263,32 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting FoilHole entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_foil_hole(
+        self, foil_hole_id: int, foil_hole_parameters: FoilHoleParameters
+    ):
+        try:
+            with Session() as db:
+                foil_hole = (
+                    db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
+                )
+                foil_hole.foilHoleImage = foil_hole_parameters.image
+                foil_hole.pixelLocationX = foil_hole_parameters.x_location
+                foil_hole.pixelLocationY = foil_hole_parameters.y_location
+                foil_hole.diameter = foil_hole_parameters.diameter
+                foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
+                foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
+                foil_hole.pixelSize = foil_hole_parameters.pixel_size
+                db.add(foil_hole)
+                db.commit()
+                return {"success": True, "return_value": foil_hole.foilHoleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating FoilHole entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
