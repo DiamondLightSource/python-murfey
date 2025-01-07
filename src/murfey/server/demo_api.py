@@ -90,7 +90,7 @@ from murfey.util.models import (
     TiltSeriesInfo,
     Visit,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
