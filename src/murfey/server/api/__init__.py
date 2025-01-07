@@ -580,7 +580,11 @@ def register_foil_hole(
             .id
         )
         if _transport_object:
-            _transport_object.do_insert_foil_hole(gsid.id, foil_hole_params)
+            fh_ispyb_response = _transport_object.do_insert_foil_hole(
+                gsid.id, foil_hole_params
+            )
+        else:
+            fh_ispyb_response = {"success": False, "return_value": None}
     except NoResultFound:
         log.debug(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
@@ -592,6 +596,7 @@ def register_foil_hole(
     else:
         jpeg_size = (0, 0)
     foil_hole = FoilHole(
+        id=fh_ispyb_response["return_value"] if fh_ispyb_response["success"] else None,
         name=foil_hole_params.name,
         session_id=session_id,
         grid_square_id=gsid,
