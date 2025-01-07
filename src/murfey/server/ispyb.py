@@ -135,7 +135,34 @@ class TransportManager:
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
     ):
-        # need to correct height and weight by pixel ratio !!!!!
+        if (
+            grid_square_parameters.height is not None
+            and grid_square_parameters.width is not None
+            and grid_square_parameters.pixel_size is not None
+            and grid_square_parameters.thumbnail_size_x is not None
+            and grid_square_parameters.thumbnail_size_y is not None
+            and grid_square_parameters.readout_area_x is not None
+            and grid_square_parameters.readout_area_y is not None
+            and grid_square_parameters.angle is not None
+        ):
+            grid_square_parameters.height = int(
+                grid_square_parameters.height
+                * (
+                    grid_square_parameters.thumbnail_size_y
+                    / grid_square_parameters.readout_area_y
+                )
+            )
+            grid_square_parameters.width = int(
+                grid_square_parameters.width
+                * (
+                    grid_square_parameters.thumbnail_size_x
+                    / grid_square_parameters.readout_area_x
+                )
+            )
+            grid_square_parameters.angle *= (
+                grid_square_parameters.readout_area_x
+                / grid_square_parameters.thumbnail_size_x
+            )
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareLabel=grid_square_id,
@@ -168,6 +195,23 @@ class TransportManager:
         grid_square_id: int,
         foil_hole_parameters: FoilHoleParameters,
     ):
+        if (
+            foil_hole_parameters.diameter is not None
+            and foil_hole_parameters.thumbnail_size_x is not None
+            and foil_hole_parameters.readout_area_x is not None
+            and foil_hole_parameters.pixel_size is not None
+        ):
+            foil_hole_parameters.diameter = int(
+                foil_hole_parameters.diameter
+                * (
+                    foil_hole_parameters.thumbnail_size_x
+                    / foil_hole_parameters.readout_area_x
+                )
+            )
+            foil_hole_parameters.pixel_size *= (
+                foil_hole_parameters.readout_area_x
+                / foil_hole_parameters.thumbnail_size_x
+            )
         record = FoilHole(
             gridSquareId=grid_square_id,
             foilHoleLabel=foil_hole_parameters.name,

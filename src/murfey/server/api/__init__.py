@@ -491,18 +491,6 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    if _transport_object:
-        dcg = db.exec(
-            select(DataCollectionGroup)
-            .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == grid_square_params.tag)
-        ).one()
-        gs_ispyb_response = _transport_object.do_insert_grid_square(
-            dcg.atlas_id, gsid, grid_square_params
-        )
-    else:
-        # mock up response so that below still works
-        gs_ispyb_response = {"success": False, "return_value": None}
     try:
         grid_square = db.exec(
             select(GridSquare)
@@ -514,7 +502,20 @@ def register_grid_square(
         grid_square.y_location = grid_square_params.y_location
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
+        # need to update ISPyB grid square here !!!!
     except Exception:
+        if _transport_object:
+            dcg = db.exec(
+                select(DataCollectionGroup)
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == grid_square_params.tag)
+            ).one()
+            gs_ispyb_response = _transport_object.do_insert_grid_square(
+                dcg.atlas_id, gsid, grid_square_params
+            )
+        else:
+            # mock up response so that below still works
+            gs_ispyb_response = {"success": False, "return_value": None}
         secured_grid_square_image_path = secure_filename(grid_square_params.image)
         if (
             secured_grid_square_image_path
