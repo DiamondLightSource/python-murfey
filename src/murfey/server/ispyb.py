@@ -146,20 +146,10 @@ class TransportManager:
             and grid_square_parameters.readout_area_y is not None
             and grid_square_parameters.angle is not None
         ):
-            grid_square_parameters.height = int(
-                grid_square_parameters.height
-                * (
-                    grid_square_parameters.thumbnail_size_y
-                    / grid_square_parameters.readout_area_y
-                )
-            )
-            grid_square_parameters.width = int(
-                grid_square_parameters.width
-                * (
-                    grid_square_parameters.thumbnail_size_x
-                    / grid_square_parameters.readout_area_x
-                )
-            )
+            # currently hard coding the scale factor because of difficulties with
+            # guaranteeing we have the atlas jpg and mrc sizes
+            grid_square_parameters.height = int(grid_square_parameters.height / 7.8)
+            grid_square_parameters.width = int(grid_square_parameters.width / 7.8)
             grid_square_parameters.pixel_size *= (
                 grid_square_parameters.readout_area_x
                 / grid_square_parameters.thumbnail_size_x
@@ -201,11 +191,28 @@ class TransportManager:
                     .filter(GridSquare.gridSquareId == grid_square_id)
                     .one()
                 )
+                if (
+                    grid_square_parameters.pixel_size is not None
+                    and grid_square_parameters.readout_area_x is not None
+                    and grid_square_parameters.thumbnail_size_x is not None
+                ):
+                    grid_square_parameters.pixel_size *= (
+                        grid_square_parameters.readout_area_x
+                        / grid_square_parameters.thumbnail_size_x
+                    )
                 grid_square.gridSquareImage = grid_square_parameters.image
                 grid_square.pixelLocationX = grid_square_parameters.x_location
                 grid_square.pixelLocationY = grid_square_parameters.y_location
-                grid_square.height = grid_square_parameters.height
-                grid_square.width = grid_square_parameters.width
+                grid_square.height = (
+                    int(grid_square_parameters.height / 7.8)
+                    if grid_square_parameters.height is not None
+                    else None
+                )
+                grid_square.width = (
+                    int(grid_square_parameters.width / 7.8)
+                    if grid_square_parameters.width is not None
+                    else None
+                )
                 grid_square.angle = grid_square_parameters.angle
                 grid_square.stageLocationX = grid_square_parameters.x_stage_position
                 grid_square.stageLocationY = grid_square_parameters.y_stage_position
