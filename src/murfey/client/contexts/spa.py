@@ -921,6 +921,7 @@ class SPAContext(_SPAContext):
             )
         msg: Dict[str, Any] = {
             "tag": tag,
+            "source": tag,
             "recipe": "ispyb-relion",
             "parameters": {
                 "acquisition_software": parameters["acquisition_software"],

@@ -2755,7 +2755,6 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
             logger.info("registering processing job")
-            assert isinstance(global_state["data_collection_ids"], dict)
             dc = murfey_db.exec(
                 select(db.DataCollection, db.DataCollectionGroup)
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)

@@ -72,6 +72,7 @@ class DCParameters(BaseModel):
 
 class ProcessingJobParameters(BaseModel):
     tag: str
+    source: str
     recipe: str
     parameters: Dict[str, Any] = {}
     experiment_type: str = "spa"

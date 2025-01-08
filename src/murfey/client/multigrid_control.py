@@ -428,7 +428,11 @@ class MultigridController:
                 ):
                     capture_post(
                         f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_processing_job",
-                        json={"tag": str(source), "recipe": recipe},
+                        json={
+                            "tag": str(source),
+                            "source": str(source),
+                            "recipe": recipe,
+                        },
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(

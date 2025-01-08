@@ -1370,9 +1370,13 @@ def suggest_path(
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
+class Dest(BaseModel):
+    destination: Path
+
+
 @router.post("/sessions/{session_id}/make_rsyncer_destination")
-def make_rsyncer_destination(session_id: int, destination: Path, db=murfey_db):
-    secure_path_parts = [secure_filename(p) for p in destination.parts]
+def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
+    secure_path_parts = [secure_filename(p) for p in destination.destintion.parts]
     destination_path = "/".join(secure_path_parts)
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -1528,6 +1532,7 @@ def register_proc(
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
+        "source": proc_params.source,
         "tag": proc_params.tag,
         "job_parameters": {
             k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
