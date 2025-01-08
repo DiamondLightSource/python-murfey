@@ -1370,7 +1370,7 @@ def suggest_path(
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
-@router.post("/{session_id}/make_rsyncer_destination")
+@router.post("/sessions/{session_id}/make_rsyncer_destination")
 def make_rsyncer_destination(session_id: int, destination: Path, db=murfey_db):
     secure_path_parts = [secure_filename(p) for p in destination.parts]
     destination_path = "/".join(secure_path_parts)
