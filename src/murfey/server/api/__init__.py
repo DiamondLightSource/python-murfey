@@ -612,7 +612,7 @@ def register_foil_hole(
     except Exception:
         if _transport_object:
             fh_ispyb_response = _transport_object.do_insert_foil_hole(
-                gsid.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+                gs.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
         else:
             fh_ispyb_response = {"success": False, "return_value": None}
