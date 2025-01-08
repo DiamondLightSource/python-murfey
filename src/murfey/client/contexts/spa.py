@@ -570,7 +570,7 @@ class SPAModularContext(_SPAContext):
         grid_square = _grid_square_from_file(transferred_file)
         grid_square_metadata_file = _grid_square_metadata_file(
             transferred_file,
-            machine_config["data_directories"],
+            [Path(p) for p in machine_config["data_directories"]],
             environment.visit,
             grid_square,
         )
