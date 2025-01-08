@@ -1339,7 +1339,7 @@ def suggest_path(
     check_path = machine_config.rsync_basepath / base_path
 
     # Check previous year to account for the year rolling over during data collection
-    if not check_path.exists():
+    if not check_path.parent.exists():
         base_path_parts = base_path.split("/")
         for part in base_path_parts:
             # Find the path part corresponding to the year
@@ -1351,10 +1351,10 @@ def suggest_path(
         check_path = machine_config.rsync_basepath / base_path
 
         # If it's not in the previous year either, it's a genuine error
-        if not check_path.exists():
+        if not check_path.parent.exists():
             log_message = (
                 "Unable to find current visit folder under "
-                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+                f"{str(check_path_prev.parent)!r} or {str(check_path.parent)!r}"
             )
             log.error(log_message)
             raise FileNotFoundError(log_message)
