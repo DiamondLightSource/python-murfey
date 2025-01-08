@@ -12,6 +12,7 @@ import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 from ispyb.sqlalchemy import (
+    Atlas,
     AutoProcProgram,
     BLSample,
     BLSampleGroup,
@@ -21,6 +22,8 @@ from ispyb.sqlalchemy import (
     BLSubSample,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
@@ -28,7 +31,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
-from murfey.util.models import Sample, Visit
+from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
 
@@ -86,6 +89,225 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Inserting Data Collection Group entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_atlas(self, record: Atlas):
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created Atlas {record.atlasId}")
+                return {"success": True, "return_value": record.atlasId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting Atlas entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_atlas(
+        self, atlas_id: int, atlas_image: str, pixel_size: float, slot: int
+    ):
+        try:
+            with Session() as db:
+                atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
+                atlas.atlasImage = atlas_image
+                atlas.pixelSize = pixel_size
+                atlas.cassetteSlot = slot
+                db.add(atlas)
+                db.commit()
+                return {"success": True, "return_value": atlas.atlasId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating Atlas entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_grid_square(
+        self,
+        atlas_id: int,
+        grid_square_id: int,
+        grid_square_parameters: GridSquareParameters,
+    ):
+        # most of this is for mypy
+        if (
+            grid_square_parameters.height is not None
+            and grid_square_parameters.width is not None
+            and grid_square_parameters.pixel_size is not None
+            and grid_square_parameters.thumbnail_size_x is not None
+            and grid_square_parameters.thumbnail_size_y is not None
+            and grid_square_parameters.readout_area_x is not None
+            and grid_square_parameters.readout_area_y is not None
+            and grid_square_parameters.angle is not None
+        ):
+            # currently hard coding the scale factor because of difficulties with
+            # guaranteeing we have the atlas jpg and mrc sizes
+            grid_square_parameters.height = int(grid_square_parameters.height / 7.8)
+            grid_square_parameters.width = int(grid_square_parameters.width / 7.8)
+            grid_square_parameters.pixel_size *= (
+                grid_square_parameters.readout_area_x
+                / grid_square_parameters.thumbnail_size_x
+            )
+        record = GridSquare(
+            atlasId=atlas_id,
+            gridSquareLabel=grid_square_id,
+            gridSquareImage=grid_square_parameters.image,
+            pixelLocationX=grid_square_parameters.x_location,
+            pixelLocationY=grid_square_parameters.y_location,
+            height=grid_square_parameters.height,
+            weight=grid_square_parameters.width,
+            angle=grid_square_parameters.angle,
+            stageLocationX=grid_square_parameters.x_stage_position,
+            stageLocationY=grid_square_parameters.y_stage_position,
+            pixelSize=grid_square_parameters.pixel_size,
+        )
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created GridSquare {record.gridSquareId}")
+                return {"success": True, "return_value": record.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting GridSquare entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_grid_square(
+        self, grid_square_id: int, grid_square_parameters: GridSquareParameters
+    ):
+        try:
+            with Session() as db:
+                grid_square = (
+                    db.query(GridSquare)
+                    .filter(GridSquare.gridSquareId == grid_square_id)
+                    .one()
+                )
+                if (
+                    grid_square_parameters.pixel_size is not None
+                    and grid_square_parameters.readout_area_x is not None
+                    and grid_square_parameters.thumbnail_size_x is not None
+                ):
+                    grid_square_parameters.pixel_size *= (
+                        grid_square_parameters.readout_area_x
+                        / grid_square_parameters.thumbnail_size_x
+                    )
+                grid_square.gridSquareImage = grid_square_parameters.image
+                grid_square.pixelLocationX = grid_square_parameters.x_location
+                grid_square.pixelLocationY = grid_square_parameters.y_location
+                grid_square.height = (
+                    int(grid_square_parameters.height / 7.8)
+                    if grid_square_parameters.height is not None
+                    else None
+                )
+                grid_square.width = (
+                    int(grid_square_parameters.width / 7.8)
+                    if grid_square_parameters.width is not None
+                    else None
+                )
+                grid_square.angle = grid_square_parameters.angle
+                grid_square.stageLocationX = grid_square_parameters.x_stage_position
+                grid_square.stageLocationY = grid_square_parameters.y_stage_position
+                grid_square.pixelSize = grid_square_parameters.pixel_size
+                db.add(grid_square)
+                db.commit()
+                return {"success": True, "return_value": grid_square.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating GridSquare entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_foil_hole(
+        self,
+        grid_square_id: int,
+        scale_factor: float,
+        foil_hole_parameters: FoilHoleParameters,
+    ):
+        if (
+            foil_hole_parameters.diameter is not None
+            and foil_hole_parameters.thumbnail_size_x is not None
+            and foil_hole_parameters.readout_area_x is not None
+            and foil_hole_parameters.pixel_size is not None
+        ):
+            foil_hole_parameters.diameter = int(
+                foil_hole_parameters.diameter * scale_factor
+            )
+            foil_hole_parameters.pixel_size *= (
+                foil_hole_parameters.readout_area_x
+                / foil_hole_parameters.thumbnail_size_x
+            )
+        record = FoilHole(
+            gridSquareId=grid_square_id,
+            foilHoleLabel=foil_hole_parameters.name,
+            foilHoleImage=foil_hole_parameters.image,
+            pixelLocationX=foil_hole_parameters.x_location,
+            pixelLocationY=foil_hole_parameters.y_location,
+            diameter=foil_hole_parameters.diameter,
+            stageLocationX=foil_hole_parameters.x_stage_position,
+            stageLocationY=foil_hole_parameters.y_stage_position,
+            pixelSize=foil_hole_parameters.pixel_size,
+        )
+        try:
+            with Session() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created FoilHole {record.gridSquareId}")
+                return {"success": True, "return_value": record.foilHoleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting FoilHole entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_foil_hole(
+        self,
+        foil_hole_id: int,
+        scale_factor: float,
+        foil_hole_parameters: FoilHoleParameters,
+    ):
+        try:
+            with Session() as db:
+                foil_hole = (
+                    db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
+                )
+                foil_hole.foilHoleImage = foil_hole_parameters.image
+                foil_hole.pixelLocationX = foil_hole_parameters.x_location
+                foil_hole.pixelLocationY = foil_hole_parameters.y_location
+                foil_hole.diameter = (
+                    foil_hole_parameters.diameter * scale_factor
+                    if foil_hole_parameters.diameter is not None
+                    else None
+                )
+                foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
+                foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
+                if (
+                    foil_hole_parameters.readout_area_x is not None
+                    and foil_hole_parameters.thumbnail_size_x is not None
+                    and foil_hole_parameters.pixel_size is not None
+                ):
+                    foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
+                        foil_hole_parameters.readout_area_x
+                        / foil_hole_parameters.thumbnail_size_x
+                    )
+                db.add(foil_hole)
+                db.commit()
+                return {"success": True, "return_value": foil_hole.foilHoleId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating FoilHole entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )

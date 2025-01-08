@@ -23,6 +23,7 @@ from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
+    Atlas,
     AutoProcProgram,
     Base,
     DataCollection,
@@ -43,6 +44,7 @@ from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
 
 import murfey
+import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
@@ -2629,8 +2631,17 @@ def feedback_callback(header: dict, message: dict) -> None:
                         experimentTypeId=message["experiment_type_id"],
                     )
                     dcgid = _register(record, header)
+                    atlas_record = Atlas(
+                        dataCollectionGroupId=dcgid,
+                        atlasImage=message.get("atlas", ""),
+                        pixelSize=message.get("atlas_pixel_size", 0),
+                        cassetteSlot=message.get("sample"),
+                    )
+                    if _transport_object:
+                        atlas_id = _transport_object.do_insert_atlas(atlas_record)
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
+                        atlas_id=atlas_id,
                         session_id=message["session_id"],
                         tag=message.get("tag"),
                     )
@@ -2655,6 +2666,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                     }
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "atlas_update":
+            if _transport_object:
+                _transport_object.do_update_atlas(
+                    message["atlas_id"],
+                    message["atlas"],
+                    message["atlas_pixel_size"],
+                    message["sample"],
+                )
         elif message["register"] == "data_collection":
             murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
