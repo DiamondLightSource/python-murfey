@@ -420,16 +420,16 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
         # Get value
         answer = prompt(message, style="bright_yellow")
 
-        # Convert empty console input into default values if they are None-like
-        if not field.field_info.default:
-            value = field.field_info.default if not answer else answer
-        # Convert inverted commas into empty strings if defaults are not None-like
-        else:
-            value = (
-                ""
-                if answer in ("''", '""') and isinstance(field.field_info.default, str)
-                else answer
-            )
+        # Parse field input if a default has been provided
+        if not isinstance(field.field_info.default, UndefinedType):
+            # Convert empty console inputs into default field values
+            if not answer:
+                value = field.field_info.default
+            # Convert inverted commas into empty strings
+            elif answer in ('""', "''") and isinstance(field.field_info.default, str):
+                value = ""
+            else:
+                value = answer
 
         # Validate and return
         try:
