@@ -163,7 +163,7 @@ def start_multigrid_watcher(
         f"{_get_murfey_url()}/instruments/{sanitise_nonpath(watcher_spec.instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
-    for d in machine_config.get("create_directories", {}).values():
+    for d in machine_config.get("create_directories", []):
         (watcher_spec.source / d).mkdir(exist_ok=True)
     watchers[session_id] = MultigridDirWatcher(
         watcher_spec.source,

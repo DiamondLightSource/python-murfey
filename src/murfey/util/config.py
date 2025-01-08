@@ -25,7 +25,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     external_executables_eer: Dict[str, str] = {}
     external_environment: Dict[str, str] = {}
     rsync_module: str = ""
-    create_directories: Dict[str, str] = {"atlas": "atlas"}
+    create_directories: list[str] = [
+        "atlas",
+    ]
     analyse_created_directories: List[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
