@@ -60,7 +60,7 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = ispyb.open() if os.getenv("ISYPB_CREDENTIALS") else None
+        self.ispyb = ispyb.open() if os.getenv("ISPYB_CREDENTIALS") else None
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
