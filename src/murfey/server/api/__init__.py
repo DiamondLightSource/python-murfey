@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from ispyb.sqlalchemy import Atlas
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
     BLSample,
@@ -1431,19 +1432,31 @@ def register_dc_group(
         dcg_murfey[0].atlas = dcg_params.atlas
         dcg_murfey[0].sample = dcg_params.sample
         dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
+
+        if _transport_object:
+            if dcg_murfey[0].atlas_id is not None:
+                _transport_object.send(
+                    _transport_object.feedback_queue,
+                    {
+                        "register": "atlas_update",
+                        "atlas_id": dcg_murfey[0].atlas_id,
+                        "atlas": dcg_params.atlas,
+                        "sample": dcg_params.sample,
+                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                    },
+                )
+            else:
+                atlas_id_response = _transport_object.do_insert_atlas(
+                    Atlas(
+                        dataCollectionGroupId=dcg_murfey[0].id,
+                        atlasImage=dcg_params.atlas,
+                        pixelSize=dcg_params.atlas_pixel_size,
+                        cassetteSlot=dcg_params.sample,
+                    )
+                )
+                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
-        if _transport_object:
-            _transport_object.send(
-                _transport_object.feedback_queue,
-                {
-                    "register": "atlas_update",
-                    "atlas_id": dcg_murfey.atlas_id,
-                    "atlas": dcg_params.atlas,
-                    "sample": dcg_params.sample,
-                    "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                },
-            )
     else:
         dcg_parameters = {
             "start_time": str(datetime.datetime.now()),
