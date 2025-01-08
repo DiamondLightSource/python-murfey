@@ -161,7 +161,7 @@ class TransportManager:
             pixelLocationX=grid_square_parameters.x_location,
             pixelLocationY=grid_square_parameters.y_location,
             height=grid_square_parameters.height,
-            weight=grid_square_parameters.width,
+            width=grid_square_parameters.width,
             angle=grid_square_parameters.angle,
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
