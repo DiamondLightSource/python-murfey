@@ -287,13 +287,12 @@ def run():
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
-    # Load RabbitMQ configuration
-    PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
-
-    # Set up RabbitMQ connection
     if args.demo:
+        # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
+        # Load RabbitMQ configuration and set up the connection
+        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
         _set_up_transport("pika")
 
     # Set up logging now that the desired verbosity is known
