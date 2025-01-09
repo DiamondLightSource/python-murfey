@@ -273,7 +273,7 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     security_config = get_security_config()
     # setup logging
