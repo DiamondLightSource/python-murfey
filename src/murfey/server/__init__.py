@@ -290,7 +290,7 @@ def run():
     # Load RabbitMQ configuration
     PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
 
-    # Set up Zocalo connection
+    # Set up RabbitMQ connection
     if args.demo:
         os.environ["MURFEY_DEMO"] = "1"
     else:
