@@ -97,7 +97,7 @@ class Security(BaseModel):
     feedback_queue: str = "murfey_feedback"
     graylog_host: str = ""
     graylog_port: Optional[int] = None
-    ispyb_credentials: Optional[str] = None
+    ispyb_credentials: str = ""
 
     @validator("graylog_port")
     def check_port_present_if_host_is(
