@@ -13,11 +13,11 @@ from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NamedTuple, Tuple
 
+import graypy
 import mrcfile
 import numpy as np
 import uvicorn
 import workflows
-import zocalo.configuration
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -274,17 +274,19 @@ def run():
         default=0,
     )
 
+    security_config = get_security_config()
     # setup logging
-    zc = zocalo.configuration.from_file()
-    zc.activate()
+    if security_config.graylog_host:
+        handler = graypy.GELFUDPHandler(
+            security_config.graylog_host, security_config.graylog_port, level_names=True
+        )
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
 
     # Install a log filter to all existing handlers.
-    # At this stage this will exclude console loggers, but will cover
-    # any Graylog logging set up by the environment activation
     LogFilter.install()
 
-    zc.add_command_line_options(parser)
-    workflows.transport.add_command_line_options(parser, transport_argument=True)
+    workflows.transport.load_configuration_file(security_config.rabbitmq_credentials)
 
     args = parser.parse_args()
 
@@ -297,7 +299,6 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    security_config = get_security_config()
     if not args.temporary and _transport_object:
         _transport_object.feedback_queue = security_config.feedback_queue
     rabbit_thread = Thread(
