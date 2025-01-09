@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import os
 from typing import Callable, List, Optional
 
 import ispyb
@@ -31,9 +30,11 @@ from ispyb.sqlalchemy import (
     url,
 )
 
+from murfey.util.config import get_security_config
 from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
 
 log = logging.getLogger("murfey.server.ispyb")
+security_config = get_security_config()
 
 try:
     Session = sqlalchemy.orm.sessionmaker(
@@ -60,7 +61,11 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = ispyb.open() if os.getenv("ISYPB_CREDENTIALS") else None
+        self.ispyb = (
+            ispyb.open(credentials=security_config.ispyb_credentials)
+            if security_config.ispyb_credentials
+            else None
+        )
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
