@@ -17,7 +17,6 @@ import graypy
 import mrcfile
 import numpy as np
 import uvicorn
-import workflows
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -42,6 +41,7 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
+from workflows.transport.pika_transport import PikaTransport
 
 import murfey
 import murfey.server.ispyb
@@ -273,6 +273,7 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    args = parser.parse_args()
 
     security_config = get_security_config()
     # setup logging
@@ -286,15 +287,14 @@ def run():
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
-    workflows.transport.load_configuration_file(security_config.rabbitmq_credentials)
-
-    args = parser.parse_args()
+    # Load RabbitMQ configuration
+    PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
 
     # Set up Zocalo connection
     if args.demo:
         os.environ["MURFEY_DEMO"] = "1"
     else:
-        _set_up_transport(args.transport)
+        _set_up_transport("pika")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
