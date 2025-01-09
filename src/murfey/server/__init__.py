@@ -225,6 +225,7 @@ def respond_with_template(
 
 
 def run():
+    # Set up argument parser
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--host",
@@ -273,17 +274,19 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    # Parse and separate known and unknown args
     args, unknown = parser.parse_known_args()
 
+    # Load the security configuration
     security_config = get_security_config()
-    # setup logging
+
+    # Set up GrayLog handler if provided in the configuration
     if security_config.graylog_host:
         handler = graypy.GELFUDPHandler(
             security_config.graylog_host, security_config.graylog_port, level_names=True
         )
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
-
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
