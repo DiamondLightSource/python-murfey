@@ -120,7 +120,6 @@ def register_lif_preprocessing_result(
             clem_img_stk.parent_lif = clem_lif_file
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
-            clem_img_stk.stack_created = True
             db.add(clem_img_stk)
             db.commit()
             db.refresh(clem_img_stk)
@@ -309,7 +308,6 @@ def register_tiff_preprocessing_result(
             clem_img_stk.associated_metadata = clem_metadata
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
-            clem_img_stk.stack_created = True
             db.add(clem_img_stk)
             db.commit()
             db.refresh(clem_img_stk)

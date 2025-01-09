@@ -272,8 +272,6 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     number_of_members: int = (
         0  # Expected number of image stacks belonging to this series
     )
-    images_aligned: bool = False  # Have all members been aligned?
-    rgbs_created: bool = False  # Have all members been colourised?
     composite_created: bool = False  # Has a composite image been created?
     composite_image: Optional[str] = None  # Full path to composite image
 
@@ -321,13 +319,6 @@ class CLEMImageStack(SQLModel, table=True):  # type: ignore
         foreign_key="clemimageseries.id",
         default=None,
     )
-
-    # Process checklist for each image
-    stack_created: bool = False  # Verify that the stack has been created
-    image_aligned: bool = False  # Verify that image alignment has been done on stack
-    aligned_image: Optional[str] = None  # Full path to aligned image stack
-    rgb_created: bool = False  # Verify that rgb image has been created
-    rgb_image: Optional[str] = None  # Full path to colorised image stack
 
 
 """
