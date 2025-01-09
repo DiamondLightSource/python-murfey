@@ -366,16 +366,9 @@ class MultigridController:
                     f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/tomography_processing_parameters",
                     json=json,
                 )
+
             source = Path(json["source"])
-            self._environment.listeners["data_collection_group_ids"] = {
-                context._flush_data_collections
-            }
-            self._environment.listeners["data_collection_ids"] = {
-                context._flush_processing_job
-            }
-            self._environment.listeners["autoproc_program_ids"] = {
-                context._flush_preprocess
-            }
+
             self._environment.id_tag_registry["data_collection_group"].append(
                 str(source)
             )
@@ -386,6 +379,68 @@ class MultigridController:
                 "tag": str(source),
             }
             requests.post(url, json=dcg_data)
+
+            data = {
+                "voltage": json["voltage"],
+                "pixel_size_on_image": json["pixel_size_on_image"],
+                "experiment_type": json["experiment_type"],
+                "image_size_x": json["image_size_x"],
+                "image_size_y": json["image_size_y"],
+                "file_extension": json["file_extension"],
+                "acquisition_software": json["acquisition_software"],
+                "image_directory": str(self._environment.default_destinations[source]),
+                "tag": json["tilt_series_tag"],
+                "source": str(source),
+                "magnification": json["magnification"],
+                "total_exposed_dose": json.get("total_exposed_dose"),
+                "c2aperture": json.get("c2aperture"),
+                "exposure_time": json.get("exposure_time"),
+                "slit_width": json.get("slit_width"),
+                "phase_plate": json.get("phase_plate", False),
+            }
+            capture_post(
+                f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self._environment.murfey_session}/start_data_collection",
+                json=data,
+            )
+            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                capture_post(
+                    f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self._environment.murfey_session}/register_processing_job",
+                    json={
+                        "tag": json["tilt_series_tag"],
+                        "source": str(source),
+                        "recipe": recipe,
+                    },
+                )
+            log.info("Registering tomography processing parameters")
+            if self._environment.data_collection_parameters.get("num_eer_frames"):
+                eer_response = requests.post(
+                    f"{str(self._environment.url.geturl())}/visits/{self._environment.visit}/{self._environment.murfey_session}/eer_fractionation_file",
+                    json={
+                        "num_frames": self._environment.data_collection_parameters[
+                            "num_eer_frames"
+                        ],
+                        "fractionation": self._environment.data_collection_parameters[
+                            "eer_fractionation"
+                        ],
+                        "dose_per_frame": self._environment.data_collection_parameters[
+                            "dose_per_frame"
+                        ],
+                        "fractionation_file_name": "eer_fractionation_tomo.txt",
+                    },
+                )
+                eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
+                json.update({"eer_fractionation_file": eer_fractionation_file})
+            requests.post(
+                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_preprocessing_parameters",
+                json=json,
+            )
+            context._flush_data_collections()
+            context._flush_processing_jobs()
+            capture_post(
+                f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
+                json={"rsync_source": str(source)},
+            )
+            log.info("tomography processing flushed")
 
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
