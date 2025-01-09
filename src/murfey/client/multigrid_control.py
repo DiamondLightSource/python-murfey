@@ -386,12 +386,23 @@ class MultigridController:
                 "tag": str(source),
             }
             requests.post(url, json=dcg_data)
+
         elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
                 "tag": str(source),
+                "atlas": (
+                    str(self._environment.samples[source].atlas)
+                    if self._environment.samples.get(source)
+                    else ""
+                ),
+                "sample": (
+                    self._environment.samples[source].sample
+                    if self._environment.samples.get(source)
+                    else None
+                ),
             }
             capture_post(url, json=dcg_data)
             if from_form:
