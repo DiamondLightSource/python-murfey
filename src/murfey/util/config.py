@@ -380,7 +380,6 @@ class MachineConfig(BaseModel):
     """
     # Security-related keys
     global_configuration_path: Optional[Path] = Field(
-        default=None,
         description=(
             "Full file path to the YAML file containing the configurations for the "
             "Murfey server."
@@ -493,9 +492,7 @@ def machine_config_from_file(
 
 class GlobalConfig(BaseModel):
     # Database connection settings
-    rabbitmq_credentials: str
     murfey_db_credentials: Optional[Path] = Field(
-        default=None,
         description=(
             "Full file path to where Murfey's SQL database credentials are stored. "
             "This is typically a YAML file."
@@ -518,6 +515,7 @@ class GlobalConfig(BaseModel):
     )
 
     # RabbitMQ settings
+    rabbitmq_credentials: Optional[Path]
     feedback_queue: str = Field(
         default="murfey_feedback",
         description=(
@@ -540,12 +538,13 @@ class GlobalConfig(BaseModel):
     auth_key: str = ""
     auth_algorithm: str = ""
     cookie_key: str = ""
-
     session_validation: str = ""
     session_token_timeout: Optional[int] = (
         None  # seconds; typically the length of a microscope session plus a bit
     )
     allow_origins: list[str] = ["*"]  # Restrict to only certain hostnames
+
+    # Graylog settings
     graylog_host: str = ""
     graylog_port: Optional[int] = None
 
@@ -595,10 +594,11 @@ def get_global_config() -> GlobalConfig:
         machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
             os.getenv("BEAMLINE", "")
         ]
-        if machine_config.global_configuration_path:
-            return global_config_from_file(machine_config.global_configuration_path)
+        if not machine_config.global_configuration_path:
+            raise FileNotFoundError("No global configuration file provided")
+        return global_config_from_file(machine_config.global_configuration_path)
     return GlobalConfig(
-        rabbitmq_credentials="",
+        rabbitmq_credentials=None,
         session_validation="",
         murfey_db_credentials=None,
         crypto_key="",

@@ -294,6 +294,8 @@ def run():
         # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
+        if not global_config.rabbitmq_credentials:
+            raise FileNotFoundError("No RabbitMQ credentials file provided")
         # Load RabbitMQ configuration and set up the connection
         PikaTransport().load_configuration_file(global_config.rabbitmq_credentials)
         _set_up_transport("PikaTransport")
