@@ -398,6 +398,7 @@ class TomographyContext(Context):
                             proc_url,
                             json={
                                 "tag": tilt_series,
+                                "source": str(self._basepath),
                                 "recipe": "em-tomo-preprocess",
                                 "experiment_type": "tomography",
                             },
@@ -406,6 +407,7 @@ class TomographyContext(Context):
                             proc_url,
                             json={
                                 "tag": tilt_series,
+                                "source": str(self._basepath),
                                 "recipe": "em-tomo-align",
                                 "experiment_type": "tomography",
                             },
