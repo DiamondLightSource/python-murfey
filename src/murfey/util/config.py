@@ -83,7 +83,7 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
-    murfey_db_credentials: Optional[Path] = None
+    murfey_db_credentials: Path
     crypto_key: str
     auth_key: str = ""
     auth_algorithm: str = ""
