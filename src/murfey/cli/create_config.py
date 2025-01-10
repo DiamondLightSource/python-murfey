@@ -412,10 +412,12 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
     # Display information on the field to be filled
     print_field_info(field)
 
-    message = (
-        "Please provide a value (press Enter to use the default value of "
-        f"{field.field_info.default!r})."
+    defaults_prompt = (
+        f"press Enter to use the default value of {field.field_info.default!r}"
+        if not isinstance(field.field_info.default, UndefinedType)
+        else "this field is mandatory"
     )
+    message = f"Please provide a value ({defaults_prompt})."
     while True:
         # Get value
         answer = prompt(message, style="bright_yellow")
@@ -430,6 +432,8 @@ def populate_field(key: str, field: ModelField, debug: bool = False) -> Any:
                 value = ""
             else:
                 value = answer
+        else:
+            value = answer
 
         # Validate and return
         try:
@@ -555,6 +559,7 @@ def add_software_packages(config: dict, debug: bool = False) -> dict[str, Any]:
     """
     Start of add_software_packages
     """
+    console.print()
     console.print(
         "Acquisition Software (acquisition_software)",
         style="bold bright_cyan",
@@ -971,7 +976,6 @@ def set_up_data_processing(config: dict, debug: bool = False) -> dict:
         "processed_directory_name",
         "processed_extra_directory",
         "recipes",
-        "modular_spa",
         "default_model",
         "model_search_directory",
         "initial_model_search_directory",
