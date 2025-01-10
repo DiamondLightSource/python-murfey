@@ -93,7 +93,7 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
-    rabbitmq_credentials: Optional[Path] = None
+    rabbitmq_credentials: Path
     feedback_queue: str = "murfey_feedback"
     graylog_host: str = ""
     graylog_port: Optional[int] = None
