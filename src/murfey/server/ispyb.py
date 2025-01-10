@@ -60,7 +60,7 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = ispyb.open() if os.getenv("ISYPB_CREDENTIALS") else None
+        self.ispyb = ispyb.open() if os.getenv("ISPYB_CREDENTIALS") else None
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
@@ -137,23 +137,36 @@ class TransportManager:
     ):
         # most of this is for mypy
         if (
-            grid_square_parameters.height is not None
-            and grid_square_parameters.width is not None
-            and grid_square_parameters.pixel_size is not None
+            grid_square_parameters.pixel_size is not None
             and grid_square_parameters.thumbnail_size_x is not None
-            and grid_square_parameters.thumbnail_size_y is not None
             and grid_square_parameters.readout_area_x is not None
-            and grid_square_parameters.readout_area_y is not None
-            and grid_square_parameters.angle is not None
         ):
             # currently hard coding the scale factor because of difficulties with
             # guaranteeing we have the atlas jpg and mrc sizes
-            grid_square_parameters.height = int(grid_square_parameters.height / 7.8)
-            grid_square_parameters.width = int(grid_square_parameters.width / 7.8)
             grid_square_parameters.pixel_size *= (
                 grid_square_parameters.readout_area_x
                 / grid_square_parameters.thumbnail_size_x
             )
+        grid_square_parameters.height = (
+            int(grid_square_parameters.height / 7.8)
+            if grid_square_parameters.height
+            else None
+        )
+        grid_square_parameters.width = (
+            int(grid_square_parameters.width / 7.8)
+            if grid_square_parameters.width
+            else None
+        )
+        grid_square_parameters.x_location = (
+            int(grid_square_parameters.x_location / 7.8)
+            if grid_square_parameters.x_location
+            else None
+        )
+        grid_square_parameters.y_location = (
+            int(grid_square_parameters.y_location / 7.8)
+            if grid_square_parameters.y_location
+            else None
+        )
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareLabel=grid_square_id,
@@ -161,7 +174,7 @@ class TransportManager:
             pixelLocationX=grid_square_parameters.x_location,
             pixelLocationY=grid_square_parameters.y_location,
             height=grid_square_parameters.height,
-            weight=grid_square_parameters.width,
+            width=grid_square_parameters.width,
             angle=grid_square_parameters.angle,
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
@@ -201,7 +214,16 @@ class TransportManager:
                         / grid_square_parameters.thumbnail_size_x
                     )
                 grid_square.gridSquareImage = grid_square_parameters.image
-                grid_square.pixelLocationX = grid_square_parameters.x_location
+                grid_square.pixelLocationX = (
+                    int(grid_square_parameters.x_location / 7.8)
+                    if grid_square_parameters.x_location
+                    else None
+                )
+                grid_square.pixelLocationY = (
+                    int(grid_square_parameters.y_location / 7.8)
+                    if grid_square_parameters.y_location
+                    else None
+                )
                 grid_square.pixelLocationY = grid_square_parameters.y_location
                 grid_square.height = (
                     int(grid_square_parameters.height / 7.8)
@@ -235,18 +257,29 @@ class TransportManager:
         foil_hole_parameters: FoilHoleParameters,
     ):
         if (
-            foil_hole_parameters.diameter is not None
-            and foil_hole_parameters.thumbnail_size_x is not None
+            foil_hole_parameters.thumbnail_size_x is not None
             and foil_hole_parameters.readout_area_x is not None
             and foil_hole_parameters.pixel_size is not None
         ):
-            foil_hole_parameters.diameter = int(
-                foil_hole_parameters.diameter * scale_factor
-            )
             foil_hole_parameters.pixel_size *= (
                 foil_hole_parameters.readout_area_x
                 / foil_hole_parameters.thumbnail_size_x
             )
+        foil_hole_parameters.diameter = (
+            int(foil_hole_parameters.diameter * scale_factor)
+            if foil_hole_parameters.diameter
+            else None
+        )
+        foil_hole_parameters.x_location = (
+            int(foil_hole_parameters.x_location * scale_factor)
+            if foil_hole_parameters.x_location
+            else None
+        )
+        foil_hole_parameters.y_location = (
+            int(foil_hole_parameters.y_location * scale_factor)
+            if foil_hole_parameters.y_location
+            else None
+        )
         record = FoilHole(
             gridSquareId=grid_square_id,
             foilHoleLabel=foil_hole_parameters.name,
@@ -284,8 +317,16 @@ class TransportManager:
                     db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
                 )
                 foil_hole.foilHoleImage = foil_hole_parameters.image
-                foil_hole.pixelLocationX = foil_hole_parameters.x_location
-                foil_hole.pixelLocationY = foil_hole_parameters.y_location
+                foil_hole.pixelLocationX = (
+                    int(foil_hole_parameters.x_location * scale_factor)
+                    if foil_hole_parameters.x_location
+                    else None
+                )
+                foil_hole.pixelLocationY = (
+                    int(foil_hole_parameters.y_location * scale_factor)
+                    if foil_hole_parameters.y_location
+                    else None
+                )
                 foil_hole.diameter = (
                     foil_hole_parameters.diameter * scale_factor
                     if foil_hole_parameters.diameter is not None

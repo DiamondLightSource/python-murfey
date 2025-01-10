@@ -2471,19 +2471,16 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "ispyb_connector",
                 {
-                    "parameters": {
-                        "ispyb_command": "buffer",
-                        "buffer_lookup": {
-                            "particle_classification_id": refined_class_uuid,
-                        },
-                        "buffer_command": {
-                            "ispyb_command": "insert_particle_classification"
-                        },
-                        "program_id": message["program_id"],
-                        "bfactor_fit_intercept": str(bfactor_fitting[1]),
-                        "bfactor_fit_linear": str(bfactor_fitting[0]),
+                    "ispyb_command": "buffer",
+                    "buffer_lookup": {
+                        "particle_classification_id": refined_class_uuid,
                     },
-                    "content": {"dummy": "dummy"},
+                    "buffer_command": {
+                        "ispyb_command": "insert_particle_classification"
+                    },
+                    "program_id": message["program_id"],
+                    "bfactor_fit_intercept": str(bfactor_fitting[1]),
+                    "bfactor_fit_linear": str(bfactor_fitting[0]),
                 },
                 new_connection=True,
             )
@@ -2639,7 +2636,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                         cassetteSlot=message.get("sample"),
                     )
                     if _transport_object:
-                        atlas_id = _transport_object.do_insert_atlas(atlas_record)
+                        atlas_id = _transport_object.do_insert_atlas(atlas_record)[
+                            "return_value"
+                        ]
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
                         atlas_id=atlas_id,
@@ -2756,7 +2755,6 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
             logger.info("registering processing job")
-            assert isinstance(global_state["data_collection_ids"], dict)
             dc = murfey_db.exec(
                 select(db.DataCollection, db.DataCollectionGroup)
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)

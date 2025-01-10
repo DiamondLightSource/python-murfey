@@ -352,6 +352,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
     atlas_id: Optional[int] = None
+    atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")

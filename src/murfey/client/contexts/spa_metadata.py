@@ -4,7 +4,6 @@ from typing import Optional
 
 import requests
 import xmltodict
-from PIL import Image
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
@@ -85,17 +84,9 @@ class SPAMetadataContext(Context):
                 atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
                     "SpatialScale"
                 ]["pixelSize"]["x"]["numericValue"]
-                readout_width = float(
-                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-                        "numericValue"
-                    ]
-                )
 
             # need to calculate the pixel size of the downscaled image
-            atlas_im = Image.open(atlas_xml_path.with_suffix(".jpg"))
-            atlas_pixel_size = atlas_original_pixel_size * (
-                readout_width / atlas_im.width
-            )
+            atlas_pixel_size = atlas_original_pixel_size * 7.8
 
             source = _get_source(
                 visitless_path.parent / "Images-Disc1" / visitless_path.name,
