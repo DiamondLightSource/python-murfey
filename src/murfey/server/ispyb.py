@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-from typing import Callable, List, Optional
+from typing import Callable, List, Literal, Optional
 
 import ispyb
 
@@ -55,7 +55,7 @@ def _send_using_new_connection(transport_type: str, queue: str, message: dict) -
 
 
 class TransportManager:
-    def __init__(self, transport_type):
+    def __init__(self, transport_type: Literal["PikaTransport"]):
         self._transport_type = transport_type
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()

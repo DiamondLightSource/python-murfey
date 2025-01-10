@@ -11,13 +11,12 @@ from functools import partial, singledispatch
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, Literal, NamedTuple, Tuple
 
 import graypy
 import mrcfile
 import numpy as np
 import uvicorn
-import workflows
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -42,6 +41,7 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
+from workflows.transport.pika_transport import PikaTransport
 
 import murfey
 import murfey.server.ispyb
@@ -225,6 +225,7 @@ def respond_with_template(
 
 
 def run():
+    # Set up argument parser
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--host",
@@ -273,28 +274,29 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    # Parse and separate known and unknown args
+    args, unknown = parser.parse_known_args()
 
+    # Load the security configuration
     security_config = get_security_config()
-    # setup logging
+
+    # Set up GrayLog handler if provided in the configuration
     if security_config.graylog_host:
         handler = graypy.GELFUDPHandler(
             security_config.graylog_host, security_config.graylog_port, level_names=True
         )
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
-
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
-    workflows.transport.load_configuration_file(security_config.rabbitmq_credentials)
-
-    args = parser.parse_args()
-
-    # Set up Zocalo connection
     if args.demo:
+        # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
-        _set_up_transport(args.transport)
+        # Load RabbitMQ configuration and set up the connection
+        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+        _set_up_transport("PikaTransport")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -393,7 +395,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type):
+def _set_up_transport(transport_type: Literal["PikaTransport"]):
     global _transport_object
     _transport_object = TransportManager(transport_type)
 
