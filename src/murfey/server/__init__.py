@@ -11,7 +11,7 @@ from functools import partial, singledispatch
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, Literal, NamedTuple, Tuple
 
 import graypy
 import mrcfile
@@ -296,7 +296,7 @@ def run():
     else:
         # Load RabbitMQ configuration and set up the connection
         PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
-        _set_up_transport("pika")
+        _set_up_transport("PikaTransport")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -395,7 +395,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type):
+def _set_up_transport(transport_type: Literal["PikaTransport"]):
     global _transport_object
     _transport_object = TransportManager(transport_type)
 
