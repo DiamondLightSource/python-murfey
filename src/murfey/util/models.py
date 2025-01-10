@@ -47,6 +47,7 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas: str = ""
     sample: Optional[int] = None
+    atlas_pixel_size: int = 0
 
 
 class DCParameters(BaseModel):
@@ -71,6 +72,7 @@ class DCParameters(BaseModel):
 
 class ProcessingJobParameters(BaseModel):
     tag: str
+    source: str
     recipe: str
     parameters: Dict[str, Any] = {}
     experiment_type: str = "spa"
@@ -259,8 +261,11 @@ class GridSquareParameters(BaseModel):
     readout_area_y: Optional[int] = None
     thumbnail_size_x: Optional[int] = None
     thumbnail_size_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    angle: Optional[float] = None
 
 
 class FoilHoleParameters(BaseModel):
@@ -276,6 +281,7 @@ class FoilHoleParameters(BaseModel):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    diameter: Optional[float] = None
 
 
 class PostInfo(BaseModel):

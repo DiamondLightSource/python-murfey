@@ -493,6 +493,7 @@ def machine_config_from_file(
 
 class GlobalConfig(BaseModel):
     # Database connection settings
+    rabbitmq_credentials: str
     murfey_db_credentials: Optional[Path] = Field(
         default=None,
         description=(
@@ -545,6 +546,16 @@ class GlobalConfig(BaseModel):
         None  # seconds; typically the length of a microscope session plus a bit
     )
     allow_origins: list[str] = ["*"]  # Restrict to only certain hostnames
+    graylog_host: str = ""
+    graylog_port: Optional[int] = None
+
+    @validator("graylog_port")
+    def check_port_present_if_host_is(
+        cls, v: Optional[int], values: dict, **kwargs
+    ) -> Optional[int]:
+        if values["graylog_host"] and v is None:
+            raise ValueError("The Graylog port must be set if the Graylog host is")
+        return v
 
 
 def global_config_from_file(config_file_path: Path) -> GlobalConfig:
@@ -587,6 +598,7 @@ def get_global_config() -> GlobalConfig:
         if machine_config.global_configuration_path:
             return global_config_from_file(machine_config.global_configuration_path)
     return GlobalConfig(
+        rabbitmq_credentials="",
         session_validation="",
         murfey_db_credentials=None,
         crypto_key="",

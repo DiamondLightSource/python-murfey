@@ -11,18 +11,18 @@ from functools import partial, singledispatch
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, Literal, NamedTuple, Tuple
 
+import graypy
 import mrcfile
 import numpy as np
 import uvicorn
-import workflows
-import zocalo.configuration
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
+    Atlas,
     AutoProcProgram,
     Base,
     DataCollection,
@@ -41,8 +41,10 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
+from workflows.transport.pika_transport import PikaTransport
 
 import murfey
+import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
@@ -223,6 +225,7 @@ def respond_with_template(
 
 
 def run():
+    # Set up argument parser
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--host",
@@ -271,26 +274,29 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    # Parse and separate known and unknown args
+    args, unknown = parser.parse_known_args()
 
-    # setup logging
-    zc = zocalo.configuration.from_file()
-    zc.activate()
+    # Load the security configuration
+    global_config = get_global_config()
 
+    # Set up GrayLog handler if provided in the configuration
+    if global_config.graylog_host:
+        handler = graypy.GELFUDPHandler(
+            global_config.graylog_host, global_config.graylog_port, level_names=True
+        )
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
     # Install a log filter to all existing handlers.
-    # At this stage this will exclude console loggers, but will cover
-    # any Graylog logging set up by the environment activation
     LogFilter.install()
 
-    zc.add_command_line_options(parser)
-    workflows.transport.add_command_line_options(parser, transport_argument=True)
-
-    args = parser.parse_args()
-
-    # Set up Zocalo connection
     if args.demo:
+        # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
-        _set_up_transport(args.transport)
+        # Load RabbitMQ configuration and set up the connection
+        PikaTransport().load_configuration_file(global_config.rabbitmq_credentials)
+        _set_up_transport("PikaTransport")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
@@ -390,7 +396,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type):
+def _set_up_transport(transport_type: Literal["PikaTransport"]):
     global _transport_object
     _transport_object = TransportManager(transport_type)
 
@@ -2468,19 +2474,16 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "ispyb_connector",
                 {
-                    "parameters": {
-                        "ispyb_command": "buffer",
-                        "buffer_lookup": {
-                            "particle_classification_id": refined_class_uuid,
-                        },
-                        "buffer_command": {
-                            "ispyb_command": "insert_particle_classification"
-                        },
-                        "program_id": message["program_id"],
-                        "bfactor_fit_intercept": str(bfactor_fitting[1]),
-                        "bfactor_fit_linear": str(bfactor_fitting[0]),
+                    "ispyb_command": "buffer",
+                    "buffer_lookup": {
+                        "particle_classification_id": refined_class_uuid,
                     },
-                    "content": {"dummy": "dummy"},
+                    "buffer_command": {
+                        "ispyb_command": "insert_particle_classification"
+                    },
+                    "program_id": message["program_id"],
+                    "bfactor_fit_intercept": str(bfactor_fitting[1]),
+                    "bfactor_fit_linear": str(bfactor_fitting[0]),
                 },
                 new_connection=True,
             )
@@ -2629,8 +2632,19 @@ def feedback_callback(header: dict, message: dict) -> None:
                         experimentTypeId=message["experiment_type_id"],
                     )
                     dcgid = _register(record, header)
+                    atlas_record = Atlas(
+                        dataCollectionGroupId=dcgid,
+                        atlasImage=message.get("atlas", ""),
+                        pixelSize=message.get("atlas_pixel_size", 0),
+                        cassetteSlot=message.get("sample"),
+                    )
+                    if _transport_object:
+                        atlas_id = _transport_object.do_insert_atlas(atlas_record)[
+                            "return_value"
+                        ]
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
+                        atlas_id=atlas_id,
                         session_id=message["session_id"],
                         tag=message.get("tag"),
                     )
@@ -2655,6 +2669,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                     }
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "atlas_update":
+            if _transport_object:
+                _transport_object.do_update_atlas(
+                    message["atlas_id"],
+                    message["atlas"],
+                    message["atlas_pixel_size"],
+                    message["sample"],
+                )
         elif message["register"] == "data_collection":
             murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
@@ -2736,7 +2758,6 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
             logger.info("registering processing job")
-            assert isinstance(global_state["data_collection_ids"], dict)
             dc = murfey_db.exec(
                 select(db.DataCollection, db.DataCollectionGroup)
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)

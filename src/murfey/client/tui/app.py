@@ -516,7 +516,11 @@ class MurfeyTUI(App):
             for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                 capture_post(
                     f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
-                    json={"tag": json["tilt_series_tag"], "recipe": recipe},
+                    json={
+                        "tag": json["tilt_series_tag"],
+                        "source": str(source),
+                        "recipe": recipe,
+                    },
                 )
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
@@ -600,7 +604,11 @@ class MurfeyTUI(App):
                 ):
                     capture_post(
                         f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
-                        json={"tag": str(source), "recipe": recipe},
+                        json={
+                            "tag": str(source),
+                            "source": str(source),
+                            "recipe": recipe,
+                        },
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(

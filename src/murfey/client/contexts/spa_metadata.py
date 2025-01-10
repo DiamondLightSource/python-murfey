@@ -64,6 +64,30 @@ class SPAMetadataContext(Context):
             visitless_path = Path(
                 str(transferred_file).replace(f"/{environment.visit}", "")
             )
+            visit_index_of_transferred_file = transferred_file.parts.index(
+                environment.visit
+            )
+            atlas_xml_path = list(
+                (
+                    Path(
+                        "/".join(
+                            transferred_file.parts[
+                                : visit_index_of_transferred_file + 1
+                            ]
+                        )
+                    )
+                    / partial_path
+                ).parent.glob("Atlas_*.xml")
+            )[0]
+            with open(atlas_xml_path, "rb") as atlas_xml:
+                atlas_xml_data = xmltodict.parse(atlas_xml)
+                atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
+                    "SpatialScale"
+                ]["pixelSize"]["x"]["numericValue"]
+
+            # need to calculate the pixel size of the downscaled image
+            atlas_pixel_size = atlas_original_pixel_size * 7.8
+
             source = _get_source(
                 visitless_path.parent / "Images-Disc1" / visitless_path.name,
                 environment,
@@ -90,6 +114,7 @@ class SPAMetadataContext(Context):
                         / environment.samples[source].atlas
                     ),
                     "sample": environment.samples[source].sample,
+                    "atlas_pixel_size": atlas_pixel_size,
                 }
                 capture_post(url, json=dcg_data)
                 registered_grid_squares = (
@@ -121,5 +146,8 @@ class SPAMetadataContext(Context):
                                     "y_location": pos_data[1],
                                     "x_stage_position": pos_data[2],
                                     "y_stage_position": pos_data[3],
+                                    "width": pos_data[4],
+                                    "height": pos_data[5],
+                                    "angle": pos_data[6],
                                 },
                             )

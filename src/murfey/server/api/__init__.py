@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from ispyb.sqlalchemy import Atlas
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
     BLSample,
@@ -502,7 +503,21 @@ def register_grid_square(
         grid_square.y_location = grid_square_params.y_location
         grid_square.x_stage_position = grid_square_params.x_stage_position
         grid_square.y_stage_position = grid_square_params.y_stage_position
+        if _transport_object:
+            _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
+        if _transport_object:
+            dcg = db.exec(
+                select(DataCollectionGroup)
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == grid_square_params.tag)
+            ).one()
+            gs_ispyb_response = _transport_object.do_insert_grid_square(
+                dcg.atlas_id, gsid, grid_square_params
+            )
+        else:
+            # mock up response so that below still works
+            gs_ispyb_response = {"success": False, "return_value": None}
         secured_grid_square_image_path = secure_filename(grid_square_params.image)
         if (
             secured_grid_square_image_path
@@ -512,6 +527,11 @@ def register_grid_square(
         else:
             jpeg_size = (0, 0)
         grid_square = GridSquare(
+            id=(
+                gs_ispyb_response["return_value"]
+                if gs_ispyb_response["success"]
+                else None
+            ),
             name=gsid,
             session_id=session_id,
             tag=grid_square_params.tag,
@@ -552,16 +572,13 @@ def register_foil_hole(
     db=murfey_db,
 ):
     try:
-        gsid = (
-            db.exec(
-                select(GridSquare)
-                .where(GridSquare.tag == foil_hole_params.tag)
-                .where(GridSquare.session_id == session_id)
-                .where(GridSquare.name == gs_name)
-            )
-            .one()
-            .id
-        )
+        gs = db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == foil_hole_params.tag)
+            .where(GridSquare.session_id == session_id)
+            .where(GridSquare.name == gs_name)
+        ).one()
+        gsid = gs.id
     except NoResultFound:
         log.debug(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
@@ -572,21 +589,53 @@ def register_foil_hole(
         jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
-    foil_hole = FoilHole(
-        name=foil_hole_params.name,
-        session_id=session_id,
-        grid_square_id=gsid,
-        x_location=foil_hole_params.x_location,
-        y_location=foil_hole_params.y_location,
-        x_stage_position=foil_hole_params.x_stage_position,
-        y_stage_position=foil_hole_params.y_stage_position,
-        readout_area_x=foil_hole_params.readout_area_x,
-        readout_area_y=foil_hole_params.readout_area_y,
-        thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
-        thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
-        pixel_size=foil_hole_params.pixel_size,
-        image=secured_foil_hole_image_path,
-    )
+    try:
+        foil_hole = db.exec(
+            select(FoilHole)
+            .where(FoilHole.name == foil_hole_params.name)
+            .where(FoilHole.grid_square_id == gsid)
+            .where(FoilHole.session_id == session_id)
+        ).one()
+        foil_hole.x_location = foil_hole_params.x_location
+        foil_hole.y_location = foil_hole_params.y_location
+        foil_hole.x_stage_position = foil_hole_params.x_stage_position
+        foil_hole.y_stage_position = foil_hole_params.y_stage_position
+        foil_hole.readout_area_x = foil_hole_params.readout_area_x
+        foil_hole.readout_area_y = foil_hole_params.readout_area_y
+        foil_hole.thumbnail_size_x = foil_hole_params.thumbnail_size_x or jpeg_size[0]
+        foil_hole.thumbnail_size_y = foil_hole_params.thumbnail_size_y or jpeg_size[1]
+        foil_hole.pixel_size = foil_hole_params.pixel_size
+        if _transport_object:
+            _transport_object.do_update_foil_hole(
+                foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+            )
+    except Exception:
+        if _transport_object:
+            fh_ispyb_response = _transport_object.do_insert_foil_hole(
+                gs.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+            )
+        else:
+            fh_ispyb_response = {"success": False, "return_value": None}
+        foil_hole = FoilHole(
+            id=(
+                fh_ispyb_response["return_value"]
+                if fh_ispyb_response["success"]
+                else None
+            ),
+            name=foil_hole_params.name,
+            session_id=session_id,
+            grid_square_id=gsid,
+            x_location=foil_hole_params.x_location,
+            y_location=foil_hole_params.y_location,
+            x_stage_position=foil_hole_params.x_stage_position,
+            y_stage_position=foil_hole_params.y_stage_position,
+            readout_area_x=foil_hole_params.readout_area_x,
+            readout_area_y=foil_hole_params.readout_area_y,
+            thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
+            thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
+            pixel_size=foil_hole_params.pixel_size,
+            image=secured_foil_hole_image_path,
+        )
     db.add(foil_hole)
     db.commit()
     db.close()
@@ -1128,6 +1177,7 @@ async def request_spa_preprocessing(
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
+                "foil_hole_id": foil_hole_id,
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": proc_params["gain_ref"],
@@ -1296,7 +1346,7 @@ def suggest_path(
     check_path = machine_config.rsync_basepath / base_path
 
     # Check previous year to account for the year rolling over during data collection
-    if not check_path.exists():
+    if not check_path.parent.exists():
         base_path_parts = base_path.split("/")
         for part in base_path_parts:
             # Find the path part corresponding to the year
@@ -1308,10 +1358,10 @@ def suggest_path(
         check_path = machine_config.rsync_basepath / base_path
 
         # If it's not in the previous year either, it's a genuine error
-        if not check_path.exists():
+        if not check_path.parent.exists():
             log_message = (
                 "Unable to find current visit folder under "
-                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+                f"{str(check_path_prev.parent)!r} or {str(check_path.parent)!r}"
             )
             log.error(log_message)
             raise FileNotFoundError(log_message)
@@ -1327,9 +1377,13 @@ def suggest_path(
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
-@router.post("/{session_id}/make_rsyncer_destination")
-def make_rsyncer_destination(session_id: int, destination: Path, db=murfey_db):
-    secure_path_parts = [secure_filename(p) for p in destination.parts]
+class Dest(BaseModel):
+    destination: Path
+
+
+@router.post("/sessions/{session_id}/make_rsyncer_destination")
+def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
+    secure_path_parts = [secure_filename(p) for p in destination.destintion.parts]
     destination_path = "/".join(secure_path_parts)
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -1383,6 +1437,30 @@ def register_dc_group(
     ).all():
         dcg_murfey[0].atlas = dcg_params.atlas
         dcg_murfey[0].sample = dcg_params.sample
+        dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
+
+        if _transport_object:
+            if dcg_murfey[0].atlas_id is not None:
+                _transport_object.send(
+                    _transport_object.feedback_queue,
+                    {
+                        "register": "atlas_update",
+                        "atlas_id": dcg_murfey[0].atlas_id,
+                        "atlas": dcg_params.atlas,
+                        "sample": dcg_params.sample,
+                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                    },
+                )
+            else:
+                atlas_id_response = _transport_object.do_insert_atlas(
+                    Atlas(
+                        dataCollectionGroupId=dcg_murfey[0].id,
+                        atlasImage=dcg_params.atlas,
+                        pixelSize=dcg_params.atlas_pixel_size,
+                        cassetteSlot=dcg_params.sample,
+                    )
+                )
+                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
     else:
@@ -1392,6 +1470,9 @@ def register_dc_group(
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
             "session_id": session_id,
+            "atlas": dcg_params.atlas,
+            "sample": dcg_params.sample,
+            "atlas_pixel_size": dcg_params.atlas_pixel_size,
         }
 
         if _transport_object:
@@ -1470,6 +1551,7 @@ def register_proc(
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
+        "source": proc_params.source,
         "tag": proc_params.tag,
         "job_parameters": {
             k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
