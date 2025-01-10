@@ -422,14 +422,14 @@ class RSyncer(Observer):
         # rsync default settings
         rsync_cmd = [
             "rsync",
-            "-iiv",
+            "-ivv",  # Second -v displays skipped files
             "--times",
             "--progress",
             "--outbuf=line",
             "--files-from=-",  # '-' indicates reading from standard input
             # Needed as a pair to trigger permission modifications
             # Ref: https://serverfault.com/a/796341
-            "-p",
+            "--perms",
             "--chmod=D0750,F0750",  # Use extended chmod format
         ]
         # Add file locations
