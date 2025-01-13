@@ -785,8 +785,11 @@ class SPAModularContext(_SPAContext):
                             foil_hole: Optional[int] = self._position_analysis(
                                 transferred_file, environment, source, machine_config
                             )
-                        except Exception:
+                        except Exception as e:
                             # try to continue if position information gathering fails so that movie is processed anyway
+                            logger.warning(
+                                f"Unable to register foil hole for {str(file_transferred_to)}. Exception: {str(e)}"
+                            )
                             foil_hole = None
 
                         preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
