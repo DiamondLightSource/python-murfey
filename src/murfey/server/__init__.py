@@ -53,10 +53,10 @@ from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
+    get_global_config,
     get_hostname,
     get_machine_config,
     get_microscope,
-    get_security_config,
 )
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
@@ -76,7 +76,7 @@ _running_server: uvicorn.Server | None = None
 _transport_object: TransportManager | None = None
 
 try:
-    _url = url(get_security_config())
+    _url = url(get_global_config())
     engine = create_engine(_url)
     murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
@@ -278,12 +278,12 @@ def run():
     args, unknown = parser.parse_known_args()
 
     # Load the security configuration
-    security_config = get_security_config()
+    global_config = get_global_config()
 
     # Set up GrayLog handler if provided in the configuration
-    if security_config.graylog_host:
+    if global_config.graylog_host:
         handler = graypy.GELFUDPHandler(
-            security_config.graylog_host, security_config.graylog_port, level_names=True
+            global_config.graylog_host, global_config.graylog_port, level_names=True
         )
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
@@ -294,15 +294,18 @@ def run():
         # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
+        if not global_config.rabbitmq_credentials:
+            raise FileNotFoundError("No RabbitMQ credentials file provided")
         # Load RabbitMQ configuration and set up the connection
-        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+        PikaTransport().load_configuration_file(global_config.rabbitmq_credentials)
         _set_up_transport("PikaTransport")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
+    global_config = get_global_config()
     if not args.temporary and _transport_object:
-        _transport_object.feedback_queue = security_config.feedback_queue
+        _transport_object.feedback_queue = global_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
         daemon=True,
@@ -1688,13 +1691,13 @@ def _resize_intial_model(
     downscaled_pixel_size: float,
     input_path: Path,
     output_path: Path,
-    executables: Dict[str, str],
+    executables: Dict[str, Path],
     env: Dict[str, str],
 ) -> None:
     if executables.get("relion_image_handler"):
         comp_proc = subprocess.run(
             [
-                f"{executables['relion_image_handler']}",
+                f"{str(executables['relion_image_handler'])}",
                 "--i",
                 str(input_path),
                 "--new_box",

@@ -24,7 +24,7 @@ def _sanitise(gain_path: Path) -> Path:
 async def prepare_gain(
     camera: int,
     gain_path: Path,
-    executables: Dict[str, str],
+    executables: Dict[str, Path],
     env: Dict[str, str],
     rescale: bool = True,
     tag: str = "",
@@ -57,7 +57,7 @@ async def prepare_gain(
         gain_path_mrc = gain_path.with_suffix(".mrc")
         gain_path_superres = gain_path.parent / (gain_path.name + "_superres.mrc")
         dm4_proc = await asyncio.create_subprocess_shell(
-            f"{executables['dm2mrc']} {gain_path} {gain_path_mrc}",
+            f"{str(executables['dm2mrc'])} {gain_path} {gain_path_mrc}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -65,7 +65,7 @@ async def prepare_gain(
         if dm4_proc.returncode:
             return None, None
         clip_proc = await asyncio.create_subprocess_shell(
-            f"{executables['clip']} {flip} {secure_path(gain_path_mrc)} {secure_path(gain_path_superres) if rescale else secure_path(gain_out)}",
+            f"{str(executables['clip'])} {flip} {secure_path(gain_path_mrc)} {secure_path(gain_path_superres) if rescale else secure_path(gain_out)}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -74,7 +74,7 @@ async def prepare_gain(
             return None, None
         if rescale:
             newstack_proc = await asyncio.create_subprocess_shell(
-                f"{executables['newstack']} -bin 2 {secure_path(gain_path_superres)} {secure_path(gain_out)}",
+                f"{str(executables['newstack'])} -bin 2 {secure_path(gain_path_superres)} {secure_path(gain_out)}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -88,7 +88,7 @@ async def prepare_gain(
 
 
 async def prepare_eer_gain(
-    gain_path: Path, executables: Dict[str, str], env: Dict[str, str], tag: str = ""
+    gain_path: Path, executables: Dict[str, Path], env: Dict[str, str], tag: str = ""
 ) -> Tuple[Path | None, Path | None]:
     if not executables.get("tif2mrc"):
         return None, None
@@ -98,7 +98,7 @@ async def prepare_eer_gain(
     for k, v in env.items():
         os.environ[k] = v
     mrc_convert = await asyncio.create_subprocess_shell(
-        f"{executables['tif2mrc']} {secure_path(gain_path)} {secure_path(gain_out)}"
+        f"{str(executables['tif2mrc'])} {secure_path(gain_path)} {secure_path(gain_out)}"
     )
     await mrc_convert.communicate()
     if mrc_convert.returncode:

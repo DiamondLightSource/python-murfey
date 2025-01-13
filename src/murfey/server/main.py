@@ -21,7 +21,7 @@ import murfey.server.api.spa
 import murfey.server.websocket
 import murfey.util.models
 from murfey.server import template_files
-from murfey.util.config import get_security_config
+from murfey.util.config import get_global_config
 
 # Import Murfey server or demo server based on settings
 if os.getenv("MURFEY_DEMO"):
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     murfey_machine_configuration: str = ""
 
 
-security_config = get_security_config()
+global_config = get_global_config()
 
 settings = Settings()
 
@@ -50,7 +50,7 @@ app.mount("/metrics", metrics_app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=security_config.allow_origins,
+    allow_origins=global_config.allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

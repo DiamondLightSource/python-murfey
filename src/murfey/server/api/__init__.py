@@ -52,7 +52,7 @@ from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util import secure_path
-from murfey.util.config import MachineConfig, from_file, settings
+from murfey.util.config import MachineConfig, machine_config_from_file, settings
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,
@@ -147,9 +147,9 @@ def connections_check():
 def machine_info() -> Optional[MachineConfig]:
     instrument_name = os.getenv("BEAMLINE")
     if settings.murfey_machine_configuration and instrument_name:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
+        return machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )[instrument_name]
     return None
 
 
@@ -157,9 +157,9 @@ def machine_info() -> Optional[MachineConfig]:
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
+        return machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )[instrument_name]
     return None
 
 
@@ -1268,6 +1268,10 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
+        # Handle case when gain reference file is None
+        if not proc_file.gain_ref:
+            log.error("No gain reference file was provided in the ProcessFile object")
+            return proc_file
         zocalo_message: dict = {
             "recipes": ["em-tomo-preprocess"],
             "parameters": {
@@ -1286,7 +1290,9 @@ async def request_tomography_preprocessing(
                 "fm_dose": proc_file.dose_per_frame,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_file.gain_ref)
-                    if proc_file.gain_ref and machine_config.data_transfer_enabled
+                    if proc_file.gain_ref
+                    and machine_config.data_transfer_enabled
+                    and machine_config.rsync_basepath
                     else proc_file.gain_ref
                 ),
                 "fm_int_file": proc_file.eer_fractionation_file,
@@ -1299,7 +1305,7 @@ async def request_tomography_preprocessing(
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             log.error(
-                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
+                f"Preprocessing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
             )
             return proc_file
     else:
@@ -1578,7 +1584,7 @@ async def process_gain(
     env = machine_config.external_environment
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
-        Path(machine_config.rsync_basepath)
+        machine_config.rsync_basepath
         / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
@@ -1666,7 +1672,7 @@ async def write_eer_fractionation_file(
         ) / secure_filename(fractionation_params.fractionation_file_name)
     else:
         file_path = (
-            Path(machine_config.rsync_basepath)
+            machine_config.rsync_basepath
             / (machine_config.rsync_module or "data")
             / str(datetime.datetime.now().year)
             / secure_filename(visit_name)
@@ -1711,7 +1717,7 @@ async def make_gif(
         instrument_name
     ]
     output_dir = (
-        Path(machine_config.rsync_basepath)
+        machine_config.rsync_basepath
         / (machine_config.rsync_module or "data")
         / secure_filename(year)
         / secure_filename(visit_name)
