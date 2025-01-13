@@ -1959,7 +1959,10 @@ def _flush_spa_preprocessing(message: dict):
         .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(db.ProcessingJob.recipe == "em-spa-preprocess")
+        .where(
+            db.ProcessingJob.recipe
+            == machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
+        )
     ).one()
     params = murfey_db.exec(
         select(db.SPARelionParameters, db.SPAFeedbackParameters)
@@ -2089,7 +2092,10 @@ def _flush_tomography_preprocessing(message: dict):
             .where(db.DataCollection.tag == f.tag)
             .where(db.ProcessingJob.dc_id == db.DataCollection.id)
             .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-            .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+            .where(
+                db.ProcessingJob.recipe
+                == machine_config.get("em-tomo-preprocess", "em-tomo-preprocess")
+            )
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
