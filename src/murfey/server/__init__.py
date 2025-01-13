@@ -1947,6 +1947,7 @@ def _flush_spa_preprocessing(message: dict):
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    recipe_name = machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
     collected_ids = murfey_db.exec(
         select(
             db.DataCollectionGroup,
@@ -1959,10 +1960,7 @@ def _flush_spa_preprocessing(message: dict):
         .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(
-            db.ProcessingJob.recipe
-            == machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
-        )
+        .where(db.ProcessingJob.recipe == recipe_name)
     ).one()
     params = murfey_db.exec(
         select(db.SPARelionParameters, db.SPAFeedbackParameters)
@@ -2003,7 +2001,7 @@ def _flush_spa_preprocessing(message: dict):
         )
         murfey_db.add(movie)
         zocalo_message: dict = {
-            "recipes": ["em-spa-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": collected_ids[1].id,
@@ -2079,6 +2077,8 @@ def _flush_tomography_preprocessing(message: dict):
         )
         return
 
+    recipe_name = machine_config.get("em-tomo-preprocess", "em-tomo-preprocess")
+
     for f in stashed_files:
         collected_ids = murfey_db.exec(
             select(
@@ -2093,10 +2093,7 @@ def _flush_tomography_preprocessing(message: dict):
             .where(db.DataCollection.tag == f.tag)
             .where(db.ProcessingJob.dc_id == db.DataCollection.id)
             .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-            .where(
-                db.ProcessingJob.recipe
-                == machine_config.get("em-tomo-preprocess", "em-tomo-preprocess")
-            )
+            .where(db.ProcessingJob.recipe == recipe_name)
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
@@ -2112,7 +2109,7 @@ def _flush_tomography_preprocessing(message: dict):
         )
         murfey_db.add(movie)
         zocalo_message: dict = {
-            "recipes": ["em-tomo-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
