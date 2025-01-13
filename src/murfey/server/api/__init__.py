@@ -1377,7 +1377,7 @@ class Dest(BaseModel):
 
 @router.post("/sessions/{session_id}/make_rsyncer_destination")
 def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
-    secure_path_parts = [secure_filename(p) for p in destination.destintion.parts]
+    secure_path_parts = [secure_filename(p) for p in destination.destination.parts]
     destination_path = "/".join(secure_path_parts)
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
