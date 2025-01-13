@@ -159,6 +159,7 @@ class MultigridController:
         finalise_thread = threading.Thread(
             name=f"Controller finaliser thread ({source})",
             target=self.rsync_processes[source].finalise,
+            kwargs={"thread": False},
             daemon=True,
         )
         finalise_thread.start()
