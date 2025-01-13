@@ -2023,6 +2023,7 @@ def _flush_spa_preprocessing(message: dict):
                 "particle_diameter": proc_params.particle_diameter or 0,
                 "fm_int_file": f.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "foil_hole_id": f.foil_hole_id,
             },
         }
         if _transport_object:
