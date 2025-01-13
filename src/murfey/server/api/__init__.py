@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from ispyb.sqlalchemy import Atlas
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
     BLSample,
@@ -611,7 +612,7 @@ def register_foil_hole(
     except Exception:
         if _transport_object:
             fh_ispyb_response = _transport_object.do_insert_foil_hole(
-                gsid.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+                gs.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
         else:
             fh_ispyb_response = {"success": False, "return_value": None}
@@ -1339,7 +1340,7 @@ def suggest_path(
     check_path = machine_config.rsync_basepath / base_path
 
     # Check previous year to account for the year rolling over during data collection
-    if not check_path.exists():
+    if not check_path.parent.exists():
         base_path_parts = base_path.split("/")
         for part in base_path_parts:
             # Find the path part corresponding to the year
@@ -1351,10 +1352,10 @@ def suggest_path(
         check_path = machine_config.rsync_basepath / base_path
 
         # If it's not in the previous year either, it's a genuine error
-        if not check_path.exists():
+        if not check_path.parent.exists():
             log_message = (
                 "Unable to find current visit folder under "
-                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+                f"{str(check_path_prev.parent)!r} or {str(check_path.parent)!r}"
             )
             log.error(log_message)
             raise FileNotFoundError(log_message)
@@ -1370,9 +1371,13 @@ def suggest_path(
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
 
 
-@router.post("/{session_id}/make_rsyncer_destination")
-def make_rsyncer_destination(session_id: int, destination: Path, db=murfey_db):
-    secure_path_parts = [secure_filename(p) for p in destination.parts]
+class Dest(BaseModel):
+    destination: Path
+
+
+@router.post("/sessions/{session_id}/make_rsyncer_destination")
+def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
+    secure_path_parts = [secure_filename(p) for p in destination.destination.parts]
     destination_path = "/".join(secure_path_parts)
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -1427,19 +1432,31 @@ def register_dc_group(
         dcg_murfey[0].atlas = dcg_params.atlas
         dcg_murfey[0].sample = dcg_params.sample
         dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
+
+        if _transport_object:
+            if dcg_murfey[0].atlas_id is not None:
+                _transport_object.send(
+                    _transport_object.feedback_queue,
+                    {
+                        "register": "atlas_update",
+                        "atlas_id": dcg_murfey[0].atlas_id,
+                        "atlas": dcg_params.atlas,
+                        "sample": dcg_params.sample,
+                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                    },
+                )
+            else:
+                atlas_id_response = _transport_object.do_insert_atlas(
+                    Atlas(
+                        dataCollectionGroupId=dcg_murfey[0].id,
+                        atlasImage=dcg_params.atlas,
+                        pixelSize=dcg_params.atlas_pixel_size,
+                        cassetteSlot=dcg_params.sample,
+                    )
+                )
+                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
-        if _transport_object:
-            _transport_object.send(
-                _transport_object.feedback_queue,
-                {
-                    "register": "atlas_update",
-                    "atlas_id": dcg_murfey.atlas_id,
-                    "atlas": dcg_params.atlas,
-                    "sample": dcg_params.sample,
-                    "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                },
-            )
     else:
         dcg_parameters = {
             "start_time": str(datetime.datetime.now()),
@@ -1528,6 +1545,7 @@ def register_proc(
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
+        "source": proc_params.source,
         "tag": proc_params.tag,
         "job_parameters": {
             k: v for k, v in proc_params.parameters.items() if v not in (None, "None")

@@ -717,7 +717,11 @@ class VisitSelection(SwitchSelection):
         if self._switch_status:
             self.app.install_screen(
                 DirectorySelection(
-                    [p for p in machine_data.get("data_directories", []) if p.exists()]
+                    [
+                        p
+                        for p in machine_data.get("data_directories", [])
+                        if Path(p).exists()
+                    ]
                 ),
                 "directory-select",
             )
