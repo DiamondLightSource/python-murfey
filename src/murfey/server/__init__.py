@@ -1974,7 +1974,7 @@ def _flush_spa_preprocessing(message: dict):
             f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
         )
         raise ValueError(
-            "No processing parameters were foudn in the database when flushing SPA preprocessing"
+            "No processing parameters were found in the database when flushing SPA preprocessing"
         )
 
     murfey_ids = _murfey_id(
