@@ -172,18 +172,21 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def finalise(self):
+    def finalise(self, thread: bool = True):
         self.stop()
         self._remove_files = True
         self._notify = False
-        self.thread = threading.Thread(
-            name=f"RSync finalisation {self._basepath}:{self._remote}",
-            target=self._process,
-            daemon=True,
-        )
-        for f in self._basepath.glob("**/*"):
-            self.queue.put(f)
-        self.stop()
+        if thread:
+            self.thread = threading.Thread(
+                name=f"RSync finalisation {self._basepath}:{self._remote}",
+                target=self._process,
+                daemon=True,
+            )
+            for f in self._basepath.glob("**/*"):
+                self.queue.put(f)
+            self.stop()
+        else:
+            self._transfer(list(self._basepath.glob("**/*")))
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
