@@ -1137,7 +1137,7 @@ async def request_spa_preprocessing(
         )
     except Exception as e:
         log.warning(
-            f"Foil hole ID not found for foil hole {proc_file.foil_hole_id}: {e}",
+            f"Foil hole ID not found for foil hole {sanitise(str(proc_file.foil_hole_id))}: {e}",
             exc_info=True,
         )
         foil_hole_id = None
