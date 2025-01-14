@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import subprocess
 import time
 from datetime import datetime
 from functools import partial
@@ -9,7 +10,6 @@ from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -283,7 +283,7 @@ def upload_gain_reference(session_id: MurfeySessionID, gain_reference: GainRefer
         str(gain_reference.gain_path),
         f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{gain_reference.visit_path}/{gain_reference.gain_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
     ]
-    gain_rsync = procrunner.run(cmd)
+    gain_rsync = subprocess.run(cmd)
     if gain_rsync.returncode:
         safe_gain_path = (
             str(gain_reference.gain_path).replace("\r\n", "").replace("\n", "")
