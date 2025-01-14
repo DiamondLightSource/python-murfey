@@ -59,6 +59,7 @@ from murfey.util.config import (
 )
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
+from murfey.util.tomo import midpoint
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -162,24 +163,6 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
         return str(mrc_out)
 
     return [_mc_path(Path(r.movie_path)) for r in results]
-
-
-def _midpoint(angles: List[float]) -> int:
-    """
-    Duplicate of the function in 'murfey.client.contexts.tomo', so as to preserve
-    client-server independence.
-    """
-    if not angles:
-        return 0
-    if len(angles) <= 2:
-        return round(angles[0])
-    sorted_angles = sorted(angles)
-    return round(
-        sorted_angles[len(sorted_angles) // 2]
-        if sorted_angles[len(sorted_angles) // 2]
-        and sorted_angles[len(sorted_angles) // 2 + 1]
-        else 0
-    )
 
 
 def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
@@ -2593,7 +2576,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)
-                tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+                tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
                     "parameters": {
