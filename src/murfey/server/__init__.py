@@ -48,7 +48,6 @@ import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
-from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
@@ -163,6 +162,24 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
         return str(mrc_out)
 
     return [_mc_path(Path(r.movie_path)) for r in results]
+
+
+def _midpoint(angles: List[float]) -> int:
+    """
+    Duplicate of the function in 'murfey.client.contexts.tomo', so as to preserve
+    client-server independence.
+    """
+    if not angles:
+        return 0
+    if len(angles) <= 2:
+        return round(angles[0])
+    sorted_angles = sorted(angles)
+    return round(
+        sorted_angles[len(sorted_angles) // 2]
+        if sorted_angles[len(sorted_angles) // 2]
+        and sorted_angles[len(sorted_angles) // 2 + 1]
+        else 0
+    )
 
 
 def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
