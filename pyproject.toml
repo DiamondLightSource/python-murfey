@@ -54,7 +54,7 @@ developer = [
 ]
 instrument-server = [
     "fastapi[standard]",
-    "jose",
+    "python-jose[cryptography]",
     "uvicorn[standard]",
 ]
 server = [
@@ -63,7 +63,6 @@ server = [
     "fastapi[standard]",
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
-    "jose",
     "mrcfile",
     "numpy",
     "packaging",
