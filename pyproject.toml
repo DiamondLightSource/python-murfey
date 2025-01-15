@@ -54,6 +54,7 @@ developer = [
 ]
 instrument-server = [
     "fastapi[standard]",
+    "jose",
     "uvicorn[standard]",
 ]
 server = [
