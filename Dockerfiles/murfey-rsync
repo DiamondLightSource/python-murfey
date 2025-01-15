@@ -1,0 +1,14 @@
+# Template build command
+# podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-rsync
+
+FROM docker.io/library/alpine:3.20
+# FROM alpine:3.14
+
+ARG groupid
+ARG groupname
+ARG userid
+
+# Add any system dependencies for the developer/build environment here
+RUN apk add --no-cache rsync
+
+RUN addgroup -S -g "${groupid}" "${groupname}" && adduser -S "${groupname}" -G "${groupname}" -u "${userid}" -s /bin/sh

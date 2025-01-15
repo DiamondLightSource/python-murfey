@@ -1,0 +1,52 @@
+# Build command template
+# podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-instrument-server -t murfey-instrument-server:<version> path/to/python-murfey
+
+# Set up the Python base image to build with
+FROM docker.io/library/python:3.12.8-slim-bullseye as build
+
+# Define external build arguments
+ARG groupid
+ARG groupname
+ARG userid
+
+# Add system dependencies for the developer/build environment
+# Add the group and user ID to be used by Murfey
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        busybox \
+        git \
+        net-tools \
+        libpq-dev && \
+    busybox --install &&\
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -r -g "${groupid}" "${groupname}" && useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}"
+
+# Copy essential Murfey source files across from repo
+COPY --chown="${userid}":"${groupid}" src/murfey/ /repos/python-murfey/src/murfey/
+COPY --chown="${userid}":"${groupid}" \
+    pyproject.toml \
+    setup.py \
+    api-spec.yaml \
+    AUTHORS.rst \
+    catalog-info.yaml \
+    LICENSE \
+    MANIFEST.in \
+    README.md \
+    /repos/python-murfey/
+
+# Set the repo as the current working directory
+WORKDIR /repos/python-murfey
+
+# Set up a virtual environment and install Murfey
+RUN python -m venv /venv && \
+    chmod -R a+x /venv && \
+    /venv/bin/python -m pip install --upgrade \
+        pip \
+        build \
+        importlib-metadata &&\
+    /venv/bin/python -m pip install .[client,instrument-server]
+
+# Prepend the virtual environment to PATH
+ENV PATH=/venv/bin:$PATH

@@ -1,0 +1,1869 @@
+components:
+  schemas:
+    ClientInfo:
+      properties:
+        id:
+          title: Id
+          type: integer
+      required:
+        - id
+      title: ClientInfo
+      type: object
+    CompletedTiltSeries:
+      properties:
+        rsync_source:
+          title: Rsync Source
+          type: string
+        tilt_series:
+          items:
+            type: string
+          title: Tilt Series
+          type: array
+      required:
+        - tilt_series
+        - rsync_source
+      title: CompletedTiltSeries
+      type: object
+    ConnectionFileParameters:
+      properties:
+        destinations:
+          items:
+            type: string
+          title: Destinations
+          type: array
+        filename:
+          title: Filename
+          type: string
+      required:
+        - filename
+        - destinations
+      title: ConnectionFileParameters
+      type: object
+    ContextInfo:
+      properties:
+        acquisition_software:
+          title: Acquisition Software
+          type: string
+        experiment_type:
+          title: Experiment Type
+          type: string
+      required:
+        - experiment_type
+        - acquisition_software
+      title: ContextInfo
+      type: object
+    DCGroupParameters:
+      properties:
+        experiment_type:
+          title: Experiment Type
+          type: string
+        experiment_type_id:
+          title: Experiment Type Id
+          type: integer
+        tag:
+          title: Tag
+          type: string
+      required:
+        - experiment_type
+        - experiment_type_id
+        - tag
+      title: DCGroupParameters
+      type: object
+    DCParameters:
+      properties:
+        acquisition_software:
+          title: Acquisition Software
+          type: string
+        c2aperture:
+          title: C2Aperture
+          type: number
+        experiment_type:
+          title: Experiment Type
+          type: string
+        exposure_time:
+          title: Exposure Time
+          type: number
+        file_extension:
+          title: File Extension
+          type: string
+        image_directory:
+          title: Image Directory
+          type: string
+        image_size_x:
+          title: Image Size X
+          type: integer
+        image_size_y:
+          title: Image Size Y
+          type: integer
+        magnification:
+          title: Magnification
+          type: number
+        phase_plate:
+          default: false
+          title: Phase Plate
+          type: boolean
+        pixel_size_on_image:
+          title: Pixel Size On Image
+          type: string
+        slit_width:
+          title: Slit Width
+          type: number
+        source:
+          title: Source
+          type: string
+        tag:
+          title: Tag
+          type: string
+        total_exposed_dose:
+          title: Total Exposed Dose
+          type: number
+        voltage:
+          title: Voltage
+          type: number
+      required:
+        - voltage
+        - pixel_size_on_image
+        - experiment_type
+        - image_size_x
+        - image_size_y
+        - file_extension
+        - acquisition_software
+        - image_directory
+        - tag
+        - source
+        - magnification
+      title: DCParameters
+      type: object
+    File:
+      properties:
+        description:
+          title: Description
+          type: string
+        name:
+          title: Name
+          type: string
+        size:
+          title: Size
+          type: integer
+        timestamp:
+          title: Timestamp
+          type: number
+      required:
+        - name
+        - description
+        - size
+        - timestamp
+      title: File
+      type: object
+    FractionationParameters:
+      properties:
+        dose_per_frame:
+          title: Dose Per Frame
+          type: number
+        fractionation:
+          title: Fractionation
+          type: integer
+        fractionation_file_name:
+          default: eer_fractionation.txt
+          title: Fractionation File Name
+          type: string
+        num_frames:
+          title: Num Frames
+          type: integer
+      required:
+        - num_frames
+        - fractionation
+        - dose_per_frame
+      title: FractionationParameters
+      type: object
+    GainReference:
+      properties:
+        gain_ref:
+          format: path
+          title: Gain Ref
+          type: string
+        rescale:
+          default: true
+          title: Rescale
+          type: boolean
+      required:
+        - gain_ref
+      title: GainReference
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    ProcessFile:
+      properties:
+        autoproc_program_id:
+          title: Autoproc Program Id
+          type: integer
+        data_collection_id:
+          title: Data Collection Id
+          type: integer
+        description:
+          title: Description
+          type: string
+        dose_per_frame:
+          title: Dose Per Frame
+          type: number
+        eer_fractionation_file:
+          title: Eer Fractionation File
+          type: string
+        extract_downscale:
+          default: 1
+          title: Extract Downscale
+          type: integer
+        gain_ref:
+          title: Gain Ref
+          type: string
+        image_number:
+          title: Image Number
+          type: integer
+        mc_binning:
+          default: 1
+          title: Mc Binning
+          type: integer
+        mc_uuid:
+          title: Mc Uuid
+          type: integer
+        path:
+          title: Path
+          type: string
+        pixel_size:
+          title: Pixel Size
+          type: number
+        processing_job:
+          title: Processing Job
+          type: integer
+        size:
+          title: Size
+          type: integer
+        timestamp:
+          title: Timestamp
+          type: number
+        voltage:
+          default: 300
+          title: Voltage
+          type: number
+      required:
+        - path
+        - description
+        - size
+        - timestamp
+        - image_number
+        - mc_uuid
+        - pixel_size
+        - dose_per_frame
+      title: ProcessFile
+      type: object
+    ProcessingJobParameters:
+      properties:
+        experiment_type:
+          default: spa
+          title: Experiment Type
+          type: string
+        parameters:
+          default: {}
+          title: Parameters
+          type: object
+        recipe:
+          title: Recipe
+          type: string
+        tag:
+          title: Tag
+          type: string
+      required:
+        - tag
+        - recipe
+      title: ProcessingJobParameters
+      type: object
+    ProcessingParametersSPA:
+      properties:
+        acquisition_software:
+          title: Acquisition Software
+          type: string
+        boxsize:
+          title: Boxsize
+          type: integer
+        c2aperture:
+          title: C2Aperture
+          type: number
+        dose_per_frame:
+          title: Dose Per Frame
+          type: number
+        downscale:
+          title: Downscale
+          type: boolean
+        eer_fractionation:
+          title: Eer Fractionation
+          type: integer
+        experiment_type:
+          title: Experiment Type
+          type: string
+        exposure_time:
+          title: Exposure Time
+          type: number
+        file_extension:
+          title: File Extension
+          type: string
+        gain_ref:
+          title: Gain Ref
+          type: string
+        image_size_x:
+          title: Image Size X
+          type: integer
+        image_size_y:
+          title: Image Size Y
+          type: integer
+        magnification:
+          title: Magnification
+          type: integer
+        mask_diameter:
+          title: Mask Diameter
+          type: integer
+        motion_corr_binning:
+          title: Motion Corr Binning
+          type: integer
+        particle_diameter:
+          title: Particle Diameter
+          type: number
+        phase_plate:
+          default: false
+          title: Phase Plate
+          type: boolean
+        pixel_size_on_image:
+          title: Pixel Size On Image
+          type: string
+        slit_width:
+          title: Slit Width
+          type: number
+        small_boxsize:
+          title: Small Boxsize
+          type: integer
+        symmetry:
+          title: Symmetry
+          type: string
+        tag:
+          title: Tag
+          type: string
+        total_exposed_dose:
+          title: Total Exposed Dose
+          type: number
+        use_cryolo:
+          title: Use Cryolo
+          type: boolean
+        voltage:
+          title: Voltage
+          type: number
+      required:
+        - tag
+        - dose_per_frame
+        - experiment_type
+        - voltage
+        - image_size_x
+        - image_size_y
+        - pixel_size_on_image
+        - motion_corr_binning
+        - file_extension
+        - acquisition_software
+        - use_cryolo
+        - symmetry
+        - downscale
+        - eer_fractionation
+      title: ProcessingParametersSPA
+      type: object
+    RegistrationMessage:
+      properties:
+        params:
+          title: Params
+          type: object
+        registration:
+          title: Registration
+          type: string
+      required:
+        - registration
+      title: RegistrationMessage
+      type: object
+    RsyncerInfo:
+      properties:
+        bytes:
+          default: 0
+          title: Bytes
+          type: integer
+        client_id:
+          title: Client Id
+          type: integer
+        data_bytes:
+          default: 0
+          title: Data Bytes
+          type: integer
+        destination:
+          title: Destination
+          type: string
+        increment_count:
+          default: 1
+          title: Increment Count
+          type: integer
+        increment_data_count:
+          default: 0
+          title: Increment Data Count
+          type: integer
+        source:
+          title: Source
+          type: string
+        transferring:
+          default: true
+          title: Transferring
+          type: boolean
+      required:
+        - source
+        - destination
+        - client_id
+      title: RsyncerInfo
+      type: object
+    SPAProcessFile:
+      properties:
+        autoproc_program_id:
+          title: Autoproc Program Id
+          type: integer
+        data_collection_id:
+          title: Data Collection Id
+          type: integer
+        description:
+          title: Description
+          type: string
+        dose_per_frame:
+          title: Dose Per Frame
+          type: number
+        eer_fractionation_file:
+          title: Eer Fractionation File
+          type: string
+        extract_downscale:
+          default: true
+          title: Extract Downscale
+          type: boolean
+        gain_ref:
+          title: Gain Ref
+          type: string
+        image_number:
+          title: Image Number
+          type: integer
+        mc_binning:
+          default: 1
+          title: Mc Binning
+          type: integer
+        path:
+          title: Path
+          type: string
+        pixel_size:
+          title: Pixel Size
+          type: number
+        processing_job:
+          title: Processing Job
+          type: integer
+        source:
+          default: ""
+          title: Source
+          type: string
+        tag:
+          title: Tag
+          type: string
+      required:
+        - tag
+        - path
+        - description
+        - image_number
+      title: SPAProcessFile
+      type: object
+    SPAProcessingParameters:
+      properties:
+        job_id:
+          title: Job Id
+          type: integer
+      required:
+        - job_id
+      title: SPAProcessingParameters
+      type: object
+    SessionInfo:
+      properties:
+        rescale:
+          default: true
+          title: Rescale
+          type: boolean
+        session_id:
+          title: Session Id
+          type: integer
+        session_name:
+          default: ""
+          title: Session Name
+          type: string
+      title: SessionInfo
+      type: object
+    SmartEMAtlasRequest:
+      properties:
+        atlas_path:
+          format: path
+          title: Atlas Path
+          type: string
+        num_preds:
+          default: 15
+          title: Num Preds
+          type: integer
+        output_dir:
+          format: path
+          title: Output Dir
+          type: string
+      required:
+        - atlas_path
+        - output_dir
+      title: SmartEMAtlasRequest
+      type: object
+    SuggestedPathParameters:
+      properties:
+        base_path:
+          format: path
+          title: Base Path
+          type: string
+        touch:
+          default: false
+          title: Touch
+          type: boolean
+      required:
+        - base_path
+      title: SuggestedPathParameters
+      type: object
+    TiltInfo:
+      properties:
+        movie_path:
+          title: Movie Path
+          type: string
+        rsync_source:
+          title: Rsync Source
+          type: string
+        tilt_series_tag:
+          title: Tilt Series Tag
+          type: string
+      required:
+        - tilt_series_tag
+        - movie_path
+        - rsync_source
+      title: TiltInfo
+      type: object
+    TiltSeriesInfo:
+      properties:
+        client_id:
+          title: Client Id
+          type: integer
+        rsync_source:
+          title: Rsync Source
+          type: string
+        tag:
+          title: Tag
+          type: string
+      required:
+        - client_id
+        - tag
+        - rsync_source
+      title: TiltSeriesInfo
+      type: object
+    TiltSeriesProcessingDetails:
+      properties:
+        autoproc_program_id:
+          title: Autoproc Program Id
+          type: integer
+        dcid:
+          title: Dcid
+          type: integer
+        file_tilt_list:
+          title: File Tilt List
+          type: string
+        manual_tilt_offset:
+          title: Manual Tilt Offset
+          type: integer
+        motion_corrected_path:
+          title: Motion Corrected Path
+          type: string
+        movie_id:
+          title: Movie Id
+          type: integer
+        name:
+          title: Name
+          type: string
+        pixel_size:
+          title: Pixel Size
+          type: number
+        processing_job:
+          title: Processing Job
+          type: integer
+      required:
+        - name
+        - file_tilt_list
+        - dcid
+        - processing_job
+        - autoproc_program_id
+        - motion_corrected_path
+        - movie_id
+        - pixel_size
+        - manual_tilt_offset
+      title: TiltSeriesProcessingDetails
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
+      type: object
+    Visit:
+      properties:
+        beamline:
+          title: Beamline
+          type: string
+        end:
+          format: date-time
+          title: End
+          type: string
+        name:
+          title: Name
+          type: string
+        proposal_title:
+          title: Proposal Title
+          type: string
+        session_id:
+          title: Session Id
+          type: integer
+        start:
+          format: date-time
+          title: Start
+          type: string
+      required:
+        - start
+        - end
+        - session_id
+        - name
+        - beamline
+        - proposal_title
+      title: Visit
+      type: object
+info:
+  title: Murfey server
+  version: 0.1.0
+openapi: 3.1.0
+paths:
+  /:
+    get:
+      operationId: root__get
+      responses:
+        "200":
+          content:
+            text/html:
+              schema:
+                type: string
+          description: Successful Response
+      summary: Root
+  /bootstrap/:
+    get:
+      description:
+        "Return a website containing instructions for installing the Murfey
+        client on a
+
+        machine with no internet access."
+      operationId: get_bootstrap_instructions_bootstrap__get
+      responses:
+        "200":
+          content:
+            text/html:
+              schema:
+                type: string
+          description: Successful Response
+      summary: Get Bootstrap Instructions
+      tags:
+        - bootstrap
+  /bootstrap/murfey.whl:
+    get:
+      description:
+        "Return a wheel file containing the latest release version of Murfey.
+        We should
+
+        not have to worry about the exact Python compatibility here, as long as
+
+        murfey.bootstrap is compatible with all relevant versions of Python.
+
+        This also ignores yanked releases, which again should be fine."
+      operationId: get_murfey_wheel_bootstrap_murfey_whl_get
+      responses:
+        "200":
+          description: Successful Response
+      summary: Get Murfey Wheel
+      tags:
+        - bootstrap
+  /bootstrap/pip.whl:
+    get:
+      description:
+        "Return a static version of pip. This does not need to be the newest
+        or best,
+
+        but has to be compatible with all supported Python versions.
+
+        This is only used during bootstrapping by the client to identify and then
+
+        download the actually newest appropriate version of pip."
+      operationId: get_pip_wheel_bootstrap_pip_whl_get
+      responses:
+        "200":
+          description: Successful Response
+      summary: Get Pip Wheel
+      tags:
+        - bootstrap
+  /clients:
+    get:
+      operationId: get_clients_clients_get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Clients
+  /clients/{client_id}/rsyncers:
+    get:
+      operationId: get_rsyncers_for_client_clients__client_id__rsyncers_get
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Rsyncers For Client
+  /clients/{client_id}/session:
+    delete:
+      operationId: remove_session_clients__client_id__session_delete
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Remove Session
+    post:
+      operationId: link_client_to_session_clients__client_id__session_post
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Link Client To Session
+  /clients/{client_id}/spa_processing_parameters:
+    get:
+      operationId: get_spa_proc_params_clients__client_id__spa_processing_parameters_get
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                title:
+                  Response Get Spa Proc Params Clients  Client Id  Spa Processing
+                  Parameters Get
+                type: array
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Spa Proc Params
+    post:
+      operationId: register_spa_proc_params_clients__client_id__spa_processing_parameters_post
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessingParametersSPA"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Spa Proc Params
+  /cygwin/setup-x86_64.exe:
+    get:
+      description:
+        "Obtain and past though a Cygwin installer from an official source.
+
+        This is used during client bootstrapping and can download and install the
+
+        Cygwin distribution that then remains on the client machines."
+      operationId: get_cygwin_setup_cygwin_setup_x86_64_exe_get
+      responses:
+        "200":
+          description: Successful Response
+      summary: Get Cygwin Setup
+      tags:
+        - bootstrap
+  /cygwin/{request_path}:
+    get:
+      description: Forward a Cygwin setup request to an official mirror.
+      operationId: parse_cygwin_request_cygwin__request_path__get
+      parameters:
+        - in: path
+          name: request_path
+          required: true
+          schema:
+            title: Request Path
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Parse Cygwin Request
+      tags:
+        - bootstrap
+  /feedback:
+    post:
+      operationId: send_murfey_message_feedback_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationMessage"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Send Murfey Message
+  /machine/:
+    get:
+      operationId: machine_info_machine__get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Machine Info
+  /microscope/:
+    get:
+      operationId: get_mic_microscope__get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Mic
+  /microscope_image/:
+    get:
+      operationId: get_mic_image_microscope_image__get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Mic Image
+  /new_client_id/:
+    get:
+      operationId: new_client_id_new_client_id__get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: New Client Id
+  /plugins/{package}:
+    get:
+      operationId: get_plugin_wheel_plugins__package__get
+      parameters:
+        - in: path
+          name: package
+          required: true
+          schema:
+            title: Package
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Plugin Wheel
+      tags:
+        - bootstrap
+  /pypi/:
+    get:
+      description: Obtain list of all PyPI packages via the simple API (PEP 503).
+      operationId: get_pypi_index_pypi__get
+      responses:
+        "200":
+          description: Successful Response
+      summary: Get Pypi Index
+      tags:
+        - bootstrap
+  /pypi/{package}/:
+    get:
+      description:
+        "Obtain list of all package downloads from PyPI via the simple
+        API (PEP 503),
+
+        and rewrite all download URLs to point to this server,
+
+        underneath the current directory."
+      operationId: get_pypi_package_downloads_list_pypi__package___get
+      parameters:
+        - in: path
+          name: package
+          required: true
+          schema:
+            title: Package
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Pypi Package Downloads List
+      tags:
+        - bootstrap
+  /pypi/{package}/{filename}:
+    get:
+      description: Obtain and pass through a specific download for a PyPI package.
+      operationId: get_pypi_file_pypi__package___filename__get
+      parameters:
+        - in: path
+          name: package
+          required: true
+          schema:
+            title: Package
+            type: string
+        - in: path
+          name: filename
+          required: true
+          schema:
+            title: Filename
+            type: string
+      responses:
+        "200":
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Pypi File
+      tags:
+        - bootstrap
+  /sessions:
+    get:
+      operationId: get_sessions_sessions_get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Sessions
+  /sessions/{session_id}:
+    delete:
+      operationId: remove_session_by_id_sessions__session_id__delete
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            title: Session Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Remove Session By Id
+  /version:
+    get:
+      operationId: get_version_version_get
+      parameters:
+        - in: query
+          name: client_version
+          required: false
+          schema:
+            default: ""
+            title: Client Version
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Get Version
+  /visits/:
+    get:
+      operationId: all_visit_info_visits__get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: All Visit Info
+  /visits/{visit_name}:
+    get:
+      operationId: visit_info_visits__visit_name__get
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Visit Info
+    post:
+      operationId: register_client_to_visit_visits__visit_name__post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Client To Visit
+  /visits/{visit_name}/align:
+    post:
+      operationId: request_tilt_series_alignment_visits__visit_name__align_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TiltSeriesProcessingDetails"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Request Tilt Series Alignment
+  /visits/{visit_name}/context:
+    post:
+      operationId: register_context_visits__visit_name__context_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContextInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Context
+  /visits/{visit_name}/eer_fractionation_file:
+    post:
+      operationId: write_eer_fractionation_file_visits__visit_name__eer_fractionation_file_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FractionationParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                title:
+                  Response Write Eer Fractionation File Visits  Visit Name  Eer
+                  Fractionation File Post
+                type: object
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Write Eer Fractionation File
+  /visits/{visit_name}/files:
+    post:
+      operationId: add_file_visits__visit_name__files_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/File"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Add File
+  /visits/{visit_name}/increment_rsync_file_count:
+    post:
+      operationId: increment_rsync_file_count_visits__visit_name__increment_rsync_file_count_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RsyncerInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Increment Rsync File Count
+  /visits/{visit_name}/increment_rsync_transferred_files:
+    post:
+      operationId: increment_rsync_transferred_files_visits__visit_name__increment_rsync_transferred_files_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RsyncerInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Increment Rsync Transferred Files
+  /visits/{visit_name}/process_gain:
+    post:
+      operationId: process_gain_visits__visit_name__process_gain_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GainReference"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Process Gain
+  /visits/{visit_name}/rsyncer:
+    post:
+      operationId: register_rsyncer_visits__visit_name__rsyncer_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RsyncerInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Rsyncer
+  /visits/{visit_name}/smartem_atlas/:
+    post:
+      operationId: request_smartem_atlas_analysis_visits__visit_name__smartem_atlas__post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmartEMAtlasRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Request Smartem Atlas Analysis
+  /visits/{visit_name}/spa_processing:
+    post:
+      operationId: request_spa_processing_visits__visit_name__spa_processing_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SPAProcessingParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Request Spa Processing
+  /visits/{visit_name}/suggested_path:
+    post:
+      operationId: suggest_path_visits__visit_name__suggested_path_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestedPathParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Suggest Path
+  /visits/{visit_name}/tilt:
+    post:
+      operationId: register_tilt_visits__visit_name__tilt_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TiltInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Tilt
+  /visits/{visit_name}/tilt_series:
+    post:
+      operationId: register_tilt_series_visits__visit_name__tilt_series_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TiltSeriesInfo"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Tilt Series
+  /visits/{visit_name}/tomography_preprocess:
+    post:
+      operationId: request_tomography_preprocessing_visits__visit_name__tomography_preprocess_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessFile"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Request Tomography Preprocessing
+  /visits/{visit_name}/write_connections_file:
+    post:
+      operationId: write_conn_file_visits__visit_name__write_connections_file_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionFileParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Write Conn File
+  /visits/{visit_name}/{client_id}/completed_tilt_series:
+    post:
+      operationId: register_completed_tilt_series_visits__visit_name___client_id__completed_tilt_series_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompletedTiltSeries"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Completed Tilt Series
+  /visits/{visit_name}/{client_id}/flush_spa_processing:
+    post:
+      operationId: flush_spa_processing_visits__visit_name___client_id__flush_spa_processing_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Flush Spa Processing
+  /visits/{visit_name}/{client_id}/register_data_collection_group:
+    post:
+      operationId: register_dc_group_visits__visit_name___client_id__register_data_collection_group_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DCGroupParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Dc Group
+  /visits/{visit_name}/{client_id}/register_processing_job:
+    post:
+      operationId: register_proc_visits__visit_name___client_id__register_processing_job_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessingJobParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Register Proc
+  /visits/{visit_name}/{client_id}/spa_preprocess:
+    post:
+      operationId: request_spa_preprocessing_visits__visit_name___client_id__spa_preprocess_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+            type: string
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SPAProcessFile"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Request Spa Preprocessing
+  /visits/{visit_name}/{client_id}/start_data_collection:
+    post:
+      operationId: start_dc_visits__visit_name___client_id__start_data_collection_post
+      parameters:
+        - in: path
+          name: visit_name
+          required: true
+          schema:
+            title: Visit Name
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DCParameters"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Start Dc
+  /visits_raw:
+    get:
+      operationId: get_current_visits_visits_raw_get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/Visit"
+                title: Response Get Current Visits Visits Raw Get
+                type: array
+          description: Successful Response
+      summary: Get Current Visits
+  /ws/test/{client_id}:
+    delete:
+      operationId: close_ws_connection_ws_test__client_id__delete
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            title: Client Id
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+          description: Validation Error
+      summary: Close Ws Connection
+      tags:
+        - websocket
+tags:
+  - description: "
+
+      API endpoints related to installing Murfey on a client.
+
+
+      Client machines may not have a direct internet connection, so Murfey allows
+
+      passing through requests to PyPI using the PEP 503 simple API, and download
+
+      requests to the Cygwin website and mirrors.
+
+
+      A static HTML page gives instructions on how to install on a network-isolated
+
+      system that has Python already installed. A previously set up system does not
+
+      need to have pip installed in order to bootstrap Murfey. Python and rsync are
+
+      required.
+
+      "
+    externalDocs:
+      description: PEP 503
+      url: https://www.python.org/dev/peps/pep-0503/
+    name: bootstrap
