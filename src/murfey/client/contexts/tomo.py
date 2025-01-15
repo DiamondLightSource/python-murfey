@@ -21,6 +21,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
+from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
 
@@ -62,20 +63,6 @@ def _construct_tilt_series_name(file_path: Path) -> str:
     # Assuming files end with _{tiltnumber}_{angle}_{date}_{time}_{fractions}.{suffix}
     split_name = file_path.name.split("_")
     return "_".join(split_name[:-5])
-
-
-def _midpoint(angles: List[float]) -> int:
-    if not angles:
-        return 0
-    if len(angles) <= 2:
-        return round(angles[0])
-    sorted_angles = sorted(angles)
-    return round(
-        sorted_angles[len(sorted_angles) // 2]
-        if sorted_angles[len(sorted_angles) // 2]
-        and sorted_angles[len(sorted_angles) // 2 + 1]
-        else 0
-    )
 
 
 class ProcessFileIncomplete(BaseModel):
@@ -738,7 +725,7 @@ class TomographyContext(Context):
                 if environment
                 else None
             )
-            mdoc_metadata["manual_tilt_offset"] = -_midpoint(
+            mdoc_metadata["manual_tilt_offset"] = -midpoint(
                 [float(b["TiltAngle"]) for b in blocks]
             )
             mdoc_metadata["source"] = str(self._basepath)
