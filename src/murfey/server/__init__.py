@@ -48,7 +48,6 @@ import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
-from murfey.client.contexts.tomo import _midpoint
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
@@ -60,6 +59,7 @@ from murfey.util.config import (
 )
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
+from murfey.util.tomo import midpoint
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
@@ -2576,7 +2576,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)
-                tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+                tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
                     "parameters": {
