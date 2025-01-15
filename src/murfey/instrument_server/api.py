@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import subprocess
 import time
 from datetime import datetime
 from functools import partial
@@ -9,7 +10,6 @@ from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -21,7 +21,7 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import sanitise_nonpath, secure_path
+from murfey.util import sanitise, sanitise_nonpath, secure_path
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
@@ -278,19 +278,16 @@ class GainReference(BaseModel):
 
 @router.post("/sessions/{session_id}/upload_gain_reference")
 def upload_gain_reference(session_id: MurfeySessionID, gain_reference: GainReference):
+    safe_gain_path = sanitise(str(gain_reference.gain_path))
+    safe_visit_path = sanitise(gain_reference.visit_path)
+    safe_destination_dir = sanitise(gain_reference.gain_destination_dir)
     cmd = [
         "rsync",
-        str(gain_reference.gain_path),
-        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{gain_reference.visit_path}/{gain_reference.gain_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
+        safe_gain_path,
+        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
     ]
-    gain_rsync = procrunner.run(cmd)
+    gain_rsync = subprocess.run(cmd)
     if gain_rsync.returncode:
-        safe_gain_path = (
-            str(gain_reference.gain_path).replace("\r\n", "").replace("\n", "")
-        )
-        safe_visit_path = gain_reference.visit_path.replace("\r\n", "").replace(
-            "\n", ""
-        )
         logger.warning(
             f"Gain reference file {safe_gain_path} was not successfully transferred to {safe_visit_path}/processing"
         )

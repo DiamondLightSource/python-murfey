@@ -32,17 +32,16 @@ classifiers = [
 dependencies = [
     "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "pydantic<2", # Locked to <2 by cygwin terminal
     "requests",
     "rich",
     "werkzeug",
 ]
 [project.optional-dependencies]
 cicd = [
-    "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
+    "pytest-cov", # Used for generating PyTest coverage reports
 ]
 client = [
-    "procrunner",
     "textual==0.42.0",
     "websocket-client",
     "xmltodict",
@@ -53,8 +52,12 @@ developer = [
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
 ]
+instrument-server = [
+    "fastapi[standard]",
+    "python-jose[cryptography]",
+    "uvicorn[standard]",
+]
 server = [
-    # "matplotlib", # For visual statistical analysis of images
     "aiohttp",
     "cryptography",
     "fastapi[standard]",

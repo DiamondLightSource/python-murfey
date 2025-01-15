@@ -33,7 +33,6 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
-    _midpoint,
     _murfey_id,
     _transport_object,
     check_tilt_series_mc,
@@ -108,6 +107,7 @@ from murfey.util.models import (
 )
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
+from murfey.util.tomo import midpoint
 
 log = logging.getLogger("murfey.server.api")
 
@@ -840,7 +840,7 @@ def register_completed_tilt_series(
             )
             if not stack_file.parent.exists():
                 stack_file.parent.mkdir(parents=True)
-            tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+            tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
             zocalo_message = {
                 "recipes": ["em-tomo-align"],
                 "parameters": {
