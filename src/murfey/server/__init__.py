@@ -2077,7 +2077,7 @@ def _flush_tomography_preprocessing(message: dict):
         )
         return
 
-    recipe_name = machine_config.get("em-tomo-preprocess", "em-tomo-preprocess")
+    recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
 
     for f in stashed_files:
         collected_ids = murfey_db.exec(
