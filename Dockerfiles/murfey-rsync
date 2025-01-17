@@ -9,6 +9,6 @@ ARG groupname
 ARG userid
 
 # Add any system dependencies for the developer/build environment here
-RUN apk add --no-cache rsync
-
-RUN addgroup -S -g "${groupid}" "${groupname}" && adduser -S "${groupname}" -G "${groupname}" -u "${userid}" -s /bin/sh
+RUN apk add --no-cache rsync && \
+    addgroup -S -g "${groupid}" "${groupname}" && \
+    adduser -S "${groupname}" -G "${groupname}" -u "${userid}" -s /bin/sh
