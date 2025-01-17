@@ -12,6 +12,7 @@ ARG userid
 # Add system dependencies for the developer/build environment
 # Add the group and user ID to be used by Murfey
 # Create virtual Python environment in which to install Murfey
+# Change properties of said Python environment
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
@@ -20,15 +21,17 @@ RUN apt-get update && \
         git \
         net-tools \
         libpq-dev && \
-    busybox --install &&\
+    busybox --install && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
     python -m venv /venv && \
+    chown -R "${userid}":"${groupid}" /venv && \
     chmod -R a+x /venv
 ENV PATH=/venv/bin:$PATH
 
 # Build Murfey in a different image
+# Change properties of the built Python environment
 FROM base AS build
 COPY --chown="${userid}":"${groupid}" ./ /python-murfey/
 RUN python -m pip install --upgrade \
@@ -36,7 +39,8 @@ RUN python -m pip install --upgrade \
         build \
         importlib-metadata \
         psycopg2-binary && \
-    python -m pip install /python-murfey[server]
+    python -m pip install /python-murfey[server] && \
+    chmod -R a+x /venv
 
 # Copy installed files across to final image
 FROM base
