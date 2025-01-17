@@ -326,7 +326,6 @@ class SPAModularContext(Context):
         super().__init__("SPA", acquisition_software)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
-        self._preprocessing_triggers: dict = {}
         self._foil_holes: Dict[int, List[int]] = {}
 
     def gather_metadata(

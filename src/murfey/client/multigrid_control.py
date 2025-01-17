@@ -370,9 +370,6 @@ class MultigridController:
 
             source = Path(json["source"])
 
-            self._environment.id_tag_registry["data_collection_group"].append(
-                str(source)
-            )
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
