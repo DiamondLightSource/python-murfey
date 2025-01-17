@@ -190,10 +190,6 @@ Models related to the single-particle analysis workflow.
 """
 
 
-class SPAProcessingParameters(BaseModel):
-    job_id: int
-
-
 class SPAProcessFile(BaseModel):
     tag: str
     path: str
