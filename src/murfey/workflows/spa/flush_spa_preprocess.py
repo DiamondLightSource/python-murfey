@@ -23,7 +23,7 @@ from murfey.util.spa_metadata import (
     _grid_square_from_file,
 )
 
-logger = logging.getLogger("murfey.server.spa.spa_metadata")
+logger = logging.getLogger("murfey.workflows.spa.flush_spa_preprocess")
 
 
 def register_grid_square(
