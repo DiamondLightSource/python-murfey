@@ -11,7 +11,7 @@ from functools import partial, singledispatch
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, Literal, NamedTuple, Tuple
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple
 
 import graypy
 import mrcfile
@@ -60,7 +60,8 @@ from murfey.util.config import (
 )
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
 from murfey.util.processing_params import default_spa_parameters
-from murfey.util.spa.spa_metadata import (
+from murfey.util.spa_metadata import (
+    GridSquare,
     _foil_hole_data,
     _foil_hole_from_file,
     _get_grid_square_atlas_positions,
@@ -1939,25 +1940,35 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
-def _grid_square_metadata_file(f: Path, grid_square: int) -> Path:
+def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
+    """Search through metadata directories to find the required grid square dm"""
     raw_dir = f.parent.parent.parent
     metadata_dirs = raw_dir.glob("metadata*")
     for md_dir in metadata_dirs:
         gs_path = md_dir / f"Metadata/GridSquare_{grid_square}.dm"
         if gs_path.is_file():
             return gs_path
-    raise ValueError(f"Could not determine grid square metadata path for {f}")
+    logger.error(f"Could not determine grid square metadata path for {f}")
+    return None
 
 
-def _flush_position_analysis(movie_path: Path, dcg_id: int, session_id: int) -> int:
+def _flush_position_analysis(
+    movie_path: Path, dcg_id: int, session_id: int
+) -> Optional[int]:
+    """Register a grid square and foil hole in the database"""
+    # Work out the grid square and associated metadata file
     grid_square = _grid_square_from_file(movie_path)
     grid_square_metadata_file = _grid_square_metadata_file(movie_path, grid_square)
-    gs = _grid_square_data(grid_square_metadata_file, grid_square)
+    if grid_square_metadata_file:
+        gs = _grid_square_data(grid_square_metadata_file, grid_square)
+    else:
+        gs = GridSquare(id=grid_square)
 
     data_collection_group = murfey_db.exec(
         select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
     ).one()
     if data_collection_group.atlas:
+        # If an atlas if present, work out where this grid square is on it
         gs_pix_position = _get_grid_square_atlas_positions(
             data_collection_group.atlas,
             grid_square=str(grid_square),
@@ -1979,6 +1990,7 @@ def _flush_position_analysis(movie_path: Path, dcg_id: int, session_id: int) -> 
             angle=gs_pix_position[6],
         )
     else:
+        # Skip location analysis if no atlas
         grid_square_parameters = GridSquareParameters(
             tag=data_collection_group.tag,
             readout_area_x=gs.readout_area_x,
@@ -1988,11 +2000,11 @@ def _flush_position_analysis(movie_path: Path, dcg_id: int, session_id: int) -> 
             pixel_size=gs.pixel_size,
             image=gs.image,
         )
-
     register_grid_square(session_id, gs.id, grid_square_parameters, murfey_db)
 
+    # Find the foil hole info and register it
     foil_hole = _foil_hole_from_file(movie_path)
-    if grid_square_metadata_file.is_file():
+    if grid_square_metadata_file:
         fh = _foil_hole_data(
             grid_square_metadata_file,
             foil_hole,
@@ -2083,6 +2095,7 @@ def _flush_spa_preprocessing(message: dict):
         if f.foil_hole_id:
             foil_hole_id = f.foil_hole_id
         else:
+            # Register grid square and foil hole if not present
             foil_hole_id = _flush_position_analysis(
                 movie_path=f.file_path,
                 dcg_id=collected_ids[0].id,
