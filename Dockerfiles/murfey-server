@@ -45,7 +45,7 @@ ARG groupid
 ARG groupname
 ARG userid
 
-# Copy completed Murfey build across, install Vim, and set user and group permissions
+# Copy completed Murfey build across and set user and group permissions
 COPY --from=build /venv/ /venv/
 RUN groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \

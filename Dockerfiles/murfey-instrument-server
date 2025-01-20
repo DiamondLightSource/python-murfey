@@ -1,18 +1,22 @@
 # Build command template
 # podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-instrument-server -t murfey-instrument-server:<version> path/to/python-murfey
 
-# Set up the Python base image to build with
+# Set up the base image to build with
 FROM docker.io/library/python:3.12.8-slim-bullseye AS base
 
-# Define external build arguments
-ARG groupid
-ARG groupname
-ARG userid
+# Install Vim in base image
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        vim \
+        && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add system dependencies for the developer/build environment
-# Add the group and user ID to be used by Murfey
-# Create virtual Python environment in which to install Murfey
-# Change properties of said Python environment
+
+# Build Murfey in a separate image
+FROM base as build
+COPY ./ /python-murfey/
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
@@ -22,24 +26,27 @@ RUN apt-get update && \
         net-tools \
         libpq-dev && \
     busybox --install && \
-    rm -rf /var/lib/apt/lists/* && \
-    groupadd -r -g "${groupid}" "${groupname}" && \
-    useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
     python -m venv /venv && \
-    chown -R "${userid}":"${groupid}" /venv && \
-    chmod -R a+x /venv
-ENV PATH=/venv/bin:$PATH
-
-# Build Murfey in a different image
-FROM base AS build
-COPY --chown="${userid}":"${groupid}" ./ /python-murfey/
-RUN python -m pip install --upgrade \
+    /venv/bin/python -m pip install --upgrade \
         pip \
         build \
         importlib-metadata &&\
-    python -m pip install /python-murfey[client,instrument-server] && \
-    chmod -R a+x /venv
+    /venv/bin/python -m pip install /python-murfey[client,instrument-server]
 
-# Copy installed files across to final image
+
+# Transfer completed Murfey build to clean image
 FROM base
-COPY --from=build --chown="${userid}":"${groupid}" /venv/ /venv/
+
+# Define external build arguments
+ARG groupid
+ARG groupname
+ARG userid
+
+# Copy completed Murfey build across and set user and group permissions
+COPY --from=build /venv/ /venv/
+RUN groupadd -r -g "${groupid}" "${groupname}" && \
+    useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
+    chown -R "${userid}":"${groupid}" /venv && \
+    chmod -R a+x /venv
+ENV PATH=/venv/bin:$PATH
+USER "${userid}":"${groupid}"
