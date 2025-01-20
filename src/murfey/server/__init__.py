@@ -49,7 +49,7 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
 from murfey.server.murfey_db import url  # murfey_db
-from murfey.server.spa_metadata import register_foil_hole, register_grid_square
+from murfey.server.spa.spa_metadata import register_foil_hole, register_grid_square
 from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
