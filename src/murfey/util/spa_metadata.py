@@ -7,7 +7,7 @@ import xmltodict
 logger = logging.getLogger("murfey.util.spa_metadata")
 
 
-class FoilHole(NamedTuple):
+class FoilHoleInfo(NamedTuple):
     id: int
     grid_square_id: int
     x_location: Optional[float] = None
@@ -23,7 +23,7 @@ class FoilHole(NamedTuple):
     diameter: Optional[float] = None
 
 
-class GridSquare(NamedTuple):
+class GridSquareInfo(NamedTuple):
     id: int
     x_location: Optional[float] = None
     y_location: Optional[float] = None
@@ -117,7 +117,7 @@ def _get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> D
     return gs_pix_positions
 
 
-def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquare:
+def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
     image_paths = list(
         (xml_path.parent.parent).glob(
             f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
@@ -135,7 +135,7 @@ def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquare:
             "numericValue"
         ]
         full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
-        return GridSquare(
+        return GridSquareInfo(
             id=grid_square,
             readout_area_x=full_size[0] if image_path else None,
             readout_area_y=full_size[1] if image_path else None,
@@ -144,10 +144,10 @@ def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquare:
             pixel_size=float(pixel_size) if image_path else None,
             image=str(image_path),
         )
-    return GridSquare(id=grid_square)
+    return GridSquareInfo(id=grid_square)
 
 
-def _foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHole:
+def _foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHoleInfo:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
@@ -183,7 +183,7 @@ def _foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHol
             stage = fh_block["b:value"]["StagePosition"]
             diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
             if int(fh_block["b:key"]) == foil_hole:
-                return FoilHole(
+                return FoilHoleInfo(
                     id=foil_hole,
                     grid_square_id=grid_square,
                     x_location=float(pix["c:x"]),
@@ -201,4 +201,4 @@ def _foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHol
     logger.warning(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
-    return FoilHole(id=foil_hole, grid_square_id=grid_square)
+    return FoilHoleInfo(id=foil_hole, grid_square_id=grid_square)
