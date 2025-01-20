@@ -4,7 +4,7 @@ from typing import Dict, NamedTuple, Optional, Tuple
 
 import xmltodict
 
-logger = logging.getLogger("murfey.util.spa.spa_metadata")
+logger = logging.getLogger("murfey.util.spa_metadata")
 
 
 class FoilHole(NamedTuple):

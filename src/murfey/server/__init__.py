@@ -1956,6 +1956,10 @@ def _flush_position_analysis(
     movie_path: Path, dcg_id: int, session_id: int
 ) -> Optional[int]:
     """Register a grid square and foil hole in the database"""
+    data_collection_group = murfey_db.exec(
+        select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
+    ).one()
+
     # Work out the grid square and associated metadata file
     grid_square = _grid_square_from_file(movie_path)
     grid_square_metadata_file = _grid_square_metadata_file(movie_path, grid_square)
@@ -1963,10 +1967,6 @@ def _flush_position_analysis(
         gs = _grid_square_data(grid_square_metadata_file, grid_square)
     else:
         gs = GridSquare(id=grid_square)
-
-    data_collection_group = murfey_db.exec(
-        select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
-    ).one()
     if data_collection_group.atlas:
         # If an atlas if present, work out where this grid square is on it
         gs_pix_position = _get_grid_square_atlas_positions(
@@ -2000,6 +2000,7 @@ def _flush_position_analysis(
             pixel_size=gs.pixel_size,
             image=gs.image,
         )
+    # Insert or update this grid square in the database
     register_grid_square(session_id, gs.id, grid_square_parameters, murfey_db)
 
     # Find the foil hole info and register it
@@ -2030,6 +2031,7 @@ def _flush_position_analysis(
             tag=data_collection_group.tag,
             name=foil_hole,
         )
+    # Insert or update this foil hole in the database
     register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
     return foil_hole
 
