@@ -49,6 +49,7 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket
 import murfey.util.db as db
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.server.spa_metadata import register_foil_hole, register_grid_square
 from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
@@ -57,7 +58,15 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
+from murfey.util.models import FoilHoleParameters, GridSquareParameters
 from murfey.util.processing_params import default_spa_parameters
+from murfey.util.spa.spa_metadata import (
+    _foil_hole_data,
+    _foil_hole_from_file,
+    _get_grid_square_atlas_positions,
+    _grid_square_data,
+    _grid_square_from_file,
+)
 from murfey.util.state import global_state
 from murfey.util.tomo import midpoint
 
@@ -1928,17 +1937,6 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.add(feedback_params)
     _db.commit()
     _db.close()
-
-
-from murfey.client.contexts.spa import (
-    _foil_hole_data,
-    _foil_hole_from_file,
-    _get_grid_square_atlas_positions,
-    _grid_square_data,
-    _grid_square_from_file,
-)
-from murfey.server.spa.spa_metadata import register_foil_hole, register_grid_square
-from murfey.util.models import FoilHoleParameters, GridSquareParameters
 
 
 def _grid_square_metadata_file(f: Path, grid_square: int) -> Path:
