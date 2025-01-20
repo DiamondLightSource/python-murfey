@@ -50,7 +50,6 @@ from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.server.spa.spa_metadata import register_foil_hole, register_grid_square
 from murfey.util import secure_path
 from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
@@ -109,6 +108,10 @@ from murfey.util.models import (
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 from murfey.util.tomo import midpoint
+from murfey.workflows.spa.flush_spa_preprocess import (
+    register_foil_hole,
+    register_grid_square,
+)
 
 log = logging.getLogger("murfey.server.api")
 
