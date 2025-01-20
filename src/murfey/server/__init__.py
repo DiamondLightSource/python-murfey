@@ -1930,6 +1930,100 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
+from murfey.client.contexts.spa import (
+    _foil_hole_data,
+    _foil_hole_from_file,
+    _get_grid_square_atlas_positions,
+    _grid_square_data,
+    _grid_square_from_file,
+)
+from murfey.server.spa.spa_metadata import register_foil_hole, register_grid_square
+from murfey.util.models import FoilHoleParameters, GridSquareParameters
+
+
+def _grid_square_metadata_file(f: Path, grid_square: int) -> Path:
+    raw_dir = f.parent.parent.parent
+    metadata_dirs = raw_dir.glob("metadata*")
+    for md_dir in metadata_dirs:
+        gs_path = md_dir / f"Metadata/GridSquare_{grid_square}.dm"
+        if gs_path.is_file():
+            return gs_path
+    raise ValueError(f"Could not determine grid square metadata path for {f}")
+
+
+def _flush_position_analysis(movie_path: Path, dcg_id: int, session_id: int) -> int:
+    grid_square = _grid_square_from_file(movie_path)
+    grid_square_metadata_file = _grid_square_metadata_file(movie_path, grid_square)
+    gs = _grid_square_data(grid_square_metadata_file, grid_square)
+
+    data_collection_group = murfey_db.exec(
+        select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
+    ).one()
+    if data_collection_group.atlas:
+        gs_pix_position = _get_grid_square_atlas_positions(
+            data_collection_group.atlas,
+            grid_square=str(grid_square),
+        )[str(grid_square)]
+        grid_square_parameters = GridSquareParameters(
+            tag=data_collection_group.tag,
+            x_location=gs_pix_position[0],
+            y_location=gs_pix_position[1],
+            x_stage_position=gs_pix_position[2],
+            y_stage_position=gs_pix_position[3],
+            readout_area_x=gs.readout_area_x,
+            readout_area_y=gs.readout_area_y,
+            thumbnail_size_x=gs.thumbnail_size_x,
+            thumbnail_size_y=gs.thumbnail_size_y,
+            height=gs_pix_position[5],
+            width=gs_pix_position[4],
+            pixel_size=gs.pixel_size,
+            image=gs.image,
+            angle=gs_pix_position[6],
+        )
+    else:
+        grid_square_parameters = GridSquareParameters(
+            tag=data_collection_group.tag,
+            readout_area_x=gs.readout_area_x,
+            readout_area_y=gs.readout_area_y,
+            thumbnail_size_x=gs.thumbnail_size_x,
+            thumbnail_size_y=gs.thumbnail_size_y,
+            pixel_size=gs.pixel_size,
+            image=gs.image,
+        )
+
+    register_grid_square(session_id, gs.id, grid_square_parameters, murfey_db)
+
+    foil_hole = _foil_hole_from_file(movie_path)
+    if grid_square_metadata_file.is_file():
+        fh = _foil_hole_data(
+            grid_square_metadata_file,
+            foil_hole,
+            grid_square,
+        )
+        foil_hole_parameters = FoilHoleParameters(
+            tag=data_collection_group.tag,
+            name=foil_hole,
+            x_location=fh.x_location,
+            y_location=fh.y_location,
+            x_stage_position=fh.x_stage_position,
+            y_stage_position=fh.y_stage_position,
+            readout_area_x=fh.readout_area_x,
+            readout_area_y=fh.readout_area_y,
+            thumbnail_size_x=fh.thumbnail_size_x,
+            thumbnail_size_y=fh.thumbnail_size_y,
+            pixel_size=fh.pixel_size,
+            image=fh.image,
+            diameter=fh.diameter,
+        )
+    else:
+        foil_hole_parameters = FoilHoleParameters(
+            tag=data_collection_group.tag,
+            name=foil_hole,
+        )
+    register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
+    return foil_hole
+
+
 def _flush_spa_preprocessing(message: dict):
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
@@ -1988,6 +2082,15 @@ def _flush_spa_preprocessing(message: dict):
         murfey_db.add(feedback_params)
 
     for i, f in enumerate(stashed_files):
+        if f.foil_hole_id:
+            foil_hole_id = f.foil_hole_id
+        else:
+            foil_hole_id = _flush_position_analysis(
+                movie_path=f.file_path,
+                dcg_id=collected_ids[0].id,
+                session_id=session_id,
+            )
+
         mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
         if not mrcp.parent.exists():
@@ -1997,7 +2100,7 @@ def _flush_spa_preprocessing(message: dict):
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
-            foil_hole_id=f.foil_hole_id,
+            foil_hole_id=foil_hole_id,
         )
         murfey_db.add(movie)
         zocalo_message: dict = {
@@ -2021,7 +2124,7 @@ def _flush_spa_preprocessing(message: dict):
                 "particle_diameter": proc_params.particle_diameter or 0,
                 "fm_int_file": f.eer_fractionation_file,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-                "foil_hole_id": f.foil_hole_id,
+                "foil_hole_id": foil_hole_id,
             },
         }
         if _transport_object:
