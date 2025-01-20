@@ -22,11 +22,11 @@ from murfey.util import (
     get_machine_config_client,
 )
 from murfey.util.spa_metadata import (
-    _foil_hole_data,
-    _foil_hole_from_file,
-    _get_grid_square_atlas_positions,
-    _grid_square_data,
-    _grid_square_from_file,
+    foil_hole_data,
+    foil_hole_from_file,
+    get_grid_square_atlas_positions,
+    grid_square_data,
+    grid_square_from_file,
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa")
@@ -371,7 +371,7 @@ class SPAModularContext(_SPAContext):
         source: Path,
         machine_config: dict,
     ) -> Optional[int]:
-        grid_square = _grid_square_from_file(transferred_file)
+        grid_square = grid_square_from_file(transferred_file)
         grid_square_metadata_file = _grid_square_metadata_file(
             transferred_file,
             [Path(p) for p in machine_config["data_directories"]],
@@ -413,12 +413,12 @@ class SPAModularContext(_SPAContext):
                     local_atlas_path = (
                         Path(visit_path) / environment.samples[source].atlas
                     )
-                    gs_pix_position = _get_grid_square_atlas_positions(
+                    gs_pix_position = get_grid_square_atlas_positions(
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
-            gs = _grid_square_data(
+            gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
             )
@@ -453,14 +453,14 @@ class SPAModularContext(_SPAContext):
                     "angle": gs_pix_position[6],
                 },
             )
-        foil_hole = _foil_hole_from_file(transferred_file)
+        foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
             fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
             if (
                 grid_square_metadata_file.is_file()
                 and environment.murfey_session is not None
             ):
-                fh = _foil_hole_data(
+                fh = foil_hole_data(
                     grid_square_metadata_file,
                     foil_hole,
                     grid_square,

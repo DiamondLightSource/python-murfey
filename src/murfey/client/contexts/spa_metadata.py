@@ -6,9 +6,10 @@ import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
+from murfey.client.contexts.spa import _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
+from murfey.util.spa_metadata import get_grid_square_atlas_positions
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
@@ -116,7 +117,7 @@ class SPAMetadataContext(Context):
                     .get(str(source), [])
                 )
                 if registered_grid_squares:
-                    gs_pix_positions = _get_grid_square_atlas_positions(
+                    gs_pix_positions = get_grid_square_atlas_positions(
                         source_visit_dir / partial_path
                     )
                     for gs in registered_grid_squares:

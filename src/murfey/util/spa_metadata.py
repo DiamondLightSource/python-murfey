@@ -38,18 +38,18 @@ class GridSquareInfo(NamedTuple):
     tag: str = ""
 
 
-def _grid_square_from_file(f: Path) -> int:
+def grid_square_from_file(f: Path) -> int:
     for p in f.parts:
         if p.startswith("GridSquare"):
             return int(p.split("_")[1])
     raise ValueError(f"Grid square ID could not be determined from path {f}")
 
 
-def _foil_hole_from_file(f: Path) -> int:
+def foil_hole_from_file(f: Path) -> int:
     return int(f.name.split("_")[1])
 
 
-def _get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> Dict[
+def get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> Dict[
     str,
     Tuple[
         Optional[int],
@@ -117,7 +117,7 @@ def _get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> D
     return gs_pix_positions
 
 
-def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
+def grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
     image_paths = list(
         (xml_path.parent.parent).glob(
             f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
@@ -147,7 +147,7 @@ def _grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
     return GridSquareInfo(id=grid_square)
 
 
-def _foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHoleInfo:
+def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHoleInfo:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)

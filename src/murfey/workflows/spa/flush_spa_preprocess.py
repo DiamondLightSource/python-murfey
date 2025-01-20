@@ -16,11 +16,11 @@ from murfey.util.models import FoilHoleParameters, GridSquareParameters
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.spa_metadata import (
     GridSquareInfo,
-    _foil_hole_data,
-    _foil_hole_from_file,
-    _get_grid_square_atlas_positions,
-    _grid_square_data,
-    _grid_square_from_file,
+    foil_hole_data,
+    foil_hole_from_file,
+    get_grid_square_atlas_positions,
+    grid_square_data,
+    grid_square_from_file,
 )
 
 logger = logging.getLogger("murfey.workflows.spa.flush_spa_preprocess")
@@ -188,15 +188,15 @@ def _flush_position_analysis(
     ).one()
 
     # Work out the grid square and associated metadata file
-    grid_square = _grid_square_from_file(movie_path)
+    grid_square = grid_square_from_file(movie_path)
     grid_square_metadata_file = _grid_square_metadata_file(movie_path, grid_square)
     if grid_square_metadata_file:
-        gs = _grid_square_data(grid_square_metadata_file, grid_square)
+        gs = grid_square_data(grid_square_metadata_file, grid_square)
     else:
         gs = GridSquareInfo(id=grid_square)
     if data_collection_group.atlas:
         # If an atlas if present, work out where this grid square is on it
-        gs_pix_position = _get_grid_square_atlas_positions(
+        gs_pix_position = get_grid_square_atlas_positions(
             data_collection_group.atlas,
             grid_square=str(grid_square),
         )[str(grid_square)]
@@ -231,9 +231,9 @@ def _flush_position_analysis(
     register_grid_square(session_id, gs.id, grid_square_parameters, murfey_db)
 
     # Find the foil hole info and register it
-    foil_hole = _foil_hole_from_file(movie_path)
+    foil_hole = foil_hole_from_file(movie_path)
     if grid_square_metadata_file:
-        fh = _foil_hole_data(
+        fh = foil_hole_data(
             grid_square_metadata_file,
             foil_hole,
             grid_square,
