@@ -325,12 +325,18 @@ def flush_spa_preprocessing(message: dict, db: Session, demo: bool = False):
             foil_hole_id = f.foil_hole_id
         else:
             # Register grid square and foil hole if not present
-            foil_hole_id = _flush_position_analysis(
-                movie_path=f.file_path,
-                dcg_id=collected_ids[0].id,
-                session_id=session_id,
-                db=db,
-            )
+            try:
+                foil_hole_id = _flush_position_analysis(
+                    movie_path=f.file_path,
+                    dcg_id=collected_ids[0].id,
+                    session_id=session_id,
+                    db=db,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Flushing position analysis for {f.file_path} caused exception {e}"
+                )
+                foil_hole_id = None
 
         mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
