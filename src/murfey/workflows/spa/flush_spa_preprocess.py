@@ -334,7 +334,7 @@ def flush_spa_preprocessing(message: dict, db: Session, demo: bool = False):
                 )
             except Exception as e:
                 logger.error(
-                    f"Flushing position analysis for {f.file_path} caused exception {e}"
+                    f"Flushing position analysis for {f.file_path} caused exception {e}", exc_info=True
                 )
                 foil_hole_id = None
 
