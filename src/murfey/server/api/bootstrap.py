@@ -228,15 +228,16 @@ def parse_cygwin_request(request_path: str):
     """
 
     # Validate request path
-    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", request_path)) is False:
+    if bool(re.fullmatch(r"^[\w\s\.\-\+/]+$", request_path)) is False:
         raise ValueError(f"{request_path!r} is not a valid request path")
 
     try:
-        url = f'{find_cygwin_mirror()}{quote(request_path, safe="")}'
+        url = f'{find_cygwin_mirror()}{quote(request_path, safe="/")}'
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
         )
+
     logger.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
     cygwin_data = requests.get(url)
     return Response(
@@ -434,7 +435,7 @@ def get_msys2_environment_index(
         raise ValueError(f"{system!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
-    arch_url = f'{msys2_url}/{quote(system, safe="")}'
+    arch_url = f'{msys2_url}/{quote(system, safe="/")}'
     response = requests.get(arch_url)
 
     # Parse and rewrite package index content
@@ -497,7 +498,7 @@ def get_msys2_package_index(
 
     # Construct URL to main MSYS repo and get response
     package_list_url = (
-        f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}'
+        f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="/")}'
     )
     response = requests.get(package_list_url)
 
@@ -581,7 +582,7 @@ def _get_full_pypi_path_response(package: str) -> requests.Response:
     # alphanumerics (including underscores; \w), dashes (\-), and periods (\.)
     if re.match(r"^[\w\-\.]+$", package) is not None:
         # Sanitise and normalise package name according to PEP 503
-        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="")
+        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="/")
 
         # Get HTTP response
         url = f"https://pypi.org/simple/{package_clean}"
