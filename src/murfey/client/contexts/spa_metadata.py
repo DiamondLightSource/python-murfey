@@ -205,6 +205,8 @@ class SPAMetadataContext(Context):
         elif transferred_file.suffix == ".dm" and environment:
             gs_name = transferred_file.name.split("_")[1]
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
+            source = _get_source(transferred_file, environment=environment)
+            visitless_source = str(source).replace(f"/{environment.visit}", "")
             for fh, fh_data in fh_positions.items():
                 capture_post(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
@@ -220,7 +222,7 @@ class SPAMetadataContext(Context):
                         "thumbnail_size_y": fh_data.thumbnail_size_y,
                         "pixel_size": fh_data.pixel_size,
                         "diameter": fh_data.diameter,
-                        "tag": str(source),
+                        "tag": visitless_source,
                         "image": fh_data.image,
                     },
                 )
