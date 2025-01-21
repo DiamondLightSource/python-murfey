@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Dict, NamedTuple, Optional
 
 import requests
 import xmltodict
@@ -13,6 +13,71 @@ from murfey.util import authorised_requests, capture_post, get_machine_config_cl
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
+
+
+class FoilHole(NamedTuple):
+    x_location: int
+    y_location: int
+    diameter: int
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    readout_area_x: Optional[int] = None
+    readout_area_y: Optional[int] = None
+    thumbnail_size_x: Optional[int] = None
+    thumbnail_size_y: Optional[int] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+
+
+def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole]:
+    with open(xml_path, "r") as xml:
+        for_parsing = xml.read()
+        data = xmltodict.parse(for_parsing)
+    data = data["GridSquareXml"]
+    readout_area = data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+        "ReadoutArea"
+    ]
+    pixel_size = data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+        "numericValue"
+    ]
+    full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+        "a:m_serializationArray"
+    ]
+    required_key = ""
+    for key in serialization_array.keys():
+        if key.startswith("b:KeyValuePairOfintTargetLocation"):
+            required_key = key
+            break
+    if not required_key:
+        return {}
+    foil_holes = {}
+    for fh_block in serialization_array[required_key]:
+        if fh_block["b:value"]["IsNearGridBar"] == "false":
+            image_paths = list(
+                (xml_path.parent.parent).glob(
+                    f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{fh_block['b:key']}_*.jpg"
+                )
+            )
+            image_paths.sort(key=lambda x: x.stat().st_ctime)
+            image_path: str = str(image_paths[-1]) if image_paths else ""
+            stage = fh_block["b:value"]["PixelCenter"]
+            stage = fh_block["b:value"]["StagePosition"]
+            diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
+            foil_holes[fh_block["b:key"]] = FoilHole(
+                x_location=int(float(stage["c:x"])),
+                y_location=int(float(stage["c:y"])),
+                x_stage_position=float(stage["c:X"]),
+                y_stage_position=float(stage["c:Y"]),
+                readout_area_x=full_size[0] if image_path else None,
+                readout_area_y=full_size[1] if image_path else None,
+                thumbnail_size_x=None,
+                thumbnail_size_y=None,
+                pixel_size=float(pixel_size) if image_path else None,
+                image=str(image_path),
+                diameter=int(float(diameter)),
+            )
+    return foil_holes
 
 
 def _atlas_destination(
@@ -136,3 +201,26 @@ class SPAMetadataContext(Context):
                                 "angle": pos_data[6],
                             },
                         )
+
+        elif transferred_file.suffix == ".dm" and environment:
+            gs_name = transferred_file.name.split("_")[1]
+            fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
+            for fh, fh_data in fh_positions.items():
+                capture_post(
+                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
+                    json={
+                        "name": fh,
+                        "x_location": fh_data.x_location,
+                        "y_location": fh_data.y_location,
+                        "x_stage_position": fh_data.x_stage_position,
+                        "y_stage_position": fh_data.y_stage_position,
+                        "readout_area_x": fh_data.readout_area_x,
+                        "readout_area_y": fh_data.readout_area_y,
+                        "thumbnail_size_x": fh_data.thumbnail_size_x,
+                        "thumbnail_size_y": fh_data.thumbnail_size_y,
+                        "pixel_size": fh_data.pixel_size,
+                        "diameter": fh_data.diameter,
+                        "tag": str(source),
+                        "image": fh_data.image,
+                    },
+                )
