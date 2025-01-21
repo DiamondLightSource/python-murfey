@@ -498,7 +498,7 @@ def get_msys2_package_index(
 
     # Construct URL to main MSYS repo and get response
     package_list_url = (
-        f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="/")}'
+        f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}'
     )
     response = requests.get(package_list_url)
 
@@ -552,7 +552,7 @@ def get_msys2_package_file(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}/{quote(package, safe="")}'
+    package_url = f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}/{quote(package, safe="/")}'
     package_file = requests.get(package_url)
 
     if package_file.status_code == 200:
