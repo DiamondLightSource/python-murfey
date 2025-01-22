@@ -157,7 +157,6 @@ def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHole
         serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
             "a:m_serializationArray"
         ]
-        required_key = ""
         for key in serialization_array.keys():
             if key.startswith("b:KeyValuePairOfintTargetLocation"):
                 required_key = key
