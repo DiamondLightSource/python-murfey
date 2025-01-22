@@ -51,14 +51,14 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             )
             image_paths.sort(key=lambda x: x.stat().st_ctime)
             image_path: str = str(image_paths[-1]) if image_paths else ""
-            stage = fh_block["b:value"]["PixelCenter"]
+            pix_loc = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
             diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
             foil_holes[fh_block["b:key"]] = FoilHole(
                 id=int(fh_block["b:key"]),
                 grid_square_id=grid_square,
-                x_location=int(float(stage["c:x"])),
-                y_location=int(float(stage["c:y"])),
+                x_location=int(float(pix_loc["c:x"])),
+                y_location=int(float(pix_loc["c:y"])),
                 x_stage_position=float(stage["c:X"]),
                 y_stage_position=float(stage["c:Y"]),
                 readout_area_x=full_size[0] if image_path else None,
