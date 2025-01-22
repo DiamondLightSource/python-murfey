@@ -39,10 +39,14 @@ def register_grid_square(
             .where(GridSquare.tag == grid_square_params.tag)
             .where(GridSquare.session_id == session_id)
         ).one()
-        grid_square.x_location = grid_square_params.x_location
-        grid_square.y_location = grid_square_params.y_location
-        grid_square.x_stage_position = grid_square_params.x_stage_position
-        grid_square.y_stage_position = grid_square_params.y_stage_position
+        grid_square.x_location = grid_square_params.x_location or grid_square.x_location
+        grid_square.y_location = grid_square_params.y_location or grid_square.y_location
+        grid_square.x_stage_position = (
+            grid_square_params.x_stage_position or grid_square.x_stage_position
+        )
+        grid_square.y_stage_position = (
+            grid_square_params.y_stage_position or grid_square.y_stage_position
+        )
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
