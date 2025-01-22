@@ -9,7 +9,6 @@ from werkzeug.utils import secure_filename
 
 from murfey.server import _murfey_id, _transport_object, sanitise
 from murfey.server.api.auth import MurfeySessionID
-from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config, get_microscope
 from murfey.util.db import DataCollectionGroup, FoilHole, GridSquare
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
@@ -30,7 +29,7 @@ def register_grid_square(
     session_id: MurfeySessionID,
     gsid: int,
     grid_square_params: GridSquareParameters,
-    db=murfey_db,
+    db: Session,
 ):
     try:
         grid_square = db.exec(
@@ -99,7 +98,7 @@ def register_foil_hole(
     session_id: MurfeySessionID,
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
-    db=murfey_db,
+    db: Session,
 ):
     try:
         gs = db.exec(
@@ -201,7 +200,7 @@ def _flush_position_analysis(
     movie_path: Path, dcg_id: int, session_id: int, db: Session
 ) -> Optional[int]:
     """Register a grid square and foil hole in the database"""
-    data_collection_group = murfey_db.exec(
+    data_collection_group = db.exec(
         select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
     ).one()
 
@@ -246,7 +245,7 @@ def _flush_position_analysis(
             image=gs.image,
         )
     # Insert or update this grid square in the database
-    register_grid_square(session_id, gs.id, grid_square_parameters, murfey_db)
+    register_grid_square(session_id, gs.id, grid_square_parameters, db)
 
     # Find the foil hole info and register it
     foil_hole = foil_hole_from_file(movie_path)
@@ -277,13 +276,13 @@ def _flush_position_analysis(
             name=foil_hole,
         )
     # Insert or update this foil hole in the database
-    register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
+    register_foil_hole(session_id, gs.id, foil_hole_parameters, db)
     return foil_hole
 
 
 def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
     session_id = message["session_id"]
-    stashed_files = murfey_db.exec(
+    stashed_files = db.exec(
         select(db.PreprocessStash)
         .where(db.PreprocessStash.session_id == session_id)
         .where(db.PreprocessStash.tag == message["tag"])
@@ -291,7 +290,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
     if not stashed_files:
         return None
     instrument_name = (
-        murfey_db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
         .one()
         .instrument_name
     )
@@ -299,7 +298,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
         instrument_name
     ]
     recipe_name = machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
-    collected_ids = murfey_db.exec(
+    collected_ids = db.exec(
         select(
             db.DataCollectionGroup,
             db.DataCollection,
@@ -313,7 +312,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
         .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
         .where(db.ProcessingJob.recipe == recipe_name)
     ).one()
-    params = murfey_db.exec(
+    params = db.exec(
         select(db.SPARelionParameters, db.SPAFeedbackParameters)
         .where(db.SPARelionParameters.pj_id == collected_ids[2].id)
         .where(db.SPAFeedbackParameters.pj_id == db.SPARelionParameters.pj_id)
@@ -330,13 +329,13 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
 
     murfey_ids = _murfey_id(
         collected_ids[3].id,
-        murfey_db,
+        db,
         number=2 * len(stashed_files),
         close=False,
     )
     if feedback_params.picker_murfey_id is None:
         feedback_params.picker_murfey_id = murfey_ids[1]
-        murfey_db.add(feedback_params)
+        db.add(feedback_params)
 
     for i, f in enumerate(stashed_files):
         if f.foil_hole_id:
@@ -368,7 +367,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
             tag=f.tag,
             foil_hole_id=foil_hole_id,
         )
-        murfey_db.add(movie)
+        db.add(movie)
         zocalo_message: dict = {
             "recipes": [recipe_name],
             "parameters": {
@@ -400,11 +399,11 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-            murfey_db.delete(f)
+            db.delete(f)
         else:
             logger.error(
                 f"Pre-processing was requested for {ppath.name} but no Zocalo transport object was found"
             )
-    murfey_db.commit()
-    murfey_db.close()
+    db.commit()
+    db.close()
     return None
