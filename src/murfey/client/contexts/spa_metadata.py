@@ -113,8 +113,10 @@ class SPAMetadataContext(Context):
             windows_path = data["EpuSessionXml"]["Samples"]["_items"]["SampleXml"][0][
                 "AtlasId"
             ]["#text"]
+            logger.info(f"Windows path to atlas metadata found: {windows_path}")
             visit_index = windows_path.split("\\").index(environment.visit)
             partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+            logger.info("Partial Linux path successfully constructed from Windows path")
 
             source = _get_source(transferred_file, environment)
             if not source:
@@ -125,9 +127,13 @@ class SPAMetadataContext(Context):
 
             source_visit_dir = source.parent
 
+            logger.info(
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
+            )
             atlas_xml_path = list(
                 (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
             )[0]
+            logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
                 atlas_xml_data = xmltodict.parse(atlas_xml)
                 atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
@@ -136,6 +142,7 @@ class SPAMetadataContext(Context):
 
             # need to calculate the pixel size of the downscaled image
             atlas_pixel_size = atlas_original_pixel_size * 7.8
+            logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
 
             sample = None
             for p in partial_path.split("/"):
@@ -143,7 +150,7 @@ class SPAMetadataContext(Context):
                     sample = int(p.replace("Sample", ""))
                     break
             else:
-                logger.warning(f"Sample could not be indetified for {transferred_file}")
+                logger.warning(f"Sample could not be identified for {transferred_file}")
                 return
             if source:
                 environment.samples[source] = SampleInfo(
