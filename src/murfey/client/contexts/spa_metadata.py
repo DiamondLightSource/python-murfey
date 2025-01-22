@@ -128,10 +128,12 @@ class SPAMetadataContext(Context):
             source_visit_dir = source.parent
 
             logger.info(
-                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / environment.visit / partial_path).parent)}"
             )
             atlas_xml_path = list(
-                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
+                (source_visit_dir / environment.visit / partial_path).parent.glob(
+                    "Atlas_*.xml"
+                )
             )[0]
             logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
@@ -190,7 +192,7 @@ class SPAMetadataContext(Context):
                         )
 
         elif transferred_file.suffix == ".dm" and environment:
-            gs_name = transferred_file.name.split("_")[1]
+            gs_name = transferred_file.stem.split("_")[1]
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
             visitless_source = str(source).replace(f"/{environment.visit}", "")
