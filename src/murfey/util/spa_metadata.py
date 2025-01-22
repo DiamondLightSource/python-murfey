@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, NamedTuple, Optional, Tuple
+from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import xmltodict
 
@@ -167,7 +167,7 @@ def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHole
             )
         )
         image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path: Path | str = image_paths[-1] if image_paths else ""
+        image_path: Union[Path, str] = image_paths[-1] if image_paths else ""
         if image_path:
             with open(Path(image_path).with_suffix(".xml")) as fh_xml:
                 fh_xml_data = xmltodict.parse(fh_xml.read())
