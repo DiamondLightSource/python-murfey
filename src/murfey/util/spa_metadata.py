@@ -148,36 +148,38 @@ def grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
 
 
 def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHoleInfo:
-    with open(xml_path, "r") as xml:
-        for_parsing = xml.read()
-        data = xmltodict.parse(for_parsing)
-    data = data["GridSquareXml"]
-    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
-        "a:m_serializationArray"
-    ]
     required_key = ""
-    for key in serialization_array.keys():
-        if key.startswith("b:KeyValuePairOfintTargetLocation"):
-            required_key = key
-            break
-    if required_key:
-        image_paths = list(
-            (xml_path.parent.parent).glob(
-                f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{foil_hole}_*.jpg"
-            )
+    if xml_path.is_file():
+        with open(xml_path, "r") as xml:
+            for_parsing = xml.read()
+            data = xmltodict.parse(for_parsing)
+        data = data["GridSquareXml"]
+        serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+            "a:m_serializationArray"
+        ]
+        required_key = ""
+        for key in serialization_array.keys():
+            if key.startswith("b:KeyValuePairOfintTargetLocation"):
+                required_key = key
+                break
+    image_paths = list(
+        (xml_path.parent.parent).glob(
+            f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{foil_hole}_*.jpg"
         )
-        image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path: Union[Path, str] = image_paths[-1] if image_paths else ""
-        if image_path:
-            with open(Path(image_path).with_suffix(".xml")) as fh_xml:
-                fh_xml_data = xmltodict.parse(fh_xml.read())
-            readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
-                "acquisition"
-            ]["camera"]["ReadoutArea"]
-            pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"][
-                "x"
-            ]["numericValue"]
-            full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+    )
+    image_paths.sort(key=lambda x: x.stat().st_ctime)
+    image_path: Union[Path, str] = image_paths[-1] if image_paths else ""
+    if image_path:
+        with open(Path(image_path).with_suffix(".xml")) as fh_xml:
+            fh_xml_data = xmltodict.parse(fh_xml.read())
+        readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
+            "camera"
+        ]["ReadoutArea"]
+        pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+            "numericValue"
+        ]
+        full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
+    if required_key:
         for fh_block in serialization_array[required_key]:
             pix = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
@@ -198,6 +200,17 @@ def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHole
                     image=str(image_path),
                     diameter=diameter,
                 )
+    elif image_path:
+        return FoilHoleInfo(
+            id=foil_hole,
+            grid_square_id=grid_square,
+            readout_area_x=full_size[0] if image_path else None,
+            readout_area_y=full_size[1] if image_path else None,
+            thumbnail_size_x=None,
+            thumbnail_size_y=None,
+            pixel_size=float(pixel_size) if image_path else None,
+            image=str(image_path),
+        )
     logger.warning(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
