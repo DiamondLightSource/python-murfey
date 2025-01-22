@@ -21,13 +21,6 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
     data = data["GridSquareXml"]
-    readout_area = data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-        "ReadoutArea"
-    ]
-    pixel_size = data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-        "numericValue"
-    ]
-    full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
     serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
         "a:m_serializationArray"
     ]
@@ -58,11 +51,6 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
                 y_location=int(float(pix_loc["c:y"])),
                 x_stage_position=float(stage["c:X"]),
                 y_stage_position=float(stage["c:Y"]),
-                readout_area_x=full_size[0] if image_path else None,
-                readout_area_y=full_size[1] if image_path else None,
-                thumbnail_size_x=None,
-                thumbnail_size_y=None,
-                pixel_size=float(pixel_size) if image_path else None,
                 image=str(image_path),
                 diameter=int(float(diameter)),
             )
