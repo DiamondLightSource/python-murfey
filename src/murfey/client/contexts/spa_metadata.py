@@ -6,20 +6,17 @@ import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import (
-    FoilHole,
-    _get_grid_square_atlas_positions,
-    _get_source,
-)
+from murfey.client.contexts.spa import _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
+from murfey.util.spa_metadata import FoilHoleInfo, get_grid_square_atlas_positions
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole]:
+def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHoleInfo]:
     with open(xml_path, "r") as xml:
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
@@ -54,7 +51,7 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             pix_loc = fh_block["b:value"]["PixelCenter"]
             stage = fh_block["b:value"]["StagePosition"]
             diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
-            foil_holes[fh_block["b:key"]] = FoilHole(
+            foil_holes[fh_block["b:key"]] = FoilHoleInfo(
                 id=int(fh_block["b:key"]),
                 grid_square_id=grid_square,
                 x_location=int(float(pix_loc["c:x"])),
@@ -165,7 +162,7 @@ class SPAMetadataContext(Context):
                     "atlas_pixel_size": atlas_pixel_size,
                 }
                 capture_post(url, json=dcg_data)
-                gs_pix_positions = _get_grid_square_atlas_positions(
+                gs_pix_positions = get_grid_square_atlas_positions(
                     _atlas_destination(environment, source, transferred_file)
                     / environment.samples[source].atlas
                 )
