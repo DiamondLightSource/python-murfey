@@ -138,9 +138,11 @@ class SPAMetadataContext(Context):
             logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
                 atlas_xml_data = xmltodict.parse(atlas_xml)
-                atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
-                    "SpatialScale"
-                ]["pixelSize"]["x"]["numericValue"]
+                atlas_original_pixel_size = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
 
             # need to calculate the pixel size of the downscaled image
             atlas_pixel_size = atlas_original_pixel_size * 7.8
