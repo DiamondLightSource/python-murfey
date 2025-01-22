@@ -1,32 +1,22 @@
 import logging
 from pathlib import Path
-from typing import Dict, NamedTuple, Optional
+from typing import Dict, Optional
 
 import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import _get_grid_square_atlas_positions, _get_source
+from murfey.client.contexts.spa import (
+    FoilHole,
+    _get_grid_square_atlas_positions,
+    _get_source,
+)
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
-
-
-class FoilHole(NamedTuple):
-    x_location: int
-    y_location: int
-    diameter: int
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
-    image: str = ""
 
 
 def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole]:
@@ -65,6 +55,8 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             stage = fh_block["b:value"]["StagePosition"]
             diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
             foil_holes[fh_block["b:key"]] = FoilHole(
+                id=int(fh_block["b:key"]),
+                grid_square_id=grid_square,
                 x_location=int(float(stage["c:x"])),
                 y_location=int(float(stage["c:y"])),
                 x_stage_position=float(stage["c:X"]),

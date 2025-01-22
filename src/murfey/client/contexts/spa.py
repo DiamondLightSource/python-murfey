@@ -28,7 +28,6 @@ requests.get, requests.post, requests.put, requests.delete = authorised_requests
 
 
 class FoilHole(NamedTuple):
-    session_id: int
     id: int
     grid_square_id: int
     x_location: Optional[float] = None
@@ -252,7 +251,6 @@ def _foil_hole_data(
                 return FoilHole(
                     id=foil_hole,
                     grid_square_id=grid_square,
-                    session_id=session_id,
                     x_location=float(pix["c:x"]),
                     y_location=float(pix["c:y"]),
                     x_stage_position=float(stage["c:X"]),
@@ -268,7 +266,7 @@ def _foil_hole_data(
     logger.warning(
         f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
     )
-    return FoilHole(id=foil_hole, grid_square_id=grid_square, session_id=session_id)
+    return FoilHole(id=foil_hole, grid_square_id=grid_square)
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
