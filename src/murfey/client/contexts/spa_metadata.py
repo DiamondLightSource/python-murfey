@@ -21,13 +21,6 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
         for_parsing = xml.read()
         data = xmltodict.parse(for_parsing)
     data = data["GridSquareXml"]
-    readout_area = data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-        "ReadoutArea"
-    ]
-    pixel_size = data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-        "numericValue"
-    ]
-    full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
     serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
         "a:m_serializationArray"
     ]
@@ -58,11 +51,6 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
                 y_location=int(float(pix_loc["c:y"])),
                 x_stage_position=float(stage["c:X"]),
                 y_stage_position=float(stage["c:Y"]),
-                readout_area_x=full_size[0] if image_path else None,
-                readout_area_y=full_size[1] if image_path else None,
-                thumbnail_size_x=None,
-                thumbnail_size_y=None,
-                pixel_size=float(pixel_size) if image_path else None,
                 image=str(image_path),
                 diameter=int(float(diameter)),
             )
@@ -128,17 +116,21 @@ class SPAMetadataContext(Context):
             source_visit_dir = source.parent
 
             logger.info(
-                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / environment.visit / partial_path).parent)}"
             )
             atlas_xml_path = list(
-                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
+                (source_visit_dir / environment.visit / partial_path).parent.glob(
+                    "Atlas_*.xml"
+                )
             )[0]
             logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
                 atlas_xml_data = xmltodict.parse(atlas_xml)
-                atlas_original_pixel_size = atlas_xml_data["MicroscopeImage"][
-                    "SpatialScale"
-                ]["pixelSize"]["x"]["numericValue"]
+                atlas_original_pixel_size = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
 
             # need to calculate the pixel size of the downscaled image
             atlas_pixel_size = atlas_original_pixel_size * 7.8
@@ -190,7 +182,7 @@ class SPAMetadataContext(Context):
                         )
 
         elif transferred_file.suffix == ".dm" and environment:
-            gs_name = transferred_file.name.split("_")[1]
+            gs_name = transferred_file.stem.split("_")[1]
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
             visitless_source = str(source).replace(f"/{environment.visit}", "")

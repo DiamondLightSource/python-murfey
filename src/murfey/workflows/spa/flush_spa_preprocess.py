@@ -39,10 +39,14 @@ def register_grid_square(
             .where(GridSquare.tag == grid_square_params.tag)
             .where(GridSquare.session_id == session_id)
         ).one()
-        grid_square.x_location = grid_square_params.x_location
-        grid_square.y_location = grid_square_params.y_location
-        grid_square.x_stage_position = grid_square_params.x_stage_position
-        grid_square.y_stage_position = grid_square_params.y_stage_position
+        grid_square.x_location = grid_square_params.x_location or grid_square.x_location
+        grid_square.y_location = grid_square_params.y_location or grid_square.y_location
+        grid_square.x_stage_position = (
+            grid_square_params.x_stage_position or grid_square.x_stage_position
+        )
+        grid_square.y_stage_position = (
+            grid_square_params.y_stage_position or grid_square.y_stage_position
+        )
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
@@ -122,23 +126,37 @@ def register_foil_hole(
             .where(FoilHole.grid_square_id == gsid)
             .where(FoilHole.session_id == session_id)
         ).one()
-        foil_hole.x_location = foil_hole_params.x_location
-        foil_hole.y_location = foil_hole_params.y_location
-        foil_hole.x_stage_position = foil_hole_params.x_stage_position
-        foil_hole.y_stage_position = foil_hole_params.y_stage_position
-        foil_hole.readout_area_x = foil_hole_params.readout_area_x
-        foil_hole.readout_area_y = foil_hole_params.readout_area_y
-        foil_hole.thumbnail_size_x = foil_hole_params.thumbnail_size_x or jpeg_size[0]
-        foil_hole.thumbnail_size_y = foil_hole_params.thumbnail_size_y or jpeg_size[1]
-        foil_hole.pixel_size = foil_hole_params.pixel_size
-        if _transport_object:
+        foil_hole.x_location = foil_hole_params.x_location or foil_hole.x_location
+        foil_hole.y_location = foil_hole_params.y_location or foil_hole.y_location
+        foil_hole.x_stage_position = (
+            foil_hole_params.x_stage_position or foil_hole.x_stage_position
+        )
+        foil_hole.y_stage_position = (
+            foil_hole_params.y_stage_position or foil_hole.y_stage_position
+        )
+        foil_hole.readout_area_x = (
+            foil_hole_params.readout_area_x or foil_hole.readout_area_x
+        )
+        foil_hole.readout_area_y = (
+            foil_hole_params.readout_area_y or foil_hole.readout_area_y
+        )
+        foil_hole.thumbnail_size_x = (
+            foil_hole_params.thumbnail_size_x or foil_hole.thumbnail_size_x
+        ) or jpeg_size[0]
+        foil_hole.thumbnail_size_y = (
+            foil_hole_params.thumbnail_size_y or foil_hole.thumbnail_size_y
+        ) or jpeg_size[1]
+        foil_hole.pixel_size = foil_hole_params.pixel_size or foil_hole.pixel_size
+        if _transport_object and gs.readout_area_x:
             _transport_object.do_update_foil_hole(
                 foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
     except Exception:
         if _transport_object:
             fh_ispyb_response = _transport_object.do_insert_foil_hole(
-                gs.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
+                gs.id,
+                gs.thumbnail_size_x / gs.readout_area_x if gs.readout_area_x else None,
+                foil_hole_params,
             )
         else:
             fh_ispyb_response = {"success": False, "return_value": None}
@@ -334,7 +352,8 @@ def flush_spa_preprocessing(message: dict, db: Session, demo: bool = False):
                 )
             except Exception as e:
                 logger.error(
-                    f"Flushing position analysis for {f.file_path} caused exception {e}", exc_info=True
+                    f"Flushing position analysis for {f.file_path} caused exception {e}",
+                    exc_info=True,
                 )
                 foil_hole_id = None
 

@@ -456,10 +456,7 @@ class SPAModularContext(_SPAContext):
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
             fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
-            if (
-                grid_square_metadata_file.is_file()
-                and environment.murfey_session is not None
-            ):
+            if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,
                     foil_hole,
