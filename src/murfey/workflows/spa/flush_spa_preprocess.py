@@ -10,7 +10,18 @@ from werkzeug.utils import secure_filename
 from murfey.server import _murfey_id, _transport_object, sanitise
 from murfey.server.api.auth import MurfeySessionID
 from murfey.util.config import get_machine_config, get_microscope
-from murfey.util.db import DataCollectionGroup, FoilHole, GridSquare
+from murfey.util.db import (
+    AutoProcProgram,
+    DataCollection,
+    DataCollectionGroup,
+    FoilHole,
+    GridSquare,
+    Movie,
+    PreprocessStash,
+    ProcessingJob,
+)
+from murfey.util.db import Session as MurfeySession
+from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.spa_metadata import (
@@ -201,7 +212,7 @@ def _flush_position_analysis(
 ) -> Optional[int]:
     """Register a grid square and foil hole in the database"""
     data_collection_group = db.exec(
-        select(db.DataCollectionGroup).where(db.DataCollectionGroup.id == dcg_id)
+        select(DataCollectionGroup).where(DataCollectionGroup.id == dcg_id)
     ).one()
 
     # Work out the grid square and associated metadata file
@@ -283,14 +294,14 @@ def _flush_position_analysis(
 def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
     session_id = message["session_id"]
     stashed_files = db.exec(
-        select(db.PreprocessStash)
-        .where(db.PreprocessStash.session_id == session_id)
-        .where(db.PreprocessStash.tag == message["tag"])
+        select(PreprocessStash)
+        .where(PreprocessStash.session_id == session_id)
+        .where(PreprocessStash.tag == message["tag"])
     ).all()
     if not stashed_files:
         return None
     instrument_name = (
-        db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        db.exec(select(MurfeySession).where(MurfeySession.id == message["session_id"]))
         .one()
         .instrument_name
     )
@@ -300,22 +311,22 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
     recipe_name = machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
     collected_ids = db.exec(
         select(
-            db.DataCollectionGroup,
-            db.DataCollection,
-            db.ProcessingJob,
-            db.AutoProcProgram,
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            AutoProcProgram,
         )
-        .where(db.DataCollectionGroup.session_id == session_id)
-        .where(db.DataCollectionGroup.tag == message["tag"])
-        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(db.ProcessingJob.recipe == recipe_name)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == message["tag"])
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == recipe_name)
     ).one()
     params = db.exec(
-        select(db.SPARelionParameters, db.SPAFeedbackParameters)
-        .where(db.SPARelionParameters.pj_id == collected_ids[2].id)
-        .where(db.SPAFeedbackParameters.pj_id == db.SPARelionParameters.pj_id)
+        select(SPARelionParameters, SPAFeedbackParameters)
+        .where(SPARelionParameters.pj_id == collected_ids[2].id)
+        .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
     ).one()
     proc_params = params[0]
     feedback_params = params[1]
@@ -360,7 +371,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
         ppath = Path(f.file_path)
         if not mrcp.parent.exists():
             mrcp.parent.mkdir(parents=True)
-        movie = db.Movie(
+        movie = Movie(
             murfey_id=murfey_ids[2 * i],
             path=f.file_path,
             image_number=f.image_number,
