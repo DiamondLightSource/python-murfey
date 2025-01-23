@@ -57,6 +57,6 @@ RUN groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
     chown -R "${userid}":"${groupid}" /venv && \
     chmod -R a+x /venv
-ENV PATH=/venv/bin:/imod-install/IMOD/bin:$PATH
-ENV IMOD_DIR=/imod-install/IMOD
+ENV PATH=/venv/bin:/imod/IMOD/bin:$PATH
+ENV IMOD_DIR=/imod/IMOD
 USER "${userid}":"${groupid}"
