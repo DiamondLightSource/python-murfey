@@ -4,17 +4,18 @@
 # Set up the base image to build with
 FROM docker.io/library/python:3.12.8-slim-bullseye AS base
 
-# Install Vim in base image
+# Install Vim and PostgreSQL dependencies in base image
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
+        libpq-dev \
         vim \
         && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/*
 
 
-# Build Murfey in a separate image
+# Build Murfey and IMOD in a separate image
 FROM base as build
 COPY ./ /python-murfey/
 RUN apt-get update && \
@@ -22,8 +23,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         busybox \
-        git \
-        libpq-dev \
+        curl \
+        # git \
         net-tools \
         && \
     busybox --install && \
@@ -34,7 +35,11 @@ RUN apt-get update && \
         importlib-metadata \
         psycopg2-binary \
         && \
-    /venv/bin/python -m pip install /python-murfey[server]
+    /venv/bin/python -m pip install /python-murfey[server] && \
+    curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.0_RHEL8-64_CUDA12.0.sh > imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
+    chmod +x imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
+    mkdir imod && \
+    ./imod_5.1.0_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
 
 
 # Transfer completed Murfey build to a clean image
@@ -45,11 +50,13 @@ ARG groupid
 ARG groupname
 ARG userid
 
-# Copy completed Murfey build across and set user and group permissions
+# Copy completed Murfey and IMOD builds across and set user and group permissions
 COPY --from=build /venv/ /venv/
+COPY --from=build /imod/ /imod/
 RUN groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
     chown -R "${userid}":"${groupid}" /venv && \
     chmod -R a+x /venv
-ENV PATH=/venv/bin:$PATH
+ENV PATH=/venv/bin:/imod-install/IMOD/bin:$PATH
+ENV IMOD_DIR=/imod-install/IMOD
 USER "${userid}":"${groupid}"
