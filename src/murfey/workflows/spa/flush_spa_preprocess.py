@@ -355,7 +355,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
             # Register grid square and foil hole if not present
             try:
                 foil_hole_id = _flush_position_analysis(
-                    movie_path=f.file_path,
+                    movie_path=Path(f.file_path),
                     dcg_id=collected_ids[0].id,
                     session_id=session_id,
                     murfey_db=murfey_db,
