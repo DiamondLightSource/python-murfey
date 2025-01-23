@@ -15,7 +15,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 
-# Build Murfey and IMOD in a separate image
+# Build Murfey and IMOD in a branch image
 FROM base as build
 COPY ./ /python-murfey/
 RUN apt-get update && \
@@ -42,10 +42,10 @@ RUN apt-get update && \
     ./imod_5.1.0_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
 
 
-# Transfer completed Murfey build to a clean image
+# Transfer completed builds to base image
 FROM base
 
-# Define external build arguments
+# Pass external build arguments to this stage
 ARG groupid
 ARG groupname
 ARG userid
