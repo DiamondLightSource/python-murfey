@@ -253,7 +253,7 @@ class TransportManager:
     def do_insert_foil_hole(
         self,
         grid_square_id: int,
-        scale_factor: float,
+        scale_factor: Optional[float],
         foil_hole_parameters: FoilHoleParameters,
     ):
         if (
@@ -265,21 +265,22 @@ class TransportManager:
                 foil_hole_parameters.readout_area_x
                 / foil_hole_parameters.thumbnail_size_x
             )
-        foil_hole_parameters.diameter = (
-            int(foil_hole_parameters.diameter * scale_factor)
-            if foil_hole_parameters.diameter
-            else None
-        )
-        foil_hole_parameters.x_location = (
-            int(foil_hole_parameters.x_location * scale_factor)
-            if foil_hole_parameters.x_location
-            else None
-        )
-        foil_hole_parameters.y_location = (
-            int(foil_hole_parameters.y_location * scale_factor)
-            if foil_hole_parameters.y_location
-            else None
-        )
+        if scale_factor:
+            foil_hole_parameters.diameter = (
+                int(foil_hole_parameters.diameter * scale_factor)
+                if foil_hole_parameters.diameter
+                else None
+            )
+            foil_hole_parameters.x_location = (
+                int(foil_hole_parameters.x_location * scale_factor)
+                if foil_hole_parameters.x_location
+                else None
+            )
+            foil_hole_parameters.y_location = (
+                int(foil_hole_parameters.y_location * scale_factor)
+                if foil_hole_parameters.y_location
+                else None
+            )
         record = FoilHole(
             gridSquareId=grid_square_id,
             foilHoleLabel=foil_hole_parameters.name,

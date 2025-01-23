@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, OrderedDict, Tuple
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
 import requests
 import xmltodict
@@ -21,111 +21,17 @@ from murfey.util import (
     capture_post,
     get_machine_config_client,
 )
+from murfey.util.spa_metadata import (
+    foil_hole_data,
+    foil_hole_from_file,
+    get_grid_square_atlas_positions,
+    grid_square_data,
+    grid_square_from_file,
+)
 
 logger = logging.getLogger("murfey.client.contexts.spa")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
-
-
-class FoilHole(NamedTuple):
-    session_id: int
-    id: int
-    grid_square_id: int
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
-    image: str = ""
-    diameter: Optional[float] = None
-
-
-class GridSquare(NamedTuple):
-    session_id: int
-    id: int
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
-    image: str = ""
-    tag: str = ""
-
-
-def _get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> Dict[
-    str,
-    Tuple[
-        Optional[int],
-        Optional[int],
-        Optional[float],
-        Optional[float],
-        Optional[int],
-        Optional[int],
-        Optional[float],
-    ],
-]:
-    with open(
-        xml_path,
-        "r",
-    ) as dm:
-        atlas_data = xmltodict.parse(dm.read())
-    tile_info = atlas_data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"][
-        "TileXml"
-    ]
-    gs_pix_positions: Dict[
-        str,
-        Tuple[
-            Optional[int],
-            Optional[int],
-            Optional[float],
-            Optional[float],
-            Optional[int],
-            Optional[int],
-            Optional[float],
-        ],
-    ] = {}
-    for ti in tile_info:
-        try:
-            nodes = ti["Nodes"]["KeyValuePairs"]
-        except KeyError:
-            continue
-        required_key = ""
-        for key in nodes.keys():
-            if key.startswith("KeyValuePairOfintNodeXml"):
-                required_key = key
-                break
-        if not required_key:
-            continue
-        for gs in nodes[required_key]:
-            if not isinstance(gs, dict):
-                continue
-            if not grid_square or gs["key"] == grid_square:
-                gs_pix_positions[gs["key"]] = (
-                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"])),
-                    int(float(gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"])),
-                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
-                    * 1e9,
-                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
-                    * 1e9,
-                    int(
-                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Size"]["d:width"])
-                    ),
-                    int(
-                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Size"]["d:height"])
-                    ),
-                    float(gs["value"]["b:PositionOnTheAtlas"]["c:Rotation"]),
-                )
-                if grid_square:
-                    break
-    return gs_pix_positions
 
 
 def _file_transferred_to(
@@ -150,17 +56,6 @@ def _file_transferred_to(
     )
 
 
-def _grid_square_from_file(f: Path) -> int:
-    for p in f.parts:
-        if p.startswith("GridSquare"):
-            return int(p.split("_")[1])
-    raise ValueError(f"Grid square ID could not be determined from path {f}")
-
-
-def _foil_hole_from_file(f: Path) -> int:
-    return int(f.name.split("_")[1])
-
-
 def _grid_square_metadata_file(
     f: Path, data_directories: List[Path], visit: str, grid_square: int
 ) -> Path:
@@ -178,97 +73,6 @@ def _grid_square_metadata_file(
         / "Metadata"
         / f"GridSquare_{grid_square}.dm"
     )
-
-
-def _grid_square_data(xml_path: Path, grid_square: int, session_id: int) -> GridSquare:
-    image_paths = list(
-        (xml_path.parent.parent).glob(
-            f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
-        )
-    )
-    if image_paths:
-        image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path = image_paths[-1]
-        with open(Path(image_path).with_suffix(".xml")) as gs_xml:
-            gs_xml_data = xmltodict.parse(gs_xml.read())
-        readout_area = gs_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
-            "camera"
-        ]["ReadoutArea"]
-        pixel_size = gs_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-            "numericValue"
-        ]
-        full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
-        return GridSquare(
-            id=grid_square,
-            session_id=session_id,
-            readout_area_x=full_size[0] if image_path else None,
-            readout_area_y=full_size[1] if image_path else None,
-            thumbnail_size_x=int((512 / max(full_size)) * full_size[0]),
-            thumbnail_size_y=int((512 / max(full_size)) * full_size[1]),
-            pixel_size=float(pixel_size) if image_path else None,
-            image=str(image_path),
-        )
-    return GridSquare(id=grid_square, session_id=session_id)
-
-
-def _foil_hole_data(
-    xml_path: Path, foil_hole: int, grid_square: int, session_id: int
-) -> FoilHole:
-    with open(xml_path, "r") as xml:
-        for_parsing = xml.read()
-        data = xmltodict.parse(for_parsing)
-    data = data["GridSquareXml"]
-    serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
-        "a:m_serializationArray"
-    ]
-    required_key = ""
-    for key in serialization_array.keys():
-        if key.startswith("b:KeyValuePairOfintTargetLocation"):
-            required_key = key
-            break
-    if required_key:
-        image_paths = list(
-            (xml_path.parent.parent).glob(
-                f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{foil_hole}_*.jpg"
-            )
-        )
-        image_paths.sort(key=lambda x: x.stat().st_ctime)
-        image_path: Path | str = image_paths[-1] if image_paths else ""
-        if image_path:
-            with open(Path(image_path).with_suffix(".xml")) as fh_xml:
-                fh_xml_data = xmltodict.parse(fh_xml.read())
-            readout_area = fh_xml_data["MicroscopeImage"]["microscopeData"][
-                "acquisition"
-            ]["camera"]["ReadoutArea"]
-            pixel_size = fh_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"][
-                "x"
-            ]["numericValue"]
-            full_size = (int(readout_area["a:width"]), int(readout_area["a:height"]))
-        for fh_block in serialization_array[required_key]:
-            pix = fh_block["b:value"]["PixelCenter"]
-            stage = fh_block["b:value"]["StagePosition"]
-            diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
-            if int(fh_block["b:key"]) == foil_hole:
-                return FoilHole(
-                    id=foil_hole,
-                    grid_square_id=grid_square,
-                    session_id=session_id,
-                    x_location=float(pix["c:x"]),
-                    y_location=float(pix["c:y"]),
-                    x_stage_position=float(stage["c:X"]),
-                    y_stage_position=float(stage["c:Y"]),
-                    readout_area_x=full_size[0] if image_path else None,
-                    readout_area_y=full_size[1] if image_path else None,
-                    thumbnail_size_x=None,
-                    thumbnail_size_y=None,
-                    pixel_size=float(pixel_size) if image_path else None,
-                    image=str(image_path),
-                    diameter=diameter,
-                )
-    logger.warning(
-        f"Foil hole positions could not be determined from metadata file {xml_path} for foil hole {foil_hole}"
-    )
-    return FoilHole(id=foil_hole, grid_square_id=grid_square, session_id=session_id)
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -566,8 +370,8 @@ class SPAModularContext(_SPAContext):
         environment: MurfeyInstanceEnvironment,
         source: Path,
         machine_config: dict,
-    ) -> int:
-        grid_square = _grid_square_from_file(transferred_file)
+    ) -> Optional[int]:
+        grid_square = grid_square_from_file(transferred_file)
         grid_square_metadata_file = _grid_square_metadata_file(
             transferred_file,
             [Path(p) for p in machine_config["data_directories"]],
@@ -596,6 +400,9 @@ class SPAModularContext(_SPAContext):
                 .json()
                 .get(str(source), {})
             )
+            if not data_collection_group:
+                logger.info("Data collection group has not yet been made")
+                return None
             if data_collection_group.get("atlas"):
                 visit_path = ""
                 for p in transferred_file.parts:
@@ -606,15 +413,14 @@ class SPAModularContext(_SPAContext):
                     local_atlas_path = (
                         Path(visit_path) / environment.samples[source].atlas
                     )
-                    gs_pix_position = _get_grid_square_atlas_positions(
+                    gs_pix_position = get_grid_square_atlas_positions(
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
             gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
-            gs = _grid_square_data(
+            gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
-                environment.murfey_session,
             )
             metadata_source = Path(
                 (
@@ -647,18 +453,14 @@ class SPAModularContext(_SPAContext):
                     "angle": gs_pix_position[6],
                 },
             )
-        foil_hole = _foil_hole_from_file(transferred_file)
+        foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
             fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
-            if (
-                grid_square_metadata_file.is_file()
-                and environment.murfey_session is not None
-            ):
-                fh = _foil_hole_data(
+            if environment.murfey_session is not None:
+                fh = foil_hole_data(
                     grid_square_metadata_file,
                     foil_hole,
                     grid_square,
-                    environment.murfey_session,
                 )
                 metadata_source = Path(
                     (

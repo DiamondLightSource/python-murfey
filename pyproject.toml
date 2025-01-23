@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.16.3"
+version = "0.16.5"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -107,6 +107,7 @@ murfey = "murfey.client:run"
 "clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
 "clem.register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
 "clem.register_tiff_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_tiff_preprocessing_result"
+"spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
