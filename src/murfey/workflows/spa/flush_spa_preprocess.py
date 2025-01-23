@@ -291,7 +291,7 @@ def _flush_position_analysis(
     return foil_hole
 
 
-def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
+def flush_spa_preprocess(message: dict, db: Session, demo: bool = False) -> bool:
     session_id = message["session_id"]
     stashed_files = db.exec(
         select(PreprocessStash)
@@ -299,7 +299,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
         .where(PreprocessStash.tag == message["tag"])
     ).all()
     if not stashed_files:
-        return None
+        return True
     instrument_name = (
         db.exec(select(MurfeySession).where(MurfeySession.id == message["session_id"]))
         .one()
@@ -334,9 +334,7 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
         logger.warning(
             f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
         )
-        raise ValueError(
-            "No processing parameters were found in the database when flushing SPA preprocessing"
-        )
+        return False
 
     murfey_ids = _murfey_id(
         collected_ids[3].id,
@@ -417,4 +415,4 @@ def flush_spa_preprocess(message: dict, db: Session, demo: bool = False):
             )
     db.commit()
     db.close()
-    return None
+    return True

@@ -2948,7 +2948,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                 else:
                     # Send it directly to DLQ without trying to rerun it
                     _transport_object.transport.nack(header, requeue=False)
+            if not result:
+                logger.error(f"Workflow {message['register']} returned {result}")
             return None
+        logger.error(f"No workflow found for {message['register']}")
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None
