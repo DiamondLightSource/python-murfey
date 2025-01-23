@@ -162,8 +162,7 @@ class SPAMetadataContext(Context):
                 }
                 capture_post(url, json=dcg_data)
                 gs_pix_positions = get_grid_square_atlas_positions(
-                    _atlas_destination(environment, source, transferred_file)
-                    / environment.samples[source].atlas
+                    source_visit_dir / environment.visit / partial_path
                 )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
