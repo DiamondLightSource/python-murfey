@@ -36,7 +36,7 @@ def test_register_grid_square_update_add_locations(mock_transport, start_postgre
         flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db)
 
     # Check this would have updated ispyb
-    mock_transport.do_update_grid_square.assert_called_with(101, new_parameters)
+    mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
 
     # Confirm the database was updated
     with Session(engine) as murfey_db:
@@ -77,7 +77,7 @@ def test_register_grid_square_update_add_nothing(mock_transport, start_postgres)
         flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db)
 
     # Check this would have updated ispyb
-    mock_transport.do_update_grid_square.assert_called_with(101, new_parameters)
+    mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
 
     # Confirm the database was not updated
     with Session(engine) as murfey_db:
