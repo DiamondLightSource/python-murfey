@@ -29,6 +29,16 @@ jobs:
           - 3306:3306
         options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3
 
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: murfey_test_db
+          POSTGRES_PASSWORD: psql_pwd
+          POSTGRES_USER: psql_user
+        ports:
+          5432: 5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - name: Use Python ${{ matrix.python-version }}
@@ -74,7 +84,7 @@ jobs:
           mysql-version: "11.3"
           auto-start: false
 
-      - name: Set up test database
+      - name: Set up test ipsyb database
         run: |
           set -eu
           cp ".github/workflows/config/my.cnf" .my.cnf
@@ -99,10 +109,22 @@ jobs:
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_sqlalchemy@'%' IDENTIFIED BY 'password_5678'; GRANT SELECT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT INSERT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT UPDATE ON ispybtest.* to ispyb_api_sqlalchemy@'%';"
           rm .my.cnf
 
+      - name: Connect to PostgreSQL
+        run: node client.js
+        env:
+          POSTGRES_HOST: postgres
+          POSTGRES_PORT: 5432
+
       - name: Check RabbitMQ is alive
         run: wget -t 10 -w 1 http://127.0.0.1:15672 -O -
 
       - name: Run tests
+        env:
+          POSTGRES_HOST: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: murfey_test_db
+          POSTGRES_PASSWORD: psql_pwd
+          POSTGRES_USER: psql_user
         run: |
           export ISPYB_CREDENTIALS=".github/workflows/config/ispyb.cfg"
           PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
