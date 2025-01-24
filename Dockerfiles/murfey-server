@@ -24,7 +24,6 @@ RUN apt-get update && \
         build-essential \
         busybox \
         curl \
-        # git \
         net-tools \
         && \
     busybox --install && \

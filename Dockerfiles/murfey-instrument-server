@@ -14,7 +14,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 
-# Build Murfey in a separate image
+# Build Murfey in a branch image
 FROM base as build
 COPY ./ /python-murfey/
 RUN apt-get update && \
@@ -22,9 +22,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         busybox \
-        git \
         net-tools \
-        libpq-dev && \
+        libpq-dev \
+        && \
     busybox --install && \
     python -m venv /venv && \
     /venv/bin/python -m pip install --upgrade \
@@ -34,7 +34,7 @@ RUN apt-get update && \
     /venv/bin/python -m pip install /python-murfey[client,instrument-server]
 
 
-# Transfer completed Murfey build to clean image
+# Transfer completed Murfey build to base image
 FROM base
 
 # Define external build arguments
