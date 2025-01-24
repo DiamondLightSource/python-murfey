@@ -62,8 +62,8 @@ def test_register_grid_square_update_add_nothing(mock_transport, start_postgres)
         tag="session_tag",
         x_location=0.1,
         y_location=0.2,
-        x_stage_location=0.3,
-        y_stage_location=0.4,
+        x_stage_position=0.3,
+        y_stage_position=0.4,
     )
     with Session(engine) as murfey_db:
         murfey_db.add(grid_square)
