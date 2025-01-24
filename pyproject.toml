@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.16.5"
+version = "0.16.6"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -36,6 +36,7 @@ dependencies = [
     "requests",
     "rich",
     "werkzeug",
+    "xmltodict",
 ]
 [project.optional-dependencies]
 cicd = [
@@ -44,7 +45,6 @@ cicd = [
 client = [
     "textual==0.42.0",
     "websocket-client",
-    "xmltodict",
 ]
 developer = [
     "bump-my-version<0.11.0", # Version control
