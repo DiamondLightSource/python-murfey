@@ -114,7 +114,7 @@ jobs:
 
       - name: Run tests
         env:
-          POSTGRES_HOST: postgres
+          POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
           POSTGRES_DB: murfey_test_db
           POSTGRES_PASSWORD: psql_pwd
