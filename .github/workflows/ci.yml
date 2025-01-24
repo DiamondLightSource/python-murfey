@@ -67,7 +67,7 @@ jobs:
           docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 test-rabbitmq
           docker container list -a
 
-      - name: Get database
+      - name: Get ispyb database
         uses: actions/download-artifact@v4
         with:
           name: database
@@ -108,12 +108,6 @@ jobs:
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_future@'%' IDENTIFIED BY 'password_4321'; GRANT SELECT ON ispybtest.* to ispyb_api_future@'%';"
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_sqlalchemy@'%' IDENTIFIED BY 'password_5678'; GRANT SELECT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT INSERT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT UPDATE ON ispybtest.* to ispyb_api_sqlalchemy@'%';"
           rm .my.cnf
-
-      - name: Connect to PostgreSQL
-        run: node client.js
-        env:
-          POSTGRES_HOST: postgres
-          POSTGRES_PORT: 5432
 
       - name: Check RabbitMQ is alive
         run: wget -t 10 -w 1 http://127.0.0.1:15672 -O -
