@@ -82,10 +82,10 @@ def test_register_grid_square_update_add_nothing(mock_transport, start_postgres)
     # Confirm the database was not updated
     with Session(engine) as murfey_db:
         grid_square_final_parameters = murfey_db.exec(select(GridSquare)).one()
-    assert grid_square_final_parameters.x_location == grid_square.x_location
-    assert grid_square_final_parameters.y_location == grid_square.y_location
-    assert grid_square_final_parameters.x_stage_position == grid_square.x_stage_position
-    assert grid_square_final_parameters.y_stage_position == grid_square.y_stage_position
+    assert grid_square_final_parameters.x_location == 0.1
+    assert grid_square_final_parameters.y_location == 0.2
+    assert grid_square_final_parameters.x_stage_position == 0.3
+    assert grid_square_final_parameters.y_stage_position == 0.4
 
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
