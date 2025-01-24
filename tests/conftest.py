@@ -1,6 +1,8 @@
 import pytest
+from sqlmodel import Session
 
-from murfey.util.db import Session, clear, setup
+from murfey.util.db import Session as MurfeySession
+from murfey.util.db import clear, setup
 from tests import engine, url
 
 
@@ -9,7 +11,7 @@ def start_postgres():
     clear(url)
     setup(url)
 
-    murfey_session = Session(id=2, name="cm12345-6")
+    murfey_session = MurfeySession(id=2, name="cm12345-6")
     with Session(engine) as murfey_db:
         murfey_db.add(murfey_session)
         murfey_db.commit()
