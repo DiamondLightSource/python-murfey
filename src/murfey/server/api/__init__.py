@@ -579,7 +579,7 @@ def flush_spa_processing(
     visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
 ):
     zocalo_message = {
-        "register": "flush_spa_preprocess",
+        "register": "spa.flush_spa_preprocess",
         "session_id": session_id,
         "tag": tag.tag,
     }

@@ -162,8 +162,7 @@ class SPAMetadataContext(Context):
                 }
                 capture_post(url, json=dcg_data)
                 gs_pix_positions = get_grid_square_atlas_positions(
-                    _atlas_destination(environment, source, transferred_file)
-                    / environment.samples[source].atlas
+                    source_visit_dir / environment.visit / partial_path
                 )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
@@ -181,7 +180,11 @@ class SPAMetadataContext(Context):
                             },
                         )
 
-        elif transferred_file.suffix == ".dm" and environment:
+        elif (
+            transferred_file.suffix == ".dm"
+            and transferred_file.name.startswith("GridSquare")
+            and environment
+        ):
             gs_name = transferred_file.stem.split("_")[1]
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
