@@ -1,26 +1,11 @@
-import os
 from unittest import mock
 
-import pytest
-from sqlalchemy import Session, create_engine, select
+from sqlmodel import Session, select
 
-from murfey.util.db import DataCollectionGroup, GridSquare, clear, setup
+from murfey.util.db import DataCollectionGroup, GridSquare
 from murfey.util.models import GridSquareParameters
 from murfey.workflows.spa import flush_spa_preprocess
-
-url = (
-    f"postgresql://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
-    f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
-)
-
-
-@pytest.fixture
-def start_postgres():
-    clear(url)
-    setup(url)
-
-
-engine = create_engine(url)
+from tests import engine
 
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
