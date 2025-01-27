@@ -356,6 +356,7 @@ class CompletedTiltSeries(BaseModel):
 
 class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
+    frame_count: int
     gain_ref: Optional[str]
     experiment_type: str
     voltage: float

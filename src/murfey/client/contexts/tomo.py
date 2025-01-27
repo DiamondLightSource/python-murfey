@@ -89,6 +89,7 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("frame_count", "Number of image frames"),
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
@@ -189,6 +190,9 @@ class TomographyContext(Context):
                     "mc_uuid": incomplete_process_file.mc_uuid,
                     "dose_per_frame": environment.data_collection_parameters.get(
                         "dose_per_frame"
+                    ),
+                    "frame_count": environment.data_collection_parameters.get(
+                        "frame_count", 0
                     ),
                     "mc_binning": environment.data_collection_parameters.get(
                         "motion_corr_binning", 1
@@ -452,6 +456,9 @@ class TomographyContext(Context):
                 "dose_per_frame": environment.data_collection_parameters.get(
                     "dose_per_frame", 0
                 ),
+                "frame_count": environment.data_collection_parameters.get(
+                    "frame_count", 0
+                ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
@@ -682,6 +689,7 @@ class TomographyContext(Context):
             mdoc_metadata: OrderedDict = OrderedDict({})
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+            mdoc_metadata["frame_count"] = float(mdoc_data_block["NumSubFrames"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
@@ -748,6 +756,9 @@ class TomographyContext(Context):
             if data_file.split(".")[-1] == "eer":
                 mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
                     metadata_file.parent / data_file
+                )
+                mdoc_metadata["frame_count"] = int(
+                    mdoc_metadata["eer_fractionation"] / mdoc_metadata["num_eer_frames"]
                 )
         except Exception as e:
             logger.error(f"Exception encountered in metadata gathering: {str(e)}")
