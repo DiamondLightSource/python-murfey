@@ -149,10 +149,13 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+                dcg_tag = "/".join(
+                    p for p in transferred_file.parent.parts if p != environment.visit
+                )
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
-                    "tag": str(source),
+                    "tag": dcg_tag,
                     "atlas": str(
                         _atlas_destination(environment, source, transferred_file)
                         / environment.samples[source].atlas
@@ -169,7 +172,7 @@ class SPAMetadataContext(Context):
                         capture_post(
                             f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs}",
                             json={
-                                "tag": str(source),
+                                "tag": dcg_tag,
                                 "x_location": pos_data[0],
                                 "y_location": pos_data[1],
                                 "x_stage_position": pos_data[2],
