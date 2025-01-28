@@ -474,54 +474,6 @@ class MurfeyTUI(App):
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
-            dcg_data = {
-                "experiment_type": "tomo",
-                "experiment_type_id": 36,
-                "tag": str(source),
-                "atlas": (
-                    str(self._environment.samples[source].atlas)
-                    if self._environment.samples.get(source)
-                    else ""
-                ),
-                "sample": (
-                    self._environment.samples[source].sample
-                    if self._environment.samples.get(source)
-                    else None
-                ),
-            }
-            capture_post(url, json=dcg_data)
-            data = {
-                "voltage": json["voltage"],
-                "pixel_size_on_image": json["pixel_size_on_image"],
-                "experiment_type": json["experiment_type"],
-                "image_size_x": json["image_size_x"],
-                "image_size_y": json["image_size_y"],
-                "file_extension": json["file_extension"],
-                "acquisition_software": json["acquisition_software"],
-                "image_directory": str(self._environment.default_destinations[source]),
-                "tag": json["tilt_series_tag"],
-                "source": str(source),
-                "magnification": json["magnification"],
-                "total_exposed_dose": json.get("total_exposed_dose"),
-                "c2aperture": json.get("c2aperture"),
-                "exposure_time": json.get("exposure_time"),
-                "slit_width": json.get("slit_width"),
-                "phase_plate": json.get("phase_plate", False),
-            }
-            capture_post(
-                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection",
-                json=data,
-            )
-            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
-                capture_post(
-                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
-                    json={
-                        "tag": json["tilt_series_tag"],
-                        "source": str(source),
-                        "recipe": recipe,
-                    },
-                )
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
@@ -545,8 +497,6 @@ class MurfeyTUI(App):
                 f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,
             )
-            context._flush_data_collections()
-            context._flush_processing_jobs()
             capture_post(
                 f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
