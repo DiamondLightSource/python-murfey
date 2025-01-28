@@ -349,23 +349,29 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         murfey_db.add(feedback_params)
 
     for i, f in enumerate(stashed_files):
-        if f.foil_hole_id:
-            foil_hole_id = f.foil_hole_id
-        else:
-            # Register grid square and foil hole if not present
-            try:
+        try:
+            foil_hole_id = None
+            if f.foil_hole_id:
+                # Check if the foil hole id has been registered in the database
+                db_foil_hole = murfey_db.exec(
+                    select(FoilHole).where(FoilHole.id == f.foil_hole_id)
+                ).all()
+                if db_foil_hole:
+                    foil_hole_id = f.foil_hole_id
+            if not foil_hole_id:
+                # Register grid square and foil hole if not present
                 foil_hole_id = _flush_position_analysis(
                     movie_path=Path(f.file_path),
                     dcg_id=collected_ids[0].id,
                     session_id=session_id,
                     murfey_db=murfey_db,
                 )
-            except Exception as e:
-                logger.error(
-                    f"Flushing position analysis for {f.file_path} caused exception {e}",
-                    exc_info=True,
-                )
-                foil_hole_id = None
+        except Exception as e:
+            logger.error(
+                f"Flushing position analysis for {f.file_path} caused exception {e}",
+                exc_info=True,
+            )
+            foil_hole_id = None
 
         mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
