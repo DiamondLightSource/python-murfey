@@ -92,7 +92,7 @@ def _get_xml_list_index(key: str, xml_list: list) -> int:
     raise ValueError(f"Key not found in XML list: {key}")
 
 
-class _SPAContext(Context):
+class SPAModularContext(Context):
     user_params = [
         ProcessingParameter(
             "dose_per_frame",
@@ -133,7 +133,6 @@ class _SPAContext(Context):
         super().__init__("SPA", acquisition_software)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
-        self._preprocessing_triggers: dict = {}
         self._foil_holes: Dict[int, List[int]] = {}
 
     def gather_metadata(
@@ -365,8 +364,6 @@ class _SPAContext(Context):
         ) or True
         return metadata
 
-
-class SPAModularContext(_SPAContext):
     def _position_analysis(
         self,
         transferred_file: Path,
@@ -661,104 +658,3 @@ class SPAModularContext(_SPAContext):
         url: str = "",
     ):
         return
-
-
-class SPAContext(_SPAContext):
-    def _register_data_collection(
-        self,
-        tag: str,
-        url: str,
-        data: dict,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        logger.info(f"registering data collection with data {data}")
-        environment.id_tag_registry["data_collection"].append(tag)
-        image_directory = str(environment.default_destinations[Path(tag)])
-        json = {
-            "voltage": data["voltage"],
-            "pixel_size_on_image": data["pixel_size_on_image"],
-            "experiment_type": data["experiment_type"],
-            "image_size_x": data["image_size_x"],
-            "image_size_y": data["image_size_y"],
-            "file_extension": data["file_extension"],
-            "acquisition_software": data["acquisition_software"],
-            "image_directory": image_directory,
-            "tag": tag,
-            "source": tag,
-            "magnification": data["magnification"],
-            "total_exposed_dose": data.get("total_exposed_dose"),
-            "c2aperture": data.get("c2aperture"),
-            "exposure_time": data.get("exposure_time"),
-            "slit_width": data.get("slit_width"),
-            "phase_plate": data.get("phase_plate", False),
-        }
-        capture_post(url, json=json)
-
-    def post_transfer(
-        self,
-        transferred_file: Path,
-        environment: MurfeyInstanceEnvironment | None = None,
-        **kwargs,
-    ) -> bool:
-        return True
-
-    def _register_processing_job(
-        self,
-        tag: str,
-        environment: MurfeyInstanceEnvironment,
-        parameters: Dict[str, Any] | None = None,
-    ):
-        logger.info(f"registering processing job with parameters: {parameters}")
-        parameters = parameters or {}
-        environment.id_tag_registry["processing_job"].append(tag)
-        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-        machine_config = get_machine_config_client(
-            str(environment.url.geturl()),
-            instrument_name=environment.instrument_name,
-            demo=environment.demo,
-        )
-        image_directory = str(
-            Path(machine_config.get("rsync_basepath", "."))
-            / environment.default_destinations[Path(tag)]
-        )
-        if self._acquisition_software == "epu":
-            import_images = f"{Path(image_directory).resolve()}/GridSquare*/Data/*{parameters['file_extension']}"
-        else:
-            import_images = (
-                f"{Path(image_directory).resolve()}/*{parameters['file_extension']}"
-            )
-        msg: Dict[str, Any] = {
-            "tag": tag,
-            "source": tag,
-            "recipe": "ispyb-relion",
-            "parameters": {
-                "acquisition_software": parameters["acquisition_software"],
-                "voltage": parameters["voltage"],
-                "gain_ref": parameters["gain_ref"],
-                "dose_per_frame": parameters["dose_per_frame"],
-                "eer_grouping": parameters["eer_fractionation"],
-                "import_images": import_images,
-                "angpix": float(parameters["pixel_size_on_image"]) * 1e10,
-                "symmetry": parameters["symmetry"],
-                "boxsize": parameters["boxsize"],
-                "downscale": parameters["downscale"],
-                "small_boxsize": parameters["small_boxsize"],
-                "mask_diameter": parameters["mask_diameter"],
-                "use_cryolo": parameters["use_cryolo"],
-                "estimate_particle_diameter": parameters["estimate_particle_diameter"],
-            },
-        }
-        if parameters["particle_diameter"]:
-            msg["parameters"]["particle_diameter"] = parameters["particle_diameter"]
-        capture_post(proc_url, json=msg)
-
-    def _launch_spa_pipeline(
-        self,
-        tag: str,
-        jobid: int,
-        environment: MurfeyInstanceEnvironment,
-        url: str = "",
-    ):
-        environment.id_tag_registry["auto_proc_program"].append(tag)
-        data = {"job_id": jobid}
-        capture_post(url, json=data)

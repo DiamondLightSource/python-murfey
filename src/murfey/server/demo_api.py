@@ -83,7 +83,6 @@ from murfey.util.models import (
     RsyncerSource,
     SessionInfo,
     SPAProcessFile,
-    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
     TiltSeriesGroupInfo,
@@ -924,12 +923,6 @@ async def add_file(file: File):
 @router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     pass
-
-
-@router.post("/visits/{visit_name}/spa_processing")
-async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    log.info("SPA processing requested")
-    return proc_params
 
 
 class Tag(BaseModel):

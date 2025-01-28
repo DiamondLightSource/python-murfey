@@ -8,7 +8,6 @@ from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
-from pydantic import BaseModel
 
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
@@ -17,7 +16,6 @@ from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
-    global_env_lock,
 )
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
@@ -65,15 +63,6 @@ def _construct_tilt_series_name(file_path: Path) -> str:
     return "_".join(split_name[:-5])
 
 
-class ProcessFileIncomplete(BaseModel):
-    dest: Path
-    source: Path
-    image_number: int
-    mc_uuid: int
-    tag: str
-    description: str = ""
-
-
 class TomographyContext(Context):
     user_params = [
         ProcessingParameter(
@@ -101,7 +90,6 @@ class TomographyContext(Context):
         self._aligned_tilt_series: List[str] = []
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
-        self._preprocessing_triggers: dict = {}
         self._lock: RLock = RLock()
 
     def _flush_data_collections(self):
@@ -120,12 +108,6 @@ class TomographyContext(Context):
             capture_post(dc_data[0], json=data)
         self._data_collection_stash = []
 
-    def _flush_processing_job(self, tag: str):
-        if proc_data := self._processing_job_stash.get(tag):
-            for pd in proc_data:
-                requests.post(pd[0], json=pd[1])
-            self._processing_job_stash.pop(tag)
-
     def _flush_processing_jobs(self):
         logger.info(
             f"Flushing {len(self._processing_job_stash.keys())} processing job API calls"
@@ -134,75 +116,6 @@ class TomographyContext(Context):
             for pd in v:
                 requests.post(pd[0], json=pd[1])
         self._processing_job_stash = {}
-
-    def _flush_preprocess(self, tag: str, app_id: int):
-        if tag_tr := self._preprocessing_triggers.get(tag):
-            for tr in tag_tr:
-                process_file = self._complete_process_file(tr[1], tr[2], app_id)
-                if process_file:
-                    capture_post(tr[0], json=process_file)
-            self._preprocessing_triggers.pop(tag)
-
-    def _complete_process_file(
-        self,
-        incomplete_process_file: ProcessFileIncomplete,
-        environment: MurfeyInstanceEnvironment,
-        app_id: int,
-    ) -> dict:
-        try:
-            with global_env_lock:
-                tag = incomplete_process_file.tag
-
-                eer_fractionation_file = None
-                if environment.data_collection_parameters.get("num_eer_frames"):
-                    response = requests.post(
-                        f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
-                        json={
-                            "num_frames": environment.data_collection_parameters[
-                                "num_eer_frames"
-                            ],
-                            "fractionation": environment.data_collection_parameters[
-                                "eer_fractionation"
-                            ],
-                            "dose_per_frame": environment.data_collection_parameters[
-                                "dose_per_frame"
-                            ],
-                            "fractionation_file_name": "eer_fractionation_tomo.txt",
-                        },
-                    )
-                    eer_fractionation_file = response.json()["eer_fractionation_file"]
-
-                new_dict = {
-                    "path": str(incomplete_process_file.dest),
-                    "description": incomplete_process_file.description,
-                    "size": incomplete_process_file.source.stat().st_size,
-                    "timestamp": incomplete_process_file.source.stat().st_ctime,
-                    "processing_job": environment.processing_job_ids[tag][
-                        "em-tomo-preprocess"
-                    ],
-                    "data_collection_id": environment.data_collection_ids[tag],
-                    "image_number": incomplete_process_file.image_number,
-                    "pixel_size": environment.data_collection_parameters[
-                        "pixel_size_on_image"
-                    ],
-                    "autoproc_program_id": app_id,
-                    "mc_uuid": incomplete_process_file.mc_uuid,
-                    "dose_per_frame": environment.data_collection_parameters.get(
-                        "dose_per_frame"
-                    ),
-                    "mc_binning": environment.data_collection_parameters.get(
-                        "motion_corr_binning", 1
-                    ),
-                    "gain_ref": environment.data_collection_parameters.get("gain_ref"),
-                    "voltage": environment.data_collection_parameters.get(
-                        "voltage", 300
-                    ),
-                    "eer_fractionation_file": eer_fractionation_file,
-                }
-                return new_dict
-        except KeyError:
-            logger.warning("Key error encountered in _complete_process_file")
-            return {}
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -441,14 +354,10 @@ class TomographyContext(Context):
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
-                "data_collection_id": environment.data_collection_ids.get(tilt_series),
                 "image_number": environment.movies[file_transferred_to].movie_number,
                 "pixel_size": environment.data_collection_parameters.get(
                     "pixel_size_on_image", 0
                 ),
-                "autoproc_program_id": environment.autoproc_program_ids.get(
-                    tilt_series, {}
-                ).get("em-tomo-preprocess"),
                 "dose_per_frame": environment.data_collection_parameters.get(
                     "dose_per_frame", 0
                 ),
