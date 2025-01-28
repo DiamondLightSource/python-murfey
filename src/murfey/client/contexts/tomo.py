@@ -689,7 +689,7 @@ class TomographyContext(Context):
             mdoc_metadata: OrderedDict = OrderedDict({})
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
-            mdoc_metadata["frame_count"] = float(mdoc_data_block["NumSubFrames"])
+            mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
