@@ -110,7 +110,7 @@ def register_foil_hole(
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
     murfey_db: Session,
-):
+) -> Optional[int]:
     try:
         gs = murfey_db.exec(
             select(GridSquare)
@@ -120,10 +120,10 @@ def register_foil_hole(
         ).one()
         gsid = gs.id
     except NoResultFound:
-        logger.debug(
+        logger.warning(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
         )
-        return
+        return None
     secured_foil_hole_image_path = secure_filename(foil_hole_params.image)
     if foil_hole_params.image and Path(secured_foil_hole_image_path).is_file():
         jpeg_size = Image.open(secured_foil_hole_image_path).size
@@ -193,6 +193,7 @@ def register_foil_hole(
     murfey_db.add(foil_hole)
     murfey_db.commit()
     murfey_db.close()
+    return foil_hole.id
 
 
 def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
@@ -287,8 +288,7 @@ def _flush_position_analysis(
             name=foil_hole,
         )
     # Insert or update this foil hole in the database
-    register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
-    return foil_hole
+    return register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
 
 
 def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) -> bool:
@@ -349,23 +349,29 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         murfey_db.add(feedback_params)
 
     for i, f in enumerate(stashed_files):
-        if f.foil_hole_id:
-            foil_hole_id = f.foil_hole_id
-        else:
-            # Register grid square and foil hole if not present
-            try:
+        try:
+            foil_hole_id = None
+            if f.foil_hole_id:
+                # Check if the foil hole id has been registered in the database
+                db_foil_hole = murfey_db.exec(
+                    select(FoilHole).where(FoilHole.id == f.foil_hole_id)
+                ).all()
+                if db_foil_hole:
+                    foil_hole_id = f.foil_hole_id
+            if not foil_hole_id:
+                # Register grid square and foil hole if not present
                 foil_hole_id = _flush_position_analysis(
                     movie_path=Path(f.file_path),
                     dcg_id=collected_ids[0].id,
                     session_id=session_id,
                     murfey_db=murfey_db,
                 )
-            except Exception as e:
-                logger.error(
-                    f"Flushing position analysis for {f.file_path} caused exception {e}",
-                    exc_info=True,
-                )
-                foil_hole_id = None
+        except Exception as e:
+            logger.error(
+                f"Flushing position analysis for {f.file_path} caused exception {e}",
+                exc_info=True,
+            )
+            foil_hole_id = None
 
         mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
