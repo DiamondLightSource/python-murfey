@@ -30,6 +30,7 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             required_key = key
             break
     if not required_key:
+        logger.warning(f"Required key not found for {str(xml_path)}")
         return {}
     foil_holes = {}
     for fh_block in serialization_array[required_key]:
@@ -149,10 +150,13 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+                dcg_tag = "/".join(
+                    p for p in transferred_file.parent.parts if p != environment.visit
+                )
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
-                    "tag": str(source),
+                    "tag": dcg_tag,
                     "atlas": str(
                         _atlas_destination(environment, source, transferred_file)
                         / environment.samples[source].atlas
@@ -169,7 +173,7 @@ class SPAMetadataContext(Context):
                         capture_post(
                             f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs}",
                             json={
-                                "tag": str(source),
+                                "tag": dcg_tag,
                                 "x_location": pos_data[0],
                                 "y_location": pos_data[1],
                                 "x_stage_position": pos_data[2],
@@ -186,6 +190,9 @@ class SPAMetadataContext(Context):
             and environment
         ):
             gs_name = transferred_file.stem.split("_")[1]
+            logger.info(
+                f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
+            )
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
             visitless_source = str(source).replace(f"/{environment.visit}", "")

@@ -2940,7 +2940,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )[0]
             result = workflow.load()(
                 message=message,
-                db=murfey_db,
+                murfey_db=murfey_db,
             )
             if _transport_object:
                 if result:

@@ -16,7 +16,7 @@ from typing import Type
 
 from murfey.client.context import Context
 from murfey.client.contexts.clem import CLEMContext
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -159,23 +159,7 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    if self._environment:
-                        try:
-                            cfg = get_machine_config_client(
-                                str(self._environment.url.geturl()),
-                                instrument_name=self._environment.instrument_name,
-                                demo=self._environment.demo,
-                            )
-                        except Exception as e:
-                            logger.error(f"Exception encountered: {e}")
-                            cfg = {}
-                    else:
-                        cfg = {}
-                    self._context = (
-                        SPAModularContext("epu", self._basepath)
-                        if cfg.get("modular_spa")
-                        else SPAContext("epu", self._basepath)
-                    )
+                    self._context = SPAModularContext("epu", self._basepath)
                 self.parameters_model = ProcessingParametersSPA
                 return True
 
@@ -325,8 +309,7 @@ class Analyser(Observer):
                                         "form": dc_metadata,
                                         "dependencies": (
                                             spa_form_dependencies
-                                            if isinstance(self._context, SPAContext)
-                                            or isinstance(
+                                            if isinstance(
                                                 self._context, SPAModularContext
                                             )
                                             else {}
@@ -385,8 +368,7 @@ class Analyser(Observer):
                                         "form": dc_metadata,
                                         "dependencies": (
                                             spa_form_dependencies
-                                            if isinstance(self._context, SPAContext)
-                                            or isinstance(
+                                            if isinstance(
                                                 self._context, SPAModularContext
                                             )
                                             else {}

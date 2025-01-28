@@ -15,7 +15,7 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
@@ -552,7 +552,7 @@ class MurfeyTUI(App):
                 json={"rsync_source": str(source)},
             )
             log.info("tomography processing flushed")
-        elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
+        elif isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "single particle",
@@ -629,31 +629,6 @@ class MurfeyTUI(App):
                     f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/flush_spa_processing",
                     json={"tag": str(source)},
                 )
-            if isinstance(context, SPAContext):
-                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection"
-                self._environment.listeners["data_collection_group_ids"] = {
-                    partial(
-                        context._register_data_collection,
-                        url=url,
-                        data=json,
-                        environment=self._environment,
-                    )
-                }
-                self._environment.listeners["data_collection_ids"] = {
-                    partial(
-                        context._register_processing_job,
-                        parameters=json,
-                        environment=self._environment,
-                    )
-                }
-                url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/spa_processing"
-                self._environment.listeners["processing_job_ids"] = {
-                    partial(
-                        context._launch_spa_pipeline,
-                        url=url,
-                        environment=self._environment,
-                    )
-                }
 
     def _set_request_destination(self, response: str):
         if response == "y":
