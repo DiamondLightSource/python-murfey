@@ -31,7 +31,7 @@ RUN apt-get update && \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
-        importlib-metadata &&\
+        importlib-metadata && \
     /venv/bin/python -m pip install /python-murfey[client,instrument-server]
 
 
