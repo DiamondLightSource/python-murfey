@@ -5,10 +5,10 @@ from typing import Optional
 from PIL import Image
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
-from werkzeug.utils import secure_filename
 
 from murfey.server import _murfey_id, _transport_object, sanitise
 from murfey.server.api.auth import MurfeySessionID
+from murfey.util import secure_path
 from murfey.util.config import get_machine_config, get_microscope
 from murfey.util.db import (
     AutoProcProgram,
@@ -72,11 +72,8 @@ def register_grid_square(
         else:
             # mock up response so that below still works
             gs_ispyb_response = {"success": False, "return_value": None}
-        secured_grid_square_image_path = secure_filename(grid_square_params.image)
-        if (
-            secured_grid_square_image_path
-            and Path(secured_grid_square_image_path).is_file()
-        ):
+        secured_grid_square_image_path = secure_path(Path(grid_square_params.image))
+        if secured_grid_square_image_path and secured_grid_square_image_path.is_file():
             jpeg_size = Image.open(secured_grid_square_image_path).size
         else:
             jpeg_size = (0, 0)
@@ -98,7 +95,7 @@ def register_grid_square(
             thumbnail_size_x=grid_square_params.thumbnail_size_x or jpeg_size[0],
             thumbnail_size_y=grid_square_params.thumbnail_size_y or jpeg_size[1],
             pixel_size=grid_square_params.pixel_size,
-            image=secured_grid_square_image_path,
+            image=str(secured_grid_square_image_path),
         )
     murfey_db.add(grid_square)
     murfey_db.commit()
@@ -124,8 +121,8 @@ def register_foil_hole(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
         )
         return None
-    secured_foil_hole_image_path = secure_filename(foil_hole_params.image)
-    if foil_hole_params.image and Path(secured_foil_hole_image_path).is_file():
+    secured_foil_hole_image_path = secure_path(Path(foil_hole_params.image))
+    if foil_hole_params.image and secured_foil_hole_image_path.is_file():
         jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
@@ -188,7 +185,7 @@ def register_foil_hole(
             thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
             thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
             pixel_size=foil_hole_params.pixel_size,
-            image=secured_foil_hole_image_path,
+            image=str(secured_foil_hole_image_path),
         )
     murfey_db.add(foil_hole)
     murfey_db.commit()
