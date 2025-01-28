@@ -30,6 +30,7 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             required_key = key
             break
     if not required_key:
+        logger.warning(f"Required key not found for {str(xml_path)}")
         return {}
     foil_holes = {}
     for fh_block in serialization_array[required_key]:
@@ -189,6 +190,9 @@ class SPAMetadataContext(Context):
             and environment
         ):
             gs_name = transferred_file.stem.split("_")[1]
+            logger.info(
+                f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
+            )
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
             visitless_source = str(source).replace(f"/{environment.visit}", "")

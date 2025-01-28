@@ -66,13 +66,16 @@ def _grid_square_metadata_file(
             break
     else:
         raise ValueError(f"Could not determine grid square metadata path for {f}")
-    return (
+    metadata_file = (
         base_dir
         / visit
         / mid_dir.parent.parent.parent
         / "Metadata"
         / f"GridSquare_{grid_square}.dm"
     )
+    if not metadata_file.is_file():
+        logger.warning(f"Grid square metadata file {str(metadata_file)} does not exist")
+    return metadata_file
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
