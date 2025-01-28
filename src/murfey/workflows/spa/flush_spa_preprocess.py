@@ -110,7 +110,7 @@ def register_foil_hole(
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
     murfey_db: Session,
-):
+) -> bool:
     try:
         gs = murfey_db.exec(
             select(GridSquare)
@@ -120,10 +120,10 @@ def register_foil_hole(
         ).one()
         gsid = gs.id
     except NoResultFound:
-        logger.debug(
+        logger.warning(
             f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
         )
-        return
+        return False
     secured_foil_hole_image_path = secure_filename(foil_hole_params.image)
     if foil_hole_params.image and Path(secured_foil_hole_image_path).is_file():
         jpeg_size = Image.open(secured_foil_hole_image_path).size
@@ -193,6 +193,7 @@ def register_foil_hole(
     murfey_db.add(foil_hole)
     murfey_db.commit()
     murfey_db.close()
+    return True
 
 
 def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
@@ -287,8 +288,10 @@ def _flush_position_analysis(
             name=foil_hole,
         )
     # Insert or update this foil hole in the database
-    register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
-    return foil_hole
+    registered_hole = register_foil_hole(
+        session_id, gs.id, foil_hole_parameters, murfey_db
+    )
+    return foil_hole if registered_hole else None
 
 
 def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) -> bool:
