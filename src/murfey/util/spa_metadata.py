@@ -123,6 +123,9 @@ def grid_square_data(xml_path: Path, grid_square: int) -> GridSquareInfo:
             f"Images-Disc*/GridSquare_{grid_square}/GridSquare_*.jpg"
         )
     )
+    logger.info(
+        f"{len(image_paths)} images found when searching {str(xml_path.parent.parent)}"
+    )
     if image_paths:
         image_paths.sort(key=lambda x: x.stat().st_ctime)
         image_path = image_paths[-1]
