@@ -44,7 +44,7 @@ class LIFPreprocessingResult(BaseModel):
 
 
 def register_lif_preprocessing_result(
-    message: dict, db: Session, demo: bool = False
+    message: dict, murfey_db: Session, demo: bool = False
 ) -> bool:
     """
     session_id (recipe)
@@ -88,28 +88,28 @@ def register_lif_preprocessing_result(
         # Register items in database if not already present
         try:
             clem_img_stk: CLEMImageStack = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageStack,
                 session_id=session_id,
                 file_path=result.image_stack,
             )
 
             clem_img_series: CLEMImageSeries = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageSeries,
                 session_id=session_id,
                 series_name=result.series_name,
             )
 
             clem_metadata: CLEMImageMetadata = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageMetadata,
                 session_id=session_id,
                 file_path=result.metadata,
             )
 
             clem_lif_file: CLEMLIFFile = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMLIFFile,
                 session_id=session_id,
                 file_path=result.parent_lif,
@@ -120,21 +120,21 @@ def register_lif_preprocessing_result(
             clem_img_stk.parent_lif = clem_lif_file
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
-            db.add(clem_img_stk)
-            db.commit()
-            db.refresh(clem_img_stk)
+            murfey_db.add(clem_img_stk)
+            murfey_db.commit()
+            murfey_db.refresh(clem_img_stk)
 
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.parent_lif = clem_lif_file
             clem_img_series.number_of_members = result.number_of_members
-            db.add(clem_img_series)
-            db.commit()
-            db.refresh(clem_img_series)
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
+            murfey_db.refresh(clem_img_series)
 
             clem_metadata.parent_lif = clem_lif_file
-            db.add(clem_metadata)
-            db.commit()
-            db.refresh(clem_metadata)
+            murfey_db.add(clem_metadata)
+            murfey_db.commit()
+            murfey_db.refresh(clem_metadata)
 
             logger.info(
                 f"LIF preprocessing results registered for {result.series_name!r} "
@@ -153,7 +153,7 @@ def register_lif_preprocessing_result(
         try:
             image_stacks = [
                 Path(row)
-                for row in db.exec(
+                for row in murfey_db.exec(
                     select(CLEMImageStack.file_path).where(
                         CLEMImageStack.series_id == clem_img_series.id
                     )
@@ -163,7 +163,9 @@ def register_lif_preprocessing_result(
                 f"Found the following images: {[str(file) for file in image_stacks]}"
             )
             instrument_name = (
-                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+                murfey_db.exec(
+                    select(MurfeySession).where(MurfeySession.id == session_id)
+                )
                 .one()
                 .instrument_name
             )
@@ -208,7 +210,7 @@ def register_lif_preprocessing_result(
         return True
 
     finally:
-        db.close()
+        murfey_db.close()
 
 
 class TIFFPreprocessingResult(BaseModel):
@@ -237,7 +239,7 @@ class TIFFPreprocessingResult(BaseModel):
 
 
 def register_tiff_preprocessing_result(
-    message: dict, db: Session, demo: bool = False
+    message: dict, murfey_db: Session, demo: bool = False
 ) -> bool:
 
     session_id: int = (
@@ -271,19 +273,19 @@ def register_tiff_preprocessing_result(
         # Register items in database if not already present
         try:
             clem_img_stk: CLEMImageStack = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageStack,
                 session_id=session_id,
                 file_path=result.image_stack,
             )
             clem_img_series: CLEMImageSeries = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageSeries,
                 session_id=session_id,
                 series_name=result.series_name,
             )
             clem_metadata: CLEMImageMetadata = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageMetadata,
                 session_id=session_id,
                 file_path=result.metadata,
@@ -293,7 +295,7 @@ def register_tiff_preprocessing_result(
             # Register TIFF files and populate them iteratively first
             for file in result.parent_tiffs:
                 clem_tiff_file: CLEMTIFFFile = get_db_entry(
-                    db=db,
+                    db=murfey_db,
                     table=CLEMTIFFFile,
                     session_id=session_id,
                     file_path=file,
@@ -301,22 +303,22 @@ def register_tiff_preprocessing_result(
                 clem_tiff_file.associated_metadata = clem_metadata
                 clem_tiff_file.child_series = clem_img_series
                 clem_tiff_file.child_stack = clem_img_stk
-                db.add(clem_tiff_file)
-                db.commit()
-                db.refresh(clem_tiff_file)
+                murfey_db.add(clem_tiff_file)
+                murfey_db.commit()
+                murfey_db.refresh(clem_tiff_file)
 
             clem_img_stk.associated_metadata = clem_metadata
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
-            db.add(clem_img_stk)
-            db.commit()
-            db.refresh(clem_img_stk)
+            murfey_db.add(clem_img_stk)
+            murfey_db.commit()
+            murfey_db.refresh(clem_img_stk)
 
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.number_of_members = result.number_of_members
-            db.add(clem_img_series)
-            db.commit()
-            db.refresh(clem_img_series)
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
+            murfey_db.refresh(clem_img_series)
 
             logger.info(
                 f"TIFF preprocessing results registered for {result.series_name!r} "
@@ -335,7 +337,7 @@ def register_tiff_preprocessing_result(
         try:
             image_stacks = [
                 Path(row)
-                for row in db.exec(
+                for row in murfey_db.exec(
                     select(CLEMImageStack.file_path).where(
                         CLEMImageStack.series_id == clem_img_series.id
                     )
@@ -345,7 +347,9 @@ def register_tiff_preprocessing_result(
                 f"Found the following images: {[str(file) for file in image_stacks]}"
             )
             instrument_name = (
-                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+                murfey_db.exec(
+                    select(MurfeySession).where(MurfeySession.id == session_id)
+                )
                 .one()
                 .instrument_name
             )
@@ -390,4 +394,4 @@ def register_tiff_preprocessing_result(
         return True
 
     finally:
-        db.close()
+        murfey_db.close()
