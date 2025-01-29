@@ -164,7 +164,7 @@ class MurfeyTUI(App):
                     break
             else:
                 self._environment.default_destinations[source] = (
-                    f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                    f"{datetime.now().year}"
                 )
                 destination = determine_default_destination(
                     self._visit,

@@ -234,7 +234,7 @@ async def request_gain_reference_upload(
         instrument_name
     ]
     visit = db.exec(select(Session).where(Session.id == session_id)).one().visit
-    visit_path = f"{machine_config.rsync_module or 'data'}/{datetime.datetime.now().year}/{visit}"
+    visit_path = f"{datetime.datetime.now().year}/{visit}"
     data = {}
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:

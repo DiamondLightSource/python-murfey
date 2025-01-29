@@ -1453,7 +1453,6 @@ async def process_gain(
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
         Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
@@ -1464,7 +1463,6 @@ async def process_gain(
         filepath_prev = filepath
         filepath = (
             Path(machine_config.rsync_basepath)
-            / (machine_config.rsync_module or "data")
             / str(datetime.datetime.now().year - 1)
             / secure_filename(visit_name)
             / machine_config.gain_directory_name
@@ -1541,7 +1539,6 @@ async def write_eer_fractionation_file(
     else:
         file_path = (
             Path(machine_config.rsync_basepath)
-            / (machine_config.rsync_module or "data")
             / str(datetime.datetime.now().year)
             / secure_filename(visit_name)
             / "processing"
@@ -1586,7 +1583,6 @@ async def make_gif(
     ]
     output_dir = (
         Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
         / secure_filename(year)
         / secure_filename(visit_name)
         / "processed"

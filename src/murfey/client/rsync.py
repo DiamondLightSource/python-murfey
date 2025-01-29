@@ -190,6 +190,7 @@ class RSyncer(Observer):
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
+            file_path = Path("/".join(file_path.parts[1:]))
             absolute_path = (self._basepath / file_path).resolve()
             self.queue.put(absolute_path)
 

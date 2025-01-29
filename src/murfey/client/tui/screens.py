@@ -310,12 +310,7 @@ class LaunchScreen(Screen):
                 if source.is_relative_to(s):
                     return
             self.app._environment.sources.append(source)
-            machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine"
-            ).json()
-            self.app._default_destinations[source] = (
-                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            )
+            self.app._default_destinations[source] = f"{datetime.now().year}"
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
@@ -1011,13 +1006,10 @@ class DestinationSelect(Screen):
                             and d.name
                             not in machine_config["create_directories"].values()
                         ):
-                            machine_data = requests.get(
-                                f"{self.app._environment.url.geturl()}/machine"
-                            ).json()
                             dest = determine_default_destination(
                                 self.app._visit,
                                 s,
-                                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+                                f"{datetime.now().year}",
                                 self.app._environment,
                                 self.app.analysers,
                                 touch=True,

@@ -46,7 +46,7 @@ def _file_transferred_to(
         return (
             Path(machine_config.get("rsync_basepath", ""))
             / Path(environment.default_destinations[source])
-            / file_path.relative_to(source)
+            / file_path.relative_to(source)  # need to strip out the rsync_module name
         )
     return (
         Path(machine_config.get("rsync_basepath", ""))

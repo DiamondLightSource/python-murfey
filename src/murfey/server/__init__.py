@@ -1628,10 +1628,7 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
 def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
     if machine_config.initial_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath
-            / (machine_config.rsync_module or "data")
-            / str(datetime.now().year)
-            / visit
+            machine_config.rsync_basepath / str(datetime.now().year) / visit
         )
         possible_models = [
             p
