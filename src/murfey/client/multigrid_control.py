@@ -19,7 +19,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post, posix_path
+from murfey.util import capture_post, get_machine_config_client, posix_path
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -70,6 +70,11 @@ class MultigridController:
             data_collection_parameters=self.data_collection_parameters,
             instrument_name=self.instrument_name,
             # processing_only_mode=server_routing_prefix_found,
+        )
+        self._machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [
