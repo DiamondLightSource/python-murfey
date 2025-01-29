@@ -252,24 +252,16 @@ class TomographyContext(Context):
                     capture_post(dc_url, json=dc_data)
 
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-                    capture_post(
-                        proc_url,
-                        json={
-                            "tag": tilt_series,
-                            "source": str(self._basepath),
-                            "recipe": "em-tomo-preprocess",
-                            "experiment_type": "tomography",
-                        },
-                    )
-                    capture_post(
-                        proc_url,
-                        json={
-                            "tag": tilt_series,
-                            "source": str(self._basepath),
-                            "recipe": "em-tomo-align",
-                            "experiment_type": "tomography",
-                        },
-                    )
+                    for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                        capture_post(
+                            proc_url,
+                            json={
+                                "tag": tilt_series,
+                                "source": str(self._basepath),
+                                "recipe": recipe,
+                                "experiment_type": "tomography",
+                            },
+                        )
 
             except Exception as e:
                 logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
