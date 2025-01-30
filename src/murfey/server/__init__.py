@@ -1954,11 +1954,7 @@ def _flush_tomography_preprocessing(message: dict):
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
     ).first()
-    proc_params = murfey_db.exec(
-        select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == collected_ids.id
-        )
-    ).one()
+    proc_params = get_tomo_preproc_params(collected_ids.id)
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
