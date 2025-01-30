@@ -46,6 +46,7 @@ log = logging.getLogger("murfey.tui.app")
 ReactiveType = TypeVar("ReactiveType")
 
 token = read_config()["Murfey"].get("token", "")
+instrument_name = read_config()["Murfey"].get("instrument_name", "")
 
 requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
 requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
@@ -154,7 +155,9 @@ class MurfeyTUI(App):
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(f"{self._environment.url.geturl()}/machine").json()
+        machine_data = requests.get(
+            f"{self._environment.url.geturl()}/instruments/{instrument_name}/machine"
+        ).json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:
