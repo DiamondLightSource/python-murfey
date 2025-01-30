@@ -150,8 +150,16 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-                dcg_tag = "/".join(
-                    p for p in transferred_file.parent.parts if p != environment.visit
+                dcg_search_dir = "/".join(
+                    p
+                    for p in transferred_file.parent.parts[1:]
+                    if p != environment.visit
+                )
+                dcg_tag = str(
+                    sorted(
+                        Path(dcg_search_dir).glob("Images-Disc*"),
+                        key=lambda x: x.stat().st_ctime,
+                    )[-1]
                 )
                 dcg_data = {
                     "experiment_type": "single particle",
@@ -195,7 +203,15 @@ class SPAMetadataContext(Context):
             )
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
-            visitless_source = str(source).replace(f"/{environment.visit}", "")
+            visitless_source_search_dir = str(source).replace(
+                f"/{environment.visit}", ""
+            )
+            visitless_source = str(
+                sorted(
+                    Path(visitless_source_search_dir).glob("Images-Disc*"),
+                    key=lambda x: x.stat().st_ctime,
+                )[-1]
+            )
             for fh, fh_data in fh_positions.items():
                 capture_post(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
