@@ -286,7 +286,7 @@ def upload_gain_reference(
     safe_visit_path = sanitise(gain_reference.visit_path)
     safe_destination_dir = sanitise(gain_reference.gain_destination_dir)
     machine_config = requests.get(
-        f"{_get_murfey_url()}/instruments/{instrument_name}/machine",
+        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     cmd = [
