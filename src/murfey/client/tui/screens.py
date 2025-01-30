@@ -47,7 +47,7 @@ from textual.widgets import (
 from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
@@ -257,18 +257,8 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        cfg = get_machine_config_client(
-            str(self.app._environment.url.geturl()),
-            instrument_name=self.app._environment.instrument_name,
-            demo=self.app._environment.demo,
-        )
-        self._context: (
-            Type[SPAModularContext] | Type[SPAContext] | Type[TomographyContext]
-        )
-        if cfg.get("modular_spa"):
-            self._context = SPAContext
-        else:
-            self._context = SPAModularContext
+        self._context: Type[SPAModularContext] | Type[TomographyContext]
+        self._context = SPAModularContext
 
     def compose(self):
         machine_data = requests.get(
@@ -975,7 +965,7 @@ class DestinationSelect(Screen):
     def __init__(
         self,
         transfer_routes: Dict[Path, str],
-        context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
+        context: Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
         destination_overrides: Optional[Dict[Path, str]] = None,
@@ -994,9 +984,7 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         with RadioSet():
-            yield RadioButton(
-                "SPA", value=self._context in (SPAContext, SPAModularContext)
-            )
+            yield RadioButton("SPA", value=self._context is SPAModularContext)
             yield RadioButton("Tomography", value=self._context is TomographyContext)
         if self.app._multigrid:
             machine_config = get_machine_config_client(
@@ -1142,15 +1130,7 @@ class DestinationSelect(Screen):
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            cfg = get_machine_config_client(
-                str(self.app._environment.url.geturl()),
-                instrument_name=self.app._environment.instrument_name,
-                demo=self.app._environment.demo,
-            )
-            if cfg.get("modular_spa"):
-                self._context = SPAContext
-            else:
-                self._context = SPAModularContext
+            self._context = SPAModularContext
         else:
             self._context = TomographyContext
         self.app.pop_screen()

@@ -2569,6 +2569,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     message["atlas_pixel_size"],
                     message["sample"],
                 )
+            return None
         elif message["register"] == "data_collection":
             murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
@@ -2941,7 +2942,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             )[0]
             result = workflow.load()(
                 message=message,
-                db=murfey_db,
+                murfey_db=murfey_db,
             )
             if _transport_object:
                 if result:

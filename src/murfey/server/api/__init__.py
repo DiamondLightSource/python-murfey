@@ -98,7 +98,6 @@ from murfey.util.models import (
     Sample,
     SessionInfo,
     SPAProcessFile,
-    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
     TiltSeriesGroupInfo,
@@ -940,16 +939,6 @@ async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
         _transport_object.send(
             _transport_object.feedback_queue, {"register": msg.registration}
         )
-
-
-@router.post("/visits/{visit_name}/spa_processing")
-async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    zocalo_message = {
-        "parameters": {"ispyb_process": proc_params.job_id},
-        "recipes": ["ispyb-relion"],
-    }
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
 
 
 @router.post("/visits/{visit_name}/{session_id}/spa_preprocess")

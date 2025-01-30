@@ -13,13 +13,13 @@ import requests
 
 import murfey.client.websocket
 from murfey.client.analyser import Analyser
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post, posix_path
+from murfey.util import capture_post, get_machine_config_client, posix_path
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -70,6 +70,11 @@ class MultigridController:
             data_collection_parameters=self.data_collection_parameters,
             instrument_name=self.instrument_name,
             # processing_only_mode=server_routing_prefix_found,
+        )
+        self._machine_config = get_machine_config_client(
+            str(self._environment.url.geturl()),
+            instrument_name=self._environment.instrument_name,
+            demo=self._environment.demo,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [
@@ -370,9 +375,6 @@ class MultigridController:
 
             source = Path(json["source"])
 
-            self._environment.id_tag_registry["data_collection_group"].append(
-                str(source)
-            )
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "tomo",
@@ -443,7 +445,7 @@ class MultigridController:
             )
             log.info("tomography processing flushed")
 
-        elif isinstance(context, SPAContext) or isinstance(context, SPAModularContext):
+        elif isinstance(context, SPAModularContext):
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
             dcg_data = {
                 "experiment_type": "single particle",
@@ -515,31 +517,6 @@ class MultigridController:
                     f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self.session_id}/flush_spa_processing",
                     json={"tag": str(source)},
                 )
-            if isinstance(context, SPAContext):
-                url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/start_data_collection"
-                self._environment.listeners["data_collection_group_ids"] = {
-                    partial(
-                        context._register_data_collection,
-                        url=url,
-                        data=json,
-                        environment=self._environment,
-                    )
-                }
-                self._environment.listeners["data_collection_ids"] = {
-                    partial(
-                        context._register_processing_job,
-                        parameters=json,
-                        environment=self._environment,
-                    )
-                }
-                url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/spa_processing"
-                self._environment.listeners["processing_job_ids"] = {
-                    partial(
-                        context._launch_spa_pipeline,
-                        url=url,
-                        environment=self._environment,
-                    )
-                }
 
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str
