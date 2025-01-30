@@ -276,15 +276,23 @@ class GainReference(BaseModel):
     gain_destination_dir: str = "processing"
 
 
-@router.post("/sessions/{session_id}/upload_gain_reference")
-def upload_gain_reference(session_id: MurfeySessionID, gain_reference: GainReference):
+@router.post(
+    "/instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference"
+)
+def upload_gain_reference(
+    instrument_name: str, session_id: MurfeySessionID, gain_reference: GainReference
+):
     safe_gain_path = sanitise(str(gain_reference.gain_path))
     safe_visit_path = sanitise(gain_reference.visit_path)
     safe_destination_dir = sanitise(gain_reference.gain_destination_dir)
+    machine_config = requests.get(
+        f"{_get_murfey_url()}/instruments/{instrument_name}/machine",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
     cmd = [
         "rsync",
         safe_gain_path,
-        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
+        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{machine_config.get('rsync_module', 'data')}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
     ]
     gain_rsync = subprocess.run(cmd)
     if gain_rsync.returncode:

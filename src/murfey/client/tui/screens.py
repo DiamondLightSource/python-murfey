@@ -91,7 +91,10 @@ def determine_default_destination(
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"]:
             if source.resolve() == Path(data_dir):
-                _default = destination + f"/{visit}"
+                _default = (
+                    destination
+                    + f"{machine_data.get('rsync_module') or 'data'}/{visit}"
+                )
                 break
             else:
                 try:
@@ -884,7 +887,7 @@ class GainReference(Screen):
             rsync_cmd = [
                 "rsync",
                 f"{posix_path(self._dir_tree._gain_reference)!r}",
-                f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
+                f"{self.app._environment.url.hostname}::{self.app._machine_config.get('rsync_module', 'data')}/{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             # Encase in bash shell
             cmd = ["bash", "-c", " ".join(rsync_cmd)]

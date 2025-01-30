@@ -239,7 +239,7 @@ async def request_gain_reference_upload(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/upload_gain_reference",
+                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference",
                 json={
                     "gain_path": str(gain_reference_request.gain_path),
                     "visit_path": visit_path,

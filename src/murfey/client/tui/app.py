@@ -214,7 +214,7 @@ class MurfeyTUI(App):
                 rsync_cmd = [
                     "rsync",
                     f"{posix_path(self._environment.gain_ref)!r}",
-                    f"{self._url.hostname}::{visit_path}/processing",
+                    f"{self._url.hostname}::{self._machine_config.get('rsync_module', 'data')}/{visit_path}/processing",
                 ]
                 # Encase in bash shell
                 cmd = [
@@ -232,6 +232,7 @@ class MurfeyTUI(App):
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
+                rsync_module=self._machine_config.get("rsync_module", "data"),
                 server_url=urlparse(rsync_url) if rsync_url else self._url,
                 # local=self._environment.demo,
                 status_bar=self._statusbar,
