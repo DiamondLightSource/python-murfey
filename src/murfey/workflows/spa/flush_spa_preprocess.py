@@ -187,10 +187,11 @@ def register_foil_hole(
             pixel_size=foil_hole_params.pixel_size,
             image=str(secured_foil_hole_image_path),
         )
+    fh_id = foil_hole.id
     murfey_db.add(foil_hole)
     murfey_db.commit()
     murfey_db.close()
-    return foil_hole.id
+    return fh_id
 
 
 def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
