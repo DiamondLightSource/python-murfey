@@ -729,6 +729,9 @@ def register_completed_tilt_series(
                     "dcid": ids.dcid,
                     "appid": ids.appid,
                     "stack_file": str(stack_file),
+                    "dose_per_frame": preproc_params.dose_per_frame,
+                    "frame_count": preproc_params.frame_count,
+                    "kv": preproc_params.voltage,
                     "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
@@ -1120,6 +1123,9 @@ async def request_tomography_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
+
+    recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
+
     data_collection = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1128,7 +1134,7 @@ async def request_tomography_preprocessing(
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+        .where(ProcessingJob.recipe == recipe_name)
     ).all()
     if data_collection:
         if registered_tilts := db.exec(
@@ -1143,7 +1149,7 @@ async def request_tomography_preprocessing(
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message: dict = {
-            "recipes": ["em-tomo-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": dcid,
@@ -1158,6 +1164,7 @@ async def request_tomography_preprocessing(
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
+                "frame_count": proc_file.frame_count,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_file.gain_ref)
                     if proc_file.gain_ref and machine_config.data_transfer_enabled

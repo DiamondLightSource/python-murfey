@@ -1951,11 +1951,7 @@ def _flush_tomography_preprocessing(message: dict):
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
     ).first()
-    proc_params = murfey_db.exec(
-        select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == collected_ids.id
-        )
-    ).one()
+    proc_params = get_tomo_preproc_params(collected_ids.id)
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
@@ -2009,6 +2005,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params.motion_corr_binning,
                 "fm_dose": proc_params.dose_per_frame,
+                "frame_count": proc_params.frame_count,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_params.gain_ref)
                     if proc_params.gain_ref
@@ -2471,6 +2468,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
+                        "dose_per_frame": preproc_params.dose_per_frame,
+                        "frame_count": preproc_params.frame_count,
+                        "kv": preproc_params.voltage,
                         "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
@@ -2829,6 +2829,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
                     voltage=message["voltage"],
                     dose_per_frame=message["dose_per_frame"],
+                    frame_count=message["frame_count"],
                     motion_corr_binning=message["motion_corr_binning"],
                     gain_ref=message["gain_ref"],
                     eer_fractionation_file=message["eer_fractionation_file"],

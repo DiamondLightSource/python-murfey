@@ -458,6 +458,7 @@ class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
     dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
     pixel_size: float
     dose_per_frame: float
+    frame_count: int
     voltage: int
     eer_fractionation_file: Optional[str] = None
     motion_corr_binning: int = 1
