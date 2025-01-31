@@ -78,6 +78,7 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("frame_count", "Number of image frames"),
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
@@ -91,31 +92,6 @@ class TomographyContext(Context):
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._lock: RLock = RLock()
-
-    def _flush_data_collections(self):
-        logger.info(
-            f"Flushing {len(self._data_collection_stash)} data collection API calls"
-        )
-        for dc_data in self._data_collection_stash:
-            data = {
-                **dc_data[2],
-                **{
-                    k: v
-                    for k, v in dc_data[1].data_collection_parameters.items()
-                    if k != "tag"
-                },
-            }
-            capture_post(dc_data[0], json=data)
-        self._data_collection_stash = []
-
-    def _flush_processing_jobs(self):
-        logger.info(
-            f"Flushing {len(self._processing_job_stash.keys())} processing job API calls"
-        )
-        for v in self._processing_job_stash.values():
-            for pd in v:
-                requests.post(pd[0], json=pd[1])
-        self._processing_job_stash = {}
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -227,8 +203,18 @@ class TomographyContext(Context):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
-                    data = {
+                    dcg_url = f"{str(environment.url.geturl())}/visits/{str(environment.visit)}/{environment.murfey_session}/register_data_collection_group"
+                    dcg_data = {
+                        "experiment_type": "tomo",
+                        "experiment_type_id": 36,
+                        "tag": str(self._basepath),
+                        "atlas": "",
+                        "sample": None,
+                    }
+                    capture_post(dcg_url, json=dcg_data)
+
+                    dc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
+                    dc_data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
@@ -245,7 +231,7 @@ class TomographyContext(Context):
                         environment.data_collection_parameters
                         and environment.data_collection_parameters.get("voltage")
                     ):
-                        data.update(
+                        dc_data.update(
                             {
                                 "voltage": environment.data_collection_parameters[
                                     "voltage"
@@ -264,51 +250,16 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
+                    capture_post(dc_url, json=dc_data)
+
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-                    if (
-                        environment.data_collection_group_ids.get(str(self._basepath))
-                        is None
-                    ):
-                        self._data_collection_stash.append((url, environment, data))
-                        self._processing_job_stash[tilt_series] = [
-                            (
-                                proc_url,
-                                {
-                                    "tag": tilt_series,
-                                    "source": str(self._basepath),
-                                    "recipe": "em-tomo-preprocess",
-                                    "experiment_type": "tomography",
-                                },
-                            )
-                        ]
-                        self._processing_job_stash[tilt_series].append(
-                            (
-                                proc_url,
-                                {
-                                    "tag": tilt_series,
-                                    "source": str(self._basepath),
-                                    "recipe": "em-tomo-align",
-                                    "experiment_type": "tomography",
-                                },
-                            )
-                        )
-                    else:
-                        capture_post(url, json=data)
+                    for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                         capture_post(
                             proc_url,
                             json={
                                 "tag": tilt_series,
                                 "source": str(self._basepath),
-                                "recipe": "em-tomo-preprocess",
-                                "experiment_type": "tomography",
-                            },
-                        )
-                        capture_post(
-                            proc_url,
-                            json={
-                                "tag": tilt_series,
-                                "source": str(self._basepath),
-                                "recipe": "em-tomo-align",
+                                "recipe": recipe,
                                 "experiment_type": "tomography",
                             },
                         )
@@ -360,6 +311,9 @@ class TomographyContext(Context):
                 ),
                 "dose_per_frame": environment.data_collection_parameters.get(
                     "dose_per_frame", 0
+                ),
+                "frame_count": environment.data_collection_parameters.get(
+                    "frame_count", 0
                 ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
@@ -591,6 +545,7 @@ class TomographyContext(Context):
             mdoc_metadata: OrderedDict = OrderedDict({})
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+            mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
@@ -657,6 +612,9 @@ class TomographyContext(Context):
             if data_file.split(".")[-1] == "eer":
                 mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
                     metadata_file.parent / data_file
+                )
+                mdoc_metadata["frame_count"] = int(
+                    mdoc_metadata["eer_fractionation"] / mdoc_metadata["num_eer_frames"]
                 )
         except Exception as e:
             logger.error(f"Exception encountered in metadata gathering: {str(e)}")

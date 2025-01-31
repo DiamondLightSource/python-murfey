@@ -54,6 +54,7 @@ class RSyncer(Observer):
         self,
         basepath_local: Path,
         basepath_remote: Path,
+        rsync_module: str,
         server_url: ParseResult,
         stop_callback: Callable = lambda *args, **kwargs: None,
         local: bool = False,
@@ -66,6 +67,7 @@ class RSyncer(Observer):
         super().__init__()
         self._basepath = basepath_local.absolute()
         self._basepath_remote = basepath_remote
+        self._rsync_module = rsync_module
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal
@@ -78,8 +80,10 @@ class RSyncer(Observer):
         if local:
             self._remote = str(basepath_remote)
         else:
-            self._remote = f"{server_url.hostname}::{basepath_remote}/"
-        logger.debug(f"rsync remote path set to {self._remote}")
+            self._remote = (
+                f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
+            )
+        logger.debug(f"rsync destination path set to {self._remote}")
 
         # For local tests you can use something along the lines of
         # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
@@ -120,6 +124,7 @@ class RSyncer(Observer):
         return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,
+            rsyncer._rsync_module,
             rsyncer._server_url,
             local=kwarguments_from_rsyncer["local"],
             status_bar=kwarguments_from_rsyncer["status_bar"],
