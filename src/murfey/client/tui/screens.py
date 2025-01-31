@@ -64,6 +64,7 @@ log = logging.getLogger("murfey.tui.screens")
 ReactiveType = TypeVar("ReactiveType")
 
 token = read_config()["Murfey"].get("token", "")
+instrument_name = read_config()["Murfey"].get("instrument_name", "")
 
 requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
 requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
@@ -264,8 +265,9 @@ class LaunchScreen(Screen):
         self._context = SPAModularContext
 
     def compose(self):
+
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
@@ -699,7 +701,7 @@ class VisitSelection(SwitchSelection):
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
 
         if self._switch_status:
@@ -766,12 +768,16 @@ class VisitCreation(Screen):
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
 
         self.app.install_screen(
             DirectorySelection(
-                [p for p in machine_data.get("data_directories", []) if p.exists()]
+                [
+                    p
+                    for p in machine_data.get("data_directories", [])
+                    if Path(p).exists()
+                ]
             ),
             "directory-select",
         )
@@ -787,11 +793,7 @@ class VisitCreation(Screen):
             )
             self.app.push_screen("gain-ref-select")
         else:
-            if self._switch_status:
-                self.app.push_screen("directory-select")
-            else:
-                self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
-                self.app.push_screen("launcher")
+            self.app.push_screen("directory-select")
 
         if machine_data.get("upstream_data_directories"):
             upstream_downloads = requests.get(
@@ -817,7 +819,7 @@ class UpstreamDownloads(Screen):
 
     def on_button_pressed(self, event: Button.Pressed):
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
             # Create the directory locally to save files to

@@ -10,11 +10,13 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 from murfey.client import read_config
+from murfey.util.config import MachineConfig
 
 
 def run():
     config = read_config()
-    known_server = config["Murfey"].get("server")
+    known_server = config["Murfey"].get("server", "")
+    instrument_name = config["Murfey"].get("instrument_name", "")
 
     parser = argparse.ArgumentParser(description="Transfer using a remote rsync daemon")
 
@@ -35,7 +37,11 @@ def run():
     console = Console()
     murfey_url = urlparse(args.server, allow_fragments=False)
 
-    machine_data = requests.get(f"{murfey_url.geturl()}/machine").json()
+    machine_data = MachineConfig(
+        requests.get(
+            f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+        ).json()
+    )
     if Path(args.source or ".").resolve() in machine_data.data_directories:
         console.print("[red]Source directory is the base directory, exiting")
         return
