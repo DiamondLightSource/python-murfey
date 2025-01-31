@@ -32,6 +32,7 @@ class MultigridController:
     session_id: int
     murfey_url: str = "http://localhost:8000"
     rsync_url: str = ""
+    rsync_module: str = "data"
     demo: bool = False
     processing_enabled: bool = True
     do_transfer: bool = True
@@ -59,12 +60,13 @@ class MultigridController:
             f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
         ).json()
         self.rsync_url = machine_data.get("rsync_url", "")
+        self.rsync_module = machine_data.get("rsync_module", "data")
         self._environment = MurfeyInstanceEnvironment(
             url=urlparse(self.murfey_url, allow_fragments=False),
             client_id=0,
             murfey_session=self.session_id,
             software_versions=machine_data.get("software_versions", {}),
-            default_destination=f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+            default_destination=f"{datetime.now().year}",
             demo=self.demo,
             visit=self.visit,
             data_collection_parameters=self.data_collection_parameters,
@@ -123,7 +125,7 @@ class MultigridController:
                     break
             else:
                 self._environment.default_destinations[source] = (
-                    f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                    f"{datetime.now().year}"
                 )
                 destination = determine_default_destination(
                     self._environment.visit,
@@ -205,7 +207,7 @@ class MultigridController:
                 rsync_cmd = [
                     "rsync",
                     f"{posix_path(self._environment.gain_ref)!r}",  # '!r' will print strings in ''
-                    f"{self._environment.url.hostname}::{visit_path}/processing",
+                    f"{self._environment.url.hostname}::{self.rsync_module}/{visit_path}/processing",
                 ]
                 # Wrap in bash shell
                 cmd = [
@@ -223,6 +225,7 @@ class MultigridController:
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
+                rsync_module=self.rsync_module,
                 server_url=(
                     urlparse(self.rsync_url)
                     if self.rsync_url
@@ -374,46 +377,6 @@ class MultigridController:
                 )
 
             source = Path(json["source"])
-
-            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
-            dcg_data = {
-                "experiment_type": "tomo",
-                "experiment_type_id": 36,
-                "tag": str(source),
-            }
-            requests.post(url, json=dcg_data)
-
-            data = {
-                "voltage": json["voltage"],
-                "pixel_size_on_image": json["pixel_size_on_image"],
-                "experiment_type": json["experiment_type"],
-                "image_size_x": json["image_size_x"],
-                "image_size_y": json["image_size_y"],
-                "file_extension": json["file_extension"],
-                "acquisition_software": json["acquisition_software"],
-                "image_directory": str(self._environment.default_destinations[source]),
-                "tag": json["tilt_series_tag"],
-                "source": str(source),
-                "magnification": json["magnification"],
-                "total_exposed_dose": json.get("total_exposed_dose"),
-                "c2aperture": json.get("c2aperture"),
-                "exposure_time": json.get("exposure_time"),
-                "slit_width": json.get("slit_width"),
-                "phase_plate": json.get("phase_plate", False),
-            }
-            capture_post(
-                f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self._environment.murfey_session}/start_data_collection",
-                json=data,
-            )
-            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
-                capture_post(
-                    f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self._environment.murfey_session}/register_processing_job",
-                    json={
-                        "tag": json["tilt_series_tag"],
-                        "source": str(source),
-                        "recipe": recipe,
-                    },
-                )
             log.info("Registering tomography processing parameters")
             if self._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
@@ -437,8 +400,6 @@ class MultigridController:
                 f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,
             )
-            context._flush_data_collections()
-            context._flush_processing_jobs()
             capture_post(
                 f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},

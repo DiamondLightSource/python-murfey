@@ -41,7 +41,6 @@ class MurfeyInstanceEnvironment(BaseModel):
     destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
-    data_collection_group_ids: Dict[str, int] = {}
     data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     movie_tilt_pair: Dict[Path, str] = {}
@@ -64,7 +63,6 @@ class MurfeyInstanceEnvironment(BaseModel):
         for w in self.watchers.values():
             w.stop()
         self.watchers = {}
-        self.data_collection_group_ids = {}
         self.data_collection_parameters = {}
         self.movies = {}
         self.movie_tilt_pair = {}

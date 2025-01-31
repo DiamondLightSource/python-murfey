@@ -46,6 +46,7 @@ log = logging.getLogger("murfey.tui.app")
 ReactiveType = TypeVar("ReactiveType")
 
 token = read_config()["Murfey"].get("token", "")
+instrument_name = read_config()["Murfey"].get("instrument_name", "")
 
 requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
 requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
@@ -154,7 +155,9 @@ class MurfeyTUI(App):
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(f"{self._environment.url.geturl()}/machine").json()
+        machine_data = requests.get(
+            f"{self._environment.url.geturl()}/instruments/{instrument_name}/machine"
+        ).json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
         else:
@@ -164,7 +167,7 @@ class MurfeyTUI(App):
                     break
             else:
                 self._environment.default_destinations[source] = (
-                    f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
+                    f"{datetime.now().year}"
                 )
                 destination = determine_default_destination(
                     self._visit,
@@ -214,7 +217,7 @@ class MurfeyTUI(App):
                 rsync_cmd = [
                     "rsync",
                     f"{posix_path(self._environment.gain_ref)!r}",
-                    f"{self._url.hostname}::{visit_path}/processing",
+                    f"{self._url.hostname}::{self._machine_config.get('rsync_module', 'data')}/{visit_path}/processing",
                 ]
                 # Encase in bash shell
                 cmd = [
@@ -232,6 +235,7 @@ class MurfeyTUI(App):
             self.rsync_processes[source] = RSyncer(
                 source,
                 basepath_remote=Path(destination),
+                rsync_module=self._machine_config.get("rsync_module", "data"),
                 server_url=urlparse(rsync_url) if rsync_url else self._url,
                 # local=self._environment.demo,
                 status_bar=self._statusbar,
@@ -474,54 +478,6 @@ class MurfeyTUI(App):
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
-            url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
-            dcg_data = {
-                "experiment_type": "tomo",
-                "experiment_type_id": 36,
-                "tag": str(source),
-                "atlas": (
-                    str(self._environment.samples[source].atlas)
-                    if self._environment.samples.get(source)
-                    else ""
-                ),
-                "sample": (
-                    self._environment.samples[source].sample
-                    if self._environment.samples.get(source)
-                    else None
-                ),
-            }
-            capture_post(url, json=dcg_data)
-            data = {
-                "voltage": json["voltage"],
-                "pixel_size_on_image": json["pixel_size_on_image"],
-                "experiment_type": json["experiment_type"],
-                "image_size_x": json["image_size_x"],
-                "image_size_y": json["image_size_y"],
-                "file_extension": json["file_extension"],
-                "acquisition_software": json["acquisition_software"],
-                "image_directory": str(self._environment.default_destinations[source]),
-                "tag": json["tilt_series_tag"],
-                "source": str(source),
-                "magnification": json["magnification"],
-                "total_exposed_dose": json.get("total_exposed_dose"),
-                "c2aperture": json.get("c2aperture"),
-                "exposure_time": json.get("exposure_time"),
-                "slit_width": json.get("slit_width"),
-                "phase_plate": json.get("phase_plate", False),
-            }
-            capture_post(
-                f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/start_data_collection",
-                json=data,
-            )
-            for recipe in ("em-tomo-preprocess", "em-tomo-align"):
-                capture_post(
-                    f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_processing_job",
-                    json={
-                        "tag": json["tilt_series_tag"],
-                        "source": str(source),
-                        "recipe": recipe,
-                    },
-                )
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
@@ -545,8 +501,6 @@ class MurfeyTUI(App):
                 f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,
             )
-            context._flush_data_collections()
-            context._flush_processing_jobs()
             capture_post(
                 f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},

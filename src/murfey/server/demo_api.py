@@ -1553,7 +1553,6 @@ async def process_gain(
     if machine_config.get("rsync_basepath"):
         filepath = (
             Path(machine_config["rsync_basepath"])
-            / (machine_config.get("rsync_module") or "data")
             / str(datetime.datetime.now().year)
             / visit_name
         )
@@ -1681,7 +1680,6 @@ async def write_eer_fractionation_file(
 ) -> dict:
     file_path = (
         Path(machine_config["rsync_basepath"])
-        / (machine_config["rsync_module"] or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
         / secure_filename(fractionation_params.fractionation_file_name)
