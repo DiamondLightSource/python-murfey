@@ -213,7 +213,8 @@ class TransportManager:
                         grid_square_parameters.readout_area_x
                         / grid_square_parameters.thumbnail_size_x
                     )
-                grid_square.gridSquareImage = grid_square_parameters.image
+                if grid_square_parameters.image:
+                    grid_square.gridSquareImage = grid_square_parameters.image
                 grid_square.pixelLocationX = (
                     int(grid_square_parameters.x_location / 7.8)
                     if grid_square_parameters.x_location
@@ -296,7 +297,7 @@ class TransportManager:
             with Session() as db:
                 db.add(record)
                 db.commit()
-                log.info(f"Created FoilHole {record.gridSquareId}")
+                log.info(f"Created FoilHole {record.foilHoleId}")
                 return {"success": True, "return_value": record.foilHoleId}
         except ispyb.ISPyBException as e:
             log.error(

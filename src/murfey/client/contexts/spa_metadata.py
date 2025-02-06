@@ -117,12 +117,10 @@ class SPAMetadataContext(Context):
             source_visit_dir = source.parent
 
             logger.info(
-                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / environment.visit / partial_path).parent)}"
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
             )
             atlas_xml_path = list(
-                (source_visit_dir / environment.visit / partial_path).parent.glob(
-                    "Atlas_*.xml"
-                )
+                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
             )[0]
             logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
@@ -150,8 +148,10 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-                dcg_search_dir = "/".join(
-                    p for p in transferred_file.parent.parts if p != environment.visit
+                dcg_search_dir = "/" + "/".join(
+                    p
+                    for p in transferred_file.parent.parts[1:]
+                    if p != environment.visit
                 )
                 dcg_images_dirs = sorted(
                     Path(dcg_search_dir).glob("Images-Disc*"),
@@ -174,7 +174,7 @@ class SPAMetadataContext(Context):
                 }
                 capture_post(url, json=dcg_data)
                 gs_pix_positions = get_grid_square_atlas_positions(
-                    source_visit_dir / environment.visit / partial_path
+                    source_visit_dir / partial_path
                 )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
