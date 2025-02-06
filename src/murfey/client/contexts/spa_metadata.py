@@ -151,16 +151,16 @@ class SPAMetadataContext(Context):
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
                 dcg_search_dir = "/".join(
-                    p
-                    for p in transferred_file.parent.parts[1:]
-                    if p != environment.visit
+                    p for p in transferred_file.parent.parts if p != environment.visit
                 )
-                dcg_tag = str(
-                    sorted(
-                        Path(dcg_search_dir).glob("Images-Disc*"),
-                        key=lambda x: x.stat().st_ctime,
-                    )[-1]
+                dcg_images_dirs = sorted(
+                    Path(dcg_search_dir).glob("Images-Disc*"),
+                    key=lambda x: x.stat().st_ctime,
                 )
+                if not dcg_images_dirs:
+                    logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
+                    return
+                dcg_tag = str(dcg_images_dirs[-1])
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
@@ -206,12 +206,16 @@ class SPAMetadataContext(Context):
             visitless_source_search_dir = str(source).replace(
                 f"/{environment.visit}", ""
             )
-            visitless_source = str(
-                sorted(
-                    Path(visitless_source_search_dir).glob("Images-Disc*"),
-                    key=lambda x: x.stat().st_ctime,
-                )[-1]
+            visitless_source_images_dirs = sorted(
+                Path(visitless_source_search_dir).glob("Images-Disc*"),
+                key=lambda x: x.stat().st_ctime,
             )
+            if not visitless_source_images_dirs:
+                logger.warning(
+                    f"Cannot find Images-Disc* in {visitless_source_search_dir}"
+                )
+                return
+            visitless_source = str(visitless_source_images_dirs[-1])
             for fh, fh_data in fh_positions.items():
                 capture_post(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
