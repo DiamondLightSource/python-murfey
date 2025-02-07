@@ -66,11 +66,13 @@ def _atlas_destination(
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
-    if environment.visit in environment.default_destinations[source]:
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source]).parent
-        )
+    for i, destination_part in enumerate(
+        Path(environment.default_destinations[source]).parts
+    ):
+        if destination_part == environment.visit:
+            return Path(machine_config.get("rsync_basepath", "")) / "/".join(
+                Path(environment.default_destinations[source]).parent.parts[: i + 1]
+            )
     return (
         Path(machine_config.get("rsync_basepath", ""))
         / Path(environment.default_destinations[source]).parent
@@ -135,7 +137,6 @@ class SPAMetadataContext(Context):
             atlas_pixel_size = atlas_original_pixel_size * 7.8
             logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
 
-            sample = None
             for p in partial_path.split("/"):
                 if p.startswith("Sample"):
                     sample = int(p.replace("Sample", ""))
@@ -167,7 +168,8 @@ class SPAMetadataContext(Context):
                     "tag": dcg_tag,
                     "atlas": str(
                         _atlas_destination(environment, source, transferred_file)
-                        / environment.samples[source].atlas
+                        / environment.samples[source].atlas.parent
+                        / atlas_xml_path.with_suffix(".jpg").name
                     ),
                     "sample": environment.samples[source].sample,
                     "atlas_pixel_size": atlas_pixel_size,
