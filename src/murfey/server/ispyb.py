@@ -225,7 +225,6 @@ class TransportManager:
                     if grid_square_parameters.y_location
                     else None
                 )
-                grid_square.pixelLocationY = grid_square_parameters.y_location
                 grid_square.height = (
                     int(grid_square_parameters.height / 7.8)
                     if grid_square_parameters.height is not None
