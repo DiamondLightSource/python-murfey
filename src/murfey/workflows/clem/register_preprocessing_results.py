@@ -13,7 +13,7 @@ import traceback
 from ast import literal_eval
 from pathlib import Path
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
@@ -221,10 +221,8 @@ class TIFFPreprocessingResult(BaseModel):
     number_of_members: int
     parent_tiffs: list[Path]
 
-    @validator(
-        "parent_tiffs",
-        pre=True,
-    )
+    @field_validator("parent_tiffs", mode="before")
+    @classmethod
     def parse_stringified_list(cls, value):
         if isinstance(value, str):
             try:
