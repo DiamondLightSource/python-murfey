@@ -66,11 +66,13 @@ def _atlas_destination(
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
-    if environment.visit in environment.default_destinations[source]:
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source]).parent
-        )
+    for i, destination_part in enumerate(
+        Path(environment.default_destinations[source]).parts
+    ):
+        if destination_part == environment.visit:
+            return Path(machine_config.get("rsync_basepath", "")) / "/".join(
+                Path(environment.default_destinations[source]).parent.parts[: i + 1]
+            )
     return (
         Path(machine_config.get("rsync_basepath", ""))
         / Path(environment.default_destinations[source]).parent
@@ -117,12 +119,10 @@ class SPAMetadataContext(Context):
             source_visit_dir = source.parent
 
             logger.info(
-                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / environment.visit / partial_path).parent)}"
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
             )
             atlas_xml_path = list(
-                (source_visit_dir / environment.visit / partial_path).parent.glob(
-                    "Atlas_*.xml"
-                )
+                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
             )[0]
             logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
             with open(atlas_xml_path, "rb") as atlas_xml:
@@ -137,7 +137,6 @@ class SPAMetadataContext(Context):
             atlas_pixel_size = atlas_original_pixel_size * 7.8
             logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
 
-            sample = None
             for p in partial_path.split("/"):
                 if p.startswith("Sample"):
                     sample = int(p.replace("Sample", ""))
@@ -150,31 +149,34 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-                dcg_search_dir = "/".join(
+                dcg_search_dir = "/" + "/".join(
                     p
                     for p in transferred_file.parent.parts[1:]
                     if p != environment.visit
                 )
-                dcg_tag = str(
-                    sorted(
-                        Path(dcg_search_dir).glob("Images-Disc*"),
-                        key=lambda x: x.stat().st_ctime,
-                    )[-1]
+                dcg_images_dirs = sorted(
+                    Path(dcg_search_dir).glob("Images-Disc*"),
+                    key=lambda x: x.stat().st_ctime,
                 )
+                if not dcg_images_dirs:
+                    logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
+                    return
+                dcg_tag = str(dcg_images_dirs[-1])
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
                     "tag": dcg_tag,
                     "atlas": str(
                         _atlas_destination(environment, source, transferred_file)
-                        / environment.samples[source].atlas
+                        / environment.samples[source].atlas.parent
+                        / atlas_xml_path.with_suffix(".jpg").name
                     ),
                     "sample": environment.samples[source].sample,
                     "atlas_pixel_size": atlas_pixel_size,
                 }
                 capture_post(url, json=dcg_data)
                 gs_pix_positions = get_grid_square_atlas_positions(
-                    source_visit_dir / environment.visit / partial_path
+                    source_visit_dir / partial_path
                 )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
@@ -206,12 +208,16 @@ class SPAMetadataContext(Context):
             visitless_source_search_dir = str(source).replace(
                 f"/{environment.visit}", ""
             )
-            visitless_source = str(
-                sorted(
-                    Path(visitless_source_search_dir).glob("Images-Disc*"),
-                    key=lambda x: x.stat().st_ctime,
-                )[-1]
+            visitless_source_images_dirs = sorted(
+                Path(visitless_source_search_dir).glob("Images-Disc*"),
+                key=lambda x: x.stat().st_ctime,
             )
+            if not visitless_source_images_dirs:
+                logger.warning(
+                    f"Cannot find Images-Disc* in {visitless_source_search_dir}"
+                )
+                return
+            visitless_source = str(visitless_source_images_dirs[-1])
             for fh, fh_data in fh_positions.items():
                 capture_post(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",

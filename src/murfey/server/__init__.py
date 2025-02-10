@@ -2566,6 +2566,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     message["atlas_pixel_size"],
                     message["sample"],
                 )
+                _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
             murfey_session_id = message["session_id"]

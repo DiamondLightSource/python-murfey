@@ -79,10 +79,19 @@ def _grid_square_metadata_file(
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    possible_sources = []
     for s in environment.sources:
         if file_path.is_relative_to(s):
-            return s
-    return None
+            possible_sources.append(s)
+    if not possible_sources:
+        return None
+    elif len(possible_sources) == 1:
+        return possible_sources[0]
+    source = possible_sources[0]
+    for extra_source in possible_sources[1:]:
+        if extra_source.is_relative_to(source):
+            source = extra_source
+    return source
 
 
 def _get_xml_list_index(key: str, xml_list: list) -> int:

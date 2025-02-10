@@ -213,32 +213,28 @@ class TransportManager:
                         grid_square_parameters.readout_area_x
                         / grid_square_parameters.thumbnail_size_x
                     )
-                grid_square.gridSquareImage = grid_square_parameters.image
-                grid_square.pixelLocationX = (
-                    int(grid_square_parameters.x_location / 7.8)
-                    if grid_square_parameters.x_location
-                    else None
-                )
-                grid_square.pixelLocationY = (
-                    int(grid_square_parameters.y_location / 7.8)
-                    if grid_square_parameters.y_location
-                    else None
-                )
-                grid_square.pixelLocationY = grid_square_parameters.y_location
-                grid_square.height = (
-                    int(grid_square_parameters.height / 7.8)
-                    if grid_square_parameters.height is not None
-                    else None
-                )
-                grid_square.width = (
-                    int(grid_square_parameters.width / 7.8)
-                    if grid_square_parameters.width is not None
-                    else None
-                )
-                grid_square.angle = grid_square_parameters.angle
-                grid_square.stageLocationX = grid_square_parameters.x_stage_position
-                grid_square.stageLocationY = grid_square_parameters.y_stage_position
-                grid_square.pixelSize = grid_square_parameters.pixel_size
+                if grid_square_parameters.image:
+                    grid_square.gridSquareImage = grid_square_parameters.image
+                if grid_square_parameters.x_location:
+                    grid_square.pixelLocationX = int(
+                        grid_square_parameters.x_location / 7.8
+                    )
+                if grid_square_parameters.y_location:
+                    grid_square.pixelLocationY = int(
+                        grid_square_parameters.y_location / 7.8
+                    )
+                if grid_square_parameters.height is not None:
+                    grid_square.height = int(grid_square_parameters.height / 7.8)
+                if grid_square_parameters.width is not None:
+                    grid_square.width = int(grid_square_parameters.width / 7.8)
+                if grid_square_parameters.angle:
+                    grid_square.angle = grid_square_parameters.angle
+                if grid_square_parameters.x_stage_position:
+                    grid_square.stageLocationX = grid_square_parameters.x_stage_position
+                if grid_square_parameters.y_stage_position:
+                    grid_square.stageLocationY = grid_square_parameters.y_stage_position
+                if grid_square_parameters.pixel_size:
+                    grid_square.pixelSize = grid_square_parameters.pixel_size
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
@@ -296,7 +292,7 @@ class TransportManager:
             with Session() as db:
                 db.add(record)
                 db.commit()
-                log.info(f"Created FoilHole {record.gridSquareId}")
+                log.info(f"Created FoilHole {record.foilHoleId}")
                 return {"success": True, "return_value": record.foilHoleId}
         except ispyb.ISPyBException as e:
             log.error(
@@ -317,24 +313,22 @@ class TransportManager:
                 foil_hole = (
                     db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
                 )
-                foil_hole.foilHoleImage = foil_hole_parameters.image
-                foil_hole.pixelLocationX = (
-                    int(foil_hole_parameters.x_location * scale_factor)
-                    if foil_hole_parameters.x_location
-                    else None
-                )
-                foil_hole.pixelLocationY = (
-                    int(foil_hole_parameters.y_location * scale_factor)
-                    if foil_hole_parameters.y_location
-                    else None
-                )
-                foil_hole.diameter = (
-                    foil_hole_parameters.diameter * scale_factor
-                    if foil_hole_parameters.diameter is not None
-                    else None
-                )
-                foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
-                foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
+                if foil_hole_parameters.image:
+                    foil_hole.foilHoleImage = foil_hole_parameters.image
+                if foil_hole_parameters.x_location:
+                    foil_hole.pixelLocationX = int(
+                        foil_hole_parameters.x_location * scale_factor
+                    )
+                if foil_hole_parameters.y_location:
+                    foil_hole.pixelLocationY = int(
+                        foil_hole_parameters.y_location * scale_factor
+                    )
+                if foil_hole_parameters.diameter is not None:
+                    foil_hole.diameter = foil_hole_parameters.diameter * scale_factor
+                if foil_hole_parameters.x_stage_position:
+                    foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
+                if foil_hole_parameters.y_stage_position:
+                    foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
                 if (
                     foil_hole_parameters.readout_area_x is not None
                     and foil_hole_parameters.thumbnail_size_x is not None
