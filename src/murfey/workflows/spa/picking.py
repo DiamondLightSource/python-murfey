@@ -320,7 +320,24 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     _db.close()
 
 
-def _request_email(failed_params: List[str]) -> None:
+def _request_email(
+    failed_params: List[str], session_id: int, murfey_db: Session
+) -> None:
+    session = murfey_db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    config = get_machine_config(instrument_name=session.instrument_name)[
+        session.instrument_name
+    ]
+    if _transport_object:
+        _transport_object.send(
+            config.notifications_queue,
+            {
+                "session": session.visit,
+                "message": f"The following parameters consistently exceeded the user set bounds: {failed_params}",
+            },
+            new_connection=True,
+        )
     return None
 
 
@@ -378,7 +395,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
     murfey_db.commit()
     murfey_db.close()
     if failures:
-        _request_email(failures)
+        _request_email(failures, message["session_id"], murfey_db)
     return None
 
 
