@@ -395,6 +395,7 @@ class NotificationValue(SQLModel, table=True):  # type: ignore
         foreign_key="notificationparameter.id", primary_key=True
     )
     index: int
+    within_bounds: bool
     notification_parameter: Optional[DataCollectionGroup] = Relationship(
         back_populates="notification_values"
     )

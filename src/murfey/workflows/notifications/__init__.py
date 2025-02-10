@@ -1,3 +1,4 @@
+import re
 from typing import Dict, Tuple
 
 from sqlmodel import Session, select
@@ -15,9 +16,10 @@ def notification_setup(
             parameter_name = k[:-3]
         else:
             continue
-        if parameter_name in parameters.keys():
+        snake_parameter_name = re.sub(r"(?<!^)(?=[A-Z])", "_", parameter_name).lower()
+        if snake_parameter_name in parameters.keys():
             continue
-        parameters[parameter_name] = (
+        parameters[snake_parameter_name] = (
             message.get(f"{parameter_name}Min", 0),
             message.get(f"{parameter_name}Max", 10000),
         )
