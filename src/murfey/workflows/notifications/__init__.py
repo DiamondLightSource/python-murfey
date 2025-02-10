@@ -1,0 +1,48 @@
+from typing import Dict, Tuple
+
+from sqlmodel import Session, select
+
+from murfey.util.db import NotificationParameter
+
+
+def notification_setup(
+    message: dict, murfey_db: Session, num_instances_between_triggers: int = 500
+) -> bool:
+    parameters: Dict[str, Tuple[float, float]] = {}
+    for k in message.keys():
+        parameter_name = ""
+        if k.endswith(("Min", "Max")):
+            parameter_name = k[:-3]
+        else:
+            continue
+        if parameter_name in parameters.keys():
+            continue
+        parameters[parameter_name] = (
+            message.get(f"{parameter_name}Min", 0),
+            message.get(f"{parameter_name}Max", 10000),
+        )
+    dcgid = message["dcg"]
+    existing_notification_parameters = murfey_db.exec(
+        select(NotificationParameter).where(NotificationParameter.dcg_id == dcgid)
+    ).all()
+    new_notification_parameters = []
+    for k, v in parameters.items():
+        for enp in existing_notification_parameters:
+            if enp.name == k:
+                enp.min_value = v[0]
+                enp.max_value = v[1]
+                break
+        else:
+            new_notification_parameters.append(
+                NotificationParameter(
+                    dcg_id=dcgid,
+                    name=k,
+                    min_value=v[0],
+                    max_value=v[1],
+                    num_instances_since_triggered=num_instances_between_triggers,
+                )
+            )
+    murfey_db.add(existing_notification_parameters + new_notification_parameters)
+    murfey_db.commit()
+    murfey_db.close()
+    return True
