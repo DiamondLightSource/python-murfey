@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from functools import partial
 
 import yaml
@@ -10,8 +9,6 @@ from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from murfey.util.config import Security, get_security_config
-
-instrument_name = os.getenv("BEAMLINE", "")
 
 
 def url(security_config: Security | None = None) -> str:

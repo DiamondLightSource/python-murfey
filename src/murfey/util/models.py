@@ -47,6 +47,7 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas: str = ""
     sample: Optional[int] = None
+    atlas_pixel_size: int = 0
 
 
 class DCParameters(BaseModel):
@@ -71,6 +72,7 @@ class DCParameters(BaseModel):
 
 class ProcessingJobParameters(BaseModel):
     tag: str
+    source: str
     recipe: str
     parameters: Dict[str, Any] = {}
     experiment_type: str = "spa"
@@ -148,19 +150,6 @@ class FractionationParameters(BaseModel):
 
 
 """
-Cryo-CLEM
-=========
-Models related to the cryo-CLEM workflow.
-"""
-
-
-class TiffSeriesInfo(BaseModel):
-    series_name: str
-    tiff_files: List[Path]
-    series_metadata: Path
-
-
-"""
 FIB
 ===
 Models related to FIB, as part of correlative workflow with TEM.
@@ -199,10 +188,6 @@ Single Particle Analysis
 ========================
 Models related to the single-particle analysis workflow.
 """
-
-
-class SPAProcessingParameters(BaseModel):
-    job_id: int
 
 
 class SPAProcessFile(BaseModel):
@@ -272,8 +257,11 @@ class GridSquareParameters(BaseModel):
     readout_area_y: Optional[int] = None
     thumbnail_size_x: Optional[int] = None
     thumbnail_size_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    angle: Optional[float] = None
 
 
 class FoilHoleParameters(BaseModel):
@@ -289,6 +277,7 @@ class FoilHoleParameters(BaseModel):
     thumbnail_size_y: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
+    diameter: Optional[float] = None
 
 
 class PostInfo(BaseModel):
@@ -299,6 +288,8 @@ class PostInfo(BaseModel):
 class MultigridWatcherSetup(BaseModel):
     source: Path
     skip_existing_processing: bool = False
+    destination_overrides: Dict[Path, str] = {}
+    rsync_restarts: List[str] = []
 
 
 class CurrentGainRef(BaseModel):
@@ -321,12 +312,9 @@ class ProcessFile(BaseModel):  # Rename to TomoProcessFile
     path: str
     description: str
     tag: str
-    data_collection_id: Optional[int] = None
     image_number: int
     pixel_size: float
     dose_per_frame: float
-    processing_job: Optional[int] = None
-    autoproc_program_id: Optional[int] = None
     mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1
@@ -361,6 +349,7 @@ class CompletedTiltSeries(BaseModel):
 
 class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
+    frame_count: int
     gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float

@@ -30,7 +30,6 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -41,7 +40,6 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -53,7 +51,6 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
     context.post_transfer(
         tmp_path / "Position_1.mdoc",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -64,7 +61,6 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
     (tmp_path / "Position_2_002_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_002_[30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -89,7 +85,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -100,7 +95,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -109,7 +103,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     (tmp_path / "Position_2_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_002_[-30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -119,7 +112,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     (tmp_path / "Position_2_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_2_001_[30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -130,7 +122,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
     (tmp_path / "Position_3_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_3_002_[-30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -143,7 +134,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
     context.post_transfer(
         tmp_path / "Position_1.mdoc",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -155,7 +145,6 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         mdoc.write("[ZValue = 0]\n[ZValue = 1]\n")
     context.post_transfer(
         tmp_path / "Position_2.mdoc",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -179,7 +168,6 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -190,7 +178,6 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     (tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_002_[-30.0]_date_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -202,7 +189,6 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         mdoc.write("[ZValue = 0]\n[ZValue = 1]\n[ZValue = 2]\n")
     context.post_transfer(
         tmp_path / "Position_1.mdoc",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -213,7 +199,6 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
     (tmp_path / "Position_1_003_[60.0]_data_time_fractions.tiff").touch()
     new_series = context.post_transfer(
         tmp_path / "Position_1_003_[60.0]_data_time_fractions.tiff",
-        role="detector",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
@@ -246,7 +231,6 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     assert len(context._tilt_series_sizes) == 0
     context.post_transfer(
         Path(__file__).parent.parent / "util" / "test_1.mdoc",
-        role="detector",
         environment=env,
         required_strings=["fractions"],
     )
@@ -257,7 +241,6 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     (tmp_path / f"test_1_001_[{tilt:.1f}]_data_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / f"test_1_001_[{tilt:.1f}]_data_time_fractions.tiff",
-        role="detector",
         environment=env,
         required_strings=["fractions"],
     )
@@ -269,7 +252,6 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
         (tmp_path / f"test_1_{i:03}_[{t:.1f}]_data_time_fractions.tiff").touch()
         context.post_transfer(
             tmp_path / f"test_1_{i:03}_[{t:.1f}]_data_time_fractions.tiff",
-            role="detector",
             environment=env,
             required_strings=["fractions"],
         )

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import re
-import sys
 import traceback
+from ast import literal_eval
+from importlib.metadata import EntryPoint  # type hinting only
 from logging import getLogger
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import Literal, Optional, Type, Union
 
+from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
+from pydantic import BaseModel, validator
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -22,13 +25,6 @@ from murfey.util.db import (
     CLEMTIFFFile,
 )
 from murfey.util.db import Session as MurfeySession
-from murfey.util.models import TiffSeriesInfo
-
-# Use backport from importlib_metadata for Python <3.10
-if sys.version_info.major == 3 and sys.version_info.minor < 10:
-    from importlib_metadata import EntryPoint, entry_points
-else:
-    from importlib.metadata import EntryPoint, entry_points
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -81,23 +77,15 @@ def validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    rsync_basepath = machine_config.rsync_basepath
-    try:
-        base_path = list(rsync_basepath.parents)[-2].as_posix()
-    except IndexError:
-        # Print to troubleshoot
-        logger.warning(f"Base path {rsync_basepath!r} is too short")
-        base_path = rsync_basepath.as_posix()
-    except Exception:
-        raise Exception("Unexpected exception occurred when loading the file base path")
+    base_path = machine_config.rsync_basepath.as_posix()
 
     # Check that full file path doesn't contain unallowed characters
-    # Currently allows only:
-    # - words (alphanumerics and "_"; \w),
-    # - spaces (\s),
-    # - periods,
-    # - dashes,
-    # - forward slashes ("/")
+    #   Currently allows only:
+    #   - words (alphanumerics and "_"; \w),
+    #   - spaces (\s),
+    #   - periods,
+    #   - dashes,
+    #   - forward slashes ("/")
     if bool(re.fullmatch(r"^[\w\s\.\-/]+$", str(full_path))) is False:
         raise ValueError(f"Unallowed characters present in {file}")
 
@@ -631,51 +619,147 @@ API ENDPOINTS FOR FILE PROCESSING
 """
 
 
-@router.post("/sessions/{session_id}/lif_to_stack")  # API posts to this URL
-def lif_to_stack(
-    session_id: int,  # Used by the decorator
+@router.post(
+    "/sessions/{session_id}/clem/preprocessing/process_raw_lifs"
+)  # API posts to this URL
+def process_raw_lifs(
+    session_id: int,
     lif_file: Path,
+    db: Session = murfey_db,
 ):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="lif_to_stack"
-    )
-
-    # Use entry point if found
-    if len(murfey_workflows) == 1:
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.lif_to_stack
-            file=lif_file,
-            root_folder="images",
-            messenger=_transport_object,
-        )
-        return True
-    # Raise error if Murfey workflow not found
-    else:
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(
+                group="murfey.workflows", name="clem.process_raw_lifs"
+            )
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
 
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
 
-@router.post("/sessions/{session_id}/tiff_to_stack")
-def tiff_to_stack(
-    session_id: int,  # Used by the decorator
-    tiff_info: TiffSeriesInfo,
-):
-    # Get command line entry point
-    murfey_workflows = entry_points().select(
-        group="murfey.workflows", name="tiff_to_stack"
+    # Pass arguments along to the correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_lifs
+        file=lif_file,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        messenger=_transport_object,
     )
+    return True
 
-    # Use entry point if found
-    if murfey_workflows:
-        workflow: EntryPoint = list(murfey_workflows)[0]
-        workflow.load()(
-            # Match the arguments found in murfey.workflows.tiff_to_stack
-            file=tiff_info.tiff_files[0],  # Pass it only one file from the list
-            root_folder="images",
-            metadata=tiff_info.series_metadata,
-            messenger=_transport_object,
-        )
-    # Raise error if Murfey workflow not found
-    else:
+
+class TIFFSeriesInfo(BaseModel):
+    series_name: str
+    tiff_files: list[Path]
+    series_metadata: Path
+
+
+@router.post("/sessions/{session_id}/clem/preprocessing/process_raw_tiffs")
+def process_raw_tiffs(
+    session_id: int,
+    tiff_info: TIFFSeriesInfo,
+    db: Session = murfey_db,
+):
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(
+                group="murfey.workflows", name="clem.process_raw_tiffs"
+            )
+        )[0]
+    except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.process_raw_tiffs
+        tiff_list=tiff_info.tiff_files,
+        root_folder="images",
+        session_id=session_id,
+        instrument_name=instrument_name,
+        metadata=tiff_info.series_metadata,
+        messenger=_transport_object,
+    )
+    return True
+
+
+class AlignAndMergeParams(BaseModel):
+    # Processing parameters
+    series_name: str
+    images: list[Path]
+    metadata: Path
+    # Optional processing parameters
+    crop_to_n_frames: Optional[int] = None
+    align_self: Literal["enabled", ""] = ""
+    flatten: Literal["mean", "min", "max", ""] = ""
+    align_across: Literal["enabled", ""] = ""
+
+    @validator(
+        "images",
+        pre=True,
+    )
+    def parse_stringified_list(cls, value):
+        if isinstance(value, str):
+            try:
+                eval_result = literal_eval(value)
+                if isinstance(eval_result, list):
+                    parent_tiffs = [Path(p) for p in eval_result]
+                    return parent_tiffs
+            except (SyntaxError, ValueError):
+                raise ValueError("Unable to parse input")
+        # Return value as-is; if it fails, it fails
+        return value
+
+
+@router.post("/sessions/{session_id}/clem/processing/align_and_merge_stacks")
+def align_and_merge_stacks(
+    session_id: int,
+    align_and_merge_params: AlignAndMergeParams,
+    db: Session = murfey_db,
+):
+    try:
+        # Try and load relevant Murfey workflow
+        workflow: EntryPoint = list(
+            entry_points().select(group="murfey.workflows", name="clem.align_and_merge")
+        )[0]
+    except IndexError:
+        raise RuntimeError("The relevant Murfey workflow was not found")
+
+    # Get instrument name from the database to load the correct config file
+    session_row: MurfeySession = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = session_row.instrument_name
+
+    # Pass arguments to correct workflow
+    workflow.load()(
+        # Match the arguments found in murfey.workflows.clem.align_and_merge
+        # Session parameters
+        session_id=session_id,
+        instrument_name=instrument_name,
+        # Processing parameters
+        series_name=align_and_merge_params.series_name,
+        images=align_and_merge_params.images,
+        metadata=align_and_merge_params.metadata,
+        # Optional processing parameters
+        crop_to_n_frames=align_and_merge_params.crop_to_n_frames,
+        align_self=align_and_merge_params.align_self,
+        flatten=align_and_merge_params.flatten,
+        align_across=align_and_merge_params.align_across,
+        # Optional session parameters
+        messenger=_transport_object,
+    )
+    return True

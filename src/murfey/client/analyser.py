@@ -16,7 +16,7 @@ from typing import Type
 
 from murfey.client.context import Context
 from murfey.client.contexts.clem import CLEMContext
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -57,7 +57,6 @@ class Analyser(Observer):
         self._limited = limited
         self._experiment_type = ""
         self._acquisition_software = ""
-        self._role = ""
         self._extension: str = ""
         self._unseen_xml: list = []
         self._context: Context | None = None
@@ -126,14 +125,12 @@ class Analyser(Observer):
         in the Context classes themselves.
         """
         if "atlas" in file_path.parts:
-            self._role = "detector"
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
 
         # CLEM workflow checks
         # Look for LIF and XLIF files
         if file_path.suffix in (".lif", ".xlif"):
-            self._role = "detector"
             self._context = CLEMContext("leica", self._basepath)
             return True
         # Look for TIFF files associated with CLEM workflow
@@ -152,7 +149,6 @@ class Analyser(Observer):
                 ).get("analyse_created_directories", [])
             )
             if created_directories.intersection(set(file_path.parts)):
-                self._role = "detector"
                 self._context = CLEMContext("leica", self._basepath)
                 return True
 
@@ -163,27 +159,8 @@ class Analyser(Observer):
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    if self._environment:
-                        try:
-                            cfg = get_machine_config_client(
-                                str(self._environment.url.geturl()),
-                                instrument_name=self._environment.instrument_name,
-                                demo=self._environment.demo,
-                            )
-                        except Exception as e:
-                            logger.error(f"Exception encountered: {e}")
-                            cfg = {}
-                    else:
-                        cfg = {}
-                    self._context = (
-                        SPAModularContext("epu", self._basepath)
-                        if cfg.get("modular_spa")
-                        else SPAContext("epu", self._basepath)
-                    )
+                    self._context = SPAModularContext("epu", self._basepath)
                 self.parameters_model = ProcessingParametersSPA
-                # Assign it the detector attribute if not already present
-                if not self._role:
-                    self._role = "detector"
                 return True
 
             # Files starting with "Position" belong to the standard tomography workflow
@@ -198,23 +175,6 @@ class Analyser(Observer):
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
                     self.parameters_model = PreprocessingParametersTomo
-                # Assign role if not already present
-                if not self._role:
-                    # Fractions files attributed to the detector
-                    if (
-                        "Fractions" in split_file_name[-1]
-                        or "fractions" in split_file_name[-1]
-                    ):
-                        self._role = "detector"
-                    # MDOC files attributed to the microscope
-                    elif (
-                        file_path.suffix == ".mdoc"
-                        or file_path.with_suffix(".mdoc").is_file()
-                    ):
-                        self._role = "microscope"
-                    # Attribute all other files to the detector
-                    else:
-                        self._role = "detector"
                 return True
 
             # Files with these suffixes belong to the serial EM tomography workflow
@@ -239,11 +199,6 @@ class Analyser(Observer):
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
                 self.parameters_model = PreprocessingParametersTomo
-                if not self._role:
-                    if "Frames" in file_path.parts:
-                        self._role = "detector"
-                    else:
-                        self._role = "microscope"
                 return True
         return False
 
@@ -251,7 +206,7 @@ class Analyser(Observer):
         try:
             if self._context:
                 self._context.post_transfer(
-                    transferred_file, role=self._role, environment=self._environment
+                    transferred_file, environment=self._environment
                 )
         except Exception as e:
             logger.error(f"An exception was encountered post transfer: {e}")
@@ -309,19 +264,17 @@ class Analyser(Observer):
                         self.queue.task_done()
                         continue
                     elif self._extension:
-                        logger.info(f"Context found successfully: {self._role}")
+                        logger.info(
+                            f"Context found successfully for {transferred_file}"
+                        )
                         try:
                             self._context.post_first_transfer(
                                 transferred_file,
-                                role=self._role,
                                 environment=self._environment,
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if (
-                            self._role == "detector"
-                            and "atlas" not in transferred_file.parts
-                        ):
+                        if "atlas" not in transferred_file.parts:
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -356,8 +309,7 @@ class Analyser(Observer):
                                         "form": dc_metadata,
                                         "dependencies": (
                                             spa_form_dependencies
-                                            if isinstance(self._context, SPAContext)
-                                            or isinstance(
+                                            if isinstance(
                                                 self._context, SPAModularContext
                                             )
                                             else {}
@@ -377,20 +329,16 @@ class Analyser(Observer):
                     self._find_extension(transferred_file)
                     if self._extension:
                         logger.info(
-                            f"Context found successfully: {self._role}, {transferred_file}"
+                            f"Extension found successfully for {transferred_file}"
                         )
                         try:
                             self._context.post_first_transfer(
                                 transferred_file,
-                                role=self._role,
                                 environment=self._environment,
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if (
-                            self._role == "detector"
-                            and "atlas" not in transferred_file.parts
-                        ):
+                        if "atlas" not in transferred_file.parts:
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -420,8 +368,7 @@ class Analyser(Observer):
                                         "form": dc_metadata,
                                         "dependencies": (
                                             spa_form_dependencies
-                                            if isinstance(self._context, SPAContext)
-                                            or isinstance(
+                                            if isinstance(
                                                 self._context, SPAModularContext
                                             )
                                             else {}
@@ -443,8 +390,8 @@ class Analyser(Observer):
         if not self._environment:
             return data_file.with_suffix(".xml")
         file_name = f"{'_'.join(p for p in data_file.stem.split('_')[:-1])}.xml"
-        data_directories = self._murfey_config.get("data_directories", {})
-        for dd in data_directories.keys():
+        data_directories = self._murfey_config.get("data_directories", [])
+        for dd in data_directories:
             if str(data_file).startswith(dd):
                 base_dir = Path(dd)
                 mid_dir = data_file.relative_to(dd).parent

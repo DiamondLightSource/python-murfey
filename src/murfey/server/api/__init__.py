@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from ispyb.sqlalchemy import Atlas
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from ispyb.sqlalchemy import (
     BLSample,
@@ -23,7 +24,7 @@ from ispyb.sqlalchemy import (
 from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.exc import NoResultFound, OperationalError
+from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -32,7 +33,6 @@ import murfey.server.prometheus as prom
 import murfey.server.websocket as ws
 import murfey.util.eer
 from murfey.server import (
-    _midpoint,
     _murfey_id,
     _transport_object,
     check_tilt_series_mc,
@@ -98,15 +98,19 @@ from murfey.util.models import (
     Sample,
     SessionInfo,
     SPAProcessFile,
-    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
     Visit,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
+from murfey.util.tomo import midpoint
+from murfey.workflows.spa.flush_spa_preprocess import (
+    register_foil_hole,
+    register_grid_square,
+)
 
 log = logging.getLogger("murfey.server.api")
 
@@ -485,50 +489,13 @@ def get_number_of_movies_from_foil_hole(
 
 
 @router.post("/sessions/{session_id}/grid_square/{gsid}")
-def register_grid_square(
+def posted_grid_square(
     session_id: MurfeySessionID,
     gsid: int,
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    try:
-        grid_square = db.exec(
-            select(GridSquare)
-            .where(GridSquare.name == gsid)
-            .where(GridSquare.tag == grid_square_params.tag)
-            .where(GridSquare.session_id == session_id)
-        ).one()
-        grid_square.x_location = grid_square_params.x_location
-        grid_square.y_location = grid_square_params.y_location
-        grid_square.x_stage_position = grid_square_params.x_stage_position
-        grid_square.y_stage_position = grid_square_params.y_stage_position
-    except Exception:
-        secured_grid_square_image_path = secure_filename(grid_square_params.image)
-        if (
-            secured_grid_square_image_path
-            and Path(secured_grid_square_image_path).is_file()
-        ):
-            jpeg_size = Image.open(secured_grid_square_image_path).size
-        else:
-            jpeg_size = (0, 0)
-        grid_square = GridSquare(
-            name=gsid,
-            session_id=session_id,
-            tag=grid_square_params.tag,
-            x_location=grid_square_params.x_location,
-            y_location=grid_square_params.y_location,
-            x_stage_position=grid_square_params.x_stage_position,
-            y_stage_position=grid_square_params.y_stage_position,
-            readout_area_x=grid_square_params.readout_area_x,
-            readout_area_y=grid_square_params.readout_area_y,
-            thumbnail_size_x=grid_square_params.thumbnail_size_x or jpeg_size[0],
-            thumbnail_size_y=grid_square_params.thumbnail_size_y or jpeg_size[1],
-            pixel_size=grid_square_params.pixel_size,
-            image=secured_grid_square_image_path,
-        )
-    db.add(grid_square)
-    db.commit()
-    db.close()
+    return register_grid_square(session_id, gsid, grid_square_params, db)
 
 
 @router.get("/sessions/{session_id}/foil_hole/{fh_name}")
@@ -545,51 +512,13 @@ def get_foil_hole(
 
 
 @router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
-def register_foil_hole(
+def post_foil_hole(
     session_id: MurfeySessionID,
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
     db=murfey_db,
 ):
-    try:
-        gsid = (
-            db.exec(
-                select(GridSquare)
-                .where(GridSquare.tag == foil_hole_params.tag)
-                .where(GridSquare.session_id == session_id)
-                .where(GridSquare.name == gs_name)
-            )
-            .one()
-            .id
-        )
-    except NoResultFound:
-        log.debug(
-            f"Foil hole {sanitise(str(foil_hole_params.name))} could not be registered as grid square {sanitise(str(gs_name))} was not found"
-        )
-        return
-    secured_foil_hole_image_path = secure_filename(foil_hole_params.image)
-    if foil_hole_params.image and Path(secured_foil_hole_image_path).is_file():
-        jpeg_size = Image.open(secured_foil_hole_image_path).size
-    else:
-        jpeg_size = (0, 0)
-    foil_hole = FoilHole(
-        name=foil_hole_params.name,
-        session_id=session_id,
-        grid_square_id=gsid,
-        x_location=foil_hole_params.x_location,
-        y_location=foil_hole_params.y_location,
-        x_stage_position=foil_hole_params.x_stage_position,
-        y_stage_position=foil_hole_params.y_stage_position,
-        readout_area_x=foil_hole_params.readout_area_x,
-        readout_area_y=foil_hole_params.readout_area_y,
-        thumbnail_size_x=foil_hole_params.thumbnail_size_x or jpeg_size[0],
-        thumbnail_size_y=foil_hole_params.thumbnail_size_y or jpeg_size[1],
-        pixel_size=foil_hole_params.pixel_size,
-        image=secured_foil_hole_image_path,
-    )
-    db.add(foil_hole)
-    db.commit()
-    db.close()
+    return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
 @router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
@@ -649,7 +578,7 @@ def flush_spa_processing(
     visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
 ):
     zocalo_message = {
-        "register": "flush_spa_preprocess",
+        "register": "spa.flush_spa_preprocess",
         "session_id": session_id,
         "tag": tag.tag,
     }
@@ -791,7 +720,7 @@ def register_completed_tilt_series(
             )
             if not stack_file.parent.exists():
                 stack_file.parent.mkdir(parents=True)
-            tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+            tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
             zocalo_message = {
                 "recipes": ["em-tomo-align"],
                 "parameters": {
@@ -800,6 +729,9 @@ def register_completed_tilt_series(
                     "dcid": ids.dcid,
                     "appid": ids.appid,
                     "stack_file": str(stack_file),
+                    "dose_per_frame": preproc_params.dose_per_frame,
+                    "frame_count": preproc_params.frame_count,
+                    "kv": preproc_params.voltage,
                     "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
@@ -1009,16 +941,6 @@ async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
         )
 
 
-@router.post("/visits/{visit_name}/spa_processing")
-async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    zocalo_message = {
-        "parameters": {"ispyb_process": proc_params.job_id},
-        "recipes": ["ispyb-relion"],
-    }
-    if _transport_object:
-        _transport_object.send("processing_recipe", zocalo_message)
-
-
 @router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
     visit_name: str,
@@ -1086,7 +1008,11 @@ async def request_spa_preprocessing(
             .one()[0]
             .id
         )
-    except Exception:
+    except Exception as e:
+        log.warning(
+            f"Foil hole ID not found for foil hole {sanitise(str(proc_file.foil_hole_id))}: {e}",
+            exc_info=True,
+        )
         foil_hole_id = None
     if proc_params:
 
@@ -1128,6 +1054,7 @@ async def request_spa_preprocessing(
                 "image_number": proc_file.image_number,
                 "microscope": get_microscope(),
                 "mc_uuid": murfey_ids[0],
+                "foil_hole_id": foil_hole_id,
                 "ft_bin": proc_params["motion_corr_binning"],
                 "fm_dose": proc_params["dose_per_frame"],
                 "gain_ref": proc_params["gain_ref"],
@@ -1196,6 +1123,9 @@ async def request_tomography_preprocessing(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
+
+    recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
+
     data_collection = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1204,7 +1134,7 @@ async def request_tomography_preprocessing(
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
+        .where(ProcessingJob.recipe == recipe_name)
     ).all()
     if data_collection:
         if registered_tilts := db.exec(
@@ -1219,7 +1149,7 @@ async def request_tomography_preprocessing(
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
         zocalo_message: dict = {
-            "recipes": ["em-tomo-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": dcid,
@@ -1234,9 +1164,10 @@ async def request_tomography_preprocessing(
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
+                "frame_count": proc_file.frame_count,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_file.gain_ref)
-                    if proc_file.gain_ref
+                    if proc_file.gain_ref and machine_config.data_transfer_enabled
                     else proc_file.gain_ref
                 ),
                 "fm_int_file": proc_file.eer_fractionation_file,
@@ -1285,7 +1216,31 @@ def suggest_path(
         raise ValueError(
             "No machine configuration set when suggesting destination path"
         )
+
+    # Construct the full path to where the dataset is to be saved
     check_path = machine_config.rsync_basepath / base_path
+
+    # Check previous year to account for the year rolling over during data collection
+    if not check_path.parent.exists():
+        base_path_parts = base_path.split("/")
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = machine_config.rsync_basepath / base_path
+
+        # If it's not in the previous year either, it's a genuine error
+        if not check_path.parent.exists():
+            log_message = (
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev.parent)!r} or {str(check_path.parent)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while check_path.exists():
         count = count + 1 if count else 2
@@ -1295,6 +1250,28 @@ def suggest_path(
         if params.extra_directory:
             (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
     return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
+
+
+class Dest(BaseModel):
+    destination: Path
+
+
+@router.post("/sessions/{session_id}/make_rsyncer_destination")
+def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
+    secure_path_parts = [secure_filename(p) for p in destination.destination.parts]
+    destination_path = "/".join(secure_path_parts)
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if not machine_config:
+        raise ValueError("No machine configuration set when making rsyncer destination")
+    full_destination_path = machine_config.rsync_basepath / destination_path
+    for parent_path in full_destination_path.parents:
+        parent_path.mkdir(mode=0o750, exist_ok=True)
+    return destination
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
@@ -1335,6 +1312,30 @@ def register_dc_group(
     ).all():
         dcg_murfey[0].atlas = dcg_params.atlas
         dcg_murfey[0].sample = dcg_params.sample
+        dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
+
+        if _transport_object:
+            if dcg_murfey[0].atlas_id is not None:
+                _transport_object.send(
+                    _transport_object.feedback_queue,
+                    {
+                        "register": "atlas_update",
+                        "atlas_id": dcg_murfey[0].atlas_id,
+                        "atlas": dcg_params.atlas,
+                        "sample": dcg_params.sample,
+                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                    },
+                )
+            else:
+                atlas_id_response = _transport_object.do_insert_atlas(
+                    Atlas(
+                        dataCollectionGroupId=dcg_murfey[0].id,
+                        atlasImage=dcg_params.atlas,
+                        pixelSize=dcg_params.atlas_pixel_size,
+                        cassetteSlot=dcg_params.sample,
+                    )
+                )
+                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
     else:
@@ -1344,6 +1345,9 @@ def register_dc_group(
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
             "session_id": session_id,
+            "atlas": dcg_params.atlas,
+            "sample": dcg_params.sample,
+            "atlas_pixel_size": dcg_params.atlas_pixel_size,
         }
 
         if _transport_object:
@@ -1422,6 +1426,7 @@ def register_proc(
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
+        "source": proc_params.source,
         "tag": proc_params.tag,
         "job_parameters": {
             k: v for k, v in proc_params.parameters.items() if v not in (None, "None")
@@ -1455,11 +1460,29 @@ async def process_gain(
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
     filepath = (
         Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
     )
+
+    # Check under previous year if the folder doesn't exist
+    if not filepath.exists():
+        filepath_prev = filepath
+        filepath = (
+            Path(machine_config.rsync_basepath)
+            / str(datetime.datetime.now().year - 1)
+            / secure_filename(visit_name)
+            / machine_config.gain_directory_name
+        )
+        # If it's not in the previous year, it's a genuine error
+        if not filepath.exists():
+            log_message = (
+                "Unable to find gain reference directory under "
+                f"{str(filepath_prev)!r} or {str(filepath)}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     if gain_reference_params.eer:
         new_gain_ref, new_gain_ref_superres = await prepare_eer_gain(
             filepath / safe_path_name,
@@ -1513,14 +1536,21 @@ async def write_eer_fractionation_file(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    file_path = (
-        Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
-        / str(datetime.datetime.now().year)
-        / secure_filename(visit_name)
-        / "processing"
-        / secure_filename(fractionation_params.fractionation_file_name)
-    )
+    if machine_config.eer_fractionation_file_template:
+        file_path = Path(
+            machine_config.eer_fractionation_file_template.format(
+                visit=secure_filename(visit_name),
+                year=str(datetime.datetime.now().year),
+            )
+        ) / secure_filename(fractionation_params.fractionation_file_name)
+    else:
+        file_path = (
+            Path(machine_config.rsync_basepath)
+            / str(datetime.datetime.now().year)
+            / secure_filename(visit_name)
+            / "processing"
+            / secure_filename(fractionation_params.fractionation_file_name)
+        )
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
 
@@ -1560,7 +1590,6 @@ async def make_gif(
     ]
     output_dir = (
         Path(machine_config.rsync_basepath)
-        / (machine_config.rsync_module or "data")
         / secure_filename(year)
         / secure_filename(visit_name)
         / "processed"

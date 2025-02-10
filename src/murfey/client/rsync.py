@@ -54,6 +54,7 @@ class RSyncer(Observer):
         self,
         basepath_local: Path,
         basepath_remote: Path,
+        rsync_module: str,
         server_url: ParseResult,
         stop_callback: Callable = lambda *args, **kwargs: None,
         local: bool = False,
@@ -66,6 +67,7 @@ class RSyncer(Observer):
         super().__init__()
         self._basepath = basepath_local.absolute()
         self._basepath_remote = basepath_remote
+        self._rsync_module = rsync_module
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal
@@ -73,10 +75,16 @@ class RSyncer(Observer):
         self._local = local
         self._server_url = server_url
         self._notify = notify
+
+        # Set rsync destination
         if local:
             self._remote = str(basepath_remote)
         else:
-            self._remote = f"{server_url.hostname}::{basepath_remote}/"
+            self._remote = (
+                f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
+            )
+        logger.debug(f"rsync destination path set to {self._remote}")
+
         # For local tests you can use something along the lines of
         # self._remote = f"wra62962@ws133:/dls/tmp/wra62962/junk/{basepath_remote}"
         # to avoid having to set up an rsync daemon
@@ -116,6 +124,7 @@ class RSyncer(Observer):
         return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,
+            rsyncer._rsync_module,
             rsyncer._server_url,
             local=kwarguments_from_rsyncer["local"],
             status_bar=kwarguments_from_rsyncer["status_bar"],
@@ -172,18 +181,21 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def finalise(self):
+    def finalise(self, thread: bool = True):
         self.stop()
         self._remove_files = True
         self._notify = False
-        self.thread = threading.Thread(
-            name=f"RSync finalisation {self._basepath}:{self._remote}",
-            target=self._process,
-            daemon=True,
-        )
-        for f in self._basepath.glob("**/*"):
-            self.queue.put(f)
-        self.stop()
+        if thread:
+            self.thread = threading.Thread(
+                name=f"RSync finalisation {self._basepath}:{self._remote}",
+                target=self._process,
+                daemon=True,
+            )
+            for f in self._basepath.glob("**/*"):
+                self.queue.put(f)
+            self.stop()
+        else:
+            self._transfer(list(self._basepath.glob("**/*")))
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
@@ -378,9 +390,11 @@ class RSyncer(Observer):
                 return
 
         def parse_stderr(line: str):
-            logger.warning(f"rsync stderr: {line!r}")
+            if line.strip():
+                logger.warning(f"rsync stderr: {line!r}")
 
         # Generate list of relative filenames for this batch of transferred files
+        #   Relative filenames will be safe to use on both Windows and Unix
         relative_filenames: List[Path] = []
         for f in files:
             try:
@@ -388,6 +402,7 @@ class RSyncer(Observer):
             except ValueError:
                 raise ValueError(f"File '{f}' is outside of {self._basepath}") from None
 
+        # Encode files to rsync as bytestring
         if self._remove_files:
             if self._required_substrings_for_removal:
                 rsync_stdin_remove = b"\n".join(
@@ -416,53 +431,88 @@ class RSyncer(Observer):
             rsync_stdin = b"\n".join(os.fsencode(f) for f in relative_filenames)
 
         # Create and run rsync subprocesses
-        # rsync commands to pass to subprocess
+        # rsync default settings
         rsync_cmd = [
             "rsync",
             "-iiv",
             "--times",
             "--progress",
             "--outbuf=line",
-            "--files-from=-",
-            "-p",  # preserve permissions
-            "--chmod=D0750,F0750",  # 4: Read, 2: Write, 1: Execute | User, Group, Others
+            "--files-from=-",  # '-' indicates reading from standard input
+            # Needed as a pair to trigger permission modifications
+            # Ref: https://serverfault.com/a/796341
+            "-p",
+            "--chmod=D0750,F0750",  # Use extended chmod format
         ]
+        # Add file locations
         rsync_cmd.extend([".", self._remote])
-        result: subprocess.CompletedProcess | None = None
+
+        # Transfer files to destination
+        result: subprocess.CompletedProcess[bytes] | None = None
         success = True
         if rsync_stdin:
+            # Wrap rsync command in a bash command
+            cmd = [
+                "bash",
+                "-c",
+                # rsync command passed in as a single string
+                " ".join(rsync_cmd),
+            ]
             result = subprocess.run(
-                rsync_cmd,
-                cwd=str(self._basepath),
+                cmd,
+                cwd=self._basepath,  # As-is Path is fine
                 capture_output=True,
                 input=rsync_stdin,
             )
-            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
-                parse_stdout(stdout_line)
-            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
-                parse_stderr(stderr_line)
+            # Parse outputs
+            for line in result.stdout.decode("utf-8", "replace").split("\n"):
+                parse_stdout(line)
+            for line in result.stderr.decode("utf-8", "replace").split("\n"):
+                parse_stderr(line)
             success = result.returncode == 0
 
+        # Remove files from source
         if rsync_stdin_remove:
+            # Insert file removal flag before locations
             rsync_cmd.insert(-2, "--remove-source-files")
+            # Wrap rsync command in a bash command
+            cmd = [
+                "bash",
+                "-c",
+                # Pass rsync command as single string
+                " ".join(rsync_cmd),
+            ]
             result = subprocess.run(
-                rsync_cmd,
-                cwd=str(self._basepath),
+                cmd,
+                cwd=self._basepath,
+                capture_output=True,
                 input=rsync_stdin_remove,
             )
-            for stdout_line in result.stdout.decode("utf8", "replace").split("\n"):
-                parse_stdout(stdout_line)
-            for stderr_line in result.stderr.decode("utf8", "replace").split("\n"):
-                parse_stderr(stderr_line)
-
+            # Parse outputs
+            for line in result.stdout.decode("utf-8", "replace").split("\n"):
+                parse_stdout(line)
+            for line in result.stderr.decode("utf-8", "replace").split("\n"):
+                parse_stderr(line)
+            # Leave it as a failure if the previous rsync subprocess failed
             if success:
-                success = result.returncode == 0 if result else False
+                success = result.returncode == 0
 
         self.notify(successful_updates, secondary=True)
 
+        # Print out a summary message for each file transfer batch instead of individual messages
+        # List out file paths as stored in memory to see if issue is due to file path mismatch
+        if len(set(relative_filenames) - transfer_success) != 0:
+            logger.debug(
+                f"Files identified for transfer ({len(relative_filenames)}): {relative_filenames!r}"
+            )
+            logger.debug(
+                f"Files successfully transferred ({len(transfer_success)}): {list(transfer_success)!r}"
+            )
+
         # Compare files from rsync stdout to original list to verify transfer
         for f in set(relative_filenames) - transfer_success:
-            logger.warning(f"Transfer of file {f.name!r} considered a failure")
+            # Mute individual file warnings; replace with summarised one above
+            # logger.warning(f"Transfer of file {f.name!r} considered a failure")
             self._files_transferred += 1
             current_outstanding = self.queue.unfinished_tasks - (
                 self._files_transferred - previously_transferred

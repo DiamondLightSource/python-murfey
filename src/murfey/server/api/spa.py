@@ -22,10 +22,7 @@ def _cryolo_model_path(visit: str, instrument_name: str) -> Path:
     ]
     if machine_config.picking_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath
-            / (machine_config.rsync_module or "data")
-            / str(datetime.now().year)
-            / visit
+            machine_config.rsync_basepath / str(datetime.now().year) / visit
         )
         possible_models = list(
             (visit_directory / machine_config.picking_model_search_directory).glob(

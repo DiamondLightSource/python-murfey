@@ -43,7 +43,6 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
-windows_terminal = APIRouter(prefix="/microsoft/terminal", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
@@ -229,15 +228,16 @@ def parse_cygwin_request(request_path: str):
     """
 
     # Validate request path
-    if bool(re.fullmatch(r"^[\w\s\.\-/]+$", request_path)) is False:
+    if bool(re.fullmatch(r"^[\w\s\.\-\+/]+$", request_path)) is False:
         raise ValueError(f"{request_path!r} is not a valid request path")
 
     try:
-        url = f'{find_cygwin_mirror()}{quote(request_path, safe="")}'
+        url = f'{find_cygwin_mirror()}{quote(request_path, safe="/")}'
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
         )
+
     logger.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
     cygwin_data = requests.get(url)
     return Response(
@@ -435,7 +435,7 @@ def get_msys2_environment_index(
         raise ValueError(f"{system!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
-    arch_url = f'{msys2_url}/{quote(system, safe="")}'
+    arch_url = f'{msys2_url}/{quote(system, safe="/")}'
     response = requests.get(arch_url)
 
     # Parse and rewrite package index content
@@ -498,7 +498,7 @@ def get_msys2_package_index(
 
     # Construct URL to main MSYS repo and get response
     package_list_url = (
-        f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}'
+        f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}'
     )
     response = requests.get(package_list_url)
 
@@ -552,7 +552,7 @@ def get_msys2_package_file(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f'{msys2_url}/{quote(system, safe="")}/{quote(environment, safe="")}/{quote(package, safe="")}'
+    package_url = f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}/{quote(package, safe="/")}'
     package_file = requests.get(package_url)
 
     if package_file.status_code == 200:
@@ -563,219 +563,6 @@ def get_msys2_package_file(
         )
     else:
         raise HTTPException(status_code=package_file.status_code)
-
-
-"""
-=======================================================================================
-WINDOWS TERMINAL-RELATED FUNCTIONS AND ENDPOINTS
-=======================================================================================
-"""
-
-windows_terminal_url = "https://github.com/microsoft/terminal/releases"
-
-
-def get_number_of_github_pages(url) -> int:
-    """
-    Parses the main GitHub releases page to find the number of pages present in the
-    repository.
-    """
-
-    response = requests.get(url)
-    headers = response.headers
-    if not headers["content-type"].startswith("text/html"):
-        raise HTTPException("Unable to parse non-HTML page for page numbers")
-
-    # Find the number of pages present in this release
-    text = response.text
-    pattern = r'aria-label="Page ([0-9]+)"'
-    matches = re.findall(pattern, text)
-    if len(matches) == 0:
-        raise HTTPException("No page numbers found")
-    pages = [int(item) for item in matches]
-    pages.sort(reverse=True)
-    return pages[0]
-
-
-@windows_terminal.get("/releases", response_class=Response)
-def get_windows_terminal_releases(request: Request):
-    """
-    Returns a list of stable Windows Terminal releases from the GitHub repository.
-    """
-
-    num_pages = get_number_of_github_pages(windows_terminal_url)
-
-    # Get list of release versions
-    versions: list[str] = []
-
-    # RegEx patterns to parse HTML file with
-    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version} leads to a
-    # HTML page with the assets for that particular version
-    release_pattern = (
-        r'src="' + f"{windows_terminal_url}" + r'/expanded_assets/([v0-9\.]+)"'
-    )
-    # Pre-release label follows after link to version tag
-    prerelease_pattern = (
-        r'[\s]*<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">[\w\s\.\-]+</a></span>'
-        r"[\s]*<span>"
-        r'[\s]*<span data-view-component="true" class="Label Label--warning Label--large v-align-text-bottom d-none d-md-inline-block">Pre-release</span>'
-    )
-    # Older packages in the repo are named "Color Tools"; omit them
-    colortool_pattern = r'<span data-view-component="true" class="f1 text-bold d-inline mr-3"><a href="/microsoft/terminal/releases/tag/([\w\.]+)" data-view-component="true" class="Link--primary Link">Color Tool[\w\s]+</a></span>'
-
-    # Iterate through repository pages
-    for p in range(num_pages):
-        url = f"{windows_terminal_url}?page={p + 1}"
-        response = requests.get(url)
-        headers = response.headers
-        if not headers["content-type"].startswith("text/html"):
-            raise HTTPException("Unable to parse non-HTML page for package versions")
-        text = response.text
-
-        # Collect only stable releases
-        releases = re.findall(release_pattern, text)
-        prereleases = re.findall(prerelease_pattern, text)
-        colortool = re.findall(colortool_pattern, text)
-        stable = set(releases) - (set(prereleases) | set(colortool))
-        versions.extend(stable)
-
-    # Construct HTML document for available versions
-    html_head = "\n".join(
-        (
-            "<!DOCTYPE html>",
-            "<html>",
-            "<head>",
-            "    <title>Links to Windows Terminal Versions</title>",
-            "</head>",
-            "<body>",
-            "    <h1>Links to Windows Terminal Versions</h1>",
-        )
-    )
-    # Construct hyperlinks
-    link_list = []
-    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
-    path = request.url.path.strip("/")  # Remove leading '/'
-
-    for v in range(len(versions)):
-        version = versions[v]
-        hyperlink = f'<a href="{base_url}/{path}/{quote(version, safe="")}">{quote(version, safe="")}</a><br />'
-        link_list.append(hyperlink)
-    hyperlinks = "\n".join(link_list)
-
-    html_tail = "\n".join(
-        (
-            "</body>",
-            "</html>",
-        )
-    )
-
-    # Combine
-    content = "\n".join((html_head, hyperlinks, html_tail))
-
-    # Return FastAPI response
-    return Response(
-        content=content.encode("utf-8"),
-        status_code=response.status_code,
-        media_type="text/html",
-    )
-
-
-@windows_terminal.get("/releases/{version}", response_class=Response)
-def get_windows_terminal_version_assets(
-    version: str,
-    request: Request,
-):
-    """
-    Returns a list of packages for the selected version of Windows Terminal.
-    """
-
-    # Validate inputs
-    if bool(re.match(r"^[\w\-\.]+$", version)) is False:
-        raise HTTPException("Invalid version format")
-
-    # https://github.com/{owner}/{repo}/releases/expanded_assets/{version}
-    url = f'{windows_terminal_url}/expanded_assets/{quote(version, safe="")}'
-
-    response = requests.get(url)
-    headers = response.headers
-    if not headers["content-type"].startswith("text/html"):
-        raise HTTPException("Unable to parse non-HTML page for page numbers")
-    text = response.text
-
-    # Find hyperlinks
-    pattern = (
-        r'href="[/\w\.]+/releases/download/'
-        + f'{quote(version, safe="")}'
-        + r'/([\w\.\-]+)"'
-    )
-    assets = re.findall(pattern, text)
-
-    # Construct HTML document for available assets
-    html_head = "\n".join(
-        (
-            "<!DOCTYPE html>",
-            "<html>",
-            "<head>",
-            f'    <title>Links to Windows Terminal {quote(version, safe="")} Assets</title>',
-            "</head>",
-            "<body>",
-            f'    <h1>Links to Windows Terminal {quote(version, safe="")} Assets</h1>',
-        )
-    )
-    # Construct hyperlinks
-    link_list = []
-    base_url = str(request.base_url).strip("/")  # Remove trailing '/'
-    path = request.url.path.strip("/")  # Remove leading '/'
-
-    for a in range(len(assets)):
-        asset = assets[a]
-        hyperlink = f'<a href="{base_url}/{path}/{quote(asset, safe="")}">{quote(asset, safe="")}</a><br />'
-        link_list.append(hyperlink)
-    hyperlinks = "\n".join(link_list)
-
-    html_tail = "\n".join(
-        (
-            "</body>",
-            "</html>",
-        )
-    )
-
-    # Combine
-    content = "\n".join((html_head, hyperlinks, html_tail))
-
-    # Return FastAPI response
-    return Response(
-        content=content.encode("utf-8"),
-        status_code=response.status_code,
-        media_type="text/html",
-    )
-
-
-@windows_terminal.get("/releases/{version}/{file_name}", response_class=Response)
-def get_windows_terminal_package_file(
-    version: str,
-    file_name: str,
-):
-    """
-    Returns a package from the GitHub repository.
-    """
-
-    # Validate version and file names
-    if bool(re.match(r"^[\w\.\-]+$", version)) is False:
-        raise HTTPException("Invalid version format")
-    if bool(re.match(r"^[\w\.\-]+$", file_name)) is False:
-        raise HTTPException("Invalid file name")
-
-    # https://github.com/{owner}/{repo}/releases/download/{version}/{file_name}
-    url = f'{windows_terminal_url}/download/{quote(version, safe="")}/{quote(file_name, safe="")}'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=response.headers,
-        )
-    else:
-        raise HTTPException(status_code=response.status_code)
 
 
 """
@@ -795,7 +582,7 @@ def _get_full_pypi_path_response(package: str) -> requests.Response:
     # alphanumerics (including underscores; \w), dashes (\-), and periods (\.)
     if re.match(r"^[\w\-\.]+$", package) is not None:
         # Sanitise and normalise package name according to PEP 503
-        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="")
+        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="/")
 
         # Get HTTP response
         url = f"https://pypi.org/simple/{package_clean}"

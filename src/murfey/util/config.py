@@ -8,14 +8,14 @@ from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, Extra, field_validator
 from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     acquisition_software: List[str]
     calibrations: Dict[str, Dict[str, Union[dict, float]]]
-    data_directories: Dict[Path, str]
+    data_directories: List[Path]
     rsync_basepath: Path
     default_model: Path
     display_name: str = ""
@@ -29,6 +29,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     create_directories: Dict[str, str] = {"atlas": "atlas"}
     analyse_created_directories: List[str] = []
     gain_reference_directory: Optional[Path] = None
+    eer_fractionation_file_template: str = ""
     processed_directory_name: str = "processed"
     gain_directory_name: str = "processing"
     node_creator_queue: str = "node_creator"
@@ -36,7 +37,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     camera: str = "FALCON"
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
     allow_removal: bool = False
-    modular_spa: bool = False
+    data_transfer_enabled: bool = True
     processing_enabled: bool = True
     machine_override: str = ""
     processed_extra_directory: str = ""
@@ -65,6 +66,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     instrument_server_url: str = "http://localhost:8001"
     frontend_url: str = "http://localhost:3000"
     murfey_url: str = "http://localhost:8000"
+    rsync_url: str = ""
 
     security_configuration_path: Optional[Path] = None
     auth_url: str = ""
@@ -81,6 +83,7 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
+    rabbitmq_credentials: str
     murfey_db_credentials: str
     crypto_key: str
     auth_key: str = ""
@@ -92,6 +95,16 @@ class Security(BaseModel):
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
     feedback_queue: str = "murfey_feedback"
+    graylog_host: str = ""
+    graylog_port: Optional[int] = None
+
+    @field_validator("graylog_port")
+    def check_port_present_if_host_is(
+        cls, v: Optional[int], values: dict, **kwargs
+    ) -> Optional[int]:
+        if values["graylog_host"] and v is None:
+            raise ValueError("The Graylog port must be set if the Graylog host is")
+        return v
 
 
 def security_from_file(config_file_path: Path) -> Security:
@@ -132,6 +145,7 @@ def get_security_config() -> Security:
         if machine_config.security_configuration_path:
             return security_from_file(machine_config.security_configuration_path)
     return Security(
+        rabbitmq_credentials="",
         session_validation="",
         murfey_db_credentials="",
         crypto_key="",
@@ -147,7 +161,7 @@ def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
         "": MachineConfig(
             acquisition_software=[],
             calibrations={},
-            data_directories={},
+            data_directories=[],
             rsync_basepath=Path("dls/tmp"),
             murfey_db_credentials="",
             default_model="/tmp/weights.h5",
@@ -169,6 +183,6 @@ def get_extended_machine_config(
     )
     if not machine_config:
         return None
-    model = entry_points.select(group="murfey.config", name=extension_name)[0].load()
+    model = entry_points().select(group="murfey.config", name=extension_name)[0].load()
     data = getattr(machine_config, extension_name, {})
-    return model(data)
+    return model(**data)

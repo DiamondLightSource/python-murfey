@@ -65,6 +65,31 @@ requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token
 requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
+def write_config(config: configparser.ConfigParser):
+    mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+    murfey_client_config_home = Path(mcch) if mcch else Path.home()
+    with open(murfey_client_config_home / ".murfey", "w") as configfile:
+        config.write(configfile)
+
+
+def main_loop(
+    source_watchers: List[murfey.client.watchdir.DirWatcher],
+    appearance_time: float,
+    transfer_all: bool,
+):
+    log.info(
+        f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
+    )
+    if appearance_time > 0:
+        modification_time: float | None = time.time() - appearance_time * 3600
+    else:
+        modification_time = None
+    while True:
+        for sw in source_watchers:
+            sw.scan(modification_time=modification_time, transfer_all=transfer_all)
+        time.sleep(15)
+
+
 def _enable_webbrowser_in_cygwin():
     """Helper function to make webbrowser.open() work in CygWin"""
     if "cygwin" in platform.system().lower() and shutil.which("cygstart"):
@@ -191,12 +216,6 @@ def run():
         help="Remove source files immediately after their transfer",
     )
     parser.add_argument(
-        "--relax",
-        action="store_true",
-        default=False,
-        help="Relax the condition that the source directory needs to be recognised from the configuration",
-    )
-    parser.add_argument(
         "--name",
         type=str,
         default="",
@@ -319,34 +338,8 @@ def run():
         gain_ref=gain_ref,
         redirected_logger=rich_handler,
         force_mdoc_metadata=not args.ignore_mdoc_metadata,
-        strict=not args.relax,
         processing_enabled=machine_data.get("processing_enabled", True),
         skip_existing_processing=args.skip_existing_processing,
     )
     app.run()
     rich_handler.redirect = False
-
-
-def main_loop(
-    source_watchers: List[murfey.client.watchdir.DirWatcher],
-    appearance_time: float,
-    transfer_all: bool,
-):
-    log.info(
-        f"Murfey {murfey.__version__} on Python {'.'.join(map(str, sys.version_info[0:3]))} entering main loop"
-    )
-    if appearance_time > 0:
-        modification_time: float | None = time.time() - appearance_time * 3600
-    else:
-        modification_time = None
-    while True:
-        for sw in source_watchers:
-            sw.scan(modification_time=modification_time, transfer_all=transfer_all)
-        time.sleep(15)
-
-
-def write_config(config: configparser.ConfigParser):
-    mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
-    murfey_client_config_home = Path(mcch) if mcch else Path.home()
-    with open(murfey_client_config_home / ".murfey", "w") as configfile:
-        config.write(configfile)

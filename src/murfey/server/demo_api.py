@@ -84,14 +84,13 @@ from murfey.util.models import (
     RsyncerSource,
     SessionInfo,
     SPAProcessFile,
-    SPAProcessingParameters,
     SuggestedPathParameters,
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
     Visit,
 )
-from murfey.util.spa_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -111,7 +110,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-machine_config: dict = {}
+machine_config: dict[str, MachineConfig] = {}
 if settings.murfey_machine_configuration:
     microscope = get_microscope()
     machine_config = from_file(Path(settings.murfey_machine_configuration), microscope)
@@ -844,26 +843,31 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
+# @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+# def get_current_visits(instrument_name: str):
+#     return [
+#         Visit(
+#             start=datetime.datetime.now(),
+#             end=datetime.datetime.now() + datetime.timedelta(days=1),
+#             session_id=1,
+#             name="cm31111-2",
+#             beamline="m12",
+#             proposal_title="Nothing of importance",
+#         ),
+#         Visit(
+#             start=datetime.datetime.now(),
+#             end=datetime.datetime.now() + datetime.timedelta(days=1),
+#             session_id=1,
+#             name="cm31111-3",
+#             beamline="m12",
+#             proposal_title="Nothing of importance",
+#         ),
+#     ]
+
+
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-def get_current_visits(instrument_name: str):
-    return [
-        Visit(
-            start=datetime.datetime.now(),
-            end=datetime.datetime.now() + datetime.timedelta(days=1),
-            session_id=1,
-            name="cm31111-2",
-            beamline="m12",
-            proposal_title="Nothing of importance",
-        ),
-        Visit(
-            start=datetime.datetime.now(),
-            end=datetime.datetime.now() + datetime.timedelta(days=1),
-            session_id=1,
-            name="cm31111-3",
-            beamline="m12",
-            proposal_title="Nothing of importance",
-        ),
-    ]
+def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
 @router.get("/visits/{visit_name}")
@@ -920,12 +924,6 @@ async def add_file(file: File):
 @router.post("/feedback")
 async def send_murfey_message(msg: RegistrationMessage):
     pass
-
-
-@router.post("/visits/{visit_name}/spa_processing")
-async def request_spa_processing(visit_name: str, proc_params: SPAProcessingParameters):
-    log.info("SPA processing requested")
-    return proc_params
 
 
 class Tag(BaseModel):
@@ -1286,12 +1284,46 @@ def suggest_path(
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
-    check_path = (
-        machine_config[instrument_name].rsync_basepath / params.base_path
+    rsync_basepath = (
+        machine_config[instrument_name].rsync_basepath
         if machine_config
-        else Path(f"/dls/{get_microscope()}") / params.base_path
+        else Path(f"/dls/{get_microscope()}")
     )
+    check_path = rsync_basepath / params.base_path
     check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+    check_path = check_path.resolve()
+
+    # Check for path traversal attempt
+    if not str(check_path).startswith(str(rsync_basepath)):
+        raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
+
+    # Check previous year to account for the year rolling over during data collection
+    if not sanitise_path(check_path).exists():
+        base_path_parts = list(params.base_path.parts)
+        for part in base_path_parts:
+            # Find the path part corresponding to the year
+            if len(part) == 4 and part.isdigit():
+                year_idx = base_path_parts.index(part)
+                base_path_parts[year_idx] = str(int(part) - 1)
+        base_path = "/".join(base_path_parts)
+        check_path_prev = check_path
+        check_path = rsync_basepath / base_path
+        check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
+        check_path = check_path.resolve()
+
+        # Check for path traversal attempt
+        if not str(check_path).startswith(str(rsync_basepath)):
+            raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
+
+        # If visit is not in the previous year either, it's a genuine error
+        if not check_path.exists():
+            log_message = sanitise(
+                "Unable to find current visit folder under "
+                f"{str(check_path_prev)!r} or {str(check_path)!r}"
+            )
+            log.error(log_message)
+            raise FileNotFoundError(log_message)
+
     check_path_name = check_path.name
     while sanitise_path(check_path).exists():
         count = count + 1 if count else 2
@@ -1522,7 +1554,6 @@ async def process_gain(
     if machine_config.get("rsync_basepath"):
         filepath = (
             Path(machine_config["rsync_basepath"])
-            / (machine_config.get("rsync_module") or "data")
             / str(datetime.datetime.now().year)
             / visit_name
         )
@@ -1650,7 +1681,6 @@ async def write_eer_fractionation_file(
 ) -> dict:
     file_path = (
         Path(machine_config["rsync_basepath"])
-        / (machine_config["rsync_module"] or "data")
         / str(datetime.datetime.now().year)
         / secure_filename(visit_name)
         / secure_filename(fractionation_params.fractionation_file_name)

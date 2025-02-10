@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import secrets
+import subprocess
 import time
 from datetime import datetime
+from functools import partial
 from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import procrunner
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -18,7 +21,7 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import sanitise_nonpath, secure_path
+from murfey.util import sanitise, sanitise_nonpath, secure_path
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
@@ -26,7 +29,7 @@ logger = getLogger("murfey.instrument_server.api")
 
 watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
-controllers = {}
+controllers: Dict[int, MultigridController] = {}
 data_collection_parameters: dict = {}
 tokens = {}
 
@@ -129,10 +132,17 @@ async def token_handshake_for_session(session_id: int, token: Token):
     )
 
 
+@router.get("/sessions/{session_id}/check_token")
+def check_token(session_id: MurfeySessionID):
+    return {"token_valid": True}
+
+
 @router.post("/sessions/{session_id}/multigrid_watcher")
 def start_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
+    if controllers.get(session_id) is not None:
+        return {"success": True}
     label = watcher_spec.label
     controllers[session_id] = MultigridController(
         [],
@@ -146,6 +156,7 @@ def start_multigrid_watcher(
         _machine_config=watcher_spec.configuration.model_dump(),
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
+        rsync_restarts=watcher_spec.rsync_restarts,
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
@@ -159,7 +170,12 @@ def start_multigrid_watcher(
         watcher_spec.configuration.model_dump(),
         skip_existing_processing=watcher_spec.skip_existing_processing,
     )
-    watchers[session_id].subscribe(controllers[session_id]._start_rsyncer_multigrid)
+    watchers[session_id].subscribe(
+        partial(
+            controllers[session_id]._start_rsyncer_multigrid,
+            destination_overrides=watcher_spec.destination_overrides,
+        )
+    )
     watchers[session_id].start()
     return {"success": True}
 
@@ -260,21 +276,26 @@ class GainReference(BaseModel):
     gain_destination_dir: str = "processing"
 
 
-@router.post("/sessions/{session_id}/upload_gain_reference")
-def upload_gain_reference(session_id: MurfeySessionID, gain_reference: GainReference):
+@router.post(
+    "/instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference"
+)
+def upload_gain_reference(
+    instrument_name: str, session_id: MurfeySessionID, gain_reference: GainReference
+):
+    safe_gain_path = sanitise(str(gain_reference.gain_path))
+    safe_visit_path = sanitise(gain_reference.visit_path)
+    safe_destination_dir = sanitise(gain_reference.gain_destination_dir)
+    machine_config = requests.get(
+        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
     cmd = [
         "rsync",
-        str(gain_reference.gain_path),
-        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{gain_reference.visit_path}/{gain_reference.gain_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
+        safe_gain_path,
+        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{machine_config.get('rsync_module', 'data')}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
     ]
-    gain_rsync = procrunner.run(cmd)
+    gain_rsync = subprocess.run(cmd)
     if gain_rsync.returncode:
-        safe_gain_path = (
-            str(gain_reference.gain_path).replace("\r\n", "").replace("\n", "")
-        )
-        safe_visit_path = gain_reference.visit_path.replace("\r\n", "").replace(
-            "\n", ""
-        )
         logger.warning(
             f"Gain reference file {safe_gain_path} was not successfully transferred to {safe_visit_path}/processing"
         )

@@ -8,18 +8,21 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.resources import files
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, Literal, NamedTuple, Tuple
 
+import graypy
 import mrcfile
 import numpy as np
 import uvicorn
-import workflows
-import zocalo.configuration
+from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
+    Atlas,
     AutoProcProgram,
     Base,
     DataCollection,
@@ -38,12 +41,15 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
+from workflows.transport.pika_transport import PikaTransport
 
 import murfey
+import murfey.server.ispyb
 import murfey.server.prometheus as prom
 import murfey.server.websocket
-from murfey.client.contexts.tomo import _midpoint
+import murfey.util.db as db
 from murfey.server.murfey_db import url  # murfey_db
+from murfey.util import LogFilter
 from murfey.util.config import (
     MachineConfig,
     get_hostname,
@@ -51,21 +57,15 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
+from murfey.util.processing_params import default_spa_parameters
+from murfey.util.state import global_state
+from murfey.util.tomo import midpoint
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass
-import murfey.util.db as db
-from murfey.util import LogFilter
-from murfey.util.spa_params import default_spa_parameters
-from murfey.util.state import global_state
 
-try:
-    from importlib.resources import files  # type: ignore
-except ImportError:
-    # Fallback for Python 3.8
-    from importlib_resources import files  # type: ignore
 
 logger = logging.getLogger("murfey.server")
 
@@ -93,7 +93,6 @@ class JobIDs(NamedTuple):
     dcid: int
     pid: int
     appid: int
-    client_id: int
 
 
 def sanitise(in_string: str) -> str:
@@ -119,7 +118,8 @@ def check_tilt_series_mc(tilt_series_id: int) -> bool:
     ).all()
     return (
         all(r[0].motion_corrected for r in results)
-        and len(results) == results[0][1].tilt_series_length
+        and len(results) >= results[0][1].tilt_series_length
+        and results[0][1].tilt_series_length > 0
     )
 
 
@@ -173,7 +173,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
             db.ProcessingJob,
             db.DataCollection,
             db.DataCollectionGroup,
-            db.ClientEnvironment,
+            db.Session,
         )
         .where(db.TiltSeries.id == tilt_series_id)
         .where(db.DataCollection.tag == db.TiltSeries.tag)
@@ -181,14 +181,13 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
         .where(db.AutoProcProgram.id == appid)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.DataCollectionGroup.id == db.DataCollection.dcg_id)
-        .where(db.ClientEnvironment.session_id == db.TiltSeries.session_id)
+        .where(db.Session.id == db.TiltSeries.session_id)
     ).all()
     return JobIDs(
         dcgid=results[0][4].id,
         dcid=results[0][3].id,
         pid=results[0][2].id,
         appid=results[0][1].id,
-        client_id=results[0][5].client_id,
     )
 
 
@@ -226,6 +225,7 @@ def respond_with_template(
 
 
 def run():
+    # Set up argument parser
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
         "--host",
@@ -274,31 +274,33 @@ def run():
         help="Increase logging output verbosity",
         default=0,
     )
+    # Parse and separate known and unknown args
+    args, unknown = parser.parse_known_args()
 
-    # setup logging
-    zc = zocalo.configuration.from_file()
-    zc.activate()
+    # Load the security configuration
+    security_config = get_security_config()
 
+    # Set up GrayLog handler if provided in the configuration
+    if security_config.graylog_host:
+        handler = graypy.GELFUDPHandler(
+            security_config.graylog_host, security_config.graylog_port, level_names=True
+        )
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
     # Install a log filter to all existing handlers.
-    # At this stage this will exclude console loggers, but will cover
-    # any Graylog logging set up by the environment activation
     LogFilter.install()
 
-    zc.add_command_line_options(parser)
-    workflows.transport.add_command_line_options(parser, transport_argument=True)
-
-    args = parser.parse_args()
-
-    # Set up Zocalo connection
     if args.demo:
+        # Run in demo mode with no connections set up
         os.environ["MURFEY_DEMO"] = "1"
     else:
-        _set_up_transport(args.transport)
+        # Load RabbitMQ configuration and set up the connection
+        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+        _set_up_transport("PikaTransport")
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    security_config = get_security_config()
     if not args.temporary and _transport_object:
         _transport_object.feedback_queue = security_config.feedback_queue
     rabbit_thread = Thread(
@@ -393,7 +395,7 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type):
+def _set_up_transport(transport_type: Literal["PikaTransport"]):
     global _transport_object
     _transport_object = TransportManager(transport_type)
 
@@ -462,9 +464,10 @@ def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _d
     _db.close()
 
 
-def _murfey_refine(murfey_id: int, refine_dir: str, app_id: int, _db):
+def _murfey_refine(murfey_id: int, refine_dir: str, tag: str, app_id: int, _db):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-refine")
     refine3d = db.Refine3D(
+        tag=tag,
         refine_dir=refine_dir,
         pj_id=pj_id,
         murfey_id=murfey_id,
@@ -503,7 +506,7 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
+def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> Dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -513,6 +516,7 @@ def _refine_murfey_id(refine_dir: str, app_id: int, _db) -> Dict[str, int]:
         select(db.Refine3D)
         .where(db.Refine3D.refine_dir == refine_dir)
         .where(db.Refine3D.pj_id == pj_id)
+        .where(db.Refine3D.tag == tag)
     ).one()
     return refined_class.murfey_id
 
@@ -1030,7 +1034,14 @@ def _release_refine_hold(message: dict, _db=murfey_db):
         )
     ).one()
     refine_params = _db.exec(
-        select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+        select(db.RefineParameters)
+        .where(db.RefineParameters.pj_id == pj_id)
+        .where(db.RefineParameters.tag == "first")
+    ).one()
+    symmetry_refine_params = _db.exec(
+        select(db.RefineParameters)
+        .where(db.RefineParameters.pj_id == pj_id)
+        .where(db.RefineParameters.tag == "symmetry")
     ).one()
     if refine_params.run:
         instrument_name = (
@@ -1054,9 +1065,19 @@ def _release_refine_hold(message: dict, _db=murfey_db):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": feedback_params.picker_ispyb_id,
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                    refine_dir=refine_params.refine_dir,
+                    tag=refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
+                "symmetry_refined_class_uuid": _refine_murfey_id(
+                    refine_dir=symmetry_refine_params.refine_dir,
+                    tag=symmetry_refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
+                ),
+                "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
@@ -1607,10 +1628,7 @@ def _register_class_selection(message: dict, _db=murfey_db, demo: bool = False):
 def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
     if machine_config.initial_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath
-            / (machine_config.rsync_module or "data")
-            / str(datetime.now().year)
-            / visit
+            machine_config.rsync_basepath / str(datetime.now().year) / visit
         )
         possible_models = [
             p
@@ -1728,11 +1746,7 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
     other_options = dict(feedback_params)
 
     visit_name = (
-        _db.exec(
-            select(db.ClientEnvironment).where(
-                db.ClientEnvironment.session_id == message["session_id"]
-            )
-        )
+        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
         .one()
         .visit
     )
@@ -1913,115 +1927,6 @@ def _register_initial_model(message: dict, _db=murfey_db, demo: bool = False):
     _db.close()
 
 
-def _flush_spa_preprocessing(message: dict):
-    session_id = message["session_id"]
-    stashed_files = murfey_db.exec(
-        select(db.PreprocessStash)
-        .where(db.PreprocessStash.session_id == session_id)
-        .where(db.PreprocessStash.tag == message["tag"])
-    ).all()
-    if not stashed_files:
-        return None
-    instrument_name = (
-        murfey_db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
-        .one()
-        .instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    collected_ids = murfey_db.exec(
-        select(
-            db.DataCollectionGroup,
-            db.DataCollection,
-            db.ProcessingJob,
-            db.AutoProcProgram,
-        )
-        .where(db.DataCollectionGroup.session_id == session_id)
-        .where(db.DataCollectionGroup.tag == message["tag"])
-        .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-        .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-        .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-        .where(db.ProcessingJob.recipe == "em-spa-preprocess")
-    ).one()
-    params = murfey_db.exec(
-        select(db.SPARelionParameters, db.SPAFeedbackParameters)
-        .where(db.SPARelionParameters.pj_id == collected_ids[2].id)
-        .where(db.SPAFeedbackParameters.pj_id == db.SPARelionParameters.pj_id)
-    ).one()
-    proc_params = params[0]
-    feedback_params = params[1]
-    if not proc_params:
-        logger.warning(
-            f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
-        )
-        raise ValueError(
-            "No processing parameters were foudn in the database when flushing SPA preprocessing"
-        )
-
-    murfey_ids = _murfey_id(
-        collected_ids[3].id,
-        murfey_db,
-        number=2 * len(stashed_files),
-        close=False,
-    )
-    if feedback_params.picker_murfey_id is None:
-        feedback_params.picker_murfey_id = murfey_ids[1]
-        murfey_db.add(feedback_params)
-
-    for i, f in enumerate(stashed_files):
-        mrcp = Path(f.mrc_out)
-        ppath = Path(f.file_path)
-        if not mrcp.parent.exists():
-            mrcp.parent.mkdir(parents=True)
-        movie = db.Movie(
-            murfey_id=murfey_ids[2 * i],
-            path=f.file_path,
-            image_number=f.image_number,
-            tag=f.tag,
-            foil_hole_id=f.foil_hole_id,
-        )
-        murfey_db.add(movie)
-        zocalo_message: dict = {
-            "recipes": ["em-spa-preprocess"],
-            "parameters": {
-                "node_creator_queue": machine_config.node_creator_queue,
-                "dcid": collected_ids[1].id,
-                "kv": proc_params.voltage,
-                "autoproc_program_id": collected_ids[3].id,
-                "movie": f.file_path,
-                "mrc_out": f.mrc_out,
-                "pixel_size": proc_params.angpix,
-                "image_number": f.image_number,
-                "microscope": get_microscope(),
-                "mc_uuid": murfey_ids[2 * i],
-                "ft_bin": proc_params.motion_corr_binning,
-                "fm_dose": proc_params.dose_per_frame,
-                "gain_ref": proc_params.gain_ref,
-                "picker_uuid": murfey_ids[2 * i + 1],
-                "session_id": session_id,
-                "particle_diameter": proc_params.particle_diameter or 0,
-                "fm_int_file": f.eer_fractionation_file,
-                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
-            },
-        }
-        if _transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
-                "processing_recipe", zocalo_message, new_connection=True
-            )
-            murfey_db.delete(f)
-        else:
-            logger.error(
-                f"Pre-processing was requested for {ppath.name} but no Zocalo transport object was found"
-            )
-    murfey_db.commit()
-    murfey_db.close()
-    return None
-
-
 def _flush_tomography_preprocessing(message: dict):
     session_id = message["session_id"]
     instrument_name = (
@@ -2046,17 +1951,15 @@ def _flush_tomography_preprocessing(message: dict):
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
     ).first()
-    proc_params = murfey_db.exec(
-        select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == collected_ids.id
-        )
-    ).one()
+    proc_params = get_tomo_preproc_params(collected_ids.id)
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
             f"No tomography processing parameters found for Murfey session {sanitise(str(message['session_id']))} on visit {sanitise(visit_name)}"
         )
         return
+
+    recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
 
     for f in stashed_files:
         collected_ids = murfey_db.exec(
@@ -2072,7 +1975,7 @@ def _flush_tomography_preprocessing(message: dict):
             .where(db.DataCollection.tag == f.tag)
             .where(db.ProcessingJob.dc_id == db.DataCollection.id)
             .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-            .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+            .where(db.ProcessingJob.recipe == recipe_name)
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
@@ -2088,7 +1991,7 @@ def _flush_tomography_preprocessing(message: dict):
         )
         murfey_db.add(movie)
         zocalo_message: dict = {
-            "recipes": ["em-tomo-preprocess"],
+            "recipes": [recipe_name],
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
@@ -2102,6 +2005,7 @@ def _flush_tomography_preprocessing(message: dict):
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_params.motion_corr_binning,
                 "fm_dose": proc_params.dose_per_frame,
+                "frame_count": proc_params.frame_count,
                 "gain_ref": (
                     str(machine_config.rsync_basepath / proc_params.gain_ref)
                     if proc_params.gain_ref
@@ -2188,7 +2092,9 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
     if feedback_params.hold_refine:
         # If waiting then save the message
         refine_params = _db.exec(
-            select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+            select(db.RefineParameters)
+            .where(db.RefineParameters.pj_id == pj_id)
+            .where(db.RefineParameters.tag == "first")
         ).one()
         # refine_params.refine_dir is not set as it will be the same as before
         refine_params.run = True
@@ -2201,24 +2107,56 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
         # Send all other messages on to a container
         try:
             refine_params = _db.exec(
-                select(db.RefineParameters).where(db.RefineParameters.pj_id == pj_id)
+                select(db.RefineParameters)
+                .where(db.RefineParameters.pj_id == pj_id)
+                .where(db.RefineParameters.tag == "first")
+            ).one()
+            symmetry_refine_params = _db.exec(
+                select(db.RefineParameters)
+                .where(db.RefineParameters.pj_id == pj_id)
+                .where(db.RefineParameters.tag == "symmetry")
             ).one()
         except SQLAlchemyError:
             next_job = feedback_params.next_job
             refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
+            symmetry_refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
+            symmetry_refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
 
             refine_params = db.RefineParameters(
+                tag="first",
                 pj_id=pj_id,
                 murfey_id=refined_grp_uuid,
                 refine_dir=refine_dir,
                 class3d_dir=message["class3d_dir"],
                 class_number=message["best_class"],
             )
+            symmetry_refine_params = db.RefineParameters(
+                tag="symmetry",
+                pj_id=pj_id,
+                murfey_id=symmetry_refined_grp_uuid,
+                refine_dir=refine_dir,
+                class3d_dir=message["class3d_dir"],
+                class_number=message["best_class"],
+            )
             _db.add(refine_params)
+            _db.add(symmetry_refine_params)
             _db.commit()
-            _murfey_refine(refined_class_uuid, refine_dir, message["program_id"], _db)
+            _murfey_refine(
+                murfey_id=refined_class_uuid,
+                refine_dir=refine_dir,
+                tag="first",
+                app_id=message["program_id"],
+                _db=_db,
+            )
+            _murfey_refine(
+                murfey_id=symmetry_refined_class_uuid,
+                refine_dir=refine_dir,
+                tag="symmetry",
+                app_id=message["program_id"],
+                _db=_db,
+            )
 
             if relion_options["symmetry"] == "C1":
                 # Extra Refine, Mask, PostProcess beyond for determined symmetry
@@ -2241,9 +2179,19 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "picker_id": other_options["picker_ispyb_id"],
                 "refined_class_uuid": _refine_murfey_id(
-                    refine_params.refine_dir, _app_id(pj_id, _db), _db
+                    refine_dir=refine_params.refine_dir,
+                    tag=refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
                 ),
                 "refined_grp_uuid": refine_params.murfey_id,
+                "symmetry_refined_class_uuid": _refine_murfey_id(
+                    refine_dir=symmetry_refine_params.refine_dir,
+                    tag=symmetry_refine_params.tag,
+                    app_id=_app_id(pj_id, _db),
+                    _db=_db,
+                ),
+                "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
                 "session_id": message["session_id"],
                 "autoproc_program_id": _app_id(
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
@@ -2412,19 +2360,16 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
             _transport_object.send(
                 "ispyb_connector",
                 {
-                    "parameters": {
-                        "ispyb_command": "buffer",
-                        "buffer_lookup": {
-                            "particle_classification_id": refined_class_uuid,
-                        },
-                        "buffer_command": {
-                            "ispyb_command": "insert_particle_classification"
-                        },
-                        "program_id": message["program_id"],
-                        "bfactor_fit_intercept": str(bfactor_fitting[1]),
-                        "bfactor_fit_linear": str(bfactor_fitting[0]),
+                    "ispyb_command": "buffer",
+                    "buffer_lookup": {
+                        "particle_classification_id": refined_class_uuid,
                     },
-                    "content": {"dummy": "dummy"},
+                    "buffer_command": {
+                        "ispyb_command": "insert_particle_classification"
+                    },
+                    "program_id": message["program_id"],
+                    "bfactor_fit_intercept": str(bfactor_fitting[1]),
+                    "bfactor_fit_linear": str(bfactor_fitting[0]),
                 },
                 new_connection=True,
             )
@@ -2514,7 +2459,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 if not stack_file.parent.exists():
                     stack_file.parent.mkdir(parents=True)
-                tilt_offset = _midpoint([float(get_angle(t)) for t in tilts])
+                tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
                     "parameters": {
@@ -2523,6 +2468,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dcid": ids.dcid,
                         "appid": ids.appid,
                         "stack_file": str(stack_file),
+                        "dose_per_frame": preproc_params.dose_per_frame,
+                        "frame_count": preproc_params.frame_count,
+                        "kv": preproc_params.voltage,
                         "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
@@ -2561,17 +2509,34 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all():
                 dcgid = dcg_murfey[0].id
             else:
-                record = DataCollectionGroup(
-                    sessionId=ispyb_session_id,
-                    experimentType=message["experiment_type"],
-                    experimentTypeId=message["experiment_type_id"],
-                )
-                dcgid = _register(record, header)
-                murfey_dcg = db.DataCollectionGroup(
-                    id=dcgid,
-                    session_id=message["session_id"],
-                    tag=message.get("tag"),
-                )
+                if ispyb_session_id is None:
+                    murfey_dcg = db.DataCollectionGroup(
+                        session_id=message["session_id"],
+                        tag=message.get("tag"),
+                    )
+                else:
+                    record = DataCollectionGroup(
+                        sessionId=ispyb_session_id,
+                        experimentType=message["experiment_type"],
+                        experimentTypeId=message["experiment_type_id"],
+                    )
+                    dcgid = _register(record, header)
+                    atlas_record = Atlas(
+                        dataCollectionGroupId=dcgid,
+                        atlasImage=message.get("atlas", ""),
+                        pixelSize=message.get("atlas_pixel_size", 0),
+                        cassetteSlot=message.get("sample"),
+                    )
+                    if _transport_object:
+                        atlas_id = _transport_object.do_insert_atlas(atlas_record)[
+                            "return_value"
+                        ]
+                    murfey_dcg = db.DataCollectionGroup(
+                        id=dcgid,
+                        atlas_id=atlas_id,
+                        session_id=message["session_id"],
+                        tag=message.get("tag"),
+                    )
                 murfey_db.add(murfey_dcg)
                 murfey_db.commit()
                 murfey_db.close()
@@ -2593,6 +2558,16 @@ def feedback_callback(header: dict, message: dict) -> None:
                     }
                 _transport_object.transport.ack(header)
             return None
+        elif message["register"] == "atlas_update":
+            if _transport_object:
+                _transport_object.do_update_atlas(
+                    message["atlas_id"],
+                    message["atlas"],
+                    message["atlas_pixel_size"],
+                    message["sample"],
+                )
+                _transport_object.transport.ack(header)
+            return None
         elif message["register"] == "data_collection":
             murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
@@ -2612,7 +2587,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
-                    f"No data collection group ID was found for image directory {message['image_directory']} and source {message['source']}"
+                    f"No data collection group ID was found for image directory {sanitise(message['image_directory'])} and source {sanitise(message['source'])}"
                 )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
@@ -2624,61 +2599,69 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all():
                 dcid = dc_murfey[0].id
             else:
-                record = DataCollection(
-                    SESSIONID=ispyb_session_id,
-                    experimenttype=message["experiment_type"],
-                    imageDirectory=message["image_directory"],
-                    imageSuffix=message["image_suffix"],
-                    voltage=message["voltage"],
-                    dataCollectionGroupId=dcgid,
-                    pixelSizeOnImage=message["pixel_size"],
-                    imageSizeX=message["image_size_x"],
-                    imageSizeY=message["image_size_y"],
-                    slitGapHorizontal=message.get("slit_width"),
-                    magnification=message.get("magnification"),
-                    exposureTime=message.get("exposure_time"),
-                    totalExposedDose=message.get("total_exposed_dose"),
-                    c2aperture=message.get("c2aperture"),
-                    phasePlate=int(message.get("phase_plate", 0)),
-                )
-                dcid = _register(
-                    record,
-                    header,
-                    tag=(
-                        message.get("tag")
-                        if message["experiment_type"] == "tomography"
-                        else ""
-                    ),
-                )
-                murfey_dc = db.DataCollection(
-                    id=dcid,
-                    tag=message.get("tag"),
-                    dcg_id=dcgid,
-                )
+                if ispyb_session_id is None:
+                    murfey_dc = db.DataCollection(
+                        tag=message.get("tag"),
+                        dcg_id=dcgid,
+                    )
+                else:
+                    record = DataCollection(
+                        SESSIONID=ispyb_session_id,
+                        experimenttype=message["experiment_type"],
+                        imageDirectory=message["image_directory"],
+                        imageSuffix=message["image_suffix"],
+                        voltage=message["voltage"],
+                        dataCollectionGroupId=dcgid,
+                        pixelSizeOnImage=message["pixel_size"],
+                        imageSizeX=message["image_size_x"],
+                        imageSizeY=message["image_size_y"],
+                        slitGapHorizontal=message.get("slit_width"),
+                        magnification=message.get("magnification"),
+                        exposureTime=message.get("exposure_time"),
+                        totalExposedDose=message.get("total_exposed_dose"),
+                        c2aperture=message.get("c2aperture"),
+                        phasePlate=int(message.get("phase_plate", 0)),
+                    )
+                    dcid = _register(
+                        record,
+                        header,
+                        tag=(
+                            message.get("tag")
+                            if message["experiment_type"] == "tomography"
+                            else ""
+                        ),
+                    )
+                    murfey_dc = db.DataCollection(
+                        id=dcid,
+                        tag=message.get("tag"),
+                        dcg_id=dcgid,
+                    )
                 murfey_db.add(murfey_dc)
                 murfey_db.commit()
+                dcid = murfey_dc.id
                 murfey_db.close()
             if dcid is None and _transport_object:
                 _transport_object.transport.nack(header, requeue=True)
                 return None
-            if global_state.get("data_collection_ids") and isinstance(
-                global_state["data_collection_ids"], dict
-            ):
-                global_state["data_collection_ids"] = {
-                    **global_state["data_collection_ids"],
-                    message.get("tag"): dcid,
-                }
-            else:
-                global_state["data_collection_ids"] = {message.get("tag"): dcid}
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "processing_job":
+            murfey_session_id = message["session_id"]
             logger.info("registering processing job")
-            assert isinstance(global_state["data_collection_ids"], dict)
-            _dcid = global_state["data_collection_ids"].get(message["tag"])
-            if _dcid is None:
-                logger.warning(f"No data collection ID found for {message['tag']}")
+            dc = murfey_db.exec(
+                select(db.DataCollection, db.DataCollectionGroup)
+                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.DataCollectionGroup.session_id == murfey_session_id)
+                .where(db.DataCollectionGroup.tag == message["source"])
+                .where(db.DataCollection.tag == message["tag"])
+            ).all()
+            if dc:
+                _dcid = dc[0][0].id
+            else:
+                logger.warning(
+                    f"No data collection ID found for {sanitise(message['tag'])}"
+                )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
                 return None
@@ -2689,81 +2672,59 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all():
                 pid = pj_murfey[0].id
             else:
-                record = ProcessingJob(dataCollectionId=_dcid, recipe=message["recipe"])
-                run_parameters = message.get("parameters", {})
-                assert isinstance(run_parameters, dict)
-                if message.get("job_parameters"):
-                    job_parameters = [
-                        ProcessingJobParameter(parameterKey=k, parameterValue=v)
-                        for k, v in message["job_parameters"].items()
-                    ]
-                    pid = _register(ExtendedRecord(record, job_parameters), header)
+                if murfey.server.ispyb.Session() is None:
+                    murfey_pj = db.ProcessingJob(recipe=message["recipe"], dc_id=_dcid)
                 else:
-                    pid = _register(record, header)
-                murfey_pj = db.ProcessingJob(
-                    id=pid, recipe=message["recipe"], dc_id=_dcid
-                )
+                    record = ProcessingJob(
+                        dataCollectionId=_dcid, recipe=message["recipe"]
+                    )
+                    run_parameters = message.get("parameters", {})
+                    assert isinstance(run_parameters, dict)
+                    if message.get("job_parameters"):
+                        job_parameters = [
+                            ProcessingJobParameter(parameterKey=k, parameterValue=v)
+                            for k, v in message["job_parameters"].items()
+                        ]
+                        pid = _register(ExtendedRecord(record, job_parameters), header)
+                    else:
+                        pid = _register(record, header)
+                    murfey_pj = db.ProcessingJob(
+                        id=pid, recipe=message["recipe"], dc_id=_dcid
+                    )
                 murfey_db.add(murfey_pj)
                 murfey_db.commit()
+                pid = murfey_pj.id
                 murfey_db.close()
             if pid is None and _transport_object:
                 _transport_object.transport.nack(header, requeue=True)
                 return None
             prom.preprocessed_movies.labels(processing_job=pid)
-            if global_state.get("processing_job_ids"):
-                global_state["processing_job_ids"] = {
-                    **global_state["processing_job_ids"],  # type: ignore
-                    message.get("tag"): {
-                        **global_state["processing_job_ids"].get(message.get("tag"), {}),  # type: ignore
-                        message["recipe"]: pid,
-                    },
-                }
-            else:
-                prids = {message["tag"]: {message["recipe"]: pid}}
-                global_state["processing_job_ids"] = prids
             if message.get("job_parameters"):
                 if _transport_object:
                     _transport_object.transport.ack(header)
                 return None
-            if app_murfey := murfey_db.exec(
+            if not murfey_db.exec(
                 select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
             ).all():
-                appid = app_murfey[0].id
-            else:
-                record = AutoProcProgram(
-                    processingJobId=pid, processingStartTime=datetime.now()
-                )
-                appid = _register(record, header)
-                if appid is None and _transport_object:
-                    _transport_object.transport.nack(header, requeue=True)
-                    return None
-                murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
+                if murfey.server.ispyb.Session() is None:
+                    murfey_app = db.AutoProcProgram(pj_id=pid)
+                else:
+                    record = AutoProcProgram(
+                        processingJobId=pid, processingStartTime=datetime.now()
+                    )
+                    appid = _register(record, header)
+                    if appid is None and _transport_object:
+                        _transport_object.transport.nack(header, requeue=True)
+                        return None
+                    murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
                 murfey_db.add(murfey_app)
                 murfey_db.commit()
                 murfey_db.close()
-            if global_state.get("autoproc_program_ids"):
-                assert isinstance(global_state["autoproc_program_ids"], dict)
-                global_state["autoproc_program_ids"] = {
-                    **global_state["autoproc_program_ids"],
-                    message.get("tag"): {
-                        **global_state["autoproc_program_ids"].get(message.get("tag"), {}),  # type: ignore
-                        message["recipe"]: appid,
-                    },
-                }
-            else:
-                global_state["autoproc_program_ids"] = {
-                    message["tag"]: {message["recipe"]: appid}
-                }
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_tomography_preprocess":
             _flush_tomography_preprocessing(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "flush_spa_preprocess":
-            _flush_spa_preprocessing(message)
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
@@ -2805,7 +2766,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=(
                         str(machine_config.rsync_basepath / message["gain_ref"])
-                        if message["gain_ref"]
+                        if message["gain_ref"] and machine_config.data_transfer_enabled
                         else message["gain_ref"]
                     ),
                     voltage=message["voltage"],
@@ -2869,6 +2830,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
                     voltage=message["voltage"],
                     dose_per_frame=message["dose_per_frame"],
+                    frame_count=message["frame_count"],
                     motion_corr_binning=message["motion_corr_binning"],
                     gain_ref=message["gain_ref"],
                     eer_fractionation_file=message["eer_fractionation_file"],
@@ -2967,6 +2929,31 @@ def feedback_callback(header: dict, message: dict) -> None:
             if _transport_object:
                 _transport_object.transport.ack(header)
             return None
+        elif (
+            message["register"] in entry_points().select(group="murfey.workflows").names
+        ):
+            # Run the workflow if a match is found
+            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+                entry_points().select(
+                    group="murfey.workflows", name=message["register"]
+                )
+            )[0]
+            result = workflow.load()(
+                message=message,
+                murfey_db=murfey_db,
+            )
+            if _transport_object:
+                if result:
+                    _transport_object.transport.ack(header)
+                else:
+                    # Send it directly to DLQ without trying to rerun it
+                    _transport_object.transport.nack(header, requeue=False)
+            if not result:
+                logger.error(
+                    f"Workflow {sanitise(message['register'])} returned {result}"
+                )
+            return None
+        logger.error(f"No workflow found for {sanitise(message['register'])}")
         if _transport_object:
             _transport_object.transport.nack(header, requeue=False)
         return None

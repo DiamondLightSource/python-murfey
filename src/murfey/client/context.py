@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple
 
-import importlib_metadata
+from backports.entry_points_selectable import entry_points
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
@@ -40,13 +40,24 @@ class Context:
         self._acquisition_software = acquisition_software
         self.name = name
 
-    def post_transfer(self, transferred_file: Path, role: str = "", **kwargs):
-        for h in importlib_metadata.entry_points(group="murfey.post_transfer_hooks"):
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        # Search external packages for additional hooks to include in Murfey
+        for h in entry_points(group="murfey.post_transfer_hooks"):
             if h.name == self.name:
-                h.load()(transferred_file, role=role, **kwargs)
+                h.load()(transferred_file, environment=environment, **kwargs)
 
-    def post_first_transfer(self, transferred_file: Path, role: str = "", **kwargs):
-        self.post_transfer(transferred_file, role=role, **kwargs)
+    def post_first_transfer(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ):
+        self.post_transfer(transferred_file, environment=environment, **kwargs)
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None

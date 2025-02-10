@@ -17,7 +17,7 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
     services:
       mariadb:
-        image: mariadb:11.3.2 # released 2024-05-06
+        image: mariadb:11.6.2 # released 2024-05-06
         # Pulls image from DockerHub
         # Docker images: https://hub.docker.com/_/mariadb
         # Previous version(s):
@@ -28,6 +28,16 @@ jobs:
         ports:
           - 3306:3306
         options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: murfey_test_db
+          POSTGRES_PASSWORD: psql_pwd
+          POSTGRES_USER: psql_user
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +67,7 @@ jobs:
           docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 test-rabbitmq
           docker container list -a
 
-      - name: Get database
+      - name: Get ispyb database
         uses: actions/download-artifact@v4
         with:
           name: database
@@ -74,7 +84,7 @@ jobs:
           mysql-version: "11.3"
           auto-start: false
 
-      - name: Set up test database
+      - name: Set up test ipsyb database
         run: |
           set -eu
           cp ".github/workflows/config/my.cnf" .my.cnf
@@ -103,12 +113,18 @@ jobs:
         run: wget -t 10 -w 1 http://127.0.0.1:15672 -O -
 
       - name: Run tests
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: murfey_test_db
+          POSTGRES_PASSWORD: psql_pwd
+          POSTGRES_USER: psql_user
         run: |
           export ISPYB_CREDENTIALS=".github/workflows/config/ispyb.cfg"
           PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           name: ${{ matrix.python-version }}
           files: coverage.xml

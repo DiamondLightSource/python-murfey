@@ -17,10 +17,7 @@ tilt_angle = itertools.cycle(range(-60, 70, 10))
 def initialise(dummy_location: Path) -> Path:
     base = dummy_location / "murfey_dummy"
     base.mkdir()
-    microscope_dir = base / "M"
     detector_dir = base / "Data"
-    microscope_dir.mkdir()
-    (microscope_dir / "Supervisor").mkdir()
     detector_dir.mkdir()
     (detector_dir / "Supervisor").mkdir()
     with open(base / "config.yaml", "w") as yaml_out:
@@ -28,10 +25,7 @@ def initialise(dummy_location: Path) -> Path:
             {
                 "m12": {
                     "acquisition_software": ["epu", "tomo", "serialem"],
-                    "data_directories": {
-                        str(detector_dir): "detector",
-                        str(microscope_dir): "microscope",
-                    },
+                    "data_directories": [str(detector_dir)],
                     "rsync_basepath": str(dummy_location),
                     "calibrations": {"dummy": 0},
                 }
@@ -99,7 +93,7 @@ def generate_data(base_path: Path, timeout: int | None = None, pause: int = 10):
                         base_path,
                         "Supervisor",
                         f"Position_{tilt}.mrc",
-                        data_dir="M",
+                        data_dir="Data",
                         size=(128, 128),
                     )
                 except ValueError:
