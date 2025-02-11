@@ -36,7 +36,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     camera: str = "FALCON"
     data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
     allow_removal: bool = False
-    modular_spa: bool = False
     data_transfer_enabled: bool = True
     processing_enabled: bool = True
     machine_override: str = ""

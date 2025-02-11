@@ -8,7 +8,6 @@ from typing import Callable, Dict, List, OrderedDict
 
 import requests
 import xmltodict
-from pydantic import BaseModel
 
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
@@ -17,10 +16,10 @@ from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
-    global_env_lock,
 )
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
+from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
 
@@ -64,29 +63,6 @@ def _construct_tilt_series_name(file_path: Path) -> str:
     return "_".join(split_name[:-5])
 
 
-def _midpoint(angles: List[float]) -> int:
-    if not angles:
-        return 0
-    if len(angles) <= 2:
-        return round(angles[0])
-    sorted_angles = sorted(angles)
-    return round(
-        sorted_angles[len(sorted_angles) // 2]
-        if sorted_angles[len(sorted_angles) // 2]
-        and sorted_angles[len(sorted_angles) // 2 + 1]
-        else 0
-    )
-
-
-class ProcessFileIncomplete(BaseModel):
-    dest: Path
-    source: Path
-    image_number: int
-    mc_uuid: int
-    tag: str
-    description: str = ""
-
-
 class TomographyContext(Context):
     user_params = [
         ProcessingParameter(
@@ -102,6 +78,7 @@ class TomographyContext(Context):
         ProcessingParameter("image_size_y", "Image Size Y"),
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
+        ProcessingParameter("frame_count", "Number of image frames"),
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
@@ -114,108 +91,7 @@ class TomographyContext(Context):
         self._aligned_tilt_series: List[str] = []
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
-        self._preprocessing_triggers: dict = {}
         self._lock: RLock = RLock()
-
-    def _flush_data_collections(self):
-        logger.info(
-            f"Flushing {len(self._data_collection_stash)} data collection API calls"
-        )
-        for dc_data in self._data_collection_stash:
-            data = {
-                **dc_data[2],
-                **{
-                    k: v
-                    for k, v in dc_data[1].data_collection_parameters.items()
-                    if k != "tag"
-                },
-            }
-            capture_post(dc_data[0], json=data)
-        self._data_collection_stash = []
-
-    def _flush_processing_job(self, tag: str):
-        if proc_data := self._processing_job_stash.get(tag):
-            for pd in proc_data:
-                requests.post(pd[0], json=pd[1])
-            self._processing_job_stash.pop(tag)
-
-    def _flush_processing_jobs(self):
-        logger.info(
-            f"Flushing {len(self._processing_job_stash.keys())} processing job API calls"
-        )
-        for v in self._processing_job_stash.values():
-            for pd in v:
-                requests.post(pd[0], json=pd[1])
-        self._processing_job_stash = {}
-
-    def _flush_preprocess(self, tag: str, app_id: int):
-        if tag_tr := self._preprocessing_triggers.get(tag):
-            for tr in tag_tr:
-                process_file = self._complete_process_file(tr[1], tr[2], app_id)
-                if process_file:
-                    capture_post(tr[0], json=process_file)
-            self._preprocessing_triggers.pop(tag)
-
-    def _complete_process_file(
-        self,
-        incomplete_process_file: ProcessFileIncomplete,
-        environment: MurfeyInstanceEnvironment,
-        app_id: int,
-    ) -> dict:
-        try:
-            with global_env_lock:
-                tag = incomplete_process_file.tag
-
-                eer_fractionation_file = None
-                if environment.data_collection_parameters.get("num_eer_frames"):
-                    response = requests.post(
-                        f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
-                        json={
-                            "num_frames": environment.data_collection_parameters[
-                                "num_eer_frames"
-                            ],
-                            "fractionation": environment.data_collection_parameters[
-                                "eer_fractionation"
-                            ],
-                            "dose_per_frame": environment.data_collection_parameters[
-                                "dose_per_frame"
-                            ],
-                            "fractionation_file_name": "eer_fractionation_tomo.txt",
-                        },
-                    )
-                    eer_fractionation_file = response.json()["eer_fractionation_file"]
-
-                new_dict = {
-                    "path": str(incomplete_process_file.dest),
-                    "description": incomplete_process_file.description,
-                    "size": incomplete_process_file.source.stat().st_size,
-                    "timestamp": incomplete_process_file.source.stat().st_ctime,
-                    "processing_job": environment.processing_job_ids[tag][
-                        "em-tomo-preprocess"
-                    ],
-                    "data_collection_id": environment.data_collection_ids[tag],
-                    "image_number": incomplete_process_file.image_number,
-                    "pixel_size": environment.data_collection_parameters[
-                        "pixel_size_on_image"
-                    ],
-                    "autoproc_program_id": app_id,
-                    "mc_uuid": incomplete_process_file.mc_uuid,
-                    "dose_per_frame": environment.data_collection_parameters.get(
-                        "dose_per_frame"
-                    ),
-                    "mc_binning": environment.data_collection_parameters.get(
-                        "motion_corr_binning", 1
-                    ),
-                    "gain_ref": environment.data_collection_parameters.get("gain_ref"),
-                    "voltage": environment.data_collection_parameters.get(
-                        "voltage", 300
-                    ),
-                    "eer_fractionation_file": eer_fractionation_file,
-                }
-                return new_dict
-        except KeyError:
-            logger.warning("Key error encountered in _complete_process_file")
-            return {}
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -327,8 +203,18 @@ class TomographyContext(Context):
                 self._tilt_series_sizes[tilt_series] = 0
             try:
                 if environment:
-                    url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
-                    data = {
+                    dcg_url = f"{str(environment.url.geturl())}/visits/{str(environment.visit)}/{environment.murfey_session}/register_data_collection_group"
+                    dcg_data = {
+                        "experiment_type": "tomo",
+                        "experiment_type_id": 36,
+                        "tag": str(self._basepath),
+                        "atlas": "",
+                        "sample": None,
+                    }
+                    capture_post(dcg_url, json=dcg_data)
+
+                    dc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
+                    dc_data = {
                         "experiment_type": "tomography",
                         "file_extension": file_path.suffix,
                         "acquisition_software": self._acquisition_software,
@@ -345,7 +231,7 @@ class TomographyContext(Context):
                         environment.data_collection_parameters
                         and environment.data_collection_parameters.get("voltage")
                     ):
-                        data.update(
+                        dc_data.update(
                             {
                                 "voltage": environment.data_collection_parameters[
                                     "voltage"
@@ -364,51 +250,16 @@ class TomographyContext(Context):
                                 ],
                             }
                         )
+                    capture_post(dc_url, json=dc_data)
+
                     proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-                    if (
-                        environment.data_collection_group_ids.get(str(self._basepath))
-                        is None
-                    ):
-                        self._data_collection_stash.append((url, environment, data))
-                        self._processing_job_stash[tilt_series] = [
-                            (
-                                proc_url,
-                                {
-                                    "tag": tilt_series,
-                                    "source": str(self._basepath),
-                                    "recipe": "em-tomo-preprocess",
-                                    "experiment_type": "tomography",
-                                },
-                            )
-                        ]
-                        self._processing_job_stash[tilt_series].append(
-                            (
-                                proc_url,
-                                {
-                                    "tag": tilt_series,
-                                    "source": str(self._basepath),
-                                    "recipe": "em-tomo-align",
-                                    "experiment_type": "tomography",
-                                },
-                            )
-                        )
-                    else:
-                        capture_post(url, json=data)
+                    for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                         capture_post(
                             proc_url,
                             json={
                                 "tag": tilt_series,
                                 "source": str(self._basepath),
-                                "recipe": "em-tomo-preprocess",
-                                "experiment_type": "tomography",
-                            },
-                        )
-                        capture_post(
-                            proc_url,
-                            json={
-                                "tag": tilt_series,
-                                "source": str(self._basepath),
-                                "recipe": "em-tomo-align",
+                                "recipe": recipe,
                                 "experiment_type": "tomography",
                             },
                         )
@@ -454,16 +305,15 @@ class TomographyContext(Context):
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
-                "data_collection_id": environment.data_collection_ids.get(tilt_series),
                 "image_number": environment.movies[file_transferred_to].movie_number,
                 "pixel_size": environment.data_collection_parameters.get(
                     "pixel_size_on_image", 0
                 ),
-                "autoproc_program_id": environment.autoproc_program_ids.get(
-                    tilt_series, {}
-                ).get("em-tomo-preprocess"),
                 "dose_per_frame": environment.data_collection_parameters.get(
                     "dose_per_frame", 0
+                ),
+                "frame_count": environment.data_collection_parameters.get(
+                    "frame_count", 0
                 ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
@@ -695,6 +545,7 @@ class TomographyContext(Context):
             mdoc_metadata: OrderedDict = OrderedDict({})
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
+            mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
@@ -738,7 +589,7 @@ class TomographyContext(Context):
                 if environment
                 else None
             )
-            mdoc_metadata["manual_tilt_offset"] = -_midpoint(
+            mdoc_metadata["manual_tilt_offset"] = -midpoint(
                 [float(b["TiltAngle"]) for b in blocks]
             )
             mdoc_metadata["source"] = str(self._basepath)
@@ -761,6 +612,9 @@ class TomographyContext(Context):
             if data_file.split(".")[-1] == "eer":
                 mdoc_metadata["num_eer_frames"] = murfey.util.eer.num_frames(
                     metadata_file.parent / data_file
+                )
+                mdoc_metadata["frame_count"] = int(
+                    mdoc_metadata["eer_fractionation"] / mdoc_metadata["num_eer_frames"]
                 )
         except Exception as e:
             logger.error(f"Exception encountered in metadata gathering: {str(e)}")

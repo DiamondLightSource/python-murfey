@@ -47,7 +47,7 @@ from textual.widgets import (
 from werkzeug.utils import secure_filename
 
 from murfey.client.analyser import Analyser, spa_form_dependencies
-from murfey.client.contexts.spa import SPAContext, SPAModularContext
+from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
 from murfey.client.instance_environment import (
@@ -64,6 +64,7 @@ log = logging.getLogger("murfey.tui.screens")
 ReactiveType = TypeVar("ReactiveType")
 
 token = read_config()["Murfey"].get("token", "")
+instrument_name = read_config()["Murfey"].get("instrument_name", "")
 
 requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
 requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
@@ -91,7 +92,10 @@ def determine_default_destination(
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"]:
             if source.resolve() == Path(data_dir):
-                _default = destination + f"/{visit}"
+                _default = (
+                    destination
+                    + f"{machine_data.get('rsync_module') or 'data'}/{visit}"
+                )
                 break
             else:
                 try:
@@ -257,22 +261,13 @@ class LaunchScreen(Screen):
         super().__init__(*args, **kwargs)
         self._selected_dir = basepath
         self._add_basepath = add_basepath
-        cfg = get_machine_config_client(
-            str(self.app._environment.url.geturl()),
-            instrument_name=self.app._environment.instrument_name,
-            demo=self.app._environment.demo,
-        )
-        self._context: (
-            Type[SPAModularContext] | Type[SPAContext] | Type[TomographyContext]
-        )
-        if cfg.get("modular_spa"):
-            self._context = SPAContext
-        else:
-            self._context = SPAModularContext
+        self._context: Type[SPAModularContext] | Type[TomographyContext]
+        self._context = SPAModularContext
 
     def compose(self):
+
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
@@ -320,12 +315,7 @@ class LaunchScreen(Screen):
                 if source.is_relative_to(s):
                     return
             self.app._environment.sources.append(source)
-            machine_data = requests.get(
-                f"{self.app._environment.url.geturl()}/machine"
-            ).json()
-            self.app._default_destinations[source] = (
-                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}"
-            )
+            self.app._default_destinations[source] = f"{datetime.now().year}"
         if self._launch_btn:
             self._launch_btn.disabled = False
         self.query_one("#selected-directories").write(str(source) + "\n")
@@ -711,7 +701,7 @@ class VisitSelection(SwitchSelection):
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
 
         if self._switch_status:
@@ -778,12 +768,16 @@ class VisitCreation(Screen):
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
 
         self.app.install_screen(
             DirectorySelection(
-                [p for p in machine_data.get("data_directories", []) if p.exists()]
+                [
+                    p
+                    for p in machine_data.get("data_directories", [])
+                    if Path(p).exists()
+                ]
             ),
             "directory-select",
         )
@@ -799,11 +793,7 @@ class VisitCreation(Screen):
             )
             self.app.push_screen("gain-ref-select")
         else:
-            if self._switch_status:
-                self.app.push_screen("directory-select")
-            else:
-                self.app.install_screen(LaunchScreen(basepath=Path("./")), "launcher")
-                self.app.push_screen("launcher")
+            self.app.push_screen("directory-select")
 
         if machine_data.get("upstream_data_directories"):
             upstream_downloads = requests.get(
@@ -829,7 +819,7 @@ class UpstreamDownloads(Screen):
 
     def on_button_pressed(self, event: Button.Pressed):
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/machine"
+            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
             # Create the directory locally to save files to
@@ -899,7 +889,7 @@ class GainReference(Screen):
             rsync_cmd = [
                 "rsync",
                 f"{posix_path(self._dir_tree._gain_reference)!r}",
-                f"{self.app._environment.url.hostname}::{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
+                f"{self.app._environment.url.hostname}::{self.app._machine_config.get('rsync_module', 'data')}/{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             # Encase in bash shell
             cmd = ["bash", "-c", " ".join(rsync_cmd)]
@@ -975,7 +965,7 @@ class DestinationSelect(Screen):
     def __init__(
         self,
         transfer_routes: Dict[Path, str],
-        context: Type[SPAContext] | Type[SPAModularContext] | Type[TomographyContext],
+        context: Type[SPAModularContext] | Type[TomographyContext],
         *args,
         dependencies: Dict[str, FormDependency] | None = None,
         destination_overrides: Optional[Dict[Path, str]] = None,
@@ -994,9 +984,7 @@ class DestinationSelect(Screen):
     def compose(self):
         bulk = []
         with RadioSet():
-            yield RadioButton(
-                "SPA", value=self._context in (SPAContext, SPAModularContext)
-            )
+            yield RadioButton("SPA", value=self._context is SPAModularContext)
             yield RadioButton("Tomography", value=self._context is TomographyContext)
         if self.app._multigrid:
             machine_config = get_machine_config_client(
@@ -1022,13 +1010,10 @@ class DestinationSelect(Screen):
                             d.is_dir()
                             and d.name not in machine_config["create_directories"]
                         ):
-                            machine_data = requests.get(
-                                f"{self.app._environment.url.geturl()}/machine"
-                            ).json()
                             dest = determine_default_destination(
                                 self.app._visit,
                                 s,
-                                f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+                                f"{datetime.now().year}",
                                 self.app._environment,
                                 self.app.analysers,
                                 touch=True,
@@ -1141,15 +1126,7 @@ class DestinationSelect(Screen):
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            cfg = get_machine_config_client(
-                str(self.app._environment.url.geturl()),
-                instrument_name=self.app._environment.instrument_name,
-                demo=self.app._environment.demo,
-            )
-            if cfg.get("modular_spa"):
-                self._context = SPAContext
-            else:
-                self._context = SPAModularContext
+            self._context = SPAModularContext
         else:
             self._context = TomographyContext
         self.app.pop_screen()

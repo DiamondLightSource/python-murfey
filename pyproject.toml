@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.16.1"
+version = "0.16.9"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -32,20 +32,19 @@ classifiers = [
 dependencies = [
     "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by zocalo
+    "pydantic<2", # Locked to <2 by cygwin terminal
     "requests",
     "rich",
     "werkzeug",
+    "xmltodict",
 ]
 [project.optional-dependencies]
 cicd = [
-    "pytest-cov", # Used by Azure Pipelines for PyTest coverage reports
+    "pytest-cov", # Used for generating PyTest coverage reports
 ]
 client = [
-    "procrunner",
     "textual==0.42.0",
     "websocket-client",
-    "xmltodict",
 ]
 developer = [
     "bump-my-version<0.11.0", # Version control
@@ -53,8 +52,12 @@ developer = [
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
 ]
+instrument-server = [
+    "fastapi[standard]",
+    "python-jose[cryptography]",
+    "uvicorn[standard]",
+]
 server = [
-    # "matplotlib", # For visual statistical analysis of images
     "aiohttp",
     "cryptography",
     "fastapi[standard]",
@@ -104,6 +107,7 @@ murfey = "murfey.client:run"
 "clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
 "clem.register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
 "clem.register_tiff_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_tiff_preprocessing_result"
+"spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

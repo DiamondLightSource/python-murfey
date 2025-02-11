@@ -42,7 +42,7 @@ class AlignAndMergeResult(BaseModel):
 
 
 def register_align_and_merge_result(
-    message: dict, db: Session, demo: bool = False
+    message: dict, murfey_db: Session, demo: bool = False
 ) -> bool:
     """
     session_id (recipe)
@@ -91,16 +91,16 @@ def register_align_and_merge_result(
         # Register items in database if not already present
         try:
             clem_img_series: CLEMImageSeries = get_db_entry(
-                db=db,
+                db=murfey_db,
                 table=CLEMImageSeries,
                 session_id=session_id,
                 series_name=result.series_name,
             )
             clem_img_series.composite_image = str(result.composite_image)
             clem_img_series.composite_created = True
-            db.add(clem_img_series)
-            db.commit()
-            db.refresh(clem_img_series)
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
+            murfey_db.refresh(clem_img_series)
 
             logger.info(
                 "Align-and-merge processing result registered for "
@@ -117,4 +117,4 @@ def register_align_and_merge_result(
 
         return True
     finally:
-        db.close()
+        murfey_db.close()

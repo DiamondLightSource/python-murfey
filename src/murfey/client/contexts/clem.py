@@ -34,9 +34,6 @@ def _file_transferred_to(
     # rsync basepath and modules are set in the microscope's configuration YAML file
     return (
         Path(machine_config.get("rsync_basepath", ""))
-        / (
-            machine_config.get("rsync_module", "data") or "data"
-        )  # Add "data" if it wasn't set
         / str(datetime.now().year)
         / source.name
         / file_path.relative_to(source)
