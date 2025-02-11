@@ -6,10 +6,14 @@ import requests
 import xmltodict
 
 from murfey.client.context import Context
-from murfey.client.contexts.spa import _get_source
+from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
-from murfey.util.spa_metadata import FoilHoleInfo, get_grid_square_atlas_positions
+from murfey.util.spa_metadata import (
+    FoilHoleInfo,
+    get_grid_square_atlas_positions,
+    grid_square_data,
+)
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
@@ -228,6 +232,40 @@ class SPAMetadataContext(Context):
                 )
                 return
             visitless_source = str(visitless_source_images_dirs[-1])
+
+            if fh_positions:
+                gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}"
+                gs_info = grid_square_data(
+                    transferred_file,
+                    int(gs_name),
+                )
+                metadata_source = Path(
+                    (
+                        "/".join(Path(visitless_source).parts[:-2])
+                        + f"/{environment.visit}/"
+                        + Path(visitless_source).parts[-2]
+                    )[1:]
+                )
+                image_path = (
+                    _file_transferred_to(
+                        environment, metadata_source, Path(gs_info.image)
+                    )
+                    if gs_info.image
+                    else ""
+                )
+                capture_post(
+                    gs_url,
+                    json={
+                        "tag": visitless_source,
+                        "readout_area_x": gs_info.readout_area_x,
+                        "readout_area_y": gs_info.readout_area_y,
+                        "thumbnail_size_x": gs_info.thumbnail_size_x,
+                        "thumbnail_size_y": gs_info.thumbnail_size_y,
+                        "pixel_size": gs_info.pixel_size,
+                        "image": str(image_path),
+                    },
+                )
+
             for fh, fh_data in fh_positions.items():
                 capture_post(
                     f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
