@@ -57,6 +57,20 @@ def register_grid_square(
         grid_square.y_stage_position = (
             grid_square_params.y_stage_position or grid_square.y_stage_position
         )
+        grid_square.readout_area_x = (
+            grid_square_params.readout_area_x or grid_square.readout_area_x
+        )
+        grid_square.readout_area_y = (
+            grid_square_params.readout_area_y or grid_square.readout_area_y
+        )
+        grid_square.thumbnail_size_x = (
+            grid_square_params.thumbnail_size_x or grid_square.thumbnail_size_x
+        )
+        grid_square.thumbnail_size_y = (
+            grid_square_params.thumbnail_size_y or grid_square.thumbnail_size_y
+        )
+        grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
+        grid_square.image = grid_square_params.image or grid_square.image
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
