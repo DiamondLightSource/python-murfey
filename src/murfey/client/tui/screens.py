@@ -952,7 +952,7 @@ class DirectorySelection(SwitchSelection):
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
         )
-        for dir in machine_config["create_directories"].values():
+        for dir in machine_config["create_directories"]:
             (visit_dir / dir).mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
@@ -1008,8 +1008,7 @@ class DestinationSelect(Screen):
                     for d in s.glob("*"):
                         if (
                             d.is_dir()
-                            and d.name
-                            not in machine_config["create_directories"].values()
+                            and d.name not in machine_config["create_directories"]
                         ):
                             dest = determine_default_destination(
                                 self.app._visit,
@@ -1049,7 +1048,7 @@ class DestinationSelect(Screen):
                 instrument_name=self.app._environment.instrument_name,
             )
             for s, d in self._transfer_routes.items():
-                if Path(d).name not in machine_config["create_directories"].values():
+                if Path(d).name not in machine_config["create_directories"]:
                     bulk.append(Label(f"Copy the source {s} to:"))
                     bulk.append(
                         Input(
