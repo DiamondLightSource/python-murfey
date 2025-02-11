@@ -2557,6 +2557,16 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
+            if dcg_hooks := entry_points().select(
+                group="murfey.hooks", name="data_collection_group"
+            ):
+                try:
+                    for hook in dcg_hooks:
+                        hook(dcgid, session_id=message["session_id"])
+                except Exception:
+                    logger.error(
+                        "Call to data collection group hook failed", exc_info=True
+                    )
             return None
         elif message["register"] == "atlas_update":
             if _transport_object:
