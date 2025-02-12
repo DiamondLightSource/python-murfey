@@ -319,8 +319,7 @@ def run():
         software_versions=machine_data.get("software_versions", {}),
         # sources=[Path(args.source)],
         # watchers=source_watchers,
-        default_destination=args.destination
-        or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+        default_destination=args.destination or str(datetime.now().year),
         demo=args.demo,
         processing_only_mode=server_routing_prefix_found,
     )

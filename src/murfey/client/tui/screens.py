@@ -92,10 +92,7 @@ def determine_default_destination(
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"]:
             if source.resolve() == Path(data_dir):
-                _default = (
-                    destination
-                    + f"{machine_data.get('rsync_module') or 'data'}/{visit}"
-                )
+                _default = destination + str(visit)
                 break
             else:
                 try:
