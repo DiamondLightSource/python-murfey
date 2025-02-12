@@ -884,7 +884,7 @@ class GainReference(Screen):
         else:
             if event.button.id == "suggested-gain-ref":
                 self._dir_tree._gain_reference = self._gain_reference
-            visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
+            visit_path = f"{datetime.now().year}/{self.app._environment.visit}"
             # Set up rsync command
             rsync_cmd = [
                 "rsync",
