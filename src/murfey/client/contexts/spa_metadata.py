@@ -213,6 +213,28 @@ class SPAMetadataContext(Context):
             and transferred_file.name.startswith("GridSquare")
             and environment
         ):
+            # Make sure we have a data collection group before trying to register grid square
+            url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+            dcg_search_dir = "/" + "/".join(
+                p
+                for p in transferred_file.parent.parent.parts[1:]
+                if p != environment.visit
+            )
+            dcg_images_dirs = sorted(
+                Path(dcg_search_dir).glob("Images-Disc*"),
+                key=lambda x: x.stat().st_ctime,
+            )
+            if not dcg_images_dirs:
+                logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
+                return
+            dcg_tag = str(dcg_images_dirs[-1])
+            dcg_data = {
+                "experiment_type": "single particle",
+                "experiment_type_id": 37,
+                "tag": dcg_tag,
+            }
+            capture_post(url, json=dcg_data)
+
             gs_name = transferred_file.stem.split("_")[1]
             logger.info(
                 f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
