@@ -120,7 +120,7 @@ def run():
         "-c",
         "--config",
         help="Security config file",
-        required=False,
+        required=True,
     )
     parser.add_argument(
         "-u",
