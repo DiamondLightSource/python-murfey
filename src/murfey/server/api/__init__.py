@@ -518,6 +518,9 @@ def post_foil_hole(
     foil_hole_params: FoilHoleParameters,
     db=murfey_db,
 ):
+    log.info(
+        f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
+    )
     return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
