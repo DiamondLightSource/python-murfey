@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -9,6 +8,8 @@ from queue import Empty, Queue
 import requests
 from jose import jwt
 from workflows.transport.pika_transport import PikaTransport
+
+from murfey.util.config import security_from_file
 
 
 def dlq_purge(
@@ -133,11 +134,8 @@ def run():
     )
     args = parser.parse_args()
 
-    # Set the environment variable then read it by importing the security config
-    os.environ["MURFEY_SECURITY_CONFIGURATION"] = args.config
-    from murfey.util.config import get_security_config
-
-    security_config = get_security_config()
+    # Read the security config file
+    security_config = security_from_file(args.config)
 
     # Get the token to post to the api with
     token = jwt.encode(
