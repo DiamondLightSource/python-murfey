@@ -42,6 +42,7 @@ def tiff_list(raw_dir: Path):
 
 @pytest.fixture
 def metadata(raw_dir: Path):
+    (raw_dir / area_name / "Metadata").mkdir(parents=True, exist_ok=True)
     metadata = raw_dir / area_name / "Metadata" / "test_series.xlif"
     if not metadata.exists():
         metadata.touch()
