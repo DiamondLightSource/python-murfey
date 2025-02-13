@@ -72,4 +72,3 @@ def test_zocalo_cluster_request(
         sent_recipe,
         new_connection=True,
     )
-    pass
