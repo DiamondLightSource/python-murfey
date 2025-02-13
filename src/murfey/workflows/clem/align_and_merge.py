@@ -37,7 +37,7 @@ def submit_cluster_request(
 
     # Load feedback queue
     machine_config = get_machine_config()[instrument_name]
-    feedback_queue: str = machine_config.feedback_queue
+    feedback_queue: str = messenger.feedback_queue
 
     # Work out session directory from file path
     processed_folder = machine_config.processed_directory_name
