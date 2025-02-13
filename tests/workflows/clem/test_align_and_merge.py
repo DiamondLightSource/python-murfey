@@ -82,7 +82,7 @@ def test_submit_cluster_request(
 
     # Construct a mock MachineConfig object for use within the function
     mock_machine_config = MagicMock(spec=MachineConfig)
-    mock_machine_config.return_value.processed_directory_name = processed_folder
+    mock_machine_config.processed_directory_name = processed_folder
     mock_get_machine_config.return_value = {
         instrument_name: mock_machine_config,
     }
