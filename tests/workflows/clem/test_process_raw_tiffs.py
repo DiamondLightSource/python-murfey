@@ -28,6 +28,7 @@ def raw_dir(tmp_path: Path):
 
 @pytest.fixture
 def tiff_list(raw_dir: Path):
+    (raw_dir / area_name).mkdir(parents=True, exist_ok=True)
     tiff_list = [
         raw_dir / area_name / f"test_series--Z{str(z).zfill(2)}--C{str(c).zfill(2)}.tif"
         for z in range(num_z)
