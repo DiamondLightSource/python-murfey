@@ -4,14 +4,19 @@ from unittest.mock import MagicMock
 import pytest
 
 from murfey.server.ispyb import TransportManager
-from murfey.workflows.clem.process_raw_lifs import zocalo_cluster_request
+from murfey.workflows.clem.process_raw_tiffs import zocalo_cluster_request
 
 # Set up variables
-visit_name = "cm12345-6"
-root_folder = "images"
 session_id = 0
 instrument_name = "clem"
+root_folder = "images"
+visit_name = "cm12345-6"
+area_name = "test_area"
 feedback_queue = "murfey_feedback"
+
+# Properties for TIFF images
+num_z = 5
+num_c = 3
 
 
 @pytest.fixture
@@ -22,15 +27,29 @@ def raw_dir(tmp_path: Path):
 
 
 @pytest.fixture
-def lif_file(raw_dir: Path):
-    file = raw_dir / "test_file.lif"
-    if not file.exists():
-        file.touch()
-    return file
+def tiff_list(raw_dir: Path):
+    tiff_list = [
+        raw_dir / area_name / f"test_series--Z{str(z).zfill(2)}--C{str(c).zfill(2)}.tif"
+        for z in range(num_z)
+        for c in range(num_c)
+    ]
+    for file in tiff_list:
+        if not file.exists():
+            file.touch()
+    return tiff_list
+
+
+@pytest.fixture
+def metadata(raw_dir: Path):
+    metadata = raw_dir / area_name / "Metadata" / "test_series.xlif"
+    if not metadata.exists():
+        metadata.touch()
+    return metadata
 
 
 def test_zocalo_cluster_request(
-    lif_file: Path,
+    tiff_list: list[Path],
+    metadata: Path,
     raw_dir: Path,
 ):
 
@@ -40,10 +59,11 @@ def test_zocalo_cluster_request(
 
     # Run the function with the listed parameters
     zocalo_cluster_request(
-        file=lif_file,
+        tiff_list=tiff_list,
         root_folder=root_folder,
         session_id=session_id,
         instrument_name=instrument_name,
+        metadata=metadata,
         messenger=mock_transport,
     )
 
@@ -51,15 +71,20 @@ def test_zocalo_cluster_request(
     job_name = "--".join(
         [
             p.replace(" ", "_") if " " in p else p
-            for p in (lif_file.relative_to(raw_dir).parent / lif_file.stem).parts
+            for p in (
+                tiff_list[0].parent.relative_to(raw_dir)
+                / tiff_list[0].stem.split("--")[0]
+            ).parts
         ]
     )
     sent_recipe = {
-        "recipes": ["clem-lif-to-stack"],
+        "recipes": ["clem-tiff-to-stack"],
         "parameters": {
             # Job parameters
-            "lif_file": f"{str(lif_file)}",
+            "tiff_list": "null",
+            "tiff_file": f"{str(tiff_list[0])}",
             "root_folder": root_folder,
+            "metadata": f"{str(metadata)}",
             # Other recipe parameters
             "session_dir": f"{str(raw_dir.parent)}",
             "session_id": session_id,
