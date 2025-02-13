@@ -19,14 +19,14 @@ def dlq_purge(
     transport.load_configuration_file(rabbitmq_credentials)
     transport.connect()
 
-    queue_to_purge = "dlq." + queue
+    queue_to_purge = f"dlq.{queue}"
     idlequeue: Queue = Queue()
     exported_messages = []
 
     def receive_dlq_message(header: dict, message: dict) -> None:
         idlequeue.put_nowait("start")
         header["x-death"][0]["time"] = datetime.timestamp(header["x-death"][0]["time"])
-        filename = dlq_dump_path / (f"{queue}-" + str(header["message-id"]))
+        filename = dlq_dump_path / f"{queue}-{header['message-id']}"
         dlqmsg = {"header": header, "message": message}
         with filename.open("w") as fh:
             json.dump(dlqmsg, fh, indent=2, sort_keys=True)

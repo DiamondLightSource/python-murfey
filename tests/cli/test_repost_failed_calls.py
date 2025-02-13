@@ -65,10 +65,10 @@ def test_handle_dlq_messages(mock_transport, tmp_path):
             "message": {"content": "msg2"},
         },
     }
-    for message in messages_dict.keys():
-        messages_paths_list.append(tmp_path / message)
-        with open(tmp_path / message, "w") as msg_file:
-            json.dump(messages_dict[message], msg_file)
+    for file_name, message in messages_dict.items():
+        messages_paths_list.append(tmp_path / file_name)
+        with open(tmp_path / file_name, "w") as msg_file:
+            json.dump(message, msg_file)
 
     # Send the two messages, plus a file that is not a message
     repost_failed_calls.handle_dlq_messages(
@@ -124,10 +124,10 @@ def test_handle_failed_posts(mock_requests, tmp_path):
             "header": {"content": "msg3"},  # does not have a message
         },
     }
-    for message in messages_dict.keys():
-        messages_paths_list.append(tmp_path / message)
-        with open(tmp_path / message, "w") as msg_file:
-            json.dump(messages_dict[message], msg_file)
+    for file_name, message in messages_dict.items():
+        messages_paths_list.append(tmp_path / file_name)
+        with open(tmp_path / file_name, "w") as msg_file:
+            json.dump(message, msg_file)
 
     class Response:
         def __init__(self, status_code):
