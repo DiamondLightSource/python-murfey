@@ -970,7 +970,7 @@ def flush_spa_processing(
         )
     except Exception:
         log.error(
-            f"Unable to find a Murfey session associated with session ID {session_id}"
+            f"Unable to find a Murfey session associated with session ID {sanitise(str(session_id))}"
         )
         return
 
