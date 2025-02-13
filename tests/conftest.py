@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 from sqlmodel import Session
@@ -34,3 +35,4 @@ def mock_security_configuration(tmp_path):
     }
     with open(config_file, "w") as f:
         json.dump(security_config, f)
+    os.environ["MURFEY_SECURITY_CONFIGURATION"] = str(config_file)
