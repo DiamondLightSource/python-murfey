@@ -65,10 +65,10 @@ def metadata(processed_dir: Path):
 
 @patch("murfey.workflows.clem.align_and_merge.get_machine_config")
 def test_submit_cluster_request(
+    mock_get_machine_config,
     image_stacks: list[Path],
     metadata: Path,
     processed_dir: Path,
-    mock_get_machine_config,
 ):
 
     # Construct the long series name
