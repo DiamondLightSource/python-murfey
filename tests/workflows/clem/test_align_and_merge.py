@@ -116,7 +116,7 @@ def test_submit_cluster_request(
             # Other recipe parameters
             "session_dir": str(processed_dir.parent),
             "session_id": session_id,
-            "job_name": series_name,
+            "job_name": series_name_long,
             "feedback_queue": feedback_queue,
         },
     }
