@@ -120,9 +120,9 @@ class TransportManager:
         try:
             with Session() as db:
                 atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
-                atlas.atlasImage = atlas_image
-                atlas.pixelSize = pixel_size
-                atlas.cassetteSlot = slot
+                atlas.atlasImage = atlas_image or atlas.atlasImage
+                atlas.pixelSize = pixel_size or atlas.pixelSize
+                atlas.cassetteSlot = slot or atlas.cassetteSlot
                 db.add(atlas)
                 db.commit()
                 return {"success": True, "return_value": atlas.atlasId}
