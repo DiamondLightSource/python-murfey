@@ -478,6 +478,12 @@ class MurfeyTUI(App):
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
+            context.register_tomography_data_collections(
+                file_extension=json["file_extension"],
+                image_directory=str(self._environment.default_destinations[source]),
+                environment=self._environment,
+            )
+
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
