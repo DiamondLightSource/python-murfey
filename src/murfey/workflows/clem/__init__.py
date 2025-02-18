@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -90,7 +91,14 @@ def _validate_and_sanitise(
         raise ValueError(f"{file} points to a directory that is not permitted")
 
     # Check that it's a file, not a directory
-    if full_path.is_file() is False:
+    # Make a couple of attempts to rule out race condition
+    attempts = 0
+    while attempts < 50:
+        if full_path.is_file() is True:
+            break
+        attempts += 1
+        time.sleep(0.1)
+    else:
         raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
@@ -180,7 +188,22 @@ def get_db_entry(
         )
         db.add(db_entry)
         db.commit()
-        db.refresh(db_entry)
+
+        # Make multiple attempts data retrieval attempts in case of race condition
+        attempts = 0
+        while attempts < 50:
+            try:
+                db.refresh(db_entry)
+                break
+            except Exception:
+                pass
+            attempts += 1
+            time.sleep(0.1)
+        else:
+            raise RuntimeError(
+                "Maximum number of attempts reached while trying to refresh database "
+                f"entry for {str(file_path if file_path else series_name)!r}"
+            )
     except Exception:
         raise Exception
 

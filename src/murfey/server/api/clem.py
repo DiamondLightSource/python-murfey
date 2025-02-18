@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 import traceback
 from ast import literal_eval
 from importlib.metadata import EntryPoint  # type hinting only
@@ -94,7 +95,14 @@ def validate_and_sanitise(
         raise ValueError(f"{file} points to a directory that is not permitted")
 
     # Check that it's a file, not a directory
-    if full_path.is_file() is False:
+    # Make a couple of attempts to rule out race condition
+    attempts = 0
+    while attempts < 50:
+        if full_path.is_file() is True:
+            break
+        attempts += 1
+        time.sleep(0.1)
+    else:
         raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
@@ -184,7 +192,23 @@ def get_db_entry(
         )
         db.add(db_entry)
         db.commit()
-        db.refresh(db_entry)
+
+        # Make multiple attempts to refresh data in case of race condition
+        attempts = 0
+        while attempts < 50:
+            try:
+                db.refresh(db_entry)
+                break
+            except Exception:
+                pass
+            attempts += 1
+            time.sleep(0.1)
+        else:
+            raise RuntimeError(
+                "Maximum number of attempts reached while trying to refresh database "
+                f"entry for {str(file_path if file_path else series_name)!r}"
+            )
+
     except Exception:
         raise Exception
 
@@ -215,7 +239,10 @@ def register_lif_file(
             file_path=lif_file,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            f"Exception encountered while registering LIF file {str(lif_file)!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Add metadata information if provided
@@ -224,7 +251,11 @@ def register_lif_file(
             master_metadata = validate_and_sanitise(master_metadata, session_id, db)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to add master metadata information to database entry for "
+                f"LIF file {str(lif_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register child metadata if provided
     for metadata in child_metadata:
@@ -238,7 +269,11 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_metadata.append(metadata_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to add child metadata information to database entry for "
+                f"LIF file {str(lif_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register child image series if provided
@@ -253,7 +288,11 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_series.append(series_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to add child series information to database entry for "
+                f"LIF file {str(lif_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register child image stacks if provided
@@ -268,7 +307,11 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_stacks.append(stack_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to add child image stack information to database entry for "
+                f"LIF file {str(lif_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Commit to database
@@ -296,7 +339,10 @@ def register_tiff_file(
             file_path=tiff_file,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            f"Exception encountered while registering TIFF file {str(tiff_file)!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Add metadata if provided
@@ -311,7 +357,10 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.associated_metadata = metadata_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                f"Unable to register metadata for TIFF file {str(tiff_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Add series information if provided
     if associated_series is not None:
@@ -325,7 +374,11 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_series = series_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register series information for TIFF file "
+                f"{str(tiff_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Add image stack information if provided
     if associated_stack is not None:
@@ -339,7 +392,11 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_stack = stack_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                f"Unable to register image stack {str(associated_stack)!r} "
+                f"in database for TIFF file {str(tiff_file)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Commit to database
     db.add(clem_tiff_file)
