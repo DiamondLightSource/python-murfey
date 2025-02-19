@@ -83,6 +83,7 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 murfey = "murfey.client:run"
 "murfey.add_user" = "murfey.cli.add_user:run"
+"murfey.build_images" = "murfey.cli.build_images:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
