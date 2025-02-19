@@ -128,9 +128,13 @@ def register_lif_preprocessing_result(
                     murfey_db.refresh(clem_img_stk)
                     break
                 except Exception:
-                    pass
-                attempts += 1
-                time.sleep(0.1)
+                    logger.warning(
+                        f"Attempt {attempts + 1} at refreshing database entry for "
+                        f"{str(result.image_stack)!r} failed: \n"
+                        f"{traceback.format_exc()}"
+                    )
+                    attempts += 1
+                    time.sleep(0.1)
             else:
                 raise RuntimeError(
                     "Maximum number of attempts reached while trying to refresh database "
@@ -150,9 +154,13 @@ def register_lif_preprocessing_result(
                     murfey_db.refresh(clem_img_series)
                     break
                 except Exception:
-                    pass
-                attempts += 1
-                time.sleep(0.1)
+                    logger.warning(
+                        f"Attempt {attempts + 1} at refreshing database entry for "
+                        f"{str(result.series_name)!r} failed: \n"
+                        f"{traceback.format_exc()}"
+                    )
+                    attempts += 1
+                    time.sleep(0.1)
             else:
                 raise RuntimeError(
                     "Maximum number of attempts reached while trying to refresh database "
@@ -169,9 +177,13 @@ def register_lif_preprocessing_result(
                     murfey_db.refresh(clem_metadata)
                     break
                 except Exception:
-                    pass
-                attempts += 1
-                time.sleep(0.1)
+                    logger.warning(
+                        f"Attempt {attempts + 1} at refreshing database entry for "
+                        f"{str(result.metadata)!r} failed: \n"
+                        f"{traceback.format_exc()}"
+                    )
+                    attempts += 1
+                    time.sleep(0.1)
             else:
                 raise RuntimeError(
                     "Maximum number of attempts reached while trying to refresh database "
@@ -352,9 +364,13 @@ def register_tiff_preprocessing_result(
                         murfey_db.refresh(clem_tiff_file)
                         break
                     except Exception:
-                        pass
-                    attempts += 1
-                    time.sleep(0.1)
+                        logger.warning(
+                            f"Attempt {attempts + 1} at refreshing database entry for "
+                            f"{str(file)!r} failed: \n"
+                            f"{traceback.format_exc()}"
+                        )
+                        attempts += 1
+                        time.sleep(0.1)
                 else:
                     raise RuntimeError(
                         "Maximum number of attempts reached while trying to refresh database "
@@ -374,9 +390,13 @@ def register_tiff_preprocessing_result(
                     murfey_db.refresh(clem_img_stk)
                     break
                 except Exception:
-                    pass
-                attempts += 1
-                time.sleep(0.1)
+                    logger.warning(
+                        f"Attempt {attempts + 1} at refreshing database entry for "
+                        f"{str(result.image_stack)!r} failed: \n"
+                        f"{traceback.format_exc()}"
+                    )
+                    attempts += 1
+                    time.sleep(0.1)
             else:
                 raise RuntimeError(
                     "Maximum number of attempts reached while trying to refresh database "
@@ -395,9 +415,13 @@ def register_tiff_preprocessing_result(
                     murfey_db.refresh(clem_img_series)
                     break
                 except Exception:
-                    pass
-                attempts += 1
-                time.sleep(0.1)
+                    logger.warning(
+                        f"Attempt {attempts + 1} at refreshing database entry for "
+                        f"{str(result.series_name)!r} failed: \n"
+                        f"{traceback.format_exc()}"
+                    )
+                    attempts += 1
+                    time.sleep(0.1)
             else:
                 raise RuntimeError(
                     "Maximum number of attempts reached while trying to refresh database "

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+import traceback
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -196,9 +197,13 @@ def get_db_entry(
                 db.refresh(db_entry)
                 break
             except Exception:
-                pass
-            attempts += 1
-            time.sleep(0.1)
+                logger.warning(
+                    f"Attempt {attempts + 1} at refreshing database entry for "
+                    f"{str(file_path if file_path else series_name)!r} failed: \n"
+                    f"{traceback.format_exc()}"
+                )
+                attempts += 1
+                time.sleep(0.1)
         else:
             raise RuntimeError(
                 "Maximum number of attempts reached while trying to refresh database "
