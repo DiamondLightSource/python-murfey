@@ -39,7 +39,6 @@ def run_subprocess(cmd: list[str], src: str = "."):
     return process.returncode
 
 
-# Function to build Docker image
 def build_image(
     image: str,
     tag: str,
@@ -116,7 +115,7 @@ def tag_image(
     bash_cmd = ["bash", "-c", " ".join(tag_cmd)]
     if not dry_run:
         print()
-        # Run subprocess command to tag image
+        # Run subprocess command to tag images
         result = run_subprocess(bash_cmd)
 
         # Check for errors
@@ -137,12 +136,12 @@ def push_images(
     images: list[str],
     dry_run: bool = False,
 ):
-    # Construct bash command to push images
+    # Construct bash command to push images to the repo
     push_cmd = [f"for IMAGE in {' '.join(images)};", "do podman push $IMAGE;", "done"]
     bash_cmd = ["bash", "-c", " ".join(push_cmd)]
     if not dry_run:
         print()
-        # Run subprocess command to push image
+        # Run subprocess command
         result = run_subprocess(bash_cmd)
 
         # Check for errors
@@ -160,14 +159,14 @@ def push_images(
 
 
 def cleanup(dry_run: bool = False):
-    # Construct bash command to push images
+    # Construct bash command to clean up Podman repo
     cleanup_cmd = [
         "podman image prune -f",
     ]
     bash_cmd = ["bash", "-c", " ".join(cleanup_cmd)]
     if not dry_run:
         print()
-        # Run subprocess command to clean up Podman repo
+        # Run subprocess command
         result = run_subprocess(bash_cmd)
 
         # Check for errors
