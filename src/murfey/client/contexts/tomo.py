@@ -638,7 +638,8 @@ class TomographyContext(Context):
                     metadata_file.parent / data_file
                 )
                 mdoc_metadata["frame_count"] = int(
-                    mdoc_metadata["eer_fractionation"] / mdoc_metadata["num_eer_frames"]
+                    int(mdoc_metadata["eer_fractionation"])
+                    / int(mdoc_metadata["num_eer_frames"])
                 )
         except Exception as e:
             logger.error(f"Exception encountered in metadata gathering: {str(e)}")
