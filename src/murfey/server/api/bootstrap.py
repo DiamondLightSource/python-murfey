@@ -539,7 +539,7 @@ def get_msys2_package_file(
 
     # Validate environment
     if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
-        raise ValueError(f"{system!r}/{environment!r} is not a valid msys2 environment")
+        raise ValueError(f"'{system}/{environment}' is not a valid msys2 environment")
 
     # Validate package name
     #   MSYS2 package names contain:
@@ -593,7 +593,7 @@ def _get_full_pypi_path_response(package: str) -> requests.Response:
         else:
             raise HTTPException(status_code=response.status_code)
     else:
-        raise ValueError(f"{package} is not a valid package name")
+        raise ValueError(f"{package!r} is not a valid package name")
 
 
 @pypi.get("/", response_class=Response)

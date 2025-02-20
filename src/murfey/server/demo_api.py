@@ -40,7 +40,7 @@ from murfey.server import templates
 from murfey.server.api import MurfeySessionID
 from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
-from murfey.util.config import MachineConfig, from_file
+from murfey.util.config import MachineConfig, from_file, security_from_file
 from murfey.util.db import (
     AutoProcProgram,
     ClientEnvironment,
@@ -962,9 +962,26 @@ def flush_spa_processing(
         return
 
     detached_ids = [c.id for c in collected_ids]
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    try:
+        instrument_name = (
+            db.exec(select(Session).where(Session.id == session_id))
+            .one()
+            .instrument_name
+        )
+    except Exception:
+        log.error(
+            f"Unable to find a Murfey session associated with session ID {sanitise(str(session_id))}"
+        )
+        return
+
+    # Load the security config
+    security_config_file = machine_config[instrument_name].security_configuration_path
+    if not security_config_file:
+        log.error(
+            f"No security configuration file set for instrument {instrument_name!r}"
+        )
+        return
+    security_config = security_from_file(security_config_file)
 
     murfey_ids = _murfey_id(
         detached_ids[3], db, number=2 * len(stashed_files), close=False
@@ -986,7 +1003,7 @@ def flush_spa_processing(
         zocalo_message = {
             "recipes": ["em-spa-preprocess"],
             "parameters": {
-                "feedback_queue": machine_config[instrument_name].feedback_queue,
+                "feedback_queue": security_config.feedback_queue,
                 "node_creator_queue": machine_config[
                     instrument_name
                 ].node_creator_queue,
