@@ -64,16 +64,7 @@ def _validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    rsync_basepath = machine_config.rsync_basepath
-    try:
-        base_path = list(rsync_basepath.parents)[-2].as_posix()
-    except IndexError:
-        logger.warning(f"Base path {rsync_basepath!r} is too short")
-        base_path = rsync_basepath.as_posix()
-    except Exception as e:
-        raise Exception(
-            f"Unexpected exception encountered when loading the file base path: {e}"
-        )
+    rsync_basepath = machine_config.rsync_basepath.resolve()
 
     # Check that full file path doesn't contain unallowed characters
     # Currently allows only:
@@ -86,7 +77,7 @@ def _validate_and_sanitise(
         raise ValueError(f"Unallowed characters present in {file}")
 
     # Check that it's not accessing somehwere it's not allowed
-    if not str(full_path).startswith(str(base_path)):
+    if not str(full_path).startswith(str(rsync_basepath)):
         raise ValueError(f"{file} points to a directory that is not permitted")
 
     # Check that it is of a permitted file type
