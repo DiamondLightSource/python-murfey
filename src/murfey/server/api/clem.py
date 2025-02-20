@@ -94,17 +94,6 @@ def validate_and_sanitise(
     if not str(full_path).startswith(str(base_path)):
         raise ValueError(f"{file} points to a directory that is not permitted")
 
-    # # Check that it's a file, not a directory
-    # # Make a couple of attempts to rule out race condition
-    # attempts = 0
-    # while attempts < 50:
-    #     if full_path.is_file() is True:
-    #         break
-    #     attempts += 1
-    #     time.sleep(0.1)
-    # else:
-    #     raise ValueError(f"{file} is not a file")
-
     # Check that it is of a permitted file type
     if f"{full_path.suffix}" not in valid_file_types:
         raise ValueError(f"{full_path.suffix} is not a permitted file format")
