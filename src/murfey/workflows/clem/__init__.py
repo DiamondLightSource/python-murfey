@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-import traceback
 from pathlib import Path
 from typing import Optional, Type, Union
 
@@ -190,25 +189,6 @@ def get_db_entry(
         db.add(db_entry)
         db.commit()
 
-        # Make multiple attempts data retrieval attempts in case of race condition
-        attempts = 0
-        while attempts < 50:
-            try:
-                db.refresh(db_entry)
-                break
-            except Exception:
-                logger.warning(
-                    f"Attempt {attempts + 1} at refreshing database entry for "
-                    f"{str(file_path if file_path else series_name)!r} failed: \n"
-                    f"{traceback.format_exc()}"
-                )
-                attempts += 1
-                time.sleep(0.1)
-        else:
-            raise RuntimeError(
-                "Maximum number of attempts reached while trying to refresh database "
-                f"entry for {str(file_path if file_path else series_name)!r}"
-            )
     except Exception:
         raise Exception
 

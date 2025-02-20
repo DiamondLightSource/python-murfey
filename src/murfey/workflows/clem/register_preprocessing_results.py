@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 import traceback
 from ast import literal_eval
 from pathlib import Path
@@ -121,74 +120,15 @@ def register_lif_preprocessing_result(
             murfey_db.add(clem_img_stk)
             murfey_db.commit()
 
-            # Make multiple attempts to refresh data in case of race condition
-            attempts = 0
-            while attempts < 50:
-                try:
-                    murfey_db.refresh(clem_img_stk)
-                    break
-                except Exception:
-                    logger.warning(
-                        f"Attempt {attempts + 1} at refreshing database entry for "
-                        f"{str(result.image_stack)!r} failed: \n"
-                        f"{traceback.format_exc()}"
-                    )
-                    attempts += 1
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(
-                    "Maximum number of attempts reached while trying to refresh database "
-                    f"entry for {str(result.image_stack)!r}"
-                )
-
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.parent_lif = clem_lif_file
             clem_img_series.number_of_members = result.number_of_members
             murfey_db.add(clem_img_series)
             murfey_db.commit()
 
-            # Make multiple attempts to refresh data in case of race condition
-            attempts = 0
-            while attempts < 50:
-                try:
-                    murfey_db.refresh(clem_img_series)
-                    break
-                except Exception:
-                    logger.warning(
-                        f"Attempt {attempts + 1} at refreshing database entry for "
-                        f"{str(result.series_name)!r} failed: \n"
-                        f"{traceback.format_exc()}"
-                    )
-                    attempts += 1
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(
-                    "Maximum number of attempts reached while trying to refresh database "
-                    f"entry for {str(result.series_name)!r}"
-                )
-
             clem_metadata.parent_lif = clem_lif_file
             murfey_db.add(clem_metadata)
             murfey_db.commit()
-
-            # Make multiple attempts to refresh data in case of race condition
-            while attempts < 50:
-                try:
-                    murfey_db.refresh(clem_metadata)
-                    break
-                except Exception:
-                    logger.warning(
-                        f"Attempt {attempts + 1} at refreshing database entry for "
-                        f"{str(result.metadata)!r} failed: \n"
-                        f"{traceback.format_exc()}"
-                    )
-                    attempts += 1
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(
-                    "Maximum number of attempts reached while trying to refresh database "
-                    f"entry for {str(result.metadata)!r}"
-                )
 
             logger.info(
                 f"LIF preprocessing results registered for {result.series_name!r} "
@@ -357,76 +297,16 @@ def register_tiff_preprocessing_result(
                 murfey_db.add(clem_tiff_file)
                 murfey_db.commit()
 
-                # Make multiple attempts to refresh data in case of race condition
-                attempts = 0
-                while attempts < 50:
-                    try:
-                        murfey_db.refresh(clem_tiff_file)
-                        break
-                    except Exception:
-                        logger.warning(
-                            f"Attempt {attempts + 1} at refreshing database entry for "
-                            f"{str(file)!r} failed: \n"
-                            f"{traceback.format_exc()}"
-                        )
-                        attempts += 1
-                        time.sleep(0.1)
-                else:
-                    raise RuntimeError(
-                        "Maximum number of attempts reached while trying to refresh database "
-                        f"entry for {str(file)!r}"
-                    )
-
             clem_img_stk.associated_metadata = clem_metadata
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
             murfey_db.add(clem_img_stk)
             murfey_db.commit()
 
-            # Make multiple attempts to refresh data in case of race condition
-            attempts = 0
-            while attempts < 50:
-                try:
-                    murfey_db.refresh(clem_img_stk)
-                    break
-                except Exception:
-                    logger.warning(
-                        f"Attempt {attempts + 1} at refreshing database entry for "
-                        f"{str(result.image_stack)!r} failed: \n"
-                        f"{traceback.format_exc()}"
-                    )
-                    attempts += 1
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(
-                    "Maximum number of attempts reached while trying to refresh database "
-                    f"entry for {str(result.image_stack)!r}"
-                )
-
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.number_of_members = result.number_of_members
             murfey_db.add(clem_img_series)
             murfey_db.commit()
-
-            # Make multiple attempts to refresh data in case of race condition
-            attempts = 0
-            while attempts < 50:
-                try:
-                    murfey_db.refresh(clem_img_series)
-                    break
-                except Exception:
-                    logger.warning(
-                        f"Attempt {attempts + 1} at refreshing database entry for "
-                        f"{str(result.series_name)!r} failed: \n"
-                        f"{traceback.format_exc()}"
-                    )
-                    attempts += 1
-                    time.sleep(0.1)
-            else:
-                raise RuntimeError(
-                    "Maximum number of attempts reached while trying to refresh database "
-                    f"entry for {str(result.series_name)!r}"
-                )
 
             logger.info(
                 f"TIFF preprocessing results registered for {result.series_name!r} "

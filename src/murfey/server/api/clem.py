@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 import traceback
 from ast import literal_eval
 from importlib.metadata import EntryPoint  # type hinting only
@@ -95,16 +94,16 @@ def validate_and_sanitise(
     if not str(full_path).startswith(str(base_path)):
         raise ValueError(f"{file} points to a directory that is not permitted")
 
-    # Check that it's a file, not a directory
-    # Make a couple of attempts to rule out race condition
-    attempts = 0
-    while attempts < 50:
-        if full_path.is_file() is True:
-            break
-        attempts += 1
-        time.sleep(0.1)
-    else:
-        raise ValueError(f"{file} is not a file")
+    # # Check that it's a file, not a directory
+    # # Make a couple of attempts to rule out race condition
+    # attempts = 0
+    # while attempts < 50:
+    #     if full_path.is_file() is True:
+    #         break
+    #     attempts += 1
+    #     time.sleep(0.1)
+    # else:
+    #     raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
     if f"{full_path.suffix}" not in valid_file_types:
@@ -193,26 +192,6 @@ def get_db_entry(
         )
         db.add(db_entry)
         db.commit()
-
-        # Make multiple attempts to refresh data in case of race condition
-        attempts = 0
-        while attempts < 50:
-            try:
-                db.refresh(db_entry)
-                break
-            except Exception:
-                logger.warning(
-                    f"Attempt {attempts + 1} at refreshing database entry for "
-                    f"{sanitise(str(file_path if file_path else series_name))!r} failed: \n"
-                    f"{traceback.format_exc()}"
-                )
-                attempts += 1
-                time.sleep(0.1)
-        else:
-            raise RuntimeError(
-                "Maximum number of attempts reached while trying to refresh database "
-                f"entry for {sanitise(str(file_path if file_path else series_name))!r}"
-            )
 
     except Exception:
         raise Exception
