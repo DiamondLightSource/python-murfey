@@ -60,29 +60,22 @@ def register_align_and_merge_result(
     )
 
     # Validate message and try and load results
-    if isinstance(message["result"], str):
-        try:
+    try:
+        if isinstance(message["result"], str):
             json_obj: dict = json.loads(message["result"])
             result = AlignAndMergeResult(**json_obj)
-        except Exception:
-            logger.error(traceback.format_exc())
-            logger.error(
-                "Exception encountered when parsing align-and-merge processing result"
-            )
-            return False
-    elif isinstance(message["result"], dict):
-        try:
+        elif isinstance(message["result"], dict):
             result = AlignAndMergeResult(**message["result"])
-        except Exception:
-            logger.error(traceback.format_exc())
+        else:
             logger.error(
-                "Exception encountered when parsing align-and-merge processing result"
+                "Invalid type for align-and-merge processing result: "
+                f"{type(message['result'])}"
             )
             return False
-    else:
+    except Exception:
         logger.error(
-            "Invalid type for align-and-merge processing result: "
-            f"{type(message['result'])}"
+            "Exception encountered when parsing align-and-merge processing result: \n"
+            f"{traceback.format_exc()}"
         )
         return False
 
@@ -100,7 +93,6 @@ def register_align_and_merge_result(
             clem_img_series.composite_created = True
             murfey_db.add(clem_img_series)
             murfey_db.commit()
-            murfey_db.refresh(clem_img_series)
 
             logger.info(
                 "Align-and-merge processing result registered for "
@@ -108,10 +100,10 @@ def register_align_and_merge_result(
             )
 
         except Exception:
-            logger.error(traceback.format_exc())
             logger.error(
                 "Exception encountered when registering LIF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack"
+                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                f"{traceback.format_exc()}"
             )
             return False
 
