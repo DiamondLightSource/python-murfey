@@ -41,7 +41,7 @@ def test_run(
 
     # Set defaults of the various flags
     def_tags = ["latest"]
-    def_src = "."
+    def_src = "/home/runner/work/python-murfey/python-murfey"
     def_dst = "localhost"
     def_uid = os.getuid()
     def_gid = os.getgid()
