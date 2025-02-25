@@ -1,6 +1,7 @@
 import grp
 import os
 import sys
+from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
@@ -12,7 +13,7 @@ test_run_params_matrix: tuple[
 ] = (
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Default settings
-    ([f"test_image_{n}" for n in range(1)], [], "", "", "", "", "", False),
+    ([f"test_image_{n}" for n in range(3)], [], "", "", "", "", "", False),
 )
 
 
@@ -82,6 +83,11 @@ def test_run(
         f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
         for image in images
     ]
+
+    # Create Dockerfiles at the location it expects
+    for image in images:
+        dockerfile = Path(src if src else def_src) / "Dockerfiles" / image
+        dockerfile.touch(exist_ok=True)
 
     # Run the function with the command
     run()
