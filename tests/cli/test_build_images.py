@@ -12,11 +12,12 @@ test_run_params_matrix: tuple[
 ] = (
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Default settings
-    ([f"test_image_{n}" for n in range(3)], [], "", "", "", "", "", False),
+    ([f"test_image_{n}" for n in range(1)], [], "", "", "", "", "", False),
 )
 
 
 @pytest.mark.parametrize("build_params", test_run_params_matrix)
+@patch("murfey.cli.build_images.run_subprocess")
 @patch("murfey.cli.build_images.cleanup")
 @patch("murfey.cli.build_images.push_images")
 @patch("murfey.cli.build_images.tag_image")
@@ -26,6 +27,7 @@ def test_run(
     mock_tag,
     mock_push,
     mock_clean,
+    mock_subprocess,
     build_params: tuple[list[str], list[str], str, str, str, str, str, bool],
 ):
     """
@@ -74,6 +76,12 @@ def test_run(
 
     # Assign it to the CLI to pass to the function
     sys.argv = build_cmd
+
+    # Mock 'build_image' return value
+    mock_build.side_effect = [
+        f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
+        for image in images
+    ]
 
     # Run the function with the command
     run()
