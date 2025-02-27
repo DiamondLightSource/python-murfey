@@ -2508,6 +2508,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.DataCollectionGroup.tag == message.get("tag"))
             ).all():
                 dcgid = dcg_murfey[0].id
+            elif message.get("data_collection_group_id") is not None:
+                dcgid = message["data_collection_group_id"]
             else:
                 if ispyb_session_id is None:
                     murfey_dcg = db.DataCollectionGroup(
@@ -2575,8 +2577,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                     message["atlas"],
                     message["atlas_pixel_size"],
                     message["sample"],
-                    experiment_type=message["experiment_type"],
-                    experiment_type_id=message["experiment_type_id"],
+                    experiment_type=message.get("experiment_type", ""),
+                    experiment_type_id=message.get("experiment_type_id"),
                 )
                 _transport_object.transport.ack(header)
             return None

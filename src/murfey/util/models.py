@@ -48,6 +48,7 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: int = 0
+    grid_squares_to_match: List[int] = []
 
 
 class DCParameters(BaseModel):

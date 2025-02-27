@@ -176,6 +176,9 @@ class SPAMetadataContext(Context):
                     logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
                     return
                 dcg_tag = str(dcg_images_dirs[-1])
+                gs_pix_positions = get_grid_square_atlas_positions(
+                    source_visit_dir / partial_path
+                )
                 dcg_data = {
                     "experiment_type": "single particle",
                     "experiment_type_id": 37,
@@ -187,11 +190,11 @@ class SPAMetadataContext(Context):
                     ),
                     "sample": environment.samples[source].sample,
                     "atlas_pixel_size": atlas_pixel_size,
+                    "grid_squares_to_match": [
+                        int(gs) for gs in gs_pix_positions.keys()
+                    ],
                 }
                 capture_post(url, json=dcg_data)
-                gs_pix_positions = get_grid_square_atlas_positions(
-                    source_visit_dir / partial_path
-                )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
                         capture_post(
@@ -228,14 +231,15 @@ class SPAMetadataContext(Context):
                 logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
                 return
             dcg_tag = str(dcg_images_dirs[-1])
+            gs_name = transferred_file.stem.split("_")[1]
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
                 "tag": dcg_tag,
+                "grid_squares_to_match": [int(gs_name)],
             }
             capture_post(url, json=dcg_data)
 
-            gs_name = transferred_file.stem.split("_")[1]
             logger.info(
                 f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
             )

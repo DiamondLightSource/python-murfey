@@ -51,6 +51,7 @@ from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util import secure_path
+from murfey.util.atlas import check_for_common_grid_squares, replace_grid_square_tags
 from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
     AutoProcProgram,
@@ -1301,6 +1302,8 @@ def get_data_collections(
 def register_dc_group(
     visit_name, session_id: MurfeySessionID, dcg_params: DCGroupParameters, db=murfey_db
 ):
+    # need to check for matching grid squares if nothing is found based on tag
+    # if that matches then grid square tags need reassigning
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
@@ -1343,6 +1346,28 @@ def register_dc_group(
                 dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
+    elif matching_dcg := check_for_common_grid_squares(
+        murfey_db,
+        dcg_params.tag,
+        session_id,
+        grid_square_names=dcg_params.grid_squares_to_match,
+    ):
+        dcg_parameters = {
+            "data_collection_group_id": matching_dcg[0],
+            "start_time": str(datetime.datetime.now()),
+            "experiment_type": dcg_params.experiment_type,
+            "experiment_type_id": dcg_params.experiment_type_id,
+            "tag": dcg_params.tag,
+            "session_id": session_id,
+            "atlas": dcg_params.atlas,
+            "sample": dcg_params.sample,
+            "atlas_pixel_size": dcg_params.atlas_pixel_size,
+        }
+        if _transport_object:
+            _transport_object.send(
+                _transport_object.feedback_queue, {"register": "data_collection_group", **dcg_parameters, "microscope": instrument_name, "proposal_code": ispyb_proposal_code, "proposal_number": ispyb_proposal_number, "visit_number": ispyb_visit_number}  # type: ignore
+            )
+        replace_grid_square_tags(murfey_db, matching_dcg[1], dcg_params.tag)
     else:
         dcg_parameters = {
             "start_time": str(datetime.datetime.now()),
