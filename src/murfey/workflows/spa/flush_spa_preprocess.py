@@ -71,6 +71,7 @@ def register_grid_square(
         )
         grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
         grid_square.image = grid_square_params.image or grid_square.image
+        grid_square.score = grid_square_params.score or grid_square.score
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:

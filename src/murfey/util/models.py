@@ -262,6 +262,7 @@ class GridSquareParameters(BaseModel):
     pixel_size: Optional[float] = None
     image: str = ""
     angle: Optional[float] = None
+    score: Optional[float] = None
 
 
 class FoilHoleParameters(BaseModel):

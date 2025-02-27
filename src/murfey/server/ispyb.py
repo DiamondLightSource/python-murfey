@@ -184,6 +184,7 @@ class TransportManager:
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
             pixelSize=grid_square_parameters.pixel_size,
+            qualityIndicator=grid_square_parameters.score,
         )
         try:
             with Session() as db:
@@ -240,6 +241,11 @@ class TransportManager:
                     grid_square.stageLocationY = grid_square_parameters.y_stage_position
                 if grid_square_parameters.pixel_size:
                     grid_square.pixelSize = grid_square_parameters.pixel_size
+                grid_square.qualityIndicator = (
+                    grid_square_parameters.score
+                    if grid_square_parameters.score is not None
+                    else grid_square.qualityIndicator
+                )
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
