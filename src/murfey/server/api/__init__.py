@@ -1327,6 +1327,8 @@ def register_dc_group(
                         "atlas": dcg_params.atlas,
                         "sample": dcg_params.sample,
                         "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                        "experiment_type": dcg_params.experiment_type,
+                        "experiment_type_id": dcg_params.experiment_type_id,
                     },
                 )
             else:

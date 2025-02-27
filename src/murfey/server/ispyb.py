@@ -115,11 +115,28 @@ class TransportManager:
         return {"success": False, "return_value": None}
 
     def do_update_atlas(
-        self, atlas_id: int, atlas_image: str, pixel_size: float, slot: int
+        self,
+        atlas_id: int,
+        atlas_image: str,
+        pixel_size: float,
+        slot: int,
+        experiment_type: str = "",
+        experiment_type_id: Optional[int] = None,
     ):
         try:
             with Session() as db:
                 atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
+                dcg = (
+                    db.query(DataCollectionGroup)
+                    .filter(
+                        DataCollectionGroup.dataCollectionGroupId
+                        == atlas.dataCollectionGroupId
+                    )
+                    .one()
+                )
+                if experiment_type and experiment_type_id is not None:
+                    dcg.experimentTypeId = experiment_type_id
+                    db.add(dcg)
                 atlas.atlasImage = atlas_image or atlas.atlasImage
                 atlas.pixelSize = pixel_size or atlas.pixelSize
                 atlas.cassetteSlot = slot or atlas.cassetteSlot

@@ -2575,6 +2575,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                     message["atlas"],
                     message["atlas_pixel_size"],
                     message["sample"],
+                    experiment_type=message["experiment_type"],
+                    experiment_type_id=message["experiment_type_id"],
                 )
                 _transport_object.transport.ack(header)
             return None
