@@ -5,7 +5,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from murfey.cli.build_images import build_image, push_images, run, tag_image
+from murfey.cli.build_images import build_image, cleanup, push_images, run, tag_image
 
 images = [f"test_image_{n}" for n in range(3)]
 
@@ -76,7 +76,7 @@ def test_build_image(mock_subprocess, mock_exists, build_params):
 
 
 tag_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
-    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Images | Tags | Destination | Dry Run
     # Populated flags
     (
         images,
@@ -118,7 +118,7 @@ def test_tag_image(mock_subprocess, tag_params):
 
 
 push_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
-    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Images | Tags | Destination | Dry Run
     # Populated flags
     (
         images,
@@ -156,6 +156,27 @@ def test_push_images(
         images=images_to_push,
         dry_run=dry_run,
     )
+    assert result
+
+
+test_cleanup_params_matrix: tuple[tuple[bool], ...] = ((True,), (False,))
+
+
+@pytest.mark.parametrize("cleanup_params", test_cleanup_params_matrix)
+@patch("murfey.cli.build_images.run_subprocess")
+def test_cleanup(
+    mock_subprocess,
+    cleanup_params,
+):
+
+    # Unpack test params
+    (dry_run,) = cleanup_params
+
+    # Mock the subprocess return value
+    mock_subprocess.return_value = 0
+
+    # Run the function
+    result = cleanup(dry_run)
     assert result
 
 
