@@ -471,7 +471,14 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
 
 
 class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
-    dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dcg_id", "dcg_tag"], ["datacollectiongroup.id", "datacollectiongroup.tag"]
+        ),
+    )
+
+    dcg_id: int = Field(primary_key=True)
+    dcg_tag: int = Field(primary_key=True)
     pixel_size: float
     dose_per_frame: float
     frame_count: int
