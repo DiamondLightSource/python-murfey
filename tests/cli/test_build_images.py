@@ -120,7 +120,7 @@ def test_run(
             destination=dst if dst else def_dst,
             user_id=uid if uid else def_uid,
             group_id=gid if gid else def_gid,
-            groupd_name=gname if gname else def_gname,
+            group_name=gname if gname else def_gname,
             dry_run=dry_run if dry_run else def_dry_run,
         )
         for image in images
