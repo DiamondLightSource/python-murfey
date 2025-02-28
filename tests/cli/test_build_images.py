@@ -92,7 +92,7 @@ def test_run(
     )
     for flag, value in flags:
         if isinstance(value, list) and value:
-            build_cmd.extend([flag, *value])
+            build_cmd.extend([flag, " ".join(value)])
         if isinstance(value, str) and value:
             build_cmd.extend([flag, value])
         if isinstance(value, bool) and value:
