@@ -109,7 +109,7 @@ def test_run(
 
     # Construct images that will be generated at the different stages of the process
     built_images: list[str] = []
-    other_tags: list[str] = []
+    other_tags: list[list[str]] = []
     images_to_push: list[str] = []
     for image in images:
         built_image = (
@@ -117,10 +117,12 @@ def test_run(
         )
         built_images.append(built_image)
         images_to_push.append(built_image)
-        for tag in (tags if tags else def_tags)[1:]:
-            new_tag = f"{built_image.split(':')[0]}:{tag}"
-            other_tags.append(new_tag)
-            images_to_push.append(new_tag)
+        new_tags = [
+            f"{built_image.split(':')[0]}:{tag}"
+            for tag in (tags if tags else def_tags)[1:]
+        ]
+        other_tags.append(new_tags)
+        images_to_push.extend(new_tags)
 
     # Mock the return values of 'build_image' and 'tag_iamge'
     mock_build.side_effect = built_images
