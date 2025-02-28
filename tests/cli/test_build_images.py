@@ -152,7 +152,7 @@ def test_run(
 
     # Check that 'tag_image' was called with the correct arguments
     if other_tags:
-        assert mock_tag.call_count == len(other_tags)
+        assert mock_tag.call_count == len(built_images)
         expected_tag_calls = (
             call(
                 image_path=image,
