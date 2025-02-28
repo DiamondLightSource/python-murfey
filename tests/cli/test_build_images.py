@@ -1,23 +1,35 @@
 import grp
 import os
 import sys
-from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
 
 from murfey.cli.build_images import run
 
+images = [f"test_image_{n}" for n in range(3)]
+
+# Set defaults of the various flags
+def_tags = ["latest"]
+def_src = "/home/runner/work/python-murfey/python-murfey"
+def_dst = "localhost"
+def_uid = os.getuid()
+def_gid = os.getgid()
+def_gname = grp.getgrgid(os.getgid()).gr_name if hasattr(grp, "getgrgid") else "nogroup"
+def_dry_run = False
+
+
 test_run_params_matrix: tuple[
     tuple[list[str], list[str], str, str, str, str, str, bool]
 ] = (
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Default settings
-    ([f"test_image_{n}" for n in range(3)], [], "", "", "", "", "", False),
+    (images, [], "", "", "", "", "", False),
 )
 
 
 @pytest.mark.parametrize("build_params", test_run_params_matrix)
+@patch("murfey.cli.build_images.Path.exists")
 @patch("murfey.cli.build_images.run_subprocess")
 @patch("murfey.cli.build_images.cleanup")
 @patch("murfey.cli.build_images.push_images")
@@ -29,6 +41,7 @@ def test_run(
     mock_push,
     mock_clean,
     mock_subprocess,
+    mock_exists,
     build_params: tuple[list[str], list[str], str, str, str, str, str, bool],
 ):
     """
@@ -38,17 +51,6 @@ def test_run(
 
     # Unpack build params
     images, tags, src, dst, uid, gid, gname, dry_run = build_params
-
-    # Set defaults of the various flags
-    def_tags = ["latest"]
-    def_src = "/home/runner/work/python-murfey/python-murfey"
-    def_dst = "localhost"
-    def_uid = os.getuid()
-    def_gid = os.getgid()
-    def_gname = (
-        grp.getgrgid(os.getgid()).gr_name if hasattr(grp, "getgrgid") else "nogroup"
-    )
-    def_dry_run = False
 
     # Set up the command based on what these values are
     build_cmd = [
@@ -84,10 +86,8 @@ def test_run(
         for image in images
     ]
 
-    # Create Dockerfiles at the location it expects
-    for image in images:
-        dockerfile = Path(src if src else def_src) / "Dockerfiles" / image
-        dockerfile.touch(exist_ok=True)
+    # Mock the check for the existence of the Dockerfiles
+    mock_exists.return_value = True
 
     # Run the function with the command
     run()
