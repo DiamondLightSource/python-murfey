@@ -288,7 +288,7 @@ def run():
             images.extend(new_tags)
 
     # Push all built images to specified repo
-    push_images(images, dry_run=args.dry_run)
+    push_images(images=images, dry_run=args.dry_run)
 
     # Perform final cleanup
     cleanup(dry_run=args.dry_run)
