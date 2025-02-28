@@ -80,14 +80,17 @@ def test_run(
     # Assign it to the CLI to pass to the function
     sys.argv = build_cmd
 
-    # Mock 'build_image' return value
+    # Mock the check for the existence of the Dockerfiles
+    mock_exists.return_value = True
+
+    # Mock the exit code of the subprocesses being run
+    mock_subprocess.return_value = 0
+
+    # Mock 'build_image' return values
     mock_build.side_effect = [
         f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
         for image in images
     ]
-
-    # Mock the check for the existence of the Dockerfiles
-    mock_exists.return_value = True
 
     # Run the function with the command
     run()
