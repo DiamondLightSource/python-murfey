@@ -11,7 +11,7 @@ images = [f"test_image_{n}" for n in range(3)]
 
 # Set defaults of the various flags
 def_tags = ["latest"]
-def_src = "/home/runner/work/python-murfey/python-murfey"
+def_src = "."
 def_dst = "localhost"
 def_uid = os.getuid()
 def_gid = os.getgid()
