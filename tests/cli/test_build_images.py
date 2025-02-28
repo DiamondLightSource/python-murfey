@@ -153,8 +153,8 @@ def test_run(
     mock_build.assert_has_calls(expected_build_calls, any_order=True)
 
     # Check that 'tag_image' was called with the correct arguments
-    if other_tags:
-        assert mock_tag.call_count == len(built_images)
+    if tags[1:]:
+        assert mock_tag.call_count == len(tags[1:])
         expected_tag_calls = (
             call(
                 image_path=image,
