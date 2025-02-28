@@ -55,7 +55,7 @@ def test_run(
     # Set up the command based on what these values are
     build_cmd = [
         "murfey.build_images",
-        " ".join(images),
+        *images,
     ]
 
     # Iterate through flags and add them according to the command
@@ -87,16 +87,16 @@ def test_run(
     mock_subprocess.return_value = 0
 
     # Mock 'build_image' return values
-    image_paths = [
+    built_images = [
         f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
         for image in images
     ]
-    mock_build.side_effect = image_paths
+    mock_build.side_effect = built_images
 
     # Mock all the return values when tagging the images
     all_tags = [
         f"{image.split(':')[0]}:{tag}"
-        for image in image_paths
+        for image in built_images
         for tag in (tags if tags else def_tags)
     ]
     mock_tag.side_effect = all_tags
