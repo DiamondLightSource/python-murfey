@@ -118,7 +118,7 @@ def test_run(
     images_to_push: list[str] = []
     for image in images:
         built_image = (
-            f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
+            f"{dst if dst else def_dst}/{image}:{tags[0] if tags else def_tags[0]}"
         )
         built_images.append(built_image)
         images_to_push.append(built_image)
@@ -170,17 +170,11 @@ def test_run(
 
     # Check that 'push_images' was called with the correct arguments
     mock_push.assert_called_once_with(
-        call(
-            images=images_to_push,
-            dry_run=dry_run if dry_run else def_dry_run,
-        ),
-        any_order=True,
+        images=images_to_push,
+        dry_run=dry_run if dry_run else def_dry_run,
     )
 
     # Check that 'cleanup' was called correctly
     mock_clean.assert_called_once_with(
-        call(
-            dry_run=dry_run if dry_run else def_dry_run,
-        ),
-        any_order=True,
+        dry_run=dry_run if dry_run else def_dry_run,
     )
