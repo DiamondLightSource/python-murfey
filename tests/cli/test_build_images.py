@@ -117,36 +117,6 @@ def test_tag_image(mock_subprocess, tag_params):
     assert image_tags == [f"{built_image.split(':')[0]}:{tag}" for tag in tags[1:]]
 
 
-test_run_params_matrix: tuple[
-    tuple[list[str], list[str], str, str, str, str, str, bool], ...
-] = (
-    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
-    # Default settings
-    (images, [], "", "", "", "", "", False),
-    # Populated flags
-    (
-        images,
-        ["latest", "dev", "1.1.1"],
-        "",
-        "docker.io",
-        "12345",
-        "34567",
-        "my-group",
-        False,
-    ),
-    (
-        images,
-        ["latest", "dev", "1.1.1"],
-        "",
-        "docker.io",
-        "12345",
-        "34567",
-        "my-group",
-        True,
-    ),
-)
-
-
 push_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Populated flags
@@ -179,7 +149,7 @@ def test_push_images(
     images_to_push = [f"{dst}/{image}:{tag}" for image in images for tag in tags]
 
     # Mock the subprocess return value
-    mock_subprocess.return_value = True
+    mock_subprocess.return_value = 0
 
     # Run the function
     result = push_images(
@@ -189,8 +159,39 @@ def test_push_images(
     assert result
 
 
+test_run_params_matrix: tuple[
+    tuple[list[str], list[str], str, str, str, str, str, bool], ...
+] = (
+    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Default settings
+    (images, [], "", "", "", "", "", False),
+    # Populated flags
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "",
+        "docker.io",
+        "12345",
+        "34567",
+        "my-group",
+        False,
+    ),
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "",
+        "docker.io",
+        "12345",
+        "34567",
+        "my-group",
+        True,
+    ),
+)
+
+
 @pytest.mark.parametrize("run_params", test_run_params_matrix)
 @patch("murfey.cli.build_images.Path.exists")
+@patch("murfey.cli.build_images.run_subprocess")
 @patch("murfey.cli.build_images.cleanup")
 @patch("murfey.cli.build_images.push_images")
 @patch("murfey.cli.build_images.tag_image")
