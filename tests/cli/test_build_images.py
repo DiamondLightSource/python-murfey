@@ -25,12 +25,10 @@ test_run_params_matrix: tuple[
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Default settings
     (images, [], "", "", "", "", "", False),
+    # Populated flags
     (
         images,
-        [
-            "latest",
-            "dev",
-        ],
+        ["latest", "dev", "1.1.1"],
         "",
         "docker.io",
         "12345",
@@ -40,10 +38,7 @@ test_run_params_matrix: tuple[
     ),
     (
         images,
-        [
-            "latest",
-            "dev",
-        ],
+        ["latest", "dev", "1.1.1"],
         "",
         "docker.io",
         "12345",
@@ -157,11 +152,11 @@ def test_run(
 
     # Check that 'tag_image' was called with the correct arguments
     if other_tags:
-        assert mock_tag.call_count == len(images) * len(other_tags)
+        assert mock_tag.call_count == len(other_tags)
         expected_tag_calls = (
             call(
                 image_path=image,
-                tags=other_tags,
+                tags=tags[1:],
                 dry_run=dry_run if dry_run else def_dry_run,
             )
             for image in built_images
