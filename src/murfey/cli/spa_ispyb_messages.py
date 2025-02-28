@@ -336,6 +336,7 @@ def run():
         .where(db.DataCollectionGroup.session_id == args.session_id)
         .where(db.DataCollectionGroup.tag == args.tag)
         .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+        .where(db.DataCollection.dcg_tag == db.DataCollectionGroup.tag)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
         .where(db.ProcessingJob.recipe == "em-spa-preprocess")

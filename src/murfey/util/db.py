@@ -6,7 +6,7 @@ of the sessions that Murfey is overseeing, along with the relationships between 
 from typing import List, Optional
 
 import sqlalchemy
-from sqlmodel import Field, Relationship, SQLModel, create_engine
+from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint, create_engine
 
 """
 GENERAL
@@ -348,6 +348,8 @@ class Tilt(SQLModel, table=True):  # type: ignore
 
 
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
+    __table_args__ = (UniqueConstraint("id", "tag", name="dcg_constraint"),)
+
     id: int = Field(primary_key=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
@@ -372,6 +374,7 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    dcg_tag: str = Field(foreign_key="datacollectiongroup.tag")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )

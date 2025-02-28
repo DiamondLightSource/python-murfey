@@ -181,6 +181,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
         .where(db.AutoProcProgram.id == appid)
         .where(db.ProcessingJob.dc_id == db.DataCollection.id)
         .where(db.DataCollectionGroup.id == db.DataCollection.dcg_id)
+        .where(db.DataCollectionGroup.tag == db.DataCollection.dcg_tag)
         .where(db.Session.id == db.TiltSeries.session_id)
     ).all()
     return JobIDs(
@@ -2399,6 +2400,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     db.AutoProcProgram,
                 )
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.DataCollection.dcg_tag == db.DataCollectionGroup.tag)
                 .where(db.ProcessingJob.dc_id == db.DataCollection.id)
                 .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
                 .where(db.AutoProcProgram.id == message["program_id"])
@@ -2598,6 +2600,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all()
             if dcg:
                 dcgid = dcg[0].id
+                dcg_tag = dcg[0].tag
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
@@ -2610,6 +2613,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 select(db.DataCollection)
                 .where(db.DataCollection.tag == message.get("tag"))
                 .where(db.DataCollection.dcg_id == dcgid)
+                .where(db.DataCollection.dcg_tag == dcg_tag)
             ).all():
                 dcid = dc_murfey[0].id
             else:
@@ -2617,6 +2621,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     murfey_dc = db.DataCollection(
                         tag=message.get("tag"),
                         dcg_id=dcgid,
+                        dcg_tag=dcg_tag,
                     )
                 else:
                     record = DataCollection(
@@ -2649,6 +2654,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         id=dcid,
                         tag=message.get("tag"),
                         dcg_id=dcgid,
+                        dcg_tag=dcg_tag,
                     )
                 murfey_db.add(murfey_dc)
                 murfey_db.commit()
@@ -2666,6 +2672,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             dc = murfey_db.exec(
                 select(db.DataCollection, db.DataCollectionGroup)
                 .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                .where(db.DataCollection.dcg_tag == db.DataCollectionGroup.tag)
                 .where(db.DataCollectionGroup.session_id == murfey_session_id)
                 .where(db.DataCollectionGroup.tag == message["source"])
                 .where(db.DataCollection.tag == message["tag"])
