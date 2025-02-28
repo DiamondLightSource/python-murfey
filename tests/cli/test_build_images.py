@@ -98,7 +98,7 @@ tag_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
 def test_tag_image(mock_subprocess, tag_params):
 
     # Unpack build params
-    images, tags, src, dst, uid, gid, gname, dry_run = tag_params
+    images, tags, dst, dry_run = tag_params
 
     # Check that the image path generated is correct
     built_image = f"{dst}/{images[0]}:{tags[0]}"
@@ -147,7 +147,7 @@ test_run_params_matrix: tuple[
 )
 
 
-@pytest.mark.parametrize("build_params", test_run_params_matrix)
+@pytest.mark.parametrize("run_params", test_run_params_matrix)
 @patch("murfey.cli.build_images.Path.exists")
 @patch("murfey.cli.build_images.run_subprocess")
 @patch("murfey.cli.build_images.cleanup")
@@ -161,7 +161,7 @@ def test_run(
     mock_clean,
     mock_subprocess,
     mock_exists,
-    build_params: tuple[list[str], list[str], str, str, str, str, str, bool],
+    run_params: tuple[list[str], list[str], str, str, str, str, str, bool],
 ):
     """
     Tests that the function is run with the expected arguments for a given
@@ -169,7 +169,7 @@ def test_run(
     """
 
     # Unpack build params
-    images, tags, src, dst, uid, gid, gname, dry_run = build_params
+    images, tags, src, dst, uid, gid, gname, dry_run = run_params
 
     # Set up the command based on what these values are
     build_cmd = [
