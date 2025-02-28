@@ -72,7 +72,7 @@ def test_build_images(mock_subprocess, mock_exists, build_params):
     )
 
     # Check that the image path generated is correct
-    assert built_image == f"{dst}/{images[0]:{tags[0]}}"
+    assert built_image == f"{dst}/{images[0]}:{tags[0]}"
 
 
 test_run_params_matrix: tuple[
