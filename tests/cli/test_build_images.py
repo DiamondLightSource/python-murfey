@@ -5,7 +5,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from murfey.cli.build_images import run
+from murfey.cli.build_images import build_image, run
 
 images = [f"test_image_{n}" for n in range(3)]
 
@@ -17,6 +17,62 @@ def_uid = os.getuid()
 def_gid = os.getgid()
 def_gname = grp.getgrgid(os.getgid()).gr_name if hasattr(grp, "getgrgid") else "nogroup"
 def_dry_run = False
+
+
+build_image_params_matrix: tuple[
+    tuple[list[str], list[str], str, str, int, int, str, bool], ...
+] = (
+    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Populated flags
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "",
+        "docker.io",
+        12345,
+        34567,
+        "my-group",
+        False,
+    ),
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "",
+        "docker.io",
+        12345,
+        34567,
+        "my-group",
+        True,
+    ),
+)
+
+
+@pytest.mark.parametrize("build_params", build_image_params_matrix)
+@patch("murfey.cli.build_images.Path.exists")
+@patch("murfey.cli.build_images.run_subprocess")
+def test_build_images(mock_subprocess, mock_exists, build_params):
+
+    # Unpack build params
+    images, tags, src, dst, uid, gid, gname, dry_run = build_params
+
+    # Set the return values for 'Path().exists()' and 'run_subprocess'
+    mock_exists.return_value = True
+    mock_subprocess.return_value = 0
+
+    # Run the command
+    built_image = build_image(
+        image=images[0],
+        tag=tags[0],
+        source=src,
+        destination=dst,
+        user_id=uid,
+        group_id=gid,
+        group_name=gname,
+        dry_run=dry_run,
+    )
+
+    # Check that the image path generated is correct
+    assert built_image == f"{dst}/{images[0]:{tags[0]}}"
 
 
 test_run_params_matrix: tuple[
