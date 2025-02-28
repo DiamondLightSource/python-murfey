@@ -2848,6 +2848,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).one():
                 params = db.TomographyPreprocessingParameters(
                     dcg_id=collected_ids[0].id,
+                    dcg_tag=collected_ids[0].tag,
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
                     voltage=message["voltage"],
                     dose_per_frame=message["dose_per_frame"],

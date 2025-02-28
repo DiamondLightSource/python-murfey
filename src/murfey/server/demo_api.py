@@ -511,6 +511,7 @@ def register_tomo_preproc_params(
     ).one():
         params = TomographyPreprocessingParameters(
             dcg_id=collected_ids[0].id,
+            dcg_tag=collected_ids[0].tag,
             pixel_size=proc_params.pixel_size_on_image,
             dose_per_frame=proc_params.dose_per_frame,
             gain_ref=proc_params.gain_ref,
