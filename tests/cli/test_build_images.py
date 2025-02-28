@@ -20,11 +20,37 @@ def_dry_run = False
 
 
 test_run_params_matrix: tuple[
-    tuple[list[str], list[str], str, str, str, str, str, bool]
+    tuple[list[str], list[str], str, str, str, str, str, bool], ...
 ] = (
     # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
     # Default settings
     (images, [], "", "", "", "", "", False),
+    (
+        images,
+        [
+            "latest",
+            "dev",
+        ],
+        "",
+        "docker.io",
+        "12345",
+        "34567",
+        "my-group",
+        False,
+    ),
+    (
+        images,
+        [
+            "latest",
+            "dev",
+        ],
+        "",
+        "docker.io",
+        "12345",
+        "34567",
+        "my-group",
+        True,
+    ),
 )
 
 
@@ -129,7 +155,9 @@ def test_run(
     )
     mock_build.assert_has_calls(expected_build_calls, any_order=True)
 
+    # Check that 'tag_image' was called with the correct arguments
     if other_tags:
+        assert mock_tag.call_count == len(images) * len(other_tags)
         expected_tag_calls = (
             call(
                 image_path=image,
@@ -139,3 +167,20 @@ def test_run(
             for image in built_images
         )
         mock_tag.assert_has_calls(expected_tag_calls, any_order=True)
+
+    # Check that 'push_images' was called with the correct arguments
+    mock_push.assert_called_once_with(
+        call(
+            images=images_to_push,
+            dry_run=dry_run if dry_run else def_dry_run,
+        ),
+        any_order=True,
+    )
+
+    # Check that 'cleanup' was called correctly
+    mock_clean.assert_called_once_with(
+        call(
+            dry_run=dry_run if dry_run else def_dry_run,
+        ),
+        any_order=True,
+    )
