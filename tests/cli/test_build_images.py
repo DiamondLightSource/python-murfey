@@ -5,7 +5,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from murfey.cli.build_images import build_image, run, tag_image
+from murfey.cli.build_images import build_image, push_images, run, tag_image
 
 images = [f"test_image_{n}" for n in range(3)]
 
@@ -147,9 +147,50 @@ test_run_params_matrix: tuple[
 )
 
 
+push_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
+    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Populated flags
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "docker.io",
+        False,
+    ),
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "docker.io",
+        True,
+    ),
+)
+
+
+@pytest.mark.parametrize("push_params", push_image_params_matrix)
+@patch("murfey.cli.build_images.run_subprocess")
+def test_push_images(
+    mock_subprocess,
+    push_params,
+):
+
+    # Unpack test parameters
+    images, tags, dst, dry_run = push_params
+
+    # Construct all images to be pushed
+    images_to_push = [f"{dst}/{image}:{tag}" for image in images for tag in tags]
+
+    # Mock the subprocess return value
+    mock_subprocess.return_value = True
+
+    # Run the function
+    result = push_images(
+        images=images_to_push,
+        dry_run=dry_run,
+    )
+    assert result
+
+
 @pytest.mark.parametrize("run_params", test_run_params_matrix)
 @patch("murfey.cli.build_images.Path.exists")
-@patch("murfey.cli.build_images.run_subprocess")
 @patch("murfey.cli.build_images.cleanup")
 @patch("murfey.cli.build_images.push_images")
 @patch("murfey.cli.build_images.tag_image")
