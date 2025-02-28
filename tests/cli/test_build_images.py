@@ -5,7 +5,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from murfey.cli.build_images import build_image, run
+from murfey.cli.build_images import build_image, run, tag_image
 
 images = [f"test_image_{n}" for n in range(3)]
 
@@ -50,7 +50,7 @@ build_image_params_matrix: tuple[
 @pytest.mark.parametrize("build_params", build_image_params_matrix)
 @patch("murfey.cli.build_images.Path.exists")
 @patch("murfey.cli.build_images.run_subprocess")
-def test_build_images(mock_subprocess, mock_exists, build_params):
+def test_build_image(mock_subprocess, mock_exists, build_params):
 
     # Unpack build params
     images, tags, src, dst, uid, gid, gname, dry_run = build_params
@@ -73,6 +73,48 @@ def test_build_images(mock_subprocess, mock_exists, build_params):
 
     # Check that the image path generated is correct
     assert built_image == f"{dst}/{images[0]}:{tags[0]}"
+
+
+tag_image_params_matrix: tuple[tuple[list[str], list[str], str, bool], ...] = (
+    # Images | Tags | Source | Destination | User ID | Group ID | Group Name | Dry Run
+    # Populated flags
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "docker.io",
+        False,
+    ),
+    (
+        images,
+        ["latest", "dev", "1.1.1"],
+        "docker.io",
+        True,
+    ),
+)
+
+
+@pytest.mark.parametrize("tag_params", tag_image_params_matrix)
+@patch("murfey.cli.build_images.run_subprocess")
+def test_tag_image(mock_subprocess, tag_params):
+
+    # Unpack build params
+    images, tags, src, dst, uid, gid, gname, dry_run = tag_params
+
+    # Check that the image path generated is correct
+    built_image = f"{dst}/{images[0]}:{tags[0]}"
+
+    # Set the return value for 'run_subprocess'
+    mock_subprocess.return_value = 0
+
+    # Run the command
+    image_tags = tag_image(
+        image_path=built_image,
+        tags=tags[1:],
+        dry_run=dry_run,
+    )
+
+    # Check that the images are tagged correctly
+    assert image_tags == [f"{built_image.split(':')[0]}:{tag}" for tag in tags[1:]]
 
 
 test_run_params_matrix: tuple[
