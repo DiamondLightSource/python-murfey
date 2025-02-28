@@ -86,33 +86,35 @@ def test_run(
     # Mock the exit code of the subprocesses being run
     mock_subprocess.return_value = 0
 
-    # Mock 'build_image' return values
-    built_images = [
-        f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
-        for image in images
-    ]
+    # Construct images that will be generated at the different stages of the process
+    built_images: list[str] = []
+    other_tags: list[str] = []
+    images_to_push: list[str] = []
+    for image in images:
+        built_image = (
+            f"{dst if dst else def_dst}/{image[0]}:{tags[0] if tags else def_tags[0]}"
+        )
+        built_images.append(built_image)
+        images_to_push.append(built_image)
+        for tag in (tags if tags else def_tags)[1:]:
+            new_tag = f"{image.split(':')[0]}:{tag}"
+            other_tags.append(new_tag)
+            images_to_push.append(new_tag)
+
+    # Mock the return values of 'build_image' and 'tag_iamge'
     mock_build.side_effect = built_images
+    mock_tag.side_effect = other_tags
 
-    # Mock all the return values when tagging the images
-    all_tags = [
-        f"{image.split(':')[0]}:{tag}"
-        for image in built_images
-        for tag in (tags if tags else def_tags)
-    ]
-    mock_tag.side_effect = all_tags
-
-    # Mock the push function
+    # Mock the push and cleanup functions
     mock_push.return_value = True
-
-    # Mock the cleanup function
     mock_clean.return_value = True
 
     # Run the function with the command
     run()
 
-    # Check that the functions were called with the correct flags
+    # Check that 'build_image' was called with the correct arguments
     assert mock_build.call_count == len(images)
-    expected_calls = (
+    expected_build_calls = (
         call(
             image=image,
             tag=tags[0] if tags else def_tags[0],
@@ -125,4 +127,15 @@ def test_run(
         )
         for image in images
     )
-    mock_build.assert_has_calls(expected_calls, any_order=True)
+    mock_build.assert_has_calls(expected_build_calls, any_order=True)
+
+    if other_tags:
+        expected_tag_calls = (
+            call(
+                image_path=image,
+                tags=other_tags,
+                dry_run=dry_run if dry_run else def_dry_run,
+            )
+            for image in built_images
+        )
+        mock_tag.assert_has_calls(expected_tag_calls, any_order=True)
