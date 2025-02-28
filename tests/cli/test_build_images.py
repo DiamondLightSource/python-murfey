@@ -92,7 +92,7 @@ def test_run(
     )
     for flag, value in flags:
         if isinstance(value, list) and value:
-            build_cmd.extend([flag, " ".join(value)])
+            build_cmd.extend([flag, *value])
         if isinstance(value, str) and value:
             build_cmd.extend([flag, value])
         if isinstance(value, bool) and value:
@@ -118,7 +118,7 @@ def test_run(
         built_images.append(built_image)
         images_to_push.append(built_image)
         for tag in (tags if tags else def_tags)[1:]:
-            new_tag = f"{image.split(':')[0]}:{tag}"
+            new_tag = f"{built_image.split(':')[0]}:{tag}"
             other_tags.append(new_tag)
             images_to_push.append(new_tag)
 
