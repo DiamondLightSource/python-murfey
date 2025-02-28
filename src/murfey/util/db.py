@@ -6,7 +6,14 @@ of the sessions that Murfey is overseeing, along with the relationships between 
 from typing import List, Optional
 
 import sqlalchemy
-from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint, create_engine
+from sqlmodel import (
+    Field,
+    ForeignKeyConstraint,
+    Relationship,
+    SQLModel,
+    UniqueConstraint,
+    create_engine,
+)
 
 """
 GENERAL
@@ -371,10 +378,16 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 
 class DataCollection(SQLModel, table=True):  # type: ignore
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dcg_id", "dcg_tag"], ["datacollectiongroup.id", "datacollectiongroup.tag"]
+        ),
+    )
+
     id: int = Field(primary_key=True, unique=True)
     tag: str = Field(primary_key=True)
-    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
-    dcg_tag: str = Field(foreign_key="datacollectiongroup.tag")
+    dcg_id: int = Field()
+    dcg_tag: str = Field()
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
