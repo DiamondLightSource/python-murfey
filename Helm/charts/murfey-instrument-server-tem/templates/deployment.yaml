@@ -37,9 +37,9 @@ spec:
         # Mount config files from secrets
         - name: murfey-client-config
           secret:
-            secretName: {{ .Values.global.murfeyClientConfigCLEMSecretName }}
+            secretName: {{ .Values.global.murfeyClientConfigTEMSecretName }}
             items:
-              - key: {{ .Values.global.murfeyClientConfigCLEMFileName }}
+              - key: {{ .Values.global.murfeyClientConfigTEMFileName }}
                 path: .murfey
         # Mount data directories
         {{- toYaml .Values.extraVolumes | nindent 8 }}
