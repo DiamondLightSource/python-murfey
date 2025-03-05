@@ -4,5 +4,6 @@ description: Umbrella Helm chart for deploying the servers and daemons needed to
 version: 0.16.12
 dependencies:
   - name: murfey-instrument-server-clem
+  - name: murfey-instrument-server-clem
   - name: murfey-server
   - name: murfey-rsync
