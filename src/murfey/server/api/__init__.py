@@ -1055,7 +1055,7 @@ async def request_spa_preprocessing(
                 "mrc_out": str(mrc_out),
                 "pixel_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
-                "microscope": get_microscope(),
+                "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "foil_hole_id": foil_hole_id,
                 "ft_bin": proc_params["motion_corr_binning"],
@@ -1163,7 +1163,7 @@ async def request_tomography_preprocessing(
                 "pixel_size": (proc_file.pixel_size) * 10**10,
                 "image_number": proc_file.image_number,
                 "kv": int(proc_file.voltage),
-                "microscope": get_microscope(),
+                "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
@@ -1374,7 +1374,7 @@ def start_dc(
         instrument_name
     ]
     log.info(
-        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
+        f"Starting data collection on microscope {instrument_name!r} "
         f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
     )
     dc_parameters = {
@@ -1407,7 +1407,7 @@ def start_dc(
             {
                 "register": "data_collection",
                 **dc_parameters,
-                "microscope": get_microscope(machine_config=machine_config),
+                "microscope": instrument_name,
                 "proposal_code": ispyb_proposal_code,
                 "proposal_number": ispyb_proposal_number,
                 "visit_number": ispyb_visit_number,
