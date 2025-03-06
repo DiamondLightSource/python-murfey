@@ -322,6 +322,11 @@ def run():
         default_destination=args.destination or str(datetime.now().year),
         demo=args.demo,
         processing_only_mode=server_routing_prefix_found,
+        rsync_url=(
+            urlparse(machine_data["rsync_url"]).hostname
+            if machine_data.get("rsync_url")
+            else ""
+        ),
     )
 
     ws.environment = instance_environment
