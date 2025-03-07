@@ -1551,7 +1551,7 @@ async def write_eer_fractionation_file(
             Path(machine_config.rsync_basepath)
             / str(datetime.datetime.now().year)
             / secure_filename(visit_name)
-            / "processing"
+            / machine_config.gain_directory_name
             / secure_filename(fractionation_params.fractionation_file_name)
         )
     if file_path.is_file():
