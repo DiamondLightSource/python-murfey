@@ -1575,18 +1575,11 @@ async def process_gain(
         )
     else:
         return {"gain_ref": None}
+    gain_ref_folder = machine_config.get("gain_directory_name", "processing")
     gain_ref_out = (
-        (
-            filepath
-            / machine_config.get("gain_directory_name", "processing")
-            / f"gain_{gain_reference_params.tag}.mrc"
-        )
+        (filepath / gain_ref_folder / f"gain_{gain_reference_params.tag}.mrc")
         if gain_reference_params.tag
-        else (
-            filepath
-            / machine_config.get("gain_directory_name", "processing")
-            / "gain.mrc"
-        )
+        else (filepath / gain_ref_folder / "gain.mrc")
     )
     return {
         "gain_ref": gain_ref_out.relative_to(Path(machine_config["rsync_basepath"]))
