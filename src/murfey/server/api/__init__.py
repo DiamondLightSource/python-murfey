@@ -735,6 +735,7 @@ def register_completed_tilt_series(
                     "dose_per_frame": preproc_params.dose_per_frame,
                     "frame_count": preproc_params.frame_count,
                     "kv": preproc_params.voltage,
+                    "tilt_axis": preproc_params.tilt_axis,
                     "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
