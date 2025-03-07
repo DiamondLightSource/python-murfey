@@ -315,6 +315,7 @@ class ProcessFile(BaseModel):  # Rename to TomoProcessFile
     image_number: int
     pixel_size: float
     dose_per_frame: float
+    frame_count: int
     mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1
