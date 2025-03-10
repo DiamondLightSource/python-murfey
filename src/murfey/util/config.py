@@ -8,7 +8,8 @@ from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra, validator
+from pydantic import BaseModel, Extra, field_validator
+from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
@@ -58,7 +59,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
 
-    model_search_directory: str = "processing"
+    picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
     failure_queue: str = ""
@@ -98,7 +99,7 @@ class Security(BaseModel):
     graylog_port: Optional[int] = None
     ispyb_credentials: Optional[Path] = None
 
-    @validator("graylog_port")
+    @field_validator("graylog_port")
     def check_port_present_if_host_is(
         cls, v: Optional[int], values: dict, **kwargs
     ) -> Optional[int]:
