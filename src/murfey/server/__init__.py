@@ -8,6 +8,7 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.metadata import EntryPoint  # For type hinting only
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
@@ -20,7 +21,6 @@ import uvicorn
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
-from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     Atlas,
     AutoProcProgram,
@@ -2942,12 +2942,17 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif (
             message["register"] in entry_points().select(group="murfey.workflows").names
         ):
-            # Run the workflow if a match is found
-            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+            # Search for corresponding workflow
+            workflows: list[EntryPoint] = list(
                 entry_points().select(
                     group="murfey.workflows", name=message["register"]
                 )
-            )[0]
+            )  # Returns either 1 item or empty list
+            if not workflows:
+                logger.error(f"No workflow found for {sanitise(message['register'])}")
+                return None
+            # Run the workflow if a match is found
+            workflow: EntryPoint = workflows[0]
             result = workflow.load()(
                 message=message,
                 murfey_db=murfey_db,
