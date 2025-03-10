@@ -410,7 +410,7 @@ class MultigridController:
                 f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
             )
-            log.info("tomography processing flushed")
+            log.info("Tomography processing flushed")
 
         elif isinstance(context, SPAModularContext):
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"

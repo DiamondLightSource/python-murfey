@@ -52,6 +52,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     superres: bool = True
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
+    rsync_url: str = ""
 
     class Config:
         validate_assignment: bool = True

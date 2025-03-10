@@ -511,7 +511,7 @@ class MurfeyTUI(App):
                 f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
             )
-            log.info("tomography processing flushed")
+            log.info("Tomography processing flushed")
         elif isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
             dcg_data = {

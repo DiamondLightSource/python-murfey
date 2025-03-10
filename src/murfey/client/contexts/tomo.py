@@ -359,6 +359,7 @@ class TomographyContext(Context):
         newly_completed_series: List[str] = []
         mdoc_tilt_series_size = self._tilt_series_sizes.get(tilt_series, 0)
         if not self._tilt_series or not mdoc_tilt_series_size:
+            logger.debug(f"Tilt series size not yet set for {tilt_series!r}")
             return newly_completed_series
 
         counted_tilts = len(self._tilt_series.get(tilt_series, []))
@@ -366,6 +367,11 @@ class TomographyContext(Context):
         if tilt_series_size_check and tilt_series not in self._completed_tilt_series:
             self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
+        else:
+            logger.debug(
+                f"{tilt_series!r} not complete yet. Counted {counted_tilts} tilts. "
+                f"Expected number of tilts was {mdoc_tilt_series_size}"
+            )
         return newly_completed_series
 
     def _add_tomo_tilt(

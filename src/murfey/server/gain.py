@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from enum import Enum
 from pathlib import Path
 from typing import Dict, Tuple
 
 from murfey.util import secure_path
+
+logger = logging.getLogger("murfey.server.gain")
 
 
 class Camera(Enum):
@@ -30,8 +33,10 @@ async def prepare_gain(
     tag: str = "",
 ) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
+        logger.error("No executables were provided to prepare the gain reference with")
         return None, None
     if camera == Camera.FALCON:
+        logger.info("Gain reference preparation not needed for Falcon detector")
         return None, None
     if gain_path.suffix == ".dm4":
         gain_out = (
@@ -63,6 +68,10 @@ async def prepare_gain(
         )
         stdout, stderr = await dm4_proc.communicate()
         if dm4_proc.returncode:
+            logger.error(
+                "Error encountered while trying to process the gain reference with 'dm2mrc': \n"
+                f"{stderr.decode('utf-8').strip()}"
+            )
             return None, None
         clip_proc = await asyncio.create_subprocess_shell(
             f"{executables['clip']} {flip} {secure_path(gain_path_mrc)} {secure_path(gain_path_superres) if rescale else secure_path(gain_out)}",
@@ -71,6 +80,10 @@ async def prepare_gain(
         )
         stdout, stderr = await clip_proc.communicate()
         if clip_proc.returncode:
+            logger.error(
+                "Error encountered while trying to process the gain reference with 'clip': \n"
+                f"{stderr.decode('utf-8').strip()}"
+            )
             return None, None
         if rescale:
             newstack_proc = await asyncio.create_subprocess_shell(
@@ -80,6 +93,10 @@ async def prepare_gain(
             )
             await newstack_proc.communicate()
             if newstack_proc.returncode:
+                logger.error(
+                    "Error encountered while trying to process the gain reference with 'newstack': \n"
+                    f"{stderr.decode('utf-8').strip()}"
+                )
                 return None, None
         if rescale:
             secure_path(gain_out_superres).symlink_to(secure_path(gain_path_superres))
@@ -91,6 +108,9 @@ async def prepare_eer_gain(
     gain_path: Path, executables: Dict[str, str], env: Dict[str, str], tag: str = ""
 ) -> Tuple[Path | None, Path | None]:
     if not executables.get("tif2mrc"):
+        logger.error(
+            "No executables were provided to prepare the EER gain reference with"
+        )
         return None, None
     gain_out = (
         gain_path.parent / f"gain_{tag}.mrc" if tag else gain_path.parent / "gain.mrc"
@@ -100,7 +120,11 @@ async def prepare_eer_gain(
     mrc_convert = await asyncio.create_subprocess_shell(
         f"{executables['tif2mrc']} {secure_path(gain_path)} {secure_path(gain_out)}"
     )
-    await mrc_convert.communicate()
+    stdout, stderr = await mrc_convert.communicate()
     if mrc_convert.returncode:
+        logger.error(
+            "Error encountered while trying to process the EER gain reference: \n"
+            f"{stderr.decode('utf-8').strip()}"
+        )
         return None, None
     return gain_out, None
