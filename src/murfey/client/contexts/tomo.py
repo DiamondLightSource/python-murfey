@@ -574,7 +574,7 @@ class TomographyContext(Context):
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
             mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
-            mdoc_metadata["tilt_axis"] = float(mdoc_data["RotationAngle"])
+            mdoc_metadata["tilt_axis"] = float(mdoc_data_block["RotationAngle"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
