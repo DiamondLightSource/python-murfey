@@ -111,6 +111,7 @@ async def start_multigrid_watcher(
             "acquisition_software": machine_config.acquisition_software,
             "calibrations": machine_config.calibrations,
             "data_directories": [str(k) for k in machine_config.data_directories],
+            "create_directories": [str(k) for k in machine_config.create_directories],
             "rsync_basepath": str(machine_config.rsync_basepath),
             "visit": visit,
             "default_model": str(machine_config.default_model),
