@@ -79,8 +79,12 @@ def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
         ]
     else:
         secured_parts = [
-            secure_filename(p) + ":" if p.endswith(":") else secure_filename(p)
-            for p in in_path.parts
+            (
+                secure_filename(part) + ":"
+                if p == 0 and ":" in part
+                else secure_filename(part)
+            )
+            for p, part in enumerate(in_path.parts)
         ]
     return Path("/".join(secured_parts))
 
