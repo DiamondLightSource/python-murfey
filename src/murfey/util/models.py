@@ -316,6 +316,7 @@ class ProcessFile(BaseModel):  # Rename to TomoProcessFile
     pixel_size: float
     dose_per_frame: float
     frame_count: int
+    tilt_axis: Optional[float]
     mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1
@@ -351,6 +352,7 @@ class CompletedTiltSeries(BaseModel):
 class PreprocessingParametersTomo(BaseModel):
     dose_per_frame: float
     frame_count: int
+    tilt_axis: float
     gain_ref: Optional[str]
     experiment_type: str
     voltage: float

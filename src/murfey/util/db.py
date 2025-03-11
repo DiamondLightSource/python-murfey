@@ -459,6 +459,7 @@ class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
     pixel_size: float
     dose_per_frame: float
     frame_count: int
+    tilt_axis: float
     voltage: int
     eer_fractionation_file: Optional[str] = None
     motion_corr_binning: int = 1
