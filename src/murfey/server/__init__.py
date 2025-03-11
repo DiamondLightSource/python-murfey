@@ -2948,6 +2948,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             )  # Returns either 1 item or empty list
             if not workflows:
                 logger.error(f"No workflow found for {sanitise(message['register'])}")
+                if _transport_object:
+                    _transport_object.transport.nack(header, requeue=False)
                 return None
             # Run the workflow if a match is found
             workflow: EntryPoint = workflows[0]
