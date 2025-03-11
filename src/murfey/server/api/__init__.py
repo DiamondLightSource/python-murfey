@@ -518,6 +518,9 @@ def post_foil_hole(
     foil_hole_params: FoilHoleParameters,
     db=murfey_db,
 ):
+    log.info(
+        f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
+    )
     return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
@@ -732,6 +735,7 @@ def register_completed_tilt_series(
                     "dose_per_frame": preproc_params.dose_per_frame,
                     "frame_count": preproc_params.frame_count,
                     "kv": preproc_params.voltage,
+                    "tilt_axis": preproc_params.tilt_axis,
                     "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
@@ -1052,7 +1056,7 @@ async def request_spa_preprocessing(
                 "mrc_out": str(mrc_out),
                 "pixel_size": proc_params["angpix"],
                 "image_number": proc_file.image_number,
-                "microscope": get_microscope(),
+                "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "foil_hole_id": foil_hole_id,
                 "ft_bin": proc_params["motion_corr_binning"],
@@ -1160,7 +1164,7 @@ async def request_tomography_preprocessing(
                 "pixel_size": (proc_file.pixel_size) * 10**10,
                 "image_number": proc_file.image_number,
                 "kv": int(proc_file.voltage),
-                "microscope": get_microscope(),
+                "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "ft_bin": proc_file.mc_binning,
                 "fm_dose": proc_file.dose_per_frame,
@@ -1371,7 +1375,7 @@ def start_dc(
         instrument_name
     ]
     log.info(
-        f"Starting data collection on microscope {get_microscope(machine_config=machine_config)} "
+        f"Starting data collection on microscope {instrument_name!r} "
         f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
     )
     dc_parameters = {
@@ -1404,7 +1408,7 @@ def start_dc(
             {
                 "register": "data_collection",
                 **dc_parameters,
-                "microscope": get_microscope(machine_config=machine_config),
+                "microscope": instrument_name,
                 "proposal_code": ispyb_proposal_code,
                 "proposal_number": ispyb_proposal_number,
                 "visit_number": ispyb_visit_number,
@@ -1518,6 +1522,28 @@ async def process_gain(
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
+    prom.monitoring_switch.remove(session.visit)
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    ).all()
+    for ri in rsync_instances:
+        prom.seen_files.remove(ri.source, session.visit)
+        prom.transferred_files.remove(ri.source, session.visit)
+        prom.transferred_files_bytes.remove(ri.source, session.visit)
+        prom.seen_data_files.remove(ri.source, session.visit)
+        prom.transferred_data_files.remove(ri.source, session.visit)
+        prom.transferred_data_files_bytes.remove(ri.source, session.visit)
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
+            prom.preprocessed_movies.remove(c[2].id)
+        except KeyError:
+            continue
     db.delete(session)
     db.commit()
     return
@@ -1548,7 +1574,7 @@ async def write_eer_fractionation_file(
             Path(machine_config.rsync_basepath)
             / str(datetime.datetime.now().year)
             / secure_filename(visit_name)
-            / "processing"
+            / machine_config.gain_directory_name
             / secure_filename(fractionation_params.fractionation_file_name)
         )
     if file_path.is_file():
@@ -1719,56 +1745,6 @@ def register_processing_success_in_ispyb(
         for updated in apps:
             updated.processingStatus = True
             _transport_object.do_update_processing_status(updated)
-
-
-@router.delete("/clients/{client_id}/session")
-def remove_session(client_id: int, db=murfey_db):
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
-    client.session_id = None
-    db.add(client)
-    db.commit()
-    if session_id is None:
-        return
-    prom.monitoring_switch.remove(client.visit)
-    rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
-    ).all()
-    for ri in rsync_instances:
-        prom.seen_files.remove(ri.source, client.visit)
-        prom.transferred_files.remove(ri.source, client.visit)
-        prom.transferred_files_bytes.remove(ri.source, client.visit)
-        prom.seen_data_files.remove(ri.source, client.visit)
-        prom.transferred_data_files.remove(ri.source, client.visit)
-        prom.transferred_data_files_bytes.remove(ri.source, client.visit)
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-    ).all()
-    for c in collected_ids:
-        try:
-            prom.preprocessed_movies.remove(c[2].id)
-        except KeyError:
-            continue
-    if (
-        len(
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.session_id == session_id
-                )
-            ).all()
-        )
-        > 1
-    ):
-        return
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    db.delete(session)
-    db.commit()
-    return
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")

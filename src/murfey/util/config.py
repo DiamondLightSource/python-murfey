@@ -25,7 +25,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     external_executables_eer: Dict[str, str] = {}
     external_environment: Dict[str, str] = {}
     rsync_module: str = ""
-    create_directories: Dict[str, str] = {"atlas": "atlas"}
+    create_directories: list[str] = ["atlas"]
     analyse_created_directories: List[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
@@ -84,8 +84,7 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
-    rabbitmq_credentials: str
-    murfey_db_credentials: str
+    murfey_db_credentials: Path
     crypto_key: str
     auth_key: str = ""
     auth_algorithm: str = ""
@@ -95,9 +94,11 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
     cookie_key: str = ""
+    rabbitmq_credentials: Path
     feedback_queue: str = "murfey_feedback"
     graylog_host: str = ""
     graylog_port: Optional[int] = None
+    ispyb_credentials: Optional[Path] = None
 
     @validator("graylog_port")
     def check_port_present_if_host_is(

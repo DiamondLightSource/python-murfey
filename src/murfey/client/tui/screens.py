@@ -92,10 +92,7 @@ def determine_default_destination(
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"]:
             if source.resolve() == Path(data_dir):
-                _default = (
-                    destination
-                    + f"{machine_data.get('rsync_module') or 'data'}/{visit}"
-                )
+                _default = f"{destination}/{visit}"
                 break
             else:
                 try:
@@ -132,7 +129,7 @@ def determine_default_destination(
         else:
             _default = ""
     else:
-        _default = destination + f"/{visit}"
+        _default = f"{destination}/{visit}"
     return (
         _default + f"/{extra_directory}"
         if not _default.endswith("/")
@@ -884,12 +881,12 @@ class GainReference(Screen):
         else:
             if event.button.id == "suggested-gain-ref":
                 self._dir_tree._gain_reference = self._gain_reference
-            visit_path = f"data/{datetime.now().year}/{self.app._environment.visit}"
+            visit_path = f"{datetime.now().year}/{self.app._environment.visit}"
             # Set up rsync command
             rsync_cmd = [
                 "rsync",
                 f"{posix_path(self._dir_tree._gain_reference)!r}",
-                f"{self.app._environment.url.hostname}::{self.app._machine_config.get('rsync_module', 'data')}/{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
+                f"{self.app._environment.rsync_url or self.app._environment.url.hostname}::{self.app._machine_config.get('rsync_module', 'data')}/{visit_path}/processing/{secure_filename(self._dir_tree._gain_reference.name)}",
             ]
             # Encase in bash shell
             cmd = ["bash", "-c", " ".join(rsync_cmd)]
@@ -952,7 +949,7 @@ class DirectorySelection(SwitchSelection):
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
         )
-        for dir in machine_config["create_directories"].values():
+        for dir in machine_config["create_directories"]:
             (visit_dir / dir).mkdir(exist_ok=True)
         self.app.install_screen(
             LaunchScreen(basepath=visit_dir, add_basepath=True), "launcher"
@@ -1008,8 +1005,7 @@ class DestinationSelect(Screen):
                     for d in s.glob("*"):
                         if (
                             d.is_dir()
-                            and d.name
-                            not in machine_config["create_directories"].values()
+                            and d.name not in machine_config["create_directories"]
                         ):
                             dest = determine_default_destination(
                                 self.app._visit,
@@ -1049,7 +1045,7 @@ class DestinationSelect(Screen):
                 instrument_name=self.app._environment.instrument_name,
             )
             for s, d in self._transfer_routes.items():
-                if Path(d).name not in machine_config["create_directories"].values():
+                if Path(d).name not in machine_config["create_directories"]:
                     bulk.append(Label(f"Copy the source {s} to:"))
                     bulk.append(
                         Input(

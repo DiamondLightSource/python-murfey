@@ -79,6 +79,7 @@ class TomographyContext(Context):
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
         ProcessingParameter("frame_count", "Number of image frames"),
+        ProcessingParameter("tilt_axis", "Stage rotation angle"),
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
@@ -86,12 +87,93 @@ class TomographyContext(Context):
         super().__init__("Tomography", acquisition_software)
         self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
+        self._tilt_series_with_pjids: List[str] = []
         self._tilt_series_sizes: Dict[str, int] = {}
         self._completed_tilt_series: List[str] = []
         self._aligned_tilt_series: List[str] = []
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._lock: RLock = RLock()
+
+    def register_tomography_data_collections(
+        self,
+        file_extension: str,
+        image_directory: str,
+        environment: MurfeyInstanceEnvironment | None = None,
+    ):
+        if not environment:
+            logger.error(
+                "No environment passed to register tomography data collections"
+            )
+            return
+        try:
+            dcg_url = f"{str(environment.url.geturl())}/visits/{str(environment.visit)}/{environment.murfey_session}/register_data_collection_group"
+            dcg_data = {
+                "experiment_type": "tomo",
+                "experiment_type_id": 36,
+                "tag": str(self._basepath),
+                "atlas": "",
+                "sample": None,
+            }
+            capture_post(dcg_url, json=dcg_data)
+
+            for tilt_series in self._tilt_series.keys():
+                if tilt_series not in self._tilt_series_with_pjids:
+                    dc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
+                    dc_data = {
+                        "experiment_type": "tomography",
+                        "file_extension": file_extension,
+                        "acquisition_software": self._acquisition_software,
+                        "image_directory": image_directory,
+                        "data_collection_tag": tilt_series,
+                        "source": str(self._basepath),
+                        "tag": tilt_series,
+                    }
+                    if (
+                        environment.data_collection_parameters
+                        and environment.data_collection_parameters.get("voltage")
+                    ):
+                        # Once mdoc parameters are known register processing jobs
+                        dc_data.update(
+                            {
+                                "voltage": environment.data_collection_parameters[
+                                    "voltage"
+                                ],
+                                "pixel_size_on_image": environment.data_collection_parameters[
+                                    "pixel_size_on_image"
+                                ],
+                                "image_size_x": environment.data_collection_parameters[
+                                    "image_size_x"
+                                ],
+                                "image_size_y": environment.data_collection_parameters[
+                                    "image_size_y"
+                                ],
+                                "magnification": environment.data_collection_parameters[
+                                    "magnification"
+                                ],
+                            }
+                        )
+                        capture_post(dc_url, json=dc_data)
+
+                        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
+                        for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                            capture_post(
+                                proc_url,
+                                json={
+                                    "tag": tilt_series,
+                                    "source": str(self._basepath),
+                                    "recipe": recipe,
+                                    "experiment_type": "tomography",
+                                },
+                            )
+                        self._tilt_series_with_pjids.append(tilt_series)
+                    else:
+                        logger.info(
+                            "Cannot register data collection yet as no values from mdoc"
+                        )
+
+        except Exception as e:
+            logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -201,71 +283,17 @@ class TomographyContext(Context):
             capture_post(ts_url, json=ts_data)
             if not self._tilt_series_sizes.get(tilt_series):
                 self._tilt_series_sizes[tilt_series] = 0
-            try:
-                if environment:
-                    dcg_url = f"{str(environment.url.geturl())}/visits/{str(environment.visit)}/{environment.murfey_session}/register_data_collection_group"
-                    dcg_data = {
-                        "experiment_type": "tomo",
-                        "experiment_type_id": 36,
-                        "tag": str(self._basepath),
-                        "atlas": "",
-                        "sample": None,
-                    }
-                    capture_post(dcg_url, json=dcg_data)
 
-                    dc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
-                    dc_data = {
-                        "experiment_type": "tomography",
-                        "file_extension": file_path.suffix,
-                        "acquisition_software": self._acquisition_software,
-                        "image_directory": str(
-                            environment.default_destinations.get(
-                                file_path.parent, file_path.parent
-                            )
-                        ),
-                        "data_collection_tag": tilt_series,
-                        "source": str(self._basepath),
-                        "tag": tilt_series,
-                    }
-                    if (
-                        environment.data_collection_parameters
-                        and environment.data_collection_parameters.get("voltage")
-                    ):
-                        dc_data.update(
-                            {
-                                "voltage": environment.data_collection_parameters[
-                                    "voltage"
-                                ],
-                                "pixel_size_on_image": environment.data_collection_parameters[
-                                    "pixel_size_on_image"
-                                ],
-                                "image_size_x": environment.data_collection_parameters[
-                                    "image_size_x"
-                                ],
-                                "image_size_y": environment.data_collection_parameters[
-                                    "image_size_y"
-                                ],
-                                "magnification": environment.data_collection_parameters[
-                                    "magnification"
-                                ],
-                            }
-                        )
-                    capture_post(dc_url, json=dc_data)
-
-                    proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
-                    for recipe in ("em-tomo-preprocess", "em-tomo-align"):
-                        capture_post(
-                            proc_url,
-                            json={
-                                "tag": tilt_series,
-                                "source": str(self._basepath),
-                                "recipe": recipe,
-                                "experiment_type": "tomography",
-                            },
-                        )
-
-            except Exception as e:
-                logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
+            # Will register processing jobs for all tilt series except the first one
+            self.register_tomography_data_collections(
+                file_extension=file_path.suffix,
+                image_directory=str(
+                    environment.default_destinations.get(
+                        file_path.parent, file_path.parent
+                    )
+                ),
+                environment=environment,
+            )
         else:
             if file_path not in self._tilt_series[tilt_series]:
                 for p in self._tilt_series[tilt_series]:
@@ -315,6 +343,9 @@ class TomographyContext(Context):
                 "frame_count": environment.data_collection_parameters.get(
                     "frame_count", 0
                 ),
+                "tilt_axis": environment.data_collection_parameters.get(
+                    "tilt_axis", 85
+                ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
@@ -335,6 +366,7 @@ class TomographyContext(Context):
         newly_completed_series: List[str] = []
         mdoc_tilt_series_size = self._tilt_series_sizes.get(tilt_series, 0)
         if not self._tilt_series or not mdoc_tilt_series_size:
+            logger.debug(f"Tilt series size not yet set for {tilt_series!r}")
             return newly_completed_series
 
         counted_tilts = len(self._tilt_series.get(tilt_series, []))
@@ -342,6 +374,11 @@ class TomographyContext(Context):
         if tilt_series_size_check and tilt_series not in self._completed_tilt_series:
             self._completed_tilt_series.append(tilt_series)
             newly_completed_series.append(tilt_series)
+        else:
+            logger.debug(
+                f"{tilt_series!r} not complete yet. Counted {counted_tilts} tilts. "
+                f"Expected number of tilts was {mdoc_tilt_series_size}"
+            )
         return newly_completed_series
 
     def _add_tomo_tilt(
@@ -546,6 +583,7 @@ class TomographyContext(Context):
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
             mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
+            mdoc_metadata["tilt_axis"] = float(mdoc_data_block["RotationAngle"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
@@ -614,7 +652,8 @@ class TomographyContext(Context):
                     metadata_file.parent / data_file
                 )
                 mdoc_metadata["frame_count"] = int(
-                    mdoc_metadata["eer_fractionation"] / mdoc_metadata["num_eer_frames"]
+                    int(mdoc_metadata["eer_fractionation"])
+                    / int(mdoc_metadata["num_eer_frames"])
                 )
         except Exception as e:
             logger.error(f"Exception encountered in metadata gathering: {str(e)}")

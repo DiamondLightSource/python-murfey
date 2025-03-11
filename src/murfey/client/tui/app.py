@@ -478,6 +478,12 @@ class MurfeyTUI(App):
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
+            context.register_tomography_data_collections(
+                file_extension=json["file_extension"],
+                image_directory=str(self._environment.default_destinations[source]),
+                environment=self._environment,
+            )
+
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
@@ -505,7 +511,7 @@ class MurfeyTUI(App):
                 f"{self.app._environment.url.geturl()}/visits/{self._visit}/{self.app._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
             )
-            log.info("tomography processing flushed")
+            log.info("Tomography processing flushed")
         elif isinstance(context, SPAModularContext):
             url = f"{str(self._url.geturl())}/visits/{str(self._visit)}/{self._environment.murfey_session}/register_data_collection_group"
             dcg_data = {
@@ -684,7 +690,7 @@ class MurfeyTUI(App):
 
     async def action_remove_session(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
         )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -698,7 +704,7 @@ class MurfeyTUI(App):
 
     def clean_up_quit(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
         )
         self.exit()
 
@@ -744,7 +750,7 @@ class MurfeyTUI(App):
             f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/successful_processing"
         )
         requests.delete(
-            f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session"
+            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
         )
         self.exit()
 

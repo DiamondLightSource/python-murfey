@@ -57,6 +57,20 @@ def register_grid_square(
         grid_square.y_stage_position = (
             grid_square_params.y_stage_position or grid_square.y_stage_position
         )
+        grid_square.readout_area_x = (
+            grid_square_params.readout_area_x or grid_square.readout_area_x
+        )
+        grid_square.readout_area_y = (
+            grid_square_params.readout_area_y or grid_square.readout_area_y
+        )
+        grid_square.thumbnail_size_x = (
+            grid_square_params.thumbnail_size_x or grid_square.thumbnail_size_x
+        )
+        grid_square.thumbnail_size_y = (
+            grid_square_params.thumbnail_size_y or grid_square.thumbnail_size_y
+        )
+        grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
+        grid_square.image = grid_square_params.image or grid_square.image
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
@@ -198,12 +212,13 @@ def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
     """Search through metadata directories to find the required grid square dm"""
     raw_dir = f.parent.parent.parent
     metadata_dirs = raw_dir.glob("metadata*")
+    gs_path = None
     for md_dir in metadata_dirs:
         gs_path = md_dir / f"Metadata/GridSquare_{grid_square}.dm"
         if gs_path.is_file():
             return gs_path
-    logger.error(f"Could not determine grid square metadata path for {f}")
-    return None
+    logger.error(f"Grid square metadata path {gs_path} does not exist for {f}")
+    return gs_path
 
 
 def _flush_position_analysis(

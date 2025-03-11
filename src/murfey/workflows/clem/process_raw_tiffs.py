@@ -6,8 +6,6 @@ The recipe referred to here is stored on GitLab.
 from pathlib import Path
 from typing import Optional
 
-from murfey.util.config import get_machine_config
-
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
@@ -50,8 +48,7 @@ def zocalo_cluster_request(
             metadata = tiff_list[0].parent / "Metadata" / (series_name + ".xlif")
 
         # Load machine config to get the feedback queue
-        machine_config = get_machine_config()
-        feedback_queue = machine_config[instrument_name].feedback_queue
+        feedback_queue: str = messenger.feedback_queue
 
         messenger.send(
             "processing_recipe",

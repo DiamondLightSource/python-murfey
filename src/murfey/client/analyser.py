@@ -23,6 +23,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
 from murfey.util import Observer, get_machine_config_client
+from murfey.util.mdoc import get_block
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 logger = logging.getLogger("murfey.client.analyser")
@@ -113,6 +114,13 @@ class Analyser(Observer):
         ):
             logger.info(f"File extension re-evaluated: {file_path.suffix}")
             self._extension = file_path.suffix
+        # If we see an .mdoc file first, use that to determine the file extensions
+        elif file_path.suffix == ".mdoc":
+            with open(file_path, "r") as md:
+                md.seek(0)
+                mdoc_data_block = get_block(md)
+            if subframe_path := mdoc_data_block.get("SubFramePath"):
+                self._extension = Path(subframe_path).suffix
         # Check for LIF files separately
         elif file_path.suffix == ".lif":
             self._extension = file_path.suffix
@@ -124,6 +132,7 @@ class Analyser(Observer):
         stages of processing. Actions to take for individual files will be determined
         in the Context classes themselves.
         """
+        logger.debug(f"Finding context using file {str(file_path)!r}")
         if "atlas" in file_path.parts:
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
@@ -258,9 +267,9 @@ class Analyser(Observer):
                     self._find_extension(transferred_file)
                     found = self._find_context(transferred_file)
                     if not found:
-                        # logger.warning(
-                        #     f"Context not understood for {transferred_file}, stopping analysis"
-                        # )
+                        logger.debug(
+                            f"Couldn't find context for {str(transferred_file)!r}"
+                        )
                         self.queue.task_done()
                         continue
                     elif self._extension:
@@ -383,6 +392,10 @@ class Analyser(Observer):
                         SPAMetadataContext,
                     ),
                 ):
+                    context = str(self._context).split(" ")[0].split(".")[-1]
+                    logger.debug(
+                        f"Transferring file {str(transferred_file)} with context {context!r}"
+                    )
                     self.post_transfer(transferred_file)
             self.queue.task_done()
 

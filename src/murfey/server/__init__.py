@@ -8,6 +8,7 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.metadata import EntryPoint  # For type hinting only
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
@@ -20,7 +21,6 @@ import uvicorn
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
-from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     Atlas,
     AutoProcProgram,
@@ -2179,6 +2179,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "dose_per_frame": preproc_params.dose_per_frame,
                         "frame_count": preproc_params.frame_count,
                         "kv": preproc_params.voltage,
+                        "tilt_axis": preproc_params.tilt_axis,
                         "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
@@ -2265,6 +2266,16 @@ def feedback_callback(header: dict, message: dict) -> None:
                         message.get("tag"): dcgid
                     }
                 _transport_object.transport.ack(header)
+            if dcg_hooks := entry_points().select(
+                group="murfey.hooks", name="data_collection_group"
+            ):
+                try:
+                    for hook in dcg_hooks:
+                        hook(dcgid, session_id=message["session_id"])
+                except Exception:
+                    logger.error(
+                        "Call to data collection group hook failed", exc_info=True
+                    )
             return None
         elif message["register"] == "atlas_update":
             if _transport_object:
@@ -2539,6 +2550,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     voltage=message["voltage"],
                     dose_per_frame=message["dose_per_frame"],
                     frame_count=message["frame_count"],
+                    tilt_axis=message["tilt_axis"],
                     motion_corr_binning=message["motion_corr_binning"],
                     gain_ref=message["gain_ref"],
                     eer_fractionation_file=message["eer_fractionation_file"],
@@ -2615,12 +2627,19 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif (
             message["register"] in entry_points().select(group="murfey.workflows").names
         ):
-            # Run the workflow if a match is found
-            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+            # Search for corresponding workflow
+            workflows: list[EntryPoint] = list(
                 entry_points().select(
                     group="murfey.workflows", name=message["register"]
                 )
-            )[0]
+            )  # Returns either 1 item or empty list
+            if not workflows:
+                logger.error(f"No workflow found for {sanitise(message['register'])}")
+                if _transport_object:
+                    _transport_object.transport.nack(header, requeue=False)
+                return None
+            # Run the workflow if a match is found
+            workflow: EntryPoint = workflows[0]
             result = workflow.load()(
                 message=message,
                 murfey_db=murfey_db,

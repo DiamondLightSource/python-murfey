@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.16.9"
+version = "0.16.12"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -64,7 +64,7 @@ server = [
     "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
     "jinja2",
     "mrcfile",
-    "numpy",
+    "numpy<2",
     "packaging",
     "passlib",
     "pillow",
@@ -86,10 +86,10 @@ murfey = "murfey.client:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
-"murfey.dlq_murfey" = "murfey.cli.dlq_resubmit:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
+"murfey.repost_failed_calls" = "murfey.cli.repost_failed_calls:run"
 "murfey.server" = "murfey.server:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"

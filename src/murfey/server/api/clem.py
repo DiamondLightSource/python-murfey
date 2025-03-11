@@ -16,6 +16,7 @@ from sqlmodel import Session, select
 
 from murfey.server import _transport_object
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     CLEMImageMetadata,
@@ -77,7 +78,7 @@ def validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    base_path = machine_config.rsync_basepath.as_posix()
+    rsync_basepath = machine_config.rsync_basepath.resolve()
 
     # Check that full file path doesn't contain unallowed characters
     #   Currently allows only:
@@ -90,12 +91,8 @@ def validate_and_sanitise(
         raise ValueError(f"Unallowed characters present in {file}")
 
     # Check that it's not accessing somehwere it's not allowed
-    if not str(full_path).startswith(str(base_path)):
+    if not str(full_path).startswith(str(rsync_basepath)):
         raise ValueError(f"{file} points to a directory that is not permitted")
-
-    # Check that it's a file, not a directory
-    if full_path.is_file() is False:
-        raise ValueError(f"{file} is not a file")
 
     # Check that it is of a permitted file type
     if f"{full_path.suffix}" not in valid_file_types:
@@ -184,7 +181,7 @@ def get_db_entry(
         )
         db.add(db_entry)
         db.commit()
-        db.refresh(db_entry)
+
     except Exception:
         raise Exception
 
@@ -215,7 +212,11 @@ def register_lif_file(
             file_path=lif_file,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            "Exception encountered while registering "
+            f"LIF file {sanitise(str(lif_file))!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Add metadata information if provided
@@ -224,7 +225,11 @@ def register_lif_file(
             master_metadata = validate_and_sanitise(master_metadata, session_id, db)
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to add master metadata information to database entry for "
+                f"LIF file {sanitise(str(lif_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register child metadata if provided
     for metadata in child_metadata:
@@ -238,7 +243,12 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_metadata.append(metadata_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"metadata file {sanitise(str(metadata))!r} in association with "
+                f"LIF file {sanitise(str(lif_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register child image series if provided
@@ -253,7 +263,12 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_series.append(series_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"metadata file {sanitise(series)!r} in association with "
+                f"LIF file {sanitise(str(lif_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register child image stacks if provided
@@ -268,7 +283,12 @@ def register_lif_file(
             # Append to database entry
             clem_lif_file.child_stacks.append(stack_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"image stack {sanitise(str(stack))!r} in association with "
+                f"LIF file {sanitise(str(lif_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Commit to database
@@ -296,7 +316,11 @@ def register_tiff_file(
             file_path=tiff_file,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            "Exception encountered while registering "
+            f"TIFF file {sanitise(str(tiff_file))!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Add metadata if provided
@@ -311,7 +335,12 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.associated_metadata = metadata_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"metadata file {sanitise(str(associated_metadata))!r} in association with "
+                f"TIFF file {sanitise(str(tiff_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Add series information if provided
     if associated_series is not None:
@@ -325,7 +354,12 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_series = series_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"CLEM series {sanitise(associated_series)!r} in association with "
+                f"TIFF file {sanitise(str(tiff_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Add image stack information if provided
     if associated_stack is not None:
@@ -339,7 +373,11 @@ def register_tiff_file(
             # Link database entries
             clem_tiff_file.child_stack = stack_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"image stack {sanitise(str(associated_stack))!r} in association with "
+                f"{traceback.format_exc()}"
+            )
 
     # Commit to database
     db.add(clem_tiff_file)
@@ -368,7 +406,11 @@ def register_clem_metadata(
             file_path=metadata_file,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            "Exception encountered while registering"
+            f"metadata file {sanitise(str(metadata_file))!r}"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Register a parent LIF file if provided
@@ -383,7 +425,12 @@ def register_clem_metadata(
             # Link database entries
             clem_metadata.parent_lif = lif_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"LIF file {sanitise(str(parent_lif))!r} in association with "
+                f"metadata file {sanitise(str(metadata_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register associated TIFF files if provided
     for tiff in associated_tiffs:
@@ -397,7 +444,12 @@ def register_clem_metadata(
             # Append entry
             clem_metadata.associated_tiffs.append(tiff_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"TIFF file {sanitise(str(tiff))!r} in association with "
+                f"metadata file {sanitise(str(metadata_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register associated image series if provided
@@ -414,7 +466,12 @@ def register_clem_metadata(
             db.add(series_db_entry)
             db.commit()
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"CLEM series {sanitise(associated_series)!r} in association with "
+                f"metadata file {sanitise(str(metadata_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register associated image stacks if provided
     for stack in associated_stacks:
@@ -427,7 +484,12 @@ def register_clem_metadata(
             )
             clem_metadata.associated_stacks.append(stack_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"image stack {sanitise(str(stack))!r} in association with "
+                f"metadata file {sanitise(str(metadata_file))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Commit to database
@@ -456,7 +518,11 @@ def register_image_series(
             series_name=series_name,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            "Exception encountered while registering "
+            f"CLEM series {sanitise(series_name)!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Register parent LIF file if provided
@@ -471,7 +537,12 @@ def register_image_series(
             # Link entries
             clem_image_series.parent_lif = lif_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"LIF file {sanitise(str(parent_lif))!r} in association with "
+                f"CLEM series {sanitise(series_name)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register parent TIFFs if provided
     for tiff in parent_tiffs:
@@ -485,7 +556,12 @@ def register_image_series(
             # Append entry
             clem_image_series.parent_tiffs.append(tiff_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"TIFF file {sanitise(str(tiff))!r} in association with "
+                f"CLEM series {sanitise(series_name)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue  # Try next item in loop
 
     # Register associated metadata if provided
@@ -500,7 +576,12 @@ def register_image_series(
             # Link entries
             clem_image_series.associated_metadata = metadata_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"metadata file {sanitise(str(associated_metadata))!r} in association with "
+                f"CLEM series {sanitise(series_name)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register child image stacks if provided
     for stack in child_stacks:
@@ -514,7 +595,12 @@ def register_image_series(
             # Append entry
             clem_image_series.child_stacks.append(stack_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"image stack {sanitise(str(stack))!r} in association with "
+                f"CLEM series {sanitise(series_name)!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register
@@ -544,7 +630,11 @@ def register_image_stack(
             file_path=image_stack,
         )
     except Exception:
-        logger.error(traceback.format_exc())
+        logger.error(
+            "Exception encountered while registering "
+            f"image stack {sanitise(str(image_stack))!r}: \n"
+            f"{traceback.format_exc()}"
+        )
         return False
 
     # Register channel name if provided
@@ -562,7 +652,12 @@ def register_image_stack(
             )
             clem_image_stack.parent_lif = lif_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"LIF file {sanitise(str(parent_lif))!r} in association with "
+                f"image stack {sanitise(str(image_stack))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register parent TIFF files if provided
     for tiff in parent_tiffs:
@@ -576,7 +671,12 @@ def register_image_stack(
             # Append entry
             clem_image_stack.parent_tiffs.append(tiff_db_entry)
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"TIFF file {sanitise(str(tiff))!r} in association with "
+                f"image stack {sanitise(str(image_stack))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
             continue
 
     # Register associated metadata if provided
@@ -591,7 +691,12 @@ def register_image_stack(
             # Link entries
             clem_image_stack.associated_metadata = metadata_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"metadata file {sanitise(str(associated_metadata))!r} in association with "
+                f"image stack {sanitise(str(image_stack))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register parent series if provided
     if parent_series is not None:
@@ -605,7 +710,12 @@ def register_image_stack(
             # Link entries
             clem_image_stack.parent_series = series_db_entry
         except Exception:
-            logger.warning(traceback.format_exc())
+            logger.warning(
+                "Unable to register "
+                f"CLEM series {sanitise(parent_series)!r} in association with "
+                f"image stack {sanitise(str(image_stack))!r}: \n"
+                f"{traceback.format_exc()}"
+            )
 
     # Register updates to entry
     db.add(clem_image_stack)

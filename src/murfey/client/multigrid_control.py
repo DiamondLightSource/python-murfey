@@ -377,6 +377,12 @@ class MultigridController:
                 )
 
             source = Path(json["source"])
+            context.register_tomography_data_collections(
+                file_extension=json["file_extension"],
+                image_directory=str(self._environment.default_destinations[source]),
+                environment=self._environment,
+            )
+
             log.info("Registering tomography processing parameters")
             if self._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
@@ -404,7 +410,7 @@ class MultigridController:
                 f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
                 json={"rsync_source": str(source)},
             )
-            log.info("tomography processing flushed")
+            log.info("Tomography processing flushed")
 
         elif isinstance(context, SPAModularContext):
             url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
