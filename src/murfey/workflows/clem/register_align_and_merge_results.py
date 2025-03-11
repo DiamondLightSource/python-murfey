@@ -101,8 +101,8 @@ def register_align_and_merge_result(
 
         except Exception:
             logger.error(
-                "Exception encountered when registering LIF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                "Exception encountered when registering align-and-merge result for "
+                f"{result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
             return False
