@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    {{- toYaml .Values.servicePorts | nindent 2 }}
+  selector:
+    app: {{ .Values.appName }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.global.runAsUser }}
+        runAsGroup: {{ .Values.global.runAsGroup }}
+      volumes:
+        # Mount config files from secrets
+        - name: murfey-client-config
+          secret:
+            secretName: {{ .Values.global.murfeyClientConfigTEMSecretName }}
+            items:
+              - key: {{ .Values.global.murfeyClientConfigTEMFileName }}
+                path: .murfey
+        # Mount data directories
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+      containers:
+        - name: {{ .Values.appName }}
+          image: {{ .Values.image }}
+          imagePullPolicy: Always
+          securityContext:
+            privileged: false
+          volumeMounts:
+            # Mount Murfey client config
+            - name: murfey-client-config
+              mountPath: /murfey/config/.murfey
+              subPath: .murfey
+              readOnly: false
+            # Mount data directories
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+          env:
+            - name: MURFEY_CLIENT_CONFIG_HOME
+              value: "/tmp"
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
+          args:
+            {{- toYaml .Values.args | nindent 12 }}

@@ -8,6 +8,7 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial, singledispatch
+from importlib.metadata import EntryPoint  # For type hinting only
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
@@ -20,7 +21,6 @@ import uvicorn
 from backports.entry_points_selectable import entry_points
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
-from importlib_metadata import EntryPoint  # For type hinting only
 from ispyb.sqlalchemy._auto_db_schema import (
     Atlas,
     AutoProcProgram,
@@ -620,8 +620,6 @@ def _register_picked_particles_use_diameter(
             )
         ).one()
 
-        particle_diameter = relion_params.particle_diameter
-
         if feedback_params.picker_ispyb_id is None:
             if demo or not _transport_object:
                 feedback_params.picker_ispyb_id = 1000
@@ -649,15 +647,15 @@ def _register_picked_particles_use_diameter(
                 _db.delete(s)
                 _db.commit()
 
-        if not particle_diameter:
+        # Calculate diameter if it wasn't provided
+        if not relion_params.particle_diameter:
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
                 select(db.ParticleSizes.particle_size).where(
                     db.ParticleSizes.pj_id == pj_id
                 )
             ).all()
-            particle_diameter = np.quantile(list(picking_db), 0.75)
-            relion_params.particle_diameter = particle_diameter
+            relion_params.particle_diameter = np.quantile(list(picking_db), 0.75)
             _db.add(relion_params)
             _db.commit()
 
@@ -682,7 +680,7 @@ def _register_picked_particles_use_diameter(
                         "defocus_u": saved_message.defocus_u,
                         "defocus_v": saved_message.defocus_v,
                         "defocus_angle": saved_message.defocus_angle,
-                        "particle_diameter": particle_diameter,
+                        "particle_diameter": relion_params.particle_diameter,
                         "downscale": relion_options["downscale"],
                         "kv": relion_options["voltage"],
                         "node_creator_queue": machine_config.node_creator_queue,
@@ -702,9 +700,9 @@ def _register_picked_particles_use_diameter(
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
+        # Use provided diameter for next step
         else:
             # If the diameter is known then just send the new message
-            particle_diameter = relion_params.particle_diameter
             zocalo_message = {
                 "parameters": {
                     "micrographs_file": params_to_forward["micrographs_file"],
@@ -723,7 +721,7 @@ def _register_picked_particles_use_diameter(
                     "defocus_u": params_to_forward["ctf_values"]["DefocusU"],
                     "defocus_v": params_to_forward["ctf_values"]["DefocusV"],
                     "defocus_angle": params_to_forward["ctf_values"]["DefocusAngle"],
-                    "particle_diameter": particle_diameter,
+                    "particle_diameter": relion_params.particle_diameter,
                     "downscale": relion_options["downscale"],
                     "kv": relion_options["voltage"],
                     "node_creator_queue": machine_config.node_creator_queue,
@@ -2944,12 +2942,19 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif (
             message["register"] in entry_points().select(group="murfey.workflows").names
         ):
-            # Run the workflow if a match is found
-            workflow: EntryPoint = list(  # Returns a list of either 1 or 0
+            # Search for corresponding workflow
+            workflows: list[EntryPoint] = list(
                 entry_points().select(
                     group="murfey.workflows", name=message["register"]
                 )
-            )[0]
+            )  # Returns either 1 item or empty list
+            if not workflows:
+                logger.error(f"No workflow found for {sanitise(message['register'])}")
+                if _transport_object:
+                    _transport_object.transport.nack(header, requeue=False)
+                return None
+            # Run the workflow if a match is found
+            workflow: EntryPoint = workflows[0]
             result = workflow.load()(
                 message=message,
                 murfey_db=murfey_db,
