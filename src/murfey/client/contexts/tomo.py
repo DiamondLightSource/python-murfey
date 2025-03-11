@@ -79,6 +79,7 @@ class TomographyContext(Context):
         ProcessingParameter("pixel_size_on_image", "Pixel Size"),
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
         ProcessingParameter("frame_count", "Number of image frames"),
+        ProcessingParameter("tilt_axis", "Stage rotation angle"),
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
@@ -339,6 +340,9 @@ class TomographyContext(Context):
                 "frame_count": environment.data_collection_parameters.get(
                     "frame_count", 0
                 ),
+                "tilt_axis": environment.data_collection_parameters.get(
+                    "tilt_axis", 85
+                ),
                 "mc_binning": environment.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
@@ -570,6 +574,7 @@ class TomographyContext(Context):
             mdoc_metadata["experiment_type"] = "tomography"
             mdoc_metadata["voltage"] = float(mdoc_data["Voltage"])
             mdoc_metadata["frame_count"] = int(mdoc_data_block["NumSubFrames"])
+            mdoc_metadata["tilt_axis"] = float(mdoc_data_block["RotationAngle"])
             mdoc_metadata["image_size_x"] = int(mdoc_data["ImageSize"][0])
             mdoc_metadata["image_size_y"] = int(mdoc_data["ImageSize"][1])
             mdoc_metadata["magnification"] = int(mdoc_data_block["Magnification"])
