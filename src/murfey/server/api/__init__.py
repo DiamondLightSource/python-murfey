@@ -1522,6 +1522,28 @@ async def process_gain(
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
+    prom.monitoring_switch.remove(session.visit)
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    ).all()
+    for ri in rsync_instances:
+        prom.seen_files.remove(ri.source, session.visit)
+        prom.transferred_files.remove(ri.source, session.visit)
+        prom.transferred_files_bytes.remove(ri.source, session.visit)
+        prom.seen_data_files.remove(ri.source, session.visit)
+        prom.transferred_data_files.remove(ri.source, session.visit)
+        prom.transferred_data_files_bytes.remove(ri.source, session.visit)
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
+            prom.preprocessed_movies.remove(c[2].id)
+        except KeyError:
+            continue
     db.delete(session)
     db.commit()
     return
@@ -1723,56 +1745,6 @@ def register_processing_success_in_ispyb(
         for updated in apps:
             updated.processingStatus = True
             _transport_object.do_update_processing_status(updated)
-
-
-@router.delete("/clients/{client_id}/session")
-def remove_session(client_id: int, db=murfey_db):
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
-    client.session_id = None
-    db.add(client)
-    db.commit()
-    if session_id is None:
-        return
-    prom.monitoring_switch.remove(client.visit)
-    rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.client_id == client_id)
-    ).all()
-    for ri in rsync_instances:
-        prom.seen_files.remove(ri.source, client.visit)
-        prom.transferred_files.remove(ri.source, client.visit)
-        prom.transferred_files_bytes.remove(ri.source, client.visit)
-        prom.seen_data_files.remove(ri.source, client.visit)
-        prom.transferred_data_files.remove(ri.source, client.visit)
-        prom.transferred_data_files_bytes.remove(ri.source, client.visit)
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-    ).all()
-    for c in collected_ids:
-        try:
-            prom.preprocessed_movies.remove(c[2].id)
-        except KeyError:
-            continue
-    if (
-        len(
-            db.exec(
-                select(ClientEnvironment).where(
-                    ClientEnvironment.session_id == session_id
-                )
-            ).all()
-        )
-        > 1
-    ):
-        return
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    db.delete(session)
-    db.commit()
-    return
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")
