@@ -373,8 +373,8 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
-    dcg_id: int = Field(foreign_key="datacollectiongroup.id", primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     name: str
     min_value: float
     max_value: float
@@ -390,10 +390,8 @@ class NotificationParameter(SQLModel, table=True):  # type: ignore
 
 
 class NotificationValue(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
-    notification_parameter_id: int = Field(
-        foreign_key="notificationparameter.id", primary_key=True
-    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    notification_parameter_id: int = Field(foreign_key="notificationparameter.id")
     index: int
     within_bounds: bool
     notification_parameter: Optional[NotificationParameter] = Relationship(
