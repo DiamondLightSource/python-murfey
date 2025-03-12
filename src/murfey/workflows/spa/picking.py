@@ -346,7 +346,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
         select(DataCollection, ProcessingJob, AutoProcProgram)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(AutoProcProgram == message["program_id"])
+        .where(AutoProcProgram.id == message["program_id"])
     ).all()
     dcgid = data_collection_hierarchy[0][0].dcg_id
     notification_parameters = murfey_db.exec(
@@ -354,6 +354,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
     ).all()
     failures = []
     for param in notification_parameters:
+        param_value_to_drop = None
         if message.get(param.name) is not None:
             param_values = murfey_db.exec(
                 select(NotificationValue).where(
@@ -361,7 +362,6 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
                 )
             ).all()
             param_values.sort(ley=lambda x: x.index)
-            param_value_to_drop = None
             if len(param_values) >= 25:
                 param_value_to_drop = param_values[0]
                 param_values = param_values[1:]
@@ -391,7 +391,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
         if param_value_to_drop is not None:
             murfey_db.delete(param_value_to_drop)
         murfey_db.add(param_values[-1])
-    murfey_db.add(notification_parameters)
+    murfey_db.add_all(notification_parameters)
     murfey_db.commit()
     murfey_db.close()
     if failures:
