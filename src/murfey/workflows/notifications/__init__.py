@@ -27,7 +27,7 @@ def notification_setup(
     existing_notification_parameters = murfey_db.exec(
         select(NotificationParameter).where(NotificationParameter.dcg_id == dcgid)
     ).all()
-    new_notification_parameters = []
+    new_notification_parameters: list[NotificationParameter] = []
     for k, v in parameters.items():
         for enp in existing_notification_parameters:
             if enp.name == k:
@@ -44,7 +44,7 @@ def notification_setup(
                     num_instances_since_triggered=num_instances_between_triggers,
                 )
             )
-    murfey_db.add(existing_notification_parameters + new_notification_parameters)
+    murfey_db.add_all(existing_notification_parameters + new_notification_parameters)
     murfey_db.commit()
     murfey_db.close()
     return True
