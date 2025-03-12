@@ -365,7 +365,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             if len(param_values) >= 25:
                 param_value_to_drop = param_values[0]
                 param_values = param_values[1:]
-            param_values = param_values.append(
+            param_values.append(
                 NotificationValue(
                     notification_parameter_id=param.id,
                     index=param_values[-1].index + 1,
