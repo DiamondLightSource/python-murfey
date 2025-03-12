@@ -354,7 +354,6 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
     ).all()
     failures = []
     for param in notification_parameters:
-        param_value_to_drop = None
         if message.get(param.name) is not None:
             param_values = murfey_db.exec(
                 select(NotificationValue).where(
@@ -362,6 +361,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
                 )
             ).all()
             param_values.sort(ley=lambda x: x.index)
+            param_value_to_drop = None
             if len(param_values) >= 25:
                 param_value_to_drop = param_values[0]
                 param_values = param_values[1:]
@@ -388,9 +388,9 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             else:
                 if param.notification_active:
                     param.notification_active = False
-        if param_value_to_drop is not None:
-            murfey_db.delete(param_value_to_drop)
-        murfey_db.add(param_values[-1])
+            if param_value_to_drop is not None:
+                murfey_db.delete(param_value_to_drop)
+            murfey_db.add(param_values[-1])
     murfey_db.add_all(notification_parameters)
     murfey_db.commit()
     murfey_db.close()
