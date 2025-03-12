@@ -70,7 +70,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     security_configuration_path: Optional[Path] = None
     auth_url: str = ""
 
-    notifications_queue: str = "pato_notifications"
+    notifications_queue: str = "pato_notification"
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
