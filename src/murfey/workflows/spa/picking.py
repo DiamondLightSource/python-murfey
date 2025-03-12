@@ -1,3 +1,4 @@
+from logging import getLogger
 from typing import List
 
 import numpy as np
@@ -28,6 +29,8 @@ from murfey.util.db import (
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.processing_params import default_spa_parameters
+
+logger = getLogger("murfey.workflows.spa.picking")
 
 
 def _register_picked_particles_use_diameter(
@@ -355,25 +358,32 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
     failures = []
     for param in notification_parameters:
         if message.get(param.name) is not None:
+            # Load instances of current parameter from database
             param_values = murfey_db.exec(
                 select(NotificationValue).where(
                     NotificationValue.notification_parameter_id == param.id
                 )
             ).all()
-            param_values.sort(ley=lambda x: x.index)
+            param_values.sort(key=lambda x: x.index)
+
+            # Drop oldest value if number of entries exceeds threshold
             param_value_to_drop = None
             if len(param_values) >= 25:
                 param_value_to_drop = param_values[0]
                 param_values = param_values[1:]
+
+            # Add newest value to end of list
             param_values.append(
                 NotificationValue(
                     notification_parameter_id=param.id,
-                    index=param_values[-1].index + 1,
+                    index=param_values[-1].index + 1 if len(param_values) else 0,
                     within_bounds=param.min_value
                     <= message[param.name]
                     <= param.max_value,
                 )
             )
+
+            # Trigger message if this param has consistently exceeded the set threshold
             if (
                 len(param_values) >= 25
                 and sum(p.within_bounds for p in param_values) / len(param_values)
@@ -388,9 +398,14 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             else:
                 if param.notification_active:
                     param.notification_active = False
+
+            # Delete oldest value
             if param_value_to_drop is not None:
                 murfey_db.delete(param_value_to_drop)
+
+            # Add newest value
             murfey_db.add(param_values[-1])
+
     murfey_db.add_all(notification_parameters)
     murfey_db.commit()
     murfey_db.close()
