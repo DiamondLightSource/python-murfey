@@ -341,6 +341,11 @@ def _request_email(
             },
             new_connection=True,
         )
+        logger.debug(
+            f"Sent notification to {config.notifications_queue!r} for "
+            f"visit {session.visit!r} about the following abnormal parameters: \n"
+            f"{', '.join([f'{p}' for p in failed_params])}"
+        )
     return None
 
 
@@ -392,9 +397,14 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             ):
                 if not param.notification_active:
                     param.notification_active = True
-                    if param.num_instances_since_triggered >= 500:
-                        failures.append(param.name)
-                        param.num_instances_since_triggered = 0
+
+                if param.num_instances_since_triggered >= 500:
+                    logger.debug(
+                        f"Parameter {param.name!r} has consistently exceeded normal "
+                        "operating thresholds"
+                    )
+                    failures.append(param.name)
+                    param.num_instances_since_triggered = 0
             else:
                 if param.notification_active:
                     param.notification_active = False
@@ -403,13 +413,18 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             if param_value_to_drop is not None:
                 murfey_db.delete(param_value_to_drop)
 
-            # Add newest value
+            # Add newest value and increment record of instances
             murfey_db.add(param_values[-1])
+            param.num_instances_since_triggered += 1
 
     murfey_db.add_all(notification_parameters)
     murfey_db.commit()
     murfey_db.close()
     if failures:
+        logger.debug(
+            "Requested email notification for the following abnormal parameters: \n"
+            f"{', '.join([f'{p}' for p in failures])}"
+        )
         _request_email(failures, message["session_id"], murfey_db)
     return None
 
