@@ -360,11 +360,42 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
+    notification_parameters: List["NotificationParameter"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
     tomography_preprocessing_parameters: List["TomographyPreprocessingParameters"] = (
         Relationship(
             back_populates="data_collection_group",
             sa_relationship_kwargs={"cascade": "delete"},
         )
+    )
+
+
+class NotificationParameter(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    name: str
+    min_value: float
+    max_value: float
+    num_instances_since_triggered: int = 0
+    notification_active: bool = False
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="notification_parameters"
+    )
+    notification_values: List["NotificationValue"] = Relationship(
+        back_populates="notification_parameter",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class NotificationValue(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(default=None, primary_key=True)
+    notification_parameter_id: int = Field(foreign_key="notificationparameter.id")
+    index: int
+    within_bounds: bool
+    notification_parameter: Optional[NotificationParameter] = Relationship(
+        back_populates="notification_values"
     )
 
 
