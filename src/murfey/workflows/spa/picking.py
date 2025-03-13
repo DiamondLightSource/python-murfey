@@ -393,20 +393,30 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
                 len(param_values) >= 25
                 and sum(p.within_bounds for p in param_values) / len(param_values)
                 < 0.25
-                and not param.notification_active
             ):
+                # If notifications disabled, enable them now
+                trigger = False
                 if not param.notification_active:
+                    # Use a variable to trigger the notification for the first
+                    # time within the first 500 messages received
+                    if param_values[-1].index < 500:
+                        logger.debug(
+                            f"First abnormal instance of parameter {param.name!r} detected"
+                        )
+                        trigger = True
                     param.notification_active = True
 
-                if param.num_instances_since_triggered >= 500:
-                    logger.debug(
-                        f"Parameter {param.name!r} has consistently exceeded normal "
-                        "operating thresholds"
-                    )
+                if param.num_instances_since_triggered >= 500 or trigger:
+                    if not trigger:
+                        logger.debug(
+                            f"Parameter {param.name!r} has exceeded normal operating thresholds"
+                        )
                     failures.append(param.name)
                     param.num_instances_since_triggered = 0
             else:
-                if param.notification_active:
+                # Only reset to False if there are more than 500 instances
+                # to stop multiple triggers within the first 500
+                if param.notification_active and param_values[-1].index > 500:
                     param.notification_active = False
 
             # Delete oldest value
