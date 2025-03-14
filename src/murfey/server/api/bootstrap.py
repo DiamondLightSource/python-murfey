@@ -256,6 +256,7 @@ MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 # Variables used by the MSYS2 functions below
 msys2_url = "https://repo.msys2.org"
 msys2_setup_file = "msys2-x86_64-latest.exe"
+msys2_file_ext = (".exe", ".sig", ".tar.xz", "tar.zst")
 valid_envs = (
     # Tuple of systems and supported libraries/compilers/architectures within
     (
@@ -289,15 +290,19 @@ valid_envs = (
 )
 
 
-@msys2.get("/setup-x86_64.exe", response_class=Response)
-def get_msys2_setup():
+@msys2.get("/distrib/{setup_file}", response_class=Response)
+def get_msys2_setup(setup_file: str):
     """
     Obtain and pass through an MSYS2 installer from an official source.
     This is used during client bootstrapping, and can download and install the
     MSYS2 distribution that then remains on the client machines.
     """
 
-    installer = requests.get(f"{msys2_url}/distrib/{msys2_setup_file}")
+    # Allow only '.exe', 'tar.xz', 'tar.zst', or '.sig' files
+    if not any(setup_file.endswith(suffix) for suffix in (msys2_file_ext)):
+        raise ValueError(f"{setup_file!r} is not a valid executable")
+
+    installer = requests.get(f"{msys2_url}/distrib/{setup_file}")
     return Response(
         content=installer.content,
         media_type=installer.headers.get("Content-Type"),
@@ -313,24 +318,6 @@ def get_msys2_main_index(
     Returns a simple index displaying valid MSYS2 systems and the latest setup file
     from the main MSYS2 repository.
     """
-
-    def get_msys2_setup_html():
-        """
-        Returns the HTML line for the latest MSYS2 installer for Windows from an official
-        source.
-        """
-        url = f"{msys2_url}/distrib"
-        index = requests.get(url)
-        content: bytes = index.content
-        content_text: str = content.decode("latin1")
-
-        for line in content_text.splitlines():
-            if line.startswith("<a href="):
-                if f'"{msys2_setup_file}"' in line:
-                    return line
-            else:
-                pass
-        return None
 
     def _rewrite_url(match):
         """
@@ -358,8 +345,8 @@ def get_msys2_main_index(
     content_text_list = []
     for line in content_text.splitlines():
         if line.startswith("<a href"):
-            # Mirror only lines related to MSYS2 environments
-            if any(env[0] in line for env in valid_envs):
+            # Mirror only lines related to MSYS2 environments or the distribution folder
+            if any(env[0] in line for env in valid_envs) or "distrib" in line:
                 line_new = re.sub(
                     '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
                     _rewrite_url,  # Function to apply search criteria to
@@ -367,26 +354,6 @@ def get_msys2_main_index(
                 )
                 content_text_list.append(line_new)
 
-            # Replace the "distrib/" hyperlink with one to the setup file
-            elif "distrib" in line:
-                # Set up URL to be requested on the Murfey server
-                mirror_file_name = "setup-x86_64.exe"
-                setup_url = f"{base_path}/{mirror_file_name}"
-
-                # Get request from the "distrib" page and rewrite it
-                setup_html = get_msys2_setup_html()
-                if setup_html is None:
-                    # Skip showing the setup file link if it fails to find it
-                    continue
-
-                line_new = "               ".join(  # Adjust spaces to align columns
-                    re.sub(
-                        '^<a href="([^">]*)">([^"<]*)</a>',
-                        f'<a href="{setup_url}">{mirror_file_name}</a>',
-                        setup_html,
-                    ).split("        ", 1)
-                )
-                content_text_list.append(line_new)
             # Other URLs don't need to be mirrored
             else:
                 pass
@@ -430,8 +397,8 @@ def get_msys2_environment_index(
     path = request.url.path.strip("/")
     base_path = f"{base_url}/{path}"
 
-    # Validate provided system
-    if any(system in env[0] for env in valid_envs) is False:
+    # Validate provided system; use this endpoint to display 'distrib' folder too
+    if not (any(system in env[0] for env in valid_envs) or system == "distrib"):
         raise ValueError(f"{system!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
@@ -444,6 +411,11 @@ def get_msys2_environment_index(
     content_text_list = []
     for line in content_text.splitlines():
         if line.startswith("<a href="):
+            # Skip non-executable files when querying 'distrib' repo
+            if system == "distrib":
+                if not any(ext in line for ext in msys2_file_ext):
+                    continue
+
             # Rewrite URL to point explicitly to current server
             line_new = re.sub(
                 '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
