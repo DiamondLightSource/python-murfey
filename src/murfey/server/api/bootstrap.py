@@ -302,7 +302,9 @@ def get_msys2_setup(setup_file: str):
         raise ValueError("Unallowed characters present in requested setup file")
 
     # Allow only '.exe', 'tar.xz', 'tar.zst', or '.sig' files
-    if not any(setup_file.endswith(ext) for ext in (msys2_file_ext)):
+    if not setup_file.startswith("msys2") and not any(
+        setup_file.endswith(ext) for ext in (msys2_file_ext)
+    ):
         raise ValueError(f"{setup_file!r} is not a valid executable")
 
     installer = requests.get(f"{msys2_url}/distrib/{setup_file}")
