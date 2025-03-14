@@ -255,7 +255,6 @@ MSYS2-RELATED FUNCTIONS AND ENDPOINTS
 
 # Variables used by the MSYS2 functions below
 msys2_url = "https://repo.msys2.org"
-msys2_setup_file = "msys2-x86_64-latest.exe"
 msys2_file_ext = (".exe", ".sig", ".tar.xz", "tar.zst")
 valid_envs = (
     # Tuple of systems and supported libraries/compilers/architectures within
