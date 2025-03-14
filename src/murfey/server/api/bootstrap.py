@@ -297,8 +297,12 @@ def get_msys2_setup(setup_file: str):
     MSYS2 distribution that then remains on the client machines.
     """
 
+    # Validate characters in sent path
+    if not bool(re.fullmatch(r"^[\w\.\-]+$", setup_file)):
+        raise ValueError("Unallowed characters present in requested setup file")
+
     # Allow only '.exe', 'tar.xz', 'tar.zst', or '.sig' files
-    if not any(setup_file.endswith(suffix) for suffix in (msys2_file_ext)):
+    if not any(setup_file.endswith(ext) for ext in (msys2_file_ext)):
         raise ValueError(f"{setup_file!r} is not a valid executable")
 
     installer = requests.get(f"{msys2_url}/distrib/{setup_file}")
