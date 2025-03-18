@@ -44,7 +44,7 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             required_key = key
             break
     if not required_key:
-        logger.warning(f"Required key not found for {str(xml_path)}")
+        logger.info(f"Required key not found for {str(xml_path)}")
         return {}
     foil_holes = {}
     for fh_block in serialization_array[required_key]:
