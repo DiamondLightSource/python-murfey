@@ -241,6 +241,8 @@ class SPAMetadataContext(Context):
             )
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
+            if source is None:
+                return None
             visitless_source_search_dir = str(source).replace(
                 f"/{environment.visit}", ""
             )
@@ -261,12 +263,15 @@ class SPAMetadataContext(Context):
                     transferred_file,
                     int(gs_name),
                 )
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{environment.visit}/"
+                    + source.parts[-2]
+                )
                 metadata_source = Path(
-                    (
-                        "/".join(Path(visitless_source).parts[:-2])
-                        + f"/{environment.visit}/"
-                        + Path(visitless_source).parts[-2]
-                    )[1:]
+                    metadata_source_as_str[1:]
+                    if metadata_source_as_str.startswith("//")
+                    else metadata_source_as_str
                 )
                 image_path = (
                     _file_transferred_to(
