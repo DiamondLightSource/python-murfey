@@ -415,7 +415,7 @@ class Analyser(Observer):
 
     def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping and rsyncer.outcome == TransferResult.SUCCESS:
-            absolute_path = (self._basepath / rsyncer.file_path).resolve()
+            absolute_path = (self._basepath / rsyncer.file_path).absolute()
             self.queue.put(absolute_path)
 
     def start(self):

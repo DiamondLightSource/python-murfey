@@ -88,15 +88,15 @@ def determine_default_destination(
     _default = ""
     if environment.processing_only_mode and environment.sources:
         log.info(f"Processing only mode with sources {environment.sources}")
-        _default = str(environment.sources[0].resolve()) or str(Path.cwd())
+        _default = str(environment.sources[0].absolute()) or str(Path.cwd())
     elif machine_data.get("data_directories"):
         for data_dir in machine_data["data_directories"]:
-            if source.resolve() == Path(data_dir):
+            if source.absolute() == Path(data_dir).absolute():
                 _default = f"{destination}/{visit}"
                 break
             else:
                 try:
-                    mid_path = source.resolve().relative_to(data_dir)
+                    mid_path = source.absolute().relative_to(Path(data_dir).absolute())
                     if use_suggested_path:
                         with global_env_lock:
                             source_name = (
@@ -221,7 +221,7 @@ class _DirectoryTree(DirectoryTree):
                 self.valid_selection = True
                 return
             for d in self._data_directories:
-                if Path(self._selected_path).resolve().is_relative_to(d):
+                if Path(self._selected_path).absolute().is_relative_to(d.absolute()):
                     self.valid_selection = True
                     break
             else:
@@ -282,7 +282,9 @@ class LaunchScreen(Screen):
         btn_disabled = True
         for d in machine_data.get("data_directories", []):
             if (
-                Path(self._dir_tree._selected_path).resolve().is_relative_to(d)
+                Path(self._dir_tree._selected_path)
+                .absolute()
+                .is_relative_to(Path(d).absolute())
                 or self.app._environment.processing_only_mode
             ):
                 btn_disabled = False
@@ -306,7 +308,7 @@ class LaunchScreen(Screen):
                 self._add_btn.disabled = True
 
     def _add_directory(self, directory: str, add_destination: bool = True):
-        source = Path(self._dir_tree.path).resolve() / directory
+        source = Path(self._dir_tree.path).absolute() / directory
         if add_destination:
             for s in self.app._environment.sources:
                 if source.is_relative_to(s):
@@ -705,9 +707,9 @@ class VisitSelection(SwitchSelection):
             self.app.install_screen(
                 DirectorySelection(
                     [
-                        p
-                        for p in machine_data.get("data_directories", [])
-                        if Path(p).exists()
+                        path
+                        for path in machine_data.get("data_directories", [])
+                        if Path(path).exists()
                     ]
                 ),
                 "directory-select",
@@ -771,9 +773,9 @@ class VisitCreation(Screen):
         self.app.install_screen(
             DirectorySelection(
                 [
-                    p
-                    for p in machine_data.get("data_directories", [])
-                    if Path(p).exists()
+                    path
+                    for path in machine_data.get("data_directories", [])
+                    if Path(path).exists()
                 ]
             ),
             "directory-select",
@@ -941,7 +943,7 @@ class DirectorySelection(SwitchSelection):
 
     def on_button_pressed(self, event: Button.Pressed):
         self.app._multigrid = self._switch_status
-        visit_dir = Path(str(event.button.label)) / self.app._visit
+        visit_dir = Path(str(event.button.label)).absolute() / self.app._visit
         visit_dir.mkdir(exist_ok=True)
         self.app._set_default_acquisition_directories(visit_dir)
         machine_config = get_machine_config_client(

@@ -239,7 +239,7 @@ def run():
 
     if args.remove_files:
         remove_prompt = Confirm.ask(
-            f"Are you sure you want to remove files from {args.source or Path('.').resolve()}?"
+            f"Are you sure you want to remove files from {args.source or Path('.').absolute()}?"
         )
         if not remove_prompt:
             exit("Exiting")

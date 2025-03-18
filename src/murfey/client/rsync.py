@@ -199,7 +199,7 @@ class RSyncer(Observer):
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
-            absolute_path = (self._basepath / file_path).resolve()
+            absolute_path = self._basepath / file_path
             self.queue.put(absolute_path)
 
     def _process(self):
