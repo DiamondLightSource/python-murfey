@@ -215,10 +215,15 @@ class SPAMetadataContext(Context):
         ):
             # Make sure we have a data collection group before trying to register grid square
             url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-            dcg_search_dir = "/" + "/".join(
+            dcg_search_dir = "/".join(
                 p
-                for p in transferred_file.parent.parent.parts[1:]
+                for p in transferred_file.parent.parent.parts
                 if p != environment.visit
+            )
+            dcg_search_dir = (
+                dcg_search_dir[1:]
+                if dcg_search_dir.startswith("//")
+                else dcg_search_dir
             )
             dcg_images_dirs = sorted(
                 Path(dcg_search_dir).glob("Images-Disc*"),
