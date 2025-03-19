@@ -478,6 +478,19 @@ def get_spa_proc_param_details(
 def register_spa_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+        proc_params.symmetry = session_processing_parameters[0].symmetry
+
     zocalo_message = {
         "register": "spa_processing_parameters",
         **dict(proc_params),
@@ -606,6 +619,18 @@ def post_foil_hole(
 def register_tomo_preproc_params(
     session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+
     zocalo_message = {
         "register": "tomography_processing_parameters",
         **dict(proc_params),
@@ -1247,7 +1272,6 @@ async def request_tomography_preprocessing(
             proc_file.eer_fractionation_file = processing_job_parameters[
                 0
             ].eer_fractionation_file
-            proc_file.mc_binning = processing_job_parameters[0].motion_corr_binning
 
         zocalo_message: dict = {
             "recipes": [recipe_name],
