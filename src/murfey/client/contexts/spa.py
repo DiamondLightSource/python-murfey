@@ -298,14 +298,14 @@ class SPAModularContext(Context):
                 if environment
                 and environment.data_collection_parameters.get("gain_ref")
                 not in (None, "None")
-                else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+                else f"{datetime.now().year}/{environment.visit}/processing/gain.mrc"
             )
             metadata["gain_ref_superres"] = (
                 environment.data_collection_parameters.get("gain_ref_superres")
                 if environment
                 and environment.data_collection_parameters.get("gain_ref_superres")
                 not in (None, "None")
-                else f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
+                else f"{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
             )
         else:
             metadata["gain_ref"] = None

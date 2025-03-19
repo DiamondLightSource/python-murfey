@@ -618,7 +618,7 @@ class TomographyContext(Context):
                     environment.data_collection_parameters.get("gain_ref")
                     if environment.data_collection_parameters.get("gain_ref")
                     not in (None, "None")
-                    else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
+                    else f"{datetime.now().year}/{environment.visit}/processing/gain.mrc"
                 )
             else:
                 mdoc_metadata["gain_ref"] = None
