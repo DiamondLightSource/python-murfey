@@ -59,6 +59,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    MagnificationLookup,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -164,6 +165,27 @@ def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
             instrument_name
         ]
     return None
+
+
+@router.get("/mag_table/")
+def get_mag_table(db=murfey_db) -> List[MagnificationLookup]:
+    return db.exec(select(MagnificationLookup)).all()
+
+
+@router.post("/mag_table/")
+def add_to_mag_table(rows: List[MagnificationLookup], db=murfey_db):
+    for r in rows:
+        db.add(r)
+    db.commit()
+
+
+@router.delete("/mag_table/{mag}")
+def remove_mag_table_row(mag: int, db=murfey_db):
+    row = db.exec(
+        select(MagnificationLookup).where(MagnificationLookup.magnification == mag)
+    ).one()
+    db.delete(row)
+    db.commit()
 
 
 @router.get("/instruments/{instrument_name}/instrument_name")
@@ -394,6 +416,61 @@ def increment_rsync_transferred_files_prometheus(
     prom.transferred_data_files_bytes.labels(
         rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.data_bytes)
+
+
+class ProcessingDetails(BaseModel):
+    data_collection_group: DataCollectionGroup
+    data_collections: List[DataCollection]
+    processing_jobs: List[ProcessingJob]
+    relion_params: SPARelionParameters
+    feedback_params: SPAFeedbackParameters
+
+
+@router.get("/sessions/{session_id}/spa_processing_parameters")
+def get_spa_proc_param_details(
+    session_id: MurfeySessionID, db=murfey_db
+) -> Optional[List[ProcessingDetails]]:
+    params = db.exec(
+        select(
+            DataCollectionGroup,
+            DataCollection,
+            ProcessingJob,
+            SPARelionParameters,
+            SPAFeedbackParameters,
+        )
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.id == DataCollection.dcg_id)
+        .where(DataCollection.id == ProcessingJob.dc_id)
+        .where(SPARelionParameters.pj_id == ProcessingJob.id)
+        .where(SPAFeedbackParameters.pj_id == ProcessingJob.id)
+    ).all()
+    if not params:
+        return None
+    unique_dcg_indices = []
+    dcg_ids = []
+    for i, p in enumerate(params):
+        if p[0].id not in dcg_ids:
+            dcg_ids.append(p[0].id)
+            unique_dcg_indices.append(i)
+
+    def _parse(ps, i, dcg_id):
+        res = []
+        for p in ps:
+            if p[0].id == dcg_id:
+                if p[i] not in res:
+                    res.append(p[i])
+        return res
+
+    return [
+        ProcessingDetails(
+            data_collection_group=params[i][0],
+            data_collections=_parse(params, 1, d),
+            processing_jobs=_parse(params, 2, d),
+            relion_params=_parse(params, 3, d)[0],
+            feedback_params=_parse(params, 4, d)[0],
+        )
+        for i, d in zip(unique_dcg_indices, dcg_ids)
+    ]
 
 
 @router.post("/sessions/{session_id}/spa_processing_parameters")

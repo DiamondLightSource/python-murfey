@@ -74,9 +74,14 @@ def sanitise_nonpath(in_string: str) -> str:
 
 def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
     if keep_spaces:
-        secured_parts = [
-            secure_filename(p) if " " not in p else p for p in in_path.parts
-        ]
+        secured_parts = []
+        for p, part in enumerate(in_path.parts):
+            if " " in part:
+                secured_parts.append(part)
+            elif ":" in part and not p:
+                secured_parts.append(secure_filename(part) + ":")
+            else:
+                secured_parts.append(secure_filename(part))
     else:
         secured_parts = [
             (

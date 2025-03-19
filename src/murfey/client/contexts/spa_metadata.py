@@ -44,7 +44,7 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
             required_key = key
             break
     if not required_key:
-        logger.warning(f"Required key not found for {str(xml_path)}")
+        logger.info(f"Required key not found for {str(xml_path)}")
         return {}
     foil_holes = {}
     for fh_block in serialization_array[required_key]:
@@ -163,10 +163,13 @@ class SPAMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-                dcg_search_dir = "/" + "/".join(
-                    p
-                    for p in transferred_file.parent.parts[1:]
-                    if p != environment.visit
+                dcg_search_dir = "/".join(
+                    p for p in transferred_file.parent.parts if p != environment.visit
+                )
+                dcg_search_dir = (
+                    dcg_search_dir[1:]
+                    if dcg_search_dir.startswith("//")
+                    else dcg_search_dir
                 )
                 dcg_images_dirs = sorted(
                     Path(dcg_search_dir).glob("Images-Disc*"),
@@ -215,10 +218,15 @@ class SPAMetadataContext(Context):
         ):
             # Make sure we have a data collection group before trying to register grid square
             url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
-            dcg_search_dir = "/" + "/".join(
+            dcg_search_dir = "/".join(
                 p
-                for p in transferred_file.parent.parent.parts[1:]
+                for p in transferred_file.parent.parent.parts
                 if p != environment.visit
+            )
+            dcg_search_dir = (
+                dcg_search_dir[1:]
+                if dcg_search_dir.startswith("//")
+                else dcg_search_dir
             )
             dcg_images_dirs = sorted(
                 Path(dcg_search_dir).glob("Images-Disc*"),
@@ -241,6 +249,8 @@ class SPAMetadataContext(Context):
             )
             fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
             source = _get_source(transferred_file, environment=environment)
+            if source is None:
+                return None
             visitless_source_search_dir = str(source).replace(
                 f"/{environment.visit}", ""
             )
@@ -261,12 +271,15 @@ class SPAMetadataContext(Context):
                     transferred_file,
                     int(gs_name),
                 )
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{environment.visit}/"
+                    + source.parts[-2]
+                )
                 metadata_source = Path(
-                    (
-                        "/".join(Path(visitless_source).parts[:-2])
-                        + f"/{environment.visit}/"
-                        + Path(visitless_source).parts[-2]
-                    )[1:]
+                    metadata_source_as_str[1:]
+                    if metadata_source_as_str.startswith("//")
+                    else metadata_source_as_str
                 )
                 image_path = (
                     _file_transferred_to(
