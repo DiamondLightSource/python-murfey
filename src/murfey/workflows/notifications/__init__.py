@@ -35,15 +35,16 @@ def notification_setup(
                 enp.max_value = v[1]
                 break
         else:
-            new_notification_parameters.append(
-                NotificationParameter(
-                    dcg_id=dcgid,
-                    name=k,
-                    min_value=v[0],
-                    max_value=v[1],
-                    num_instances_since_triggered=num_instances_between_triggers,
+            if v[0] is not None and v[1] is not None:
+                new_notification_parameters.append(
+                    NotificationParameter(
+                        dcg_id=dcgid,
+                        name=k,
+                        min_value=v[0],
+                        max_value=v[1],
+                        num_instances_since_triggered=num_instances_between_triggers,
+                    )
                 )
-            )
     murfey_db.add_all(existing_notification_parameters + new_notification_parameters)
     murfey_db.commit()
     murfey_db.close()
