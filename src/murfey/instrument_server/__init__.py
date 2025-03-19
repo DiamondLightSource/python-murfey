@@ -37,7 +37,10 @@ def run():
 
     ws = murfey.client.websocket.WSApp(
         server=read_config()["Murfey"].get("server"),
+<<<<<<< HEAD
         id=0,
+=======
+>>>>>>> 64e4467 (Setup logging to graylog for instrument server via main server)
     )
 
     handler = CustomHandler(ws.send)
