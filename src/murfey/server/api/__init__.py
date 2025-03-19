@@ -65,6 +65,7 @@ from murfey.util.db import (
     ProcessingJob,
     RsyncInstance,
     Session,
+    SessionProcessingParameters,
     SPAFeedbackParameters,
     SPARelionParameters,
     Tilt,
@@ -477,6 +478,19 @@ def get_spa_proc_param_details(
 def register_spa_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
 ):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+        proc_params.symmetry = session_processing_parameters[0].symmetry
+
     zocalo_message = {
         "register": "spa_processing_parameters",
         **dict(proc_params),
@@ -605,6 +619,18 @@ def post_foil_hole(
 def register_tomo_preproc_params(
     session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
 ):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+
     zocalo_message = {
         "register": "tomography_processing_parameters",
         **dict(proc_params),
@@ -1142,7 +1168,11 @@ async def request_spa_preprocessing(
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
                 "particle_diameter": proc_params["particle_diameter"] or 0,
-                "fm_int_file": proc_file.eer_fractionation_file,
+                "fm_int_file": (
+                    proc_params["eer_fractionation_file"]
+                    if proc_params["eer_fractionation_file"]
+                    else proc_file.eer_fractionation_file
+                ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "cryolo_model_weights": str(
                     _cryolo_model_path(visit_name, instrument_name)
@@ -1229,6 +1259,20 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
+
+        processing_job_parameters = db.exec(
+            select(TomographyProcessingParameters).where(
+                TomographyProcessingParameters.processing_job_id
+                == data_collection[2].id
+            )
+        ).all()
+        if processing_job_parameters:
+            proc_file.gain_ref = processing_job_parameters[0].gain_ref
+            proc_file.dose_per_frame = processing_job_parameters[0].dose_per_frame
+            proc_file.eer_fractionation_file = processing_job_parameters[
+                0
+            ].eer_fractionation_file
+
         zocalo_message: dict = {
             "recipes": [recipe_name],
             "parameters": {
@@ -1514,6 +1558,24 @@ def register_proc(
         },
     }
 
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+
+    if session_processing_parameters:
+        proc_params["job_parameters"].update(
+            {
+                "gain_ref": session_processing_parameters[0].gain_ref,
+                "dose_per_frame": session_processing_parameters[0].dose_per_frame,
+                "eer_fractionation_file": session_processing_parameters[
+                    0
+                ].eer_fractionation_file,
+                "symmetry": session_processing_parameters[0].symmetry,
+            }
+        )
+
     if _transport_object:
         _transport_object.send(
             _transport_object.feedback_queue,
@@ -1654,6 +1716,17 @@ async def write_eer_fractionation_file(
             / machine_config.gain_directory_name
             / secure_filename(fractionation_params.fractionation_file_name)
         )
+
+    session_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_parameters:
+        session_parameters[0].eer_fractionation_file = str(file_path)
+        db.add(session_parameters)
+        db.commit()
+
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
 

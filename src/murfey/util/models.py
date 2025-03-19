@@ -226,7 +226,7 @@ class ProcessingParametersSPA(BaseModel):
     boxsize: Optional[int]
     downscale: bool
     small_boxsize: Optional[int]
-    eer_fractionation: int
+    eer_fractionation_file: str = ""
     particle_diameter: Optional[float]
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None

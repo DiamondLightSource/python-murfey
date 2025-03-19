@@ -417,7 +417,11 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
                 "picker_uuid": murfey_ids[2 * i + 1],
                 "session_id": session_id,
                 "particle_diameter": proc_params.particle_diameter or 0,
-                "fm_int_file": f.eer_fractionation_file,
+                "fm_int_file": (
+                    proc_params.eer_fractionation_file
+                    if proc_params.eer_fractionation_file
+                    else f.eer_fractionation_file
+                ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "foil_hole_id": foil_hole_id,
             },

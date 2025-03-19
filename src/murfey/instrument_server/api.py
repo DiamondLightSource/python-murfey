@@ -220,6 +220,7 @@ def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
 
 
 class ProcessingParameters(BaseModel):
+    gain_ref: str
     dose_per_frame: Optional[float] = None
     extract_downscale: bool = True
     particle_diameter: Optional[float] = None
@@ -238,7 +239,8 @@ def register_processing_parameters(
 ):
     data_collection_parameters[proc_param_block.label] = {}
     for k, v in proc_param_block.params.dict().items():
-        data_collection_parameters[proc_param_block.label][k] = v
+        if v is not None:
+            data_collection_parameters[proc_param_block.label][k] = v
     return {"success": True}
 
 

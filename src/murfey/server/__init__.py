@@ -2490,7 +2490,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                     ),
                     voltage=message["voltage"],
                     motion_corr_binning=message["motion_corr_binning"],
-                    eer_grouping=message["eer_fractionation"],
+                    eer_fractionation_file=message["eer_fractionation_file"],
                     symmetry=message["symmetry"],
                     particle_diameter=message["particle_diameter"],
                     downscale=message["downscale"],

@@ -223,12 +223,12 @@ def run():
     metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
     metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
     metadata["gain_ref"] = (
-        f"data/{datetime.now().year}/{args.visit}/processing/gain.mrc"
+        f"{datetime.now().year}/{args.visit}/processing/gain.mrc"
         if args.gain_ref is None
         else args.gain_ref
     )
     metadata["gain_ref_superres"] = (
-        f"data/{datetime.now().year}/{args.visit}/processing/gain_superres.mrc"
+        f"{datetime.now().year}/{args.visit}/processing/gain_superres.mrc"
         if args.gain_ref_superres is None
         else args.gain_ref_superres
     )
