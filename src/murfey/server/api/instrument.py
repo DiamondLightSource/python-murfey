@@ -145,6 +145,7 @@ class ProvidedProcessingParameters(BaseModel):
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
+    gain_ref: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
@@ -171,6 +172,7 @@ async def pass_proc_params_to_instrument_server(
                         "particle_diameter": proc_params.particle_diameter,
                         "symmetry": proc_params.symmetry,
                         "eer_fractionation": proc_params.eer_fractionation,
+                        "gain_ref": proc_params.gain_ref,
                     },
                 },
                 headers={

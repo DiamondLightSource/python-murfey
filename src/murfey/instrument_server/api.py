@@ -225,6 +225,7 @@ class ProcessingParameters(BaseModel):
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
+    gain_ref: Optional[str] = None
 
 
 class ProcessingParameterBlock(BaseModel):
@@ -238,7 +239,8 @@ def register_processing_parameters(
 ):
     data_collection_parameters[proc_param_block.label] = {}
     for k, v in proc_param_block.params.dict().items():
-        data_collection_parameters[proc_param_block.label][k] = v
+        if v is not None:
+            data_collection_parameters[proc_param_block.label][k] = v
     return {"success": True}
 
 
