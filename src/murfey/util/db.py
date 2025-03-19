@@ -326,6 +326,14 @@ TEM SESSION AND PROCESSING WORKFLOW
 """
 
 
+class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    gain_ref: str
+    dose_per_frame: float
+    eer_fractionation_file: str = ""
+    symmetry: str = "C1"
+
+
 class TiltSeries(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     tag: str
@@ -641,7 +649,7 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     gain_ref: Optional[str]
     voltage: int
     motion_corr_binning: int
-    eer_grouping: int
+    eer_fractionation_file: str = ""
     symmetry: str
     particle_diameter: Optional[float]
     downscale: bool

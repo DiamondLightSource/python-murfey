@@ -23,7 +23,7 @@ from murfey.server.api.auth import (
 from murfey.server.murfey_db import murfey_db
 from murfey.util import secure_path
 from murfey.util.config import get_machine_config
-from murfey.util.db import Session
+from murfey.util.db import Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
@@ -145,13 +145,22 @@ class ProvidedProcessingParameters(BaseModel):
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
-    gain_ref: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
 async def pass_proc_params_to_instrument_server(
     session_id: MurfeySessionID, proc_params: ProvidedProcessingParameters, db=murfey_db
 ):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+
+    session_processing_parameters = SessionProcessingParameters(
+        dose_per_frame=proc_params.dose_per_frame,
+        gain_ref=session.current_gain_ref,
+        symmetry=proc_params.symmetry,
+    )
+    db.add(session_processing_parameters)
+    db.commit()
+
     data = {}
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -172,7 +181,7 @@ async def pass_proc_params_to_instrument_server(
                         "particle_diameter": proc_params.particle_diameter,
                         "symmetry": proc_params.symmetry,
                         "eer_fractionation": proc_params.eer_fractionation,
-                        "gain_ref": proc_params.gain_ref,
+                        "gain_ref": session.current_gain_ref,
                     },
                 },
                 headers={

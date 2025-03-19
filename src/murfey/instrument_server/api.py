@@ -220,12 +220,12 @@ def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
 
 
 class ProcessingParameters(BaseModel):
+    gain_ref: str
     dose_per_frame: Optional[float] = None
     extract_downscale: bool = True
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
-    gain_ref: Optional[str] = None
 
 
 class ProcessingParameterBlock(BaseModel):
