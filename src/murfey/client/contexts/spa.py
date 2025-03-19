@@ -474,12 +474,15 @@ class SPAModularContext(Context):
                     foil_hole,
                     grid_square,
                 )
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{environment.visit}/"
+                    + source.parts[-2]
+                )
                 metadata_source = Path(
-                    (
-                        "/".join(source.parts[:-2])
-                        + f"/{environment.visit}/"
-                        + source.parts[-2]
-                    )[1:]
+                    metadata_source_as_str[1:]
+                    if metadata_source_as_str.startswith("//")
+                    else metadata_source_as_str
                 )
                 image_path = (
                     _file_transferred_to(environment, metadata_source, Path(fh.image))
