@@ -143,7 +143,7 @@ class MultigridController:
             source,
             destination,
             force_metadata=self.processing_enabled,
-            analyse=not extra_directory and use_suggested_path and analyse,
+            analyse=analyse,
             remove_files=remove_files,
             tag=tag,
             limited=limited,

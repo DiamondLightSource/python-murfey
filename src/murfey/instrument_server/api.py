@@ -21,7 +21,7 @@ from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import sanitise, sanitise_nonpath, secure_path
+from murfey.util import posix_path, sanitise, sanitise_nonpath, secure_path
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
@@ -291,7 +291,7 @@ def upload_gain_reference(
     ).json()
     cmd = [
         "rsync",
-        safe_gain_path,
+        posix_path(Path(safe_gain_path)),
         f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{machine_config.get('rsync_module', 'data')}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
     ]
     gain_rsync = subprocess.run(cmd)
