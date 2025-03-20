@@ -18,8 +18,11 @@ class Camera(Enum):
     FALCON = 3
 
 
-def _sanitise(gain_path: Path) -> Path:
-    dest = gain_path.parent / "gain" / gain_path.name.replace(" ", "_")
+def _sanitise(gain_path: Path, tag: str) -> Path:
+    if tag:
+        dest = gain_path.parent / f"gain_{tag}" / gain_path.name.replace(" ", "_")
+    else:
+        dest = gain_path.parent / "gain" / gain_path.name.replace(" ", "_")
     dest.write_bytes(gain_path.read_bytes())
     return dest
 
@@ -57,7 +60,7 @@ async def prepare_gain(
             secure_path(gain_path.parent / f"gain_{tag}").mkdir(exist_ok=True)
         else:
             secure_path(gain_path.parent / "gain").mkdir(exist_ok=True)
-        gain_path = _sanitise(gain_path)
+        gain_path = _sanitise(gain_path, tag)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
         gain_path_superres = gain_path.parent / (gain_path.name + "_superres.mrc")

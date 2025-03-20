@@ -1262,8 +1262,7 @@ async def request_tomography_preprocessing(
 
         processing_job_parameters = db.exec(
             select(TomographyProcessingParameters).where(
-                TomographyProcessingParameters.processing_job_id
-                == data_collection[2].id
+                TomographyProcessingParameters.pj_id == data_collection[2].id
             )
         ).all()
         if processing_job_parameters:
@@ -1547,7 +1546,7 @@ def register_proc(
     proc_params: ProcessingJobParameters,
     db=murfey_db,
 ):
-    proc_parameters = {
+    proc_parameters: dict = {
         "session_id": session_id,
         "experiment_type": proc_params.experiment_type,
         "recipe": proc_params.recipe,
@@ -1565,7 +1564,8 @@ def register_proc(
     ).all()
 
     if session_processing_parameters:
-        proc_params["job_parameters"].update(
+        job_parameters: dict = proc_parameters["job_parameters"]
+        job_parameters.update(
             {
                 "gain_ref": session_processing_parameters[0].gain_ref,
                 "dose_per_frame": session_processing_parameters[0].dose_per_frame,
@@ -1575,6 +1575,7 @@ def register_proc(
                 "symmetry": session_processing_parameters[0].symmetry,
             }
         )
+        proc_parameters["job_parameters"] = job_parameters
 
     if _transport_object:
         _transport_object.send(

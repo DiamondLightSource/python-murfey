@@ -41,7 +41,9 @@ def run():
     )
 
     handler = CustomHandler(ws.send)
-    logging.getLogger().addHandler(handler)
+    logging.getLogger("murfey").addHandler(handler)
+    logging.getLogger("fastapi").addHandler(handler)
+    logging.getLogger("uvicorn").addHandler(handler)
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
