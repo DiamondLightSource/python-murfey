@@ -60,8 +60,8 @@ async def activate_instrument_server_for_session(
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/token",
                 json={"access_token": token, "token_type": "bearer"},
             ) as response:
@@ -80,11 +80,11 @@ async def check_if_session_is_active(instrument_name: str, session_id: int):
     if instrument_server_tokens.get(session_id) is None:
         return {"active": False}
     async with lock:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as clientsession:
             machine_config = get_machine_config(instrument_name=instrument_name)[
                 instrument_name
             ]
-            async with session.get(
+            async with clientsession.get(
                 f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/check_token",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
@@ -116,8 +116,8 @@ async def start_multigrid_watcher(
             "visit": visit,
             "default_model": str(machine_config.default_model),
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/multigrid_watcher",
                 json={
                     "source": str(secure_path(watcher_spec.source / visit)),
@@ -171,8 +171,8 @@ async def pass_proc_params_to_instrument_server(
     ]
     if machine_config.instrument_server_url:
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/processing_parameters",
                 json={
                     "label": label,
@@ -200,8 +200,8 @@ async def check_instrument_server(instrument_name: str):
         instrument_name
     ]
     if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.get(
                 f"{machine_config.instrument_server_url}/health",
             ) as resp:
                 data = await resp.json()
@@ -221,8 +221,8 @@ async def get_possible_gain_references(
     if machine_config.instrument_server_url:
         async with lock:
             token = instrument_server_tokens[session_id]["access_token"]
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.get(
                 f"{machine_config.instrument_server_url}/instruments/{sanitise(instrument_name)}/sessions/{sanitise(str(session_id))}/possible_gain_references",
                 headers={"Authorization": f"Bearer {token}"},
             ) as resp:
@@ -250,8 +250,8 @@ async def request_gain_reference_upload(
     visit_path = f"{datetime.datetime.now().year}/{visit}"
     data = {}
     if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference",
                 json={
                     "gain_path": str(gain_reference_request.gain_path),
@@ -283,8 +283,8 @@ async def request_upstream_tiff_data_download(
             / secure_filename(visit_name)
         )
         if machine_config.instrument_server_url:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.post(
                     f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/sessions/{sanitise(str(session_id))}/upstream_tiff_data_request",
                     json={"download_dir": download_dir},
                     headers={
@@ -311,8 +311,8 @@ async def stop_rsyncer(
         instrument_name
     ]
     if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/stop_rsyncer",
                 json={
                     "label": session_id,
@@ -338,8 +338,8 @@ async def finalise_rsyncer(
         instrument_name
     ]
     if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/finalise_rsyncer",
                 json={
                     "label": session_id,
@@ -366,8 +366,8 @@ async def remove_rsyncer(
     ]
     if isinstance(session_id, int):
         if machine_config.instrument_server_url:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.post(
                     f"{machine_config.instrument_server_url}/sessions/{session_id}/remove_rsyncer",
                     json={
                         "label": session_id,
@@ -394,8 +394,8 @@ async def restart_rsyncer(
     ]
     if isinstance(session_id, int):
         if machine_config.instrument_server_url:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.post(
                     f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
                     json={
                         "label": session_id,
