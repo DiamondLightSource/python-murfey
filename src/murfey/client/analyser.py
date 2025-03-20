@@ -302,6 +302,10 @@ class Analyser(Observer):
                                         f"Metadata gathering failed with a key error for key: {e.args[0]}"
                                     )
                                     raise e
+                                except ValueError as e:
+                                    logger.error(
+                                        f"Metadata gathering failed with a value error: {e}"
+                                    )
                             if not dc_metadata or not self._force_mdoc_metadata:
                                 self._unseen_xml.append(transferred_file)
                             else:
@@ -406,8 +410,8 @@ class Analyser(Observer):
         data_directories = self._murfey_config.get("data_directories", [])
         for dd in data_directories:
             if str(data_file).startswith(dd):
-                base_dir = Path(dd)
-                mid_dir = data_file.relative_to(dd).parent
+                base_dir = Path(dd).absolute()
+                mid_dir = data_file.relative_to(base_dir).parent
                 break
         else:
             return data_file.with_suffix(".xml")
