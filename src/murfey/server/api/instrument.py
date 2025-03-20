@@ -154,6 +154,7 @@ async def pass_proc_params_to_instrument_server(
     session = db.exec(select(Session).where(Session.id == session_id)).one()
 
     session_processing_parameters = SessionProcessingParameters(
+        session_id=session_id,
         dose_per_frame=proc_params.dose_per_frame,
         gain_ref=session.current_gain_ref,
         symmetry=proc_params.symmetry,
