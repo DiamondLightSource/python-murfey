@@ -1262,8 +1262,7 @@ async def request_tomography_preprocessing(
 
         processing_job_parameters = db.exec(
             select(TomographyProcessingParameters).where(
-                TomographyProcessingParameters.processing_job_id
-                == data_collection[2].id
+                TomographyProcessingParameters.pj_id == data_collection[2].id
             )
         ).all()
         if processing_job_parameters:
