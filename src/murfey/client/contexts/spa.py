@@ -61,8 +61,8 @@ def _grid_square_metadata_file(
 ) -> Path:
     for dd in data_directories:
         if str(f).startswith(str(dd)):
-            base_dir = dd
-            mid_dir = f.relative_to(dd).parent
+            base_dir = dd.absolute()
+            mid_dir = f.relative_to(base_dir).parent
             break
     else:
         raise ValueError(f"Could not determine grid square metadata path for {f}")
