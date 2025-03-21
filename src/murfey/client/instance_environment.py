@@ -49,7 +49,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     visit: str = ""
     processing_only_mode: bool = False
     gain_ref: Optional[Path] = None
-    superres: bool = True
+    superres: bool = False
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
     rsync_url: str = ""
