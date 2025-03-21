@@ -37,7 +37,7 @@ def run():
 
     ws = murfey.client.websocket.WSApp(
         server=read_config()["Murfey"].get("server"),
-        id=0,
+        register_client=False,
     )
 
     handler = CustomHandler(ws.send)
