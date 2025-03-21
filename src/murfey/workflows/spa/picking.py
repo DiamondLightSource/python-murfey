@@ -324,7 +324,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
 
 
 def _request_email(
-    failed_params: List[str], session_id: int, murfey_db: Session
+    failed_params: List[str], dcg_id: int, session_id: int, murfey_db: Session
 ) -> None:
     session = murfey_db.exec(
         select(MurfeySession).where(MurfeySession.id == session_id)
@@ -336,14 +336,14 @@ def _request_email(
         _transport_object.send(
             config.notifications_queue,
             {
-                "session": session.visit,
+                "groupId": dcg_id,
                 "message": f"The following parameters consistently exceeded the user set bounds: {failed_params}",
             },
             new_connection=True,
         )
         logger.debug(
             f"Sent notification to {config.notifications_queue!r} for "
-            f"visit {session.visit!r} about the following abnormal parameters: \n"
+            f"visit {session.visit!r}, data collection group ID {dcg_id} about the following abnormal parameters: \n"
             f"{', '.join([f'{p}' for p in failed_params])}"
         )
     return None
@@ -435,7 +435,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             "Requested email notification for the following abnormal parameters: \n"
             f"{', '.join([f'{p}' for p in failures])}"
         )
-        _request_email(failures, message["session_id"], murfey_db)
+        _request_email(failures, dcgid, message["session_id"], murfey_db)
     return None
 
 
