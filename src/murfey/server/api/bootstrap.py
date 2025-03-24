@@ -15,6 +15,8 @@ required.
 from __future__ import annotations
 
 import functools
+import io
+import json
 import logging
 import random
 import re
@@ -23,7 +25,7 @@ from urllib.parse import quote
 import packaging.version
 import requests
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 import murfey
 from murfey.server import get_machine_config, respond_with_template
@@ -43,6 +45,7 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
+rust = APIRouter(prefix="/rust", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
@@ -563,6 +566,44 @@ def get_msys2_package_file(
         )
     else:
         raise HTTPException(status_code=package_file.status_code)
+
+
+"""
+=======================================================================================
+RUST-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
+"""
+
+rust_dl = "https://static.crates.io/crates"
+rust_api = "https://crates.io"
+
+
+@rust.get("/cargo/config.json", response_class=StreamingResponse)
+def get_maturin_config(request: Request):
+    """
+    Download a config.json file used by Maturin that is used when integrating Rust
+    backends for Python packages. This file will determine where Maturin sources
+    Rust backend packages from.
+
+    This config is to be saved in ~/.cargo/registry/config.json
+    """
+
+    # Construct config file with the necessary endpoints
+    config = {
+        "dl": f"{request.url.scheme}://{request.url.netloc}/crates",
+        "api": f"{request.url.scheme}://{request.url.netloc}/api/crates",
+        # "proxy": f"{request.url.scheme}://{request.url.netloc}",
+    }
+
+    # Save it as a JSON and return it as part of the response
+    json_data = json.dumps(config, indent=4)
+    json_bytes = io.BytesIO(json_data.encode("utf-8"))
+
+    return StreamingResponse(
+        json_bytes,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=config.json"},
+    )
 
 
 """
