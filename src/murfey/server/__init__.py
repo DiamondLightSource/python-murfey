@@ -2418,10 +2418,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.nack(header, requeue=True)
                 return None
             prom.preprocessed_movies.labels(processing_job=pid)
-            if message.get("job_parameters"):
-                if _transport_object:
-                    _transport_object.transport.ack(header)
-                return None
             if not murfey_db.exec(
                 select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
             ).all():
