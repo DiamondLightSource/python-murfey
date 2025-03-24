@@ -241,6 +241,10 @@ def register_processing_parameters(
     for k, v in proc_param_block.params.dict().items():
         if v is not None:
             data_collection_parameters[proc_param_block.label][k] = v
+    if controllers.get(session_id):
+        controllers[session_id].data_collection_parameters.update(
+            data_collection_parameters[proc_param_block.label]
+        )
     return {"success": True}
 
 
