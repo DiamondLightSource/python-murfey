@@ -179,7 +179,9 @@ def start_multigrid_watcher(
             destination_overrides=watcher_spec.destination_overrides,
         )
     )
-    watchers[session_id].subscribe(controllers[session_id]._multigrid_watcher_finalised)
+    watchers[session_id].subscribe(
+        controllers[session_id]._multigrid_watcher_finalised, final=True
+    )
     watchers[session_id].start()
     return {"success": True}
 
@@ -219,6 +221,7 @@ def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource)
 
 @router.post("/sessions/{session_id}/finalise_session")
 def finalise_session(session_id: MurfeySessionID):
+    watchers[session_id].request_stop()
     controllers[session_id].finalise()
     return {"success": True}
 

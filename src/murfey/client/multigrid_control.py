@@ -99,6 +99,7 @@ class MultigridController:
 
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
+        self.dormancy_check()
 
     def dormancy_check(self):
         if not self.multigrid_watcher_active:
