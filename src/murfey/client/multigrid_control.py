@@ -34,6 +34,8 @@ class MultigridController:
     rsync_url: str = ""
     rsync_module: str = "data"
     demo: bool = False
+    dormant: bool = False
+    multigrid_watcher_active: bool = True
     processing_enabled: bool = True
     do_transfer: bool = True
     dummy_dc: bool = False
@@ -94,6 +96,9 @@ class MultigridController:
             server=self.murfey_url,
             register_client=False,
         )
+
+    def _multigrid_watcher_finalised(self):
+        self.multigrid_watcher_active = False
 
     def _start_rsyncer_multigrid(
         self,

@@ -176,6 +176,7 @@ def start_multigrid_watcher(
             destination_overrides=watcher_spec.destination_overrides,
         )
     )
+    watchers[session_id].subscribe(controllers[session_id]._multigrid_watcher_finalised)
     watchers[session_id].start()
     return {"success": True}
 
