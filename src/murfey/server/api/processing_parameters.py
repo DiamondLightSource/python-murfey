@@ -54,10 +54,10 @@ def set_session_processing_parameters(
         edited_parameters.dose_per_frame or proc_params.dose_per_frame
     )
     proc_params.eer_fractionation_file = (
-        edited_parameters.eer_fractioantion_file or proc_params.eer_fractionation_file
+        edited_parameters.eer_fractionation_file or proc_params.eer_fractionation_file
     )
     proc_params.symmetry = edited_parameters.symmetry or proc_params.symmetry
     db.add(proc_params)
     db.commit()
-    db.exit()
+    db.close()
     return edited_parameters
