@@ -17,6 +17,7 @@ import murfey.server.api.clem
 import murfey.server.api.display
 import murfey.server.api.hub
 import murfey.server.api.instrument
+import murfey.server.api.processing_parameters
 import murfey.server.api.spa
 import murfey.server.websocket
 import murfey.util.models
@@ -73,6 +74,7 @@ app.include_router(murfey.server.api.auth.router)
 app.include_router(murfey.server.api.display.router)
 app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.hub.router)
+app.include_router(murfey.server.api.processing_parameters.router)
 app.include_router(murfey.server.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey

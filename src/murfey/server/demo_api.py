@@ -28,7 +28,6 @@ from murfey.server import (
     _flush_grid_square_records,
     _flush_tomography_preprocessing,
     _murfey_id,
-    _register_picked_particles_use_diameter,
     feedback_callback,
     get_hostname,
     get_microscope,
@@ -91,6 +90,7 @@ from murfey.util.models import (
 )
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.state import global_state
+from murfey.workflows.spa.picking import _register_picked_particles_use_diameter
 
 log = logging.getLogger("murfey.server.demo_api")
 
