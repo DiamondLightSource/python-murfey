@@ -144,6 +144,9 @@ def start_multigrid_watcher(
     if controllers.get(session_id) is not None:
         return {"success": True}
     label = watcher_spec.label
+    for sid, controller in controllers.items():
+        if controller.dormant:
+            del controllers[sid]
     controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,
