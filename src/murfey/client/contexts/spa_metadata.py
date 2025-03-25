@@ -271,20 +271,8 @@ class SPAMetadataContext(Context):
                     transferred_file,
                     int(gs_name),
                 )
-                metadata_source_as_str = (
-                    "/".join(source.parts[:-2])
-                    + f"/{environment.visit}/"
-                    + source.parts[-2]
-                )
-                metadata_source = Path(
-                    metadata_source_as_str[1:]
-                    if metadata_source_as_str.startswith("//")
-                    else metadata_source_as_str
-                )
                 image_path = (
-                    _file_transferred_to(
-                        environment, metadata_source, Path(gs_info.image)
-                    )
+                    _file_transferred_to(environment, source, Path(gs_info.image))
                     if gs_info.image
                     else ""
                 )
