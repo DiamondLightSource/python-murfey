@@ -21,7 +21,7 @@ class EditableSessionProcessingParameters(BaseModel):
     symmetry: str = ""
 
 
-@router.get("sessions/{session_id}/session_processing_parameters")
+@router.get("/sessions/{session_id}/session_processing_parameters")
 def get_session_processing_parameters(
     session_id: MurfeySessionID, db: Session = murfey_db
 ) -> EditableSessionProcessingParameters:
@@ -38,7 +38,7 @@ def get_session_processing_parameters(
     )
 
 
-@router.post("sessions/{session_id}/session_processing_parameters")
+@router.post("/sessions/{session_id}/session_processing_parameters")
 def set_session_processing_parameters(
     session_id: MurfeySessionID,
     edited_parameters: EditableSessionProcessingParameters,
