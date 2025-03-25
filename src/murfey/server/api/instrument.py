@@ -407,3 +407,29 @@ async def restart_rsyncer(
                 ) as resp:
                     data = await resp.json()
     return data
+
+
+class RSyncerInfo(BaseModel):
+    source: str
+    num_files_transferred: int
+    num_files_in_queue: int
+
+
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
+async def get_rsyncer_info(
+    instrument_name: str, session_id: MurfeySessionID
+) -> List[RSyncerInfo]:
+    data = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        async with lock:
+            token = instrument_server_tokens[session_id]["access_token"]
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.get(
+                f"{machine_config.instrument_server_url}/sessions/{sanitise(str(session_id))}/rsyncer_info",
+                headers={"Authorization": f"Bearer {token}"},
+            ) as resp:
+                data = await resp.json()
+    return data
