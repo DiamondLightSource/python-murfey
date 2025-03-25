@@ -214,6 +214,12 @@ def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource)
     return {"success": True}
 
 
+@router.post("/sessions/{session_id}/finalise_session")
+def finalise_session(session_id: MurfeySessionID):
+    controllers[session_id].finalise()
+    return {"success": True}
+
+
 @router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._restart_rsyncer(rsyncer_source.source)
