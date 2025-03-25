@@ -15,7 +15,7 @@ import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Callable, List, NamedTuple
+from typing import Awaitable, Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
 from murfey.client.tui.status_bar import StatusBar
@@ -75,6 +75,7 @@ class RSyncer(Observer):
         self._local = local
         self._server_url = server_url
         self._notify = notify
+        self._finalised = False
 
         # Set rsync destination
         if local:
@@ -181,7 +182,11 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def finalise(self, thread: bool = True):
+    def finalise(
+        self,
+        thread: bool = True,
+        callback: Callable[..., Awaitable[None] | None] | None = None,
+    ):
         self.stop()
         self._remove_files = True
         self._notify = False
@@ -196,6 +201,9 @@ class RSyncer(Observer):
             self.stop()
         else:
             self._transfer(list(self._basepath.glob("**/*")))
+        self._finalised = True
+        if callback:
+            callback()
 
     def enqueue(self, file_path: Path):
         if not self._stopping:

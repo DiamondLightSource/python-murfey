@@ -100,6 +100,25 @@ class MultigridController:
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
 
+    def dormancy_check(self):
+        if not self.multigrid_watcher_active:
+            if (
+                all(r._finalised for r in self.rsync_processes.values())
+                and not any(a.thread.is_alive() for a in self.analysers.values())
+                and not any(
+                    w.thread.is_alive() for w in self._environment.watchers.values()
+                )
+            ):
+                self.dormant = True
+
+    def finalise(self):
+        for a in self.analysers.values():
+            a.request_stop()
+        for w in self._environment.watchers.values():
+            w.request_stop()
+        for p in self.rsync_processes.keys():
+            self._finalise_rsyncer(p)
+
     def _start_rsyncer_multigrid(
         self,
         source: Path,
@@ -170,7 +189,9 @@ class MultigridController:
     def _finalise_rsyncer(self, source: Path):
         finalise_thread = threading.Thread(
             name=f"Controller finaliser thread ({source})",
-            target=self.rsync_processes[source].finalise,
+            target=partial(
+                self.rsync_processes[source].finalise, callback=self.dormancy_check
+            ),
             kwargs={"thread": False},
             daemon=True,
         )
@@ -302,6 +323,7 @@ class MultigridController:
                 )
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
+            self.analysers[source].subscribe(self.dormancy_check, final=True)
             self.analysers[source].start()
             if transfer:
                 self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
@@ -340,6 +362,9 @@ class MultigridController:
                         source=str(source),
                     ),
                     secondary=True,
+                )
+                self._environment.watchers[source].subscribe(
+                    self.dormancy_check, final=True
                 )
                 self._environment.watchers[source].start()
 
