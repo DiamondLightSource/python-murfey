@@ -2271,7 +2271,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             ):
                 try:
                     for hook in dcg_hooks:
-                        hook(dcgid, session_id=message["session_id"])
+                        hook.load()(dcgid, session_id=message["session_id"])
                 except Exception:
                     logger.error(
                         "Call to data collection group hook failed", exc_info=True
