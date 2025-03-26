@@ -646,11 +646,8 @@ def get_index_config(request: Request):
     used by Cargo when searching for and downloading packages.
     """
 
-    print(f"Received request to access {str(request.url)}")
-
     # Construct URL for Rust router
     base_url = f"{request.url.scheme}://{request.url.netloc}" + rust.prefix
-    print(f"Base URL is {base_url}")
 
     # Construct config file with the necessary endpoints
     config = {
@@ -686,7 +683,7 @@ def get_index_package_metadata(
     c1 = 3, and c2 is the first character of the package.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate path to the package metadata
     if not all(bool(re.fullmatch(r"[\w\-]{1,2}", char)) for char in (c1, c2)):
@@ -723,7 +720,7 @@ def get_index_package_metadata_for_short_package_names(
     /1/{package} or /2/{package}.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate path to crate
     if n not in ("1", "2"):
@@ -754,7 +751,7 @@ def get_rust_api_package_index(
     in a JSON object based on the search query given.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
     if package and not bool(re.fullmatch(r"[\w\-]+", package)):
@@ -790,7 +787,7 @@ def get_rust_api_package_info(
     to other types of metadata.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
     if not bool(re.fullmatch(r"[\w\-]+", package)):
@@ -814,7 +811,7 @@ def get_rust_api_package_versions(
     links for said versions.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate crate name
     if not bool(re.fullmatch(r"[\w\-]+", package)):
@@ -840,7 +837,7 @@ def get_rust_api_package_download(
     Obtain and pass through a crate download request for a specific Rust package.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
     if not bool(re.fullmatch(r"[\w\-]+", package)):
@@ -880,7 +877,7 @@ def get_rust_package_download(
     Obtain and pass through a crate download request for a Rust package.
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package and version
     if not bool(re.fullmatch(r"[\w\-]+", package)):
@@ -926,7 +923,7 @@ def get_rust_package_crate(
     (e.g. https://static.crates.io/crates/anyhow will fail)
     """
 
-    print(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate crate and package names
     if not bool(re.fullmatch(r"[\w\-]+", package)):
