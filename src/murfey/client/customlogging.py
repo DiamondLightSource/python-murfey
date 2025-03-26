@@ -23,7 +23,7 @@ class CustomHandler(logging.Handler):
         try:
             return json.dumps(record_dict)
         except TypeError:
-            return json.dumps({str(k): str(v) for k, v in record_dict.items})
+            return json.dumps({str(k): str(v) for k, v in record_dict.items()})
 
     def emit(self, record):
         try:
