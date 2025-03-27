@@ -606,6 +606,12 @@ def get_cargo_config(request: Request):
             "[source.murfey-crates]",
             f'registry = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
             "",
+            "[registries.murfey-crates]",
+            f'index = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
+            "",
+            "[registry]",
+            'default = "murfey-crates"',  # Redirect to our mirror
+            "",
         ]
     )
     config_bytes = io.BytesIO(config_data.encode("utf-8"))
