@@ -686,7 +686,7 @@ def get_index_package_metadata(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate path to the package metadata
-    if not all(bool(re.fullmatch(r"[\w\-]{1,2}", char)) for char in (c1, c2)):
+    if any(not re.fullmatch(r"[\w\-]{1,2}", char) for char in (c1, c2)):
         raise ValueError("Invalid path to package metadata")
 
     if len(c1) == 1 and not c1 == "3":
@@ -694,7 +694,7 @@ def get_index_package_metadata(
     if c1 == "3" and not len(c2) == 1:
         raise ValueError("Invalid path to package metadata")
 
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
 
     # Request and return the metadata as a JSON file
@@ -725,7 +725,7 @@ def get_index_package_metadata_for_short_package_names(
     # Validate path to crate
     if n not in ("1", "2"):
         raise ValueError("Invalid path to package metadata")
-    if not bool(re.fullmatch(r"[\w\-]{1,2}", package)):
+    if not re.fullmatch(r"[\w\-]{1,2}", package):
         raise ValueError("Invalid package name")
 
     # Request and return the metadata as a JSON file
@@ -754,9 +754,9 @@ def get_rust_api_package_index(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
-    if package and not bool(re.fullmatch(r"[\w\-]+", package)):
+    if package and not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
-    if cursor and not bool(re.fullmatch(r"[a-zA-Z0-9]+", cursor)):
+    if cursor and not re.fullmatch(r"[a-zA-Z0-9]+", cursor):
         raise ValueError("Invalid cursor")
 
     # Formulate the search query to pass to the crates page
@@ -790,7 +790,7 @@ def get_rust_api_package_info(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
 
     # Return JSON of the package's page
@@ -814,7 +814,7 @@ def get_rust_api_package_versions(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate crate name
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
 
     # Return JSON of the package's version information
@@ -840,12 +840,12 @@ def get_rust_api_package_download(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package name
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
     # Validate version number
     # Not all developers adhere to guidelines when versioning their packages, so
     # '-', '_', '+', as well as letters can also be present in this field.
-    if not bool(re.fullmatch(r"[\w\-\.\+]+", version)):
+    if not re.fullmatch(r"[\w\-\.\+]+", version):
         raise ValueError("Invalid version number")
 
     # Request and return package
@@ -880,9 +880,9 @@ def get_rust_package_download(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate package and version
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
-    if not bool(re.fullmatch(r"[\w\-\.\+]+", version)):
+    if not re.fullmatch(r"[\w\-\.\+]+", version):
         raise ValueError("Invalid version number")
 
     # Request and return crate from https://static.crates.io
@@ -926,12 +926,12 @@ def get_rust_package_crate(
     logger.debug(f"Received request to access {str(request.url)}")
 
     # Validate crate and package names
-    if not bool(re.fullmatch(r"[\w\-]+", package)):
+    if not re.fullmatch(r"[\w\-]+", package):
         raise ValueError("Invalid package name")
     if not crate.endswith(".crate"):
         raise ValueError("This is a not a Rust crate")
     # Rust crates follow a '{crate}-{version}.crate' structure
-    if not bool(re.fullmatch(r"[\w\-]+\-[0-9\.]+\.crate", crate)):
+    if not re.fullmatch(r"[\w\-]+\-[0-9\.]+\.crate", crate):
         raise ValueError("Invalid crate name")
 
     # Request and return package
