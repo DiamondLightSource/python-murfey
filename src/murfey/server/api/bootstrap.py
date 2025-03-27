@@ -931,7 +931,7 @@ def get_rust_package_crate(
     if not crate.endswith(".crate"):
         raise ValueError("This is a not a Rust crate")
     # Rust crates follow a '{crate}-{version}.crate' structure
-    if not re.fullmatch(r"[\w\-]+\-[0-9\.]+\.crate", crate):
+    if not re.fullmatch(r"[\w\-\.]+\.crate", crate):
         raise ValueError("Invalid crate name")
 
     # Request and return package
