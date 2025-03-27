@@ -96,6 +96,9 @@ class Session(SQLModel, table=True):  # type: ignore
     rsync_instances: List[RsyncInstance] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    session_processing_parameters: List["SessionProcessingParameters"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 """
@@ -332,6 +335,9 @@ class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
     dose_per_frame: float
     eer_fractionation_file: str = ""
     symmetry: str = "C1"
+    session: Optional[Session] = Relationship(
+        back_populates="session_processing_parameters"
+    )
 
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
