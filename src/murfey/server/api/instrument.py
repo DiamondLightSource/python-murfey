@@ -420,6 +420,7 @@ class RSyncerInfo(BaseModel):
     files_transferred: int
     files_counted: int
     transferring: bool
+    session_id: int
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
@@ -443,7 +444,7 @@ async def get_rsyncer_info(
             ) as resp:
                 data = await resp.json()
     combined_data = []
-    data_source_lookup = {d.source: d for d in data}
+    data_source_lookup = {d["source"]: d for d in data}
     for ri in rsync_instances:
         d = data_source_lookup.get(ri.source, {})
         combined_data.append(
@@ -458,6 +459,7 @@ async def get_rsyncer_info(
                 files_transferred=ri.files_transferred,
                 files_counted=ri.files_counted,
                 transferring=ri.transferring,
+                session_id=session_id,
             )
         )
     return combined_data
