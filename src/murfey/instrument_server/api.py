@@ -147,10 +147,6 @@ def start_multigrid_watcher(
     for sid, controller in controllers.items():
         if controller.dormant:
             del controllers[sid]
-            requests.delete(
-                f"{_get_murfey_url()}/sessions/{sanitise_nonpath(str(sid))}",
-                headers={"Authorization": f"Bearer {tokens[sid]}"},
-            )
     controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,

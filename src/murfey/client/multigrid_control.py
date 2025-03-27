@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
+import aiohttp
 import requests
 
 import murfey.client.websocket
@@ -101,7 +102,7 @@ class MultigridController:
         self.multigrid_watcher_active = False
         self.dormancy_check()
 
-    def dormancy_check(self):
+    async def dormancy_check(self):
         if not self.multigrid_watcher_active:
             if (
                 all(r._finalised for r in self.rsync_processes.values())
@@ -110,6 +111,14 @@ class MultigridController:
                     w.thread.is_alive() for w in self._environment.watchers.values()
                 )
             ):
+                async with aiohttp.ClientSession() as clientsession:
+                    async with clientsession.delete(
+                        f"{self._environment.url.geturl()}/sessions/{self.session_id}",
+                        json={"access_token": self.token, "token_type": "bearer"},
+                    ) as response:
+                        success = response.status == 200
+                if not success:
+                    log.warning(f"Could not delete database data for {self.session_id}")
                 self.dormant = True
 
     def finalise(self):

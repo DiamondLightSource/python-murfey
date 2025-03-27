@@ -53,6 +53,7 @@ developer = [
     "pytest", # Test code functionality
 ]
 instrument-server = [
+    "aiohttp",
     "fastapi[standard]",
     "python-jose[cryptography]",
     "uvicorn[standard]",
