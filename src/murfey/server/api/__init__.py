@@ -1725,7 +1725,7 @@ async def write_eer_fractionation_file(
     ).all()
     if session_parameters:
         session_parameters[0].eer_fractionation_file = str(file_path)
-        db.add(session_parameters)
+        db.add(session_parameters[0])
         db.commit()
 
     if file_path.is_file():

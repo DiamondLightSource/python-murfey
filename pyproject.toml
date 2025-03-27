@@ -54,8 +54,7 @@ developer = [
 ]
 instrument-server = [
     "fastapi[standard]",
-    "python-jose[cryptography]",
-    "uvicorn[standard]",
+    "python-jose",
 ]
 server = [
     "aiohttp",
@@ -73,7 +72,6 @@ server = [
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
-    "uvicorn[standard]",
     "zocalo",
 ]
 [project.urls]
