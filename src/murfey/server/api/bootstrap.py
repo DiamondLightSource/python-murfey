@@ -15,6 +15,8 @@ required.
 from __future__ import annotations
 
 import functools
+import io
+import json
 import logging
 import random
 import re
@@ -22,8 +24,8 @@ from urllib.parse import quote
 
 import packaging.version
 import requests
-from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 import murfey
 from murfey.server import get_machine_config, respond_with_template
@@ -43,11 +45,14 @@ version = APIRouter(prefix="/version", tags=["bootstrap"])
 bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
 msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
+rust = APIRouter(prefix="/rust", tags=["bootstrap"])
 pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
 plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
 
 logger = logging.getLogger("murfey.server.api.bootstrap")
 
+# Create a reusable HTTP session to avoid spamming external endpoints
+http_session = requests.Session()
 
 """
 =======================================================================================
@@ -563,6 +568,403 @@ def get_msys2_package_file(
         )
     else:
         raise HTTPException(status_code=package_file.status_code)
+
+
+"""
+=======================================================================================
+RUST-RELATED FUNCTIONS AND ENDPOINTS
+=======================================================================================
+"""
+
+# Base URLs to use
+rust_index = "https://index.crates.io"
+rust_dl = "https://static.crates.io/crates"
+rust_api = "https://crates.io"
+
+
+@rust.get("/cargo/config.toml", response_class=StreamingResponse)
+def get_cargo_config(request: Request):
+    """
+    Returns a properly configured Cargo config that sets it to look ONLY at the
+    crates.io mirror.
+
+    The default path for this config on Linux devices is ~/.cargo/config.toml,
+    and its default path on Windows is %USERPROFILE%\\.cargo\\config.toml.
+    """
+
+    # Construct URL to our mirror of the Rust sparse index
+    index_mirror = (
+        f"{request.url.scheme}://{request.url.netloc}/{rust.prefix.strip('/')}/index/"
+    )
+
+    # Construct and return the config.toml file
+    config_data = "\n".join(
+        [
+            "[source.crates-io]",
+            'replace-with = "murfey-crates"',  # Redirect to our mirror
+            "",
+            "[source.murfey-crates]",
+            f'registry = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
+            "",
+            "[registries.murfey-crates]",
+            f'index = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
+            "",
+            "[registry]",
+            'default = "murfey-crates"',  # Redirect to our mirror
+            "",
+        ]
+    )
+    config_bytes = io.BytesIO(config_data.encode("utf-8"))
+
+    return StreamingResponse(
+        config_bytes,
+        media_type="application/toml+json",
+        headers={"Content-Disposition": "attachment; filename=config.toml"},
+    )
+
+
+"""
+crates.io Sparse Index Registry Key Endpoints
+"""
+
+
+@rust.get("/index")
+def get_index_page():
+    """
+    Returns a mirror of the https://index.crates.io landing page.
+    """
+
+    response = http_session.get(rust_index)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return Response(
+        content=response.content,
+        media_type=response.headers.get("Content-Type"),
+        status_code=response.status_code,
+    )
+
+
+@rust.get("/index/config.json", response_class=StreamingResponse)
+def get_index_config(request: Request):
+    """
+    Download a config.json file used by Cargo to navigate sparse index registries
+    with.
+
+    The 'dl' key points to our mirror of the static crates.io repository, while
+    the 'api' key points to an API version of that same registry. Both will be
+    used by Cargo when searching for and downloading packages.
+    """
+
+    # Construct URL for Rust router
+    base_url = f"{request.url.scheme}://{request.url.netloc}" + rust.prefix
+
+    # Construct config file with the necessary endpoints
+    config = {
+        "dl": f"{base_url}/crates",
+        "api": f"{base_url}",
+    }
+
+    # Save it as a JSON and return it as part of the response
+    json_data = json.dumps(config, indent=4)
+    json_bytes = io.BytesIO(json_data.encode("utf-8"))
+
+    return StreamingResponse(
+        json_bytes,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=config.json"},
+    )
+
+
+@rust.get("/index/{c1}/{c2}/{package}", response_class=StreamingResponse)
+def get_index_package_metadata(
+    request: Request,
+    c1: str,
+    c2: str,
+    package: str,
+):
+    """
+    Download the metadata for a given package from the crates.io sparse index.
+    The path to the metadata file on the server side takes the following form:
+    /{c1}/{c2}/{package}
+
+    c1 and c2 are 2 characters-long strings that are taken from the first 4
+    characters of the package name (a-z, A-Z, 0-9, -, _). For 3-letter packages,
+    c1 = 3, and c2 is the first character of the package.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate path to the package metadata
+    if any(not re.fullmatch(r"[\w\-]{1,2}", char) for char in (c1, c2)):
+        raise ValueError("Invalid path to package metadata")
+
+    if len(c1) == 1 and not c1 == "3":
+        raise ValueError("Invalid path to package metadata")
+    if c1 == "3" and not len(c2) == 1:
+        raise ValueError("Invalid path to package metadata")
+
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+
+    # Request and return the metadata as a JSON file
+    url = f"{rust_index}/{c1}/{c2}/{package}"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        response.iter_content(chunk_size=8192),
+        media_type="application/json",
+    )
+
+
+@rust.get("/index/{n}/{package}", response_class=StreamingResponse)
+def get_index_package_metadata_for_short_package_names(
+    request: Request,
+    n: str,
+    package: str,
+):
+    """
+    The Rust sparse index' naming scheme for packages with 1-2 characters is
+    different from the standard path convention. They are stored under
+    /1/{package} or /2/{package}.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate path to crate
+    if n not in ("1", "2"):
+        raise ValueError("Invalid path to package metadata")
+    if not re.fullmatch(r"[\w\-]{1,2}", package):
+        raise ValueError("Invalid package name")
+
+    # Request and return the metadata as a JSON file
+    url = f"{rust_index}/{n}/{package}"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        response.iter_content(chunk_size=8192),
+        media_type="application/json",
+    )
+
+
+@rust.get("/crates/{package}/{version}/download", response_class=StreamingResponse)
+def get_rust_package_download(
+    request: Request,
+    package: str,
+    version: str,
+):
+    """
+    Obtain and pass through a crate download request for a Rust package via the
+    sparse index registry.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate package and version
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+    if not re.fullmatch(r"[\w\-\.\+]+", version):
+        raise ValueError("Invalid version number")
+
+    # Request and return crate from https://static.crates.io
+    url = f"{rust_dl}/{package}/{version}/download"
+    response = http_session.get(url)
+    file_name = f"{package}-{version}.crate"  # Construct file name to save package as
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Content-Type": response.headers.get(
+                "Content-Type", "application/octet-stream"
+            ),
+            "Content-Length": response.headers.get("Content-Length"),
+        },
+        status_code=response.status_code,
+    )
+
+
+"""
+crates.io API Key Endpoints
+"""
+
+
+@rust.get("/api/v1/crates")
+def get_rust_api_package_index(
+    request: Request,
+    package: str = Query(None, alias="q"),
+    per_page: int = Query(10),
+    cursor: str = Query(None, alias="seek"),
+):
+    """
+    Displays the Rust API package index, which returns names of available packages
+    in a JSON object based on the search query given.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate package name
+    if package and not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+    if cursor and not re.fullmatch(r"[a-zA-Z0-9]+", cursor):
+        raise ValueError("Invalid cursor")
+
+    # Formulate the search query to pass to the crates page
+    search_params: dict[str, str | int] = {}
+    if package:
+        search_params["q"] = package
+    if per_page:
+        search_params["per_page"] = per_page
+    if cursor:
+        search_params["seek"] = cursor
+
+    # Submit request and return response
+    url = f"{rust_api}/api/v1/crates"
+    response = http_session.get(url, params=search_params)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return response.json()
+
+
+@rust.get("/api/v1/crates/{package}")
+def get_rust_api_package_info(
+    request: Request,
+    package: str,
+):
+    """
+    Displays general information for a given Rust package, as a JSON object.
+    Contains both version information and download information, in addition
+    to other types of metadata.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate package name
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+
+    # Return JSON of the package's page
+    url = f"{rust_api}/api/v1/crates/{package}"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return response.json()
+
+
+@rust.get("/api/v1/crates/{package}/versions")
+def get_rust_api_package_versions(
+    request: Request,
+    package: str,
+):
+    """
+    Displays all available versions for a particular Rust package, along with download
+    links for said versions.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate crate name
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+
+    # Return JSON of the package's version information
+    url = f"{rust_api}/api/v1/crates/{package}/versions"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return response.json()
+
+
+@rust.get(
+    "/api/v1/crates/{package}/{version}/download", response_class=StreamingResponse
+)
+def get_rust_api_package_download(
+    request: Request,
+    package: str,
+    version: str,
+):
+    """
+    Obtain and pass through a crate download request for a specific Rust package.
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate package name
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+    # Validate version number
+    # Not all developers adhere to guidelines when versioning their packages, so
+    # '-', '_', '+', as well as letters can also be present in this field.
+    if not re.fullmatch(r"[\w\-\.\+]+", version):
+        raise ValueError("Invalid version number")
+
+    # Request and return package
+    url = f"{rust_api}/api/v1/crates/{package}/{version}/download"
+    response = http_session.get(url)
+    file_name = f"{package}-{version}.crate"  # Construct crate name to save as
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Content-Type": response.headers.get(
+                "Content-Type", "application/octet-stream"
+            ),
+            "Content-Length": response.headers.get("Content-Length"),
+        },
+        status_code=response.status_code,
+    )
+
+
+@rust.get("/crates/{package}/{crate}", response_class=StreamingResponse)
+def get_rust_package_crate(
+    request: Request,
+    package: str,
+    crate: str,
+):
+    """
+    Obtain and pass through a download for a specific Rust crate. The Rust API
+    download request actually redirects to the static crate repository, so this
+    endpoint covers cases where the static crate download link is requested.
+
+    The static Rust package repository has been configured such that only requests
+    for a specific crate are accepted and handled.
+    (e.g. https://static.crates.io/crates/anyhow/anyhow-1.0.97.crate will pass)
+
+    A request for any other part of the URL path will be denied.
+    (e.g. https://static.crates.io/crates/anyhow will fail)
+    """
+
+    logger.debug(f"Received request to access {str(request.url)}")
+
+    # Validate crate and package names
+    if not re.fullmatch(r"[\w\-]+", package):
+        raise ValueError("Invalid package name")
+    if not crate.endswith(".crate"):
+        raise ValueError("This is a not a Rust crate")
+    # Rust crates follow a '{crate}-{version}.crate' structure
+    if not re.fullmatch(r"[\w\-\.]+\.crate", crate):
+        raise ValueError("Invalid crate name")
+
+    # Request and return package
+    url = f"{rust_dl}/{package}/{crate}"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        content=response.iter_content(),
+        headers={
+            "Content-Disposition": f'attachment; filename="{crate}"',
+            "Content-Type": response.headers.get(
+                "Content-Type", "application/octet-stream"
+            ),
+            "Content-Length": response.headers.get("Content-Length"),
+        },
+        status_code=response.status_code,
+    )
 
 
 """
