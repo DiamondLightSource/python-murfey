@@ -23,7 +23,7 @@ from murfey.server.api.auth import (
 from murfey.server.murfey_db import murfey_db
 from murfey.util import secure_path
 from murfey.util.config import get_machine_config
-from murfey.util.db import Session, SessionProcessingParameters
+from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
@@ -415,16 +415,24 @@ class RSyncerInfo(BaseModel):
     num_files_in_queue: int
     alive: bool
     stopping: bool
+    destination: str
+    tag: str
+    files_transferred: int
+    files_counted: int
+    transferring: bool
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
 async def get_rsyncer_info(
-    instrument_name: str, session_id: MurfeySessionID
+    instrument_name: str, session_id: MurfeySessionID, db=murfey_db
 ) -> List[RSyncerInfo]:
     data = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    ).all()
     if machine_config.instrument_server_url:
         async with lock:
             token = instrument_server_tokens[session_id]["access_token"]
@@ -434,4 +442,22 @@ async def get_rsyncer_info(
                 headers={"Authorization": f"Bearer {token}"},
             ) as resp:
                 data = await resp.json()
-    return data
+    combined_data = []
+    data_source_lookup = {d.source: d for d in data}
+    for ri in rsync_instances:
+        d = data_source_lookup.get(ri.source, {})
+        combined_data.append(
+            RSyncerInfo(
+                source=ri.source,
+                num_files_transferred=d.get("num_files_transferred", 0),
+                num_files_in_queue=d.get("num_files_in_queue", 0),
+                alive=d.get("alive", False),
+                stopping=d.get("stopping", True),
+                destination=ri.destination,
+                tag=ri.tag,
+                files_transferred=ri.files_transferred,
+                files_counted=ri.files_counted,
+                transferring=ri.transferring,
+            )
+        )
+    return combined_data
