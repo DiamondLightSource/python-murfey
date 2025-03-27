@@ -21,7 +21,7 @@ from murfey.server.api.auth import (
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
-from murfey.util import secure_path
+from murfey.util import sanitise_nonpath, secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup
@@ -365,7 +365,7 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/finalise_session",
+                f"{machine_config.instrument_server_url}/sessions/{sanitise_nonpath(str(session_id))}/finalise_session",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
