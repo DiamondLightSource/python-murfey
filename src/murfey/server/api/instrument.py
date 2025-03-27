@@ -413,6 +413,8 @@ class RSyncerInfo(BaseModel):
     source: str
     num_files_transferred: int
     num_files_in_queue: int
+    alive: bool
+    stopping: bool
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")

@@ -223,6 +223,8 @@ class RSyncerInfo(BaseModel):
     source: str
     num_files_transferred: int
     num_files_in_queue: int
+    alive: bool
+    stopping: bool
 
 
 @router.get("/sessions/{session_id}/rsyncer_info")
@@ -234,6 +236,8 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
                 source=str(k),
                 num_files_transferred=v._files_transferred,
                 num_files_in_queue=v.queue.qsize(),
+                alive=v.thread.is_alive(),
+                stopping=v._stopping,
             )
         )
     return info
