@@ -440,12 +440,17 @@ async def get_rsyncer_info(
                 token = instrument_server_tokens[session_id]["access_token"]
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.get(
-                    f"{machine_config.instrument_server_url}/sessions/{sanitise(str(session_id))}/rsyncer_info",
+                    f"{machine_config.instrument_server_url}/sessions/{session_id}/rsyncer_info",
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     data = await resp.json()
         except KeyError:
             data = []
+        except Exception:
+            log.warning(
+                "Exception encountered gathering rsyncer info from the instrument server",
+                exc_info=True,
+            )
     combined_data = []
     data_source_lookup = {d["source"]: d for d in data}
     for ri in rsync_instances:
