@@ -114,3 +114,5 @@ class MultigridDirWatcher(murfey.util.Observer):
             if first_loop:
                 first_loop = False
             time.sleep(15)
+
+        self.notify(final=True)

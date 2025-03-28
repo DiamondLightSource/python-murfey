@@ -144,6 +144,9 @@ def start_multigrid_watcher(
     if controllers.get(session_id) is not None:
         return {"success": True}
     label = watcher_spec.label
+    for sid, controller in controllers.items():
+        if controller.dormant:
+            del controllers[sid]
     controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,
@@ -175,6 +178,9 @@ def start_multigrid_watcher(
             controllers[session_id]._start_rsyncer_multigrid,
             destination_overrides=watcher_spec.destination_overrides,
         )
+    )
+    watchers[session_id].subscribe(
+        controllers[session_id]._multigrid_watcher_finalised, final=True
     )
     watchers[session_id].start()
     return {"success": True}
@@ -210,6 +216,13 @@ def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
 @router.post("/sessions/{session_id}/finalise_rsyncer")
 def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._finalise_rsyncer(rsyncer_source.source)
+    return {"success": True}
+
+
+@router.post("/sessions/{session_id}/finalise_session")
+def finalise_session(session_id: MurfeySessionID):
+    watchers[session_id].request_stop()
+    controllers[session_id].finalise()
     return {"success": True}
 
 

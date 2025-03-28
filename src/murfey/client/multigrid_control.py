@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
+import aiohttp
 import requests
 
 import murfey.client.websocket
@@ -34,6 +35,8 @@ class MultigridController:
     rsync_url: str = ""
     rsync_module: str = "data"
     demo: bool = False
+    dormant: bool = False
+    multigrid_watcher_active: bool = True
     processing_enabled: bool = True
     do_transfer: bool = True
     dummy_dc: bool = False
@@ -94,6 +97,37 @@ class MultigridController:
             server=self.murfey_url,
             register_client=False,
         )
+
+    def _multigrid_watcher_finalised(self):
+        self.multigrid_watcher_active = False
+        self.dormancy_check()
+
+    async def dormancy_check(self):
+        if not self.multigrid_watcher_active:
+            if (
+                all(r._finalised for r in self.rsync_processes.values())
+                and not any(a.thread.is_alive() for a in self.analysers.values())
+                and not any(
+                    w.thread.is_alive() for w in self._environment.watchers.values()
+                )
+            ):
+                async with aiohttp.ClientSession() as clientsession:
+                    async with clientsession.delete(
+                        f"{self._environment.url.geturl()}/sessions/{self.session_id}",
+                        json={"access_token": self.token, "token_type": "bearer"},
+                    ) as response:
+                        success = response.status == 200
+                if not success:
+                    log.warning(f"Could not delete database data for {self.session_id}")
+                self.dormant = True
+
+    def finalise(self):
+        for a in self.analysers.values():
+            a.request_stop()
+        for w in self._environment.watchers.values():
+            w.request_stop()
+        for p in self.rsync_processes.keys():
+            self._finalise_rsyncer(p)
 
     def _start_rsyncer_multigrid(
         self,
@@ -165,7 +199,9 @@ class MultigridController:
     def _finalise_rsyncer(self, source: Path):
         finalise_thread = threading.Thread(
             name=f"Controller finaliser thread ({source})",
-            target=self.rsync_processes[source].finalise,
+            target=partial(
+                self.rsync_processes[source].finalise, callback=self.dormancy_check
+            ),
             kwargs={"thread": False},
             daemon=True,
         )
@@ -297,6 +333,7 @@ class MultigridController:
                 )
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
+            self.analysers[source].subscribe(self.dormancy_check, final=True)
             self.analysers[source].start()
             if transfer:
                 self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
@@ -335,6 +372,9 @@ class MultigridController:
                         source=str(source),
                     ),
                     secondary=True,
+                )
+                self._environment.watchers[source].subscribe(
+                    self.dormancy_check, final=True
                 )
                 self._environment.watchers[source].start()
 
