@@ -505,10 +505,23 @@ def get_cargo_config(request: Request):
     and its default path on Windows is %USERPROFILE%\\.cargo\\config.toml.
     """
 
-    # Construct URL to our mirror of the Rust sparse index
-    index_mirror = (
-        f"{request.url.scheme}://{request.url.netloc}/{rust.prefix.strip('/')}/index/"
+    # Check if this is a forwarded request from somewhere else and construct netloc
+    netloc = (
+        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
+        if request.headers.get("X-Forwarded-Host")
+        and request.headers.get("X-Forwarded-Port")
+        else request.url.netloc
     )
+
+    # Find path to Rust router using current URL Path
+    path_to_router = request.url.path.removesuffix("/cargo/config.toml")
+
+    # Construct base URL for subsequent use
+    base_url = f"{request.url.scheme}://{netloc}{path_to_router}"
+    logger.debug(f"Base URL to Rust sub-router determined to be {base_url}")
+
+    # Construct URL to our mirror of the Rust sparse index
+    index_url = f"{base_url}/index/"
 
     # Construct and return the config.toml file
     config_data = "\n".join(
@@ -517,10 +530,10 @@ def get_cargo_config(request: Request):
             'replace-with = "murfey-crates"',  # Redirect to our mirror
             "",
             "[source.murfey-crates]",
-            f'registry = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
+            f'registry = "sparse+{index_url}"',  # sparse+ to use sparse protocol
             "",
             "[registries.murfey-crates]",
-            f'index = "sparse+{index_mirror}"',  # sparse+ to use sparse protocol
+            f'index = "sparse+{index_url}"',  # sparse+ to use sparse protocol
             "",
             "[registry]",
             'default = "murfey-crates"',  # Redirect to our mirror
@@ -568,8 +581,20 @@ def get_index_config(request: Request):
     used by Cargo when searching for and downloading packages.
     """
 
-    # Construct URL for Rust router
-    base_url = f"{request.url.scheme}://{request.url.netloc}" + rust.prefix
+    # Check if this is a forwarded request from somewhere else and construct netloc
+    netloc = (
+        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
+        if request.headers.get("X-Forwarded-Host")
+        and request.headers.get("X-Forwarded-Port")
+        else request.url.netloc
+    )
+
+    # Find path to Rust router using current URL Path
+    path_to_router = request.url.path.removesuffix("/index/config.json")
+
+    # Construct base URL for subsequent use
+    base_url = f"{request.url.scheme}://{netloc}{path_to_router}"
+    logger.debug(f"Base URL to Rust sub-router determined to be {base_url}")
 
     # Construct config file with the necessary endpoints
     config = {
