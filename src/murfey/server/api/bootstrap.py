@@ -111,7 +111,7 @@ def get_bootstrap_instructions(request: Request):
     )
 
 
-@bootstrap.get("/pip.whl", response_class=Response)
+@bootstrap.get("/pip.whl", response_class=StreamingResponse)
 def get_pip_wheel():
     """
     Return a static version of pip. This does not need to be the newest or best,
@@ -125,7 +125,7 @@ def get_pip_wheel():
     )
 
 
-@bootstrap.get("/murfey.whl", response_class=Response)
+@bootstrap.get("/murfey.whl", response_class=StreamingResponse)
 def get_murfey_wheel():
     """
     Return a wheel file containing the latest release version of Murfey. We should
@@ -133,7 +133,7 @@ def get_murfey_wheel():
     murfey.bootstrap is compatible with all relevant versions of Python.
     This also ignores yanked releases, which again should be fine.
     """
-    full_path_response = requests.get("https://pypi.org/simple/murfey")
+    full_path_response = http_session.get("https://pypi.org/simple/murfey")
     wheels = {}
 
     for wheel_file in re.findall(
@@ -161,7 +161,7 @@ CYGWIN-RELATED API ENDPOINTS
 """
 
 
-@cygwin.get("/setup-x86_64.exe", response_class=Response)
+@cygwin.get("/setup-x86_64.exe", response_class=StreamingResponse)
 def get_cygwin_setup():
     """
     Obtain and pass through a Cygwin installer from an official source.
@@ -169,11 +169,12 @@ def get_cygwin_setup():
     Cygwin distribution that then remains on the client machines.
     """
     filename = "setup-x86_64.exe"
-    installer = requests.get(f"https://www.cygwin.com/{filename}")
-    return Response(
-        content=installer.content,
-        media_type=installer.headers.get("Content-Type"),
-        status_code=installer.status_code,
+    response = http_session.get(f"https://www.cygwin.com/{filename}")
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        media_type=response.headers.get("Content-Type"),
+        headers={"Content-Disposition": f"attachment; filename=cygwin-{filename}"},
+        status_code=response.status_code,
     )
 
 
@@ -185,7 +186,7 @@ def find_cygwin_mirror() -> str:
     lifetime of the server.
     """
     url = "https://www.cygwin.com/mirrors.lst"
-    mirrors = requests.get(url)
+    mirrors = http_session.get(url)
     logger.info(
         f"Reading mirrors from {url} returned status code {mirrors.status_code} {mirrors.reason}"
     )
@@ -226,11 +227,16 @@ def find_cygwin_mirror() -> str:
     return picked_mirror
 
 
-@cygwin.get("/{request_path:path}", response_class=Response)
-def parse_cygwin_request(request_path: str):
+@cygwin.get("/{request_path:path}", response_class=StreamingResponse)
+def parse_cygwin_request(
+    request: Request,
+    request_path: str,
+):
     """
     Forward a Cygwin setup request to an official mirror.
     """
+
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate request path
     if bool(re.fullmatch(r"^[\w\s\.\-\+/]+$", request_path)) is False:
@@ -244,11 +250,11 @@ def parse_cygwin_request(request_path: str):
         )
 
     logger.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
-    cygwin_data = requests.get(url)
-    return Response(
-        content=cygwin_data.content,
-        media_type=cygwin_data.headers.get("Content-Type"),
-        status_code=cygwin_data.status_code,
+    response = http_session.get(url)
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        media_type=response.headers.get("Content-Type"),
+        status_code=response.status_code,
     )
 
 
@@ -294,13 +300,18 @@ valid_envs = (
 )
 
 
-@msys2.get("/distrib/{setup_file}", response_class=Response)
-def get_msys2_setup(setup_file: str):
+@msys2.get("/distrib/{setup_file}", response_class=StreamingResponse)
+def get_msys2_setup(
+    request: Request,
+    setup_file: str,
+):
     """
     Obtain and pass through an MSYS2 installer from an official source.
     This is used during client bootstrapping, and can download and install the
     MSYS2 distribution that then remains on the client machines.
     """
+
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate characters in sent path
     if not bool(re.fullmatch(r"^[\w\.\-]+$", setup_file)):
@@ -312,15 +323,15 @@ def get_msys2_setup(setup_file: str):
     ):
         raise ValueError(f"{setup_file!r} is not a valid executable")
 
-    installer = requests.get(f"{msys2_url}/distrib/{setup_file}")
-    return Response(
-        content=installer.content,
-        media_type=installer.headers.get("Content-Type"),
-        status_code=installer.status_code,
+    response = http_session.get(f"{msys2_url}/distrib/{setup_file}")
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        media_type=response.headers.get("Content-Type"),
+        status_code=response.status_code,
     )
 
 
-@msys2.get("", response_class=Response)
+@msys2.get("/", response_class=Response)
 def get_msys2_main_index(
     request: Request,
 ) -> Response:
@@ -329,25 +340,11 @@ def get_msys2_main_index(
     from the main MSYS2 repository.
     """
 
-    def _rewrite_url(match):
-        """
-        Use regular expression matching to rewrite the package URLs and point them
-        explicitly to this current server.
-        """
-        url = (
-            f"{base_path}/{match.group(1)}"
-            if not str(match.group(1)).startswith("http")
-            else str(match.group(1))
-        )
-        return f'<a href="{url}">' + match.group(2) + "</a>"
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
-    # Get base path to current FastAPI endpoint
-    base_url = str(request.base_url).strip("/")
-    path = request.url.path.strip("/")
-    base_path = f"{base_url}/{path}"
-
+    # Construct URL and get response
     env_url = f"{msys2_url}"
-    response = requests.get(env_url)
+    response = http_session.get(env_url)
 
     # Parse and rewrite package index content
     content: bytes = response.content  # Get content in bytes
@@ -357,16 +354,10 @@ def get_msys2_main_index(
         if line.startswith("<a href"):
             # Mirror only lines related to MSYS2 environments or the distribution folder
             if any(env[0] in line for env in valid_envs) or "distrib" in line:
-                line_new = re.sub(
-                    '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
-                    _rewrite_url,  # Function to apply search criteria to
-                    line,
-                )
-                content_text_list.append(line_new)
-
+                content_text_list.append(line)
             # Other URLs don't need to be mirrored
             else:
-                pass
+                continue
         else:
             content_text_list.append(line)
 
@@ -380,32 +371,17 @@ def get_msys2_main_index(
     )
 
 
-@msys2.get("/{system}", response_class=Response)
+@msys2.get("/{system}/", response_class=Response)
 def get_msys2_environment_index(
-    system: str,
     request: Request,
+    system: str,
 ) -> Response:
     """
     Returns a list of all MSYS2 environments for a given system from the main MSYS2
     repository.
     """
 
-    def _rewrite_url(match):
-        """
-        Use regular expression matching to rewrite the package URLs and point them
-        explicitly to this current server.
-        """
-        url = (
-            f"{base_path}/{match.group(1)}"
-            if not str(match.group(1)).startswith("http")
-            else str(match.group(1))
-        )
-        return f'<a href="{url}">' + match.group(2) + "</a>"
-
-    # Get base path to current FastAPI endpoint
-    base_url = str(request.base_url).strip("/")
-    path = request.url.path.strip("/")
-    base_path = f"{base_url}/{path}"
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate provided system; use this endpoint to display 'distrib' folder too
     if not (any(system in env[0] for env in valid_envs) or system == "distrib"):
@@ -413,7 +389,7 @@ def get_msys2_environment_index(
 
     # Construct URL to main MSYS repo and get response
     arch_url = f'{msys2_url}/{quote(system, safe="/")}'
-    response = requests.get(arch_url)
+    response = http_session.get(arch_url)
 
     # Parse and rewrite package index content
     content: bytes = response.content  # Get content in bytes
@@ -425,14 +401,7 @@ def get_msys2_environment_index(
             if system == "distrib":
                 if not any(ext in line for ext in msys2_file_ext):
                     continue
-
-            # Rewrite URL to point explicitly to current server
-            line_new = re.sub(
-                '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
-                _rewrite_url,  # Function to apply search criteria to
-                line,
-            )
-            content_text_list.append(line_new)
+            content_text_list.append(line)
         else:
             content_text_list.append(line)
 
@@ -446,33 +415,18 @@ def get_msys2_environment_index(
     )
 
 
-@msys2.get("/{system}/{environment}", response_class=Response)
+@msys2.get("/{system}/{environment}/", response_class=Response)
 def get_msys2_package_index(
+    request: Request,
     system: str,
     environment: str,
-    request: Request,
 ) -> Response:
     """
     Obtain a list of all available MSYS2 packages for a given environment from the main
     MSYS2 repo.
     """
 
-    def _rewrite_url(match):
-        """
-        Use regular expression matching to rewrite the package URLs and point them
-        explicitly to this current server.
-        """
-        url = (
-            f"{base_path}/{match.group(1)}"
-            if not str(match.group(1)).startswith("http")
-            else str(match.group(1))
-        )
-        return f'<a href="{url}">' + match.group(2) + "</a>"
-
-    # Get base path to current FastAPI endpoint
-    base_url = str(request.base_url).strip("/")
-    path = request.url.path.strip("/")
-    base_path = f"{base_url}/{path}"
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate environment
     if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
@@ -482,35 +436,17 @@ def get_msys2_package_index(
     package_list_url = (
         f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}'
     )
-    response = requests.get(package_list_url)
-
-    # Parse and rewrite package index content
-    content: bytes = response.content  # Get content in bytes
-    content_text: str = content.decode("latin1")  # Convert to strings
-    content_text_list = []
-    for line in content_text.splitlines():
-        if line.startswith("<a href="):
-            line_new = re.sub(
-                '^<a href="([^">]*)">([^<]*)</a>',  # Regex search criteria
-                _rewrite_url,  # Function to apply search criteria to
-                line,
-            )
-            content_text_list.append(line_new)
-        else:
-            content_text_list.append(line)
-
-    # Reconstruct conent
-    content_text_new = str("\n".join(content_text_list))  # Regenerate HTML structure
-    content_new = content_text_new.encode("latin1")  # Convert back to bytes
+    response = http_session.get(package_list_url)
     return Response(
-        content=content_new,
+        content=response.content,
         status_code=response.status_code,
         media_type=response.headers.get("Content-Type"),
     )
 
 
-@msys2.get("/{system}/{environment}/{package}", response_class=Response)
+@msys2.get("/{system}/{environment}/{package}", response_class=StreamingResponse)
 def get_msys2_package_file(
+    request: Request,
     system: str,
     environment: str,
     package: str,
@@ -518,6 +454,8 @@ def get_msys2_package_file(
     """
     Obtain and pass through a specific download for an MSYS2 package.
     """
+
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate environment
     if any(system in env[0] and environment in env[1] for env in valid_envs) is False:
@@ -535,16 +473,14 @@ def get_msys2_package_file(
 
     # Construct URL to main MSYS repo and get response
     package_url = f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}/{quote(package, safe="/")}'
-    package_file = requests.get(package_url)
-
-    if package_file.status_code == 200:
-        return Response(
-            content=package_file.content,
-            media_type=package_file.headers.get("Content-Type"),
-            status_code=package_file.status_code,
-        )
-    else:
-        raise HTTPException(status_code=package_file.status_code)
+    response = http_session.get(package_url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        media_type=response.headers.get("Content-Type"),
+        status_code=response.status_code,
+    )
 
 
 """
@@ -605,7 +541,7 @@ crates.io Sparse Index Registry Key Endpoints
 """
 
 
-@rust.get("/index")
+@rust.get("/index/", response_class=Response)
 def get_index_page():
     """
     Returns a mirror of the https://index.crates.io landing page.
@@ -669,7 +605,7 @@ def get_index_package_metadata(
     c1 = 3, and c2 is the first character of the package.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate path to the package metadata
     if any(not re.fullmatch(r"[\w\-]{1,2}", char) for char in (c1, c2)):
@@ -706,7 +642,7 @@ def get_index_package_metadata_for_short_package_names(
     /1/{package} or /2/{package}.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate path to crate
     if n not in ("1", "2"):
@@ -736,7 +672,7 @@ def get_rust_package_download(
     sparse index registry.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate package and version
     if not re.fullmatch(r"[\w\-]+", package):
@@ -780,7 +716,7 @@ def get_rust_api_package_index(
     in a JSON object based on the search query given.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate package name
     if package and not re.fullmatch(r"[\w\-]+", package):
@@ -816,7 +752,7 @@ def get_rust_api_package_info(
     to other types of metadata.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate package name
     if not re.fullmatch(r"[\w\-]+", package):
@@ -837,10 +773,10 @@ def get_rust_api_package_versions(
 ):
     """
     Displays all available versions for a particular Rust package, along with download
-    links for said versions.
+    links for said versions, as a JSON object.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate crate name
     if not re.fullmatch(r"[\w\-]+", package):
@@ -866,7 +802,7 @@ def get_rust_api_package_download(
     Obtain and pass through a crate download request for a specific Rust package.
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate package name
     if not re.fullmatch(r"[\w\-]+", package):
@@ -915,7 +851,7 @@ def get_rust_package_crate(
     (e.g. https://static.crates.io/crates/anyhow will fail)
     """
 
-    logger.debug(f"Received request to access {str(request.url)}")
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate crate and package names
     if not re.fullmatch(r"[\w\-]+", package):
@@ -959,20 +895,18 @@ def _get_full_pypi_path_response(package: str) -> requests.Response:
 
     # Check that a package name follows PEP 503 naming conventions, containing only
     # alphanumerics (including underscores; \w), dashes (\-), and periods (\.)
-    if re.match(r"^[\w\-\.]+$", package) is not None:
-        # Sanitise and normalise package name according to PEP 503
-        package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="/")
-
-        # Get HTTP response
-        url = f"https://pypi.org/simple/{package_clean}"
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            return response
-        else:
-            raise HTTPException(status_code=response.status_code)
-    else:
+    if not re.fullmatch(r"[\w\-\.]+", package):
         raise ValueError(f"{package!r} is not a valid package name")
+
+    # Sanitise and normalise package name according to PEP 503
+    package_clean = quote(re.sub(r"[-_.]+", "-", package.lower()), safe="/")
+
+    # Get HTTP response
+    url = f"https://pypi.org/simple/{package_clean}"
+    response = http_session.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code)
+    return response
 
 
 @pypi.get("/", response_class=Response)
@@ -981,17 +915,16 @@ def get_pypi_index():
     Obtain list of all PyPI packages via the simple API (PEP 503).
     """
 
-    index = requests.get("https://pypi.org/simple/")
-
+    response = http_session.get("https://pypi.org/simple/")
     return Response(
-        content=index.content,
-        status_code=index.status_code,
-        media_type=index.headers.get("Content-Type"),
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
 @pypi.get("/{package}/", response_class=Response)
-def get_pypi_package_downloads_list(package: str) -> Response:
+def get_pypi_package_downloads_list(request: Request, package: str) -> Response:
     """
     Obtain list of all package downloads from PyPI via the simple API (PEP 503), and
     rewrite all download URLs to point to this server, under the current directory.
@@ -1005,6 +938,8 @@ def get_pypi_package_downloads_list(package: str) -> Response:
         # url = match.group(4)  # Original
         url = match.group(3)
         return '<a href="' + url + '"' + match.group(2) + ">" + match.group(3) + "</a>"
+
+    logger.debug(f"Received request to access {str(request.url)!r}")
 
     # Validate package and URL
     full_path_response = _get_full_pypi_path_response(package)
@@ -1042,8 +977,12 @@ def get_pypi_package_downloads_list(package: str) -> Response:
     )
 
 
-@pypi.get("/{package}/{filename}", response_class=Response)
-def get_pypi_file(package: str, filename: str):
+@pypi.get("/{package}/{filename}", response_class=StreamingResponse)
+def get_pypi_file(
+    request: Request,
+    package: str,
+    filename: str,
+):
     """
     Obtain and pass through a specific download for a PyPI package.
     """
@@ -1081,6 +1020,8 @@ def get_pypi_file(package: str, filename: str):
 
         return response_bytes_new
 
+    logger.debug(f"Received request to access {str(request.url)!r}")
+
     # Validate package and URL
     full_path_response = _get_full_pypi_path_response(package)
 
@@ -1098,12 +1039,12 @@ def get_pypi_file(package: str, filename: str):
     if not selected_package_link:
         raise HTTPException(status_code=404, detail="File not found for package")
     original_url = selected_package_link.group(1)
-    original_file = requests.get(original_url)
+    response = http_session.get(original_url)
 
-    return Response(
-        content=original_file.content,
-        media_type=original_file.headers.get("Content-Type"),
-        status_code=original_file.status_code,
+    return StreamingResponse(
+        content=response.iter_content(chunk_size=8192),
+        media_type=response.headers.get("Content-Type"),
+        status_code=response.status_code,
     )
 
 
