@@ -404,6 +404,7 @@ class Analyser(Observer):
                     )
                     self.post_transfer(transferred_file)
             self.queue.task_done()
+        self.notify(final=True)
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
@@ -431,6 +432,10 @@ class Analyser(Observer):
             raise RuntimeError("Analyser has already stopped")
         logger.info(f"Analyser thread starting for {self}")
         self.thread.start()
+
+    def request_stop(self):
+        self._stopping = True
+        self._halt_thread = True
 
     def stop(self):
         logger.debug("Analyser thread stop requested")
