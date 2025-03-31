@@ -69,9 +69,12 @@ class State(Mapping[str, T], Observer):
         self,
         fn: Callable[[str, T | None], Awaitable[None] | None],
         secondary: bool = False,
+        final: bool = False,
     ):
         if secondary:
             self._secondary_listeners.append(fn)
+        elif final:
+            self._final_listeners.append(fn)
         else:
             self._listeners.append(fn)
 
