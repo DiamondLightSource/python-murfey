@@ -1857,6 +1857,16 @@ async def get_sessions(db=murfey_db):
     return res
 
 
+@router.get("/instruments/{instrument_name}/sessions")
+async def get_sessions_by_instrument_name(
+    instrument_name: str, db=murfey_db
+) -> List[Session]:
+    sessions = db.exec(
+        select(Session).where(Session.instrument_name == instrument_name)
+    ).all()
+    return sessions
+
+
 @router.post("/instruments/{instrument_name}/clients/{client_id}/session")
 def link_client_to_session(
     instrument_name: str, client_id: int, sess: SessionInfo, db=murfey_db
