@@ -105,8 +105,23 @@ def get_bootstrap_instructions(request: Request):
     machine with no internet access.
     """
 
+    # Constructs the netloc (hostname + port) and proxy path depending on if the
+    # request was forwarded via proxy
+    netloc = (
+        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
+        if request.headers.get("X-Forwarded-Host")
+        and request.headers.get("X-Forwarded-Port")
+        else request.url.netloc
+    )
+    # Additional bit in URL path after the netloc caused by the proxy reroute
+    proxy_path = request.url.path.removesuffix(f"{bootstrap.prefix}/")
+
     return respond_with_template(
         request=request,
+        parameters={
+            "netloc": netloc,
+            "proxy_path": proxy_path,
+        },
         filename="bootstrap.html",
     )
 

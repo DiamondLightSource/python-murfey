@@ -1,36 +1,39 @@
 {% extends "base.html" %} {% block title %}Bootstrapping instructions{% endblock
 %} {% block content %}
 <h1>Bootstrapping instructions</h1>
-<h2>Installing a Linux Terminal</h2>
+<h2>Installing a Linux Environment</h2>
 <h3>Installing Cygwin</h3>
 <p>
-  If you already have a Cygwin install, rename it so that it doesn't get
-  overwritten (something like "[install name]-old").
+  If you already have a Cygwin install that you would like to preserve, rename
+  it so that it doesn't get overwritten (something like "cygwin64-old").
 </p>
 <p>
   Download the Cygwin setup executable using this
-  <a href="/cygwin/setup-x86_64.exe">mirror</a>, and then run the following from
-  a terminal (both Command Prompt and Windows Powershell work)
+  <a href="{{ proxy_path }}/cygwin/setup-x86_64.exe">mirror</a>, and then run
+  the following from a terminal (both Command Prompt and Windows Powershell
+  work)
 </p>
 <pre style="font-family: monospace">
-    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
+    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
 </pre>
 <p>
-  The Cygwin install sometimes hangs even when it is finished, hit Enter to
-  return to a command prompt.
+  This will install Cygwin with the minimum packages needed to run Murfey. The
+  Cygwin install command will occasionally hang after completion. In such an
+  event, just hit Enter to return to a normal command prompt window.
 </p>
 
 <h3>Installing MSYS2</h3>
 <p>
   MSYS2 is a lightweight Linux environment which provides compiler support for
-  the more modern programming languages used in the backend of Murfey's package
-  dependencies.
+  the more modern programming languages used by Murfey's package dependencies.
 </p>
 <p>
   The Murfey server supports the forwarding of download requests to client PCs
   that cannot access the wider internet. Download the MSYS2 setup executable
-  using this <a href="/msys2/setup-x86_64.exe">mirror</a>, and run the
-  executable using the default settings.
+  using this
+  <a href="{{ proxy_path }}/msys2/distrib/msys2-x86_64-latest.exe">mirror</a>,
+  and run the executable using the default settings. This will install it to
+  C:\msys64.
 </p>
 <p>
   By default, MSYS2 comes with preset lists of mirrors and servers that it
@@ -48,7 +51,7 @@
 <p>This is an example of how the URL to the Murfey server should look like:</p>
 <pre style="font-family: monospace">
     Server = https://repo.msys2.org/mingw/x86_64/  # Original URL
-    Server = {{ request.url.scheme }}://{{ request.url.netloc }}/msys2/mingw/x86_64  # Murfey URL
+    Server = {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/msys2/mingw/x86_64/  # Murfey URL
 </pre>
 <p>
   MSYS2 comes with multiple environments, but UCRT64 is the most modern one. In
@@ -57,11 +60,20 @@
   environment. This can be achieved using the following commands:
 </p>
 <pre style="font-family: monospace">
-    $ pacman -Syu --disable-download-timeout  # Downloads the package database and searches for updates
-    $ pacman -S rsync --disable-download-timeout
-    $ pacman -S mingw-w64-python-pip --disable-download-timeout
-    $ pacman -S mingw-w64-x86_64-rust --disable-download-timeout
+    $ pacman -Syu
+    $ pacman -S rsync
+    $ pacman -S mingw-w64-ucrt-x86_64-python-pip
+    $ pacman -S mingw-w64-ucrt-x86_64-rust
 </pre>
+<p>
+  Other utility packages such as
+  <span style="font-family: monospace">vim</span> can also be installed by
+  running
+  <span style="font-family: monospace">pacman -S &lt;package-name&gt;</span>.
+  You can browse the other packages supported by
+  <span style="font-family: monospace">pacman</span> by searching the repo using
+  <span style="font-family: monospace">pacman -Ss &lt;package-name&gt;</span>
+</p>
 
 <h2>Setting Up Python</h2>
 <p>
@@ -73,7 +85,7 @@
 <h3>Setting Up a Virtual Environment</h3>
 <p>To set up a virtual environment, run the following commands:</p>
 <pre style="font-family: monospace">
-    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
+    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
     $ virtualenv your-env-name  # Create the virtual environment
     $ source your-env-name/bin/activate  # Activate the virtual environment
 </pre>
@@ -84,6 +96,9 @@
   commands:
 </p>
 <pre style="font-family: monospace">
-    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
+    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
+</pre>
+<pre>
+  If you wish to install the client-side dependencies needed to run Murfey via the web UI, replace <span style="font-family: monospace;">murfey[client]</span> with <span style="font-family: monospace;">murfey[client,instrument-server]</span>.
 </pre>
 {% endblock %}
