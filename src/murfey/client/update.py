@@ -15,8 +15,9 @@ def check(api_base: ParseResult, install: bool = True, force: bool = False):
     If the version number is outside the allowed range then this can trigger
     an update on the client, and in that case will terminate the process.
     """
+    proxy_path = api_base.path
     version_check_url = api_base._replace(
-        path="/version", query=f"client_version={murfey.__version__}"
+        path=f"{proxy_path}/version", query=f"client_version={murfey.__version__}"
     )
     server_reply = requests.get(version_check_url.geturl())
     if server_reply.status_code != 200:
@@ -59,6 +60,7 @@ def install_murfey(api_base: ParseResult, version: str) -> bool:
     Return 'true' on success and 'false' on error."""
 
     assert api_base.hostname is not None
+    proxy_path = api_base.path
     result = subprocess.run(
         [
             sys.executable,
@@ -67,7 +69,7 @@ def install_murfey(api_base: ParseResult, version: str) -> bool:
             "--trusted-host",
             api_base.hostname,
             "-i",
-            api_base._replace(path="/pypi", query="").geturl(),
+            api_base._replace(path=f"{proxy_path}/pypi", query="").geturl(),
             f"murfey[client]=={version}",
         ]
     )
