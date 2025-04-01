@@ -25,16 +25,23 @@ class WSApp:
         self.id = uuid.uuid4() if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
-        url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
+
+        url = urllib.parse.urlparse(server)._replace(scheme="ws")
+        proxy_path = url.path  # Path component indicates what the proxy path used was
+
         self._address = url.geturl()
         self._alive = True
         self._ready = False
         self._send_queue: queue.Queue[Optional[str]] = queue.Queue()
         self._receive_queue: queue.Queue[Optional[str]] = queue.Queue()
+
+        # Construct the websocket URL
+        # Prepend the proxy path to the new URL path
+        # It will evaluate to "" if nothing's there, and starts with "/path" if present
         ws_url = (
-            url._replace(path=f"/ws/test/{self.id}").geturl()
+            url._replace(path=f"{proxy_path}/ws/test/{self.id}").geturl()
             if register_client
-            else url._replace(path=f"/ws/connect/{self.id}").geturl()
+            else url._replace(path=f"{proxy_path}/ws/connect/{self.id}").geturl()
         )
         self._ws = websocket.WebSocketApp(
             ws_url,
