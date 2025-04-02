@@ -15,11 +15,11 @@ required.
 from __future__ import annotations
 
 import functools
-import io
 import json
 import logging
 import random
 import re
+from io import BytesIO
 from urllib.parse import quote
 
 import packaging.version
@@ -185,11 +185,19 @@ def get_cygwin_setup():
     """
     filename = "setup-x86_64.exe"
     response = http_session.get(f"https://www.cygwin.com/{filename}")
+
+    # Construct headers to return with response
+    headers: dict[str, str] = {
+        "Content-Disposition": f"attachment; filename=cygwin-{filename}"
+    }
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        media_type=response.headers.get("Content-Type"),
-        headers={"Content-Disposition": f"attachment; filename=cygwin-{filename}"},
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -266,10 +274,16 @@ def parse_cygwin_request(
 
     logger.info(f"Forwarding Cygwin download request to {_sanitise_str(url)}")
     response = http_session.get(url)
+
+    headers: dict[str, str] = {}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        media_type=response.headers.get("Content-Type"),
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -339,10 +353,16 @@ def get_msys2_setup(
         raise ValueError(f"{setup_file!r} is not a valid executable")
 
     response = http_session.get(f"{msys2_url}/distrib/{setup_file}")
+
+    headers: dict[str, str] = {}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        media_type=response.headers.get("Content-Type"),
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -491,10 +511,16 @@ def get_msys2_package_file(
     response = http_session.get(package_url)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
+
+    headers: dict[str, str] = {}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        media_type=response.headers.get("Content-Type"),
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -555,12 +581,18 @@ def get_cargo_config(request: Request):
             "",
         ]
     )
-    config_bytes = io.BytesIO(config_data.encode("utf-8"))
+    config_bytes = config_data.encode("utf-8")
+
+    headers: dict[str, str] = {
+        "Content-Disposition": "attachment; filename=config.toml",
+        "Content-Length": str(len(config_bytes)),
+    }
 
     return StreamingResponse(
-        config_bytes,
+        BytesIO(config_bytes),
+        status_code=200,
+        headers=headers,
         media_type="application/toml+json",
-        headers={"Content-Disposition": "attachment; filename=config.toml"},
     )
 
 
@@ -580,8 +612,8 @@ def get_index_page():
         raise HTTPException(status_code=response.status_code)
     return Response(
         content=response.content,
-        media_type=response.headers.get("Content-Type"),
         status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -619,12 +651,18 @@ def get_index_config(request: Request):
 
     # Save it as a JSON and return it as part of the response
     json_data = json.dumps(config, indent=4)
-    json_bytes = io.BytesIO(json_data.encode("utf-8"))
+    json_bytes = json_data.encode("utf-8")
+
+    headers: dict[str, str] = {
+        "Content-Disposition": "attachment; filename=config.json",
+        "Content-Length": str(len(json_bytes)),
+    }
 
     return StreamingResponse(
-        json_bytes,
+        BytesIO(json_bytes),
+        status_code=200,
+        headers=headers,
         media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=config.json"},
     )
 
 
@@ -666,7 +704,8 @@ def get_index_package_metadata(
         raise HTTPException(status_code=response.status_code)
     return StreamingResponse(
         response.iter_content(chunk_size=8192),
-        media_type="application/json",
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -697,7 +736,8 @@ def get_index_package_metadata_for_short_package_names(
         raise HTTPException(status_code=response.status_code)
     return StreamingResponse(
         response.iter_content(chunk_size=8192),
-        media_type="application/json",
+        status_code=response.status_code,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
@@ -726,16 +766,16 @@ def get_rust_package_download(
     file_name = f"{package}-{version}.crate"  # Construct file name to save package as
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
+
+    headers = {"Content-Disposition": f'attachment; filename="{file_name}"'}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        headers={
-            "Content-Disposition": f'attachment; filename="{file_name}"',
-            "Content-Type": response.headers.get(
-                "Content-Type", "application/octet-stream"
-            ),
-            "Content-Length": response.headers.get("Content-Length"),
-        },
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type", "application/octet-stream"),
     )
 
 
@@ -859,16 +899,16 @@ def get_rust_api_package_download(
     file_name = f"{package}-{version}.crate"  # Construct crate name to save as
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
+
+    headers = {"Content-Disposition": f'attachment; filename="{file_name}"'}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        headers={
-            "Content-Disposition": f'attachment; filename="{file_name}"',
-            "Content-Type": response.headers.get(
-                "Content-Type", "application/octet-stream"
-            ),
-            "Content-Length": response.headers.get("Content-Length"),
-        },
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type", "application/octet-stream"),
     )
 
 
@@ -907,16 +947,16 @@ def get_rust_package_crate(
     response = http_session.get(url)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
+
+    headers = {"Content-Disposition": f'attachment; filename="{crate}"'}
+    if response.headers.get("Content-Length"):
+        headers["Content-Length"] = response.headers["Content-Length"]
+
     return StreamingResponse(
-        content=response.iter_content(),
-        headers={
-            "Content-Disposition": f'attachment; filename="{crate}"',
-            "Content-Type": response.headers.get(
-                "Content-Type", "application/octet-stream"
-            ),
-            "Content-Length": response.headers.get("Content-Length"),
-        },
+        content=response.iter_content(chunk_size=8192),
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type", "application/octet-stream"),
     )
 
 
@@ -1012,8 +1052,8 @@ def get_pypi_package_downloads_list(request: Request, package: str) -> Response:
 
     return Response(
         content=content_new,
-        media_type=full_path_response.headers.get("Content-Type"),
         status_code=full_path_response.status_code,
+        media_type=full_path_response.headers.get("Content-Type"),
     )
 
 
@@ -1081,10 +1121,15 @@ def get_pypi_file(
     original_url = selected_package_link.group(1)
     response = http_session.get(original_url)
 
+    # Construct headers to return with response
+    headers: dict[str, str] = {}
+    if response.headers.get("Content-Length"):
+        headers["Content-Lengh"] = response.headers["Content-Length"]
     return StreamingResponse(
         content=response.iter_content(chunk_size=8192),
-        media_type=response.headers.get("Content-Type"),
         status_code=response.status_code,
+        headers=headers,
+        media_type=response.headers.get("Content-Type"),
     )
 
 
