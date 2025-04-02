@@ -26,10 +26,9 @@ class WSApp:
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
 
+        # Parse server URL and get proxy path used, if any
         url = urllib.parse.urlparse(server)._replace(scheme="ws")
-        proxy_path = url.path.rstrip(
-            "/"
-        )  # Path component indicates what the proxy path used was
+        proxy_path = url.path.rstrip("/")
 
         self._address = url.geturl()
         self._alive = True
@@ -39,7 +38,7 @@ class WSApp:
 
         # Construct the websocket URL
         # Prepend the proxy path to the new URL path
-        # It will evaluate to "" if nothing's there, and starts with "/path" if present
+        # It will evaluate to "" if nothing's there, and starts with "/" if present
         ws_url = (
             url._replace(path=f"{proxy_path}/ws/test/{self.id}").geturl()
             if register_client
