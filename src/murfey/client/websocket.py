@@ -27,7 +27,9 @@ class WSApp:
         websocket.enableTrace(True)
 
         url = urllib.parse.urlparse(server)._replace(scheme="ws")
-        proxy_path = url.path  # Path component indicates what the proxy path used was
+        proxy_path = url.path.rstrip(
+            "/"
+        )  # Path component indicates what the proxy path used was
 
         self._address = url.geturl()
         self._alive = True
