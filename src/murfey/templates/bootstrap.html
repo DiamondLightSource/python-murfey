@@ -107,13 +107,39 @@
   then be pasted in a <span style="font-family: monospace">.cargo</span> folder,
   which, by default, shold be located in your User Profile homespace:
 </p>
-<pre style="font-family: monospace">%USERPROFILE%\.cargo</pre>
+<pre style="font-family: monospace">
+    %USERPROFILE%\.cargo
+</pre>
 <p>For a user named Murfey, for example, this would take the form:</p>
-<pre style="font-family: monospace">C:\Users\Murfey\.cargo</pre>
+<pre style="font-family: monospace">
+    C:\Users\Murfey\.cargo
+</pre>
 <p>
   With this file configured,
   <span style="font-family: monospace">cargo</span> will know to look for
   package metadata and files via the Murfey mirror instead.
+</p>
+
+<h4>D. Running MSYS2 Through Command Prompt</h4>
+<p>
+  In order to run Murfey via the terminal, MSYS2 will have to be run through
+  Windoww's Command Prompt terminal, as there is an ongoing bug with MSYS2's
+  pre-packaged terminal that prevents mouse interaction with interactive apps in
+  the terminal.
+</p>
+<p>
+  To do so, simply right-click on your desktop and navigate to
+  <span>New > Shortcut</span>. When prompted for the location of the item, enter
+  the following into the text box:
+</p>
+<pre style="font-family: monospace">
+    cmd.exe /k "C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -shell bash"
+</pre>
+<p>
+  After naming the shortcut, click Finish to create the shortcut. This will run
+  a UCRT64 instance of MSYS2 through the Command Prompt terminal that starts you
+  off in MSYS2's default home directory. You can proceed to customise the
+  shortcut icon to taste.
 </p>
 
 <h2>2. Setting Up Python</h2>
@@ -123,14 +149,14 @@
   base environment is simpler, but uninstallation of the Python packages in the
   future could potentially interfere with the base environment's functionality.
 </p>
-<h3>Setting Up a Virtual Environment</h3>
+<h3>A. (Optional) Setting Up a Virtual Environment</h3>
 <p>To set up a virtual environment, run the following commands:</p>
 <pre style="font-family: monospace">
     $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
     $ virtualenv your-env-name  # Create the virtual environment
     $ source your-env-name/bin/activate  # Activate the virtual environment
 </pre>
-<h3>Installing Murfey</h3>
+<h3>B. Installing Murfey</h3>
 <p>
   You can install Murfey in the Python environment (the base one or a virtual
   environment) in either the Cygwin or UCRT64 terminal using the following
@@ -139,7 +165,10 @@
 <pre style="font-family: monospace">
     $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
 </pre>
-<pre>
-  If you wish to install the client-side dependencies needed to run Murfey via the web UI, replace <span style="font-family: monospace;">murfey[client]</span> with <span style="font-family: monospace;">murfey[client,instrument-server]</span>.
-</pre>
+<p>
+  If you wish to install the client-side dependencies needed to run Murfey via
+  the web UI, replace
+  <span style="font-family: monospace">murfey[client]</span> with
+  <span style="font-family: monospace">murfey[client,instrument-server]</span>.
+</p>
 {% endblock %}
