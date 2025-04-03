@@ -19,6 +19,7 @@ import json
 import logging
 import random
 import re
+import zipfile
 from io import BytesIO
 from urllib.parse import quote
 
@@ -329,7 +330,80 @@ valid_envs = (
 )
 
 
-@msys2.get("/distrib/{setup_file}", response_class=StreamingResponse)
+@msys2.get("/config/pacman.d.zip", response_class=StreamingResponse)
+def get_pacman_mirrors(request: Request):
+    """
+    Dynamically generates a zip file containing mirrorlist files that have been set
+    up to mirror the MSYS2 package database for each environment.
+
+    The files in this folder should be pasted into, and overwrite, the 'mirrorlist'
+    files present in the %MSYS64%\\etc\\pacman.d folder. The default path to this
+    folder is C:\\msys64\\etc\\pacman.d.
+    """
+
+    # Check if this is a forwarded request from somewhere else and construct netloc
+    netloc = (
+        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
+        if request.headers.get("X-Forwarded-Host")
+        and request.headers.get("X-Forwarded-Port")
+        else request.url.netloc
+    )
+
+    # Find path to Rust router using current URL Path
+    path_to_router = request.url.path.removesuffix("/config/pacman.d.zip")
+
+    # Construct base URL for subsequent use
+    base_url = f"{request.url.scheme}://{netloc}{path_to_router}"
+    logger.debug(f"Base URL to MSYS2 sub-router determined to be {base_url}")
+
+    # Construct package database mirrors
+    # Files are called mirrorlist.{environment}
+    # URL format: {scheme}://{netloc}{proxy_path}/{router_prefix}/path/to/repo
+    url_paths = {
+        "clang64": "mingw/clang64",
+        "mingw": "mingw/$repo",
+        "mingw32": "mingw/i686",
+        "mingw64": "mingw/x86_64",
+        "msys": "msys/$arch",
+        "ucrt64": "mingw/ucrt64",
+    }
+    # Construct file names and contents
+    mirror_lists = {
+        f"mirrorlist.{env}": "\n".join(
+            [
+                "# See https://www.msys2.org/dev/mirrors",
+                "",
+                "## Primary",
+                f"Server = {base_url}/repo/{repo_path}",
+                "",
+            ]
+        )
+        for env, repo_path in url_paths.items()
+    }
+
+    # Create in-memory buffer for the ZIP file
+    zip_buffer = BytesIO()
+
+    # Create a zip file in the buffer
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_name, content in mirror_lists.items():
+            zip_file.writestr(file_name, content)
+    zip_buffer.seek(0)  # Move object pointer back to start
+
+    # Construct and return streaming response
+    headers = {
+        "Content-Disposition": "attachment; filename=pacman.d.zip",
+        "Content-Length": str(zip_buffer.getbuffer().nbytes),
+    }
+    return StreamingResponse(
+        zip_buffer,
+        status_code=200,
+        headers=headers,
+        media_type="application/zip",
+    )
+
+
+@msys2.get("/repo/distrib/{setup_file}", response_class=StreamingResponse)
 def get_msys2_setup(
     request: Request,
     setup_file: str,
@@ -366,7 +440,7 @@ def get_msys2_setup(
     )
 
 
-@msys2.get("/", response_class=Response)
+@msys2.get("/repo/", response_class=Response)
 def get_msys2_main_index(
     request: Request,
 ) -> Response:
@@ -406,7 +480,7 @@ def get_msys2_main_index(
     )
 
 
-@msys2.get("/{system}/", response_class=Response)
+@msys2.get("/repo/{system}/", response_class=Response)
 def get_msys2_environment_index(
     request: Request,
     system: str,
@@ -450,7 +524,7 @@ def get_msys2_environment_index(
     )
 
 
-@msys2.get("/{system}/{environment}/", response_class=Response)
+@msys2.get("/repo/{system}/{environment}/", response_class=Response)
 def get_msys2_package_index(
     request: Request,
     system: str,
@@ -479,7 +553,7 @@ def get_msys2_package_index(
     )
 
 
-@msys2.get("/{system}/{environment}/{package}", response_class=StreamingResponse)
+@msys2.get("/repo/{system}/{environment}/{package}", response_class=StreamingResponse)
 def get_msys2_package_file(
     request: Request,
     system: str,
