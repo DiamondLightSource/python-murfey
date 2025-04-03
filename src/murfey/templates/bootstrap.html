@@ -17,7 +17,9 @@
   the following from a terminal (both Command Prompt and Windows Powershell
   work):
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
 </pre>
 <p>
@@ -55,10 +57,14 @@
 </p>
 <p>
   Once downloaded, extract the files to
-  <span style="font-family: monospace">%MSYS64%\etc\pacman.d</span>. If MSYS2
-  was installed at the default location, this will be:
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >%MSYS64%\etc\pacman.d</span
+  >. If MSYS2 was installed at the default location, this will be:
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     C:\msys64\etc\pacman.d
 </pre>
 <h4>B. Installing Dependencies</h4>
@@ -68,7 +74,9 @@
   properly, the following packages will need to be installed in the UCRT64
   environment. This can be achieved using the following commands:
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     $ pacman -Syu
     $ pacman -S msys2-runtime-3.6
     $ pacman -S rsync
@@ -77,12 +85,20 @@
 </pre>
 <p>
   Other utility packages such as
-  <span style="font-family: monospace">vim</span> can also be installed by
-  running
-  <span style="font-family: monospace">pacman -S &lt;package-name&gt;</span>.
-  You can browse the other packages available on MSYS2 by searching the repo
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >vim</span
+  >
+  can also be installed by running
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pacman -S &lt;package-name&gt;</span
+  >. You can browse the other packages available on MSYS2 by searching the repo
   using
-  <span style="font-family: monospace">pacman -Ss &lt;package-name&gt;</span>
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pacman -Ss &lt;package-name&gt;</span
+  >
 </p>
 <h4>C. Configuring the Rust Package Manager (If Network-Restricted)</h4>
 <p>
@@ -93,32 +109,58 @@
 </p>
 <p>
   Rust packages and their associated metadata are, by default, stored in
-  <span style="font-family: monospace">https://crates.io</span>. Package
-  download and installation is in turn conducted by the package manager
-  <span style="font-family: monospace">cargo</span>. For network-restricted
-  client PCs, Murfey also supports mirroring
-  <span style="font-family: monospace">https://crates.io</span> to facilitate
-  the installation of Rust packages.
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >https://crates.io</span
+  >. Package download and installation is in turn conducted by the package
+  manager
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >. For network-restricted client PCs, Murfey also supports mirroring
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >https://crates.io</span
+  >
+  to facilitate the installation of Rust packages.
 </p>
 <p>
-  To configure <span style="font-family: monospace">cargo</span>, simply
-  download the pre-configured
-  <span style="font-family: monospace">config.toml</span> file via this
-  <a href="{{ proxy_path }}/rust/cargo/config.toml">link</a>. This file should
-  then be pasted in a <span style="font-family: monospace">.cargo</span> folder,
-  which, by default, shold be located in your User Profile homespace:
+  To configure
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >, simply download the pre-configured
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >config.toml</span
+  >
+  file via this <a href="{{ proxy_path }}/rust/cargo/config.toml">link</a>. This
+  file should then be pasted in a
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >.cargo</span
+  >
+  folder, which, by default, shold be located in your User Profile homespace:
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     %USERPROFILE%\.cargo
 </pre>
 <p>For a user named Murfey, for example, this would take the form:</p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     C:\Users\Murfey\.cargo
 </pre>
 <p>
   With this file configured,
-  <span style="font-family: monospace">cargo</span> will know to look for
-  package metadata and files via the Murfey mirror instead.
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >
+  will know to look for package metadata and files via the Murfey mirror
+  instead.
 </p>
 
 <h4>D. Running MSYS2 Through Command Prompt</h4>
@@ -133,7 +175,9 @@
   <span>New > Shortcut</span>. When prompted for the location of the item, enter
   the following into the text box:
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     cmd.exe /k "C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -shell bash"
 </pre>
 <p>
@@ -152,7 +196,9 @@
 </p>
 <h3>A. (Optional) Setting Up a Virtual Environment</h3>
 <p>To set up a virtual environment, run the following commands:</p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
     $ virtualenv your-env-name  # Create the virtual environment
     $ source your-env-name/bin/activate  # Activate the virtual environment
@@ -163,13 +209,22 @@
   environment) in either the Cygwin or UCRT64 terminal using the following
   commands:
 </p>
-<pre style="font-family: monospace">
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
     $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
 </pre>
 <p>
   If you wish to install the client-side dependencies needed to run Murfey via
   the web UI, replace
-  <span style="font-family: monospace">murfey[client]</span> with
-  <span style="font-family: monospace">murfey[client,instrument-server]</span>.
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >murfey[client]</span
+  >
+  with
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >murfey[client,instrument-server]</span
+  >.
 </p>
 {% endblock %}
