@@ -216,6 +216,9 @@ def respond_with_template(
         "hostname": get_hostname(),
         "microscope": get_microscope(),
         "version": murfey.__version__,
+        # Extra parameters to reconstruct URLs for forwarded requests
+        "netloc": request.url.netloc,
+        "proxy_path": "",
     }
     if parameters:
         template_parameters.update(parameters)
