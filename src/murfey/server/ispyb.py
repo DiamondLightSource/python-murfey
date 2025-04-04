@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable, List, Literal, Optional
+from typing import Callable, Generator, List, Literal, Optional
 
 import ispyb
 
@@ -535,7 +535,7 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> sqlalchemy.orm.Session:
+def _get_session() -> Generator[Optional[sqlalchemy.orm.Session], None, None]:
     db = Session()
     if db is None:
         yield None
