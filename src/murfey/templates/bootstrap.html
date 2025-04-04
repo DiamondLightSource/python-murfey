@@ -2,41 +2,10 @@
 %} {% block content %}
 <h1>Bootstrapping instructions</h1>
 <h2>1. Setting Up a POSIX Environment</h2>
-<h3>Option 1: Installing Cygwin</h3>
+<h3>A. Installing MSYS2 (Recommended)</h3>
 <p>
-  Cygwin is a lightweight POSIX environment that provides the minimum
-  requirements needed for a Windows client PC to efficiently transfer files to a
-  Unix storage server. However, it currently does not support building and
-  installing packages which have been written in Rust, which many modern Python
-  packages, including Murfey's dependencies, now make use of. Nevertheless,
-  older versions of Murfey will still work with it.
-</p>
-<p>
-  To install, download the Cygwin setup executable using this
-  <a href="{{ proxy_path }}/cygwin/setup-x86_64.exe">mirror</a>, and then run
-  the following from a terminal (both Command Prompt and Windows Powershell
-  work):
-</p>
-<pre
-  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
->
-    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
-</pre>
-<p>
-  This will install Cygwin with the minimum packages needed to run Murfey. The
-  Cygwin install command will occasionally hang after completion. In such an
-  event, just hit Enter to return to a normal command prompt window.
-</p>
-<p>
-  If you already have a Cygwin install that you would like to preserve, rename
-  it so that it doesn't get overwritten (something like "cygwin64-old") before
-  running the command line above.
-</p>
-
-<h3>Option 2: Installing MSYS2</h3>
-<p>
-  MSYS2 is a lightweight POSIX environment which provides compiler support for
-  the more modern programming languages used by Murfey's package dependencies.
+  MSYS2 is a POSIX environment which provides extensive compiler support for the
+  more modern programming languages used by Murfey's package dependencies.
 </p>
 <p>
   The Murfey server supports the forwarding of download requests to
@@ -47,7 +16,7 @@
   >, then run it using the default settings. This will install MSYS2 to
   C:\msys64.
 </p>
-<h4>A. Setting Up the Package Manager (If Network-Restricted)</h4>
+<h4>Setting Up the MSYS2 Package Manager (If Network-Restricted)</h4>
 <p>
   By default, MSYS2 comes with preset lists of mirrors and servers that it
   installs its packages from. On a network-restricted PC, these will need to be
@@ -67,7 +36,7 @@
 >
     C:\msys64\etc\pacman.d
 </pre>
-<h4>B. Installing Dependencies</h4>
+<h4>Installing Dependencies</h4>
 <p>
   MSYS2 comes with multiple environments, but UCRT64 is the most modern one. In
   order for the Murfey client to be able to install and run its dependencies
@@ -100,7 +69,7 @@
     >pacman -Ss &lt;package-name&gt;</span
   >
 </p>
-<h4>C. Configuring the Rust Package Manager (If Network-Restricted)</h4>
+<h4>Configuring the Rust Package Manager (If Network-Restricted)</h4>
 <p>
   Many newer Python packages now have dependencies written in Rust that allow
   them to operate more efficiently. MSYS2 supports the compilation and
@@ -140,7 +109,7 @@
     style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
     >.cargo</span
   >
-  folder, which, by default, shold be located in your User Profile homespace:
+  folder, which, by default, should be located in your User Profile homespace:
 </p>
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
@@ -163,10 +132,10 @@
   instead.
 </p>
 
-<h4>D. Running MSYS2 Through Command Prompt</h4>
+<h4>Running MSYS2 Through Command Prompt</h4>
 <p>
   In order to run Murfey via the terminal, MSYS2 will have to be run through
-  Windoww's Command Prompt terminal, as there is an ongoing bug with MSYS2's
+  Window's Command Prompt terminal, as there is an ongoing bug with MSYS2's
   pre-packaged terminal that prevents mouse interaction with interactive apps in
   the terminal.
 </p>
@@ -187,12 +156,48 @@
   shortcut icon to taste.
 </p>
 
+<h3>B. Installing Cygwin (Legacy)</h3>
+<p>
+  Cygwin is a lightweight POSIX environment that provides the minimum
+  requirements needed for a Windows client PC to run Murfey . However, it does
+  not support building and installing packages which have been written in Rust,
+  which many modern Python packages, including Murfey's dependencies, now make
+  use of. It is still possible to install and run Murfey via Cygwin, but older
+  versions of its dependencies will have to be installed.
+</p>
+<p>
+  To install, download the Cygwin setup executable using this
+  <a href="{{ proxy_path }}/cygwin/setup-x86_64.exe">mirror</a>, and then run
+  the following from a terminal (both Command Prompt and Windows Powershell
+  work):
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
+</pre>
+<p>
+  This will install Cygwin with the minimum packages needed to run Murfey. The
+  Cygwin install command will occasionally hang after completion. In such an
+  event, just hit Enter to return to a normal command prompt window.
+</p>
+<p>
+  If you already have a Cygwin install that you would like to preserve, rename
+  it so that it doesn't get overwritten (something like "cygwin64-old") before
+  running the command line above.
+</p>
+
 <h2>2. Setting Up Python</h2>
 <p>
-  Once Python and pip are installed in the terminal, you have the option to
-  install Murfey in either the base environment or a virtual environment. The
-  base environment is simpler, but uninstallation of the Python packages in the
-  future could potentially interfere with the base environment's functionality.
+  Once Python and
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pip</span
+  >
+  are installed in the terminal, you have the option to install Murfey in either
+  the base environment or a virtual environment. The base environment is
+  simpler, but uninstallation of the Python packages in the future could
+  potentially interfere with the base environment's functionality.
 </p>
 <h3>A. (Optional) Setting Up a Virtual Environment</h3>
 <p>To set up a virtual environment, run the following commands:</p>
