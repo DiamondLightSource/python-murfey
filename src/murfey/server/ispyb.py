@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable, List, Literal, Optional
+from typing import Callable, Generator, List, Literal, Optional
 
 import ispyb
 
@@ -535,7 +535,7 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> sqlalchemy.orm.Session:
+def _get_session() -> Generator[Optional[sqlalchemy.orm.Session], None, None]:
     db = Session()
     if db is None:
         yield None
@@ -557,6 +557,17 @@ def get_session_id(
     visit_number: str,
     db: sqlalchemy.orm.Session | None,
 ) -> int | None:
+
+    # Log received lookup parameters
+    log.debug(
+        "Looking up ISPyB BLSession ID using the following values:\n"
+        f"microscope: {microscope}\n"
+        f"proposal_code: {proposal_code}\n"
+        f"proposal_number: {proposal_number}\n"
+        f"visit_number: {visit_number}\n"
+    )
+
+    # Lookup BLSession ID
     if db is None:
         return None
     query = (
