@@ -30,6 +30,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
+from murfey.util import sanitise
 from murfey.util.config import get_security_config
 from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
 
@@ -561,10 +562,10 @@ def get_session_id(
     # Log received lookup parameters
     log.debug(
         "Looking up ISPyB BLSession ID using the following values:\n"
-        f"microscope: {microscope}\n"
-        f"proposal_code: {proposal_code}\n"
-        f"proposal_number: {proposal_number}\n"
-        f"visit_number: {visit_number}\n"
+        f"microscope: {sanitise(microscope)}\n"
+        f"proposal_code: {sanitise(proposal_code)}\n"
+        f"proposal_number: {sanitise(proposal_number)}\n"
+        f"visit_number: {sanitise(visit_number)}\n"
     )
 
     # Lookup BLSession ID
