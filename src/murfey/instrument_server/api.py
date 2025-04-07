@@ -335,6 +335,14 @@ def upload_gain_reference(
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
 
+    # Validate that file passed is from the gain reference directory
+    gain_ref_dir = machine_config.get("gain_reference_directory", "")
+    if not safe_gain_path.startswith(gain_ref_dir):
+        raise ValueError(
+            "Gain reference file does not originate from the gain reference directory "
+            f"{gain_ref_dir!r}"
+        )
+
     # Return the rsync URL if set, otherwise assume you are syncing via Murfey
     rsync_url = urlparse(str(machine_config.get("rsync_url", _get_murfey_url())))
     rsync_module = machine_config.get("rsync_module", "data")
