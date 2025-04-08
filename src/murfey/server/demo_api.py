@@ -89,7 +89,6 @@ from murfey.util.models import (
     Visit,
 )
 from murfey.util.processing_params import default_spa_parameters
-from murfey.util.state import global_state
 from murfey.workflows.spa.picking import _register_picked_particles_use_diameter
 
 log = logging.getLogger("murfey.server.demo_api")
@@ -1447,15 +1446,6 @@ def register_dc_group(
             db.add(murfey_app_3d)
             db.commit()
 
-        if global_state.get("data_collection_group_ids") and isinstance(
-            global_state["data_collection_group_ids"], dict
-        ):
-            global_state["data_collection_group_ids"] = {
-                **global_state["data_collection_group_ids"],
-                dcg_params.tag: dcgid,
-            }
-        else:
-            global_state["data_collection_group_ids"] = {dcg_params.tag: dcgid}
     if dcg_params.atlas:
         _flush_grid_square_records(
             {"session_id": session_id, "tag": dcg_params.tag}, demo=True
@@ -1511,15 +1501,6 @@ def start_dc(
     db.add(murfey_app)
     db.commit()
     db.close()
-    if global_state.get("data_collection_ids") and isinstance(
-        global_state["data_collection_ids"], dict
-    ):
-        global_state["data_collection_ids"] = {
-            **global_state["data_collection_ids"],
-            dc_params.tag: 1,
-        }
-    else:
-        global_state["data_collection_ids"] = {dc_params.tag: 1}
     if dc_params.exposure_time:
         prom.exposure_time.set(dc_params.exposure_time)
     return dc_params
@@ -1529,35 +1510,8 @@ def start_dc(
 def register_proc(
     visit_name, session_id: MurfeySessionID, proc_params: ProcessingJobParameters
 ):
+    # This should probably do something
     log.info("Registering processing job")
-    if global_state.get("processing_job_ids"):
-        assert isinstance(global_state["processing_job_ids"], dict)
-        global_state["processing_job_ids"] = {
-            **{
-                k: v
-                for k, v in global_state["processing_job_ids"].items()
-                if k != proc_params.tag
-            },
-            proc_params.tag: {
-                **global_state["processing_job_ids"].get(proc_params.tag, {}),
-                proc_params.recipe: 1,
-            },
-        }
-    else:
-        global_state["processing_job_ids"] = {proc_params.tag: {proc_params.recipe: 1}}
-    if global_state.get("autoproc_program_ids"):
-        assert isinstance(global_state["autoproc_program_ids"], dict)
-        global_state["autoproc_program_ids"] = {
-            **global_state["autoproc_program_ids"],
-            proc_params.tag: {
-                **global_state["autoproc_program_ids"].get(proc_params.tag, {}),
-                proc_params.recipe: 1,
-            },
-        }
-    else:
-        global_state["autoproc_program_ids"] = {
-            proc_params.tag: {proc_params.recipe: 1}
-        }
     log.info("Processing job registered")
     return proc_params
 

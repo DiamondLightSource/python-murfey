@@ -76,7 +76,6 @@ from murfey.util.models import (
     BLSampleImageParameters,
     BLSampleParameters,
     BLSubSampleParameters,
-    ClearanceKeys,
     ClientInfo,
     ContextInfo,
     CurrentGainRef,
@@ -107,7 +106,6 @@ from murfey.util.models import (
     Visit,
 )
 from murfey.util.processing_params import default_spa_parameters
-from murfey.util.state import global_state
 from murfey.util.tomo import midpoint
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole,
@@ -1793,42 +1791,6 @@ async def make_gif(
         loop=0,
     )
     return {"output_gif": str(output_path)}
-
-
-@router.post("/visits/{visit_name}/clean_state")
-async def clean_state(visit_name: str, for_clearance: ClearanceKeys):
-    if global_state.get("data_collection_group_ids") and isinstance(
-        global_state["data_collection_group_ids"], dict
-    ):
-        global_state["data_collection_group_ids"] = {
-            k: v
-            for k, v in global_state["data_collection_group_ids"].items()
-            if k not in for_clearance.data_collection_group
-        }
-    if global_state.get("data_collection_ids") and isinstance(
-        global_state["data_collection_ids"], dict
-    ):
-        global_state["data_collection_ids"] = {
-            k: v
-            for k, v in global_state["data_collection_ids"].items()
-            if k not in for_clearance.data_collection
-        }
-    if global_state.get("processing_job_ids") and isinstance(
-        global_state["processing_job_ids"], dict
-    ):
-        global_state["processing_job_ids"] = {
-            k: v
-            for k, v in global_state["processing_job_ids"].items()
-            if k not in for_clearance.processing_job
-        }
-    if global_state.get("autoproc_program_ids") and isinstance(
-        global_state["autoproc_program_ids"], dict
-    ):
-        global_state["autoproc_program_ids"] = {
-            k: v
-            for k, v in global_state["autoproc_program_ids"].items()
-            if k not in for_clearance.autoproc_program
-        }
 
 
 @router.get("/new_client_id/")

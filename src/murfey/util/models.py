@@ -127,13 +127,6 @@ class RsyncerInfo(BaseModel):
     tag: str = ""
 
 
-class ClearanceKeys(BaseModel):
-    data_collection_group: List[str]
-    data_collection: List[str]
-    processing_job: List[str]
-    autoproc_program: List[str]
-
-
 class GainReference(BaseModel):
     gain_ref: Path
     rescale: bool = True
