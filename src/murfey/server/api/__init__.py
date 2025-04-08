@@ -77,11 +77,9 @@ from murfey.util.models import (
     BLSampleParameters,
     BLSubSampleParameters,
     ClientInfo,
-    ContextInfo,
     CurrentGainRef,
     DCGroupParameters,
     DCParameters,
-    File,
     FoilHoleParameters,
     FractionationParameters,
     GainReference,
@@ -1021,23 +1019,6 @@ def visit_info(
         return None
 
 
-@router.post("/visits/{visit_name}/context")
-async def register_context(context_info: ContextInfo):
-    await ws.manager.broadcast(f"Context registered: {context_info}")
-    await ws.manager.set_state("experiment_type", context_info.experiment_type)
-    await ws.manager.set_state(
-        "acquisition_software", context_info.acquisition_software
-    )
-
-
-@router.post("/visits/{visit_name}/files")
-async def add_file(file: File):
-    message = f"File {file} transferred"
-    log.info(message)
-    await ws.manager.broadcast(f"File {file} transferred")
-    return file
-
-
 @router.post("/instruments/{instrument_name}/feedback")
 async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
     if _transport_object:
@@ -1320,7 +1301,6 @@ async def request_tomography_preprocessing(
         db.add(for_stash)
         db.commit()
         db.close()
-    # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
 
 

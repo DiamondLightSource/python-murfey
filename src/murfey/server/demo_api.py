@@ -62,11 +62,9 @@ from murfey.util.db import (
 )
 from murfey.util.models import (
     ClientInfo,
-    ContextInfo,
     CurrentGainRef,
     DCGroupParameters,
     DCParameters,
-    File,
     FoilHoleParameters,
     FractionationParameters,
     GainReference,
@@ -897,26 +895,6 @@ def visit_info(request: Request, visit_name: str):
         name="visit.html",
         context={"visit": return_query},
     )
-
-
-@router.post("/visits/{visit_name}/context")
-async def register_context(context_info: ContextInfo):
-    log.info(
-        f"Context {context_info.experiment_type}:{context_info.acquisition_software} registered"
-    )
-    await ws.manager.broadcast(f"Context registered: {context_info}")
-    await ws.manager.set_state("experiment_type", context_info.experiment_type)
-    await ws.manager.set_state(
-        "acquisition_software", context_info.acquisition_software
-    )
-
-
-@router.post("/visits/{visit_name}/files")
-async def add_file(file: File):
-    message = f"File {file} transferred"
-    log.info(message)
-    await ws.manager.broadcast(f"File {file} transferred")
-    return file
 
 
 @router.post("/feedback")

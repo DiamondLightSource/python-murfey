@@ -83,14 +83,6 @@ class RegistrationMessage(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
-class File(BaseModel):
-    name: str
-    description: str
-    size: int
-    timestamp: datetime
-    full_path: str
-
-
 class ConnectionFileParameters(BaseModel):
     filename: str
     destinations: List[str]
@@ -100,11 +92,6 @@ class SessionInfo(BaseModel):
     session_id: Optional[int]
     session_name: str = ""
     rescale: bool = True
-
-
-class ContextInfo(BaseModel):
-    experiment_type: str
-    acquisition_software: str
 
 
 class ClientInfo(BaseModel):
