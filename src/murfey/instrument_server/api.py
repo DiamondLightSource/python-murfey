@@ -138,7 +138,7 @@ def check_token(session_id: MurfeySessionID):
 
 
 @router.post("/sessions/{session_id}/multigrid_watcher")
-def start_multigrid_watcher(
+def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
     if controllers.get(session_id) is not None:
@@ -182,6 +182,13 @@ def start_multigrid_watcher(
     watchers[session_id].subscribe(
         controllers[session_id]._multigrid_watcher_finalised, final=True
     )
+    watchers[session_id].start()
+
+
+@router.post("/sessions/{session_id}/start_multigrid_watcher")
+def start_multigrid_watcher(session_id: MurfeySessionID):
+    if watchers.get(session_id) is None:
+        return {"success": False}
     watchers[session_id].start()
     return {"success": True}
 
