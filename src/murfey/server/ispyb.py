@@ -564,8 +564,8 @@ def get_session_id(
         "Looking up ISPyB BLSession ID using the following values:\n"
         f"microscope: {sanitise(microscope)}\n"
         f"proposal_code: {sanitise(proposal_code)}\n"
-        f"proposal_number: {sanitise(proposal_number)}\n"
-        f"visit_number: {sanitise(visit_number)}\n"
+        f"proposal_number: {sanitise(str(proposal_number))}\n"
+        f"visit_number: {sanitise(str(visit_number))}\n"
     )
 
     # Lookup BLSession ID
