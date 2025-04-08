@@ -1949,7 +1949,7 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
 
     if message["symmetry"] != relion_params.symmetry:
         # Currently don't do anything with a symmetrised re-run of the refinement
-        logger.info(f"Recieved symmetrised structure of {message['symmetry']}")
+        logger.info(f"Received symmetrised structure of {message['symmetry']}")
         return True
 
     if not feedback_params.hold_refine:
