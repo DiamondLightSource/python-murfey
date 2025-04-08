@@ -10,7 +10,7 @@ import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import authorised_requests
+from murfey.util.client import authorised_requests
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 

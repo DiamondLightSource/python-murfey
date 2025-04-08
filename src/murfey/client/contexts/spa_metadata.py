@@ -8,7 +8,11 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util import authorised_requests, capture_post, get_machine_config_client
+from murfey.util.client import (
+    authorised_requests,
+    capture_post,
+    get_machine_config_client,
+)
 from murfey.util.spa_metadata import (
     FoilHoleInfo,
     get_grid_square_atlas_positions,
