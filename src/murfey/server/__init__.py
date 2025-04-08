@@ -2292,7 +2292,7 @@ def feedback_callback(header: dict, message: dict) -> None:
         elif message["register"] == "data_collection":
             logger.debug(
                 "Received message named 'data_collection' containing the following items:\n"
-                f"{', '.join([f'{key}: {sanitise(str(value))}' for key, value in message.items()])}"
+                f"{', '.join([f'{sanitise(key)}: {sanitise(str(value))}' for key, value in message.items()])}"
             )
             murfey_session_id = message["session_id"]
             ispyb_session_id = get_session_id(
