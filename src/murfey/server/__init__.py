@@ -44,10 +44,9 @@ from werkzeug.utils import secure_filename
 from workflows.transport.pika_transport import PikaTransport
 
 import murfey
-import murfey.server.ispyb
 import murfey.server.prometheus as prom
-import murfey.server.websocket
 import murfey.util.db as db
+from murfey.server.ispyb import get_session_id
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
@@ -2207,7 +2206,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection_group":
-            ispyb_session_id = murfey.server.ispyb.get_session_id(
+            ispyb_session_id = get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
                 proposal_number=message["proposal_number"],
@@ -2292,11 +2291,11 @@ def feedback_callback(header: dict, message: dict) -> None:
             return None
         elif message["register"] == "data_collection":
             logger.debug(
-                f"Received message named 'data_collection' containing the following items:\n"
-                f"{', '.join([f'{sanitise(key)}: {sanitise(value)}' for key, value in message.items()])}"
+                "Received message named 'data_collection' containing the following items:\n"
+                f"{', '.join([f'{sanitise(key)}: {sanitise(str(value))}' for key, value in message.items()])}"
             )
             murfey_session_id = message["session_id"]
-            ispyb_session_id = murfey.server.ispyb.get_session_id(
+            ispyb_session_id = get_session_id(
                 microscope=message["microscope"],
                 proposal_code=message["proposal_code"],
                 proposal_number=message["proposal_number"],
