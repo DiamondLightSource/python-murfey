@@ -90,7 +90,6 @@ from murfey.util.models import (
     MillingParameters,
     PostInfo,
     PreprocessingParametersTomo,
-    ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
@@ -104,6 +103,7 @@ from murfey.util.models import (
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
+    TomoProcessFile,
     Visit,
 )
 from murfey.util.processing_params import default_spa_parameters
@@ -1210,7 +1210,10 @@ async def request_spa_preprocessing(
 
 @router.post("/visits/{visit_name}/{session_id}/tomography_preprocess")
 async def request_tomography_preprocessing(
-    visit_name: str, session_id: MurfeySessionID, proc_file: ProcessFile, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    proc_file: TomoProcessFile,
+    db=murfey_db,
 ):
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -1260,15 +1263,15 @@ async def request_tomography_preprocessing(
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
 
-        processing_job_parameters = db.exec(
-            select(TomographyProcessingParameters).where(
-                TomographyProcessingParameters.pj_id == data_collection[0][2].id
+        session_processing_parameters = db.exec(
+            select(SessionProcessingParameters).where(
+                SessionProcessingParameters.session_id == session_id
             )
         ).all()
-        if processing_job_parameters:
-            proc_file.gain_ref = processing_job_parameters[0].gain_ref
-            proc_file.dose_per_frame = processing_job_parameters[0].dose_per_frame
-            proc_file.eer_fractionation_file = processing_job_parameters[
+        if session_processing_parameters:
+            proc_file.gain_ref = session_processing_parameters[0].gain_ref
+            proc_file.dose_per_frame = session_processing_parameters[0].dose_per_frame
+            proc_file.eer_fractionation_file = session_processing_parameters[
                 0
             ].eer_fractionation_file
 

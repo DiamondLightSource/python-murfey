@@ -73,7 +73,6 @@ from murfey.util.models import (
     GridSquareParameters,
     PostInfo,
     PreprocessingParametersTomo,
-    ProcessFile,
     ProcessingJobParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
@@ -86,6 +85,7 @@ from murfey.util.models import (
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
+    TomoProcessFile,
     Visit,
 )
 from murfey.util.processing_params import default_spa_parameters
@@ -1196,7 +1196,7 @@ def flush_tomography_processing(
 
 @router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
 async def request_tomography_preprocessing(
-    visit_name: str, client_id: int, proc_file: ProcessFile, db=murfey_db
+    visit_name: str, client_id: int, proc_file: TomoProcessFile, db=murfey_db
 ):
     if not sanitise_path(Path(proc_file.path)).exists():
         log.warning(
