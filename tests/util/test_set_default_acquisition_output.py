@@ -1,6 +1,6 @@
 import json
 
-from murfey.util import set_default_acquisition_output
+from murfey.util.client import set_default_acquisition_output
 
 
 def test_set_default_acquisition_output_normal_operation(tmp_path):
