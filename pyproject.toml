@@ -72,7 +72,7 @@ server = [
     "python-jose[cryptography]",
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
-    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py<=8.2.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo",
 ]
 [project.urls]
