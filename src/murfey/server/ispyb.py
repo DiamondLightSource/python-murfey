@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Callable, List, Literal, Optional
+from typing import Callable, Generator, List, Literal, Optional
 
 import ispyb
 
@@ -30,6 +30,7 @@ from ispyb.sqlalchemy import (
     url,
 )
 
+from murfey.util import sanitise
 from murfey.util.config import get_security_config
 from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
 
@@ -535,7 +536,7 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> sqlalchemy.orm.Session:
+def _get_session() -> Generator[Optional[sqlalchemy.orm.Session], None, None]:
     db = Session()
     if db is None:
         yield None
@@ -557,6 +558,17 @@ def get_session_id(
     visit_number: str,
     db: sqlalchemy.orm.Session | None,
 ) -> int | None:
+
+    # Log received lookup parameters
+    log.debug(
+        "Looking up ISPyB BLSession ID using the following values:\n"
+        f"microscope: {sanitise(microscope)}\n"
+        f"proposal_code: {sanitise(proposal_code)}\n"
+        f"proposal_number: {sanitise(proposal_number)}\n"
+        f"visit_number: {sanitise(visit_number)}\n"
+    )
+
+    # Lookup BLSession ID
     if db is None:
         return None
     query = (

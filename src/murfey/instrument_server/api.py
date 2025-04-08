@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import requests
@@ -328,19 +328,43 @@ def upload_gain_reference(
     safe_gain_path = sanitise(str(gain_reference.gain_path))
     safe_visit_path = sanitise(gain_reference.visit_path)
     safe_destination_dir = sanitise(gain_reference.gain_destination_dir)
-    machine_config = requests.get(
+
+    # Load machine config and other needed properties
+    machine_config: dict[str, Any] = requests.get(
         f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
+
+    # Validate that file passed is from the gain reference directory
+    gain_ref_dir = machine_config.get("gain_reference_directory", "")
+    if not safe_gain_path.startswith(gain_ref_dir):
+        raise ValueError(
+            "Gain reference file does not originate from the gain reference directory "
+            f"{gain_ref_dir!r}"
+        )
+
+    # Return the rsync URL if set, otherwise assume you are syncing via Murfey
+    rsync_url = urlparse(str(machine_config.get("rsync_url", _get_murfey_url())))
+    rsync_module = machine_config.get("rsync_module", "data")
+    rsync_path = f"{rsync_url.hostname}::{rsync_module}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}"
+
+    # Run rsync subprocess to transfer gain reference
     cmd = [
         "rsync",
         posix_path(Path(safe_gain_path)),
-        f"{urlparse(_get_murfey_url(), allow_fragments=False).hostname}::{machine_config.get('rsync_module', 'data')}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}",
+        rsync_path,
     ]
-    gain_rsync = subprocess.run(cmd)
+    gain_rsync = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+    )
     if gain_rsync.returncode:
         logger.warning(
-            f"Gain reference file {safe_gain_path} was not successfully transferred to {safe_visit_path}/processing"
+            f"Failed to transfer gain reference file {safe_gain_path!r} to {f'{safe_visit_path}/processing'!r} \n"
+            f"Executed the following command: {' '.join(cmd)!r} \n"
+            f"Returned the following error: \n"
+            f"{gain_rsync.stderr}"
         )
         return {"success": False}
     return {"success": True}

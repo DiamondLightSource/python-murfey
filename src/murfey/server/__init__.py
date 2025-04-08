@@ -2291,6 +2291,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                 _transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
+            logger.debug(
+                f"Received message named 'data_collection' containing the following items:\n"
+                f"{', '.join([f'{sanitise(key)}: {sanitise(value)}' for key, value in message.items()])}"
+            )
             murfey_session_id = message["session_id"]
             ispyb_session_id = murfey.server.ispyb.get_session_id(
                 microscope=message["microscope"],
@@ -2309,7 +2313,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                 # flush_data_collections(message["source"], murfey_db)
             else:
                 logger.warning(
-                    f"No data collection group ID was found for image directory {sanitise(message['image_directory'])} and source {sanitise(message['source'])}"
+                    "No data collection group ID was found for image directory "
+                    f"{sanitise(message['image_directory'])} and source "
+                    f"{sanitise(message['source'])}"
                 )
                 if _transport_object:
                     _transport_object.transport.nack(header, requeue=True)
