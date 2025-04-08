@@ -308,13 +308,13 @@ Models related to the tomographic reconstruction workflow.
 """
 
 
-class ProcessFile(BaseModel):  # Rename to TomoProcessFile
+class TomoProcessFile(BaseModel):
     path: str
     description: str
     tag: str
     image_number: int
     pixel_size: float
-    dose_per_frame: float
+    dose_per_frame: Optional[float]
     frame_count: int
     tilt_axis: Optional[float]
     mc_uuid: Optional[int] = None
@@ -350,7 +350,7 @@ class CompletedTiltSeries(BaseModel):
 
 
 class PreprocessingParametersTomo(BaseModel):
-    dose_per_frame: float
+    dose_per_frame: Optional[float]
     frame_count: int
     tilt_axis: float
     gain_ref: Optional[str]
