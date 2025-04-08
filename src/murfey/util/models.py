@@ -350,7 +350,7 @@ class CompletedTiltSeries(BaseModel):
 
 
 class PreprocessingParametersTomo(BaseModel):
-    dose_per_frame: float
+    dose_per_frame: Optional[float]
     frame_count: int
     tilt_axis: float
     gain_ref: Optional[str]
