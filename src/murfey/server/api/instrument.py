@@ -485,7 +485,10 @@ async def get_rsyncer_info(
                     f"{machine_config.instrument_server_url}/sessions/{session_id}/rsyncer_info",
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
-                    data = await resp.json()
+                    if resp.status == 200:
+                        data = await resp.json()
+                    else:
+                        data = []
         except KeyError:
             data = []
         except Exception:
