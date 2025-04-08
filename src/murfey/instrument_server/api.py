@@ -182,7 +182,7 @@ def setup_multigrid_watcher(
     watchers[session_id].subscribe(
         controllers[session_id]._multigrid_watcher_finalised, final=True
     )
-    watchers[session_id].start()
+    return {"success": True}
 
 
 @router.post("/sessions/{session_id}/start_multigrid_watcher")
