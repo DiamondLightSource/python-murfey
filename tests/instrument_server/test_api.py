@@ -16,20 +16,20 @@ client = TestClient(app)
 test_upload_gain_reference_params_matrix = (
     # Rsync URL | Rsync module | Gain reference directory |
     (
-        "http://1.1.1.1",
+        "http://1.1.1.1",  # When rsync_url is provided
         "data",
         "/c/ProgramData/Gatan/Gain Reference",
-    ),  # When rsync_url is provided
+    ),
     (
-        "",
+        "",  # When rsync_url is blank
         "data",
         "/c/ProgramData/Gatan/Gain Reference",
-    ),  # When rsync_url is blank
+    ),
     (
-        None,
+        None,  # When rsync_url not provided
         "data",
         "/c/ProgramData/Gatan/Gain Reference",
-    ),  # When rsync_url not provided
+    ),
 )
 
 
