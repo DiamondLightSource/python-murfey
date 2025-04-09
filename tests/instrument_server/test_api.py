@@ -35,7 +35,7 @@ test_upload_gain_reference_params_matrix = (
 
 @mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 @patch("murfey.instrument_server.api.subprocess")
-@patch("murfey.instrument_server.api.urlparse", wrap=urlparse)
+@patch("murfey.instrument_server.api.urlparse", wraps=urlparse)
 @patch("murfey.instrument_server.api._get_murfey_url")
 @patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
@@ -79,10 +79,11 @@ def test_upload_gain_reference(
 
     # If no rsync_url key is provided, or rsync_url key is empty,
     # This should default to the Murfey URL
+    returned_urlparse = spy_parse.return_value
     expected_urlparse = urlparse(server_url) if not rsync_url else urlparse(rsync_url)
-    assert expected_urlparse.scheme == spy_parse.return_value.scheme
-    assert expected_urlparse.netloc == spy_parse.return_value.netloc
-    assert expected_urlparse.path == spy_parse.return_value.path
+    assert expected_urlparse.scheme == returned_urlparse.scheme
+    assert expected_urlparse.netloc == returned_urlparse.netloc
+    assert expected_urlparse.path == returned_urlparse.path
 
     # Check that the subprocess was run
     mock_subprocess.run.assert_called_once()
