@@ -34,15 +34,15 @@ test_upload_gain_reference_params_matrix = (
 
 
 @mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
-@patch("murfey.instrument_server.api.subprocess.run")
+@patch("murfey.instrument_server.api.subprocess")
 @patch("murfey.instrument_server.api.urlparse", wraps=urlparse)
 @patch("murfey.instrument_server.api._get_murfey_url")
-@patch("murfey.instrument_server.api.requests.get")
+@patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
-    mock_get,
-    mock_server_url,
+    mock_request,
+    mock_get_server_url,
     spy_parse,
-    mock_run,
+    mock_subprocess,
     test_params: tuple[Optional[str], str, str],
 ):
 
@@ -57,9 +57,12 @@ def test_upload_gain_reference(
         mock_machine_config["rsync_url"] = rsync_url
 
     # Assign expected values to the mock objects
-    mock_get.return_value = Mock(status_code=200, json=lambda: mock_machine_config)
-    mock_server_url.return_value = server_url
-    mock_run.return_value = Mock(returncode=0)
+    mock_request.get.return_value = Mock(
+        status_code=200,
+        json=lambda: mock_machine_config,
+    )
+    mock_get_server_url.return_value = server_url
+    mock_subprocess.run.return_value = Mock(returncode=0)
 
     # Construct payload and submit post request
     payload = {
@@ -72,7 +75,7 @@ def test_upload_gain_reference(
     )
 
     # Check that the machine config request was called
-    mock_get.assert_called_once()
+    mock_request.get.assert_called_once()
 
     # If no rsync_url key is provided, or rsync_url key is empty,
     # This should default to the Murfey URL
@@ -82,7 +85,7 @@ def test_upload_gain_reference(
         assert spy_parse.return_value == urlparse(rsync_url)
 
     # Check that the subprocess was run
-    mock_run.assert_called_once()
+    mock_subprocess.run.assert_called_once()
 
     # Check that the endpoint function ran through to completion successfully
     assert response.status_code == 200
