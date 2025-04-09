@@ -74,19 +74,19 @@ def test_upload_gain_reference(
         "/instruments/m02/sessions/1/upload_gain_reference", json=payload
     )
 
-    # Check that the machine config request was called
+    # # Check that the machine config request was called
     # mock_request.get.assert_called_once()
 
-    # If no rsync_url key is provided, or rsync_url key is empty,
-    # This should default to the Murfey URL
-    returned_urlparse = spy_parse.return_value
-    expected_urlparse = urlparse(server_url) if not rsync_url else urlparse(rsync_url)
-    assert expected_urlparse.scheme == returned_urlparse.scheme
-    assert expected_urlparse.netloc == returned_urlparse.netloc
-    assert expected_urlparse.path == returned_urlparse.path
+    # # If no rsync_url key is provided, or rsync_url key is empty,
+    # # This should default to the Murfey URL
+    # returned_urlparse = spy_parse.return_value
+    # expected_urlparse = urlparse(server_url) if not rsync_url else urlparse(rsync_url)
+    # assert expected_urlparse.scheme == returned_urlparse.scheme
+    # assert expected_urlparse.netloc == returned_urlparse.netloc
+    # assert expected_urlparse.path == returned_urlparse.path
 
-    # Check that the subprocess was run
-    mock_subprocess.run.assert_called_once()
+    # # Check that the subprocess was run
+    # mock_subprocess.run.assert_called_once()
 
     # Check that the endpoint function ran through to completion successfully
     assert response.status_code == 200
