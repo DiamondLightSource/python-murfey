@@ -57,10 +57,10 @@ def test_upload_gain_reference(
         mock_machine_config["rsync_url"] = rsync_url
 
     # Assign expected values to the mock objects
-    mock_request.get.return_value = Mock(
-        status_code=200,
-        json=lambda: mock_machine_config,
-    )
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = mock_machine_config
+    mock_request.get.return_value = mock_response
     mock_get_server_url.return_value = server_url
     mock_subprocess.run.return_value = Mock(returncode=0)
 
