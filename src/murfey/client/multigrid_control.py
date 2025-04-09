@@ -403,7 +403,8 @@ class MultigridController:
         # it is then necessary to extract the data from the message
         if from_form:
             json = json.get("form", {})
-            json = {k: str(v) for k, v in json.items()}
+            # Safely convert all entries into strings, but leave None as-is
+            json = {k: str(v) if v is not None else None for k, v in json.items()}
         self._environment.data_collection_parameters = {
             k: None if v == "None" else v for k, v in json.items()
         }
@@ -411,7 +412,7 @@ class MultigridController:
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
             if from_form:
-                requests.post(
+                capture_post(
                     f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/tomography_processing_parameters",
                     json=json,
                 )
@@ -442,7 +443,7 @@ class MultigridController:
                 )
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 json.update({"eer_fractionation_file": eer_fractionation_file})
-            requests.post(
+            capture_post(
                 f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_preprocessing_parameters",
                 json=json,
             )
