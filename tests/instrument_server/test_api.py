@@ -71,7 +71,7 @@ def test_upload_gain_reference(
         "gain_destination_dir": "processing",
     }
     response = client.post(
-        "/instruments/m02/session/1/upload_gain_reference", json=payload
+        "/instruments/m02/sessions/1/upload_gain_reference", json=payload
     )
 
     # Check that the machine config request was called
