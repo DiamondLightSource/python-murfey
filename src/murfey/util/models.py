@@ -83,6 +83,14 @@ class RegistrationMessage(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
+class File(BaseModel):
+    name: str
+    description: str
+    size: int
+    timestamp: datetime
+    full_path: str
+
+
 class ConnectionFileParameters(BaseModel):
     filename: str
     destinations: List[str]
