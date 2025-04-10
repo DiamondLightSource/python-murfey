@@ -24,16 +24,19 @@ logger = logging.getLogger("murfey.util.client")
 
 def read_config() -> configparser.ConfigParser:
     config = configparser.ConfigParser()
+
+    # Look for 'MURFEY_CLIENT_CONFIGURATION' environment variable first
+    mcc = os.environ.get("MURFEY_CLIENT_CONFIGURATION")
+    if mcc:
+        config_file = Path(mcc)
+    # If not set, look for 'MURFEY_CLIENT_CONFIG_HOME' or '~', and then to look for '.murfey'
+    else:
+        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
+        murfey_client_config_home = Path(mcch) if mcch else Path.home()
+        config_file = murfey_client_config_home / ".murfey"
+
+    # Attempt to read the file and return the config
     try:
-        # Look for 'MURFEY_CLIENT_CONFIGURATION' environment variable first
-        mcc = os.environ.get("MURFEY_CLIENT_CONFIGURATION")
-        if mcc:
-            config_file = Path(mcc)
-        # If not set, look for 'MURFEY_CLIENT_CONFIG_HOME' or '~', and then to look for '.murfey'
-        else:
-            mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
-            murfey_client_config_home = Path(mcch) if mcch else Path.home()
-            config_file = murfey_client_config_home / ".murfey"
         with open(config_file) as file:
             config.read_file(file)
     except FileNotFoundError:
