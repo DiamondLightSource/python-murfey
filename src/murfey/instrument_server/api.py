@@ -239,7 +239,7 @@ def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
-class RSyncerInfo(BaseModel):
+class ObserverInfo(BaseModel):
     source: str
     num_files_transferred: int
     num_files_in_queue: int
@@ -248,11 +248,11 @@ class RSyncerInfo(BaseModel):
 
 
 @router.get("/sessions/{session_id}/rsyncer_info")
-def get_rsyncer_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
+def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
     info = []
     for k, v in controllers[session_id].rsync_processes.items():
         info.append(
-            RSyncerInfo(
+            ObserverInfo(
                 source=str(k),
                 num_files_transferred=v._files_transferred,
                 num_files_in_queue=v.queue.qsize(),
@@ -264,11 +264,11 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
 
 
 @router.get("/sessions/{session_id}/analyser_info")
-def get_analyser_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
+def get_analyser_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
     info = []
     for k, v in controllers[session_id].analysers.items():
         info.append(
-            RSyncerInfo(
+            ObserverInfo(
                 source=str(k),
                 num_files_transferred=0,
                 num_files_in_queue=v.queue.qsize(),

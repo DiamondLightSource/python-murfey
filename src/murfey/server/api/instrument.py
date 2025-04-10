@@ -472,8 +472,8 @@ class RSyncerInfo(BaseModel):
 async def get_rsyncer_info(
     instrument_name: str, session_id: MurfeySessionID, db=murfey_db
 ) -> List[RSyncerInfo]:
-    rsyncer_data = []
-    analyser_data = []
+    rsyncer_list = []
+    analyser_list = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -490,11 +490,11 @@ async def get_rsyncer_info(
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     if resp.status == 200:
-                        rsyncer_data = await resp.json()
+                        rsyncer_list = await resp.json()
                     else:
-                        rsyncer_data = []
+                        rsyncer_list = []
         except KeyError:
-            rsyncer_data = []
+            rsyncer_list = []
         except Exception:
             log.warning(
                 "Exception encountered gathering rsyncer info from the instrument server",
@@ -510,11 +510,11 @@ async def get_rsyncer_info(
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     if resp.status == 200:
-                        analyser_data = await resp.json()
+                        analyser_list = await resp.json()
                     else:
-                        analyser_data = []
+                        analyser_list = []
         except KeyError:
-            analyser_data = []
+            analyser_list = []
         except Exception:
             log.warning(
                 "Exception encountered gathering analyser info from the instrument server",
@@ -522,21 +522,21 @@ async def get_rsyncer_info(
             )
 
     combined_data = []
-    rsyncer_source_lookup = {d["source"]: d for d in rsyncer_data}
-    analyser_source_lookup = {d["source"]: d for d in analyser_data}
+    rsyncer_source_lookup = {d["source"]: d for d in rsyncer_list}
+    analyser_source_lookup = {d["source"]: d for d in analyser_list}
     for ri in rsync_instances:
-        rsync_inst = rsyncer_source_lookup.get(ri.source, {})
-        analyser_inst = analyser_source_lookup.get(ri.source, {})
+        rsync_data = rsyncer_source_lookup.get(ri.source, {})
+        analyser_data = analyser_source_lookup.get(ri.source, {})
         combined_data.append(
             RSyncerInfo(
                 source=ri.source,
-                num_files_transferred=rsync_inst.get("num_files_transferred", 0),
-                num_files_in_queue=rsync_inst.get("num_files_in_queue", 0),
-                num_files_to_analyse=analyser_inst.get("num_files_in_queue", 0),
-                alive=rsync_inst.get("alive", False),
-                stopping=rsync_inst.get("stopping", True),
-                analyser_alive=analyser_inst.get("alive", False),
-                analyser_stopping=analyser_inst.get("stopping", True),
+                num_files_transferred=rsync_data.get("num_files_transferred", 0),
+                num_files_in_queue=rsync_data.get("num_files_in_queue", 0),
+                num_files_to_analyse=analyser_data.get("num_files_in_queue", 0),
+                alive=rsync_data.get("alive", False),
+                stopping=rsync_data.get("stopping", True),
+                analyser_alive=analyser_data.get("alive", False),
+                analyser_stopping=analyser_data.get("stopping", True),
                 destination=ri.destination,
                 tag=ri.tag,
                 files_transferred=ri.files_transferred,
