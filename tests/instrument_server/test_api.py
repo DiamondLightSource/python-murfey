@@ -5,8 +5,24 @@ from urllib.parse import urlparse
 
 from pytest import mark
 
-from murfey.instrument_server.api import GainReference, upload_gain_reference
+from murfey.instrument_server.api import (
+    GainReference,
+    _get_murfey_url,
+    upload_gain_reference,
+)
 from murfey.util import posix_path
+
+
+def test_get_murfey_url(
+    mock_client_configuration,  # From conftest.py
+):
+    # Mock the module-wide config variable with the fixture value
+    # The fixture is only loaded within the test function, so this patch
+    # has to happen inside the function instead of as a decorator
+    with patch("murfey.instrument_server.api.config", mock_client_configuration):
+        known_server = _get_murfey_url()
+        assert known_server == mock_client_configuration["Murfey"].get("server")
+
 
 test_upload_gain_reference_params_matrix = (
     # Rsync URL settings
