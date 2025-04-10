@@ -61,11 +61,13 @@ test_upload_gain_reference_params_matrix = (
 
 @mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 @patch("murfey.instrument_server.api.subprocess")
+@patch("murfey.instrument_server.api.tokens")
 @patch("murfey.instrument_server.api._get_murfey_url")
 @patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
     mock_request,
     mock_get_server_url,
+    mock_tokens,
     mock_subprocess,
     test_params: tuple[Optional[str]],
 ):
