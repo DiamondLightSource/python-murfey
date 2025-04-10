@@ -9,7 +9,7 @@ from murfey.instrument_server.api import GainReference, upload_gain_reference
 from murfey.util import posix_path
 
 test_upload_gain_reference_params_matrix = (
-    # Rsync URL
+    # Rsync URL settings
     ("http://1.1.1.1",),  # When rsync_url is provided
     ("",),  # When rsync_url is blank
     (None,),  # When rsync_url not provided
@@ -24,11 +24,11 @@ def test_upload_gain_reference(
     mock_request,
     mock_get_server_url,
     mock_subprocess,
-    test_params: tuple[Optional[str], str, str],
+    test_params: tuple[Optional[str]],
 ):
 
     # Create a mock machine config base on the test params
-    rsync_url_setting, rsync_module, gain_ref_dir = test_params
+    (rsync_url_setting,) = test_params
     server_url = "http://0.0.0.0:8000"
     rsync_module = "data"
     gain_ref_dir = "C:/ProgramData/Gatan/Gain Reference"
