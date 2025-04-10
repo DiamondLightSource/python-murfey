@@ -11,6 +11,7 @@ from murfey.util.client import (
     read_config,
     set_default_acquisition_output,
 )
+from murfey.util.models import Visit
 
 test_read_config_params_matrix = (
     # Environment variable to set | Append to tmp_path
@@ -116,7 +117,7 @@ def test_get_visit_list(
 
     # Check that expected outputs are correct (order-sensitive)
     for v, visit in enumerate(visits):
-        assert visit.dict() == example_visits[v]
+        assert visit.dict() == Visit.parse_obj(example_visits[v]).dict()
 
 
 def test_set_default_acquisition_output_normal_operation(tmp_path):
