@@ -190,15 +190,6 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
     )
 
 
-def get_tomo_proc_params(pj_id: int, *args) -> db.TomographyProcessingParameters:
-    results = murfey_db.exec(
-        select(db.TomographyProcessingParameters).where(
-            db.TomographyProcessingParameters.pj_id == pj_id
-        )
-    ).one()
-    return results
-
-
 def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingParameters:
     results = murfey_db.exec(
         select(db.TomographyPreprocessingParameters).where(

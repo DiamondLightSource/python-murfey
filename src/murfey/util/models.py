@@ -372,9 +372,3 @@ class PreprocessingParametersTomo(BaseModel):
         gain_ref: Optional[str]
         manual_tilt_offset: float
         eer_fractionation: int
-
-
-class ProcessingParametersTomo(BaseModel):
-    manual_tilt_offset: int
-    tag: str
-    tilt_series_tag: str
