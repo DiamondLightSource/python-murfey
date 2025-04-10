@@ -45,9 +45,10 @@ def test_get_murfey_url(
     original_url = str(mock_client_configuration["Murfey"].get("server"))
     if not original_url.startswith(("http://", "https://")):
         original_url = f"http://{original_url}"
+
+    # Check that the components of the result match those in the config
     parsed_original = urlparse(original_url)
     parsed_server = urlparse(known_server)
-    # Check that the components of the result match those in the config
     assert parsed_server.scheme in ("http", "https")
     assert parsed_server.hostname == parsed_original.hostname
     assert parsed_server.port == parsed_original.port
