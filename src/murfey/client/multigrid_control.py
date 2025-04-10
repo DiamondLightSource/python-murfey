@@ -438,7 +438,7 @@ class MultigridController:
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 json.update({"eer_fractionation_file": eer_fractionation_file})
             capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_preprocessing_parameters",
+                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_processing_parameters",
                 json=json,
             )
             capture_post(

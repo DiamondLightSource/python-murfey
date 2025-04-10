@@ -88,9 +88,9 @@ from murfey.util.models import (
     GridSquareParameters,
     MillingParameters,
     PostInfo,
-    PreprocessingParametersTomo,
     ProcessingJobParameters,
     ProcessingParametersSPA,
+    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     RsyncerSource,
@@ -613,9 +613,9 @@ def post_foil_hole(
     return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
-@router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
+@router.post("/sessions/{session_id}/tomography_processing_parameters")
 def register_tomo_preproc_params(
-    session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
+    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(

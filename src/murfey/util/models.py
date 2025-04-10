@@ -349,7 +349,7 @@ class CompletedTiltSeries(BaseModel):
     rsync_source: str
 
 
-class PreprocessingParametersTomo(BaseModel):
+class ProcessingParametersTomo(BaseModel):
     dose_per_frame: Optional[float]
     frame_count: int
     tilt_axis: float

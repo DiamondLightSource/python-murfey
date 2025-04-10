@@ -190,10 +190,10 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
     )
 
 
-def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingParameters:
+def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyProcessingParameters:
     results = murfey_db.exec(
-        select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == dcg_id
+        select(db.TomographyProcessingParameters).where(
+            db.TomographyProcessingParameters.dcg_id == dcg_id
         )
     ).one()
     return results
@@ -2537,11 +2537,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
             ).one()
             if not murfey_db.exec(
-                select(func.count(db.TomographyPreprocessingParameters.dcg_id)).where(
-                    db.TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+                select(func.count(db.TomographyProcessingParameters.dcg_id)).where(
+                    db.TomographyProcessingParameters.dcg_id == collected_ids[0].id
                 )
             ).one():
-                params = db.TomographyPreprocessingParameters(
+                params = db.TomographyProcessingParameters(
                     dcg_id=collected_ids[0].id,
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
                     voltage=message["voltage"],
