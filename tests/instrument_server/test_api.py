@@ -12,16 +12,40 @@ from murfey.instrument_server.api import (
 )
 from murfey.util import posix_path
 
+test_get_murfey_url_params_matrix = (
+    # Server URL to use
+    ("default",),
+    ("0.0.0.0:8000",),
+    ("murfey_server",),
+    ("http://murfey_server:8000",),
+    ("http://murfey_server:8080/api",),
+)
 
+
+@mark.parametrize("test_params", test_get_murfey_url_params_matrix)
 def test_get_murfey_url(
+    test_params: tuple[str],
     mock_client_configuration,  # From conftest.py
 ):
+    # Unpack test_params
+    (server_url_to_test,) = test_params
+
+    # Replace the server URL from the fixture with other ones for testing
+    if server_url_to_test != "default":
+        mock_client_configuration["Murfey"]["server"] = server_url_to_test
+
     # Mock the module-wide config variable with the fixture value
     # The fixture is only loaded within the test function, so this patch
     # has to happen inside the function instead of as a decorator
     with patch("murfey.instrument_server.api.config", mock_client_configuration):
         known_server = _get_murfey_url()
-        assert known_server == mock_client_configuration["Murfey"].get("server")
+        parsed_server = urlparse(known_server)
+        parsed_original = urlparse(
+            str(mock_client_configuration["Murfey"].get("server"))
+        )
+        assert parsed_server.scheme in ("http", "https")
+        assert parsed_server.netloc == parsed_original.netloc
+        assert parsed_server.path == parsed_original.path
 
 
 test_upload_gain_reference_params_matrix = (
