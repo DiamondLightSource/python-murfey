@@ -71,8 +71,9 @@ requests.get, requests.post, requests.put, requests.delete = authorised_requests
 
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
+    proxy_path = api_base.path.rstrip("/")
     get_visits_url = api_base._replace(
-        path=f"/instruments/{instrument_name}/visits_raw"
+        path=f"{proxy_path}/instruments/{instrument_name}/visits_raw"
     )
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
