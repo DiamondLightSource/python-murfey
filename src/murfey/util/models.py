@@ -368,7 +368,7 @@ class PreprocessingParametersTomo(BaseModel):
     eer_fractionation: int
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]  # Doesn't match the model?
+        dose_per_frame: Optional[float]
         gain_ref: Optional[str]
         manual_tilt_offset: float
         eer_fractionation: int
