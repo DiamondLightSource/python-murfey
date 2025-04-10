@@ -19,7 +19,6 @@ from murfey.client.instance_environment import (
 )
 from murfey.util import authorised_requests, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
-from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
 
@@ -68,7 +67,6 @@ class TomographyContext(Context):
         ProcessingParameter(
             "dose_per_frame", "Dose Per Frame (e- / Angstrom^2 / frame)", default=1
         ),
-        ProcessingParameter("manual_tilt_offset", "Tilt Offset", default=0),
         ProcessingParameter("gain_ref", "Gain Reference"),
         ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
     ]
@@ -566,7 +564,6 @@ class TomographyContext(Context):
                         if environment
                         else None
                     )
-                    metadata["manual_tilt_offset"] = 0
                     metadata["source"] = str(self._basepath)
                 except KeyError:
                     return OrderedDict({})
@@ -626,9 +623,6 @@ class TomographyContext(Context):
                 environment.data_collection_parameters.get("dose_per_frame")
                 if environment
                 else None
-            )
-            mdoc_metadata["manual_tilt_offset"] = -midpoint(
-                [float(b["TiltAngle"]) for b in blocks]
             )
             mdoc_metadata["source"] = str(self._basepath)
             mdoc_metadata["tag"] = str(self._basepath)
