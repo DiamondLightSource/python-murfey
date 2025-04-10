@@ -38,7 +38,7 @@ def test_read_config(
     if env_var:
         full_path = tmp_path / partial_path
         env_var_dict[env_var] = str(full_path)
-        file_path = full_path if full_path.suffix() else full_path / ".murfey"
+        file_path = full_path if full_path.suffix else full_path / ".murfey"
     else:
         file_path = Path().home() / ".murfey"
 
