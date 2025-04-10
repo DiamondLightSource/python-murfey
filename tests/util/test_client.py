@@ -114,8 +114,9 @@ def test_get_visit_list(
     expected_url = f"{server_url}/instruments/{instrument_name}/visits_raw"
     mock_request.get.assert_called_once_with(expected_url)
 
-    # Check that expected outputs are correct (order-insensitive)
-    assert {visit.dict() for visit in visits} == set(example_visits)
+    # Check that expected outputs are correct (order-sensitive)
+    for v, visit in enumerate(visits):
+        assert visit.dict() == example_visits[v]
 
 
 def test_set_default_acquisition_output_normal_operation(tmp_path):
