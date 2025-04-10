@@ -138,7 +138,7 @@ def check_token(session_id: MurfeySessionID):
 
 
 @router.post("/sessions/{session_id}/multigrid_watcher")
-def start_multigrid_watcher(
+def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
     if controllers.get(session_id) is not None:
@@ -182,6 +182,13 @@ def start_multigrid_watcher(
     watchers[session_id].subscribe(
         controllers[session_id]._multigrid_watcher_finalised, final=True
     )
+    return {"success": True}
+
+
+@router.post("/sessions/{session_id}/start_multigrid_watcher")
+def start_multigrid_watcher(session_id: MurfeySessionID):
+    if watchers.get(session_id) is None:
+        return {"success": False}
     watchers[session_id].start()
     return {"success": True}
 
@@ -232,7 +239,7 @@ def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
-class RSyncerInfo(BaseModel):
+class ObserverInfo(BaseModel):
     source: str
     num_files_transferred: int
     num_files_in_queue: int
@@ -241,13 +248,29 @@ class RSyncerInfo(BaseModel):
 
 
 @router.get("/sessions/{session_id}/rsyncer_info")
-def get_rsyncer_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
+def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
     info = []
     for k, v in controllers[session_id].rsync_processes.items():
         info.append(
-            RSyncerInfo(
+            ObserverInfo(
                 source=str(k),
                 num_files_transferred=v._files_transferred,
+                num_files_in_queue=v.queue.qsize(),
+                alive=v.thread.is_alive(),
+                stopping=v._stopping,
+            )
+        )
+    return info
+
+
+@router.get("/sessions/{session_id}/analyser_info")
+def get_analyser_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
+    info = []
+    for k, v in controllers[session_id].analysers.items():
+        info.append(
+            ObserverInfo(
+                source=str(k),
+                num_files_transferred=0,
                 num_files_in_queue=v.queue.qsize(),
                 alive=v.thread.is_alive(),
                 stopping=v._stopping,
