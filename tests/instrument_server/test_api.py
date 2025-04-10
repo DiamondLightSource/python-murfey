@@ -18,18 +18,24 @@ test_upload_gain_reference_params_matrix = (
 
 @mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 @patch("murfey.instrument_server.api.subprocess")
+@patch("murfey.instrument_server.api.tokens")
 @patch("murfey.instrument_server.api._get_murfey_url")
 @patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
     mock_request,
     mock_get_server_url,
+    mock_tokens,
     mock_subprocess,
     test_params: tuple[Optional[str]],
 ):
 
-    # Create a mock machine config base on the test params
+    # Unpack test parameters and define other ones
     (rsync_url_setting,) = test_params
     server_url = "http://0.0.0.0:8000"
+    instrument_name = "murfey"
+    session_id = 1
+
+    # Create a mock machine config base on the test params
     rsync_module = "data"
     gain_ref_dir = "C:/ProgramData/Gatan/Gain Reference"
     mock_machine_config = {
@@ -48,7 +54,9 @@ def test_upload_gain_reference(
     mock_subprocess.run.return_value = Mock(
         returncode=0, stderr="An error has occurred."
     )
-
+    mock_tokens = {
+        session_id: "hello",
+    }
     # Construct payload and pass request to function
     gain_ref_file = f"{gain_ref_dir}/gain.mrc"
     visit_path = "2025/aa00000-0"
@@ -59,15 +67,19 @@ def test_upload_gain_reference(
         "gain_destination_dir": gain_dest_dir,
     }
     result = upload_gain_reference(
-        instrument_name="murfey",
-        session_id=1,
+        instrument_name=instrument_name,
+        session_id=session_id,
         gain_reference=GainReference(
             **payload,
         ),
     )
 
     # Check that the machine config request was called
-    mock_request.get.assert_called_once()
+    machine_config_url = f"{server_url}/instruments/{instrument_name}/machine"
+    mock_request.get.assert_called_once_with(
+        machine_config_url,
+        headers={"Authorization": f"Bearer {mock_tokens[session_id]}"},
+    )
 
     # Check that the subprocess was run with the expected arguments
     # If no rsync_url key is provided, or rsync_url key is empty,
