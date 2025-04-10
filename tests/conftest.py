@@ -1,4 +1,5 @@
 import json
+from configparser import ConfigParser
 
 import pytest
 from sqlmodel import Session
@@ -19,6 +20,20 @@ def start_postgres():
     with Session(engine) as murfey_db:
         murfey_db.add(murfey_session)
         murfey_db.commit()
+
+
+@pytest.fixture()
+def mock_client_configuration() -> ConfigParser:
+    """
+    Returns the client-side configuration file as a pre-loaded ConfigParser object.
+    """
+    config = ConfigParser()
+    config["Murfey"] = {
+        "instrument_name": "murfey",
+        "server": "http://0.0.0.0:8000",
+        "token": "pneumonoultramicroscopicsilicovolcanoconiosis",
+    }
+    return config
 
 
 @pytest.fixture()
