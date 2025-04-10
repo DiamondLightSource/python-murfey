@@ -455,8 +455,11 @@ class RSyncerInfo(BaseModel):
     source: str
     num_files_transferred: int
     num_files_in_queue: int
+    num_files_to_analyse: int
     alive: bool
     stopping: bool
+    analyser_alive: bool
+    analyser_stopping: bool
     destination: str
     tag: str
     files_transferred: int
@@ -469,7 +472,8 @@ class RSyncerInfo(BaseModel):
 async def get_rsyncer_info(
     instrument_name: str, session_id: MurfeySessionID, db=murfey_db
 ) -> List[RSyncerInfo]:
-    data = []
+    rsyncer_data = []
+    analyser_data = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -486,27 +490,53 @@ async def get_rsyncer_info(
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     if resp.status == 200:
-                        data = await resp.json()
+                        rsyncer_data = await resp.json()
                     else:
-                        data = []
+                        rsyncer_data = []
         except KeyError:
-            data = []
+            rsyncer_data = []
         except Exception:
             log.warning(
                 "Exception encountered gathering rsyncer info from the instrument server",
                 exc_info=True,
             )
+
+        try:
+            async with lock:
+                token = instrument_server_tokens[session_id]["access_token"]
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.get(
+                    f"{machine_config.instrument_server_url}/sessions/{session_id}/analyser_info",
+                    headers={"Authorization": f"Bearer {token}"},
+                ) as resp:
+                    if resp.status == 200:
+                        analyser_data = await resp.json()
+                    else:
+                        analyser_data = []
+        except KeyError:
+            analyser_data = []
+        except Exception:
+            log.warning(
+                "Exception encountered gathering analyser info from the instrument server",
+                exc_info=True,
+            )
+
     combined_data = []
-    data_source_lookup = {d["source"]: d for d in data}
+    rsyncer_source_lookup = {d["source"]: d for d in rsyncer_data}
+    analyser_source_lookup = {d["source"]: d for d in analyser_data}
     for ri in rsync_instances:
-        d = data_source_lookup.get(ri.source, {})
+        rsync_inst = rsyncer_source_lookup.get(ri.source, {})
+        analyser_inst = analyser_source_lookup.get(ri.source, {})
         combined_data.append(
             RSyncerInfo(
                 source=ri.source,
-                num_files_transferred=d.get("num_files_transferred", 0),
-                num_files_in_queue=d.get("num_files_in_queue", 0),
-                alive=d.get("alive", False),
-                stopping=d.get("stopping", True),
+                num_files_transferred=rsync_inst.get("num_files_transferred", 0),
+                num_files_in_queue=rsync_inst.get("num_files_in_queue", 0),
+                num_files_to_analyse=analyser_inst.get("num_files_in_queue", 0),
+                alive=rsync_inst.get("alive", False),
+                stopping=rsync_inst.get("stopping", True),
+                analyser_alive=analyser_inst.get("alive", False),
+                analyser_stopping=analyser_inst.get("stopping", True),
                 destination=ri.destination,
                 tag=ri.tag,
                 files_transferred=ri.files_transferred,

@@ -263,6 +263,22 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
     return info
 
 
+@router.get("/sessions/{session_id}/analyser_info")
+def get_analyser_info(session_id: MurfeySessionID) -> list[RSyncerInfo]:
+    info = []
+    for k, v in controllers[session_id].analysers.items():
+        info.append(
+            RSyncerInfo(
+                source=str(k),
+                num_files_transferred=0,
+                num_files_in_queue=v.queue.qsize(),
+                alive=v.thread.is_alive(),
+                stopping=v._stopping,
+            )
+        )
+    return info
+
+
 class ProcessingParameters(BaseModel):
     gain_ref: str
     dose_per_frame: Optional[float] = None
