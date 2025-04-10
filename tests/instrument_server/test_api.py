@@ -40,13 +40,17 @@ def test_get_murfey_url(
     with patch("murfey.instrument_server.api.config", mock_client_configuration):
         known_server = _get_murfey_url()
 
-    # Check that the components of the result match those in the config
-    parsed_server = urlparse(known_server)
+    # Prepend 'http://' to config URLs that don't have it for the comparison
+    # Otherwise, urlparse stores it under the 'path' attribute
     original_url = str(mock_client_configuration["Murfey"].get("server"))
     if not original_url.startswith(("http://", "https://")):
         original_url = f"http://{original_url}"
     parsed_original = urlparse(original_url)
+    parsed_server = urlparse(known_server)
+    # Check that the components of the result match those in the config
     assert parsed_server.scheme in ("http", "https")
+    assert parsed_server.hostname == parsed_original.hostname
+    assert parsed_server.port == parsed_original.port
     assert parsed_server.netloc == parsed_original.netloc
     assert parsed_server.path == parsed_original.path
 
