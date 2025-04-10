@@ -367,7 +367,11 @@ def upload_gain_reference(
         )
 
     # Return the rsync URL if set, otherwise assume you are syncing via Murfey
-    rsync_url = urlparse(str(machine_config.get("rsync_url", _get_murfey_url())))
+    rsync_url = urlparse(
+        str(machine_config["rsync_url"])
+        if machine_config.get("rsync_url", "")
+        else _get_murfey_url()
+    )
     rsync_module = machine_config.get("rsync_module", "data")
     rsync_path = f"{rsync_url.hostname}::{rsync_module}/{safe_visit_path}/{safe_destination_dir}/{secure_filename(gain_reference.gain_path.name)}"
 
