@@ -61,13 +61,11 @@ test_upload_gain_reference_params_matrix = (
 
 @mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 @patch("murfey.instrument_server.api.subprocess")
-@patch("murfey.instrument_server.api.tokens")
 @patch("murfey.instrument_server.api._get_murfey_url")
 @patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
     mock_request,
     mock_get_server_url,
-    mock_tokens,
     mock_subprocess,
     test_params: tuple[Optional[str]],
 ):
@@ -97,9 +95,7 @@ def test_upload_gain_reference(
     mock_subprocess.run.return_value = Mock(
         returncode=0, stderr="An error has occurred."
     )
-    # mock_tokens = {
-    #     session_id: "hello",
-    # }
+
     # Construct payload and pass request to function
     gain_ref_file = f"{gain_ref_dir}/gain.mrc"
     visit_path = "2025/aa00000-0"
