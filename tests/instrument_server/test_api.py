@@ -39,13 +39,13 @@ def test_get_murfey_url(
     # has to happen inside the function instead of as a decorator
     with patch("murfey.instrument_server.api.config", mock_client_configuration):
         known_server = _get_murfey_url()
-        parsed_server = urlparse(known_server)
-        parsed_original = urlparse(
-            str(mock_client_configuration["Murfey"].get("server"))
-        )
-        assert parsed_server.scheme in ("http", "https")
-        assert parsed_server.netloc == parsed_original.netloc
-        assert parsed_server.path == parsed_original.path
+
+    # Check that the components of the result match those in the config
+    parsed_server = urlparse(known_server)
+    parsed_original = urlparse(str(mock_client_configuration["Murfey"].get("server")))
+    assert parsed_server.scheme in ("http", "https")
+    assert parsed_server.netloc == parsed_original.netloc
+    assert parsed_server.path == parsed_original.path
 
 
 test_upload_gain_reference_params_matrix = (
