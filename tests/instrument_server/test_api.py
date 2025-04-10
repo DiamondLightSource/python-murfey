@@ -94,9 +94,7 @@ def test_upload_gain_reference(
     mock_response.json.return_value = mock_machine_config
     mock_request.get.return_value = mock_response
     mock_get_server_url.return_value = server_url
-    mock_subprocess.run.return_value = Mock(
-        returncode=0, stderr="An error has occurred."
-    )
+    mock_subprocess.run.return_value = Mock(returncode=0)
 
     # Construct payload and pass request to function
     gain_ref_file = f"{gain_ref_dir}/gain.mrc"
