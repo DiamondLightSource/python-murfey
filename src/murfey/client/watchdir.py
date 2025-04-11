@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
-import murfey.util
 from murfey.client.tui.status_bar import StatusBar
+from murfey.util.client import Observer
 
 log = logging.getLogger("murfey.client.watchdir")
 
@@ -26,7 +26,7 @@ class _FileInfo(NamedTuple):
     settling_time: Optional[float] = None
 
 
-class DirWatcher(murfey.util.Observer):
+class DirWatcher(Observer):
     def __init__(
         self,
         path: str | os.PathLike,

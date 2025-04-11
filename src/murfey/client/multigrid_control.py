@@ -20,7 +20,8 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post, get_machine_config_client, posix_path
+from murfey.util import posix_path
+from murfey.util.client import capture_post, get_machine_config_client
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 

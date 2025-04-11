@@ -33,10 +33,10 @@ from murfey.client.tui.screens import (
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
-from murfey.util import (
+from murfey.util import posix_path
+from murfey.util.client import (
     capture_post,
     get_machine_config_client,
-    posix_path,
     read_config,
     set_default_acquisition_output,
 )

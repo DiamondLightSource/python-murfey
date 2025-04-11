@@ -22,7 +22,7 @@ from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
-from murfey.util import Observer, get_machine_config_client
+from murfey.util.client import Observer, get_machine_config_client
 from murfey.util.mdoc import get_block
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 

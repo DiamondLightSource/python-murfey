@@ -7,12 +7,12 @@ import time
 from pathlib import Path
 from typing import List
 
-import murfey.util
+from murfey.util.client import Observer
 
 log = logging.getLogger("murfey.client.watchdir_multigrid")
 
 
-class MultigridDirWatcher(murfey.util.Observer):
+class MultigridDirWatcher(Observer):
     def __init__(
         self,
         path: str | os.PathLike,

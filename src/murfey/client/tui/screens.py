@@ -56,7 +56,8 @@ from murfey.client.instance_environment import (
 )
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
-from murfey.util import capture_post, get_machine_config_client, posix_path, read_config
+from murfey.util import posix_path
+from murfey.util.client import capture_post, get_machine_config_client, read_config
 from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
 
 log = logging.getLogger("murfey.tui.screens")

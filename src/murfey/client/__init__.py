@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import configparser
-
-# import json
 import logging
 import os
 import platform
@@ -12,18 +10,14 @@ import sys
 import time
 import webbrowser
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 from queue import Queue
 from typing import List, Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
-
-# from multiprocessing import Process, Queue
 from rich.prompt import Confirm
 
-import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
@@ -31,38 +25,11 @@ from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util import _get_visit_list
-
-# from asyncio import Queue
-
-
-# from rich.prompt import Prompt
-
+from murfey.util.client import _get_visit_list, authorised_requests, read_config
 
 log = logging.getLogger("murfey.client")
 
-
-def read_config() -> configparser.ConfigParser:
-    config = configparser.ConfigParser()
-    try:
-        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
-        murfey_client_config_home = Path(mcch) if mcch else Path.home()
-        with open(murfey_client_config_home / ".murfey") as configfile:
-            config.read_file(configfile)
-    except FileNotFoundError:
-        log.warning(
-            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
-        )
-    if "Murfey" not in config:
-        config["Murfey"] = {}
-    return config
-
-
-token = read_config()["Murfey"].get("token", "")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def write_config(config: configparser.ConfigParser):

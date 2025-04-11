@@ -15,7 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import (
+from murfey.util.client import (
     authorised_requests,
     capture_get,
     capture_post,

@@ -17,11 +17,11 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
-from murfey.client import read_config
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import posix_path, sanitise, sanitise_nonpath, secure_path
+from murfey.util.client import read_config
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
 
