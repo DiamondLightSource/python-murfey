@@ -1643,7 +1643,10 @@ async def process_gain(
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
-    prom.monitoring_switch.remove(session.visit)
+    try:
+        prom.monitoring_switch.remove(session.visit)
+    except KeyError:
+        pass
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     ).all()
