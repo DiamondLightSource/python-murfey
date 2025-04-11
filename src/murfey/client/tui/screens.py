@@ -57,7 +57,7 @@ from murfey.client.instance_environment import (
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
 from murfey.util import capture_post, get_machine_config_client, posix_path, read_config
-from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 log = logging.getLogger("murfey.tui.screens")
 
@@ -463,7 +463,7 @@ class ProcessingForm(Screen):
     def _write_params(
         self,
         params: dict | None = None,
-        model: PreprocessingParametersTomo | ProcessingParametersSPA | None = None,
+        model: ProcessingParametersTomo | ProcessingParametersSPA | None = None,
     ):
         if params:
             try:
@@ -473,9 +473,9 @@ class ProcessingForm(Screen):
             for k in analyser._context.user_params + analyser._context.metadata_params:
                 self.app.query_one("#info").write(f"{k.label}: {params.get(k.name)}")
             self.app._start_dc(params)
-            if model == PreprocessingParametersTomo:
+            if model == ProcessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_preprocessing_parameters",
+                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_processing_parameters",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
@@ -1156,9 +1156,7 @@ class DestinationSelect(Screen):
     def on_button_pressed(self, event):
         if self.app._multigrid and self.app._processing_enabled:
             if self._context == TomographyContext:
-                valid = validate_form(
-                    self._user_params, PreprocessingParametersTomo.Base
-                )
+                valid = validate_form(self._user_params, ProcessingParametersTomo.Base)
             else:
                 valid = validate_form(self._user_params, ProcessingParametersSPA.Base)
             if not valid:

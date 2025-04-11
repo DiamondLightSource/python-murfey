@@ -378,7 +378,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    tomography_preprocessing_parameters: List["TomographyPreprocessingParameters"] = (
+    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
         Relationship(
             back_populates="data_collection_group",
             sa_relationship_kwargs={"cascade": "delete"},
@@ -448,12 +448,6 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
-        Relationship(
-            back_populates="processing_job",
-            sa_relationship_kwargs={"cascade": "delete"},
-        )
-    )
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -499,7 +493,7 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
     )
 
 
-class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
+class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
     pixel_size: float
     dose_per_frame: float
@@ -510,14 +504,6 @@ class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
     motion_corr_binning: int = 1
     gain_ref: Optional[str] = None
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
-        back_populates="tomography_preprocessing_parameters"
-    )
-
-
-class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
-    manual_tilt_offset: int
-    processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="tomography_processing_parameters"
     )
 

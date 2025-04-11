@@ -337,7 +337,7 @@ class CompletedTiltSeries(BaseModel):
     rsync_source: str
 
 
-class PreprocessingParametersTomo(BaseModel):
+class ProcessingParametersTomo(BaseModel):
     dose_per_frame: Optional[float]
     frame_count: int
     tilt_axis: float
@@ -348,7 +348,6 @@ class PreprocessingParametersTomo(BaseModel):
     image_size_y: int
     pixel_size_on_image: str
     motion_corr_binning: int
-    manual_tilt_offset: float
     file_extension: str
     tag: str
     tilt_series_tag: str
@@ -358,11 +357,4 @@ class PreprocessingParametersTomo(BaseModel):
     class Base(BaseModel):
         dose_per_frame: Optional[float]
         gain_ref: Optional[str]
-        manual_tilt_offset: float
         eer_fractionation: int
-
-
-class ProcessingParametersTomo(BaseModel):
-    manual_tilt_offset: int
-    tag: str
-    tilt_series_tag: str
