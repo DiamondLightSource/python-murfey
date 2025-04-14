@@ -1643,20 +1643,25 @@ async def process_gain(
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
-    try:
-        prom.monitoring_switch.remove(session.visit)
-    except KeyError:
-        pass
-    rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    sessions_for_visit = db.exec(
+        select(Session).where(Session.visit == session.visit)
     ).all()
-    for ri in rsync_instances:
-        prom.seen_files.remove(ri.source, session.visit)
-        prom.transferred_files.remove(ri.source, session.visit)
-        prom.transferred_files_bytes.remove(ri.source, session.visit)
-        prom.seen_data_files.remove(ri.source, session.visit)
-        prom.transferred_data_files.remove(ri.source, session.visit)
-        prom.transferred_data_files_bytes.remove(ri.source, session.visit)
+    if len(sessions_for_visit) == 1:
+        # Don't remove prometheus metrics if there are other sessions using them
+        try:
+            prom.monitoring_switch.remove(session.visit)
+        except KeyError:
+            pass
+        rsync_instances = db.exec(
+            select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+        ).all()
+        for ri in rsync_instances:
+            prom.seen_files.remove(ri.source, session.visit)
+            prom.transferred_files.remove(ri.source, session.visit)
+            prom.transferred_files_bytes.remove(ri.source, session.visit)
+            prom.seen_data_files.remove(ri.source, session.visit)
+            prom.transferred_data_files.remove(ri.source, session.visit)
+            prom.transferred_data_files_bytes.remove(ri.source, session.visit)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
