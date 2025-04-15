@@ -220,6 +220,12 @@ def remove_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
+@router.post("/sessions/{session_id}/abandon_controller")
+def abandon_controller(session_id: MurfeySessionID):
+    controllers[session_id].abandon()
+    return {"success": True}
+
+
 @router.post("/sessions/{session_id}/finalise_rsyncer")
 def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._finalise_rsyncer(rsyncer_source.source)
