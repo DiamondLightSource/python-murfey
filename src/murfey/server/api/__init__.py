@@ -296,15 +296,22 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
-@router.delete("/sessions/{session_id}/rsyncer/{source:path}")
-def delete_rsyncer(session_id: int, source: str, db=murfey_db):
-    rsync_instance = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == source)
-    ).one()
-    db.delete(rsync_instance)
-    db.commit()
+@router.delete("/sessions/{session_id}/rsyncer")
+def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
+    try:
+        rsync_instance = db.exec(
+            select(RsyncInstance)
+            .where(RsyncInstance.session_id == session_id)
+            .where(RsyncInstance.source == str(source))
+        ).one()
+        db.delete(rsync_instance)
+        db.commit()
+    except Exception:
+        log.error(
+            f"Failed to delete rsyncer for source directory {sanitise(str(source))!r} "
+            f"in session {session_id}.",
+            exc_info=True,
+        )
 
 
 @router.post("/sessions/{session_id}/rsyncer_stopped")
