@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import aiohttp
 import requests
@@ -20,7 +20,8 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
-from murfey.util import capture_post, get_machine_config_client, posix_path
+from murfey.util import posix_path
+from murfey.util.client import capture_post, get_machine_config_client
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -188,9 +189,7 @@ class MultigridController:
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
-            remove_url = (
-                f"{self.murfey_url}/sessions/{self.session_id}/rsyncer/{str(source)}"
-            )
+            remove_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer?source={quote(str(source), safe='')}"
             requests.delete(remove_url)
         else:
             stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"

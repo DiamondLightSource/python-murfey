@@ -17,7 +17,11 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import authorised_requests, capture_post, get_machine_config_client
+from murfey.util.client import (
+    authorised_requests,
+    capture_post,
+    get_machine_config_client,
+)
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")

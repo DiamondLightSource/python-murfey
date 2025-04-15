@@ -75,13 +75,10 @@ from murfey.util.models import (
     BLSampleImageParameters,
     BLSampleParameters,
     BLSubSampleParameters,
-    ClearanceKeys,
     ClientInfo,
-    ContextInfo,
     CurrentGainRef,
     DCGroupParameters,
     DCParameters,
-    File,
     FoilHoleParameters,
     FractionationParameters,
     GainReference,
@@ -105,7 +102,6 @@ from murfey.util.models import (
     Visit,
 )
 from murfey.util.processing_params import default_spa_parameters
-from murfey.util.state import global_state
 from murfey.util.tomo import midpoint
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole,
@@ -298,15 +294,22 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     return rsyncer_info
 
 
-@router.delete("/sessions/{session_id}/rsyncer/{source:path}")
-def delete_rsyncer(session_id: int, source: str, db=murfey_db):
-    rsync_instance = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == source)
-    ).one()
-    db.delete(rsync_instance)
-    db.commit()
+@router.delete("/sessions/{session_id}/rsyncer")
+def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
+    try:
+        rsync_instance = db.exec(
+            select(RsyncInstance)
+            .where(RsyncInstance.session_id == session_id)
+            .where(RsyncInstance.source == str(source))
+        ).one()
+        db.delete(rsync_instance)
+        db.commit()
+    except Exception:
+        log.error(
+            f"Failed to delete rsyncer for source directory {sanitise(str(source))!r} "
+            f"in session {session_id}.",
+            exc_info=True,
+        )
 
 
 @router.post("/sessions/{session_id}/rsyncer_stopped")
@@ -986,23 +989,6 @@ def visit_info(
         return None
 
 
-@router.post("/visits/{visit_name}/context")
-async def register_context(context_info: ContextInfo):
-    await ws.manager.broadcast(f"Context registered: {context_info}")
-    await ws.manager.set_state("experiment_type", context_info.experiment_type)
-    await ws.manager.set_state(
-        "acquisition_software", context_info.acquisition_software
-    )
-
-
-@router.post("/visits/{visit_name}/files")
-async def add_file(file: File):
-    message = f"File {file} transferred"
-    log.info(message)
-    await ws.manager.broadcast(f"File {file} transferred")
-    return file
-
-
 @router.post("/instruments/{instrument_name}/feedback")
 async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
     if _transport_object:
@@ -1285,7 +1271,6 @@ async def request_tomography_preprocessing(
         db.add(for_stash)
         db.commit()
         db.close()
-    # await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
     return proc_file
 
 
@@ -1628,7 +1613,10 @@ async def process_gain(
 @router.delete("/sessions/{session_id}")
 def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
-    prom.monitoring_switch.remove(session.visit)
+    try:
+        prom.monitoring_switch.remove(session.visit)
+    except KeyError:
+        pass
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     ).all()
@@ -1758,42 +1746,6 @@ async def make_gif(
     return {"output_gif": str(output_path)}
 
 
-@router.post("/visits/{visit_name}/clean_state")
-async def clean_state(visit_name: str, for_clearance: ClearanceKeys):
-    if global_state.get("data_collection_group_ids") and isinstance(
-        global_state["data_collection_group_ids"], dict
-    ):
-        global_state["data_collection_group_ids"] = {
-            k: v
-            for k, v in global_state["data_collection_group_ids"].items()
-            if k not in for_clearance.data_collection_group
-        }
-    if global_state.get("data_collection_ids") and isinstance(
-        global_state["data_collection_ids"], dict
-    ):
-        global_state["data_collection_ids"] = {
-            k: v
-            for k, v in global_state["data_collection_ids"].items()
-            if k not in for_clearance.data_collection
-        }
-    if global_state.get("processing_job_ids") and isinstance(
-        global_state["processing_job_ids"], dict
-    ):
-        global_state["processing_job_ids"] = {
-            k: v
-            for k, v in global_state["processing_job_ids"].items()
-            if k not in for_clearance.processing_job
-        }
-    if global_state.get("autoproc_program_ids") and isinstance(
-        global_state["autoproc_program_ids"], dict
-    ):
-        global_state["autoproc_program_ids"] = {
-            k: v
-            for k, v in global_state["autoproc_program_ids"].items()
-            if k not in for_clearance.autoproc_program
-        }
-
-
 @router.get("/new_client_id/")
 async def new_client_id(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
@@ -1821,6 +1773,18 @@ async def get_sessions(db=murfey_db):
                 r["clients"].append(cl)
         res.append(r)
     return res
+
+
+@router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
+def get_sessions_with_visit(
+    instrument_name: str, visit_name: str, db=murfey_db
+) -> List[Session]:
+    sessions = db.exec(
+        select(Session)
+        .where(Session.instrument_name == instrument_name)
+        .where(Session.visit == visit_name)
+    ).all()
+    return sessions
 
 
 @router.get("/instruments/{instrument_name}/sessions")

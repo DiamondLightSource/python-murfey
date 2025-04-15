@@ -102,11 +102,6 @@ class SessionInfo(BaseModel):
     rescale: bool = True
 
 
-class ContextInfo(BaseModel):
-    experiment_type: str
-    acquisition_software: str
-
-
 class ClientInfo(BaseModel):
     id: int
 
@@ -125,13 +120,6 @@ class RsyncerInfo(BaseModel):
     increment_data_count: int = 0
     data_bytes: int = 0
     tag: str = ""
-
-
-class ClearanceKeys(BaseModel):
-    data_collection_group: List[str]
-    data_collection: List[str]
-    processing_job: List[str]
-    autoproc_program: List[str]
 
 
 class GainReference(BaseModel):

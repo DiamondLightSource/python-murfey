@@ -5,9 +5,9 @@ import uvicorn
 from rich.logging import RichHandler
 
 import murfey
-from murfey.client import read_config
 from murfey.client.customlogging import CustomHandler
 from murfey.util import LogFilter
+from murfey.util.client import read_config
 
 logger = logging.getLogger("murfey.instrument_server")
 

@@ -14,7 +14,7 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config_client
+from murfey.util.client import capture_post, get_machine_config_client
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")

@@ -57,7 +57,6 @@ from murfey.util.config import (
     get_security_config,
 )
 from murfey.util.processing_params import default_spa_parameters
-from murfey.util.state import global_state
 from murfey.util.tomo import midpoint
 
 try:
@@ -2249,17 +2248,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                     time.sleep(2)
                     _transport_object.transport.nack(header, requeue=True)
                     return None
-                if global_state.get("data_collection_group_ids") and isinstance(
-                    global_state["data_collection_group_ids"], dict
-                ):
-                    global_state["data_collection_group_ids"] = {
-                        **global_state["data_collection_group_ids"],
-                        message.get("tag"): dcgid,
-                    }
-                else:
-                    global_state["data_collection_group_ids"] = {
-                        message.get("tag"): dcgid
-                    }
                 _transport_object.transport.ack(header)
             if dcg_hooks := entry_points().select(
                 group="murfey.hooks", name="data_collection_group"

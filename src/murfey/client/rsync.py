@@ -19,7 +19,7 @@ from typing import Awaitable, Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util import Observer
+from murfey.util.client import Observer
 
 logger = logging.getLogger("murfey.client.rsync")
 
