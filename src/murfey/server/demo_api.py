@@ -1547,6 +1547,18 @@ async def get_sessions(db=murfey_db):
     return res
 
 
+@router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
+def get_sessions_with_visit(
+    instrument_name: str, visit_name: str, db=murfey_db
+) -> List[Session]:
+    sessions = db.exec(
+        select(Session)
+        .where(Session.instrument_name == instrument_name)
+        .where(Session.visit == visit_name)
+    ).all()
+    return sessions
+
+
 @router.get("/instruments/{instrument_name}/sessions")
 async def get_sessions_by_instrument_name(
     instrument_name: str, db=murfey_db
