@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import aiohttp
 import requests
@@ -189,9 +189,7 @@ class MultigridController:
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
-            remove_url = (
-                f"{self.murfey_url}/sessions/{self.session_id}/rsyncer/{str(source)}"
-            )
+            remove_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer?source={quote(str(source), safe='')}"
             requests.delete(remove_url)
         else:
             stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"
