@@ -57,7 +57,6 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
-    TomographyPreprocessingParameters,
     TomographyProcessingParameters,
 )
 from murfey.util.models import (
@@ -70,7 +69,6 @@ from murfey.util.models import (
     GainReference,
     GridSquareParameters,
     PostInfo,
-    PreprocessingParametersTomo,
     ProcessingJobParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
@@ -476,9 +474,9 @@ def register_spa_proc_params(
     db.commit()
 
 
-@router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
-def register_tomo_preproc_params(
-    session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
+@router.post("/sessions/{session_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     log.info(
         f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}"
@@ -499,68 +497,19 @@ def register_tomo_preproc_params(
         .where(ProcessingJob.recipe == "em-tomo-preprocess")
     ).one()
     if not db.exec(
-        select(func.count(TomographyPreprocessingParameters.dcg_id)).where(
-            TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+        select(func.count(TomographyProcessingParameters.dcg_id)).where(
+            TomographyProcessingParameters.dcg_id == collected_ids[0].id
         )
     ).one():
-        params = TomographyPreprocessingParameters(
+        params = TomographyProcessingParameters(
             dcg_id=collected_ids[0].id,
             pixel_size=proc_params.pixel_size_on_image,
             dose_per_frame=proc_params.dose_per_frame,
             gain_ref=proc_params.gain_ref,
             motion_corr_binning=proc_params.motion_corr_binning,
             voltage=proc_params.voltage,
-            # manual_tilt_offset=proc_params.manual_tilt_offset,
         )
         db.add(params)
-    if not db.exec(
-        select(func.count(TomographyProcessingParameters.pj_id)).where(
-            TomographyProcessingParameters.pj_id == collected_ids[2].id
-        )
-    ).one():
-        tomogram_params = TomographyProcessingParameters(
-            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
-        )
-        db.add(tomogram_params)
-    db.commit()
-    db.close()
-
-
-@router.post("/clients/{client_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    client_id: int, proc_params: ProcessingParametersTomo, db=murfey_db
-):
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    session_id = client.session_id
-    log.info(
-        f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}, {session_id}"
-    )
-    collected_ids = db.exec(
-        select(
-            DataCollectionGroup,
-            DataCollection,
-            ProcessingJob,
-            AutoProcProgram,
-        )
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == proc_params.tag)
-        .where(DataCollection.tag == proc_params.tilt_series_tag)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
-    ).one()
-    if not db.exec(
-        select(func.count(TomographyProcessingParameters.pj_id)).where(
-            TomographyProcessingParameters.pj_id == collected_ids[2].id
-        )
-    ).one():
-        tomogram_params = TomographyProcessingParameters(
-            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
-        )
-        db.add(tomogram_params)
     db.commit()
     db.close()
 

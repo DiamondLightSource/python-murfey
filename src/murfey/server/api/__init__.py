@@ -42,7 +42,7 @@ from murfey.server import (
     get_job_ids,
     get_machine_config,
     get_microscope,
-    get_tomo_preproc_params,
+    get_tomo_proc_params,
     sanitise,
     templates,
 )
@@ -70,7 +70,6 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
-    TomographyProcessingParameters,
 )
 from murfey.util.models import (
     BLSampleImageParameters,
@@ -86,7 +85,6 @@ from murfey.util.models import (
     GridSquareParameters,
     MillingParameters,
     PostInfo,
-    PreprocessingParametersTomo,
     ProcessingJobParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
@@ -618,9 +616,9 @@ def post_foil_hole(
     return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
-@router.post("/sessions/{session_id}/tomography_preprocessing_parameters")
-def register_tomo_preproc_params(
-    session_id: MurfeySessionID, proc_params: PreprocessingParametersTomo, db=murfey_db
+@router.post("/sessions/{session_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(
@@ -641,41 +639,6 @@ def register_tomo_preproc_params(
     }
     if _transport_object:
         _transport_object.send(_transport_object.feedback_queue, zocalo_message)
-
-
-@router.post("/sessions/{session_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
-):
-    log.info(
-        f"Registering tomography processing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}"
-    )
-    collected_ids = db.exec(
-        select(
-            DataCollectionGroup,
-            DataCollection,
-            ProcessingJob,
-            AutoProcProgram,
-        )
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == proc_params.tag)
-        .where(DataCollection.tag == proc_params.tilt_series_tag)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
-    ).one()
-    if not db.exec(
-        select(func.count(TomographyProcessingParameters.pj_id)).where(
-            TomographyProcessingParameters.pj_id == collected_ids[2].id
-        )
-    ).one():
-        tomogram_params = TomographyProcessingParameters(
-            pj_id=collected_ids[2].id, manual_tilt_offset=proc_params.manual_tilt_offset
-        )
-        db.add(tomogram_params)
-    db.commit()
-    db.close()
 
 
 class Tag(BaseModel):
@@ -804,7 +767,7 @@ def register_completed_tilt_series(
             ]
             tilts = get_all_tilts(ts.id)
             ids = get_job_ids(ts.id, collected_ids[3].id)
-            preproc_params = get_tomo_preproc_params(ids.dcgid)
+            preproc_params = get_tomo_proc_params(ids.dcgid)
 
             first_tilt = db.exec(
                 select(Tilt).where(Tilt.tilt_series_id == ts.id)

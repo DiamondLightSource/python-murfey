@@ -24,7 +24,7 @@ from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.client.tui.forms import FormDependency
 from murfey.util.client import Observer, get_machine_config_client
 from murfey.util.mdoc import get_block
-from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -65,7 +65,7 @@ class Analyser(Observer):
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
         self.parameters_model: (
-            Type[ProcessingParametersSPA] | Type[PreprocessingParametersTomo] | None
+            Type[ProcessingParametersSPA] | Type[ProcessingParametersTomo] | None
         ) = None
 
         self.queue: queue.Queue = queue.Queue()
@@ -183,7 +183,7 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
-                    self.parameters_model = PreprocessingParametersTomo
+                    self.parameters_model = ProcessingParametersTomo
                 return True
 
             # Files with these suffixes belong to the serial EM tomography workflow
@@ -207,7 +207,7 @@ class Analyser(Observer):
                 ):
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = PreprocessingParametersTomo
+                self.parameters_model = ProcessingParametersTomo
                 return True
         return False
 

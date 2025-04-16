@@ -410,12 +410,6 @@ class MultigridController:
         source = Path(json["source"])
         context = self.analysers[source]._context
         if isinstance(context, TomographyContext):
-            if from_form:
-                capture_post(
-                    f"{self._environment.url.geturl()}/clients/{self._environment.client_id}/tomography_processing_parameters",
-                    json=json,
-                )
-
             source = Path(json["source"])
             context.register_tomography_data_collections(
                 file_extension=json["file_extension"],
@@ -443,7 +437,7 @@ class MultigridController:
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 json.update({"eer_fractionation_file": eer_fractionation_file})
             capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_preprocessing_parameters",
+                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_processing_parameters",
                 json=json,
             )
             capture_post(

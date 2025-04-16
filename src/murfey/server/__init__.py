@@ -189,19 +189,10 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
     )
 
 
-def get_tomo_proc_params(pj_id: int, *args) -> db.TomographyProcessingParameters:
+def get_tomo_proc_params(dcg_id: int, *args) -> db.TomographyProcessingParameters:
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
-            db.TomographyProcessingParameters.pj_id == pj_id
-        )
-    ).one()
-    return results
-
-
-def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyPreprocessingParameters:
-    results = murfey_db.exec(
-        select(db.TomographyPreprocessingParameters).where(
-            db.TomographyPreprocessingParameters.dcg_id == dcg_id
+            db.TomographyProcessingParameters.dcg_id == dcg_id
         )
     ).one()
     return results
@@ -1660,7 +1651,7 @@ def _flush_tomography_preprocessing(message: dict):
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
     ).first()
-    proc_params = get_tomo_preproc_params(collected_ids.id)
+    proc_params = get_tomo_proc_params(collected_ids.id)
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
@@ -2160,7 +2151,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ]
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
-                preproc_params = get_tomo_preproc_params(ids.dcgid)
+                preproc_params = get_tomo_proc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[3]
                     / "Tomograms"
@@ -2534,11 +2525,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
             ).one()
             if not murfey_db.exec(
-                select(func.count(db.TomographyPreprocessingParameters.dcg_id)).where(
-                    db.TomographyPreprocessingParameters.dcg_id == collected_ids[0].id
+                select(func.count(db.TomographyProcessingParameters.dcg_id)).where(
+                    db.TomographyProcessingParameters.dcg_id == collected_ids[0].id
                 )
             ).one():
-                params = db.TomographyPreprocessingParameters(
+                params = db.TomographyProcessingParameters(
                     dcg_id=collected_ids[0].id,
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
                     voltage=message["voltage"],
