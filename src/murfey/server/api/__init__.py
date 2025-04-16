@@ -1616,31 +1616,36 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     sessions_for_visit = db.exec(
         select(Session).where(Session.visit == session.visit)
     ).all()
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-    ).all()
-    # Ignore key errors when deleting Prometheus entries (it might not be set up)
-    try:
-        # Don't remove prometheus metrics if there are other sessions using them
-        if len(sessions_for_visit) == 1:
-            rsync_instances = db.exec(
-                select(RsyncInstance).where(RsyncInstance.session_id == session_id)
-            ).all()
+    # Don't remove prometheus metrics if there are other sessions using them
+    if len(sessions_for_visit) == 1:
+        try:
             prom.monitoring_switch.remove(session.visit)
-            for ri in rsync_instances:
+        except KeyError:
+            pass
+        rsync_instances = db.exec(
+            select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+        ).all()
+        for ri in rsync_instances:
+            try:
                 prom.seen_files.remove(ri.source, session.visit)
                 prom.transferred_files.remove(ri.source, session.visit)
                 prom.transferred_files_bytes.remove(ri.source, session.visit)
                 prom.seen_data_files.remove(ri.source, session.visit)
                 prom.transferred_data_files.remove(ri.source, session.visit)
                 prom.transferred_data_files_bytes.remove(ri.source, session.visit)
-        for c in collected_ids:
+            except KeyError:
+                pass
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        try:
             prom.preprocessed_movies.remove(c[2].id)
-    except KeyError:
-        pass
+        except KeyError:
+            continue
     db.delete(session)
     db.commit()
     return
