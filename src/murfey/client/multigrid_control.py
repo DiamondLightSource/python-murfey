@@ -122,6 +122,14 @@ class MultigridController:
                     log.warning(f"Could not delete database data for {self.session_id}")
                 self.dormant = True
 
+    def abandon(self):
+        for a in self.analysers.values():
+            a.request_stop()
+        for w in self._environment.watchers.values():
+            w.request_stop()
+        for p in self.rsync_processes.values():
+            p.request_stop()
+
     def finalise(self):
         for a in self.analysers.values():
             a.request_stop()

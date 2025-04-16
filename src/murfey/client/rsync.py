@@ -182,6 +182,10 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
+    def request_stop(self):
+        self._stopping = True
+        self._halt_thread = True
+
     def finalise(
         self,
         thread: bool = True,
