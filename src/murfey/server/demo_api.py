@@ -475,7 +475,7 @@ def register_spa_proc_params(
 
 
 @router.post("/sessions/{session_id}/tomography_processing_parameters")
-def register_tomo_preproc_params(
+def register_tomo_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     log.info(

@@ -189,7 +189,7 @@ def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
     )
 
 
-def get_tomo_preproc_params(dcg_id: int, *args) -> db.TomographyProcessingParameters:
+def get_tomo_proc_params(dcg_id: int, *args) -> db.TomographyProcessingParameters:
     results = murfey_db.exec(
         select(db.TomographyProcessingParameters).where(
             db.TomographyProcessingParameters.dcg_id == dcg_id
@@ -1651,7 +1651,7 @@ def _flush_tomography_preprocessing(message: dict):
         .where(db.DataCollectionGroup.session_id == session_id)
         .where(db.DataCollectionGroup.tag == message["data_collection_group_tag"])
     ).first()
-    proc_params = get_tomo_preproc_params(collected_ids.id)
+    proc_params = get_tomo_proc_params(collected_ids.id)
     if not proc_params:
         visit_name = message["visit_name"].replace("\r\n", "").replace("\n", "")
         logger.warning(
@@ -2151,7 +2151,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 ]
                 tilts = get_all_tilts(relevant_tilt_series.id)
                 ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id)
-                preproc_params = get_tomo_preproc_params(ids.dcgid)
+                preproc_params = get_tomo_proc_params(ids.dcgid)
                 stack_file = (
                     Path(message["mrc_out"]).parents[3]
                     / "Tomograms"

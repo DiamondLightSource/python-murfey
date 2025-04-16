@@ -42,7 +42,7 @@ from murfey.server import (
     get_job_ids,
     get_machine_config,
     get_microscope,
-    get_tomo_preproc_params,
+    get_tomo_proc_params,
     sanitise,
     templates,
 )
@@ -617,7 +617,7 @@ def post_foil_hole(
 
 
 @router.post("/sessions/{session_id}/tomography_processing_parameters")
-def register_tomo_preproc_params(
+def register_tomo_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
 ):
     session_processing_parameters = db.exec(
@@ -767,7 +767,7 @@ def register_completed_tilt_series(
             ]
             tilts = get_all_tilts(ts.id)
             ids = get_job_ids(ts.id, collected_ids[3].id)
-            preproc_params = get_tomo_preproc_params(ids.dcgid)
+            preproc_params = get_tomo_proc_params(ids.dcgid)
 
             first_tilt = db.exec(
                 select(Tilt).where(Tilt.tilt_series_id == ts.id)
