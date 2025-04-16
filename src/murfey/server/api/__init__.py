@@ -1616,33 +1616,31 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     sessions_for_visit = db.exec(
         select(Session).where(Session.visit == session.visit)
     ).all()
-    if len(sessions_for_visit) == 1:
-        # Don't remove prometheus metrics if there are other sessions using them
-        try:
-            prom.monitoring_switch.remove(session.visit)
-        except KeyError:
-            pass
-        rsync_instances = db.exec(
-            select(RsyncInstance).where(RsyncInstance.session_id == session_id)
-        ).all()
-        for ri in rsync_instances:
-            prom.seen_files.remove(ri.source, session.visit)
-            prom.transferred_files.remove(ri.source, session.visit)
-            prom.transferred_files_bytes.remove(ri.source, session.visit)
-            prom.seen_data_files.remove(ri.source, session.visit)
-            prom.transferred_data_files.remove(ri.source, session.visit)
-            prom.transferred_data_files_bytes.remove(ri.source, session.visit)
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
     ).all()
-    for c in collected_ids:
-        try:
+    # Ignore key errors when deleting Prometheus entries (it might not be set up)
+    try:
+        # Don't remove prometheus metrics if there are other sessions using them
+        if len(sessions_for_visit) == 1:
+            rsync_instances = db.exec(
+                select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+            ).all()
+            prom.monitoring_switch.remove(session.visit)
+            for ri in rsync_instances:
+                prom.seen_files.remove(ri.source, session.visit)
+                prom.transferred_files.remove(ri.source, session.visit)
+                prom.transferred_files_bytes.remove(ri.source, session.visit)
+                prom.seen_data_files.remove(ri.source, session.visit)
+                prom.transferred_data_files.remove(ri.source, session.visit)
+                prom.transferred_data_files_bytes.remove(ri.source, session.visit)
+        for c in collected_ids:
             prom.preprocessed_movies.remove(c[2].id)
-        except KeyError:
-            continue
+    except KeyError:
+        pass
     db.delete(session)
     db.commit()
     return
