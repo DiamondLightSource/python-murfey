@@ -1987,12 +1987,17 @@ def update_current_gain_ref(
 def inspect_prometheus_metrics(
     metric_name: str,
 ):
+    """
+    A debugging endpoint that returns the current contents of any Prometheus
+    gauges and counters that have been set up thus far.
+    """
+
     # Extract the Prometheus metric defined in the Prometheus module
     metric: Optional[Counter | Gauge] = getattr(prom, metric_name, None)
     if metric is None or not isinstance(metric, (Counter, Gauge)):
         raise LookupError("No matching metric was found")
 
-    # Print out contents
+    # Package contents into dict and return
     results = {}
     if hasattr(metric, "_metrics"):
         for i, (label_tuple, sub_metric) in enumerate(metric._metrics.items()):
