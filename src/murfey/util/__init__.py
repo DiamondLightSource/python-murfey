@@ -151,3 +151,4 @@ def safe_run(
             f"Function {func.__name__!r} failed to run for object {label!r}",
             exc_info=True,
         )
+        return None
