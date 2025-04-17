@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from typing import Optional
+from typing import Any, Callable, Optional
 from uuid import uuid4
 
 from werkzeug.utils import secure_filename
@@ -132,3 +132,23 @@ class LogFilter(logging.Filter):
             if "." not in logger_name:
                 return False
             logger_name = logger_name.rsplit(".", maxsplit=1)[0]
+
+
+def safe_run(
+    func: Callable,
+    args: list | tuple = [],
+    kwargs: dict[str, Any] = {},
+    label: str = "",
+):
+    """
+    A wrapper to encase individual functions in try-except blocks so that a warning
+    is raised if the function fails, but the process continues as normal otherwise.
+    """
+    try:
+        return func(*args, **kwargs)
+    except Exception:
+        logger.warning(
+            f"Function {func.__name__!r} failed to run for object {label!r}",
+            exc_info=True,
+        )
+        return None
