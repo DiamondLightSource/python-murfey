@@ -22,6 +22,7 @@ from ispyb.sqlalchemy import (
     Proposal,
 )
 from PIL import Image
+from prometheus_client import Counter, Gauge
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
@@ -50,7 +51,7 @@ from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.util import secure_path
+from murfey.util import safe_run, secure_path
 from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
     AutoProcProgram,
@@ -1618,23 +1619,45 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     ).all()
     # Don't remove prometheus metrics if there are other sessions using them
     if len(sessions_for_visit) == 1:
-        try:
-            prom.monitoring_switch.remove(session.visit)
-        except KeyError:
-            pass
+        safe_run(
+            prom.monitoring_switch.remove,
+            args=(session.visit,),
+            label="monitoring_switch",
+        )
         rsync_instances = db.exec(
             select(RsyncInstance).where(RsyncInstance.session_id == session_id)
         ).all()
         for ri in rsync_instances:
-            try:
-                prom.seen_files.remove(ri.source, session.visit)
-                prom.transferred_files.remove(ri.source, session.visit)
-                prom.transferred_files_bytes.remove(ri.source, session.visit)
-                prom.seen_data_files.remove(ri.source, session.visit)
-                prom.transferred_data_files.remove(ri.source, session.visit)
-                prom.transferred_data_files_bytes.remove(ri.source, session.visit)
-            except KeyError:
-                pass
+            safe_run(
+                prom.seen_files.remove,
+                args=(ri.source, session.visit),
+                label="seen_files",
+            )
+            safe_run(
+                prom.transferred_files.remove,
+                args=(ri.source, session.visit),
+                label="transferred_files",
+            )
+            safe_run(
+                prom.transferred_files_bytes.remove,
+                args=(ri.source, session.visit),
+                label="transferred_files_bytes",
+            )
+            safe_run(
+                prom.seen_data_files.remove,
+                args=(ri.source, session.visit),
+                label="seen_data_files",
+            )
+            safe_run(
+                prom.transferred_data_files.remove,
+                args=(ri.source, session.visit),
+                label="transferred_data_files",
+            )
+            safe_run(
+                prom.transferred_data_files_bytes.remove,
+                args=(ri.source, session.visit),
+                label="transferred_data_file_bytes",
+            )
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)
@@ -1642,10 +1665,11 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
         .where(ProcessingJob.dc_id == DataCollection.id)
     ).all()
     for c in collected_ids:
-        try:
-            prom.preprocessed_movies.remove(c[2].id)
-        except KeyError:
-            continue
+        safe_run(
+            prom.preprocessed_movies.remove,
+            args=(c[2].id,),
+            label="preprocessed_movies",
+        )
     db.delete(session)
     db.commit()
     return
@@ -1957,3 +1981,25 @@ def update_current_gain_ref(
     session.current_gain_ref = new_gain_ref.path
     db.add(session)
     db.commit()
+
+
+@router.get("/prometheus/{metric_name}")
+def inspect_prometheus_metrics(
+    metric_name: str,
+):
+    # Extract the Prometheus metric defined in the Prometheus module
+    metric: Optional[Counter | Gauge] = getattr(prom, metric_name, None)
+    if metric is None or not isinstance(metric, (Counter, Gauge)):
+        raise LookupError("No matching metric was found")
+
+    # Print out contents
+    results = {}
+    if hasattr(metric, "_metrics"):
+        for i, (label_tuple, sub_metric) in enumerate(metric._metrics.items()):
+            labels = dict(zip(metric._labelnames, label_tuple))
+            labels["value"] = sub_metric._value.get()
+            results[i] = labels
+        return results
+    else:
+        value = metric._value.get()
+        return {"value": value}
