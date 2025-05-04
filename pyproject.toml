@@ -43,7 +43,7 @@ cicd = [
     "pytest-cov", # Used for generating PyTest coverage reports
 ]
 client = [
-    "textual==0.42.0",
+    "textual==3.2.0",
     "websocket-client",
 ]
 developer = [
