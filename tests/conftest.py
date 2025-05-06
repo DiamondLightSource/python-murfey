@@ -14,6 +14,14 @@ from murfey.util.db import clear, setup
 from tests import murfey_db_engine, murfey_db_url
 
 
+@pytest.fixture(scope="session")
+def session_tmp_path(tmp_path_factory) -> Path:
+    """
+    Creates a temporary path that persists for the entire test session
+    """
+    return tmp_path_factory.mktemp("session_tmp")
+
+
 @pytest.fixture
 def start_postgres():
     clear(murfey_db_url)
@@ -40,8 +48,8 @@ def mock_client_configuration() -> ConfigParser:
 
 
 @pytest.fixture(scope="session")
-def mock_ispyb_credentials(tmp_path: Path):
-    creds_file = tmp_path / "ispyb_creds.cfg"
+def mock_ispyb_credentials(session_tmp_path: Path) -> Path:
+    creds_file = session_tmp_path / "ispyb_creds.cfg"
     ispyb_config = ConfigParser()
     # Use values from the GitHub workflow ISPyB config file
     ispyb_config["ispyb_sqlalchemy"] = {
@@ -58,10 +66,10 @@ def mock_ispyb_credentials(tmp_path: Path):
 
 @pytest.fixture(scope="session")
 def mock_security_configuration(
-    tmp_path: Path,
+    session_tmp_path: Path,
     mock_ispyb_credentials: Path,
-):
-    config_file = tmp_path / "security_config.yaml"
+) -> Path:
+    config_file = session_tmp_path / "security_config.yaml"
     security_config = {
         "murfey_db_credentials": "/path/to/murfey_db_credentials",
         "crypto_key": "crypto_key",
