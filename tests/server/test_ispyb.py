@@ -16,7 +16,7 @@ def test_get_session_id(
     ispyb_session.commit()
 
     proposal_db_entry = Proposal(
-        personId=Person.personId,
+        personId=person_db_entry.personId,
         proposalCode="cm",
         proposalNumber="12345",
     )
