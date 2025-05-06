@@ -25,7 +25,7 @@ def start_postgres():
         murfey_db.commit()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def mock_client_configuration() -> ConfigParser:
     """
     Returns the client-side configuration file as a pre-loaded ConfigParser object.
@@ -39,7 +39,7 @@ def mock_client_configuration() -> ConfigParser:
     return config
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def mock_ispyb_credentials(tmp_path: Path):
     creds_file = tmp_path / "ispyb_creds.cfg"
     ispyb_config = ConfigParser()
@@ -56,7 +56,7 @@ def mock_ispyb_credentials(tmp_path: Path):
     return creds_file
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def mock_security_configuration(
     tmp_path: Path,
     mock_ispyb_credentials: Path,
@@ -85,7 +85,7 @@ https://github.com/DiamondLightSource/ispyb-api/blob/main/tests/conftest.py
 """
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def ispyb_db(mock_ispyb_credentials):
     with ispyb.open(mock_ispyb_credentials) as connection:
         yield connection
@@ -105,7 +105,7 @@ def ispyb_session_factory(ispyb_engine):
     return scoped_session(sessionmaker(bind=ispyb_engine))
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def ispyb_session(ispyb_session_factory):
     ispyb_session = ispyb_session_factory()
     yield ispyb_session
