@@ -39,9 +39,14 @@ security_config = get_security_config()
 
 try:
     Session = sqlalchemy.orm.sessionmaker(
-        bind=sqlalchemy.create_engine(url(), connect_args={"use_pure": True})
+        bind=sqlalchemy.create_engine(
+            url(credentials=security_config.ispyb_credentials),
+            connect_args={"use_pure": True},
+        )
     )
+    log.info("Loaded ISPyB database session")
 except AttributeError:
+    log.error("Error loading ISPyB session", exc_info=True)
     Session = lambda: None
 
 
@@ -67,6 +72,8 @@ class TransportManager:
             if security_config.ispyb_credentials
             else None
         )
+        if self.ispyb is not None:
+            print("Loaded ISPyB databse")
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
@@ -632,6 +639,7 @@ def get_all_ongoing_visits(
     microscope: str, db: sqlalchemy.orm.Session | None
 ) -> list[Visit]:
     if db is None:
+        print("No database found")
         return []
     query = (
         db.query(BLSession)
