@@ -101,6 +101,10 @@ jobs:
                    schemas/ispyb/routines.sql \
                    grants/ispyb_processing.sql \
                    grants/ispyb_import.sql; do
+
+              echo "Patching ${f} to fix CLI escape issues..."
+              sed -i 's/\\-/-/g' "$f"
+
               echo Importing ${f}...
               mariadb --defaults-file=.my.cnf < $f
           done
