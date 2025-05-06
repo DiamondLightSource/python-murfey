@@ -2,7 +2,11 @@ import json
 from configparser import ConfigParser
 from pathlib import Path
 
+import ispyb
 import pytest
+from ispyb.sqlalchemy import url
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlmodel import Session
 
 from murfey.util.db import Session as MurfeySession
@@ -70,3 +74,40 @@ def mock_security_configuration(
     with open(config_file, "w") as f:
         json.dump(security_config, f)
     return config_file
+
+
+"""
+=======================================================================================
+Fixtures for setting up mock ISPyB database
+=======================================================================================
+These were adapted from the tests found at:
+https://github.com/DiamondLightSource/ispyb-api/blob/main/tests/conftest.py
+"""
+
+
+@pytest.fixture
+def ispyb_db(mock_ispyb_credentials):
+    with ispyb.open(mock_ispyb_credentials) as connection:
+        yield connection
+
+
+@pytest.fixture(scope="session")
+def ispyb_engine(mock_ispyb_credentials):
+    ispyb_engine = create_engine(
+        url=url(mock_ispyb_credentials), connect_args={"use_pure": True}
+    )
+    yield ispyb_engine
+    ispyb_engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def ispyb_session_factory(ispyb_engine):
+    return scoped_session(sessionmaker(bind=ispyb_engine))
+
+
+@pytest.fixture(scope="function")
+def ispyb_session(ispyb_session_factory):
+    ispyb_session = ispyb_session_factory()
+    yield ispyb_session
+    ispyb_session.rollback()
+    ispyb_session.close()
