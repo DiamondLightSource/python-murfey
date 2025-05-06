@@ -6,7 +6,6 @@ from queue import Empty
 from unittest import mock
 
 from murfey.cli import repost_failed_calls
-from tests.conftest import mock_security_config_name
 
 
 @mock.patch("murfey.cli.repost_failed_calls.PikaTransport")
@@ -167,12 +166,11 @@ def test_run_repost_failed_calls(
     mock_repost,
     mock_purge,
     mock_security_configuration,
-    tmp_path,
 ):
     mock_jwt.encode.return_value = "dummy_token"
     mock_purge.return_value = ["/path/to/msg1"]
 
-    config_file = tmp_path / mock_security_config_name
+    config_file = mock_security_configuration
     with open(config_file) as f:
         security_config = json.load(f)
 
