@@ -1,4 +1,5 @@
 import json
+import os
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Any, Generator, Type, TypeVar
@@ -12,8 +13,6 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import sessionmaker
 
 from murfey.util.db import Session as MurfeySession
-from murfey.util.db import clear, setup
-from tests import murfey_db_engine, murfey_db_url
 
 
 @pytest.fixture(scope="session")
@@ -243,12 +242,57 @@ Fixtures for setting up test Murfey database
 """
 
 
-@pytest.fixture
-def start_postgres():
-    clear(murfey_db_url)
-    setup(murfey_db_url)
+@pytest.fixture(scope="session")
+def murfey_db_engine():
+    url = (
+        f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
+        f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
+    )
+    engine = create_engine(url)
+    yield engine
+    engine.dispose()
 
-    murfey_session = MurfeySession(id=2, name="cm12345-6")
-    with SQLAlchemySession(murfey_db_engine) as murfey_db:
-        murfey_db.add(murfey_session)
-        murfey_db.commit()
+
+@pytest.fixture(scope="session")
+def murfey_db_session_factory(murfey_db_engine):
+    return sessionmaker(bind=murfey_db_engine, expire_on_commit=False)
+
+
+@pytest.fixture(scope="session")
+def seed_murfey_db(murfey_db_session_factory):
+    # Populate Murfey database with initial values
+    murfey_session: SQLAlchemySession = murfey_db_session_factory()
+    _ = get_or_create_db_entry(
+        session=murfey_session,
+        table=MurfeySession,
+        lookup_kwargs={
+            "name": f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}",
+        },
+    )
+    murfey_session.close()
+
+
+@pytest.fixture
+def murfey_db_session(
+    murfey_db_session_factory,
+    murfey_db_engine: Engine,
+    seed_murfey_db,
+) -> Generator[SQLAlchemySession, None, None]:
+    """
+    Returns a test-safe session that wraps each test in a rollback-safe save point
+    """
+    connection = murfey_db_engine.connect()
+    transaction = connection.begin()
+
+    session: SQLAlchemySession = murfey_db_session_factory(bind=connection)
+    session.begin_nested()  # Save point for test
+
+    # Trigger the restart_savepoint function after the end of the transaction
+    event.listen(session, "after_transaction_end", restart_savepoint)
+
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
