@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from configparser import ConfigParser
@@ -11,6 +13,7 @@ from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, sele
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import sessionmaker
+from sqlmodel import Session as SQLModelSession
 from sqlmodel import SQLModel
 
 from murfey.util.db import Session as MurfeySession
@@ -108,7 +111,7 @@ SQLAlchemyTable = TypeVar("SQLAlchemyTable", bound=DeclarativeMeta)
 
 
 def get_or_create_db_entry(
-    session: SQLAlchemySession,
+    session: SQLAlchemySession | SQLModelSession,
     table: Type[SQLAlchemyTable],
     lookup_kwargs: dict[str, Any] = {},
     insert_kwargs: dict[str, Any] = {},
@@ -139,7 +142,9 @@ def get_or_create_db_entry(
     return entry
 
 
-def restart_savepoint(session: SQLAlchemySession, transaction: RootTransaction):
+def restart_savepoint(
+    session: SQLAlchemySession | SQLModelSession, transaction: RootTransaction
+):
     """
     Re-establish a SAVEPOINT after a nested transaction is committed or rolled back.
     This helps to maintain isolation across different test cases.
@@ -260,22 +265,24 @@ def murfey_db_engine():
 
 @pytest.fixture(scope="session")
 def murfey_db_session_factory(murfey_db_engine):
-    return sessionmaker(bind=murfey_db_engine, expire_on_commit=False)
+    return sessionmaker(
+        bind=murfey_db_engine, expire_on_commit=False, class_=SQLModelSession
+    )
 
 
 @pytest.fixture(scope="session")
 def seed_murfey_db(murfey_db_session_factory):
     # Populate Murfey database with initial values
-    murfey_session: SQLAlchemySession = murfey_db_session_factory()
+    session: SQLModelSession = murfey_db_session_factory()
     _ = get_or_create_db_entry(
-        session=murfey_session,
+        session=session,
         table=MurfeySession,
         lookup_kwargs={
             "id": ExampleVisit.murfey_session_id,
             "name": f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}",
         },
     )
-    murfey_session.close()
+    session.close()
 
 
 @pytest.fixture
@@ -283,14 +290,14 @@ def murfey_db_session(
     murfey_db_session_factory,
     murfey_db_engine: Engine,
     seed_murfey_db,
-) -> Generator[SQLAlchemySession, None, None]:
+) -> Generator[SQLModelSession, None, None]:
     """
     Returns a test-safe session that wraps each test in a rollback-safe save point
     """
     connection = murfey_db_engine.connect()
     transaction = connection.begin()
 
-    session: SQLAlchemySession = murfey_db_session_factory(bind=connection)
+    session: SQLModelSession = murfey_db_session_factory(bind=connection)
     session.begin_nested()  # Save point for test
 
     # Trigger the restart_savepoint function after the end of the transaction
