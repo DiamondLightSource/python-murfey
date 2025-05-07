@@ -88,7 +88,7 @@ def test_register_grid_square_update_add_nothing(
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
 def test_register_grid_square_insert_with_ispyb(
-    mock_transport, murfey_db_session, tmp_path
+    mock_transport, murfey_db_session: Session, tmp_path
 ):
     # Create a data collection group for lookups
     grid_square = DataCollectionGroup(
