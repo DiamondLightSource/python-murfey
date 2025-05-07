@@ -1,5 +1,6 @@
 from ispyb.sqlalchemy import BLSession, Proposal
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from murfey.server.ispyb import get_session_id
 from tests.conftest import ExampleVisit
@@ -10,7 +11,7 @@ def test_get_session_id(
 ):
     # Manually get the BLSession ID for comparison
     query = (
-        ispyb_db.exec(
+        ispyb_db.execute(
             select(BLSession)
             .join(Proposal)
             .where(BLSession.proposalId == Proposal.proposalId)

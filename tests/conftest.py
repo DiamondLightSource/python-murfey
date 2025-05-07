@@ -7,8 +7,8 @@ import ispyb
 import pytest
 from ispyb.sqlalchemy import BLSession, Person, Proposal, url
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlmodel import Session
 
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import clear, setup
@@ -123,9 +123,9 @@ def ispyb_session_factory(ispyb_engine):
 
 
 @pytest.fixture
-def ispyb_db(ispyb_session_factory) -> Generator[Session, None, None]:
+def ispyb_db(ispyb_session_factory) -> Generator[SQLAlchemySession, None, None]:
     # Get a new session from the session factory
-    ispyb_db: Session = ispyb_session_factory()
+    ispyb_db: SQLAlchemySession = ispyb_session_factory()
 
     # Populate the ISPyB table with some default values
     person_db_entry = Person(
@@ -173,6 +173,6 @@ def start_postgres():
     setup(murfey_db_url)
 
     murfey_session = MurfeySession(id=2, name="cm12345-6")
-    with Session(murfey_db_engine) as murfey_db:
+    with SQLAlchemySession(murfey_db_engine) as murfey_db:
         murfey_db.add(murfey_session)
         murfey_db.commit()
