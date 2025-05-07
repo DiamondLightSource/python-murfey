@@ -1,42 +1,34 @@
-from ispyb.sqlalchemy import BLSession, Person, Proposal
+from ispyb.sqlalchemy import BLSession, Proposal
+from sqlmodel import Session, select
 
 from murfey.server.ispyb import get_session_id
+from tests.conftest import ExampleVisit
 
 
 def test_get_session_id(
-    ispyb_session,
+    ispyb_db: Session,
 ):
-
-    # Create some values to put into BLSession and Proposal
-    # 'Person' is a required table
-    person_db_entry = Person(
-        login="murfey",
+    # Manually get the BLSession ID for comparison
+    result = (
+        ispyb_db.exec(
+            select(BLSession)
+            .join(Proposal)
+            .where(BLSession.proposalId == Proposal.proposalId)
+            .where(BLSession.beamLineName == ExampleVisit.instrument_name)
+            .where(Proposal.proposalCode == ExampleVisit.proposal_code)
+            .where(Proposal.proposalNumber == str(ExampleVisit.proposal_number))
+            .where(BLSession.visit_number == ExampleVisit.visit_number)
+        )
+        .one()
+        .sessionId
     )
-    ispyb_session.add(person_db_entry)
-    ispyb_session.commit()
-
-    proposal_db_entry = Proposal(
-        personId=person_db_entry.personId,
-        proposalCode="cm",
-        proposalNumber="12345",
-    )
-    ispyb_session.add(proposal_db_entry)
-    ispyb_session.commit()
-
-    bl_session_db_entry = BLSession(
-        proposalId=proposal_db_entry.proposalId,
-        beamLineName="murfey",
-        visit_number=6,
-    )
-    ispyb_session.add(bl_session_db_entry)
-    ispyb_session.commit()
 
     # Test function
-    result = get_session_id(
+    session_id = get_session_id(
         microscope="murfey",
         proposal_code="cm",
         proposal_number="12345",
         visit_number="6",
-        db=ispyb_session,
+        db=ispyb_db,
     )
-    assert result == bl_session_db_entry.sessionId
+    assert result == session_id
