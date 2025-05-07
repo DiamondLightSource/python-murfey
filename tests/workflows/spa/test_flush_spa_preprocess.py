@@ -33,7 +33,9 @@ def test_register_grid_square_update_add_locations(
     )
 
     # Run the registration
-    flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db_session)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
@@ -73,7 +75,9 @@ def test_register_grid_square_update_add_nothing(
     new_parameters = GridSquareParameters(tag="session_tag")
 
     # Run the registration
-    flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db_session)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
@@ -123,7 +127,9 @@ def test_register_grid_square_insert_with_ispyb(
     )
 
     # Run the registration
-    flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db_session)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_insert_grid_square.assert_called_with(90, 101, new_parameters)
