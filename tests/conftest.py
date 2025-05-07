@@ -11,6 +11,7 @@ from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, sele
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import sessionmaker
+from sqlmodel import SQLModel
 
 from murfey.util.db import Session as MurfeySession
 
@@ -249,6 +250,7 @@ def murfey_db_engine():
         f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
     )
     engine = create_engine(url)
+    SQLModel.metadata.create_all(engine)
     yield engine
     engine.dispose()
 
