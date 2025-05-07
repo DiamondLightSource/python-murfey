@@ -1,12 +1,13 @@
 import json
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator, Type, TypeVar
 
 import ispyb
 import pytest
 from ispyb.sqlalchemy import BLSession, Person, Proposal, url
-from sqlalchemy import create_engine
+from sqlalchemy import and_, create_engine, select
+from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -117,50 +118,86 @@ def ispyb_engine(mock_ispyb_credentials):
     ispyb_engine.dispose()
 
 
+SQLAlchemyTable = TypeVar("SQLAlchemyTable", bound=DeclarativeMeta)
+
+
+def get_or_create_db_entry(
+    session: SQLAlchemySession,
+    table: Type[SQLAlchemyTable],
+    lookup_kwargs: dict[str, Any] = {},
+    insert_kwargs: dict[str, Any] = {},
+) -> SQLAlchemyTable:
+    """
+    Helper function to facilitate looking up SQLAlchemy tables for
+    matching entries. Returns the entry if it exists and creates it
+    if it doesn't.
+    """
+
+    # if lookup kwargs are provided, check if entry exists
+    if lookup_kwargs:
+        conditions = [
+            getattr(table, key) == value for key, value in lookup_kwargs.items()
+        ]
+        entry = session.execute(select(table).where(and_(*conditions)))
+        if entry:
+            return entry
+    # If not present, create and return new entry
+    # Use new kwargs if provided; otherwise, use lookup kwargs
+    insert_kwargs = insert_kwargs or lookup_kwargs
+    entry = table(**insert_kwargs)
+    session.add(entry)
+    session.commit()
+    return entry
+
+
 @pytest.fixture(scope="session")
 def ispyb_session_factory(ispyb_engine):
-    return scoped_session(sessionmaker(bind=ispyb_engine))
+    factory = scoped_session(sessionmaker(bind=ispyb_engine))
+    ispyb_db = factory()
+
+    # Populate the ISPyB table with some initial values
+    # Return existing table entry if already present
+    person_db_entry = get_or_create_db_entry(
+        session=ispyb_db,
+        table=Person,
+        lookup_kwargs={
+            "givenName": ExampleVisit.given_name,
+            "familyName": ExampleVisit.family_name,
+            "login": ExampleVisit.login,
+        },
+    )
+    proposal_db_entry = get_or_create_db_entry(
+        session=ispyb_db,
+        table=Proposal,
+        lookup_kwargs={
+            "personId": person_db_entry.personId,
+            "proposalCode": ExampleVisit.proposal_code,
+            "proposalNumber": str(ExampleVisit.proposal_number),
+        },
+    )
+    bl_session_db_entry = get_or_create_db_entry(
+        session=ispyb_db,
+        table=BLSession,
+        lookup_kwargs={
+            "proposalId": proposal_db_entry.proposalId,
+            "beamLineName": ExampleVisit.instrument_name,
+            "visit_number": ExampleVisit.visit_number,
+        },
+    )
+    ispyb_db.add(bl_session_db_entry)
+    ispyb_db.commit()
+
+    ispyb_db.close()
+    return factory  # Return its current state
 
 
 @pytest.fixture
 def ispyb_db(ispyb_session_factory) -> Generator[SQLAlchemySession, None, None]:
     # Get a new session from the session factory
     ispyb_db: SQLAlchemySession = ispyb_session_factory()
-    save_point = ispyb_db.begin_nested()  # Checkpoint to roll back database to
-
-    try:
-        # Populate the ISPyB table with some default values
-        person_db_entry = Person(
-            givenName=ExampleVisit.given_name,
-            familyName=ExampleVisit.family_name,
-            login=ExampleVisit.login,
-        )
-        ispyb_db.add(person_db_entry)
-        ispyb_db.commit()
-
-        proposal_db_entry = Proposal(
-            personId=person_db_entry.personId,
-            proposalCode=ExampleVisit.proposal_code,
-            proposalNumber=str(ExampleVisit.proposal_number),
-        )
-        ispyb_db.add(proposal_db_entry)
-        ispyb_db.commit()
-
-        bl_session_db_entry = BLSession(
-            proposalId=proposal_db_entry.proposalId,
-            beamLineName=ExampleVisit.instrument_name,
-            visit_number=ExampleVisit.visit_number,
-        )
-        ispyb_db.add(bl_session_db_entry)
-        ispyb_db.commit()
-
-        # Yield the Session and pass processing over to other function
-        yield ispyb_db
-
-    # Tidying up
-    finally:
-        save_point.rollback()
-        ispyb_db.close()
+    yield ispyb_db
+    ispyb_db.rollback()
+    ispyb_db.close()
 
 
 """
