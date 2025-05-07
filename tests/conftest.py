@@ -271,7 +271,7 @@ def seed_murfey_db(murfey_db_session_factory):
         session=murfey_session,
         table=MurfeySession,
         lookup_kwargs={
-            "session": ExampleVisit.murfey_session_id,
+            "id": ExampleVisit.murfey_session_id,
             "name": f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}",
         },
     )
