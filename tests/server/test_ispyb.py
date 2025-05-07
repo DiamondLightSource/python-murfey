@@ -20,7 +20,7 @@ def test_get_session_id(
             .where(Proposal.proposalNumber == str(ExampleVisit.proposal_number))
             .where(BLSession.visit_number == ExampleVisit.visit_number)
         )
-        .one()
+        .scalar_one()
         .sessionId
     )
 
