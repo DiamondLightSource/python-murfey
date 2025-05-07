@@ -95,6 +95,9 @@ class ExampleVisit:
     proposal_number = 12345
     visit_number = 6
 
+    # Murfey-specific
+    murfey_session_id = 1
+
     # Person (ISPyB)
     given_name = "Eliza"
     family_name = "Murfey"
@@ -268,6 +271,7 @@ def seed_murfey_db(murfey_db_session_factory):
         session=murfey_session,
         table=MurfeySession,
         lookup_kwargs={
+            "session": ExampleVisit.murfey_session_id,
             "name": f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}",
         },
     )

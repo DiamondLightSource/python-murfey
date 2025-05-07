@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 from murfey.util.db import DataCollectionGroup, GridSquare
 from murfey.util.models import GridSquareParameters
 from murfey.workflows.spa import flush_spa_preprocess
+from tests.conftest import ExampleVisit
 
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
@@ -16,7 +17,7 @@ def test_register_grid_square_update_add_locations(
     grid_square = GridSquare(
         id=1,
         name=101,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
     )
     murfey_db_session.add(grid_square)
@@ -58,7 +59,7 @@ def test_register_grid_square_update_add_nothing(
     grid_square = GridSquare(
         id=1,
         name=101,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         x_location=0.1,
         y_location=0.2,
@@ -92,7 +93,7 @@ def test_register_grid_square_insert_with_ispyb(
     # Create a data collection group for lookups
     grid_square = DataCollectionGroup(
         id=1,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         atlas_id=90,
     )
@@ -131,7 +132,7 @@ def test_register_grid_square_insert_with_ispyb(
     grid_square_final_parameters = murfey_db_session.exec(select(GridSquare)).one()
     assert grid_square_final_parameters.id == 1
     assert grid_square_final_parameters.name == 101
-    assert grid_square_final_parameters.session_id == 2
+    assert grid_square_final_parameters.session_id == ExampleVisit.murfey_session_id
     assert grid_square_final_parameters.tag == "session_tag"
     assert grid_square_final_parameters.x_location == 1.1
     assert grid_square_final_parameters.y_location == 1.2
