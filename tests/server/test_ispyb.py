@@ -9,7 +9,7 @@ def test_get_session_id(
     ispyb_db: Session,
 ):
     # Manually get the BLSession ID for comparison
-    result = (
+    query = (
         ispyb_db.exec(
             select(BLSession)
             .join(Proposal)
@@ -24,11 +24,11 @@ def test_get_session_id(
     )
 
     # Test function
-    session_id = get_session_id(
+    result = get_session_id(
         microscope="murfey",
         proposal_code="cm",
         proposal_number="12345",
         visit_number="6",
         db=ispyb_db,
     )
-    assert result == session_id
+    assert query == result
