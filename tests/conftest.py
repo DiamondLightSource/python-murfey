@@ -77,10 +77,8 @@ def mock_security_configuration(
 
 """
 =======================================================================================
-Fixtures for setting up mock ISPyB database
+Database-related helper functions and classes
 =======================================================================================
-These were adapted from the tests found at:
-https://github.com/DiamondLightSource/ispyb-api/blob/main/tests/conftest.py
 """
 
 
@@ -101,26 +99,6 @@ class ExampleVisit:
     given_name = "Eliza"
     family_name = "Murfey"
     login = "murfey123"
-
-
-@pytest.fixture(scope="session")
-def ispyb_db_connection(mock_ispyb_credentials):
-    with ispyb.open(mock_ispyb_credentials) as connection:
-        yield connection
-
-
-@pytest.fixture(scope="session")
-def ispyb_engine(mock_ispyb_credentials):
-    ispyb_engine = create_engine(
-        url=url(mock_ispyb_credentials), connect_args={"use_pure": True}
-    )
-    yield ispyb_engine
-    ispyb_engine.dispose()
-
-
-@pytest.fixture(scope="session")
-def ispyb_db_session_factory(ispyb_engine):
-    return sessionmaker(bind=ispyb_engine, expire_on_commit=False)
 
 
 SQLAlchemyTable = TypeVar("SQLAlchemyTable", bound=DeclarativeMeta)
@@ -156,6 +134,44 @@ def get_or_create_db_entry(
     session.add(entry)
     session.commit()
     return entry
+
+
+def restart_savepoint(session: SQLAlchemySession, transaction: RootTransaction):
+    """
+    Re-establish a SAVEPOINT after a nested transaction is committed or rolled back.
+    This helps to maintain isolation across different test cases.
+    """
+    if transaction.nested and not transaction._parent.nested:
+        session.begin_nested()
+
+
+"""
+=======================================================================================
+Fixtures for setting up test ISPyB database
+=======================================================================================
+These were adapted from the tests found at:
+https://github.com/DiamondLightSource/ispyb-api/blob/main/tests/conftest.py
+"""
+
+
+@pytest.fixture(scope="session")
+def ispyb_db_connection(mock_ispyb_credentials):
+    with ispyb.open(mock_ispyb_credentials) as connection:
+        yield connection
+
+
+@pytest.fixture(scope="session")
+def ispyb_engine(mock_ispyb_credentials):
+    engine = create_engine(
+        url=url(mock_ispyb_credentials), connect_args={"use_pure": True}
+    )
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def ispyb_db_session_factory(ispyb_engine):
+    return sessionmaker(bind=ispyb_engine, expire_on_commit=False)
 
 
 @pytest.fixture(scope="session")
@@ -194,22 +210,6 @@ def seed_ispyb_db(ispyb_db_session_factory):
     ispyb_db_session.close()
 
 
-def restart_savepoint(session: SQLAlchemySession, transaction: RootTransaction):
-    """
-    Re-establish a SAVEPOINT after a nested transaction is committed or rolled back.
-    This helps to maintain isolation across different test cases.
-    """
-    if transaction.nested and not transaction._parent.nested:
-        session.begin_nested()
-
-
-def attach_event_listener(session: SQLAlchemySession):
-    """
-    Attach the restart_savepoint function as an event listener for after_transaction_end
-    """
-    event.listen(session, "after_transaction_end", restart_savepoint)
-
-
 @pytest.fixture
 def ispyb_db_session(
     ispyb_db_session_factory,
@@ -217,7 +217,7 @@ def ispyb_db_session(
     seed_ispyb_db,
 ) -> Generator[SQLAlchemySession, None, None]:
     """
-    Returns a test-safe session that wraps each test in a rollback-safe SAVEPOINT.
+    Returns a test-safe session that wraps each test in a rollback-safe save point.
     """
     connection = ispyb_engine.connect()
     transaction = connection.begin()  # Outer transaction
@@ -225,8 +225,8 @@ def ispyb_db_session(
     session: SQLAlchemySession = ispyb_db_session_factory(bind=connection)
     session.begin_nested()  # Save point for test
 
-    # Attach the listener to the session for this connection
-    attach_event_listener(session)
+    # Trigger the restart_savepoint function after the end of the transaction
+    event.listen(session, "after_transaction_end", restart_savepoint)
 
     try:
         yield session
@@ -238,7 +238,7 @@ def ispyb_db_session(
 
 """
 =======================================================================================
-Fixtures for setting up mock Murfey database
+Fixtures for setting up test Murfey database
 =======================================================================================
 """
 
