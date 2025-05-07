@@ -41,6 +41,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -67,13 +68,13 @@ jobs:
           docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 test-rabbitmq
           docker container list -a
 
-      - name: Get ispyb database
+      - name: Get ISPyB database
         uses: actions/download-artifact@v4
         with:
           name: database
           path: database/
 
-      - name: Install package
+      - name: Install Murfey
         run: |
           set -eux
           pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
@@ -84,7 +85,7 @@ jobs:
           mysql-version: "11.3"
           auto-start: false
 
-      - name: Set up test ipsyb database
+      - name: Set up test ISPyB database
         run: |
           set -eu
           cp ".github/workflows/config/my.cnf" .my.cnf
@@ -102,12 +103,13 @@ jobs:
                    grants/ispyb_processing.sql \
                    grants/ispyb_import.sql; do
 
-              echo "Patching ${f} to fix CLI escape issues..."
+              echo "Patching ${f} in SQL files to fix CLI escape issues..."
               sed -i 's/\\-/-/g' "$f"
 
-              echo Importing ${f}...
+              echo "Importing ${f}..."
               mariadb --defaults-file=.my.cnf < $f
           done
+
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api@'%' IDENTIFIED BY 'password_1234'; GRANT ispyb_processing to ispyb_api@'%'; GRANT ispyb_import to ispyb_api@'%'; SET DEFAULT ROLE ispyb_processing FOR ispyb_api@'%';"
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_future@'%' IDENTIFIED BY 'password_4321'; GRANT SELECT ON ispybtest.* to ispyb_api_future@'%';"
           mariadb --defaults-file=.my.cnf -e "CREATE USER ispyb_api_sqlalchemy@'%' IDENTIFIED BY 'password_5678'; GRANT SELECT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT INSERT ON ispybtest.* to ispyb_api_sqlalchemy@'%'; GRANT UPDATE ON ispybtest.* to ispyb_api_sqlalchemy@'%';"
@@ -116,7 +118,7 @@ jobs:
       - name: Check RabbitMQ is alive
         run: wget -t 10 -w 1 http://127.0.0.1:15672 -O -
 
-      - name: Run tests
+      - name: Run Murfey tests
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
@@ -124,10 +126,9 @@ jobs:
           POSTGRES_PASSWORD: psql_pwd
           POSTGRES_USER: psql_user
         run: |
-          export ISPYB_CREDENTIALS=".github/workflows/config/ispyb.cfg"
           PYTHONDEVMODE=1 pytest -v -ra --cov=murfey --cov-report=xml --cov-branch
 
-      - name: Upload to Codecov
+      - name: Upload test results to Codecov
         uses: codecov/codecov-action@v5
         with:
           name: ${{ matrix.python-version }}
