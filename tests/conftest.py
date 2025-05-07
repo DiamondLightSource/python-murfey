@@ -126,38 +126,41 @@ def ispyb_session_factory(ispyb_engine):
 def ispyb_db(ispyb_session_factory) -> Generator[SQLAlchemySession, None, None]:
     # Get a new session from the session factory
     ispyb_db: SQLAlchemySession = ispyb_session_factory()
+    save_point = ispyb_db.begin_nested()  # Checkpoint to roll back database to
 
-    # Populate the ISPyB table with some default values
-    person_db_entry = Person(
-        givenName=ExampleVisit.given_name,
-        familyName=ExampleVisit.family_name,
-        login=ExampleVisit.login,
-    )
-    ispyb_db.add(person_db_entry)
-    ispyb_db.commit()
+    try:
+        # Populate the ISPyB table with some default values
+        person_db_entry = Person(
+            givenName=ExampleVisit.given_name,
+            familyName=ExampleVisit.family_name,
+            login=ExampleVisit.login,
+        )
+        ispyb_db.add(person_db_entry)
+        ispyb_db.commit()
 
-    proposal_db_entry = Proposal(
-        personId=person_db_entry.personId,
-        proposalCode=ExampleVisit.proposal_code,
-        proposalNumber=str(ExampleVisit.proposal_number),
-    )
-    ispyb_db.add(proposal_db_entry)
-    ispyb_db.commit()
+        proposal_db_entry = Proposal(
+            personId=person_db_entry.personId,
+            proposalCode=ExampleVisit.proposal_code,
+            proposalNumber=str(ExampleVisit.proposal_number),
+        )
+        ispyb_db.add(proposal_db_entry)
+        ispyb_db.commit()
 
-    bl_session_db_entry = BLSession(
-        proposalId=proposal_db_entry.proposalId,
-        beamLineName=ExampleVisit.instrument_name,
-        visit_number=ExampleVisit.visit_number,
-    )
-    ispyb_db.add(bl_session_db_entry)
-    ispyb_db.commit()
+        bl_session_db_entry = BLSession(
+            proposalId=proposal_db_entry.proposalId,
+            beamLineName=ExampleVisit.instrument_name,
+            visit_number=ExampleVisit.visit_number,
+        )
+        ispyb_db.add(bl_session_db_entry)
+        ispyb_db.commit()
 
-    # Yield the Session and pass processing over to other function
-    yield ispyb_db
+        # Yield the Session and pass processing over to other function
+        yield ispyb_db
 
     # Tidying up
-    ispyb_db.rollback()
-    ispyb_db.close()
+    finally:
+        save_point.rollback()
+        ispyb_db.close()
 
 
 """
