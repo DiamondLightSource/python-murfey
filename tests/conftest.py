@@ -138,7 +138,9 @@ def get_or_create_db_entry(
         conditions = [
             getattr(table, key) == value for key, value in lookup_kwargs.items()
         ]
-        entry = session.execute(select(table).where(and_(*conditions)))
+        entry = (
+            session.execute(select(table).where(and_(*conditions))).scalars().first()
+        )
         if entry:
             return entry
     # If not present, create and return new entry
