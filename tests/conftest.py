@@ -128,9 +128,9 @@ def get_or_create_db_entry(
     insert_kwargs: dict[str, Any] = {},
 ) -> SQLAlchemyTable:
     """
-    Helper function to facilitate looking up SQLAlchemy tables for
-    matching entries. Returns the entry if it exists and creates it
-    if it doesn't.
+    Helper function to facilitate looking up or creating SQLAlchemy table entries.
+    Returns the entry if a match based on the lookup criteria is found, otherwise
+    creates and returns a new entry.
     """
 
     # if lookup kwargs are provided, check if entry exists
@@ -143,6 +143,7 @@ def get_or_create_db_entry(
         )
         if entry:
             return entry
+
     # If not present, create and return new entry
     # Use new kwargs if provided; otherwise, use lookup kwargs
     insert_kwargs = insert_kwargs or lookup_kwargs
@@ -153,14 +154,14 @@ def get_or_create_db_entry(
 
 
 @pytest.fixture(scope="session")
-def ispyb_session_factory(ispyb_engine):
+def ispyb_db_session_factory(ispyb_engine):
     factory = scoped_session(sessionmaker(bind=ispyb_engine))
-    ispyb_db = factory()
 
     # Populate the ISPyB table with some initial values
     # Return existing table entry if already present
+    ispyb_db_session = factory()
     person_db_entry = get_or_create_db_entry(
-        session=ispyb_db,
+        session=ispyb_db_session,
         table=Person,
         lookup_kwargs={
             "givenName": ExampleVisit.given_name,
@@ -169,7 +170,7 @@ def ispyb_session_factory(ispyb_engine):
         },
     )
     proposal_db_entry = get_or_create_db_entry(
-        session=ispyb_db,
+        session=ispyb_db_session,
         table=Proposal,
         lookup_kwargs={
             "personId": person_db_entry.personId,
@@ -177,8 +178,8 @@ def ispyb_session_factory(ispyb_engine):
             "proposalNumber": str(ExampleVisit.proposal_number),
         },
     )
-    bl_session_db_entry = get_or_create_db_entry(
-        session=ispyb_db,
+    _ = get_or_create_db_entry(
+        session=ispyb_db_session,
         table=BLSession,
         lookup_kwargs={
             "proposalId": proposal_db_entry.proposalId,
@@ -186,20 +187,24 @@ def ispyb_session_factory(ispyb_engine):
             "visit_number": ExampleVisit.visit_number,
         },
     )
-    ispyb_db.add(bl_session_db_entry)
-    ispyb_db.commit()
-
-    ispyb_db.close()
+    ispyb_db_session.close()
     return factory  # Return its current state
 
 
 @pytest.fixture
-def ispyb_db(ispyb_session_factory) -> Generator[SQLAlchemySession, None, None]:
+def ispyb_db_session(
+    ispyb_db_session_factory,
+) -> Generator[SQLAlchemySession, None, None]:
+
     # Get a new session from the session factory
-    ispyb_db: SQLAlchemySession = ispyb_session_factory()
-    yield ispyb_db
-    ispyb_db.rollback()
-    ispyb_db.close()
+    ispyb_db_session: SQLAlchemySession = ispyb_db_session_factory()
+
+    # Let other function run
+    yield ispyb_db_session
+
+    # Tidy up after function is complete
+    ispyb_db_session.rollback()
+    ispyb_db_session.close()
 
 
 """

@@ -7,11 +7,11 @@ from tests.conftest import ExampleVisit
 
 
 def test_get_session_id(
-    ispyb_db: Session,
+    ispyb_db_session: Session,
 ):
     # Manually get the BLSession ID for comparison
     query = (
-        ispyb_db.execute(
+        ispyb_db_session.execute(
             select(BLSession)
             .join(Proposal)
             .where(BLSession.proposalId == Proposal.proposalId)
@@ -30,17 +30,17 @@ def test_get_session_id(
         proposal_code=ExampleVisit.proposal_code,
         proposal_number=str(ExampleVisit.proposal_number),
         visit_number=str(ExampleVisit.visit_number),
-        db=ispyb_db,
+        db=ispyb_db_session,
     )
     assert query == result
 
 
 def test_get_proposal_id(
-    ispyb_db: Session,
+    ispyb_db_session: Session,
 ):
     # Manually query the Proposal ID
     query = (
-        ispyb_db.execute(
+        ispyb_db_session.execute(
             select(Proposal)
             .where(Proposal.proposalCode == ExampleVisit.proposal_code)
             .where(Proposal.proposalNumber == ExampleVisit.proposal_number)
@@ -53,6 +53,6 @@ def test_get_proposal_id(
     result = get_proposal_id(
         proposal_code=ExampleVisit.proposal_code,
         proposal_number=ExampleVisit.proposal_number,
-        db=ispyb_db,
+        db=ispyb_db_session,
     )
     assert query == result
