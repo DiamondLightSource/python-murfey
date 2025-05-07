@@ -53,5 +53,6 @@ def test_get_proposal_id(
     result = get_proposal_id(
         proposal_code=ExampleVisit.proposal_code,
         proposal_number=ExampleVisit.proposal_number,
+        db=ispyb_db,
     )
     assert query == result
