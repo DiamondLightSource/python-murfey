@@ -1,10 +1,11 @@
 import json
 from configparser import ConfigParser
 from pathlib import Path
+from typing import Generator
 
 import ispyb
 import pytest
-from ispyb.sqlalchemy import url
+from ispyb.sqlalchemy import BLSession, Person, Proposal, url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlmodel import Session
@@ -20,17 +21,6 @@ def session_tmp_path(tmp_path_factory) -> Path:
     Creates a temporary path that persists for the entire test session
     """
     return tmp_path_factory.mktemp("session_tmp")
-
-
-@pytest.fixture
-def start_postgres():
-    clear(murfey_db_url)
-    setup(murfey_db_url)
-
-    murfey_session = MurfeySession(id=2, name="cm12345-6")
-    with Session(murfey_db_engine) as murfey_db:
-        murfey_db.add(murfey_session)
-        murfey_db.commit()
 
 
 @pytest.fixture(scope="session")
@@ -93,8 +83,27 @@ https://github.com/DiamondLightSource/ispyb-api/blob/main/tests/conftest.py
 """
 
 
+class ExampleVisit:
+    """
+    This is a class to store information that will common to all database entries for
+    a particular Murfey session, to enable ease of replication when creating database
+    fixtures.
+    """
+
+    # Visit-related (ISPyB & Murfey)
+    instrument_name = "i01"
+    proposal_code = "cm"
+    proposal_number = 12345
+    visit_number = 6
+
+    # Person (ISPyB)
+    given_name = "Eliza"
+    family_name = "Murfey"
+    login = "murfey123"
+
+
 @pytest.fixture(scope="session")
-def ispyb_db(mock_ispyb_credentials):
+def ispyb_db_connection(mock_ispyb_credentials):
     with ispyb.open(mock_ispyb_credentials) as connection:
         yield connection
 
@@ -114,8 +123,54 @@ def ispyb_session_factory(ispyb_engine):
 
 
 @pytest.fixture
-def ispyb_session(ispyb_session_factory):
-    ispyb_session = ispyb_session_factory()
-    yield ispyb_session
-    ispyb_session.rollback()
-    ispyb_session.close()
+def ispyb_db(ispyb_session_factory) -> Generator[Session, None, None]:
+    # Get a new session from the session factory
+    ispyb_db: Session = ispyb_session_factory()
+
+    # Populate the ISPyB table with some default values
+    person_db_entry = Person(
+        givenName=ExampleVisit.given_name,
+        familyName=ExampleVisit.family_name,
+        login=ExampleVisit.login,
+    )
+    proposal_db_entry = Proposal(
+        personId=person_db_entry.personId,
+        proposalCode=ExampleVisit.proposal_code,
+        proposalNumber=str(ExampleVisit.proposal_number),
+    )
+    bl_session_db_entry = BLSession(
+        proposalId=proposal_db_entry.proposalId,
+        beamLineName=ExampleVisit.instrument_name,
+        visit_number=ExampleVisit.visit_number,
+    )
+    ispyb_db.add_all(
+        [
+            person_db_entry,
+            proposal_db_entry,
+            bl_session_db_entry,
+        ]
+    )
+    ispyb_db.commit()
+    yield ispyb_db  # Yield the Session and pass processing over to other function
+
+    # Tidying up
+    ispyb_db.rollback()
+    ispyb_db.close()
+
+
+"""
+=======================================================================================
+Fixtures for setting up mock Murfey database
+=======================================================================================
+"""
+
+
+@pytest.fixture
+def start_postgres():
+    clear(murfey_db_url)
+    setup(murfey_db_url)
+
+    murfey_session = MurfeySession(id=2, name="cm12345-6")
+    with Session(murfey_db_engine) as murfey_db:
+        murfey_db.add(murfey_session)
+        murfey_db.commit()
