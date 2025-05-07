@@ -26,10 +26,10 @@ def test_get_session_id(
 
     # Test function
     result = get_session_id(
-        microscope="murfey",
-        proposal_code="cm",
-        proposal_number="12345",
-        visit_number="6",
+        microscope=ExampleVisit.instrument_name,
+        proposal_code=ExampleVisit.proposal_code,
+        proposal_number=str(ExampleVisit.proposal_number),
+        visit_number=str(ExampleVisit.visit_number),
         db=ispyb_db,
     )
     assert query == result
