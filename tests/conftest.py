@@ -6,10 +6,10 @@ from typing import Any, Generator, Type, TypeVar
 import ispyb
 import pytest
 from ispyb.sqlalchemy import BLSession, Person, Proposal, url
-from sqlalchemy import and_, create_engine, select
+from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, select
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import clear, setup
@@ -118,6 +118,11 @@ def ispyb_engine(mock_ispyb_credentials):
     ispyb_engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def ispyb_db_session_factory(ispyb_engine):
+    return sessionmaker(bind=ispyb_engine, expire_on_commit=False)
+
+
 SQLAlchemyTable = TypeVar("SQLAlchemyTable", bound=DeclarativeMeta)
 
 
@@ -154,12 +159,11 @@ def get_or_create_db_entry(
 
 
 @pytest.fixture(scope="session")
-def ispyb_db_session_factory(ispyb_engine):
-    factory = scoped_session(sessionmaker(bind=ispyb_engine))
+def seed_ispyb_db(ispyb_db_session_factory):
 
     # Populate the ISPyB table with some initial values
     # Return existing table entry if already present
-    ispyb_db_session = factory()
+    ispyb_db_session: SQLAlchemySession = ispyb_db_session_factory()
     person_db_entry = get_or_create_db_entry(
         session=ispyb_db_session,
         table=Person,
@@ -188,23 +192,48 @@ def ispyb_db_session_factory(ispyb_engine):
         },
     )
     ispyb_db_session.close()
-    return factory  # Return its current state
+
+
+def restart_savepoint(session: SQLAlchemySession, transaction: RootTransaction):
+    """
+    Re-establish a SAVEPOINT after a nested transaction is committed or rolled back.
+    This helps to maintain isolation across different test cases.
+    """
+    if transaction.nested and not transaction._parent.nested:
+        session.begin_nested()
+
+
+def attach_event_listener(session: SQLAlchemySession):
+    """
+    Attach the restart_savepoint function as an event listener for after_transaction_end
+    """
+    event.listen(session, "after_transaction_end", restart_savepoint)
 
 
 @pytest.fixture
 def ispyb_db_session(
     ispyb_db_session_factory,
+    ispyb_engine: Engine,
+    seed_ispyb_db,
 ) -> Generator[SQLAlchemySession, None, None]:
+    """
+    Returns a test-safe session that wraps each test in a rollback-safe SAVEPOINT.
+    """
+    connection = ispyb_engine.connect()
+    transaction = connection.begin()  # Outer transaction
 
-    # Get a new session from the session factory
-    ispyb_db_session: SQLAlchemySession = ispyb_db_session_factory()
+    session: SQLAlchemySession = ispyb_db_session_factory(bind=connection)
+    session.begin_nested()  # Save point for test
 
-    # Let other function run
-    yield ispyb_db_session
+    # Attach the listener to the session for this connection
+    attach_event_listener(session)
 
-    # Tidy up after function is complete
-    ispyb_db_session.rollback()
-    ispyb_db_session.close()
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 """
