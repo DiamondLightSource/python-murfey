@@ -1,10 +1,12 @@
 import argparse
 import logging
+from urllib.parse import urlparse
 
 import uvicorn
 from rich.logging import RichHandler
 
 import murfey
+import murfey.client.update
 from murfey.client.customlogging import CustomHandler
 from murfey.util import LogFilter
 from murfey.util.client import read_config
@@ -26,6 +28,12 @@ def run():
         default=8001,
     )
     args = parser.parse_args()
+
+    murfey_url = urlparse(read_config()["Murfey"].get("server"), allow_fragments=False)
+    try:
+        murfey.client.update.check(murfey_url)
+    except Exception as e:
+        print(f"Murfey update check failed with {e}")
 
     LogFilter.install()
 
