@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import secrets
 import time
 from logging import getLogger
@@ -19,7 +18,7 @@ from sqlmodel import Session, create_engine, select
 
 from murfey.server import sanitise
 from murfey.server.murfey_db import murfey_db, url
-from murfey.util.config import get_machine_config, get_security_config
+from murfey.util.config import get_security_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
 
@@ -64,12 +63,7 @@ class CookieScheme(HTTPBearer):
 
 # Set up variables used for authentication
 security_config = get_security_config()
-machine_config = get_machine_config()
-auth_url = (
-    machine_config[os.getenv("BEAMLINE", "")].auth_url
-    if machine_config.get(os.getenv("BEAMLINE", ""))
-    else ""
-)
+auth_url = security_config.auth_url
 ALGORITHM = security_config.auth_algorithm or "HS256"
 SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
 if security_config.auth_type == "password":
