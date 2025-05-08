@@ -1,4 +1,5 @@
 from ispyb.sqlalchemy import BLSession, Proposal
+from pytest import mark
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -56,3 +57,18 @@ def test_get_proposal_id(
         db=ispyb_db_session,
     )
     assert query == result
+
+
+@mark.skip
+def test_get_sub_samples_from_visit():
+    pass
+
+
+@mark.skip
+def test_get_all_ongoing_visits():
+    pass
+
+
+@mark.skip
+def test_get_data_collection_group_ids():
+    pass
