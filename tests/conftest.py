@@ -140,9 +140,18 @@ def get_or_create_db_entry(
         conditions = [
             getattr(table, key) == value for key, value in lookup_kwargs.items()
         ]
-        entry = (
-            session.execute(select(table).where(and_(*conditions))).scalars().first()
-        )
+        # Use 'exec()' for SQLModel sessions
+        if isinstance(session, SQLModelSession):
+            entry = session.exec(select(table).where(and_(*conditions))).first()
+        # Use 'execute()' for SQLAlchemy sessions
+        elif isinstance(session, SQLAlchemySession):
+            entry = (
+                session.execute(select(table).where(and_(*conditions)))
+                .scalars()
+                .first()
+            )
+        else:
+            raise TypeError("Unexpected Session type")
         if entry:
             return entry
 
