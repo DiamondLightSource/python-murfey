@@ -8,7 +8,7 @@ from typing import Any, Generator, Type, TypeVar
 
 import ispyb
 import pytest
-from ispyb.sqlalchemy import BLSession, Person, Proposal, url
+from ispyb.sqlalchemy import BLSession, ExperimentType, Person, Proposal, url
 from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, select
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
@@ -87,8 +87,8 @@ Database-related helper functions and classes
 
 class ExampleVisit:
     """
-    This is a class to store information that will common to all database entries for
-    a particular Murfey session, to enable ease of replication when creating database
+    This class stores information that will be common to all database entries for a
+    particular Murfey session, to enable ease of replication when creating database
     fixtures.
     """
 
@@ -105,6 +105,19 @@ class ExampleVisit:
     given_name = "Eliza"
     family_name = "Murfey"
     login = "murfey123"
+
+
+class ISPyBTableValues:
+    """
+    Visit-independent default values for ISPyB tables
+    """
+
+    # ExperimentType (ISPyB)
+    experiment_types = {
+        "Tomography": 36,
+        "Single Particle": 37,
+        "Atlas": 44,
+    }
 
 
 SQLAlchemyTable = TypeVar("SQLAlchemyTable", bound=DeclarativeMeta)
@@ -215,6 +228,19 @@ def seed_ispyb_db(ispyb_db_session_factory):
             "visit_number": ExampleVisit.visit_number,
         },
     )
+    _ = [
+        get_or_create_db_entry(
+            session=ispyb_db_session,
+            table=ExperimentType,
+            lookup_kwargs={
+                "experimentTypeId": id,
+                "name": name,
+                "proposalType": "em",
+                "active": 1,
+            },
+        )
+        for name, id in ISPyBTableValues.experiment_types.items()
+    ]
     ispyb_db_session.close()
 
 
