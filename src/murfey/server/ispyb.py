@@ -667,16 +667,3 @@ def get_all_ongoing_visits(microscope: str, db: Session | None) -> list[Visit]:
         )
         for row in query
     ]
-
-
-def get_data_collection_group_ids(session_id):
-    query = (
-        ISPyBSession()
-        .query(DataCollectionGroup)
-        .filter(
-            DataCollectionGroup.sessionId == session_id,
-        )
-        .all()
-    )
-    dcgids = [row.dataCollectionGroupId for row in query]
-    return dcgids
