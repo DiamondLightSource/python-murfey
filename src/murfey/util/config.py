@@ -68,7 +68,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     rsync_url: str = ""
 
     security_configuration_path: Optional[Path] = None
-    auth_url: str = ""
 
     notifications_queue: str = "pato_notification"
 
@@ -88,6 +87,7 @@ class Security(BaseModel):
     crypto_key: str
     auth_key: str = ""
     auth_algorithm: str = ""
+    auth_url: str = ""
     sqlalchemy_pooling: bool = True
     allow_origins: List[str] = ["*"]
     session_validation: str = ""
