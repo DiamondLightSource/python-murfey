@@ -1973,6 +1973,17 @@ def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) ->
     return sid
 
 
+@router.post("/sessions/{session_id}")
+def update_session(
+    session_id: MurfeySessionID, process: bool = True, db=murfey_db
+) -> None:
+    session = db.exec(select(Session).where(session_id == session_id)).one()
+    session.process = process
+    db.add(session)
+    db.commit()
+    return None
+
+
 @router.put("/sessions/{session_id}/current_gain_ref")
 def update_current_gain_ref(
     session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
