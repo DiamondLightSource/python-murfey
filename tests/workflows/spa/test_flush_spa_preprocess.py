@@ -5,22 +5,23 @@ from sqlmodel import Session, select
 from murfey.util.db import DataCollectionGroup, GridSquare
 from murfey.util.models import GridSquareParameters
 from murfey.workflows.spa import flush_spa_preprocess
-from tests import engine
+from tests.conftest import ExampleVisit
 
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
-def test_register_grid_square_update_add_locations(mock_transport, start_postgres):
+def test_register_grid_square_update_add_locations(
+    mock_transport, murfey_db_session: Session
+):
     """Test the updating of an existing grid square"""
     # Create a grid square to update
     grid_square = GridSquare(
         id=1,
         name=101,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
     )
-    with Session(engine) as murfey_db:
-        murfey_db.add(grid_square)
-        murfey_db.commit()
+    murfey_db_session.add(grid_square)
+    murfey_db_session.commit()
 
     # Parameters to update with
     new_parameters = GridSquareParameters(
@@ -32,15 +33,15 @@ def test_register_grid_square_update_add_locations(mock_transport, start_postgre
     )
 
     # Run the registration
-    with Session(engine) as murfey_db:
-        flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
 
     # Confirm the database was updated
-    with Session(engine) as murfey_db:
-        grid_square_final_parameters = murfey_db.exec(select(GridSquare)).one()
+    grid_square_final_parameters = murfey_db_session.exec(select(GridSquare)).one()
     assert grid_square_final_parameters.x_location == new_parameters.x_location
     assert grid_square_final_parameters.y_location == new_parameters.y_location
     assert (
@@ -52,36 +53,37 @@ def test_register_grid_square_update_add_locations(mock_transport, start_postgre
 
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
-def test_register_grid_square_update_add_nothing(mock_transport, start_postgres):
+def test_register_grid_square_update_add_nothing(
+    mock_transport, murfey_db_session: Session
+):
     """Test the updating of an existing grid square, but with nothing to update with"""
     # Create a grid square to update
     grid_square = GridSquare(
         id=1,
         name=101,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         x_location=0.1,
         y_location=0.2,
         x_stage_position=0.3,
         y_stage_position=0.4,
     )
-    with Session(engine) as murfey_db:
-        murfey_db.add(grid_square)
-        murfey_db.commit()
+    murfey_db_session.add(grid_square)
+    murfey_db_session.commit()
 
     # Parameters to update with
     new_parameters = GridSquareParameters(tag="session_tag")
 
     # Run the registration
-    with Session(engine) as murfey_db:
-        flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_update_grid_square.assert_called_with(1, new_parameters)
 
     # Confirm the database was not updated
-    with Session(engine) as murfey_db:
-        grid_square_final_parameters = murfey_db.exec(select(GridSquare)).one()
+    grid_square_final_parameters = murfey_db_session.exec(select(GridSquare)).one()
     assert grid_square_final_parameters.x_location == 0.1
     assert grid_square_final_parameters.y_location == 0.2
     assert grid_square_final_parameters.x_stage_position == 0.3
@@ -90,18 +92,17 @@ def test_register_grid_square_update_add_nothing(mock_transport, start_postgres)
 
 @mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
 def test_register_grid_square_insert_with_ispyb(
-    mock_transport, start_postgres, tmp_path
+    mock_transport, murfey_db_session: Session, tmp_path
 ):
     # Create a data collection group for lookups
     grid_square = DataCollectionGroup(
         id=1,
-        session_id=2,
+        session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         atlas_id=90,
     )
-    with Session(engine) as murfey_db:
-        murfey_db.add(grid_square)
-        murfey_db.commit()
+    murfey_db_session.add(grid_square)
+    murfey_db_session.commit()
 
     # Set the ispyb return
     mock_transport.do_insert_grid_square.return_value = {
@@ -126,18 +127,18 @@ def test_register_grid_square_insert_with_ispyb(
     )
 
     # Run the registration
-    with Session(engine) as murfey_db:
-        flush_spa_preprocess.register_grid_square(2, 101, new_parameters, murfey_db)
+    flush_spa_preprocess.register_grid_square(
+        ExampleVisit.murfey_session_id, 101, new_parameters, murfey_db_session
+    )
 
     # Check this would have updated ispyb
     mock_transport.do_insert_grid_square.assert_called_with(90, 101, new_parameters)
 
     # Confirm the database entry was made
-    with Session(engine) as murfey_db:
-        grid_square_final_parameters = murfey_db.exec(select(GridSquare)).one()
+    grid_square_final_parameters = murfey_db_session.exec(select(GridSquare)).one()
     assert grid_square_final_parameters.id == 1
     assert grid_square_final_parameters.name == 101
-    assert grid_square_final_parameters.session_id == 2
+    assert grid_square_final_parameters.session_id == ExampleVisit.murfey_session_id
     assert grid_square_final_parameters.tag == "session_tag"
     assert grid_square_final_parameters.x_location == 1.1
     assert grid_square_final_parameters.y_location == 1.2

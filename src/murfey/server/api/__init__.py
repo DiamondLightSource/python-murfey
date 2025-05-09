@@ -892,6 +892,9 @@ async def register_tilt(
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    log.debug(
+        f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
+    )
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
