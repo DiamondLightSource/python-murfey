@@ -140,7 +140,9 @@ async def setup_multigrid_watcher(
 
 
 @router.post("/sessions/{session_id}/start_multigrid_watcher")
-async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
+async def start_multigrid_watcher(
+    session_id: MurfeySessionID, process: bool = True, db=murfey_db
+):
     data = {}
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -151,7 +153,7 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/start_multigrid_watcher",
+                f"{machine_config.instrument_server_url}/sessions/{session_id}/start_multigrid_watcher?process={'true' if process else 'false'}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },

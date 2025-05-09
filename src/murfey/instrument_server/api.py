@@ -186,9 +186,13 @@ def setup_multigrid_watcher(
 
 
 @router.post("/sessions/{session_id}/start_multigrid_watcher")
-def start_multigrid_watcher(session_id: MurfeySessionID):
+def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
     if watchers.get(session_id) is None:
         return {"success": False}
+    if not process:
+        watchers[session_id]._listeners = [
+            partial(watchers[session_id]._listeners[0], analyse=False)
+        ]
     watchers[session_id].start()
     return {"success": True}
 
