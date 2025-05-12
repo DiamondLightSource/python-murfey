@@ -29,8 +29,8 @@ from ispyb.sqlalchemy import (
     ZcZocaloBuffer,
     url,
 )
+from pydantic import BaseModel
 
-from murfey.server.api.session_info import Visit
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
 from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample
@@ -44,6 +44,27 @@ try:
     )
 except AttributeError:
     Session = lambda: None
+
+
+class Visit(BaseModel):
+    start: datetime.datetime
+    end: datetime.datetime
+    session_id: int
+    name: str
+    beamline: str
+    proposal_title: str
+
+    def __repr__(self) -> str:
+        return (
+            "Visit("
+            f"start='{self.start:%Y-%m-%d %H:%M}', "
+            f"end='{self.end:%Y-%m-%d %H:%M}', "
+            f"session_id='{self.session_id!r}',"
+            f"name={self.name!r}, "
+            f"beamline={self.beamline!r}, "
+            f"proposal_title={self.proposal_title!r}"
+            ")"
+        )
 
 
 def _send_using_new_connection(transport_type: str, queue: str, message: dict) -> None:

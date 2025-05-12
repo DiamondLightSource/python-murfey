@@ -24,7 +24,9 @@ from murfey.util.db import (
 )
 
 router = APIRouter(
-    prefix="session_info", dependencies=[Depends(validate_token)], tags=["session info"]
+    prefix="/session_info",
+    dependencies=[Depends(validate_token)],
+    tags=["session info"],
 )
 
 
@@ -156,7 +158,7 @@ async def get_clients(db=murfey_db):
 
 
 spa_router = APIRouter(
-    prefix="session_info/spa",
+    prefix="/session_info/spa",
     dependencies=[Depends(validate_token)],
     tags=["session info for SPA"],
 )
@@ -218,7 +220,7 @@ def get_spa_proc_param_details(
 
 
 tomo_router = APIRouter(
-    prefix="session_info/tomo",
+    prefix="/session_info/tomo",
     dependencies=[Depends(validate_token)],
     tags=["session info for cryoET"],
 )

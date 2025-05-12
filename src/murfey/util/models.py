@@ -19,44 +19,6 @@ class SuggestedPathParameters(BaseModel):
     extra_directory: str = ""
 
 
-class DCGroupParameters(BaseModel):
-    # DC = Data collection
-    experiment_type: str
-    experiment_type_id: int
-    tag: str
-    atlas: str = ""
-    sample: Optional[int] = None
-    atlas_pixel_size: int = 0
-
-
-class DCParameters(BaseModel):
-    voltage: float
-    pixel_size_on_image: str
-    experiment_type: str
-    image_size_x: int
-    image_size_y: int
-    file_extension: str
-    acquisition_software: str
-    image_directory: str
-    tag: str
-    source: str
-    magnification: float
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
-    phase_plate: bool = False
-    data_collection_tag: str = ""
-
-
-class ProcessingJobParameters(BaseModel):
-    tag: str
-    source: str
-    recipe: str
-    parameters: Dict[str, Any] = {}
-    experiment_type: str = "spa"
-
-
 class RegistrationMessage(BaseModel):
     registration: str
     params: Optional[Dict[str, Any]] = None
