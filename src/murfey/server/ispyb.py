@@ -30,9 +30,10 @@ from ispyb.sqlalchemy import (
     url,
 )
 
+from murfey.server.api.session_info import Visit
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
-from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
+from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
