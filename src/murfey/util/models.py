@@ -13,12 +13,6 @@ Models used in multiple workflows.
 """
 
 
-class SuggestedPathParameters(BaseModel):
-    base_path: Path
-    touch: bool = False
-    extra_directory: str = ""
-
-
 class RegistrationMessage(BaseModel):
     registration: str
     params: Optional[Dict[str, Any]] = None
@@ -61,21 +55,6 @@ class RsyncerInfo(BaseModel):
     increment_data_count: int = 0
     data_bytes: int = 0
     tag: str = ""
-
-
-class GainReference(BaseModel):
-    gain_ref: Path
-    rescale: bool = True
-    eer: bool = False
-    tag: str = ""
-
-
-class FractionationParameters(BaseModel):
-    fractionation: int
-    dose_per_frame: float
-    num_frames: int = 0
-    eer_path: Optional[str] = None
-    fractionation_file_name: str = "eer_fractionation.txt"
 
 
 """

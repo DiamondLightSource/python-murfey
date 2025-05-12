@@ -69,8 +69,6 @@ from murfey.util.models import (
     ClientInfo,
     CurrentGainRef,
     FoilHoleParameters,
-    FractionationParameters,
-    GainReference,
     GridSquareParameters,
     PostInfo,
     ProcessingParametersSPA,
@@ -80,7 +78,6 @@ from murfey.util.models import (
     RsyncerSource,
     SessionInfo,
     SPAProcessFile,
-    SuggestedPathParameters,
     TiltInfo,
     TiltSeriesGroupInfo,
     TiltSeriesInfo,
@@ -790,28 +787,6 @@ def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfe
     db.commit()
 
 
-# @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-# def get_current_visits(instrument_name: str):
-#     return [
-#         Visit(
-#             start=datetime.datetime.now(),
-#             end=datetime.datetime.now() + datetime.timedelta(days=1),
-#             session_id=1,
-#             name="cm31111-2",
-#             beamline="m12",
-#             proposal_title="Nothing of importance",
-#         ),
-#         Visit(
-#             start=datetime.datetime.now(),
-#             end=datetime.datetime.now() + datetime.timedelta(days=1),
-#             session_id=1,
-#             name="cm31111-3",
-#             beamline="m12",
-#             proposal_title="Nothing of importance",
-#         ),
-#     ]
-
-
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
@@ -1220,92 +1195,6 @@ def shutdown():
     return {"success": True}
 
 
-@router.post("/visits/{visit_name}/{session_id}/suggested_path")
-def suggest_path(
-    visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
-):
-    count: int | None = router.raw_count
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    rsync_basepath = (
-        machine_config[instrument_name].rsync_basepath
-        if machine_config
-        else Path(f"/dls/{get_microscope()}")
-    )
-    check_path = rsync_basepath / params.base_path
-    check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
-    check_path = check_path.resolve()
-
-    # Check for path traversal attempt
-    if not str(check_path).startswith(str(rsync_basepath)):
-        raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
-
-    # Check previous year to account for the year rolling over during data collection
-    if not sanitise_path(check_path).exists():
-        base_path_parts = list(params.base_path.parts)
-        for part in base_path_parts:
-            # Find the path part corresponding to the year
-            if len(part) == 4 and part.isdigit():
-                year_idx = base_path_parts.index(part)
-                base_path_parts[year_idx] = str(int(part) - 1)
-        base_path = "/".join(base_path_parts)
-        check_path_prev = check_path
-        check_path = rsync_basepath / base_path
-        check_path = check_path.parent / f"{check_path.stem}{count}{check_path.suffix}"
-        check_path = check_path.resolve()
-
-        # Check for path traversal attempt
-        if not str(check_path).startswith(str(rsync_basepath)):
-            raise Exception(f"Path traversal attempt detected: {str(check_path)!r}")
-
-        # If visit is not in the previous year either, it's a genuine error
-        if not check_path.exists():
-            log_message = sanitise(
-                "Unable to find current visit folder under "
-                f"{str(check_path_prev)!r} or {str(check_path)!r}"
-            )
-            log.error(log_message)
-            raise FileNotFoundError(log_message)
-
-    check_path_name = check_path.name
-    while sanitise_path(check_path).exists():
-        count = count + 1 if count else 2
-        check_path = check_path.parent / f"{check_path_name}{count}"
-    router.raw_count += 1
-    if params.touch:
-        sanitise_path(check_path).mkdir(mode=0o750)
-        if params.extra_directory:
-            (sanitise_path(check_path) / secure_filename(params.extra_directory)).mkdir(
-                mode=0o750
-            )
-    return {
-        "suggested_path": check_path.relative_to(
-            machine_config[instrument_name].rsync_basepath
-        )
-    }
-
-
-@router.get("/sessions/{session_id}/data_collection_groups")
-def get_dc_groups(
-    session_id: MurfeySessionID, db=murfey_db
-) -> Dict[str, DataCollectionGroup]:
-    data_collection_groups = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
-    ).all()
-    return {dcg.tag: dcg for dcg in data_collection_groups}
-
-
-@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
-def get_data_collections(
-    session_id: MurfeySessionID, dcgid: int, db=murfey_db
-) -> List[DataCollection]:
-    data_collections = db.exec(
-        select(DataCollection).where(DataCollection.dcg_id == dcgid)
-    ).all()
-    return data_collections
-
-
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
 def register_dc_group(
     visit_name: str,
@@ -1445,30 +1334,6 @@ def register_proc(
     return proc_params
 
 
-@router.post("/sessions/{session_id}/process_gain")
-async def process_gain(
-    session_id: MurfeySessionID, gain_reference_params: GainReference, db=murfey_db
-):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
-    if machine_config.get("rsync_basepath"):
-        filepath = (
-            Path(machine_config["rsync_basepath"])
-            / str(datetime.datetime.now().year)
-            / visit_name
-        )
-    else:
-        return {"gain_ref": None}
-    gain_ref_folder = machine_config.get("gain_directory_name", "processing")
-    gain_ref_out = (
-        (filepath / gain_ref_folder / f"gain_{gain_reference_params.tag}.mrc")
-        if gain_reference_params.tag
-        else (filepath / gain_ref_folder / "gain.mrc")
-    )
-    return {
-        "gain_ref": gain_ref_out.relative_to(Path(machine_config["rsync_basepath"]))
-    }
-
-
 @router.get("/new_client_id/")
 async def new_client_id(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
@@ -1595,40 +1460,6 @@ def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
     db.delete(session)
     db.commit()
     return
-
-
-@router.post("/visits/{visit_name}/{session_id}/eer_fractionation_file")
-async def write_eer_fractionation_file(
-    visit_name: str, session_id: int, fractionation_params: FractionationParameters
-) -> dict:
-    file_path = (
-        Path(machine_config["rsync_basepath"])
-        / str(datetime.datetime.now().year)
-        / secure_filename(visit_name)
-        / secure_filename(fractionation_params.fractionation_file_name)
-    )
-    log.info(f"EER fractionation file {file_path} creation requested")
-    if file_path.is_file():
-        return {"eer_fractionation_file": str(file_path)}
-
-    if fractionation_params.num_frames:
-        num_eer_frames = fractionation_params.num_frames
-    elif (
-        fractionation_params.eer_path
-        and sanitise_path(Path(fractionation_params.eer_path)).is_file()
-    ):
-        num_eer_frames = murfey.util.eer.num_frames(Path(fractionation_params.eer_path))
-    else:
-        log.warning(
-            f"EER fractionation unable to find {sanitise_path(Path(fractionation_params.eer_path)) if fractionation_params.eer_path else None} "
-            f"or use {sanitise(str(fractionation_params.num_frames))} frames"
-        )
-        return {"eer_fractionation_file": None}
-    with open(file_path, "w") as frac_file:
-        frac_file.write(
-            f"{num_eer_frames} {fractionation_params.fractionation} {fractionation_params.dose_per_frame}"
-        )
-    return {"eer_fractionation_file": str(file_path)}
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")

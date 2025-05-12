@@ -15,6 +15,7 @@ import murfey.server.api.auth
 import murfey.server.api.bootstrap
 import murfey.server.api.clem
 import murfey.server.api.display
+import murfey.server.api.file_manip
 import murfey.server.api.hub
 import murfey.server.api.instrument
 import murfey.server.api.processing_parameters
@@ -77,6 +78,7 @@ app.include_router(murfey.server.api.display.router)
 app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.hub.router)
 app.include_router(murfey.server.api.processing_parameters.router)
+app.include_router(murfey.server.api.file_manip.router)
 app.include_router(murfey.server.api.session_info.router)
 app.include_router(murfey.server.api.session_info.spa_router)
 app.include_router(murfey.server.api.session_info.tomo_router)
