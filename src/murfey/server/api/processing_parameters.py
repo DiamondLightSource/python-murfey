@@ -12,7 +12,11 @@ from murfey.util.db import SessionProcessingParameters
 
 logger = getLogger("murfey.server.api.processing_parameters")
 
-router = APIRouter(dependencies=[Depends(validate_token)])
+router = APIRouter(
+    prefix="/session_parameters",
+    dependencies=[Depends(validate_token)],
+    tags=["processing parameters"],
+)
 
 
 class EditableSessionProcessingParameters(BaseModel):

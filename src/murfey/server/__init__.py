@@ -41,6 +41,7 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 from werkzeug.utils import secure_filename
+from workflows import Error as WorkflowsError
 from workflows.transport.pika_transport import PikaTransport
 
 import murfey
@@ -287,8 +288,13 @@ def run():
         os.environ["MURFEY_DEMO"] = "1"
     else:
         # Load RabbitMQ configuration and set up the connection
-        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
-        _set_up_transport("PikaTransport")
+        try:
+            PikaTransport().load_configuration_file(
+                security_config.rabbitmq_credentials
+            )
+            _set_up_transport("PikaTransport")
+        except WorkflowsError:
+            pass
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)

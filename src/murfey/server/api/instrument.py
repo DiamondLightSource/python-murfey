@@ -27,7 +27,11 @@ from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup
 
 # Create APIRouter class object
-router = APIRouter(dependencies=[Depends(validate_token)])
+router = APIRouter(
+    prefix="/instrument_server",
+    dependencies=[Depends(validate_token)],
+    tags=["instrument_server"],
+)
 
 log = logging.getLogger("murfey.server.instrument")
 
