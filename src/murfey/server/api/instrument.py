@@ -140,13 +140,11 @@ async def setup_multigrid_watcher(
 
 
 @router.post("/sessions/{session_id}/start_multigrid_watcher")
-async def start_multigrid_watcher(
-    session_id: MurfeySessionID, process: bool = True, db=murfey_db
-):
+async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
     data = {}
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    process = session.process
+    instrument_name = session.instrument_name
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
