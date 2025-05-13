@@ -487,6 +487,7 @@ class RSyncerInfo(BaseModel):
     files_counted: int
     transferring: bool
     session_id: int
+    num_files_skipped: int = 0
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
@@ -564,6 +565,7 @@ async def get_rsyncer_info(
                 files_counted=ri.files_counted,
                 transferring=ri.transferring,
                 session_id=session_id,
+                num_files_skipped=rsync_data.get("num_files_skipped", 0),
             )
         )
     return combined_data
