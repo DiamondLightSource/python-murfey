@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import datetime
 import logging
 import os
 from functools import lru_cache
@@ -10,20 +8,10 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
-from ispyb.sqlalchemy import (
-    BLSample,
-    BLSampleGroup,
-    BLSampleImage,
-    BLSession,
-    BLSubSample,
-    Proposal,
-)
+from ispyb.sqlalchemy import BLSample, BLSampleGroup, BLSampleImage, BLSubSample
 from PIL import Image
 from prometheus_client import Counter, Gauge
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.exc import OperationalError
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
@@ -43,21 +31,17 @@ from murfey.server.murfey_db import murfey_db
 from murfey.util import safe_run
 from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
-    AutoProcProgram,
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
     GridSquare,
     MagnificationLookup,
-    Movie,
     ProcessingJob,
     RsyncInstance,
     Session,
     SPAFeedbackParameters,
     SPARelionParameters,
-    Tilt,
-    TiltSeries,
 )
 from murfey.util.models import (
     BLSampleImageParameters,
@@ -73,8 +57,6 @@ from murfey.util.models import (
     RsyncerInfo,
     RsyncerSource,
     Sample,
-    SessionInfo,
-    TiltInfo,
 )
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole,
@@ -156,47 +138,6 @@ def remove_mag_table_row(mag: int, db=murfey_db):
     db.commit()
 
 
-@router.get("/instruments/{instrument_name}/instrument_name")
-def get_instrument_display_name(instrument_name: str) -> str:
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    if machine_config:
-        return machine_config.display_name
-    return ""
-
-
-@router.get("/instruments/{instrument_name}/visits/")
-def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispyb.DB):
-    visits = murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
-
-    if visits:
-        return_query = [
-            {
-                "Start date": visit.start,
-                "End date": visit.end,
-                "Visit name": visit.name,
-                "Time remaining": str(visit.end - datetime.datetime.now()),
-            }
-            for visit in visits
-        ]  # "Proposal title": visit.proposal_title
-        log.debug(
-            f"{len(visits)} visits active for {sanitise(instrument_name)=}: {', '.join(v.name for v in visits)}"
-        )
-        return templates.TemplateResponse(
-            request=request,
-            name="activevisits.html",
-            context={"info": return_query, "microscope": instrument_name},
-        )
-    else:
-        log.debug(f"No visits identified for {sanitise(instrument_name)=}")
-        return templates.TemplateResponse(
-            request=request,
-            name="activevisits.html",
-            context={"info": [], "microscope": instrument_name},
-        )
-
-
 @router.post("/visits/{visit_name}")
 def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey_db):
     client_env = db.exec(
@@ -213,14 +154,6 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
         db.commit()
     db.close()
     return client_info
-
-
-@router.get("/num_movies")
-def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
-    res = db.exec(
-        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
-    ).all()
-    return {r[0]: r[1] for r in res}
 
 
 @router.post("/sessions/{session_id}/rsyncer")
@@ -457,38 +390,6 @@ def post_foil_hole(
     return register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
-@router.post("/visits/{visit_name}/{session_id}/tilt")
-async def register_tilt(
-    visit_name: str, session_id: MurfeySessionID, tilt_info: TiltInfo, db=murfey_db
-):
-    def _add_tilt():
-        tilt_series_id = (
-            db.exec(
-                select(TiltSeries)
-                .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-                .where(TiltSeries.session_id == session_id)
-                .where(TiltSeries.rsync_source == tilt_info.source)
-            )
-            .one()
-            .id
-        )
-        if db.exec(
-            select(Tilt)
-            .where(Tilt.movie_path == tilt_info.movie_path)
-            .where(Tilt.tilt_series_id == tilt_series_id)
-        ).all():
-            return
-        tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
-        db.add(tilt)
-        db.commit()
-
-    try:
-        _add_tilt()
-    except OperationalError:
-        await asyncio.sleep(30)
-        _add_tilt()
-
-
 @router.get("/visit/{visit_name}/samples")
 def get_samples(visit_name: str, db=murfey.server.ispyb.DB) -> List[Sample]:
     return murfey.server.ispyb.get_sub_samples_from_visit(visit_name, db=db)
@@ -536,52 +437,6 @@ def register_sample_image(
     if _transport_object:
         return _transport_object.do_insert_sample_image(record)
     return {"success": False}
-
-
-@router.get("/instruments/{instrument_name}/visits/{visit_name}")
-def visit_info(
-    request: Request, instrument_name: str, visit_name: str, db=murfey.server.ispyb.DB
-):
-    query = (
-        db.query(BLSession)
-        .join(Proposal)
-        .filter(
-            BLSession.proposalId == Proposal.proposalId,
-            BLSession.beamLineName == instrument_name,
-            BLSession.endDate > datetime.datetime.now(),
-            BLSession.startDate < datetime.datetime.now(),
-        )
-        .add_columns(
-            BLSession.startDate,
-            BLSession.endDate,
-            BLSession.beamLineName,
-            Proposal.proposalCode,
-            Proposal.proposalNumber,
-            BLSession.visit_number,
-            Proposal.title,
-        )
-        .all()
-    )
-    if query:
-        return_query = [
-            {
-                "Start date": id.startDate,
-                "End date": id.endDate,
-                "Beamline name": id.beamLineName,
-                "Visit name": visit_name,
-                "Time remaining": str(id.endDate - datetime.datetime.now()),
-            }
-            for id in query
-            if id.proposalCode + str(id.proposalNumber) + "-" + str(id.visit_number)
-            == visit_name
-        ]  # "Proposal title": id.title
-        return templates.TemplateResponse(
-            request=request,
-            name="visit.html",
-            context={"visit": return_query},
-        )
-    else:
-        return None
 
 
 @router.post("/instruments/{instrument_name}/feedback")
@@ -695,56 +550,6 @@ async def make_gif(
         loop=0,
     )
     return {"output_gif": str(output_path)}
-
-
-@router.get("/new_client_id/")
-async def new_client_id(db=murfey_db):
-    clients = db.exec(select(ClientEnvironment)).all()
-    if not clients:
-        return {"new_id": 0}
-    sorted_ids = sorted([c.client_id for c in clients])
-    return {"new_id": sorted_ids[-1] + 1}
-
-
-@router.post("/instruments/{instrument_name}/clients/{client_id}/session")
-def link_client_to_session(
-    instrument_name: str, client_id: int, sess: SessionInfo, db=murfey_db
-):
-    sid = sess.session_id
-    if sid is None:
-        s = Session(name=sess.session_name, instrument_name=instrument_name)
-        db.add(s)
-        db.commit()
-        sid = s.id
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    client.session_id = sid
-    db.add(client)
-    db.commit()
-    db.close()
-    return sid
-
-
-@router.post("/sessions/{session_id}/successful_processing")
-def register_processing_success_in_ispyb(
-    session_id: MurfeySessionID, db=murfey.server.ispyb.DB, murfey_db=murfey_db
-):
-    collected_ids = murfey_db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-    ).all()
-    appids = [c[3].id for c in collected_ids]
-    if _transport_object:
-        apps = db.query(ISPyBAutoProcProgram).filter(
-            ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
-        )
-        for updated in apps:
-            updated.processingStatus = True
-            _transport_object.do_update_processing_status(updated)
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")

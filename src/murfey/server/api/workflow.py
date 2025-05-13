@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -7,6 +8,7 @@ import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import Atlas
 from pydantic import BaseModel
+from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
 
@@ -913,3 +915,41 @@ def register_tilt_series_for_rerun(
         ts.processing_requested = False
         db.add(ts)
     db.commit()
+
+
+class TiltInfo(BaseModel):
+    tilt_series_tag: str
+    movie_path: str
+    source: str
+
+
+@tomo_router.post("/visits/{visit_name}/{session_id}/tilt")
+async def register_tilt(
+    visit_name: str, session_id: MurfeySessionID, tilt_info: TiltInfo, db=murfey_db
+):
+    def _add_tilt():
+        tilt_series_id = (
+            db.exec(
+                select(TiltSeries)
+                .where(TiltSeries.tag == tilt_info.tilt_series_tag)
+                .where(TiltSeries.session_id == session_id)
+                .where(TiltSeries.rsync_source == tilt_info.source)
+            )
+            .one()
+            .id
+        )
+        if db.exec(
+            select(Tilt)
+            .where(Tilt.movie_path == tilt_info.movie_path)
+            .where(Tilt.tilt_series_id == tilt_series_id)
+        ).all():
+            return
+        tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
+        db.add(tilt)
+        db.commit()
+
+    try:
+        _add_tilt()
+    except OperationalError:
+        await asyncio.sleep(30)
+        _add_tilt()

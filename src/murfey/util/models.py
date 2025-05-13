@@ -31,12 +31,6 @@ class ConnectionFileParameters(BaseModel):
     destinations: List[str]
 
 
-class SessionInfo(BaseModel):
-    session_id: Optional[int]
-    session_name: str = ""
-    rescale: bool = True
-
-
 class ClientInfo(BaseModel):
     id: int
 
@@ -157,12 +151,6 @@ Tomography
 ==========
 Models related to the tomographic reconstruction workflow.
 """
-
-
-class TiltInfo(BaseModel):
-    tilt_series_tag: str
-    movie_path: str
-    source: str
 
 
 class CompletedTiltSeries(BaseModel):

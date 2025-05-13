@@ -13,6 +13,16 @@ router = APIRouter(prefix="/display", tags=["display"])
 machine_config = get_machine_config()
 
 
+@router.get("/instruments/{instrument_name}/instrument_name")
+def get_instrument_display_name(instrument_name: str) -> str:
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config:
+        return machine_config.display_name
+    return ""
+
+
 @router.get("/instruments/{instrument_name}/image/")
 def get_mic_image(instrument_name: str):
     if machine_config[instrument_name].image_path:

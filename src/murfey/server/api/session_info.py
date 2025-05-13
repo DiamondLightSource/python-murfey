@@ -1,12 +1,15 @@
 from datetime import datetime
+from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import select
 
 import murfey.server.ispyb
+from murfey.server import sanitise, templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
@@ -25,6 +28,8 @@ from murfey.util.db import (
     Tilt,
     TiltSeries,
 )
+
+logger = getLogger("murfey.server.api.session_info")
 
 router = APIRouter(
     prefix="/session_info",
@@ -57,6 +62,37 @@ class Visit(BaseModel):
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
+
+
+@router.get("/instruments/{instrument_name}/visits/")
+def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispyb.DB):
+    visits = murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
+
+    if visits:
+        return_query = [
+            {
+                "Start date": visit.start,
+                "End date": visit.end,
+                "Visit name": visit.name,
+                "Time remaining": str(visit.end - datetime.now()),
+            }
+            for visit in visits
+        ]  # "Proposal title": visit.proposal_title
+        logger.debug(
+            f"{len(visits)} visits active for {sanitise(instrument_name)=}: {', '.join(v.name for v in visits)}"
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="activevisits.html",
+            context={"info": return_query, "microscope": instrument_name},
+        )
+    else:
+        logger.debug(f"No visits identified for {sanitise(instrument_name)=}")
+        return templates.TemplateResponse(
+            request=request,
+            name="activevisits.html",
+            context={"info": [], "microscope": instrument_name},
+        )
 
 
 @router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
@@ -158,6 +194,14 @@ def get_data_collections(
 async def get_clients(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
+
+
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
 
 
 spa_router = APIRouter(
