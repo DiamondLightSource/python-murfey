@@ -130,7 +130,6 @@ async def setup_multigrid_watcher(
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
                     "visit_end_time": session.visit_end_time,
-                    "grace_period": machine_config.grace_period,
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"

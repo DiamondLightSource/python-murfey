@@ -49,7 +49,6 @@ class MultigridController:
     token: str = ""
     _machine_config: dict = field(default_factory=lambda: {})
     visit_end_time: Optional[datetime] = None
-    end_time_grace_period: int = 0
 
     def __post_init__(self):
         if self.token:
@@ -280,7 +279,6 @@ class MultigridController:
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
                 end_time=self.visit_end_time,
-                grace_period=self.end_time_grace_period,
             )
 
             def rsync_result(update: RSyncerUpdate):

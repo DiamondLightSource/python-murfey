@@ -71,8 +71,6 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
 
     notifications_queue: str = "pato_notification"
 
-    grace_period: int = 0
-
 
 def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
