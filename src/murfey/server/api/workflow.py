@@ -1,19 +1,48 @@
 from datetime import datetime
 from logging import getLogger
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import Atlas
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import col, select
+from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
-from murfey.server import sanitise
-from murfey.server.api import _transport_object
+from murfey.server import (
+    _murfey_id,
+    _transport_object,
+    check_tilt_series_mc,
+    get_all_tilts,
+    get_angle,
+    get_job_ids,
+    get_tomo_proc_params,
+    sanitise,
+)
 from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
-from murfey.util.db import DataCollectionGroup, Session, SessionProcessingParameters
+from murfey.util.db import (
+    AutoProcProgram,
+    DataCollection,
+    DataCollectionGroup,
+    FoilHole,
+    GridSquare,
+    Movie,
+    PreprocessStash,
+    ProcessingJob,
+    Session,
+    SessionProcessingParameters,
+    SPAFeedbackParameters,
+    SPARelionParameters,
+    Tilt,
+    TiltSeries,
+)
+from murfey.util.processing_params import default_spa_parameters
+from murfey.util.tomo import midpoint
 
 logger = getLogger("murfey.server.api.workflow")
 
@@ -233,3 +262,654 @@ def register_proc(
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
+
+
+spa_router = APIRouter(
+    prefix="/workflow/spa",
+    dependencies=[Depends(validate_token)],
+    tags=["workflow SPA"],
+)
+
+
+class ProcessingParametersSPA(BaseModel):
+    tag: str
+    dose_per_frame: float
+    gain_ref: Optional[str]
+    experiment_type: str
+    voltage: float
+    image_size_x: int
+    image_size_y: int
+    pixel_size_on_image: str
+    motion_corr_binning: int
+    file_extension: str
+    acquisition_software: str
+    use_cryolo: bool
+    symmetry: str
+    mask_diameter: Optional[int]
+    boxsize: Optional[int]
+    downscale: bool
+    small_boxsize: Optional[int]
+    eer_fractionation_file: str = ""
+    particle_diameter: Optional[float]
+    magnification: Optional[int] = None
+    total_exposed_dose: Optional[float] = None
+    c2aperture: Optional[float] = None
+    exposure_time: Optional[float] = None
+    slit_width: Optional[float] = None
+    phase_plate: bool = False
+
+    class Base(BaseModel):
+        dose_per_frame: Optional[float]
+        gain_ref: Optional[str]
+        use_cryolo: bool
+        symmetry: str
+        mask_diameter: Optional[int]
+        boxsize: Optional[int]
+        downscale: bool
+        small_boxsize: Optional[int]
+        eer_fractionation: int
+
+
+@spa_router.post("/sessions/{session_id}/spa_processing_parameters")
+def register_spa_proc_params(
+    session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
+):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+        proc_params.symmetry = session_processing_parameters[0].symmetry
+
+    zocalo_message = {
+        "register": "spa_processing_parameters",
+        **dict(proc_params),
+        "session_id": session_id,
+    }
+    if _transport_object:
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+
+
+class Tag(BaseModel):
+    tag: str
+
+
+@spa_router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
+def flush_spa_processing(
+    visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
+):
+    zocalo_message = {
+        "register": "spa.flush_spa_preprocess",
+        "session_id": session_id,
+        "tag": tag.tag,
+    }
+    if _transport_object:
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    return
+
+
+class SPAProcessFile(BaseModel):
+    tag: str
+    path: str
+    description: str
+    processing_job: Optional[int]
+    data_collection_id: Optional[int]
+    image_number: int
+    autoproc_program_id: Optional[int]
+    foil_hole_id: Optional[int]
+    pixel_size: Optional[float]
+    dose_per_frame: Optional[float]
+    mc_binning: Optional[int] = 1
+    gain_ref: Optional[str] = None
+    extract_downscale: bool = True
+    eer_fractionation_file: Optional[str] = None
+    source: str = ""
+
+
+@spa_router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
+async def request_spa_preprocessing(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    proc_file: SPAProcessFile,
+    db=murfey_db,
+):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
+    visit_idx = parts.index(visit_name)
+    core = Path("/") / Path(*parts[: visit_idx + 1])
+    ppath = Path("/") / Path(*parts)
+    sub_dataset = ppath.relative_to(core).parts[0]
+    extra_path = machine_config.processed_extra_directory
+    for i, p in enumerate(ppath.parts):
+        if p.startswith("raw"):
+            movies_path_index = i
+            break
+    else:
+        raise ValueError(f"{proc_file.path} does not contain a raw directory")
+    mrc_out = (
+        core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / extra_path
+        / "MotionCorr"
+        / "job002"
+        / "Movies"
+        / "/".join(ppath.parts[movies_path_index + 1 : -1])
+        / str(ppath.stem + "_motion_corrected.mrc")
+    )
+    try:
+        collected_ids = db.exec(
+            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == proc_file.tag)
+            .where(DataCollection.dcg_id == DataCollectionGroup.id)
+            .where(ProcessingJob.dc_id == DataCollection.id)
+            .where(AutoProcProgram.pj_id == ProcessingJob.id)
+            .where(ProcessingJob.recipe == "em-spa-preprocess")
+        ).one()
+        params = db.exec(
+            select(SPARelionParameters, SPAFeedbackParameters)
+            .where(SPARelionParameters.pj_id == collected_ids[2].id)
+            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+        ).one()
+        proc_params: dict | None = dict(params[0])
+        feedback_params = params[1]
+    except sqlalchemy.exc.NoResultFound:
+        proc_params = None
+    try:
+        foil_hole_id = (
+            db.exec(
+                select(FoilHole, GridSquare)
+                .where(FoilHole.name == proc_file.foil_hole_id)
+                .where(FoilHole.session_id == session_id)
+                .where(GridSquare.id == FoilHole.grid_square_id)
+                .where(GridSquare.tag == proc_file.tag)
+            )
+            .one()[0]
+            .id
+        )
+    except Exception as e:
+        logger.warning(
+            f"Foil hole ID not found for foil hole {sanitise(str(proc_file.foil_hole_id))}: {e}",
+            exc_info=True,
+        )
+        foil_hole_id = None
+    if proc_params:
+
+        detached_ids = [c.id for c in collected_ids]
+
+        murfey_ids = _murfey_id(detached_ids[3], db, number=2, close=False)
+
+        if feedback_params.picker_murfey_id is None:
+            feedback_params.picker_murfey_id = murfey_ids[1]
+            db.add(feedback_params)
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+            tag=proc_file.tag,
+            foil_hole_id=foil_hole_id,
+        )
+        db.add(movie)
+        db.commit()
+        db.close()
+
+        if not mrc_out.parent.exists():
+            Path(secure_filename(str(mrc_out))).parent.mkdir(
+                parents=True, exist_ok=True
+            )
+        recipe_name = machine_config.recipes.get(
+            "em-spa-preprocess", "em-spa-preprocess"
+        )
+        zocalo_message: dict = {
+            "recipes": [recipe_name],
+            "parameters": {
+                "node_creator_queue": machine_config.node_creator_queue,
+                "dcid": detached_ids[1],
+                "kv": proc_params["voltage"],
+                "autoproc_program_id": detached_ids[3],
+                "movie": proc_file.path,
+                "mrc_out": str(mrc_out),
+                "pixel_size": proc_params["angpix"],
+                "image_number": proc_file.image_number,
+                "microscope": instrument_name,
+                "mc_uuid": murfey_ids[0],
+                "foil_hole_id": foil_hole_id,
+                "ft_bin": proc_params["motion_corr_binning"],
+                "fm_dose": proc_params["dose_per_frame"],
+                "gain_ref": proc_params["gain_ref"],
+                "picker_uuid": murfey_ids[1],
+                "session_id": session_id,
+                "particle_diameter": proc_params["particle_diameter"] or 0,
+                "fm_int_file": (
+                    proc_params["eer_fractionation_file"]
+                    if proc_params["eer_fractionation_file"]
+                    else proc_file.eer_fractionation_file
+                ),
+                "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "cryolo_model_weights": str(
+                    _cryolo_model_path(visit_name, instrument_name)
+                ),
+            },
+        }
+        # log.info(f"Sending Zocalo message {zocalo_message}")
+        if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
+            _transport_object.send("processing_recipe", zocalo_message)
+        else:
+            logger.error(
+                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
+            )
+            return proc_file
+
+    else:
+        for_stash = PreprocessStash(
+            file_path=str(proc_file.path),
+            tag=proc_file.tag,
+            session_id=session_id,
+            image_number=proc_file.image_number,
+            mrc_out=str(mrc_out),
+            eer_fractionation_file=str(proc_file.eer_fractionation_file),
+            foil_hole_id=foil_hole_id,
+        )
+        db.add(for_stash)
+        db.commit()
+        db.close()
+
+    return proc_file
+
+
+tomo_router = APIRouter(
+    prefix="/workflow/tomo",
+    dependencies=[Depends(validate_token)],
+    tags=["workflow cryoET"],
+)
+
+
+class ProcessingParametersTomo(BaseModel):
+    dose_per_frame: Optional[float]
+    frame_count: int
+    tilt_axis: float
+    gain_ref: Optional[str]
+    experiment_type: str
+    voltage: float
+    image_size_x: int
+    image_size_y: int
+    pixel_size_on_image: str
+    motion_corr_binning: int
+    file_extension: str
+    tag: str
+    tilt_series_tag: str
+    eer_fractionation_file: Optional[str]
+    eer_fractionation: int
+
+    class Base(BaseModel):
+        dose_per_frame: Optional[float]
+        gain_ref: Optional[str]
+        eer_fractionation: int
+
+
+@tomo_router.post("/sessions/{session_id}/tomography_processing_parameters")
+def register_tomo_proc_params(
+    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
+):
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        proc_params.gain_ref = session_processing_parameters[0].gain_ref
+        proc_params.dose_per_frame = session_processing_parameters[0].dose_per_frame
+        proc_params.eer_fractionation_file = session_processing_parameters[
+            0
+        ].eer_fractionation_file
+
+    zocalo_message = {
+        "register": "tomography_processing_parameters",
+        **dict(proc_params),
+        "session_id": session_id,
+    }
+    if _transport_object:
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+
+
+class Source(BaseModel):
+    rsync_source: str
+
+
+@tomo_router.post("/visits/{visit_name}/{session_id}/flush_tomography_processing")
+def flush_tomography_processing(
+    visit_name: str, session_id: MurfeySessionID, rsync_source: Source, db=murfey_db
+):
+    zocalo_message = {
+        "register": "flush_tomography_preprocess",
+        "session_id": session_id,
+        "visit_name": visit_name,
+        "data_collection_group_tag": rsync_source.rsync_source,
+    }
+    if _transport_object:
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    return
+
+
+class TiltSeriesInfo(BaseModel):
+    session_id: int
+    tag: str
+    source: str
+
+
+@tomo_router.post("/visits/{visit_name}/tilt_series")
+def register_tilt_series(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    session_id = tilt_series_info.session_id
+    if db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all():
+        return
+    tilt_series = TiltSeries(
+        session_id=session_id,
+        tag=tilt_series_info.tag,
+        rsync_source=tilt_series_info.source,
+    )
+    db.add(tilt_series)
+    db.commit()
+
+
+class TiltSeriesGroupInfo(BaseModel):
+    tags: List[str]
+    source: str
+    tilt_series_lengths: List[int]
+
+
+@tomo_router.post("/sessions/{session_id}/tilt_series_length")
+def register_tilt_series_length(
+    session_id: int,
+    tilt_series_group: TiltSeriesGroupInfo,
+    db=murfey_db,
+):
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts_index = tilt_series_group.tags.index(ts.tag)
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
+        db.add(ts)
+    db.commit()
+
+
+class TomoProcessFile(BaseModel):
+    path: str
+    description: str
+    tag: str
+    image_number: int
+    pixel_size: float
+    dose_per_frame: Optional[float]
+    frame_count: int
+    tilt_axis: Optional[float]
+    mc_uuid: Optional[int] = None
+    voltage: float = 300
+    mc_binning: int = 1
+    gain_ref: Optional[str] = None
+    extract_downscale: int = 1
+    eer_fractionation_file: Optional[str] = None
+    group_tag: Optional[str] = None
+
+
+@tomo_router.post("/visits/{visit_name}/{session_id}/tomography_preprocess")
+async def request_tomography_preprocessing(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    proc_file: TomoProcessFile,
+    db=murfey_db,
+):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    visit_idx = Path(proc_file.path).parts.index(visit_name)
+    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
+    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
+    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    extra_path = machine_config.processed_extra_directory
+    mrc_out = (
+        core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / extra_path
+        / "MotionCorr"
+        / "job002"
+        / "Movies"
+        / str(ppath.stem + "_motion_corrected.mrc")
+    )
+    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
+
+    recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
+
+    data_collection = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == proc_file.group_tag)
+        .where(DataCollection.tag == proc_file.tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == recipe_name)
+    ).all()
+    if data_collection:
+        if registered_tilts := db.exec(
+            select(Tilt).where(Tilt.movie_path == proc_file.path)
+        ).all():
+            if len(registered_tilts) == 1:
+                if registered_tilts[0].motion_corrected:
+                    return proc_file
+        dcid = data_collection[0][1].id
+        appid = data_collection[0][3].id
+        murfey_ids = _murfey_id(appid, db, number=1, close=False)
+        if not mrc_out.parent.exists():
+            mrc_out.parent.mkdir(parents=True, exist_ok=True)
+
+        session_processing_parameters = db.exec(
+            select(SessionProcessingParameters).where(
+                SessionProcessingParameters.session_id == session_id
+            )
+        ).all()
+        if session_processing_parameters:
+            proc_file.gain_ref = session_processing_parameters[0].gain_ref
+            proc_file.dose_per_frame = session_processing_parameters[0].dose_per_frame
+            proc_file.eer_fractionation_file = session_processing_parameters[
+                0
+            ].eer_fractionation_file
+
+        zocalo_message: dict = {
+            "recipes": [recipe_name],
+            "parameters": {
+                "node_creator_queue": machine_config.node_creator_queue,
+                "dcid": dcid,
+                # "timestamp": datetime.datetime.now(),
+                "autoproc_program_id": appid,
+                "movie": proc_file.path,
+                "mrc_out": str(mrc_out),
+                "pixel_size": (proc_file.pixel_size) * 10**10,
+                "image_number": proc_file.image_number,
+                "kv": int(proc_file.voltage),
+                "microscope": instrument_name,
+                "mc_uuid": murfey_ids[0],
+                "ft_bin": proc_file.mc_binning,
+                "fm_dose": proc_file.dose_per_frame,
+                "frame_count": proc_file.frame_count,
+                "gain_ref": (
+                    str(machine_config.rsync_basepath / proc_file.gain_ref)
+                    if proc_file.gain_ref and machine_config.data_transfer_enabled
+                    else proc_file.gain_ref
+                ),
+                "fm_int_file": proc_file.eer_fractionation_file,
+            },
+        }
+        if _transport_object:
+            zocalo_message["parameters"][
+                "feedback_queue"
+            ] = _transport_object.feedback_queue
+            _transport_object.send("processing_recipe", zocalo_message)
+        else:
+            logger.error(
+                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
+            )
+            return proc_file
+    else:
+        for_stash = PreprocessStash(
+            file_path=str(proc_file.path),
+            session_id=session_id,
+            image_number=proc_file.image_number,
+            mrc_out=str(mrc_out),
+            tag=proc_file.tag,
+            group_tag=proc_file.group_tag,
+        )
+        db.add(for_stash)
+        db.commit()
+        db.close()
+    return proc_file
+
+
+@tomo_router.post("/visits/{visit_name}/{session_id}/completed_tilt_series")
+def register_completed_tilt_series(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tilt_series_group: TiltSeriesGroupInfo,
+    db=murfey_db,
+):
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.rsync_source == tilt_series_group.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts_index = tilt_series_group.tags.index(ts.tag)
+        ts.tilt_series_length = tilt_series_group.tilt_series_lengths[ts_index]
+        db.add(ts)
+    db.commit()
+    for ts in tilt_series_db:
+        if (
+            check_tilt_series_mc(ts.id)
+            and not ts.processing_requested
+            and ts.tilt_series_length > 2
+        ):
+            ts.processing_requested = True
+            db.add(ts)
+
+            collected_ids = db.exec(
+                select(
+                    DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
+                )
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.tag == tilt_series_group.source)
+                .where(DataCollection.tag == ts.tag)
+                .where(DataCollection.dcg_id == DataCollectionGroup.id)
+                .where(ProcessingJob.dc_id == DataCollection.id)
+                .where(AutoProcProgram.pj_id == ProcessingJob.id)
+                .where(ProcessingJob.recipe == "em-tomo-align")
+            ).one()
+            instrument_name = (
+                db.exec(select(Session).where(Session.id == session_id))
+                .one()
+                .instrument_name
+            )
+            machine_config = get_machine_config(instrument_name=instrument_name)[
+                instrument_name
+            ]
+            tilts = get_all_tilts(ts.id)
+            ids = get_job_ids(ts.id, collected_ids[3].id)
+            preproc_params = get_tomo_proc_params(ids.dcgid)
+
+            first_tilt = db.exec(
+                select(Tilt).where(Tilt.tilt_series_id == ts.id)
+            ).first()
+            parts = [secure_filename(p) for p in Path(first_tilt.movie_path).parts]
+            visit_idx = parts.index(visit_name)
+            core = Path(*Path(first_tilt.movie_path).parts[: visit_idx + 1])
+            ppath = Path(
+                "/".join(secure_filename(p) for p in Path(first_tilt.movie_path).parts)
+            )
+            sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+            extra_path = machine_config.processed_extra_directory
+            stack_file = (
+                core
+                / machine_config.processed_directory_name
+                / sub_dataset
+                / extra_path
+                / "Tomograms"
+                / "job006"
+                / "tomograms"
+                / f"{ts.tag}_stack.mrc"
+            )
+            if not stack_file.parent.exists():
+                stack_file.parent.mkdir(parents=True)
+            tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
+            zocalo_message = {
+                "recipes": ["em-tomo-align"],
+                "parameters": {
+                    "input_file_list": str([[t, str(get_angle(t))] for t in tilts]),
+                    "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
+                    "dcid": ids.dcid,
+                    "appid": ids.appid,
+                    "stack_file": str(stack_file),
+                    "dose_per_frame": preproc_params.dose_per_frame,
+                    "frame_count": preproc_params.frame_count,
+                    "kv": preproc_params.voltage,
+                    "tilt_axis": preproc_params.tilt_axis,
+                    "pixel_size": preproc_params.pixel_size,
+                    "manual_tilt_offset": -tilt_offset,
+                    "node_creator_queue": machine_config.node_creator_queue,
+                },
+            }
+            if _transport_object:
+                logger.info(f"Sending Zocalo message for processing: {zocalo_message}")
+                _transport_object.send(
+                    "processing_recipe", zocalo_message, new_connection=True
+                )
+            else:
+                logger.info(
+                    f"No transport object found. Zocalo message would be {zocalo_message}"
+                )
+    db.commit()
+
+
+@tomo_router.post("/visits/{visit_name}/rerun_tilt_series")
+def register_tilt_series_for_rerun(
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+):
+    """Set processing to false for cases where an extra tilt is found for a series"""
+    session_id = tilt_series_info.session_id
+    tilt_series_db = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all()
+    for ts in tilt_series_db:
+        ts.processing_requested = False
+        db.add(ts)
+    db.commit()

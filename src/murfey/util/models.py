@@ -98,63 +98,6 @@ Models related to the single-particle analysis workflow.
 """
 
 
-class SPAProcessFile(BaseModel):
-    tag: str
-    path: str
-    description: str
-    processing_job: Optional[int]
-    data_collection_id: Optional[int]
-    image_number: int
-    autoproc_program_id: Optional[int]
-    foil_hole_id: Optional[int]
-    pixel_size: Optional[float]
-    dose_per_frame: Optional[float]
-    mc_binning: Optional[int] = 1
-    gain_ref: Optional[str] = None
-    extract_downscale: bool = True
-    eer_fractionation_file: Optional[str] = None
-    source: str = ""
-
-
-class ProcessingParametersSPA(BaseModel):
-    tag: str
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    file_extension: str
-    acquisition_software: str
-    use_cryolo: bool
-    symmetry: str
-    mask_diameter: Optional[int]
-    boxsize: Optional[int]
-    downscale: bool
-    small_boxsize: Optional[int]
-    eer_fractionation_file: str = ""
-    particle_diameter: Optional[float]
-    magnification: Optional[int] = None
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
-    phase_plate: bool = False
-
-    class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
-        use_cryolo: bool
-        symmetry: str
-        mask_diameter: Optional[int]
-        boxsize: Optional[int]
-        downscale: bool
-        small_boxsize: Optional[int]
-        eer_fractionation: int
-
-
 class GridSquareParameters(BaseModel):
     tag: str
     x_location: Optional[float] = None
@@ -216,65 +159,12 @@ Models related to the tomographic reconstruction workflow.
 """
 
 
-class TomoProcessFile(BaseModel):
-    path: str
-    description: str
-    tag: str
-    image_number: int
-    pixel_size: float
-    dose_per_frame: Optional[float]
-    frame_count: int
-    tilt_axis: Optional[float]
-    mc_uuid: Optional[int] = None
-    voltage: float = 300
-    mc_binning: int = 1
-    gain_ref: Optional[str] = None
-    extract_downscale: int = 1
-    eer_fractionation_file: Optional[str] = None
-    group_tag: Optional[str] = None
-
-
 class TiltInfo(BaseModel):
     tilt_series_tag: str
     movie_path: str
     source: str
 
 
-class TiltSeriesInfo(BaseModel):
-    session_id: int
-    tag: str
-    source: str
-
-
-class TiltSeriesGroupInfo(BaseModel):
-    tags: List[str]
-    source: str
-    tilt_series_lengths: List[int]
-
-
 class CompletedTiltSeries(BaseModel):
     tilt_series: List[str]
     rsync_source: str
-
-
-class ProcessingParametersTomo(BaseModel):
-    dose_per_frame: Optional[float]
-    frame_count: int
-    tilt_axis: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    file_extension: str
-    tag: str
-    tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
-    eer_fractionation: int
-
-    class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
-        eer_fractionation: int

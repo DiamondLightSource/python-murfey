@@ -14,6 +14,9 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
+    Movie,
     ProcessingJob,
     RsyncInstance,
     Session,
@@ -217,6 +220,25 @@ def get_spa_proc_param_details(
         )
         for i, d in zip(unique_dcg_indices, dcg_ids)
     ]
+
+
+@spa_router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
+)
+def get_number_of_movies_from_foil_hole(
+    session_id: int, dcgid: int, gsid: int, fhid: int, db=murfey_db
+) -> int:
+    movies = db.exec(
+        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
+        .where(Movie.foil_hole_id == FoilHole.id)
+        .where(FoilHole.name == fhid)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return len(movies)
 
 
 tomo_router = APIRouter(

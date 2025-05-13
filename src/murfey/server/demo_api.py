@@ -3,32 +3,26 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-import random
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import packaging.version
-import sqlalchemy
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from ispyb.sqlalchemy import BLSession
 from PIL import Image
 from pydantic import BaseModel, BaseSettings
 from sqlalchemy import func
-from sqlmodel import col, select
+from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.api.bootstrap
 import murfey.server.prometheus as prom
-import murfey.server.websocket as ws
-import murfey.util.eer
 from murfey.server import (
     _flush_grid_square_records,
-    _flush_tomography_preprocessing,
     _murfey_id,
-    feedback_callback,
     get_hostname,
     get_microscope,
     sanitise,
@@ -63,7 +57,6 @@ from murfey.util.db import (
     SPARelionParameters,
     Tilt,
     TiltSeries,
-    TomographyProcessingParameters,
 )
 from murfey.util.models import (
     ClientInfo,
@@ -71,20 +64,13 @@ from murfey.util.models import (
     FoilHoleParameters,
     GridSquareParameters,
     PostInfo,
-    ProcessingParametersSPA,
-    ProcessingParametersTomo,
     RegistrationMessage,
     RsyncerInfo,
     RsyncerSource,
     SessionInfo,
-    SPAProcessFile,
     TiltInfo,
-    TiltSeriesGroupInfo,
-    TiltSeriesInfo,
-    TomoProcessFile,
 )
 from murfey.util.processing_params import default_spa_parameters
-from murfey.workflows.spa.picking import _register_picked_particles_use_diameter
 
 log = logging.getLogger("murfey.server.demo_api")
 
@@ -413,106 +399,6 @@ def get_spa_proc_param_details(
     ]
 
 
-@router.post("/sessions/{session_id}/spa_processing_parameters")
-def register_spa_proc_params(
-    session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
-):
-    log.info(
-        f"Registration request for SPA processing parameters with data: {proc_params.json()}"
-    )
-    try:
-        collected_ids = db.exec(
-            select(
-                DataCollectionGroup,
-                DataCollection,
-                ProcessingJob,
-                AutoProcProgram,
-            )
-            .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == proc_params.tag)
-            .where(DataCollection.dcg_id == DataCollectionGroup.id)
-            .where(ProcessingJob.dc_id == DataCollection.id)
-            .where(AutoProcProgram.pj_id == ProcessingJob.id)
-            .where(ProcessingJob.recipe == "em-spa-preprocess")
-        ).one()
-        current_gain_ref = (
-            db.exec(select(Session).where(Session.id == session_id))
-            .one()
-            .current_gain_ref
-        )
-        params = SPARelionParameters(
-            pj_id=collected_ids[2].id,
-            angpix=proc_params.pixel_size_on_image,
-            dose_per_frame=proc_params.dose_per_frame,
-            gain_ref=current_gain_ref or proc_params.gain_ref,
-            voltage=proc_params.voltage,
-            motion_corr_binning=proc_params.motion_corr_binning,
-            eer_grouping=proc_params.eer_fractionation,
-            symmetry=proc_params.symmetry,
-            particle_diameter=proc_params.particle_diameter,
-            downscale=proc_params.downscale,
-            boxsize=proc_params.boxsize,
-            small_boxsize=proc_params.small_boxsize,
-            mask_diameter=proc_params.mask_diameter,
-        )
-        feedback_params = SPAFeedbackParameters(
-            pj_id=collected_ids[2].id,
-            estimate_particle_diameter=proc_params.particle_diameter is None,
-            hold_class2d=False,
-            hold_class3d=False,
-            class_selection_score=0,
-            star_combination_job=0,
-            initial_model="",
-            next_job=0,
-        )
-    except Exception as e:
-        log.warning(f"registration failed: {e}")
-        return
-    db.add(params)
-    db.add(feedback_params)
-    db.commit()
-
-
-@router.post("/sessions/{session_id}/tomography_processing_parameters")
-def register_tomo_proc_params(
-    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
-):
-    log.info(
-        f"Registering tomography preprocessing parameters {sanitise(proc_params.tag)}, {sanitise(proc_params.tilt_series_tag)}"
-    )
-    collected_ids = db.exec(
-        select(
-            DataCollectionGroup,
-            DataCollection,
-            ProcessingJob,
-            AutoProcProgram,
-        )
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == proc_params.tag)
-        .where(DataCollection.tag == proc_params.tilt_series_tag)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
-    ).one()
-    if not db.exec(
-        select(func.count(TomographyProcessingParameters.dcg_id)).where(
-            TomographyProcessingParameters.dcg_id == collected_ids[0].id
-        )
-    ).one():
-        params = TomographyProcessingParameters(
-            dcg_id=collected_ids[0].id,
-            pixel_size=proc_params.pixel_size_on_image,
-            dose_per_frame=proc_params.dose_per_frame,
-            gain_ref=proc_params.gain_ref,
-            motion_corr_binning=proc_params.motion_corr_binning,
-            voltage=proc_params.voltage,
-        )
-        db.add(params)
-    db.commit()
-    db.close()
-
-
 @router.get("/clients/{client_id}/spa_processing_parameters")
 def get_spa_proc_params(client_id: int, db=murfey_db) -> List[dict]:
     params = db.exec(
@@ -695,54 +581,6 @@ def register_foil_hole(
     db.add(foil_hole)
     db.commit()
     db.close()
-
-
-@router.post("/visits/{visit_name}/tilt_series")
-def register_tilt_series(
-    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
-):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(
-                ClientEnvironment.client_id == tilt_series_info.client_id
-            )
-        )
-        .one()
-        .session_id
-    )
-    tilt_series = TiltSeries(
-        session_id=session_id,
-        tag=tilt_series_info.tag,
-        rsync_source=tilt_series_info.source,
-    )
-    db.add(tilt_series)
-    db.commit()
-
-
-@router.post("/visits/{visit_name}/{client_id}/completed_tilt_series")
-def register_completed_tilt_series(
-    visit_name: str,
-    client_id: int,
-    tilt_series_group: TiltSeriesGroupInfo,
-    db=murfey_db,
-):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
-    tilt_series_db = db.exec(
-        select(TiltSeries)
-        .where(col(TiltSeries.tag).in_(tilt_series_group.tags))
-        .where(TiltSeries.session_id == session_id)
-        .where(TiltSeries.rsync_source == tilt_series_group.source)
-    ).all()
-    for ts in tilt_series_db:
-        ts.complete = True
-        db.add(ts)
-    db.commit()
 
 
 @router.get("/clients/{client_id}/tilt_series/{tilt_series_tag}/tilts")
@@ -939,233 +777,8 @@ def flush_spa_processing(
     return
 
 
-@router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
-async def request_spa_preprocessing(
-    visit_name: str,
-    session_id: MurfeySessionID,
-    proc_file: SPAProcessFile,
-    db=murfey_db,
-):
-    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
-    visit_idx = parts.index(visit_name)
-    core = Path("/") / Path(*parts[: visit_idx + 1])
-    ppath = Path("/") / Path(*parts)
-    sub_dataset = ppath.relative_to(core).parts[0]
-    for i, p in enumerate(ppath.parts):
-        if p.startswith("raw"):
-            movies_path_index = i
-            break
-    else:
-        raise ValueError(f"{proc_file.path} does not contain a raw directory")
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    mrc_out = (
-        core
-        / machine_config[instrument_name].processed_directory_name
-        / sub_dataset
-        / "MotionCorr"
-        / "job002"
-        / "Movies"
-        / "/".join(ppath.parts[movies_path_index + 1 : -1])
-        / str(ppath.stem + "_motion_corrected.mrc")
-    )
-    try:
-        collected_ids = db.exec(
-            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-            .where(DataCollectionGroup.session_id == session_id)
-            .where(DataCollectionGroup.tag == proc_file.tag)
-            .where(DataCollection.dcg_id == DataCollectionGroup.id)
-            .where(ProcessingJob.dc_id == DataCollection.id)
-            .where(AutoProcProgram.pj_id == ProcessingJob.id)
-            .where(ProcessingJob.recipe == "em-spa-preprocess")
-        ).one()
-        params = db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters)
-            .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
-        ).one()
-        proc_params: dict | None = dict(params[0])
-        feedback_params = params[1]
-    except sqlalchemy.exc.NoResultFound:
-        proc_params = None
-    try:
-        foil_hole_id = (
-            db.exec(
-                select(FoilHole, GridSquare)
-                .where(FoilHole.name == proc_file.foil_hole_id)
-                .where(FoilHole.session_id == session_id)
-                .where(GridSquare.id == FoilHole.grid_square_id)
-                .where(GridSquare.tag == proc_file.tag)
-            )
-            .one()[0]
-            .id
-        )
-    except Exception:
-        foil_hole_id = None
-    if proc_params:
-        collected_ids = db.exec(
-            select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-            .where(
-                DataCollectionGroup.session_id == session_id
-                and DataCollectionGroup.tag == "spa"
-            )
-            .where(DataCollectionGroup.tag == proc_file.tag)
-            .where(DataCollection.dcg_id == DataCollectionGroup.id)
-            .where(ProcessingJob.dc_id == DataCollection.id)
-            .where(AutoProcProgram.pj_id == ProcessingJob.id)
-            .where(ProcessingJob.recipe == "em-spa-preprocess")
-        ).one()
-
-        detached_ids = [c.id for c in collected_ids]
-
-        murfey_ids = _murfey_id(detached_ids[3], db, number=2)
-
-        feedback_params.picker_murfey_id = murfey_ids[1]
-        db.add(feedback_params)
-        movie = Movie(
-            murfey_id=murfey_ids[0],
-            path=proc_file.path,
-            image_number=proc_file.image_number,
-            tag=proc_file.tag,
-            foil_hole_id=foil_hole_id,
-        )
-        db.add(movie)
-        db.commit()
-
-        if not mrc_out.parent.exists():
-            Path(secure_filename(mrc_out)).parent.mkdir(parents=True)
-        log.info("Sending Zocalo message")
-        movie = db.exec(select(Movie).where(Movie.murfey_id == murfey_ids[0])).one()
-        movie.preprocessed = True
-        db.add(movie)
-        db.commit()
-        _register_picked_particles_use_diameter(
-            {
-                "session_id": session_id,
-                "extraction_parameters": {
-                    "micrographs_file": "MotionCorr/job002/micrographs.star",
-                    "coord_list_file": "AutoPick/job007/coords.star",
-                    "extract_file": "Extract/job008/particles.star",
-                    "ctf_values": {
-                        "CtfMaxResolution": 4,
-                        "CtfFigureOfMerit": 0.8,
-                        "DefocusU": 1,
-                        "DefocusV": 1,
-                        "DefocusAngle": 10,
-                        "CtfImage": "CtfFind/job006/ctf.mrc",
-                    },
-                },
-                "particle_diameters": [random.randint(20, 30) for i in range(400)],
-                "program_id": detached_ids[3],
-            },
-            _db=db,
-            demo=True,
-        )
-        prom.preprocessed_movies.labels(processing_job=detached_ids[2]).inc()
-
-    else:
-        for_stash = PreprocessStash(
-            file_path=str(proc_file.path),
-            tag=proc_file.tag,
-            session_id=session_id,
-            image_number=proc_file.image_number,
-            mrc_out=str(mrc_out),
-            foil_hole_id=foil_hole_id,
-        )
-        db.add(for_stash)
-        db.commit()
-
-    return proc_file
-
-
 class Source(BaseModel):
     rsync_source: str
-
-
-@router.post("/visits/{visit_name}/{client_id}/flush_tomography_processing")
-def flush_tomography_processing(
-    visit_name: str, client_id: int, rsync_source: Source, db=murfey_db
-):
-    zocalo_message = {
-        "register": "flush_tomography_preprocess",
-        "client_id": client_id,
-        "visit_name": visit_name,
-        "data_collection_group_tag": rsync_source.rsync_source,
-    }
-    _flush_tomography_preprocessing(zocalo_message)
-    return
-
-
-@router.post("/visits/{visit_name}/{client_id}/tomography_preprocess")
-async def request_tomography_preprocessing(
-    visit_name: str, client_id: int, proc_file: TomoProcessFile, db=murfey_db
-):
-    if not sanitise_path(Path(proc_file.path)).exists():
-        log.warning(
-            f"{sanitise(str(proc_file.path))} has not been transferred before preprocessing"
-        )
-    log.info(f"Tomo preprocesing requested for {sanitise(str(proc_file.path))}")
-    visit_idx = Path(proc_file.path).parts.index(visit_name)
-    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
-    sub_dataset = (
-        ppath.relative_to(core).parts[0]
-        if len(ppath.relative_to(core).parts) > 1
-        else ""
-    )
-    mrc_out = (
-        core
-        / "processed"
-        / sub_dataset
-        / "MotionCorr"
-        / str(ppath.stem + "_motion_corrected.mrc")
-    )
-    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
-    data_collection = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.id == DataCollection.dcg_id)
-        .where(DataCollection.tag == proc_file.tag)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-        .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "em-tomo-preprocess")
-    ).all()
-    if data_collection:
-        if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True)
-        feedback_callback(
-            {},
-            {
-                "register": "motion_corrected",
-                "movie": str(proc_file.path),
-                "mrc_out": str(mrc_out),
-                "movie_id": proc_file.mc_uuid,
-                "fm_int_file": proc_file.eer_fractionation_file,
-                "program_id": data_collection[0][3].id,
-            },
-        )
-        await ws.manager.broadcast(f"Pre-processing requested for {ppath.name}")
-        mrc_out.touch()
-    else:
-        for_stash = PreprocessStash(
-            file_path=str(proc_file.path),
-            session_id=session_id,
-            image_number=proc_file.image_number,
-            mrc_out=str(mrc_out),
-            tag=proc_file.tag,
-        )
-        db.add(for_stash)
-        db.commit()
-        db.close()
-    return proc_file
 
 
 @router.get("/version")

@@ -1,9 +1,9 @@
 from datetime import datetime
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends
-from logger import getLogger
 from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename

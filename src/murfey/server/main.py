@@ -83,6 +83,8 @@ app.include_router(murfey.server.api.session_info.router)
 app.include_router(murfey.server.api.session_info.spa_router)
 app.include_router(murfey.server.api.session_info.tomo_router)
 app.include_router(murfey.server.api.workflow.router)
+app.include_router(murfey.server.api.workflow.spa_router)
+app.include_router(murfey.server.api.workflow.tomo_router)
 app.include_router(murfey.server.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey
