@@ -1967,9 +1967,24 @@ async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_d
     return FileResponse(path=test_path)
 
 
+class VisitEndTime(BaseModel):
+    end_time: Optional[datetime.datetime] = None
+
+
 @router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
-def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
-    s = Session(name=name, visit=visit, instrument_name=instrument_name)
+def create_session(
+    instrument_name: str,
+    visit: str,
+    name: str,
+    visit_end_time: VisitEndTime,
+    db=murfey_db,
+) -> int:
+    s = Session(
+        name=name,
+        visit=visit,
+        instrument_name=instrument_name,
+        visit_end_time=visit_end_time.end_time,
+    )
     db.add(s)
     db.commit()
     sid = s.id
