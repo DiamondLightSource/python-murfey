@@ -1977,7 +1977,7 @@ def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) ->
 def update_session(
     session_id: MurfeySessionID, process: bool = True, db=murfey_db
 ) -> None:
-    session = db.exec(select(Session).where(session_id == session_id)).one()
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
     session.process = process
     db.add(session)
     db.commit()
