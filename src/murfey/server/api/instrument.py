@@ -98,9 +98,8 @@ async def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
 ):
     data = {}
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session.instrument_name
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -130,6 +129,8 @@ async def setup_multigrid_watcher(
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
+                    "visit_end_time": session.visit_end_time,
+                    "grace_period": machine_config.grace_period,
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"

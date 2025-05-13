@@ -160,6 +160,8 @@ def setup_multigrid_watcher(
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
         rsync_restarts=watcher_spec.rsync_restarts,
+        visit_end_time=watcher_spec.visit_end_time,
+        end_time_grace_period=watcher_spec.grace_period,
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
