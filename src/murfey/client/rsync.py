@@ -219,6 +219,10 @@ class RSyncer(Observer):
             absolute_path = self._basepath / file_path
             self.queue.put(absolute_path)
 
+    def flush_skipped(self):
+        for f in self._skipped_files:
+            self.queue.put(f)
+
     def _process(self):
         logger.info("RSync thread starting")
         files_to_transfer: list[Path]
