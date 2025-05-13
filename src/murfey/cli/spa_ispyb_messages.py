@@ -19,7 +19,7 @@ from sqlmodel import create_engine, select
 
 from murfey.client.contexts.spa import _get_xml_list_index
 from murfey.server import _murfey_id, _register
-from murfey.server.ispyb import Session, TransportManager, get_session_id
+from murfey.server.ispyb import ISPyBSession, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
 from murfey.util.config import get_machine_config, get_microscope, get_security_config
@@ -256,7 +256,7 @@ def run():
             proposal_code=args.visit[:2],
             proposal_number=args.visit[2:].split("-")[0],
             visit_number=args.visit.split("-")[1],
-            db=Session(),
+            db=ISPyBSession(),
         ),
     )
 

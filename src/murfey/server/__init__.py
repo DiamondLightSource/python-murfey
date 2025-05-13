@@ -46,7 +46,7 @@ from workflows.transport.pika_transport import PikaTransport
 import murfey
 import murfey.server.prometheus as prom
 import murfey.util.db as db
-from murfey.server.ispyb import get_session_id
+from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import LogFilter
 from murfey.util.config import (
@@ -2203,7 +2203,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 proposal_code=message["proposal_code"],
                 proposal_number=message["proposal_number"],
                 visit_number=message["visit_number"],
-                db=murfey.server.ispyb.Session(),
+                db=ISPyBSession(),
             )
             if dcg_murfey := murfey_db.exec(
                 select(db.DataCollectionGroup)
@@ -2281,7 +2281,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 proposal_code=message["proposal_code"],
                 proposal_number=message["proposal_number"],
                 visit_number=message["visit_number"],
-                db=murfey.server.ispyb.Session(),
+                db=ISPyBSession(),
             )
             dcg = murfey_db.exec(
                 select(db.DataCollectionGroup)
@@ -2380,7 +2380,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             ).all():
                 pid = pj_murfey[0].id
             else:
-                if murfey.server.ispyb.Session() is None:
+                if ISPyBSession() is None:
                     murfey_pj = db.ProcessingJob(recipe=message["recipe"], dc_id=_dcid)
                 else:
                     record = ProcessingJob(
@@ -2410,7 +2410,7 @@ def feedback_callback(header: dict, message: dict) -> None:
             if not murfey_db.exec(
                 select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
             ).all():
-                if murfey.server.ispyb.Session() is None:
+                if ISPyBSession() is None:
                     murfey_app = db.AutoProcProgram(pj_id=pid)
                 else:
                     record = AutoProcProgram(
