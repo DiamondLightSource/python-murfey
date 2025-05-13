@@ -13,6 +13,7 @@ import queue
 import subprocess
 import threading
 import time
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Awaitable, Callable, List, NamedTuple
@@ -63,6 +64,8 @@ class RSyncer(Observer):
         remove_files: bool = False,
         required_substrings_for_removal: List[str] = [],
         notify: bool = True,
+        end_time: datetime | None = None,
+        grace_period: int = 0,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -76,6 +79,10 @@ class RSyncer(Observer):
         self._server_url = server_url
         self._notify = notify
         self._finalised = False
+        self._end_time = end_time
+        self._grace_period = grace_period
+
+        self._skipped_files: List[Path] = []
 
         # Set rsync destination
         if local:
@@ -304,14 +311,25 @@ class RSyncer(Observer):
 
         return True
 
-    def _transfer(self, files: list[Path]) -> bool:
+    def _transfer(self, infiles: list[Path]) -> bool:
         """
         Transfer files via an rsync sub-process, and parses the rsync stdout to verify
         the success of the transfer.
         """
 
         # Set up initial variables
-        files = [f for f in files if f.is_file()]
+        if self._end_time:
+            files = [
+                f
+                for f in infiles
+                if f.is_file()
+                and f.stat().st_ctime
+                < (self._end_time + timedelta(seconds=self._grace_period)).timestamp()
+            ]
+            self._skipped_files.extend(set(infiles).difference(set(files)))
+        else:
+            files = [f for f in infiles if f.is_file()]
+
         previously_transferred = self._files_transferred
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []
