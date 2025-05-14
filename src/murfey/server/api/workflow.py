@@ -400,7 +400,7 @@ async def request_spa_preprocessing(
             .where(SPARelionParameters.pj_id == collected_ids[2].id)
             .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
-        proc_params: dict | None = dict(params[0])
+        proc_params: Optional[dict] = dict(params[0])
         feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None

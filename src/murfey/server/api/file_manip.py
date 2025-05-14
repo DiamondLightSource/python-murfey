@@ -36,7 +36,7 @@ class SuggestedPathParameters(BaseModel):
 def suggest_path(
     visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
 ):
-    count: int | None = None
+    count: Optional[int] = None
     secure_path_parts = [secure_filename(p) for p in params.base_path.parts]
     base_path = "/".join(secure_path_parts)
     instrument_name = (
