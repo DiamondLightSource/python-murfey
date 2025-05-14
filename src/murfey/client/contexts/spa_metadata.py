@@ -8,6 +8,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
+from murfey.server.api.session_control import spa_router as session_spa_router
 from murfey.server.api.workflow import router as workflow_router
 from murfey.util.client import (
     authorised_requests,
@@ -203,7 +204,7 @@ class SPAMetadataContext(Context):
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
                         capture_post(
-                            f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs}",
+                            f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_grid_square', session_id=environment.murfey_session, gsid=gs)}",
                             json={
                                 "tag": dcg_tag,
                                 "x_location": pos_data[0],
@@ -271,7 +272,7 @@ class SPAMetadataContext(Context):
             visitless_source = str(visitless_source_images_dirs[-1])
 
             if fh_positions:
-                gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}"
+                gs_url = f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_grid_square', session_id=environment.murfey_session, gsid=gs_name)}"
                 gs_info = grid_square_data(
                     transferred_file,
                     int(gs_name),
@@ -296,7 +297,7 @@ class SPAMetadataContext(Context):
 
             for fh, fh_data in fh_positions.items():
                 capture_post(
-                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
+                    f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_foil_hole', session_id=environment.murfey_session, gs_name=gs_name)}",
                     json={
                         "name": fh,
                         "x_location": fh_data.x_location,

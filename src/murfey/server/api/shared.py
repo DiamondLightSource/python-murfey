@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 from sqlmodel import select
 
@@ -10,6 +10,8 @@ from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     ProcessingJob,
     RsyncInstance,
     Session,
@@ -86,3 +88,48 @@ def remove_session_by_id(session_id: int, db):
     db.delete(session)
     db.commit()
     return
+
+
+def get_grid_squares(session_id: int, db):
+    grid_squares = db.exec(
+        select(GridSquare).where(GridSquare.session_id == session_id)
+    ).all()
+    tags = {gs.tag for gs in grid_squares}
+    res = {}
+    for t in tags:
+        res[t] = [gs for gs in grid_squares if gs.tag == t]
+    return res
+
+
+def get_grid_squares_from_dcg(session_id: int, dcgid: int, db) -> List[GridSquare]:
+    grid_squares = db.exec(
+        select(GridSquare, DataCollectionGroup)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [gs[0] for gs in grid_squares]
+
+
+def get_foil_holes_from_grid_square(
+    session_id: int, dcgid: int, gsid: int, db
+) -> List[FoilHole]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare, DataCollectionGroup)
+        .where(FoilHole.grid_square_id == GridSquare.id)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.session_id == session_id)
+        .where(GridSquare.tag == DataCollectionGroup.tag)
+        .where(DataCollectionGroup.id == dcgid)
+    ).all()
+    return [fh[0] for fh in foil_holes]
+
+
+def get_foil_hole(session_id: int, fh_name: int, db) -> Dict[str, int]:
+    foil_holes = db.exec(
+        select(FoilHole, GridSquare)
+        .where(FoilHole.name == fh_name)
+        .where(FoilHole.session_id == session_id)
+        .where(GridSquare.id == FoilHole.grid_square_id)
+    ).all()
+    return {f[1].tag: f[0].id for f in foil_holes}

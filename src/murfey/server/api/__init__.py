@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -30,8 +30,6 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
-    FoilHole,
-    GridSquare,
     MagnificationLookup,
     ProcessingJob,
     RsyncInstance,
@@ -44,19 +42,11 @@ from murfey.util.models import (
     BLSampleParameters,
     BLSubSampleParameters,
     ClientInfo,
-    CurrentGainRef,
-    FoilHoleParameters,
-    GridSquareParameters,
     MillingParameters,
-    PostInfo,
     RegistrationMessage,
     RsyncerInfo,
     RsyncerSource,
     Sample,
-)
-from murfey.workflows.spa.flush_spa_preprocess import (
-    register_foil_hole,
-    register_grid_square,
 )
 
 log = logging.getLogger("murfey.server.api")
@@ -130,50 +120,6 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
         db.commit()
     db.close()
     return client_info
-
-
-@router.post("/sessions/{session_id}/rsyncer")
-def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
-    rsync_instance = RsyncInstance(
-        source=rsyncer_info.source,
-        session_id=rsyncer_info.session_id,
-        transferring=rsyncer_info.transferring,
-        destination=rsyncer_info.destination,
-        tag=rsyncer_info.tag,
-    )
-    db.add(rsync_instance)
-    db.commit()
-    db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
-    prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
-    prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
-    prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(
-        0
-    )
-    prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    return rsyncer_info
 
 
 @router.delete("/sessions/{session_id}/rsyncer")
@@ -288,84 +234,6 @@ class ProcessingDetails(BaseModel):
     feedback_params: SPAFeedbackParameters
 
 
-@router.get("/sessions/{session_id}/grid_squares")
-def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
-    grid_squares = db.exec(
-        select(GridSquare).where(GridSquare.session_id == session_id)
-    ).all()
-    tags = {gs.tag for gs in grid_squares}
-    res = {}
-    for t in tags:
-        res[t] = [gs for gs in grid_squares if gs.tag == t]
-    return res
-
-
-@router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
-def get_grid_squares_from_dcg(
-    session_id: int, dcgid: int, db=murfey_db
-) -> List[GridSquare]:
-    grid_squares = db.exec(
-        select(GridSquare, DataCollectionGroup)
-        .where(GridSquare.session_id == session_id)
-        .where(GridSquare.tag == DataCollectionGroup.tag)
-        .where(DataCollectionGroup.id == dcgid)
-    ).all()
-    return [gs[0] for gs in grid_squares]
-
-
-@router.get(
-    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
-)
-def get_foil_holes_from_grid_square(
-    session_id: int, dcgid: int, gsid: int, db=murfey_db
-) -> List[FoilHole]:
-    foil_holes = db.exec(
-        select(FoilHole, GridSquare, DataCollectionGroup)
-        .where(FoilHole.grid_square_id == GridSquare.id)
-        .where(GridSquare.name == gsid)
-        .where(GridSquare.session_id == session_id)
-        .where(GridSquare.tag == DataCollectionGroup.tag)
-        .where(DataCollectionGroup.id == dcgid)
-    ).all()
-    return [fh[0] for fh in foil_holes]
-
-
-@router.post("/sessions/{session_id}/grid_square/{gsid}")
-def posted_grid_square(
-    session_id: MurfeySessionID,
-    gsid: int,
-    grid_square_params: GridSquareParameters,
-    db=murfey_db,
-):
-    return register_grid_square(session_id, gsid, grid_square_params, db)
-
-
-@router.get("/sessions/{session_id}/foil_hole/{fh_name}")
-def get_foil_hole(
-    session_id: MurfeySessionID, fh_name: int, db=murfey_db
-) -> Dict[str, int]:
-    foil_holes = db.exec(
-        select(FoilHole, GridSquare)
-        .where(FoilHole.name == fh_name)
-        .where(FoilHole.session_id == session_id)
-        .where(GridSquare.id == FoilHole.grid_square_id)
-    ).all()
-    return {f[1].tag: f[0].id for f in foil_holes}
-
-
-@router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
-def post_foil_hole(
-    session_id: MurfeySessionID,
-    gs_name: int,
-    foil_hole_params: FoilHoleParameters,
-    db=murfey_db,
-):
-    log.info(
-        f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
-    )
-    return register_foil_hole(session_id, gs_name, foil_hole_params, db)
-
-
 @router.get("/visit/{visit_name}/samples")
 def get_samples(visit_name: str, db=murfey.server.ispyb.DB) -> List[Sample]:
     return murfey.server.ispyb.get_sub_samples_from_visit(visit_name, db=db)
@@ -470,17 +338,6 @@ def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name).set(on)
 
 
-@router.post("/instruments/{instrument_name}/failed_client_post")
-def failed_client_post(instrument_name: str, post_info: PostInfo):
-    zocalo_message = {
-        "register": "failed_client_post",
-        "url": post_info.url,
-        "json": post_info.data,
-    }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
-
-
 @router.get("/sessions/{session_id}/upstream_visits")
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
@@ -556,36 +413,6 @@ async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_d
         return None
 
     return FileResponse(path=test_path)
-
-
-@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
-def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
-    s = Session(name=name, visit=visit, instrument_name=instrument_name)
-    db.add(s)
-    db.commit()
-    sid = s.id
-    return sid
-
-
-@router.post("/sessions/{session_id}")
-def update_session(
-    session_id: MurfeySessionID, process: bool = True, db=murfey_db
-) -> None:
-    session = db.exec(select(Session).where(session_id == session_id)).one()
-    session.process = process
-    db.add(session)
-    db.commit()
-    return None
-
-
-@router.put("/sessions/{session_id}/current_gain_ref")
-def update_current_gain_ref(
-    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
-):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    session.current_gain_ref = new_gain_ref.path
-    db.add(session)
-    db.commit()
 
 
 @router.get("/prometheus/{metric_name}")

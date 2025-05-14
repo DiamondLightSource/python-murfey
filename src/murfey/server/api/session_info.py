@@ -11,6 +11,14 @@ from sqlmodel import select
 import murfey.server.ispyb
 from murfey.server import sanitise, templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.shared import get_foil_hole as _get_foil_hole
+from murfey.server.api.shared import (
+    get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
+)
+from murfey.server.api.shared import get_grid_squares as _get_grid_squares
+from murfey.server.api.shared import (
+    get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
+)
 from murfey.server.api.shared import (
     get_machine_config_for_instrument,
     remove_session_by_id,
@@ -120,6 +128,26 @@ async def get_sessions(db=murfey_db):
     return res
 
 
+@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
+def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
+    s = Session(name=name, visit=visit, instrument_name=instrument_name)
+    db.add(s)
+    db.commit()
+    sid = s.id
+    return sid
+
+
+@router.post("/sessions/{session_id}")
+def update_session(
+    session_id: MurfeySessionID, process: bool = True, db=murfey_db
+) -> None:
+    session = db.exec(select(Session).where(session_id == session_id)).one()
+    session.process = process
+    db.add(session)
+    db.commit()
+    return None
+
+
 @router.delete("/sessions/{session_id}")
 def remove_session(session_id: MurfeySessionID, db=murfey_db):
     remove_session_by_id(session_id, db)
@@ -196,6 +224,20 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
         select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
     ).all()
     return {r[0]: r[1] for r in res}
+
+
+class CurrentGainRef(BaseModel):
+    path: str
+
+
+@router.put("/sessions/{session_id}/current_gain_ref")
+def update_current_gain_ref(
+    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
+):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session.current_gain_ref = new_gain_ref.path
+    db.add(session)
+    db.commit()
 
 
 spa_router = APIRouter(
@@ -277,6 +319,34 @@ def get_number_of_movies_from_foil_hole(
         .where(DataCollectionGroup.id == dcgid)
     ).all()
     return len(movies)
+
+
+@spa_router.get("/sessions/{session_id}/grid_squares")
+def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
+    return _get_grid_squares(session_id, db)
+
+
+@spa_router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
+def get_grid_squares_from_dcg(
+    session_id: MurfeySessionID, dcgid: int, db=murfey_db
+) -> List[GridSquare]:
+    return _get_grid_squares_from_dcg(session_id, dcgid, db)
+
+
+@spa_router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
+)
+def get_foil_holes_from_grid_square(
+    session_id: MurfeySessionID, dcgid: int, gsid: int, db=murfey_db
+) -> List[FoilHole]:
+    return _get_foil_holes_from_grid_square(session_id, dcgid, gsid, db)
+
+
+@spa_router.get("/sessions/{session_id}/foil_hole/{fh_name}")
+def get_foil_hole(
+    session_id: MurfeySessionID, fh_name: int, db=murfey_db
+) -> Dict[str, int]:
+    return _get_foil_hole(session_id, fh_name, db)
 
 
 tomo_router = APIRouter(

@@ -185,20 +185,11 @@ class FoilHoleParameters(BaseModel):
     diameter: Optional[float] = None
 
 
-class PostInfo(BaseModel):
-    url: str
-    data: dict
-
-
 class MultigridWatcherSetup(BaseModel):
     source: Path
     skip_existing_processing: bool = False
     destination_overrides: Dict[Path, str] = {}
     rsync_restarts: List[str] = []
-
-
-class CurrentGainRef(BaseModel):
-    path: str
 
 
 class Token(BaseModel):

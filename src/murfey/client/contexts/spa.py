@@ -17,6 +17,7 @@ from murfey.client.instance_environment import (
 )
 from murfey.server.api.file_manip import router as file_manip_router
 from murfey.server.api.session_control import router as session_router
+from murfey.server.api.session_control import spa_router as session_spa_router
 from murfey.server.api.workflow import spa_router as workflow_spa_router
 from murfey.util.client import (
     authorised_requests,
@@ -429,7 +430,7 @@ class SPAModularContext(Context):
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
-            gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+            gs_url = f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
             gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
@@ -470,7 +471,7 @@ class SPAModularContext(Context):
             )
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
-            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
+            fh_url = f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
             if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,

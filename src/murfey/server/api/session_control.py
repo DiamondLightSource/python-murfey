@@ -1,4 +1,5 @@
-from typing import Optional
+from logging import getLogger
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
@@ -6,8 +7,17 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 import murfey.server.ispyb
+import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.shared import get_foil_hole as _get_foil_hole
+from murfey.server.api.shared import (
+    get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
+)
+from murfey.server.api.shared import get_grid_squares as _get_grid_squares
+from murfey.server.api.shared import (
+    get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
+)
 from murfey.server.api.shared import (
     get_machine_config_for_instrument,
     remove_session_by_id,
@@ -19,9 +29,21 @@ from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
+    FoilHole,
+    GridSquare,
     ProcessingJob,
+    RsyncInstance,
     Session,
 )
+from murfey.util.models import FoilHoleParameters, GridSquareParameters, RsyncerInfo
+from murfey.workflows.spa.flush_spa_preprocess import (
+    register_foil_hole as _register_foil_hole,
+)
+from murfey.workflows.spa.flush_spa_preprocess import (
+    register_grid_square as _register_grid_square,
+)
+
+logger = getLogger("murfey.server.api.session_control")
 
 router = APIRouter(
     prefix="/session_control",
@@ -94,3 +116,121 @@ def register_processing_success_in_ispyb(
         for updated in apps:
             updated.processingStatus = True
             _transport_object.do_update_processing_status(updated)
+
+
+class PostInfo(BaseModel):
+    url: str
+    data: dict
+
+
+@router.post("/instruments/{instrument_name}/failed_client_post")
+def failed_client_post(instrument_name: str, post_info: PostInfo):
+    zocalo_message = {
+        "register": "failed_client_post",
+        "url": post_info.url,
+        "json": post_info.data,
+    }
+    if _transport_object:
+        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+
+
+@router.post("/sessions/{session_id}/rsyncer")
+def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
+    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    rsync_instance = RsyncInstance(
+        source=rsyncer_info.source,
+        session_id=rsyncer_info.session_id,
+        transferring=rsyncer_info.transferring,
+        destination=rsyncer_info.destination,
+        tag=rsyncer_info.tag,
+    )
+    db.add(rsync_instance)
+    db.commit()
+    db.close()
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    )
+    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.transferred_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(
+        0
+    )
+    prom.transferred_data_files.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    prom.transferred_data_files_bytes.labels(
+        rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
+    return rsyncer_info
+
+
+spa_router = APIRouter(
+    prefix="/session_control/spa",
+    dependencies=[Depends(validate_token)],
+    tags=["session info for SPA"],
+)
+
+
+@spa_router.get("/sessions/{session_id}/grid_squares")
+def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
+    return _get_grid_squares(session_id, db)
+
+
+@spa_router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
+def get_grid_squares_from_dcg(
+    session_id: MurfeySessionID, dcgid: int, db=murfey_db
+) -> List[GridSquare]:
+    return _get_grid_squares_from_dcg(session_id, dcgid, db)
+
+
+@spa_router.get(
+    "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
+)
+def get_foil_holes_from_grid_square(
+    session_id: MurfeySessionID, dcgid: int, gsid: int, db=murfey_db
+) -> List[FoilHole]:
+    return _get_foil_holes_from_grid_square(session_id, dcgid, gsid, db)
+
+
+@spa_router.get("/sessions/{session_id}/foil_hole/{fh_name}")
+def get_foil_hole(
+    session_id: MurfeySessionID, fh_name: int, db=murfey_db
+) -> Dict[str, int]:
+    return _get_foil_hole(session_id, fh_name, db)
+
+
+@spa_router.post("/sessions/{session_id}/grid_square/{gsid}")
+def register_grid_square(
+    session_id: MurfeySessionID,
+    gsid: int,
+    grid_square_params: GridSquareParameters,
+    db=murfey_db,
+):
+    return _register_grid_square(session_id, gsid, grid_square_params, db)
+
+
+@spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
+def register_foil_hole(
+    session_id: MurfeySessionID,
+    gs_name: int,
+    foil_hole_params: FoilHoleParameters,
+    db=murfey_db,
+):
+    logger.info(
+        f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
+    )
+    return _register_foil_hole(session_id, gs_name, foil_hole_params, db)
