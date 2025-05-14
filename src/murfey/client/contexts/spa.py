@@ -15,6 +15,8 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
+from murfey.server.api.file_manip import router as file_manip_router
+from murfey.server.api.workflow import spa_router as workflow_spa_router
 from murfey.util.client import (
     authorised_requests,
     capture_get,
@@ -580,7 +582,7 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                                f"{str(environment.url.geturl())}{file_manip_router.url_path_for('write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
@@ -609,7 +611,7 @@ class SPAModularContext(Context):
                             )
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}{workflow_spa_router.url_path_for('request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",

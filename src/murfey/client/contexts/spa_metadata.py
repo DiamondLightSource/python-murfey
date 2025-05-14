@@ -8,6 +8,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
+from murfey.server.api.workflow import router as workflow_router
 from murfey.util.client import (
     authorised_requests,
     capture_post,
@@ -166,7 +167,7 @@ class SPAMetadataContext(Context):
                 environment.samples[source] = SampleInfo(
                     atlas=Path(partial_path), sample=sample
                 )
-                url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+                url = f"{str(environment.url.geturl())}{workflow_router.url_path_for('register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
                 dcg_search_dir = "/".join(
                     p for p in transferred_file.parent.parts if p != environment.visit
                 )
@@ -221,7 +222,7 @@ class SPAMetadataContext(Context):
             and environment
         ):
             # Make sure we have a data collection group before trying to register grid square
-            url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+            url = f"{str(environment.url.geturl())}{workflow_router.url_path_for('register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
             dcg_search_dir = "/".join(
                 p
                 for p in transferred_file.parent.parent.parts

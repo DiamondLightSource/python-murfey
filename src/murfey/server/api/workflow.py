@@ -43,6 +43,7 @@ from murfey.util.db import (
     Tilt,
     TiltSeries,
 )
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 from murfey.util.processing_params import default_spa_parameters
 from murfey.util.tomo import midpoint
 
@@ -273,45 +274,6 @@ spa_router = APIRouter(
 )
 
 
-class ProcessingParametersSPA(BaseModel):
-    tag: str
-    dose_per_frame: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    file_extension: str
-    acquisition_software: str
-    use_cryolo: bool
-    symmetry: str
-    mask_diameter: Optional[int]
-    boxsize: Optional[int]
-    downscale: bool
-    small_boxsize: Optional[int]
-    eer_fractionation_file: str = ""
-    particle_diameter: Optional[float]
-    magnification: Optional[int] = None
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
-    phase_plate: bool = False
-
-    class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
-        use_cryolo: bool
-        symmetry: str
-        mask_diameter: Optional[int]
-        boxsize: Optional[int]
-        downscale: bool
-        small_boxsize: Optional[int]
-        eer_fractionation: int
-
-
 @spa_router.post("/sessions/{session_id}/spa_processing_parameters")
 def register_spa_proc_params(
     session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
@@ -539,29 +501,6 @@ tomo_router = APIRouter(
     dependencies=[Depends(validate_token)],
     tags=["workflow cryoET"],
 )
-
-
-class ProcessingParametersTomo(BaseModel):
-    dose_per_frame: Optional[float]
-    frame_count: int
-    tilt_axis: float
-    gain_ref: Optional[str]
-    experiment_type: str
-    voltage: float
-    image_size_x: int
-    image_size_y: int
-    pixel_size_on_image: str
-    motion_corr_binning: int
-    file_extension: str
-    tag: str
-    tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
-    eer_fractionation: int
-
-    class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
-        eer_fractionation: int
 
 
 @tomo_router.post("/sessions/{session_id}/tomography_processing_parameters")

@@ -25,11 +25,23 @@ from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util.client import _get_visit_list, authorised_requests, read_config
+from murfey.util.client import authorised_requests, read_config
+from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
+
+
+def _get_visit_list(api_base: ParseResult, instrument_name: str):
+    proxy_path = api_base.path.rstrip("/")
+    get_visits_url = api_base._replace(
+        path=f"{proxy_path}/instruments/{instrument_name}/visits_raw"
+    )
+    server_reply = requests.get(get_visits_url.geturl())
+    if server_reply.status_code != 200:
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
+    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def write_config(config: configparser.ConfigParser):
