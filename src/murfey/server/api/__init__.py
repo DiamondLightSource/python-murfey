@@ -6,8 +6,6 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from ispyb.sqlalchemy import BLSample, BLSampleGroup, BLSampleImage, BLSubSample
-from PIL import Image
 from prometheus_client import Counter, Gauge
 from pydantic import BaseModel
 from sqlmodel import select
@@ -37,17 +35,7 @@ from murfey.util.db import (
     SPAFeedbackParameters,
     SPARelionParameters,
 )
-from murfey.util.models import (
-    BLSampleImageParameters,
-    BLSampleParameters,
-    BLSubSampleParameters,
-    ClientInfo,
-    MillingParameters,
-    RegistrationMessage,
-    RsyncerInfo,
-    RsyncerSource,
-    Sample,
-)
+from murfey.util.models import ClientInfo, RsyncerInfo, RsyncerSource
 
 log = logging.getLogger("murfey.server.api")
 
@@ -232,104 +220,6 @@ class ProcessingDetails(BaseModel):
     processing_jobs: List[ProcessingJob]
     relion_params: SPARelionParameters
     feedback_params: SPAFeedbackParameters
-
-
-@router.get("/visit/{visit_name}/samples")
-def get_samples(visit_name: str, db=murfey.server.ispyb.DB) -> List[Sample]:
-    return murfey.server.ispyb.get_sub_samples_from_visit(visit_name, db=db)
-
-
-@router.post("/visit/{visit_name}/sample_group")
-def register_sample_group(visit_name: str, db=murfey.server.ispyb.DB) -> dict:
-    proposal_id = murfey.server.ispyb.get_proposal_id(
-        visit_name[:2], visit_name.split("-")[0][2:], db=db
-    )
-    record = BLSampleGroup(proposalId=proposal_id)
-    if _transport_object:
-        return _transport_object.do_insert_sample_group(record)
-    return {"success": False}
-
-
-@router.post("/visit/{visit_name}/sample")
-def register_sample(visit_name: str, sample_params: BLSampleParameters) -> dict:
-    record = BLSample()
-    if _transport_object:
-        return _transport_object.do_insert_sample(record, sample_params.sample_group_id)
-    return {"success": False}
-
-
-@router.post("/visit/{visit_name}/subsample")
-def register_subsample(
-    visit_name: str, subsample_params: BLSubSampleParameters
-) -> dict:
-    record = BLSubSample(
-        blSampleId=subsample_params.sample_id, imgFilePath=subsample_params.image_path
-    )
-    if _transport_object:
-        return _transport_object.do_insert_subsample(record)
-    return {"success": False}
-
-
-@router.post("/visit/{visit_name}/sample_image")
-def register_sample_image(
-    visit_name: str, sample_image_params: BLSampleImageParameters
-) -> dict:
-    record = BLSampleImage(
-        blSampleId=sample_image_params.sample_id,
-        imageFullPath=sample_image_params.image_path,
-    )
-    if _transport_object:
-        return _transport_object.do_insert_sample_image(record)
-    return {"success": False}
-
-
-@router.post("/instruments/{instrument_name}/feedback")
-async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
-    if _transport_object:
-        _transport_object.send(
-            _transport_object.feedback_queue, {"register": msg.registration}
-        )
-
-
-@router.post("/visits/{year}/{visit_name}/{session_id}/make_milling_gif")
-async def make_gif(
-    year: int,
-    visit_name: str,
-    session_id: int,
-    gif_params: MillingParameters,
-    db=murfey_db,
-):
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    output_dir = (
-        Path(machine_config.rsync_basepath)
-        / secure_filename(year)
-        / secure_filename(visit_name)
-        / "processed"
-    )
-    output_dir.mkdir(exist_ok=True)
-    output_dir = output_dir / secure_filename(gif_params.raw_directory)
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-    image_full_paths = [
-        output_dir.parent / gif_params.raw_directory / i for i in gif_params.images
-    ]
-    images = [Image.open(f) for f in image_full_paths]
-    for im in images:
-        im.thumbnail((512, 512))
-    images[0].save(
-        output_path,
-        format="GIF",
-        append_images=images[1:],
-        save_all=True,
-        duration=30,
-        loop=0,
-    )
-    return {"output_gif": str(output_path)}
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")

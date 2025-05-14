@@ -33,7 +33,7 @@ from pydantic import BaseModel
 
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
-from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample
+from murfey.util.models import FoilHoleParameters, GridSquareParameters
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
@@ -623,31 +623,6 @@ def get_proposal_id(
         .all()
     )
     return query[0].proposalId
-
-
-def get_sub_samples_from_visit(visit: str, db: sqlalchemy.orm.Session) -> List[Sample]:
-    proposal_id = get_proposal_id(visit[:2], visit.split("-")[0][2:], db)
-    samples = (
-        db.query(BLSampleGroup, BLSampleGroupHasBLSample, BLSample, BLSubSample)
-        .join(BLSample, BLSample.blSampleId == BLSampleGroupHasBLSample.blSampleId)
-        .join(
-            BLSampleGroup,
-            BLSampleGroup.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
-        )
-        .join(BLSubSample, BLSubSample.blSampleId == BLSample.blSampleId)
-        .filter(BLSampleGroup.proposalId == proposal_id)
-        .all()
-    )
-    res = [
-        Sample(
-            sample_group_id=s[1].blSampleGroupId,
-            sample_id=s[2].blSampleId,
-            subsample_id=s[3].blSubSampleId,
-            image_path=s[3].imgFilePath,
-        )
-        for s in samples
-    ]
-    return res
 
 
 def get_all_ongoing_visits(

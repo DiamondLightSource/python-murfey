@@ -6,11 +6,23 @@ from typing import Any, Dict, List, Optional
 
 import sqlalchemy
 from fastapi import APIRouter, Depends
-from ispyb.sqlalchemy import Atlas
+from ispyb.sqlalchemy import (
+    Atlas,
+    BLSample,
+    BLSampleGroup,
+    BLSampleGroupHasBLSample,
+    BLSampleImage,
+    BLSubSample,
+)
 from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 import murfey.server.prometheus as prom
 from murfey.server import (
@@ -25,6 +37,7 @@ from murfey.server import (
 )
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.spa import _cryolo_model_path
+from murfey.server.ispyb import DB, get_proposal_id
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
@@ -892,3 +905,149 @@ async def register_tilt(
     except OperationalError:
         await asyncio.sleep(30)
         _add_tilt()
+
+
+correlative_router = APIRouter(
+    prefix="/workflow/correlative",
+    dependencies=[Depends(validate_token)],
+    tags=["workflow correlative imaging"],
+)
+
+
+class Sample(BaseModel):
+    sample_group_id: int
+    sample_id: int
+    subsample_id: int
+    image_path: Optional[Path]
+
+
+@correlative_router.get("/visit/{visit_name}/samples")
+def get_samples(visit_name: str, db=DB) -> List[Sample]:
+    proposal_id = get_proposal_id(visit_name[:2], visit_name.split("-")[0][2:], db)
+    samples = (
+        db.query(BLSampleGroup, BLSampleGroupHasBLSample, BLSample, BLSubSample)
+        .join(BLSample, BLSample.blSampleId == BLSampleGroupHasBLSample.blSampleId)
+        .join(
+            BLSampleGroup,
+            BLSampleGroup.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
+        )
+        .join(BLSubSample, BLSubSample.blSampleId == BLSample.blSampleId)
+        .filter(BLSampleGroup.proposalId == proposal_id)
+        .all()
+    )
+    res = [
+        Sample(
+            sample_group_id=s[1].blSampleGroupId,
+            sample_id=s[2].blSampleId,
+            subsample_id=s[3].blSubSampleId,
+            image_path=s[3].imgFilePath,
+        )
+        for s in samples
+    ]
+    return res
+
+
+@correlative_router.post("/visit/{visit_name}/sample_group")
+def register_sample_group(visit_name: str, db=DB) -> dict:
+    proposal_id = get_proposal_id(visit_name[:2], visit_name.split("-")[0][2:], db=db)
+    record = BLSampleGroup(proposalId=proposal_id)
+    if _transport_object:
+        return _transport_object.do_insert_sample_group(record)
+    return {"success": False}
+
+
+class BLSampleParameters(BaseModel):
+    sample_group_id: int
+
+
+@correlative_router.post("/visit/{visit_name}/sample")
+def register_sample(visit_name: str, sample_params: BLSampleParameters) -> dict:
+    record = BLSample()
+    if _transport_object:
+        return _transport_object.do_insert_sample(record, sample_params.sample_group_id)
+    return {"success": False}
+
+
+class BLSubSampleParameters(BaseModel):
+    sample_id: int
+    image_path: Optional[Path] = None
+
+
+@correlative_router.post("/visit/{visit_name}/subsample")
+def register_subsample(
+    visit_name: str, subsample_params: BLSubSampleParameters
+) -> dict:
+    record = BLSubSample(
+        blSampleId=subsample_params.sample_id, imgFilePath=subsample_params.image_path
+    )
+    if _transport_object:
+        return _transport_object.do_insert_subsample(record)
+    return {"success": False}
+
+
+class BLSampleImageParameters(BaseModel):
+    sample_id: int
+    sample_path: Path
+
+
+@correlative_router.post("/visit/{visit_name}/sample_image")
+def register_sample_image(
+    visit_name: str, sample_image_params: BLSampleImageParameters
+) -> dict:
+    record = BLSampleImage(
+        blSampleId=sample_image_params.sample_id,
+        imageFullPath=sample_image_params.image_path,
+    )
+    if _transport_object:
+        return _transport_object.do_insert_sample_image(record)
+    return {"success": False}
+
+
+class MillingParameters(BaseModel):
+    lamella_number: int
+    images: List[str]
+    raw_directory: str
+
+
+@correlative_router.post("/visits/{year}/{visit_name}/{session_id}/make_milling_gif")
+async def make_gif(
+    year: int,
+    visit_name: str,
+    session_id: int,
+    gif_params: MillingParameters,
+    db=murfey_db,
+):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    output_dir = (
+        Path(machine_config.rsync_basepath)
+        / secure_filename(year)
+        / secure_filename(visit_name)
+        / "processed"
+    )
+    output_dir.mkdir(exist_ok=True)
+    output_dir = output_dir / secure_filename(gif_params.raw_directory)
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
+    image_full_paths = [
+        output_dir.parent / gif_params.raw_directory / i for i in gif_params.images
+    ]
+    if Image is not None:
+        images = [Image.open(f) for f in image_full_paths]
+    else:
+        images = []
+    for im in images:
+        im.thumbnail((512, 512))
+    images[0].save(
+        output_path,
+        format="GIF",
+        append_images=images[1:],
+        save_all=True,
+        duration=30,
+        loop=0,
+    )
+    return {"output_gif": str(output_path)}
