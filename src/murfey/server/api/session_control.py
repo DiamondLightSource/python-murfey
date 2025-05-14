@@ -8,7 +8,10 @@ from sqlmodel import select
 import murfey.server.ispyb
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
-from murfey.server.api.shared import get_machine_config_for_instrument
+from murfey.server.api.shared import (
+    get_machine_config_for_instrument,
+    remove_session_by_id,
+)
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import MachineConfig
 from murfey.util.db import (
@@ -65,6 +68,11 @@ def link_client_to_session(
     db.commit()
     db.close()
     return sid
+
+
+@router.delete("/sessions/{session_id}")
+def remove_session(session_id: MurfeySessionID, db=murfey_db):
+    remove_session_by_id(session_id, db)
 
 
 @router.post("/sessions/{session_id}/successful_processing")

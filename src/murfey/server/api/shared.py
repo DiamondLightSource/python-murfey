@@ -2,7 +2,18 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
+from sqlmodel import select
+
+import murfey.server.prometheus as prom
+from murfey.util import safe_run
 from murfey.util.config import MachineConfig, from_file, settings
+from murfey.util.db import (
+    DataCollection,
+    DataCollectionGroup,
+    ProcessingJob,
+    RsyncInstance,
+    Session,
+)
 
 
 @lru_cache(maxsize=5)
@@ -12,3 +23,66 @@ def get_machine_config_for_instrument(instrument_name: str) -> Optional[MachineC
             instrument_name
         ]
     return None
+
+
+def remove_session_by_id(session_id: int, db):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    sessions_for_visit = db.exec(
+        select(Session).where(Session.visit == session.visit)
+    ).all()
+    # Don't remove prometheus metrics if there are other sessions using them
+    if len(sessions_for_visit) == 1:
+        safe_run(
+            prom.monitoring_switch.remove,
+            args=(session.visit,),
+            label="monitoring_switch",
+        )
+        rsync_instances = db.exec(
+            select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+        ).all()
+        for ri in rsync_instances:
+            safe_run(
+                prom.seen_files.remove,
+                args=(ri.source, session.visit),
+                label="seen_files",
+            )
+            safe_run(
+                prom.transferred_files.remove,
+                args=(ri.source, session.visit),
+                label="transferred_files",
+            )
+            safe_run(
+                prom.transferred_files_bytes.remove,
+                args=(ri.source, session.visit),
+                label="transferred_files_bytes",
+            )
+            safe_run(
+                prom.seen_data_files.remove,
+                args=(ri.source, session.visit),
+                label="seen_data_files",
+            )
+            safe_run(
+                prom.transferred_data_files.remove,
+                args=(ri.source, session.visit),
+                label="transferred_data_files",
+            )
+            safe_run(
+                prom.transferred_data_files_bytes.remove,
+                args=(ri.source, session.visit),
+                label="transferred_data_file_bytes",
+            )
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+    ).all()
+    for c in collected_ids:
+        safe_run(
+            prom.preprocessed_movies.remove,
+            args=(c[2].id,),
+            label="preprocessed_movies",
+        )
+    db.delete(session)
+    db.commit()
+    return

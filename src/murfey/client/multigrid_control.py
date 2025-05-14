@@ -20,6 +20,11 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
+from murfey.server.api.file_manip import router as file_manip_router
+from murfey.server.api.session_control import router as session_router
+from murfey.server.api.workflow import router as workflow_router
+from murfey.server.api.workflow import spa_router as workflow_spa_router
+from murfey.server.api.workflow import tomo_router as workflow_tomo_router
 from murfey.util import posix_path
 from murfey.util.client import capture_post, get_machine_config_client
 
@@ -114,7 +119,7 @@ class MultigridController:
             ):
                 async with aiohttp.ClientSession() as clientsession:
                     async with clientsession.delete(
-                        f"{self._environment.url.geturl()}/sessions/{self.session_id}",
+                        f"{self._environment.url.geturl()}{session_router.url_path_for('remove_session', session_id=self.session_id)}",
                         json={"access_token": self.token, "token_type": "bearer"},
                     ) as response:
                         success = response.status == 200
@@ -153,7 +158,7 @@ class MultigridController:
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
         machine_data = requests.get(
-            f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
+            f"{self._environment.url.geturl()}{session_router.url_path_for('machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         if destination_overrides.get(source):
             destination = (
@@ -428,7 +433,7 @@ class MultigridController:
             log.info("Registering tomography processing parameters")
             if self._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
-                    f"{str(self._environment.url.geturl())}/visits/{self._environment.visit}/{self._environment.murfey_session}/eer_fractionation_file",
+                    f"{str(self._environment.url.geturl())}{file_manip_router.url_path_for('write_eer_fractionation_file', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                     json={
                         "num_frames": self._environment.data_collection_parameters[
                             "num_eer_frames"
@@ -445,17 +450,17 @@ class MultigridController:
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 json.update({"eer_fractionation_file": eer_fractionation_file})
             capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_processing_parameters",
+                f"{self._environment.url.geturl()}{workflow_tomo_router.url_path_for('register_tomo_proc_params', session_id=self._environment.murfey_session)}",
                 json=json,
             )
             capture_post(
-                f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
+                f"{self._environment.url.geturl()}{workflow_tomo_router.url_path_for('flush_tomography_processing', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                 json={"rsync_source": str(source)},
             )
             log.info("Tomography processing flushed")
 
         elif isinstance(context, SPAModularContext):
-            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
+            url = f"{str(self._environment.url.geturl())}{workflow_router.url_path_for('register_dc_group', visit_name=self._environment.visit, session_id=self.session_id)}"
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
@@ -494,7 +499,7 @@ class MultigridController:
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/start_data_collection",
+                    f"{str(self._environment.url.geturl())}{workflow_spa_router.url_path_for('start_dc', visit_name=self._environment.visit, session_id=self.session_id)}",
                     json=data,
                 )
                 for recipe in (
@@ -505,7 +510,7 @@ class MultigridController:
                     "em-spa-refine",
                 ):
                     capture_post(
-                        f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_processing_job",
+                        f"{str(self._environment.url.geturl())}{workflow_router.url_path_for('register_proc', visit_name=self._environment.visit, session_id=self.session_id)}",
                         json={
                             "tag": str(source),
                             "source": str(source),
@@ -514,7 +519,7 @@ class MultigridController:
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(
-                    f"{self._environment.url.geturl()}/sessions/{self.session_id}/spa_processing_parameters",
+                    f"{self._environment.url.geturl()}{workflow_router.url_path_for('register_spa_proc_params', session_id=self.session_id)}",
                     json={
                         **{k: None if v == "None" else v for k, v in json.items()},
                         "tag": str(source),
@@ -523,7 +528,7 @@ class MultigridController:
                 if response and not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(
-                    f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self.session_id}/flush_spa_processing",
+                    f"{self._environment.url.geturl()}{workflow_spa_router.url_path_for('flush_spa_processing', visit_name=self._environment.visit, session_id=self.session_id)}",
                     json={"tag": str(source)},
                 )
 

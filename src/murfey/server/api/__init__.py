@@ -26,7 +26,6 @@ from murfey.server import (
 )
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.murfey_db import murfey_db
-from murfey.util import safe_run
 from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
@@ -422,70 +421,6 @@ async def send_murfey_message(instrument_name: str, msg: RegistrationMessage):
         _transport_object.send(
             _transport_object.feedback_queue, {"register": msg.registration}
         )
-
-
-@router.delete("/sessions/{session_id}")
-def remove_session_by_id(session_id: MurfeySessionID, db=murfey_db):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    sessions_for_visit = db.exec(
-        select(Session).where(Session.visit == session.visit)
-    ).all()
-    # Don't remove prometheus metrics if there are other sessions using them
-    if len(sessions_for_visit) == 1:
-        safe_run(
-            prom.monitoring_switch.remove,
-            args=(session.visit,),
-            label="monitoring_switch",
-        )
-        rsync_instances = db.exec(
-            select(RsyncInstance).where(RsyncInstance.session_id == session_id)
-        ).all()
-        for ri in rsync_instances:
-            safe_run(
-                prom.seen_files.remove,
-                args=(ri.source, session.visit),
-                label="seen_files",
-            )
-            safe_run(
-                prom.transferred_files.remove,
-                args=(ri.source, session.visit),
-                label="transferred_files",
-            )
-            safe_run(
-                prom.transferred_files_bytes.remove,
-                args=(ri.source, session.visit),
-                label="transferred_files_bytes",
-            )
-            safe_run(
-                prom.seen_data_files.remove,
-                args=(ri.source, session.visit),
-                label="seen_data_files",
-            )
-            safe_run(
-                prom.transferred_data_files.remove,
-                args=(ri.source, session.visit),
-                label="transferred_data_files",
-            )
-            safe_run(
-                prom.transferred_data_files_bytes.remove,
-                args=(ri.source, session.visit),
-                label="transferred_data_file_bytes",
-            )
-    collected_ids = db.exec(
-        select(DataCollectionGroup, DataCollection, ProcessingJob)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollection.dcg_id == DataCollectionGroup.id)
-        .where(ProcessingJob.dc_id == DataCollection.id)
-    ).all()
-    for c in collected_ids:
-        safe_run(
-            prom.preprocessed_movies.remove,
-            args=(c[2].id,),
-            label="preprocessed_movies",
-        )
-    db.delete(session)
-    db.commit()
-    return
 
 
 @router.post("/visits/{year}/{visit_name}/{session_id}/make_milling_gif")

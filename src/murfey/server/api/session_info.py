@@ -11,7 +11,10 @@ from sqlmodel import select
 import murfey.server.ispyb
 from murfey.server import sanitise, templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
-from murfey.server.api.shared import get_machine_config_for_instrument
+from murfey.server.api.shared import (
+    get_machine_config_for_instrument,
+    remove_session_by_id,
+)
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
@@ -115,6 +118,11 @@ async def get_sessions(db=murfey_db):
                 r["clients"].append(cl)
         res.append(r)
     return res
+
+
+@router.delete("/sessions/{session_id}")
+def remove_session(session_id: MurfeySessionID, db=murfey_db):
+    remove_session_by_id(session_id, db)
 
 
 @router.get("/sessions/{session_id}/upstream_visits")
