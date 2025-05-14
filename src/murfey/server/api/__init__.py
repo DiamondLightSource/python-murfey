@@ -128,6 +128,11 @@ async def root(request: Request):
     )
 
 
+@router.get("/time")
+async def get_current_timestamp():
+    return {"timestamp": datetime.datetime.now().timestamp()}
+
+
 @router.get("/health/")
 def health_check(db=murfey.server.ispyb.DB):
     conn = db.connection()

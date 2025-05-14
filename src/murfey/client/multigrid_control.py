@@ -100,6 +100,15 @@ class MultigridController:
             register_client=False,
         )
 
+        if self.visit_end_time:
+            current_time = datetime.now()
+            server_timestamp = requests.get(f"{self.murfey_url}/time").json()[
+                "timestamp"
+            ]
+            self.visit_end_time += (
+                datetime.fromtimestamp(server_timestamp) - current_time
+            )
+
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
         self.dormancy_check()
