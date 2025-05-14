@@ -160,6 +160,7 @@ def setup_multigrid_watcher(
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
         rsync_restarts=watcher_spec.rsync_restarts,
+        visit_end_time=watcher_spec.visit_end_time,
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
@@ -251,6 +252,7 @@ class ObserverInfo(BaseModel):
     num_files_in_queue: int
     alive: bool
     stopping: bool
+    num_files_skipped: int = 0
 
 
 @router.get("/sessions/{session_id}/rsyncer_info")
@@ -264,6 +266,7 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
                 num_files_in_queue=v.queue.qsize(),
                 alive=v.thread.is_alive(),
                 stopping=v._stopping,
+                num_files_skipped=len(v._skipped_files),
             )
         )
     return info
