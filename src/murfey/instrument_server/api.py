@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -27,7 +27,7 @@ from murfey.util.models import File, Token
 
 logger = getLogger("murfey.instrument_server.api")
 
-watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
+watchers: Dict[str | int, MultigridDirWatcher] = {}
 rsyncers: Dict[str, RSyncer] = {}
 controllers: Dict[int, MultigridController] = {}
 data_collection_parameters: dict = {}
@@ -190,9 +190,7 @@ def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
     if watchers.get(session_id) is None:
         return {"success": False}
     if not process:
-        watchers[session_id]._listeners = [
-            partial(watchers[session_id]._listeners[0], analyse=False)
-        ]
+        watchers[session_id]._analyse = False
     watchers[session_id].start()
     return {"success": True}
 
