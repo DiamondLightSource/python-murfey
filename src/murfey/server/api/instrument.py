@@ -149,6 +149,10 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
         instrument_name
     ]
     if machine_config.instrument_server_url:
+        log.debug(
+            f"Submitting request to start multigrid watcher for session {session_id} "
+            f"with processing {('enabled' if process else 'disabled')}"
+        )
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/start_multigrid_watcher?process={'true' if process else 'false'}",
@@ -157,6 +161,7 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
                 },
             ) as resp:
                 data = await resp.json()
+    log.debug(f"Received response: {data}")
     return data
 
 
