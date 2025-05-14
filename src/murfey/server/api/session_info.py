@@ -4,12 +4,21 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import select
+from werkzeug.utils import secure_filename
 
 import murfey.server.ispyb
-from murfey.server import sanitise, templates
+import murfey.server.websocket as ws
+from murfey.server import (
+    _transport_object,
+    get_hostname,
+    get_microscope,
+    sanitise,
+    templates,
+)
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
@@ -49,6 +58,35 @@ router = APIRouter(
     dependencies=[Depends(validate_token)],
     tags=["session info"],
 )
+
+
+# This will be the homepage for a given microscope.
+@router.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="home.html",
+        context={
+            "hostname": get_hostname(),
+            "microscope": get_microscope(),
+            "version": murfey.__version__,
+        },
+    )
+
+
+@router.get("/health/")
+def health_check(db=murfey.server.ispyb.DB):
+    conn = db.connection()
+    conn.close()
+    return {
+        "ispyb_connection": True,
+        "rabbitmq_connection": _transport_object.transport.is_connected(),
+    }
+
+
+@router.get("/connections/")
+def connections_check():
+    return {"connections": list(ws.manager.active_connections.keys())}
 
 
 @router.get("/instruments/{instrument_name}/machine")
@@ -151,23 +189,6 @@ def update_session(
 @router.delete("/sessions/{session_id}")
 def remove_session(session_id: MurfeySessionID, db=murfey_db):
     remove_session_by_id(session_id, db)
-
-
-@router.get("/sessions/{session_id}/upstream_visits")
-async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
-    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
-    visit_name = murfey_session.visit
-    instrument_name = murfey_session.instrument_name
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    upstream_visits = {}
-    # Iterates through provided upstream directories
-    for p in machine_config.upstream_data_directories:
-        # Looks for visit name in file path
-        for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
-            upstream_visits[v.name] = v / machine_config.processed_directory_name
-    return upstream_visits
 
 
 @router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
@@ -373,3 +394,89 @@ def get_tilts(
         else:
             tilts[el[1].rsync_source] = [el[2].movie_path]
     return tilts
+
+
+correlative_router = APIRouter(
+    prefix="/session_info/correlative",
+    dependencies=[Depends(validate_token)],
+    tags=["session info for correlative imaging"],
+)
+
+
+@correlative_router.get("/sessions/{session_id}/upstream_visits")
+async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
+    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    upstream_visits = {}
+    # Iterates through provided upstream directories
+    for p in machine_config.upstream_data_directories:
+        # Looks for visit name in file path
+        for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
+            upstream_visits[v.name] = v / machine_config.processed_directory_name
+    return upstream_visits
+
+
+def _get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
+    tiff_dirs = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    for directory_name in machine_config.upstream_data_tiff_locations:
+        for p in machine_config.upstream_data_directories:
+            if (Path(p) / secure_filename(visit_name)).is_dir():
+                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
+                tiff_dirs.append(processed_dir)
+                break
+    if not tiff_dirs:
+        logger.warning(
+            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+        )
+    return tiff_dirs
+
+
+@correlative_router.get("/visits/{visit_name}/{session_id}/upstream_tiff_paths")
+async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
+    """
+    Looks for TIFF files associated with the current session in the permitted storage
+    servers, and returns their relative file paths as a list.
+    """
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    upstream_tiff_paths = []
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
+    if not tiff_dirs:
+        return None
+    for tiff_dir in tiff_dirs:
+        for f in tiff_dir.glob("**/*.tiff"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+        for f in tiff_dir.glob("**/*.tif"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+    return upstream_tiff_paths
+
+
+@correlative_router.get(
+    "/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}"
+)
+async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_db):
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
+    if not tiff_dirs:
+        return None
+
+    tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+    for tiff_dir in tiff_dirs:
+        test_path = tiff_dir / tiff_path
+        if test_path.is_file():
+            break
+    else:
+        logger.warning(f"TIFF {tiff_path} not found")
+        return None
+
+    return FileResponse(path=test_path)
