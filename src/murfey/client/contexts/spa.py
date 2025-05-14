@@ -16,6 +16,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.server.api.file_manip import router as file_manip_router
+from murfey.server.api.session_control import router as session_router
 from murfey.server.api.workflow import spa_router as workflow_spa_router
 from murfey.util.client import (
     authorised_requests,
@@ -264,7 +265,7 @@ class SPAModularContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
+                f"{str(environment.url.geturl())}{session_router.url_path_for('machine_info_by_instrument', instrument_name=environment.instrument_name)}"
             )
             if server_config_response is None:
                 return None

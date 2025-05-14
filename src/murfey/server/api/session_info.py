@@ -11,8 +11,9 @@ from sqlmodel import select
 import murfey.server.ispyb
 from murfey.server import sanitise, templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.shared import get_machine_config_for_instrument
 from murfey.server.murfey_db import murfey_db
-from murfey.util.config import get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
@@ -37,6 +38,11 @@ router = APIRouter(
     dependencies=[Depends(validate_token)],
     tags=["session info"],
 )
+
+
+@router.get("/instruments/{instrument_name}/machine")
+def machine_info_by_instrument(instrument_name: str) -> Optional[MachineConfig]:
+    return get_machine_config_for_instrument(instrument_name)
 
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])

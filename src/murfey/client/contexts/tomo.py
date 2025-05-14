@@ -18,6 +18,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.server.api.file_manip import router as file_manip_router
+from murfey.server.api.session_control import router as session_router
 from murfey.server.api.workflow import router as workflow_router
 from murfey.server.api.workflow import tomo_router as workflow_tomo_router
 from murfey.util.client import (
@@ -595,7 +596,7 @@ class TomographyContext(Context):
             binning_factor = 1
             if environment:
                 server_config = requests.get(
-                    f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
+                    f"{str(environment.url.geturl())}{session_router.url_path_for('machine_info_by_instrument', instrument_name=environment.instrument_name)}"
                 ).json()
                 if (
                     server_config.get("superres")

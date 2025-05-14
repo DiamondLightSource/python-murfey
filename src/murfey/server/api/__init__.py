@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
-from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -29,7 +27,6 @@ from murfey.server import (
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import safe_run
-from murfey.util.config import MachineConfig, from_file, settings
 from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
@@ -95,26 +92,6 @@ def health_check(db=murfey.server.ispyb.DB):
 @router.get("/connections/")
 def connections_check():
     return {"connections": list(ws.manager.active_connections.keys())}
-
-
-@router.get("/machine")
-def machine_info() -> Optional[MachineConfig]:
-    instrument_name = os.getenv("BEAMLINE")
-    if settings.murfey_machine_configuration and instrument_name:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
-    return None
-
-
-@lru_cache(maxsize=5)
-@router.get("/instruments/{instrument_name}/machine")
-def machine_info_by_name(instrument_name: str) -> Optional[MachineConfig]:
-    if settings.murfey_machine_configuration:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
-    return None
 
 
 @router.get("/mag_table/")
