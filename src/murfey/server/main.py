@@ -19,6 +19,8 @@ import murfey.server.api.file_manip
 import murfey.server.api.hub
 import murfey.server.api.instrument
 import murfey.server.api.processing_parameters
+import murfey.server.api.prometheus
+import murfey.server.api.session_control
 import murfey.server.api.session_info
 import murfey.server.api.spa
 import murfey.server.api.workflow
@@ -78,11 +80,16 @@ app.include_router(murfey.server.api.display.router)
 app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.hub.router)
 app.include_router(murfey.server.api.processing_parameters.router)
+app.include_router(murfey.server.api.prometheus.router)
 app.include_router(murfey.server.api.file_manip.router)
+app.include_router(murfey.server.api.session_control.router)
+app.include_router(murfey.server.api.session_control.spa_router)
 app.include_router(murfey.server.api.session_info.router)
+app.include_router(murfey.server.api.session_info.correlative_router)
 app.include_router(murfey.server.api.session_info.spa_router)
 app.include_router(murfey.server.api.session_info.tomo_router)
 app.include_router(murfey.server.api.workflow.router)
+app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
 app.include_router(murfey.server.websocket.ws)

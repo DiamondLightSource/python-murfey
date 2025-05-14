@@ -21,6 +21,7 @@ from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
 from murfey.server.api.file_manip import router as file_manip_router
+from murfey.server.api.prometheus import router as prom_router
 from murfey.server.api.session_control import router as session_router
 from murfey.server.api.workflow import router as workflow_router
 from murfey.server.api.workflow import spa_router as workflow_spa_router
@@ -535,7 +536,7 @@ class MultigridController:
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str
     ):
-        url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_file_count"
+        url = f"{str(self._environment.url.geturl())}{prom_router.url_path_for('increment_rsync_file_count', visit_name=self._environment.visit)}"
         num_data_files = len(
             [
                 f
@@ -559,7 +560,7 @@ class MultigridController:
         self, update: RSyncerUpdate, source: str, destination: str
     ):
         if update.outcome is TransferResult.SUCCESS:
-            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_transferred_files_prometheus"
+            url = f"{str(self._environment.url.geturl())}{prom_router.url_path_for('increment_rsync_transferred_files_prometheus', visit_name=self._environment.visit)}"
             data_files = (
                 [update]
                 if update.file_path.suffix in self._data_suffixes
@@ -588,7 +589,7 @@ class MultigridController:
         ]
         if not checked_updates:
             return
-        url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_transferred_files"
+        url = f"{str(self._environment.url.geturl())}{prom_router.url_path_for('increment_rsync_transferred_files', visit_name=self._environment.visit)}"
         data_files = [
             u
             for u in updates

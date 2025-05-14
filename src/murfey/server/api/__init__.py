@@ -18,7 +18,7 @@ from murfey.util.db import (
     RsyncInstance,
     Session,
 )
-from murfey.util.models import ClientInfo, RsyncerInfo, RsyncerSource
+from murfey.util.models import ClientInfo, RsyncerSource
 
 log = logging.getLogger("murfey.server.api")
 
@@ -108,70 +108,6 @@ def register_restarted_rsyncer(
     rsyncer.transferring = True
     db.add(rsyncer)
     db.commit()
-
-
-@router.post("/visits/{visit_name}/increment_rsync_file_count")
-def increment_rsync_file_count(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
-        )
-    ).one()
-    rsync_instance.files_counted += rsyncer_info.increment_count
-    db.add(rsync_instance)
-    db.commit()
-    db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
-        rsyncer_info.increment_count
-    )
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
-        rsyncer_info.increment_data_count
-    )
-
-
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files")
-def increment_rsync_transferred_files(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
-        )
-    ).one()
-    rsync_instance.files_transferred += rsyncer_info.increment_count
-    db.add(rsync_instance)
-    db.commit()
-    db.close()
-
-
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
-def increment_rsync_transferred_files_prometheus(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.increment_count)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.bytes)
-    prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.increment_data_count)
-    prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.data_bytes)
-
-
-@router.post("/visits/{visit_name}/monitoring/{on}")
-def change_monitoring_status(visit_name: str, on: int):
-    prom.monitoring_switch.labels(visit=visit_name)
-    prom.monitoring_switch.labels(visit=visit_name).set(on)
 
 
 @router.get("/prometheus/{metric_name}")

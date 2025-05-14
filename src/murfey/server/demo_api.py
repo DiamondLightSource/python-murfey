@@ -30,8 +30,7 @@ from murfey.server import (
 )
 from murfey.server import shutdown as _shutdown
 from murfey.server import templates
-from murfey.server.api import MurfeySessionID
-from murfey.server.api.auth import validate_token
+from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.session_info import Visit
 from murfey.server.api.workflow import (
     DCGroupParameters,
@@ -60,15 +59,11 @@ from murfey.util.db import (
 )
 from murfey.util.models import (
     ClientInfo,
-    CurrentGainRef,
     FoilHoleParameters,
     GridSquareParameters,
-    PostInfo,
     RegistrationMessage,
     RsyncerInfo,
     RsyncerSource,
-    SessionInfo,
-    TiltInfo,
 )
 from murfey.util.processing_params import default_spa_parameters
 
@@ -601,30 +596,6 @@ def get_tilts(client_id: int, tilt_series_tag: str, db=murfey_db):
     return tilts
 
 
-@router.post("/visits/{visit_name}/{client_id}/tilt")
-def register_tilt(visit_name: str, client_id: int, tilt_info: TiltInfo, db=murfey_db):
-    session_id = (
-        db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        )
-        .one()
-        .session_id
-    )
-    tilt_series_id = (
-        db.exec(
-            select(TiltSeries)
-            .where(TiltSeries.tag == tilt_info.tilt_series_tag)
-            .where(TiltSeries.session_id == session_id)
-            .where(TiltSeries.rsync_source == tilt_info.source)
-        )
-        .one()
-        .id
-    )
-    tilt = Tilt(movie_path=tilt_info.movie_path, tilt_series_id=tilt_series_id)
-    db.add(tilt)
-    db.commit()
-
-
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
@@ -998,25 +969,6 @@ async def get_sessions_by_instrument_name(
     return sessions
 
 
-@router.post("/instruments/{instrument_name}/clients/{client_id}/session")
-def link_client_to_session(
-    instrument_name: str, client_id: int, sess: SessionInfo, db=murfey_db
-):
-    sid = sess.session_id
-    if sid is None:
-        s = Session(name=sess.session_name, instrument_name=instrument_name)
-        db.add(s)
-        db.commit()
-        sid = s.id
-    client = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    client.session_id = sid
-    db.add(client)
-    db.commit()
-    return sid
-
-
 @router.delete("/clients/{client_id}/session")
 def remove_session(client_id: int, db=murfey_db):
     client = db.exec(
@@ -1146,12 +1098,6 @@ async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_d
     return FileResponse(path=test_path)
 
 
-@router.post("/failed_client_post")
-def failed_client_post(post_info: PostInfo):
-    log.info("Post failed")
-    return
-
-
 @router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
 def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
     s = Session(name=name, visit=visit, instrument_name=instrument_name)
@@ -1159,13 +1105,3 @@ def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) ->
     db.commit()
     sid = s.id
     return sid
-
-
-@router.put("/sessions/{session_id}/current_gain_ref")
-def update_current_gain_ref(
-    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
-):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    session.current_gain_ref = new_gain_ref.path
-    db.add(session)
-    db.commit()
