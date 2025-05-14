@@ -105,8 +105,8 @@ class MultigridController:
             server_timestamp = requests.get(f"{self.murfey_url}/time").json()[
                 "timestamp"
             ]
-            self.visit_end_time += (
-                datetime.fromtimestamp(server_timestamp) - current_time
+            self.visit_end_time += current_time - datetime.fromtimestamp(
+                server_timestamp
             )
 
     def _multigrid_watcher_finalised(self):
