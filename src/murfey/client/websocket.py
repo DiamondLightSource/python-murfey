@@ -87,7 +87,7 @@ class WSApp:
         backoff = 0
         while True:
             attempt_start = time.perf_counter()
-            connection_failure = self._ws.run_forever()
+            connection_failure = self._ws.run_forever(ping_interval=30, ping_timeout=10)
             if not connection_failure:
                 break
             if (time.perf_counter() - attempt_start) < 5:
@@ -108,7 +108,10 @@ class WSApp:
                 continue
             while not self._ready:
                 time.sleep(0.3)
-            self._ws.send(element)
+            try:
+                self._ws.send(element)
+            except Exception:
+                log.error("Error sending message through websocket", exc_info=True)
             self._send_queue.task_done()
         log.debug("Websocket send-queue-feeder thread stopped")
 
@@ -135,7 +138,10 @@ class WSApp:
             self._send_queue.put(None)
             self._feeder_thread.join()
             self._receiver_thread.join()
-        self._ws.close()
+        try:
+            self._ws.close()
+        except Exception:
+            log.error("Error closing websocket connection", exc_info=True)
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
         self._receive_queue.put(message)
