@@ -18,7 +18,7 @@ from murfey.util.db import (
     RsyncInstance,
     Session,
 )
-from murfey.util.models import ClientInfo, RsyncerSource
+from murfey.util.models import ClientInfo
 
 log = logging.getLogger("murfey.server.api")
 
@@ -80,34 +80,6 @@ def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
             f"in session {session_id}.",
             exc_info=True,
         )
-
-
-@router.post("/sessions/{session_id}/rsyncer_stopped")
-def register_stopped_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
-):
-    rsyncer = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
-    ).one()
-    rsyncer.transferring = False
-    db.add(rsyncer)
-    db.commit()
-
-
-@router.post("/sessions/{session_id}/rsyncer_started")
-def register_restarted_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
-):
-    rsyncer = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
-    ).one()
-    rsyncer.transferring = True
-    db.add(rsyncer)
-    db.commit()
 
 
 @router.get("/prometheus/{metric_name}")

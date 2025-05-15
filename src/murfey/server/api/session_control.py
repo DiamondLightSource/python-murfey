@@ -6,8 +6,12 @@ from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
 from sqlmodel import select
 
-import murfey.server.ispyb
 import murfey.server.prometheus as prom
+
+try:
+    from murfey.server.ispyb import DB
+except ImportError:
+    DB = None
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
@@ -99,7 +103,7 @@ def remove_session(session_id: MurfeySessionID, db=murfey_db):
 
 @router.post("/sessions/{session_id}/successful_processing")
 def register_processing_success_in_ispyb(
-    session_id: MurfeySessionID, db=murfey.server.ispyb.DB, murfey_db=murfey_db
+    session_id: MurfeySessionID, db=DB, murfey_db=murfey_db
 ):
     collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
@@ -110,12 +114,13 @@ def register_processing_success_in_ispyb(
     ).all()
     appids = [c[3].id for c in collected_ids]
     if _transport_object:
-        apps = db.query(ISPyBAutoProcProgram).filter(
-            ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
-        )
-        for updated in apps:
-            updated.processingStatus = True
-            _transport_object.do_update_processing_status(updated)
+        if db is not None:
+            apps = db.query(ISPyBAutoProcProgram).filter(
+                ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
+            )
+            for updated in apps:
+                updated.processingStatus = True
+                _transport_object.do_update_processing_status(updated)
 
 
 class PostInfo(BaseModel):
@@ -176,6 +181,46 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
         rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     return rsyncer_info
+
+
+@router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
+def get_rsyncers_for_session(session_id: MurfeySessionID, db=murfey_db):
+    rsync_instances = db.exec(
+        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+    )
+    return rsync_instances.all()
+
+
+class RsyncerSource(BaseModel):
+    source: str
+
+
+@router.post("/sessions/{session_id}/rsyncer_stopped")
+def register_stopped_rsyncer(
+    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    rsyncer = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.session_id == session_id)
+        .where(RsyncInstance.source == rsyncer_source.source)
+    ).one()
+    rsyncer.transferring = False
+    db.add(rsyncer)
+    db.commit()
+
+
+@router.post("/sessions/{session_id}/rsyncer_started")
+def register_restarted_rsyncer(
+    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    rsyncer = db.exec(
+        select(RsyncInstance)
+        .where(RsyncInstance.session_id == session_id)
+        .where(RsyncInstance.source == rsyncer_source.source)
+    ).one()
+    rsyncer.transferring = True
+    db.add(rsyncer)
+    db.commit()
 
 
 spa_router = APIRouter(

@@ -653,7 +653,7 @@ class MurfeyTUI(App):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self._environment.client_id}/session",
+                f"{self._environment.url.geturl()}{session_router.url_path_for('link_client_to_session', instrument_name=self._environment.instrument_name, client_id=self._environment.client_id)}",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -672,7 +672,7 @@ class MurfeyTUI(App):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following:\n {sources} \n"
             rsync_instances = requests.get(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/rsyncers"
+                f"{self._environment.url.geturl()}{session_router.url_path_for('get_rsyncers_for_session', session_id=self._environment.murfey_session)}"
             ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
@@ -696,7 +696,7 @@ class MurfeyTUI(App):
 
     async def action_remove_session(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
+            f"{self._environment.url.geturl()}{session_router.url_path_for('remove_session', session_id=self._environment.murfey_session)}"
         )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -710,7 +710,7 @@ class MurfeyTUI(App):
 
     def clean_up_quit(self) -> None:
         requests.delete(
-            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
+            f"{self._environment.url.geturl()}{session_router.url_path_for('remove_session', session_id=self._environment.murfey_session)}"
         )
         self.exit()
 
@@ -753,10 +753,10 @@ class MurfeyTUI(App):
             removal_rp.stop()
             log.info(f"rsyncer {rp} rerun with removal")
         requests.post(
-            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/successful_processing"
+            f"{self._environment.url.geturl()}{session_router.url_path_for('register_processing_success_in_ispyb', session_id=self._environment.murfey_session)}"
         )
         requests.delete(
-            f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}"
+            f"{self._environment.url.geturl()}{session_router.url_path_for('remove_session', session_id=self._environment.murfey_session)}"
         )
         self.exit()
 
