@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Optional
 
+import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -24,12 +25,15 @@ class EditableSessionProcessingParameters(BaseModel):
 @router.get("/sessions/{session_id}/session_processing_parameters")
 def get_session_processing_parameters(
     session_id: MurfeySessionID, db: Session = murfey_db
-) -> EditableSessionProcessingParameters:
-    proc_params = db.exec(
-        select(SessionProcessingParameters).where(
-            SessionProcessingParameters.session_id == session_id
-        )
-    ).one()
+) -> Optional[EditableSessionProcessingParameters]:
+    try:
+        proc_params = db.exec(
+            select(SessionProcessingParameters).where(
+                SessionProcessingParameters.session_id == session_id
+            )
+        ).one()
+    except sqlalchemy.exc.NoResultFound:
+        return None
     return EditableSessionProcessingParameters(
         gain_ref=proc_params.gain_ref,
         dose_per_frame=proc_params.dose_per_frame,

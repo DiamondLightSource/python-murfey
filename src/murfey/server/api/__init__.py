@@ -372,13 +372,22 @@ async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClien
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
+    try:
+        rsync_instance = db.exec(
+            select(RsyncInstance).where(
+                RsyncInstance.source == rsyncer_info.source,
+                RsyncInstance.destination == rsyncer_info.destination,
+                RsyncInstance.session_id == rsyncer_info.session_id,
+            )
+        ).one()
+    except Exception:
+        log.error(
+            f"Failed to find rsync instance for visit {sanitise(visit_name)} "
+            "with the following properties: \n"
+            f"{rsyncer_info.dict()}",
+            exc_info=True,
         )
-    ).one()
+        return None
     rsync_instance.files_counted += rsyncer_info.increment_count
     db.add(rsync_instance)
     db.commit()
@@ -1994,6 +2003,17 @@ def create_session(
     db.commit()
     sid = s.id
     return sid
+
+
+@router.post("/sessions/{session_id}")
+def update_session(
+    session_id: MurfeySessionID, process: bool = True, db=murfey_db
+) -> None:
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session.process = process
+    db.add(session)
+    db.commit()
+    return None
 
 
 @router.put("/sessions/{session_id}/current_gain_ref")

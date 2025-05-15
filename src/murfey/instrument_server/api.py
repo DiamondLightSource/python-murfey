@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -27,9 +27,9 @@ from murfey.util.models import File, Token
 
 logger = getLogger("murfey.instrument_server.api")
 
-watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
-rsyncers: Dict[str, RSyncer] = {}
-controllers: Dict[int, MultigridController] = {}
+watchers: dict[str | int, MultigridDirWatcher] = {}
+rsyncers: dict[str, RSyncer] = {}
+controllers: dict[int, MultigridController] = {}
 data_collection_parameters: dict = {}
 tokens = {}
 
@@ -187,9 +187,11 @@ def setup_multigrid_watcher(
 
 
 @router.post("/sessions/{session_id}/start_multigrid_watcher")
-def start_multigrid_watcher(session_id: MurfeySessionID):
+def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
     if watchers.get(session_id) is None:
         return {"success": False}
+    if not process:
+        watchers[session_id]._analyse = False
     watchers[session_id].start()
     return {"success": True}
 
@@ -322,7 +324,7 @@ def register_processing_parameters(
 )
 def get_possible_gain_references(
     instrument_name: str, session_id: MurfeySessionID
-) -> List[File]:
+) -> list[File]:
     machine_config = requests.get(
         f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},

@@ -160,7 +160,8 @@ class MultigridController:
         tag: str = "",
         limited: bool = False,
     ):
-        log.info(f"starting multigrid rsyncer: {source}")
+        log.info(f"Starting multigrid rsyncer: {source}")
+        log.debug(f"Analysis of {source} is {('enabled' if analyse else 'disabled')}")
         destination_overrides = destination_overrides or {}
         machine_data = requests.get(
             f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
