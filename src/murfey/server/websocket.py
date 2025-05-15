@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, TypeVar, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlmodel import select
+from sqlmodel import Session, select
 
 import murfey.server.prometheus as prom
 from murfey.server.murfey_db import get_murfey_db_session
@@ -38,8 +38,9 @@ class ConnectionManager:
 
     @staticmethod
     def _register_new_client(client_id: int):
+        log.debug(f"Registering new client with ID {client_id}")
         new_client = ClientEnvironment(client_id=client_id, connected=True)
-        murfey_db = next(get_murfey_db_session())
+        murfey_db: Session = next(get_murfey_db_session())
         murfey_db.add(new_client)
         murfey_db.commit()
         murfey_db.close()
@@ -47,7 +48,7 @@ class ConnectionManager:
     def disconnect(self, client_id: int | str, unregister_client: bool = True):
         self.active_connections.pop(client_id)
         if unregister_client:
-            murfey_db = next(get_murfey_db_session())
+            murfey_db: Session = next(get_murfey_db_session())
             client_env = murfey_db.exec(
                 select(ClientEnvironment).where(
                     ClientEnvironment.client_id == client_id
@@ -73,7 +74,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
         while True:
             data = await websocket.receive_text()
             try:
-                json_data = json.loads(data)
+                json_data: dict = json.loads(data)
                 if json_data["type"] == "log":  # and isinstance(json_data, dict)
                     json_data.pop("type")
                     await forward_log(json_data, websocket)
@@ -100,7 +101,7 @@ async def websocket_connection_endpoint(
         while True:
             data = await websocket.receive_text()
             try:
-                json_data = json.loads(data)
+                json_data: dict = json.loads(data)
                 if json_data.get("type") == "log":  # and isinstance(json_data, dict)
                     json_data.pop("type")
                     await forward_log(json_data, websocket)
@@ -115,12 +116,12 @@ async def websocket_connection_endpoint(
         await manager.broadcast(f"Client #{client_id} disconnected")
 
 
-async def check_connections(active_connections):
+async def check_connections(active_connections: list[WebSocket]):
     log.info("Checking connections")
     for connection in active_connections:
         log.info("Checking response")
         try:
-            await asyncio.wait_for(connection.receive(), timeout=6)
+            await asyncio.wait_for(connection.receive(), timeout=10)
         except asyncio.TimeoutError:
             log.info(f"Disconnecting Client {connection[0]}")
             manager.disconnect(connection[0], connection[1])
@@ -139,7 +140,7 @@ async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
 
 @ws.delete("/test/{client_id}")
 async def close_ws_connection(client_id: int):
-    murfey_db = next(get_murfey_db_session())
+    murfey_db: Session = next(get_murfey_db_session())
     client_env = murfey_db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
     ).one()
