@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, TypeVar, Union
+from typing import Any, TypeVar
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import Session, select
@@ -22,7 +22,7 @@ log = logging.getLogger("murfey.server.websocket")
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[int | str, WebSocket] = {}
+        self.active_connections: dict[int | str, WebSocket] = {}
 
     async def connect(
         self, websocket: WebSocket, client_id: int | str, register_client: bool = True
@@ -93,7 +93,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
 
 @ws.websocket("/connect/{client_id}")
 async def websocket_connection_endpoint(
-    websocket: WebSocket, client_id: Union[int, str]
+    websocket: WebSocket,
+    client_id: int | str,
 ):
     await manager.connect(websocket, client_id, register_client=False)
     await manager.broadcast(f"Client {client_id} joined")
@@ -157,7 +158,7 @@ async def close_ws_connection(client_id: int):
 
 
 @ws.delete("/connect/{client_id}")
-async def close_unrecorded_ws_connection(client_id: Union[int, str]):
+async def close_unrecorded_ws_connection(client_id: int | str):
     client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(client_id)

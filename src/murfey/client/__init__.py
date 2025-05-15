@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from pprint import pprint
 from queue import Queue
-from typing import List, Literal
+from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
@@ -41,7 +41,7 @@ def write_config(config: configparser.ConfigParser):
 
 
 def main_loop(
-    source_watchers: List[murfey.client.watchdir.DirWatcher],
+    source_watchers: list[murfey.client.watchdir.DirWatcher],
     appearance_time: float,
     transfer_all: bool,
 ):
