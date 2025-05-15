@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import Session, select
@@ -22,10 +22,13 @@ log = logging.getLogger("murfey.server.websocket")
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[int | str, WebSocket] = {}
+        self.active_connections: dict[Union[int, str], WebSocket] = {}
 
     async def connect(
-        self, websocket: WebSocket, client_id: int | str, register_client: bool = True
+        self,
+        websocket: WebSocket,
+        client_id: Union[int, str],
+        register_client: bool = True,
     ):
         await websocket.accept()
         self.active_connections[client_id] = websocket
@@ -45,7 +48,7 @@ class ConnectionManager:
         murfey_db.commit()
         murfey_db.close()
 
-    def disconnect(self, client_id: int | str, unregister_client: bool = True):
+    def disconnect(self, client_id: Union[int, str], unregister_client: bool = True):
         self.active_connections.pop(client_id)
         if unregister_client:
             murfey_db: Session = next(get_murfey_db_session())
@@ -94,7 +97,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
 @ws.websocket("/connect/{client_id}")
 async def websocket_connection_endpoint(
     websocket: WebSocket,
-    client_id: int | str,
+    client_id: Union[int, str],
 ):
     await manager.connect(websocket, client_id, register_client=False)
     await manager.broadcast(f"Client {client_id} joined")
@@ -158,7 +161,7 @@ async def close_ws_connection(client_id: int):
 
 
 @ws.delete("/connect/{client_id}")
-async def close_unrecorded_ws_connection(client_id: int | str):
+async def close_unrecorded_ws_connection(client_id: Union[int, str]):
     client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(client_id)
