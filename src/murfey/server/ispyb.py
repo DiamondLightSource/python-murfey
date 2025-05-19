@@ -44,7 +44,8 @@ try:
         )
     )
     log.info("Loaded ISPyB database session")
-except AttributeError:
+# Catch all errors associated with loading ISPyB database
+except Exception:
     log.error("Error loading ISPyB session", exc_info=True)
     ISPyBSession = lambda: None
 
@@ -66,13 +67,17 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = (
-            ispyb.open(credentials=security_config.ispyb_credentials)
-            if security_config.ispyb_credentials
-            else None
-        )
-        if self.ispyb is not None:
-            print("Loaded ISPyB databse")
+        try:
+            # Attempt to connect to ISPyB if credentials files provided
+            self.ispyb = (
+                ispyb.open(credentials=security_config.ispyb_credentials)
+                if security_config.ispyb_credentials
+                else None
+            )
+        except Exception:
+            # Log error and return None if the connection fails
+            log.error("Error encountered connecting to ISPyB server", exc_info=True)
+            self.ispyb = None
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
