@@ -114,22 +114,31 @@ def from_file(config_file_path: Path, instrument: str = "") -> dict[str, Machine
 
 
 class Security(BaseModel):
+    # Murfey database settings
     murfey_db_credentials: Path
     crypto_key: str
-    auth_key: str = ""
-    auth_algorithm: str = ""
-    auth_url: str = ""
     sqlalchemy_pooling: bool = True
-    allow_origins: list[str] = ["*"]
+
+    # ISPyB settings
+    ispyb_credentials: Optional[Path] = None
+
+    # Murfey server connection settings
+    auth_algorithm: str = ""
+    auth_key: str = ""
+    auth_type: Literal["password", "cookie"] = "password"
+    auth_url: str = ""
+    cookie_key: str = ""
     session_validation: str = ""
     session_token_timeout: Optional[int] = None
-    auth_type: Literal["password", "cookie"] = "password"
-    cookie_key: str = ""
+    allow_origins: list[str] = ["*"]
+
+    # RabbitMQ settings
     rabbitmq_credentials: Path
     feedback_queue: str = "murfey_feedback"
+
+    # Graylog settings
     graylog_host: str = ""
     graylog_port: Optional[int] = None
-    ispyb_credentials: Optional[Path] = None
 
     @validator("graylog_port")
     def check_port_present_if_host_is(
