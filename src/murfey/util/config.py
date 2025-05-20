@@ -140,6 +140,11 @@ class Security(BaseModel):
     graylog_host: str = ""
     graylog_port: Optional[int] = None
 
+    class Config:
+        json_encoders = {
+            Path: str,
+        }
+
     @validator("graylog_port")
     def check_port_present_if_host_is(
         cls, v: Optional[int], values: dict, **kwargs
