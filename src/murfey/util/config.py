@@ -4,7 +4,7 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
@@ -26,16 +26,16 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     # Hardware and software -----------------------------------------------------------
     camera: str = "FALCON"
     superres: bool = False
-    calibrations: Dict[str, Dict[str, Union[dict, float]]]
-    acquisition_software: List[str]
-    software_versions: Dict[str, str] = {}
-    software_settings_output_directories: Dict[str, List[str]] = {}
-    data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
+    calibrations: dict[str, dict[str, Union[dict, float]]]
+    acquisition_software: list[str]
+    software_versions: dict[str, str] = {}
+    software_settings_output_directories: dict[str, list[str]] = {}
+    data_required_substrings: dict[str, dict[str, list[str]]] = {}
 
     # Client side directory setup -----------------------------------------------------
-    data_directories: List[Path]
+    data_directories: list[Path]
     create_directories: list[str] = ["atlas"]
-    analyse_created_directories: List[str] = []
+    analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
 
@@ -48,9 +48,9 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     allow_removal: bool = False
 
     # Upstream data download setup
-    upstream_data_directories: List[Path] = []  # Previous sessions
+    upstream_data_directories: list[Path] = []  # Previous sessions
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
-    upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
+    upstream_data_tiff_locations: list[str] = ["processed"]  # Location of CLEM TIFFs
 
     # Data processing setup -----------------------------------------------------------
     # General processing setup
@@ -59,7 +59,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     gain_directory_name: str = "processing"
     processed_directory_name: str = "processed"
     processed_extra_directory: str = ""
-    recipes: Dict[str, str] = {
+    recipes: dict[str, str] = {
         "em-spa-bfactor": "em-spa-bfactor",
         "em-spa-class2d": "em-spa-class2d",
         "em-spa-class3d": "em-spa-class3d",
@@ -75,10 +75,10 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     initial_model_search_directory: str = "processing/initial_model"
 
     # Data analysis plugins
-    external_executables: Dict[str, str] = {}
-    external_executables_eer: Dict[str, str] = {}
-    external_environment: Dict[str, str] = {}
-    plugin_packages: Dict[str, Path] = {}
+    external_executables: dict[str, str] = {}
+    external_executables_eer: dict[str, str] = {}
+    external_environment: dict[str, str] = {}
+    plugin_packages: dict[str, Path] = {}
 
     # Server and network setup --------------------------------------------------------
     # Configurations and URLs
@@ -93,7 +93,7 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     notifications_queue: str = "pato_notification"
 
 
-def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
+def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
     return {
@@ -110,7 +110,7 @@ class Security(BaseModel):
     auth_algorithm: str = ""
     auth_url: str = ""
     sqlalchemy_pooling: bool = True
-    allow_origins: List[str] = ["*"]
+    allow_origins: list[str] = ["*"]
     session_validation: str = ""
     session_token_timeout: Optional[int] = None
     auth_type: Literal["password", "cookie"] = "password"
@@ -179,7 +179,7 @@ def get_security_config() -> Security:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
+def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
     machine_config = {
         "": MachineConfig(
             acquisition_software=[],
