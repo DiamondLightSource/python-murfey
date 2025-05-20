@@ -22,7 +22,7 @@ log = logging.getLogger("murfey.server.websocket")
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[Union[int, str], WebSocket] = {}
+        self.active_connections: dict[int | str, WebSocket] = {}
 
     async def connect(
         self,
