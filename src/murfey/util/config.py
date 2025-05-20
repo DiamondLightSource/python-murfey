@@ -11,7 +11,7 @@ from backports.entry_points_selectable import entry_points
 from pydantic import BaseModel, BaseSettings, Extra, validator
 
 
-class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
+class MachineConfig(BaseModel):  # type: ignore
     """
     Keys that describe the type of workflow conducted on the client side, and how
     Murfey will handle its data transfer and processing
@@ -91,6 +91,16 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
     failure_queue: str = ""
     node_creator_queue: str = "node_creator"
     notifications_queue: str = "pato_notification"
+
+    class Config:
+        """
+        Inner class that defines this model's parsing and serialising behaviour
+        """
+
+        extra = Extra.allow
+        json_encoders = {
+            Path: str,
+        }
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
