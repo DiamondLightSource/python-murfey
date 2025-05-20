@@ -30,6 +30,7 @@ from murfey.server.api.shared import (
 )
 from murfey.server.api.shared import (
     get_machine_config_for_instrument,
+    get_upstream_tiff_dirs,
     remove_session_by_id,
 )
 from murfey.server.murfey_db import murfey_db
@@ -420,24 +421,6 @@ async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     return upstream_visits
 
 
-def _get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
-    tiff_dirs = []
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    for directory_name in machine_config.upstream_data_tiff_locations:
-        for p in machine_config.upstream_data_directories:
-            if (Path(p) / secure_filename(visit_name)).is_dir():
-                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
-                tiff_dirs.append(processed_dir)
-                break
-    if not tiff_dirs:
-        logger.warning(
-            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
-        )
-    return tiff_dirs
-
-
 @correlative_router.get("/visits/{visit_name}/{session_id}/upstream_tiff_paths")
 async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
     """
@@ -448,7 +431,7 @@ async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     upstream_tiff_paths = []
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
+    tiff_dirs = get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
     for tiff_dir in tiff_dirs:
@@ -466,7 +449,7 @@ async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_d
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
-    tiff_dirs = _get_upstream_tiff_dirs(visit_name, instrument_name)
+    tiff_dirs = get_upstream_tiff_dirs(visit_name, instrument_name)
     if not tiff_dirs:
         return None
 

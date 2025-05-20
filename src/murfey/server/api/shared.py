@@ -1,12 +1,15 @@
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from sqlmodel import select
+from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
+from murfey.server import sanitise
 from murfey.util import safe_run
-from murfey.util.config import MachineConfig, from_file, settings
+from murfey.util.config import MachineConfig, from_file, get_machine_config, settings
 from murfey.util.db import (
     DataCollection,
     DataCollectionGroup,
@@ -16,6 +19,8 @@ from murfey.util.db import (
     RsyncInstance,
     Session,
 )
+
+logger = logging.getLogger("murfey.server.api.shared")
 
 
 @lru_cache(maxsize=5)
@@ -133,3 +138,21 @@ def get_foil_hole(session_id: int, fh_name: int, db) -> Dict[str, int]:
         .where(GridSquare.id == FoilHole.grid_square_id)
     ).all()
     return {f[1].tag: f[0].id for f in foil_holes}
+
+
+def get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
+    tiff_dirs = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    for directory_name in machine_config.upstream_data_tiff_locations:
+        for p in machine_config.upstream_data_directories:
+            if (Path(p) / secure_filename(visit_name)).is_dir():
+                processed_dir = Path(p) / secure_filename(visit_name) / directory_name
+                tiff_dirs.append(processed_dir)
+                break
+    if not tiff_dirs:
+        logger.warning(
+            f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
+        )
+    return tiff_dirs

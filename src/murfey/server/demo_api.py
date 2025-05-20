@@ -62,8 +62,6 @@ from murfey.util.models import (
     FoilHoleParameters,
     GridSquareParameters,
     RegistrationMessage,
-    RsyncerInfo,
-    RsyncerSource,
 )
 from murfey.util.processing_params import default_spa_parameters
 
@@ -197,31 +195,6 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
     return {r[0]: r[1] for r in res}
 
 
-@router.post("/sessions/{session_id}/rsyncer")
-def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
-    log.info(f"Registering rsync instance {sanitise(rsyncer_info.source)}")
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
-    rsync_instance = RsyncInstance(
-        source=rsyncer_info.source,
-        session_id=rsyncer_info.session_id,
-        transferring=rsyncer_info.transferring,
-        destination=rsyncer_info.destination,
-        tag=rsyncer_info.tag,
-    )
-    db.add(rsync_instance)
-    db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
-    prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).set(0)
-    return rsyncer_info
-
-
 @router.delete("/sessions/{session_id}/rsyncer/{source:path}")
 def delete_rsyncer(session_id: int, source: str, db=murfey_db):
     rsync_instance = db.exec(
@@ -230,34 +203,6 @@ def delete_rsyncer(session_id: int, source: str, db=murfey_db):
         .where(RsyncInstance.source == source)
     ).one()
     db.delete(rsync_instance)
-    db.commit()
-
-
-@router.post("/sessions/{session_id}/rsyncer_stopped")
-def register_stopped_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
-):
-    rsyncer = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
-    ).one()
-    rsyncer.transferring = False
-    db.add(rsyncer)
-    db.commit()
-
-
-@router.post("/sessions/{session_id}/rsyncer_started")
-def register_restarted_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
-):
-    rsyncer = db.exec(
-        select(RsyncInstance)
-        .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
-    ).one()
-    rsyncer.transferring = True
-    db.add(rsyncer)
     db.commit()
 
 
@@ -284,59 +229,6 @@ async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClien
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
     ).all()
     return SessionClients(session=session, clients=clients)
-
-
-@router.post("/visits/{visit_name}/increment_rsync_file_count")
-def increment_rsync_file_count(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
-        )
-    ).one()
-    rsync_instance.files_counted += 1
-    db.add(rsync_instance)
-    db.commit()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
-        rsyncer_info.increment_count
-    )
-
-
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files")
-def increment_rsync_transferred_files(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
-        )
-    ).one()
-    rsync_instance.files_transferred += 1
-    db.add(rsync_instance)
-    db.commit()
-
-
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
-def increment_rsync_transferred_files_prometheus(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
-):
-    prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.increment_count)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.bytes)
-    prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.increment_data_count)
-    prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    ).inc(rsyncer_info.data_bytes)
 
 
 class ProcessingDetails(BaseModel):
