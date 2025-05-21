@@ -3,11 +3,12 @@ name: Build and test
 on: [push, pull_request]
 
 env:
-  DATABASE_SCHEMA: 4.2.1 # released 2024-08-19
+  ISPYB_DATABASE_SCHEMA: 4.6.0
   # Installs from GitHub
   # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
   # Previous version(s):
-  # 4.1.0
+  # 4.2.1 # released 2024-08-19
+  # 4.1.0 # released 2024-03-26
 
 permissions:
   contents: read
@@ -53,10 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download ISPyB DB schema v${{ env.DATABASE_SCHEMA }} for tests
+      - name: Download ISPyB DB schema v${{ env.ISPYB_DATABASE_SCHEMA }} for tests
         run: |
           mkdir database
-          wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v${{ env.DATABASE_SCHEMA }}/ispyb-database-${{ env.DATABASE_SCHEMA }}.tar.gz -O database/ispyb-database.tar.gz
+          wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v${{ env.ISPYB_DATABASE_SCHEMA }}/ispyb-database-${{ env.ISPYB_DATABASE_SCHEMA }}.tar.gz -O database/ispyb-database.tar.gz
       - name: Store database artifact
         uses: actions/upload-artifact@v4
         with:

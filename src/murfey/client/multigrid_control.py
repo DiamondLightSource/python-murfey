@@ -54,6 +54,7 @@ class MultigridController:
     data_collection_parameters: dict = field(default_factory=lambda: {})
     token: str = ""
     _machine_config: dict = field(default_factory=lambda: {})
+    visit_end_time: Optional[datetime] = None
 
     def __post_init__(self):
         if self.token:
@@ -104,6 +105,15 @@ class MultigridController:
             server=self.murfey_url,
             register_client=False,
         )
+
+        if self.visit_end_time:
+            current_time = datetime.now()
+            server_timestamp = requests.get(
+                f"{self.murfey_url}{session_router.url_path_for('get_current_timestamp')}"
+            ).json()["timestamp"]
+            self.visit_end_time += current_time - datetime.fromtimestamp(
+                server_timestamp
+            )
 
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
@@ -156,7 +166,8 @@ class MultigridController:
         tag: str = "",
         limited: bool = False,
     ):
-        log.info(f"starting multigrid rsyncer: {source}")
+        log.info(f"Starting multigrid rsyncer: {source}")
+        log.debug(f"Analysis of {source} is {('enabled' if analyse else 'disabled')}")
         destination_overrides = destination_overrides or {}
         machine_data = requests.get(
             f"{self._environment.url.geturl()}{session_router.url_path_for('machine_info_by_instrument', instrument_name=self.instrument_name)}"
@@ -283,6 +294,7 @@ class MultigridController:
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
+                end_time=self.visit_end_time,
             )
 
             def rsync_result(update: RSyncerUpdate):

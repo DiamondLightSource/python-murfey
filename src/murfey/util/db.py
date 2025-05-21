@@ -3,6 +3,7 @@ Contains classes that are used to store information on the metadata and status o
 of the sessions that Murfey is overseeing, along with the relationships between them.
 """
 
+from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy
@@ -49,6 +50,7 @@ class Session(SQLModel, table=True):  # type: ignore
     current_gain_ref: str = Field(default="")
     instrument_name: str = Field(default="")
     process: bool = Field(default=True)
+    visit_end_time: Optional[datetime] = Field(default=None)
 
     # CLEM Workflow
 

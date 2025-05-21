@@ -97,6 +97,9 @@ def machine_info_by_instrument(instrument_name: str) -> Optional[MachineConfig]:
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    logger.debug(
+        f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
+    )
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
@@ -167,9 +170,24 @@ async def get_sessions(db=murfey_db):
     return res
 
 
+class VisitEndTime(BaseModel):
+    end_time: Optional[datetime] = None
+
+
 @router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
-def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
-    s = Session(name=name, visit=visit, instrument_name=instrument_name)
+def create_session(
+    instrument_name: str,
+    visit: str,
+    name: str,
+    visit_end_time: VisitEndTime,
+    db=murfey_db,
+) -> int:
+    s = Session(
+        name=name,
+        visit=visit,
+        instrument_name=instrument_name,
+        visit_end_time=visit_end_time.end_time,
+    )
     db.add(s)
     db.commit()
     sid = s.id

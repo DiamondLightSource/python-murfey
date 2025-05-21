@@ -21,15 +21,17 @@ class MultigridDirWatcher(Observer):
     ):
         super().__init__()
         self._basepath = Path(path)
-        self._skip_existing_processing = skip_existing_processing
-        self._seen_dirs: List[Path] = []
-        self._stopping = False
         self._machine_config = machine_config
+        self._seen_dirs: List[Path] = []
         self.thread = threading.Thread(
             name=f"MultigridDirWatcher {self._basepath}",
             target=self._process,
             daemon=True,
         )
+        # Toggleable settings
+        self._analyse = True
+        self._skip_existing_processing = skip_existing_processing
+        self._stopping = False
 
     def start(self):
         if self.thread.is_alive():
@@ -60,8 +62,14 @@ class MultigridDirWatcher(Observer):
                             include_mid_path=False,
                             use_suggested_path=False,
                             analyse=(
-                                d.name
-                                in self._machine_config["analyse_created_directories"]
+                                (
+                                    d.name
+                                    in self._machine_config[
+                                        "analyse_created_directories"
+                                    ]
+                                )
+                                if self._analyse
+                                else False
                             ),
                             tag="atlas",
                         )
@@ -72,7 +80,7 @@ class MultigridDirWatcher(Observer):
                             d,
                             extra_directory=f"metadata_{d.name}",
                             include_mid_path=False,
-                            analyse=True,  # not (first_loop and self._skip_existing_processing),
+                            analyse=self._analyse,
                             limited=True,
                             tag="metadata",
                         )
@@ -80,15 +88,17 @@ class MultigridDirWatcher(Observer):
                     processing_started = False
                     for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
                         if d02 not in self._seen_dirs:
-                            # if skip exisiting processing is set then do not process for any
-                            # data directories found on the first loop
-                            # this allows you to avoid triggering processing again if murfey is restarted
+                            # If 'skip_existing_processing' is set, do not process for
+                            # any data directories found on the first loop.
+                            # This allows you to avoid triggering processing again if Murfey is restarted
                             self.notify(
                                 d02,
                                 include_mid_path=False,
                                 remove_files=True,
-                                analyse=not (
-                                    first_loop and self._skip_existing_processing
+                                analyse=(
+                                    not (first_loop and self._skip_existing_processing)
+                                    if self._analyse
+                                    else False
                                 ),
                                 tag="fractions",
                             )
@@ -104,8 +114,10 @@ class MultigridDirWatcher(Observer):
                             self.notify(
                                 d02,
                                 include_mid_path=False,
-                                analyse=not (
-                                    first_loop and self._skip_existing_processing
+                                analyse=(
+                                    not (first_loop and self._skip_existing_processing)
+                                    if self._analyse
+                                    else False
                                 ),
                                 tag="fractions",
                             )

@@ -1,11 +1,16 @@
+from logging import getLogger
+
 from fastapi import APIRouter, Depends
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
+from murfey.server import sanitise
 from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import RsyncInstance
 from murfey.util.models import RsyncerInfo
+
+logger = getLogger("murfey.server.api.prometheus")
 
 router = APIRouter(
     prefix="/prometheus",
@@ -18,13 +23,22 @@ router = APIRouter(
 def increment_rsync_file_count(
     visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
-    rsync_instance = db.exec(
-        select(RsyncInstance).where(
-            RsyncInstance.source == rsyncer_info.source,
-            RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
+    try:
+        rsync_instance = db.exec(
+            select(RsyncInstance).where(
+                RsyncInstance.source == rsyncer_info.source,
+                RsyncInstance.destination == rsyncer_info.destination,
+                RsyncInstance.session_id == rsyncer_info.session_id,
+            )
+        ).one()
+    except Exception:
+        logger.error(
+            f"Failed to find rsync instance for visit {sanitise(visit_name)} "
+            "with the following properties: \n"
+            f"{rsyncer_info.dict()}",
+            exc_info=True,
         )
-    ).one()
+        return None
     rsync_instance.files_counted += rsyncer_info.increment_count
     db.add(rsync_instance)
     db.commit()

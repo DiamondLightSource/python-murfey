@@ -102,9 +102,8 @@ async def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
 ):
     data = {}
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session.instrument_name
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -134,6 +133,7 @@ async def setup_multigrid_watcher(
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
+                    "visit_end_time": session.visit_end_time,
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
@@ -153,6 +153,10 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
         instrument_name
     ]
     if machine_config.instrument_server_url:
+        log.debug(
+            f"Submitting request to start multigrid watcher for session {session_id} "
+            f"with processing {('enabled' if process else 'disabled')}"
+        )
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}/sessions/{session_id}/start_multigrid_watcher?process={'true' if process else 'false'}",
@@ -161,6 +165,7 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
                 },
             ) as resp:
                 data = await resp.json()
+    log.debug(f"Received response: {data}")
     return data
 
 
@@ -491,6 +496,7 @@ class RSyncerInfo(BaseModel):
     files_counted: int
     transferring: bool
     session_id: int
+    num_files_skipped: int = 0
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
@@ -568,6 +574,7 @@ async def get_rsyncer_info(
                 files_counted=ri.files_counted,
                 transferring=ri.transferring,
                 session_id=session_id,
+                num_files_skipped=rsync_data.get("num_files_skipped", 0),
             )
         )
     return combined_data

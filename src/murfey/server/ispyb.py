@@ -5,9 +5,6 @@ import logging
 from typing import Callable, Generator, List, Literal, Optional
 
 import ispyb
-
-# import ispyb.sqlalchemy
-import sqlalchemy.orm
 import workflows.transport
 from fastapi import Depends
 from ispyb.sqlalchemy import (
@@ -30,6 +27,8 @@ from ispyb.sqlalchemy import (
     url,
 )
 from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
@@ -39,11 +38,17 @@ log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
 
 try:
-    Session = sqlalchemy.orm.sessionmaker(
-        bind=sqlalchemy.create_engine(url(), connect_args={"use_pure": True})
+    ISPyBSession = sessionmaker(
+        bind=create_engine(
+            url(credentials=security_config.ispyb_credentials),
+            connect_args={"use_pure": True},
+        )
     )
-except AttributeError:
-    Session = lambda: None
+    log.info("Loaded ISPyB database session")
+# Catch all errors associated with loading ISPyB database
+except Exception:
+    log.error("Error loading ISPyB session", exc_info=True)
+    ISPyBSession = lambda: None
 
 
 class Visit(BaseModel):
@@ -84,11 +89,17 @@ class TransportManager:
         self.transport = workflows.transport.lookup(transport_type)()
         self.transport.connect()
         self.feedback_queue = ""
-        self.ispyb = (
-            ispyb.open(credentials=security_config.ispyb_credentials)
-            if security_config.ispyb_credentials
-            else None
-        )
+        try:
+            # Attempt to connect to ISPyB if credentials files provided
+            self.ispyb = (
+                ispyb.open(credentials=security_config.ispyb_credentials)
+                if security_config.ispyb_credentials
+                else None
+            )
+        except Exception:
+            # Log error and return None if the connection fails
+            log.error("Error encountered connecting to ISPyB server", exc_info=True)
+            self.ispyb = None
         self._connection_callback: Callable | None = None
 
     def reconnect(self):
@@ -109,7 +120,7 @@ class TransportManager:
         **kwargs,
     ):
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created DataCollectionGroup {record.dataCollectionGroupId}")
@@ -124,7 +135,7 @@ class TransportManager:
 
     def do_insert_atlas(self, record: Atlas):
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created Atlas {record.atlasId}")
@@ -141,7 +152,7 @@ class TransportManager:
         self, atlas_id: int, atlas_image: str, pixel_size: float, slot: int
     ):
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
                 atlas.atlasImage = atlas_image or atlas.atlasImage
                 atlas.pixelSize = pixel_size or atlas.pixelSize
@@ -209,7 +220,7 @@ class TransportManager:
             pixelSize=grid_square_parameters.pixel_size,
         )
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created GridSquare {record.gridSquareId}")
@@ -226,7 +237,7 @@ class TransportManager:
         self, grid_square_id: int, grid_square_parameters: GridSquareParameters
     ):
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 grid_square = (
                     db.query(GridSquare)
                     .filter(GridSquare.gridSquareId == grid_square_id)
@@ -317,7 +328,7 @@ class TransportManager:
             pixelSize=foil_hole_parameters.pixel_size,
         )
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created FoilHole {record.foilHoleId}")
@@ -337,7 +348,7 @@ class TransportManager:
         foil_hole_parameters: FoilHoleParameters,
     ):
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 foil_hole = (
                     db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
                 )
@@ -395,7 +406,7 @@ class TransportManager:
             else "Created for Murfey"
         )
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 record.comments = comment
                 db.add(record)
                 db.commit()
@@ -411,7 +422,7 @@ class TransportManager:
 
     def do_insert_sample_group(self, record: BLSampleGroup) -> dict:
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created BLSampleGroup {record.blSampleGroupId}")
@@ -426,7 +437,7 @@ class TransportManager:
 
     def do_insert_sample(self, record: BLSample, sample_group_id: int) -> dict:
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created BLSample {record.blSampleId}")
@@ -449,7 +460,7 @@ class TransportManager:
 
     def do_insert_subsample(self, record: BLSubSample) -> dict:
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created BLSubSample {record.blSubSampleId}")
@@ -464,7 +475,7 @@ class TransportManager:
 
     def do_insert_sample_image(self, record: BLSampleImage) -> dict:
         try:
-            with Session() as db:
+            with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
                 log.info(f"Created BLSampleImage {record.blSampleImageId}")
@@ -547,7 +558,7 @@ class TransportManager:
             return {"success": False, "return_value": None}
 
     def do_buffer_lookup(self, app_id: int, uuid: int) -> Optional[int]:
-        with Session() as db:
+        with ISPyBSession() as db:
             buffer_objects = (
                 db.query(ZcZocaloBuffer)
                 .filter_by(AutoProcProgramID=app_id, UUID=uuid)
@@ -558,8 +569,8 @@ class TransportManager:
         return reference
 
 
-def _get_session() -> Generator[Optional[sqlalchemy.orm.Session], None, None]:
-    db = Session()
+def _get_session() -> Generator[Optional[Session], None, None]:
+    db = ISPyBSession()
     if db is None:
         yield None
         return
@@ -578,7 +589,7 @@ def get_session_id(
     proposal_code: str,
     proposal_number: str,
     visit_number: str,
-    db: sqlalchemy.orm.Session | None,
+    db: Session | None,
 ) -> int | None:
 
     # Log received lookup parameters
@@ -611,9 +622,7 @@ def get_session_id(
     return res
 
 
-def get_proposal_id(
-    proposal_code: str, proposal_number: str, db: sqlalchemy.orm.Session
-) -> int:
+def get_proposal_id(proposal_code: str, proposal_number: str, db: Session) -> int:
     query = (
         db.query(Proposal)
         .filter(
@@ -625,10 +634,9 @@ def get_proposal_id(
     return query[0].proposalId
 
 
-def get_all_ongoing_visits(
-    microscope: str, db: sqlalchemy.orm.Session | None
-) -> list[Visit]:
+def get_all_ongoing_visits(microscope: str, db: Session | None) -> list[Visit]:
     if db is None:
+        print("No database found")
         return []
     query = (
         db.query(BLSession)
@@ -661,16 +669,3 @@ def get_all_ongoing_visits(
         )
         for row in query
     ]
-
-
-def get_data_collection_group_ids(session_id):
-    query = (
-        Session()
-        .query(DataCollectionGroup)
-        .filter(
-            DataCollectionGroup.sessionId == session_id,
-        )
-        .all()
-    )
-    dcgids = [row.dataCollectionGroupId for row in query]
-    return dcgids

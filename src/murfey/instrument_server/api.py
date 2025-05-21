@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from logging import getLogger
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -27,9 +27,9 @@ from murfey.util.models import File, Token
 
 logger = getLogger("murfey.instrument_server.api")
 
-watchers: Dict[Union[str, int], MultigridDirWatcher] = {}
-rsyncers: Dict[str, RSyncer] = {}
-controllers: Dict[int, MultigridController] = {}
+watchers: dict[str | int, MultigridDirWatcher] = {}
+rsyncers: dict[str, RSyncer] = {}
+controllers: dict[int, MultigridController] = {}
 data_collection_parameters: dict = {}
 tokens = {}
 
@@ -160,6 +160,7 @@ def setup_multigrid_watcher(
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
         rsync_restarts=watcher_spec.rsync_restarts,
+        visit_end_time=watcher_spec.visit_end_time,
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
@@ -255,6 +256,7 @@ class ObserverInfo(BaseModel):
     num_files_in_queue: int
     alive: bool
     stopping: bool
+    num_files_skipped: int = 0
 
 
 @router.get("/sessions/{session_id}/rsyncer_info")
@@ -268,6 +270,7 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
                 num_files_in_queue=v.queue.qsize(),
                 alive=v.thread.is_alive(),
                 stopping=v._stopping,
+                num_files_skipped=len(v._skipped_files),
             )
         )
     return info
@@ -323,7 +326,7 @@ def register_processing_parameters(
 )
 def get_possible_gain_references(
     instrument_name: str, session_id: MurfeySessionID
-) -> List[File]:
+) -> list[File]:
     machine_config = requests.get(
         f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},

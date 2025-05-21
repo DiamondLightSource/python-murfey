@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -66,6 +67,11 @@ router = APIRouter(
 )
 
 
+@router.get("/time")
+async def get_current_timestamp():
+    return {"timestamp": datetime.now().timestamp()}
+
+
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_instrument(instrument_name: str) -> Optional[MachineConfig]:
     return get_machine_config_for_instrument(instrument_name)
@@ -82,6 +88,9 @@ async def new_client_id(db=murfey_db):
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    logger.debug(
+        f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
+    )
     return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
