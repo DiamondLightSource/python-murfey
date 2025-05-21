@@ -280,7 +280,7 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
-            ts_url = f"{str(environment.url.geturl())}{workflow_tomo_router.url_path_for('register_tile_series', visit_name=environment.visit)}"
+            ts_url = f"{str(environment.url.geturl())}{workflow_tomo_router.url_path_for('register_tilt_series', visit_name=environment.visit)}"
             ts_data = {
                 "session_id": environment.murfey_session,
                 "tag": tilt_series,
