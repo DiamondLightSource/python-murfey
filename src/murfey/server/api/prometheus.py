@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 from logging import getLogger
+from typing import Optional
 
 from fastapi import APIRouter, Depends
+from prometheus_client import Counter, Gauge
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
@@ -90,3 +94,30 @@ def increment_rsync_transferred_files_prometheus(
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)
     prom.monitoring_switch.labels(visit=visit_name).set(on)
+
+
+@router.get("metrics/{metric_name}")
+def inspect_prometheus_metrics(
+    metric_name: str,
+):
+    """
+    A debugging endpoint that returns the current contents of any Prometheus
+    gauges and counters that have been set up thus far.
+    """
+
+    # Extract the Prometheus metric defined in the Prometheus module
+    metric: Optional[Counter | Gauge] = getattr(prom, metric_name, None)
+    if metric is None or not isinstance(metric, (Counter, Gauge)):
+        raise LookupError("No matching metric was found")
+
+    # Package contents into dict and return
+    results = {}
+    if hasattr(metric, "_metrics"):
+        for i, (label_tuple, sub_metric) in enumerate(metric._metrics.items()):
+            labels = dict(zip(metric._labelnames, label_tuple))
+            labels["value"] = sub_metric._value.get()
+            results[i] = labels
+        return results
+    else:
+        value = metric._value.get()
+        return {"value": value}
