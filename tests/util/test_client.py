@@ -70,7 +70,7 @@ test_get_visit_list_params_matrix = (
 
 
 @mark.parametrize("test_params", test_get_visit_list_params_matrix)
-@patch("murfey.util.client.requests")
+@patch("murfey.client.requests")
 def test_get_visit_list(
     mock_request,
     test_params: tuple[str],
