@@ -6,11 +6,8 @@ from urllib.parse import urlparse
 
 from pytest import mark
 
-from murfey.util.client import (
-    _get_visit_list,
-    read_config,
-    set_default_acquisition_output,
-)
+from murfey.client import _get_visit_list
+from murfey.util.client import read_config, set_default_acquisition_output
 from murfey.util.models import Visit
 
 test_read_config_params_matrix = (
