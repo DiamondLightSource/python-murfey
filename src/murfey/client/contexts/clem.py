@@ -4,7 +4,6 @@ the CLEM workflow should be processed.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
 from urllib.parse import quote
@@ -31,13 +30,16 @@ def _file_transferred_to(
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
-    # rsync basepath and modules are set in the microscope's configuration YAML file
-    return (
-        Path(machine_config.get("rsync_basepath", ""))
-        / str(datetime.now().year)
-        / source.name
-        / file_path.relative_to(source)
+
+    # Construct destination path
+    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
+        environment.default_destinations[source]
     )
+    # Add the visit number to the path if it's not present in 'source'
+    if environment.visit not in environment.default_destinations[source]:
+        base_destination = base_destination / environment.visit
+    destination = base_destination / file_path.relative_to(source)
+    return destination
 
 
 def _get_source(
