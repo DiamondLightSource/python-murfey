@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+import murfey.server.ispyb
 import murfey.server.prometheus as prom
 
 try:
@@ -43,7 +44,12 @@ from murfey.util.db import (
     RsyncInstance,
     Session,
 )
-from murfey.util.models import FoilHoleParameters, GridSquareParameters, RsyncerInfo
+from murfey.util.models import (
+    FoilHoleParameters,
+    GridSquareParameters,
+    RsyncerInfo,
+    Visit,
+)
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
 )
@@ -72,6 +78,11 @@ async def new_client_id(db=murfey_db):
         return {"new_id": 0}
     sorted_ids = sorted([c.client_id for c in clients])
     return {"new_id": sorted_ids[-1] + 1}
+
+
+@router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+    return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
 
 
 class SessionInfo(BaseModel):
