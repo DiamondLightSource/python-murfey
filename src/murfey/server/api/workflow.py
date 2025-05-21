@@ -33,12 +33,12 @@ from murfey.server import (
     get_angle,
     get_job_ids,
     get_tomo_proc_params,
-    sanitise,
 )
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.ispyb import DB, get_proposal_id
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,

@@ -40,7 +40,6 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
-from werkzeug.utils import secure_filename
 from workflows import Error as WorkflowsError
 from workflows.transport.pika_transport import PikaTransport
 
@@ -49,7 +48,7 @@ import murfey.server.prometheus as prom
 import murfey.util.db as db
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.server.murfey_db import url  # murfey_db
-from murfey.util import LogFilter
+from murfey.util import LogFilter, sanitise
 from murfey.util.config import (
     MachineConfig,
     get_hostname,
@@ -92,14 +91,6 @@ class JobIDs(NamedTuple):
     dcid: int
     pid: int
     appid: int
-
-
-def sanitise(in_string: str) -> str:
-    return in_string.replace("\r\n", "").replace("\n", "")
-
-
-def sanitise_path(in_path: Path) -> Path:
-    return Path("/".join(secure_filename(p) for p in in_path.parts))
 
 
 def get_angle(tilt_file_name: str) -> float:

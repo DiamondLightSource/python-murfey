@@ -12,13 +12,7 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.ispyb
 import murfey.server.websocket as ws
-from murfey.server import (
-    _transport_object,
-    get_hostname,
-    get_microscope,
-    sanitise,
-    templates,
-)
+from murfey.server import _transport_object, get_hostname, get_microscope, templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
@@ -34,6 +28,7 @@ from murfey.server.api.shared import (
     remove_session_by_id,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     ClientEnvironment,

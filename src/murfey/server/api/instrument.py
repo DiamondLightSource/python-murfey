@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-from murfey.server import sanitise
 from murfey.server.api.auth import (
     MurfeySessionID,
     create_access_token,
@@ -21,7 +20,7 @@ from murfey.server.api.auth import (
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
-from murfey.util import secure_path
+from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup

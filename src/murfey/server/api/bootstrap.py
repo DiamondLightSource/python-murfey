@@ -29,7 +29,8 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 import murfey
-from murfey.server import get_machine_config, respond_with_template
+from murfey.server import respond_with_template
+from murfey.util.config import get_machine_config
 
 tag = {
     "name": "bootstrap",

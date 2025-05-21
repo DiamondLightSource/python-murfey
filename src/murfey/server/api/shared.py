@@ -7,8 +7,7 @@ from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
-from murfey.server import sanitise
-from murfey.util import safe_run
+from murfey.util import safe_run, sanitise
 from murfey.util.config import MachineConfig, from_file, get_machine_config, settings
 from murfey.util.db import (
     DataCollection,

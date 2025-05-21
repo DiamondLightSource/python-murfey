@@ -8,11 +8,10 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-from murfey.server import sanitise
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
-from murfey.util import secure_path
+from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import Session, SessionProcessingParameters
 from murfey.util.eer import num_frames

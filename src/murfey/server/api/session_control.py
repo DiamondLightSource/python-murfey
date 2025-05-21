@@ -17,7 +17,7 @@ try:
     from murfey.server.ispyb import DB
 except ImportError:
     DB = None
-from murfey.server import _transport_object, sanitise
+from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
@@ -33,6 +33,7 @@ from murfey.server.api.shared import (
     remove_session_by_id,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     AutoProcProgram,

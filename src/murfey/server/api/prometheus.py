@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
-from murfey.server import sanitise
 from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.db import RsyncInstance
 from murfey.util.models import RsyncerInfo
 
