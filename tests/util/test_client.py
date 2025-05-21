@@ -109,7 +109,9 @@ def test_get_visit_list(
         visits = _get_visit_list(urlparse(server_url), instrument_name)
 
     # Check that request was sent with the correct URL
-    expected_url = f"{server_url}/instruments/{instrument_name}/visits_raw"
+    expected_url = (
+        f"{server_url}/session_control/instruments/{instrument_name}/visits_raw"
+    )
     mock_request.get.assert_called_once_with(expected_url)
 
     # Check that expected outputs are correct (order-sensitive)
