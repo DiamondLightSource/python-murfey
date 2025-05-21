@@ -20,17 +20,19 @@ import logging
 import random
 import re
 import zipfile
+from importlib.resources import files
 from io import BytesIO
+from typing import Any
 from urllib.parse import quote
 
 import packaging.version
 import requests
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
 
 import murfey
-from murfey.server import respond_with_template
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_hostname, get_machine_config, get_microscope
 
 tag = {
     "name": "bootstrap",
@@ -98,6 +100,27 @@ def get_version(client_version: str = ""):
 GENERAL BOOTSTRAP-RELATED API ENDPOINTS
 =======================================================================================
 """
+
+template_files = files("murfey") / "templates"
+templates = Jinja2Templates(directory=template_files)
+
+
+def respond_with_template(
+    request: Request, filename: str, parameters: dict[str, Any] | None = None
+):
+    template_parameters = {
+        "hostname": get_hostname(),
+        "microscope": get_microscope(),
+        "version": murfey.__version__,
+        # Extra parameters to reconstruct URLs for forwarded requests
+        "netloc": request.url.netloc,
+        "proxy_path": "",
+    }
+    if parameters:
+        template_parameters.update(parameters)
+    return templates.TemplateResponse(
+        request=request, name=filename, context=template_parameters
+    )
 
 
 @bootstrap.get("/", response_class=HTMLResponse)
