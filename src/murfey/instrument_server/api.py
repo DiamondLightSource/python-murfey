@@ -191,9 +191,7 @@ def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
     if watchers.get(session_id) is None:
         return {"success": False}
     if not process:
-        watchers[session_id]._listeners = [
-            partial(watchers[session_id]._listeners[0], analyse=False)
-        ]
+        watchers[session_id]._analyse = False
     watchers[session_id].start()
     return {"success": True}
 
