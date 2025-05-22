@@ -18,7 +18,7 @@ from sqlmodel import Session as MurfeySession
 from sqlmodel import create_engine, select
 
 from murfey.client.contexts.spa import _get_xml_list_index
-from murfey.server import _murfey_id, _register
+from murfey.server.feedback import _murfey_id, _register
 from murfey.server.ispyb import ISPyBSession, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
