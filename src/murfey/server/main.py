@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from backports.entry_points_selectable import entry_points
 from fastapi import FastAPI
@@ -28,13 +27,6 @@ import murfey.server.api.workflow
 import murfey.server.websocket
 from murfey.server import template_files
 from murfey.util.config import get_security_config
-
-# Import Murfey server or demo server based on settings
-if os.getenv("MURFEY_DEMO"):
-    from murfey.server.demo_api import router
-else:
-    from murfey.server.api import router
-
 
 log = logging.getLogger("murfey.server.main")
 
@@ -66,7 +58,6 @@ app.mount("/static", StaticFiles(directory=template_files / "static"), name="sta
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
 # Add router endpoints to the API
-app.include_router(router)
 app.include_router(murfey.server.api.bootstrap.version)
 app.include_router(murfey.server.api.bootstrap.bootstrap)
 app.include_router(murfey.server.api.bootstrap.cygwin)
