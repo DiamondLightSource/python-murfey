@@ -10,8 +10,8 @@ from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+import murfey
 import murfey.server.api.websocket as ws
-import murfey.server.ispyb
 from murfey.server import _transport_object
 from murfey.server.api import templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
@@ -28,6 +28,8 @@ from murfey.server.api.shared import (
     get_upstream_tiff_dirs,
     remove_session_by_id,
 )
+from murfey.server.ispyb import DB as ispyb_db
+from murfey.server.ispyb import get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import (
@@ -77,7 +79,7 @@ async def root(request: Request):
 
 
 @router.get("/health/")
-def health_check(db=murfey.server.ispyb.DB):
+def health_check(db=ispyb_db):
     conn = db.connection()
     conn.close()
     return {
@@ -97,16 +99,16 @@ def machine_info_by_instrument(instrument_name: str) -> Optional[MachineConfig]:
 
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+def get_current_visits(instrument_name: str, db=ispyb_db):
     logger.debug(
         f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
     )
-    return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
+    return get_all_ongoing_visits(instrument_name, db)
 
 
 @router.get("/instruments/{instrument_name}/visits/")
-def all_visit_info(instrument_name: str, request: Request, db=murfey.server.ispyb.DB):
-    visits = murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
+def all_visit_info(instrument_name: str, request: Request, db=ispyb_db):
+    visits = get_all_ongoing_visits(instrument_name, db)
 
     if visits:
         return_query = [

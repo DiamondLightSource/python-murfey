@@ -36,7 +36,8 @@ from murfey.server.feedback import (
     get_job_ids,
     get_tomo_proc_params,
 )
-from murfey.server.ispyb import DB, get_proposal_id
+from murfey.server.ispyb import DB as ispyb_db
+from murfey.server.ispyb import get_proposal_id
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config
@@ -922,7 +923,7 @@ class Sample(BaseModel):
 
 
 @correlative_router.get("/visit/{visit_name}/samples")
-def get_samples(visit_name: str, db=DB) -> List[Sample]:
+def get_samples(visit_name: str, db=ispyb_db) -> List[Sample]:
     proposal_id = get_proposal_id(visit_name[:2], visit_name.split("-")[0][2:], db)
     samples = (
         db.query(BLSampleGroup, BLSampleGroupHasBLSample, BLSample, BLSubSample)
@@ -948,7 +949,7 @@ def get_samples(visit_name: str, db=DB) -> List[Sample]:
 
 
 @correlative_router.post("/visit/{visit_name}/sample_group")
-def register_sample_group(visit_name: str, db=DB) -> dict:
+def register_sample_group(visit_name: str, db=ispyb_db) -> dict:
     proposal_id = get_proposal_id(visit_name[:2], visit_name.split("-")[0][2:], db=db)
     record = BLSampleGroup(proposalId=proposal_id)
     if _transport_object:

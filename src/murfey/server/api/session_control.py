@@ -10,13 +10,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-import murfey.server.ispyb
 import murfey.server.prometheus as prom
-
-try:
-    from murfey.server.ispyb import DB
-except ImportError:
-    DB = None
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
@@ -32,6 +26,8 @@ from murfey.server.api.shared import (
     get_upstream_tiff_dirs,
     remove_session_by_id,
 )
+from murfey.server.ispyb import DB as ispyb_db
+from murfey.server.ispyb import get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import MachineConfig, get_machine_config
@@ -88,11 +84,11 @@ async def new_client_id(db=murfey_db):
 
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-def get_current_visits(instrument_name: str, db=murfey.server.ispyb.DB):
+def get_current_visits(instrument_name: str, db=ispyb_db):
     logger.debug(
         f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
     )
-    return murfey.server.ispyb.get_all_ongoing_visits(instrument_name, db)
+    return get_all_ongoing_visits(instrument_name, db)
 
 
 class SessionInfo(BaseModel):
@@ -142,7 +138,7 @@ def remove_session(session_id: MurfeySessionID, db=murfey_db):
 
 @router.post("/sessions/{session_id}/successful_processing")
 def register_processing_success_in_ispyb(
-    session_id: MurfeySessionID, db=DB, murfey_db=murfey_db
+    session_id: MurfeySessionID, db=ispyb_db, murfey_db=murfey_db
 ):
     collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)

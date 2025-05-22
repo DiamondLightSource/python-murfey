@@ -580,8 +580,8 @@ def _get_session() -> Generator[Optional[Session], None, None]:
         db.close()
 
 
-DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
+DB = Depends(_get_session)
 
 
 def get_session_id(
