@@ -60,7 +60,7 @@ logger = getLogger("murfey.server.api.session_control")
 router = APIRouter(
     prefix="/session_control",
     dependencies=[Depends(validate_token)],
-    tags=["session control"],
+    tags=["Session Control: General"],
 )
 
 
@@ -279,7 +279,7 @@ def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
 spa_router = APIRouter(
     prefix="/session_control/spa",
     dependencies=[Depends(validate_token)],
-    tags=["session control for SPA"],
+    tags=["Session Control: SPA"],
 )
 
 
@@ -337,7 +337,7 @@ def register_foil_hole(
 correlative_router = APIRouter(
     prefix="/session_control/correlative",
     dependencies=[Depends(validate_token)],
-    tags=["session control for correlative imaging"],
+    tags=["Session Control: Correlative Imaging"],
 )
 
 

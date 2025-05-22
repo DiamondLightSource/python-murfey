@@ -21,7 +21,7 @@ logger = getLogger("murfey.server.api.file_manip")
 router = APIRouter(
     prefix="/file_manipulation",
     dependencies=[Depends(validate_token)],
-    tags=["file manipulation"],
+    tags=["File Manipulation"],
 )
 
 

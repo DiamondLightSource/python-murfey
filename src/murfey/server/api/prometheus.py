@@ -19,7 +19,7 @@ logger = getLogger("murfey.server.api.prometheus")
 router = APIRouter(
     prefix="/prometheus",
     dependencies=[Depends(validate_token)],
-    tags=["prometheus"],
+    tags=["Prometheus"],
 )
 
 

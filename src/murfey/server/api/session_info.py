@@ -60,7 +60,7 @@ logger = getLogger("murfey.server.api.session_info")
 router = APIRouter(
     prefix="/session_info",
     dependencies=[Depends(validate_token)],
-    tags=["session info"],
+    tags=["Session Info: General"],
 )
 
 
@@ -286,7 +286,7 @@ def update_current_gain_ref(
 spa_router = APIRouter(
     prefix="/session_info/spa",
     dependencies=[Depends(validate_token)],
-    tags=["session info for SPA"],
+    tags=["Session Info: SPA"],
 )
 
 
@@ -395,7 +395,7 @@ def get_foil_hole(
 tomo_router = APIRouter(
     prefix="/session_info/tomo",
     dependencies=[Depends(validate_token)],
-    tags=["session info for cryoET"],
+    tags=["Session Info: CryoET"],
 )
 
 
@@ -421,7 +421,7 @@ def get_tilts(
 correlative_router = APIRouter(
     prefix="/session_info/correlative",
     dependencies=[Depends(validate_token)],
-    tags=["session info for correlative imaging"],
+    tags=["Session Info: Correlative Imaging"],
 )
 
 

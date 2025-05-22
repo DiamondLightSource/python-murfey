@@ -9,7 +9,7 @@ from murfey.util.config import get_machine_config
 from murfey.util.db import DataCollectionGroup, FoilHole, GridSquare
 
 # Create APIRouter class object
-router = APIRouter(prefix="/display", tags=["display"])
+router = APIRouter(prefix="/display", tags=["Display"])
 machine_config = get_machine_config()
 
 

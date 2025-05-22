@@ -12,7 +12,7 @@ from murfey.util.config import get_machine_config
 from murfey.util.db import Session as MurfeySession
 
 # Create APIRouter class object
-router = APIRouter()
+router = APIRouter(tags=["Workflows: crYOLO Models"])
 
 
 @lru_cache(maxsize=5)

@@ -29,7 +29,7 @@ from murfey.util.models import File, MultigridWatcherSetup
 router = APIRouter(
     prefix="/instrument_server",
     dependencies=[Depends(validate_token)],
-    tags=["instrument_server"],
+    tags=["Instrument Server"],
 )
 
 log = logging.getLogger("murfey.server.instrument")

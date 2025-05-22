@@ -10,7 +10,7 @@ from murfey.util.db import MagnificationLookup
 router = APIRouter(
     prefix="/mag_table",
     dependencies=[Depends(validate_token)],
-    tags=["magnification table"],
+    tags=["Magnification Table"],
 )
 
 

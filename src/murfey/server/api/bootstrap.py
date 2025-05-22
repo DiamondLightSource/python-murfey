@@ -34,7 +34,7 @@ from murfey.server.api import templates
 from murfey.util.config import get_hostname, get_machine_config, get_microscope
 
 tag = {
-    "name": "bootstrap",
+    "name": "Bootstrap",
     "description": __doc__,
     "externalDocs": {
         "description": "PEP 503",
@@ -44,13 +44,13 @@ tag = {
 
 # Set up API endpoint groups
 # NOTE: Routers MUST have prefixes. prefix="" causes an error
-version = APIRouter(prefix="/version", tags=["bootstrap"])
-bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
-cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
-msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
-rust = APIRouter(prefix="/rust", tags=["bootstrap"])
-pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
-plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
+version = APIRouter(prefix="/version", tags=["Bootstrap"])
+bootstrap = APIRouter(prefix="/bootstrap", tags=["Bootstrap"])
+cygwin = APIRouter(prefix="/cygwin", tags=["Bootstrap"])
+msys2 = APIRouter(prefix="/msys2", tags=["Bootstrap"])
+rust = APIRouter(prefix="/rust", tags=["Bootstrap"])
+pypi = APIRouter(prefix="/pypi", tags=["Bootstrap"])
+plugins = APIRouter(prefix="/plugins", tags=["Bootstrap"])
 
 logger = logging.getLogger("murfey.server.api.bootstrap")
 

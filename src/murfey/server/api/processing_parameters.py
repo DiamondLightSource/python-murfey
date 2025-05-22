@@ -15,7 +15,7 @@ logger = getLogger("murfey.server.api.processing_parameters")
 router = APIRouter(
     prefix="/session_parameters",
     dependencies=[Depends(validate_token)],
-    tags=["processing parameters"],
+    tags=["Processing Parameters"],
 )
 
 

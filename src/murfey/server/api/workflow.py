@@ -64,7 +64,9 @@ from murfey.util.tomo import midpoint
 logger = getLogger("murfey.server.api.workflow")
 
 router = APIRouter(
-    prefix="/workflow", dependencies=[Depends(validate_token)], tags=["workflow"]
+    prefix="/workflow",
+    dependencies=[Depends(validate_token)],
+    tags=["Workflows: General"],
 )
 
 
@@ -284,7 +286,7 @@ def register_proc(
 spa_router = APIRouter(
     prefix="/workflow/spa",
     dependencies=[Depends(validate_token)],
-    tags=["workflow SPA"],
+    tags=["Workflows: SPA"],
 )
 
 
@@ -513,7 +515,7 @@ async def request_spa_preprocessing(
 tomo_router = APIRouter(
     prefix="/workflow/tomo",
     dependencies=[Depends(validate_token)],
-    tags=["workflow cryoET"],
+    tags=["Workflows: CryoET"],
 )
 
 
@@ -911,7 +913,7 @@ async def register_tilt(
 correlative_router = APIRouter(
     prefix="/workflow/correlative",
     dependencies=[Depends(validate_token)],
-    tags=["workflow correlative imaging"],
+    tags=["Workflows: Correlative Imaging"],
 )
 
 
