@@ -23,8 +23,8 @@ import murfey.server.api.prometheus
 import murfey.server.api.session_control
 import murfey.server.api.session_info
 import murfey.server.api.spa
+import murfey.server.api.websocket
 import murfey.server.api.workflow
-import murfey.server.websocket
 from murfey.server import template_files
 from murfey.util.config import get_security_config
 
@@ -85,7 +85,7 @@ app.include_router(murfey.server.api.workflow.router)
 app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
-app.include_router(murfey.server.websocket.ws)
+app.include_router(murfey.server.api.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey
 for r in entry_points(group="murfey.routers"):

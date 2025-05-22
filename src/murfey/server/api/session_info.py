@@ -10,8 +10,8 @@ from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+import murfey.server.api.websocket as ws
 import murfey.server.ispyb
-import murfey.server.websocket as ws
 from murfey.server import _transport_object
 from murfey.server.api import templates
 from murfey.server.api.auth import MurfeySessionID, validate_token
