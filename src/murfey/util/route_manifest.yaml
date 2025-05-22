@@ -1,0 +1,708 @@
+murfey.instrument_server.api.router:
+  - path: /health
+    function: health
+    methods:
+      - GET
+  - path: /token
+    function: token_handshake
+    methods:
+      - POST
+  - path: /sessions/{session_id}/token
+    function: token_handshake_for_session
+    methods:
+      - POST
+  - path: /sessions/{session_id}/check_token
+    function: check_token
+    methods:
+      - GET
+  - path: /sessions/{session_id}/multigrid_watcher
+    function: setup_multigrid_watcher
+    methods:
+      - POST
+  - path: /sessions/{session_id}/start_multigrid_watcher
+    function: start_multigrid_watcher
+    methods:
+      - POST
+  - path: /sessions/{session_id}/multigrid_watcher/{label}
+    function: stop_multigrid_watcher
+    methods:
+      - DELETE
+  - path: /sessions/{session_id}/stop_rsyncer
+    function: stop_rsyncer
+    methods:
+      - POST
+  - path: /sessions/{session_id}/remove_rsyncer
+    function: remove_rsyncer
+    methods:
+      - POST
+  - path: /sessions/{session_id}/abandon_controller
+    function: abandon_controller
+    methods:
+      - POST
+  - path: /sessions/{session_id}/finalise_rsyncer
+    function: finalise_rsyncer
+    methods:
+      - POST
+  - path: /sessions/{session_id}/finalise_session
+    function: finalise_session
+    methods:
+      - POST
+  - path: /sessions/{session_id}/restart_rsyncer
+    function: restart_rsyncer
+    methods:
+      - POST
+  - path: /sessions/{session_id}/rsyncer_info
+    function: get_rsyncer_info
+    methods:
+      - GET
+  - path: /sessions/{session_id}/analyser_info
+    function: get_analyser_info
+    methods:
+      - GET
+  - path: /sessions/{session_id}/processing_parameters
+    function: register_processing_parameters
+    methods:
+      - POST
+  - path: /instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
+    function: get_possible_gain_references
+    methods:
+      - GET
+  - path: /instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference
+    function: upload_gain_reference
+    methods:
+      - POST
+  - path: /visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
+    function: gather_upstream_tiffs
+    methods:
+      - POST
+murfey.server.api.auth.router:
+  - path: /token
+    function: generate_token
+    methods:
+      - POST
+  - path: /sessions/{session_id}/token
+    function: mint_session_token
+    methods:
+      - GET
+  - path: /validate_token
+    function: simple_token_validation
+    methods:
+      - GET
+murfey.server.api.bootstrap.bootstrap:
+  - path: /bootstrap/
+    function: get_bootstrap_instructions
+    methods:
+      - GET
+  - path: /bootstrap/pip.whl
+    function: get_pip_wheel
+    methods:
+      - GET
+  - path: /bootstrap/murfey.whl
+    function: get_murfey_wheel
+    methods:
+      - GET
+murfey.server.api.bootstrap.cygwin:
+  - path: /cygwin/setup-x86_64.exe
+    function: get_cygwin_setup
+    methods:
+      - GET
+  - path: /cygwin/{request_path:path}
+    function: parse_cygwin_request
+    methods:
+      - GET
+murfey.server.api.bootstrap.msys2:
+  - path: /msys2/config/pacman.d.zip
+    function: get_pacman_mirrors
+    methods:
+      - GET
+  - path: /msys2/repo/distrib/{setup_file}
+    function: get_msys2_setup
+    methods:
+      - GET
+  - path: /msys2/repo/
+    function: get_msys2_main_index
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/
+    function: get_msys2_environment_index
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/{environment}/
+    function: get_msys2_package_index
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/{environment}/{package}
+    function: get_msys2_package_file
+    methods:
+      - GET
+murfey.server.api.bootstrap.plugins:
+  - path: /plugins/instruments/{instrument_name}/{package}
+    function: get_plugin_wheel
+    methods:
+      - GET
+murfey.server.api.bootstrap.pypi:
+  - path: /pypi/
+    function: get_pypi_index
+    methods:
+      - GET
+  - path: /pypi/{package}/
+    function: get_pypi_package_downloads_list
+    methods:
+      - GET
+  - path: /pypi/{package}/{filename}
+    function: get_pypi_file
+    methods:
+      - GET
+murfey.server.api.bootstrap.rust:
+  - path: /rust/cargo/config.toml
+    function: get_cargo_config
+    methods:
+      - GET
+  - path: /rust/index/
+    function: get_index_page
+    methods:
+      - GET
+  - path: /rust/index/config.json
+    function: get_index_config
+    methods:
+      - GET
+  - path: /rust/index/{c1}/{c2}/{package}
+    function: get_index_package_metadata
+    methods:
+      - GET
+  - path: /rust/index/{n}/{package}
+    function: get_index_package_metadata_for_short_package_names
+    methods:
+      - GET
+  - path: /rust/crates/{package}/{version}/download
+    function: get_rust_package_download
+    methods:
+      - GET
+  - path: /rust/api/v1/crates
+    function: get_rust_api_package_index
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}
+    function: get_rust_api_package_info
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}/versions
+    function: get_rust_api_package_versions
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}/{version}/download
+    function: get_rust_api_package_download
+    methods:
+      - GET
+  - path: /rust/crates/{package}/{crate}
+    function: get_rust_package_crate
+    methods:
+      - GET
+murfey.server.api.bootstrap.version:
+  - path: /version/
+    function: get_version
+    methods:
+      - GET
+murfey.server.api.clem.router:
+  - path: /sessions/{session_id}/clem/lif_files
+    function: register_lif_file
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/tiff_files
+    function: register_tiff_file
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/metadata_files
+    function: register_clem_metadata
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/image_series
+    function: register_image_series
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/image_stacks
+    function: register_image_stack
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/preprocessing/process_raw_lifs
+    function: process_raw_lifs
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/preprocessing/process_raw_tiffs
+    function: process_raw_tiffs
+    methods:
+      - POST
+  - path: /sessions/{session_id}/clem/processing/align_and_merge_stacks
+    function: align_and_merge_stacks
+    methods:
+      - POST
+murfey.server.api.display.router:
+  - path: /display/instruments/{instrument_name}/instrument_name
+    function: get_instrument_display_name
+    methods:
+      - GET
+  - path: /display/instruments/{instrument_name}/image/
+    function: get_mic_image
+    methods:
+      - GET
+  - path: /display/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{grid_square_name}/image
+    function: get_grid_square_img
+    methods:
+      - GET
+  - path: /display/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{grid_square_name}/foil_holes/{foil_hole_name}/image
+    function: get_foil_hole_img
+    methods:
+      - GET
+murfey.server.api.file_manip.router:
+  - path: /file_manipulation/visits/{visit_name}/{session_id}/suggested_path
+    function: suggest_path
+    methods:
+      - POST
+  - path: /file_manipulation/sessions/{session_id}/make_rsyncer_destination
+    function: make_rsyncer_destination
+    methods:
+      - POST
+  - path: /file_manipulation/sessions/{session_id}/process_gain
+    function: process_gain
+    methods:
+      - POST
+  - path: /file_manipulation/visits/{visit_name}/{session_id}/eer_fractionation_file
+    function: write_eer_fractionation_file
+    methods:
+      - POST
+murfey.server.api.hub.router:
+  - path: /instruments
+    function: get_instrument_info
+    methods:
+      - GET
+  - path: /instrument/{instrument_name}/image
+    function: get_instrument_image
+    methods:
+      - GET
+murfey.server.api.instrument.router:
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server
+    function: activate_instrument_server_for_session
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/active
+    function: check_if_session_is_active
+    methods:
+      - GET
+  - path: /instrument_server/sessions/{session_id}/multigrid_watcher
+    function: setup_multigrid_watcher
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/start_multigrid_watcher
+    function: start_multigrid_watcher
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/provided_processing_parameters
+    function: pass_proc_params_to_instrument_server
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/instrument_server
+    function: check_instrument_server
+    methods:
+      - GET
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
+    function: get_possible_gain_references
+    methods:
+      - GET
+  - path: /instrument_server/sessions/{session_id}/upload_gain_reference
+    function: request_gain_reference_upload
+    methods:
+      - POST
+  - path: /instrument_server/visits/{visit_name}/{session_id}/upstream_tiff_data_request
+    function: request_upstream_tiff_data_download
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/stop_rsyncer
+    function: stop_rsyncer
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/finalise_rsyncer
+    function: finalise_rsyncer
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/finalise_session
+    function: finalise_session
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/abandon_session
+    function: abandon_session
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/remove_rsyncer
+    function: remove_rsyncer
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/restart_rsyncer
+    function: restart_rsyncer
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info
+    function: get_rsyncer_info
+    methods:
+      - GET
+murfey.server.api.mag_table.router:
+  - path: /mag_table/mag_table/
+    function: get_mag_table
+    methods:
+      - GET
+  - path: /mag_table/mag_table/
+    function: add_to_mag_table
+    methods:
+      - POST
+  - path: /mag_table/mag_table/{mag}
+    function: remove_mag_table_row
+    methods:
+      - DELETE
+murfey.server.api.processing_parameters.router:
+  - path: /session_parameters/sessions/{session_id}/session_processing_parameters
+    function: get_session_processing_parameters
+    methods:
+      - GET
+  - path: /session_parameters/sessions/{session_id}/session_processing_parameters
+    function: set_session_processing_parameters
+    methods:
+      - POST
+murfey.server.api.prometheus.router:
+  - path: /prometheus/visits/{visit_name}/increment_rsync_file_count
+    function: increment_rsync_file_count
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files
+    function: increment_rsync_transferred_files
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files_prometheus
+    function: increment_rsync_transferred_files_prometheus
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/monitoring/{on}
+    function: change_monitoring_status
+    methods:
+      - POST
+  - path: /prometheus/metrics/{metric_name}
+    function: inspect_prometheus_metrics
+    methods:
+      - GET
+murfey.server.api.session_control.correlative_router:
+  - path: /session_control/correlative/sessions/{session_id}/upstream_visits
+    function: find_upstream_visits
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+    function: gather_upstream_tiffs
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+    function: get_tiff
+    methods:
+      - GET
+murfey.server.api.session_control.router:
+  - path: /session_control/time
+    function: get_current_timestamp
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/machine
+    function: machine_info_by_instrument
+    methods:
+      - GET
+  - path: /session_control/new_client_id/
+    function: new_client_id
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/visits_raw
+    function: get_current_visits
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/clients/{client_id}/session
+    function: link_client_to_session
+    methods:
+      - POST
+  - path: /session_control/sessions
+    function: get_sessions
+    methods:
+      - GET
+  - path: /session_control/sessions/{session_id}
+    function: remove_session
+    methods:
+      - DELETE
+  - path: /session_control/sessions/{session_id}/successful_processing
+    function: register_processing_success_in_ispyb
+    methods:
+      - POST
+  - path: /session_control/instruments/{instrument_name}/failed_client_post
+    function: failed_client_post
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer
+    function: register_rsyncer
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncers
+    function: get_rsyncers_for_session
+    methods:
+      - GET
+  - path: /session_control/sessions/{session_id}/rsyncer_stopped
+    function: register_stopped_rsyncer
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer_started
+    function: register_restarted_rsyncer
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer
+    function: delete_rsyncer
+    methods:
+      - DELETE
+murfey.server.api.session_control.spa_router:
+  - path: /session_control/spa/sessions/{session_id}/grid_squares
+    function: get_grid_squares
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares
+    function: get_grid_squares_from_dcg
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes
+    function: get_foil_holes_from_grid_square
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/foil_hole/{fh_name}
+    function: get_foil_hole
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/grid_square/{gsid}
+    function: register_grid_square
+    methods:
+      - POST
+  - path: /session_control/spa/sessions/{session_id}/grid_square/{gs_name}/foil_hole
+    function: register_foil_hole
+    methods:
+      - POST
+murfey.server.api.session_info.correlative_router:
+  - path: /session_info/correlative/sessions/{session_id}/upstream_visits
+    function: find_upstream_visits
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+    function: gather_upstream_tiffs
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+    function: get_tiff
+    methods:
+      - GET
+murfey.server.api.session_info.router:
+  - path: /session_info/
+    function: root
+    methods:
+      - GET
+  - path: /session_info/health/
+    function: health_check
+    methods:
+      - GET
+  - path: /session_info/connections/
+    function: connections_check
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/machine
+    function: machine_info_by_instrument
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits_raw
+    function: get_current_visits
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits/
+    function: all_visit_info
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/rsyncers
+    function: get_rsyncers_for_client
+    methods:
+      - GET
+  - path: /session_info/session/{session_id}
+    function: get_session
+    methods:
+      - GET
+  - path: /session_info/sessions
+    function: get_sessions
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits/{visit}/session/{name}
+    function: create_session
+    methods:
+      - POST
+  - path: /session_info/sessions/{session_id}
+    function: update_session
+    methods:
+      - POST
+  - path: /session_info/sessions/{session_id}
+    function: remove_session
+    methods:
+      - DELETE
+  - path: /session_info/instruments/{instrument_name}/visits/{visit_name}/sessions
+    function: get_sessions_with_visit
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/sessions
+    function: get_sessions_by_instrument_name
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/data_collection_groups
+    function: get_dc_groups
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections
+    function: get_data_collections
+    methods:
+      - GET
+  - path: /session_info/clients
+    function: get_clients
+    methods:
+      - GET
+  - path: /session_info/num_movies
+    function: count_number_of_movies
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/current_gain_ref
+    function: update_current_gain_ref
+    methods:
+      - PUT
+murfey.server.api.session_info.spa_router:
+  - path: /session_info/spa/sessions/{session_id}/spa_processing_parameters
+    function: get_spa_proc_param_details
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies
+    function: get_number_of_movies_from_foil_hole
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/grid_squares
+    function: get_grid_squares
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares
+    function: get_grid_squares_from_dcg
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes
+    function: get_foil_holes_from_grid_square
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/foil_hole/{fh_name}
+    function: get_foil_hole
+    methods:
+      - GET
+murfey.server.api.session_info.tomo_router:
+  - path: /session_info/tomo/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts
+    function: get_tilts
+    methods:
+      - GET
+murfey.server.api.spa.router:
+  - path: /sessions/{session_id}/cryolo_model
+    function: get_cryolo_model_path
+    methods:
+      - GET
+murfey.server.api.websocket.ws:
+  - path: /ws/test/{client_id}
+    function: websocket_endpoint
+    methods: []
+  - path: /ws/connect/{client_id}
+    function: websocket_connection_endpoint
+    methods: []
+  - path: /ws/test/{client_id}
+    function: close_ws_connection
+    methods:
+      - DELETE
+  - path: /ws/connect/{client_id}
+    function: close_unrecorded_ws_connection
+    methods:
+      - DELETE
+murfey.server.api.workflow.correlative_router:
+  - path: /workflow/correlative/visit/{visit_name}/samples
+    function: get_samples
+    methods:
+      - GET
+  - path: /workflow/correlative/visit/{visit_name}/sample_group
+    function: register_sample_group
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/sample
+    function: register_sample
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/subsample
+    function: register_subsample
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/sample_image
+    function: register_sample_image
+    methods:
+      - POST
+  - path: /workflow/correlative/visits/{year}/{visit_name}/{session_id}/make_milling_gif
+    function: make_gif
+    methods:
+      - POST
+murfey.server.api.workflow.router:
+  - path: /workflow/visits/{visit_name}/{session_id}/register_data_collection_group
+    function: register_dc_group
+    methods:
+      - POST
+  - path: /workflow/visits/{visit_name}/{session_id}/start_data_collection
+    function: start_dc
+    methods:
+      - POST
+  - path: /workflow/visits/{visit_name}/{session_id}/register_processing_job
+    function: register_proc
+    methods:
+      - POST
+murfey.server.api.workflow.spa_router:
+  - path: /workflow/spa/sessions/{session_id}/spa_processing_parameters
+    function: register_spa_proc_params
+    methods:
+      - POST
+  - path: /workflow/spa/visits/{visit_name}/{session_id}/flush_spa_processing
+    function: flush_spa_processing
+    methods:
+      - POST
+  - path: /workflow/spa/visits/{visit_name}/{session_id}/spa_preprocess
+    function: request_spa_preprocessing
+    methods:
+      - POST
+murfey.server.api.workflow.tomo_router:
+  - path: /workflow/tomo/sessions/{session_id}/tomography_processing_parameters
+    function: register_tomo_proc_params
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/flush_tomography_processing
+    function: flush_tomography_processing
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/tilt_series
+    function: register_tilt_series
+    methods:
+      - POST
+  - path: /workflow/tomo/sessions/{session_id}/tilt_series_length
+    function: register_tilt_series_length
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tomography_preprocess
+    function: request_tomography_preprocessing
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/completed_tilt_series
+    function: register_completed_tilt_series
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/rerun_tilt_series
+    function: register_tilt_series_for_rerun
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tilt
+    function: register_tilt
+    methods:
+      - POST
