@@ -23,7 +23,7 @@ class WSApp:
     def __init__(
         self, *, server: str, id: int | str | None = None, register_client: bool = True
     ):
-        self.id = uuid.uuid4() if id is None else id
+        self.id = str(uuid.uuid4()) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
 
