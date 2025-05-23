@@ -106,21 +106,19 @@ def url_path_for(
     route_path: str = route_info["path"]
     path_params: list[dict[str, str]] = route_info["path_params"]
 
-    # Validate the kwargs provided
-    for param, value in kwargs.items():
-        # Check if the name is not a match
-        if param not in [p["name"] for p in path_params] and path_params:
-            message = f"Unknown path parameter provided: {param}"
-            logger.error(message)
-            raise KeyError(message)
+    # Validate the stored path params against the ones provided
+    if path_params:
         for path_param in path_params:
-            if (
-                path_param["name"] == param
-                and type(value).__name__ != path_param["type"]
-            ):
+            param_name = path_param["name"]
+            param_type = path_param["type"]
+            if param_name not in kwargs.keys():
+                message = f"Path param {param_name!r} was not provided"
+                logger.error(message)
+                raise KeyError(message)
+            if type(kwargs[param_name]).__name__ != param_type:
                 message = (
-                    f"'{param}' must be {path_param['type']!r}; "
-                    f"received {type(value).__name__!r}"
+                    f"{param_name!r} must be {param_type!r}; "
+                    f"received {type(kwargs[param_name]).__name__!r}"
                 )
                 logger.error(message)
                 raise TypeError(message)
@@ -132,7 +130,9 @@ def url_path_for(
 if __name__ == "__main__":
     # Run test on some existing routes
     url_path = url_path_for(
-        "bootstrap.pypi",
-        "get_pypi_index",
+        "workflow.tomo_router",
+        "register_tilt",
+        visit_name="nt15587-15",
+        session_id=2,
     )
     print(url_path)
