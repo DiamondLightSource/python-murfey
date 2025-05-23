@@ -43,6 +43,7 @@ from murfey.util.db import (
     Session,
 )
 from murfey.util.models import (
+    ClientInfo,
     FoilHoleParameters,
     GridSquareParameters,
     RsyncerInfo,
@@ -115,6 +116,24 @@ def link_client_to_session(
     db.commit()
     db.close()
     return sid
+
+
+@router.post("/visits/{visit_name}")
+def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey_db):
+    client_env = db.exec(
+        select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
+    ).one()
+    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
+    if client_env:
+        client_env.visit = visit_name
+        db.add(client_env)
+        db.commit()
+    if session:
+        session.visit = visit_name
+        db.add(session)
+        db.commit()
+    db.close()
+    return client_info
 
 
 @router.get("/sessions")
