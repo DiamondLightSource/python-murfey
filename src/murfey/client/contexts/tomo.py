@@ -492,7 +492,7 @@ class TomographyContext(Context):
 
                     # Always update the tilt series length in the database after an mdoc
                     if environment.murfey_session is not None:
-                        length_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tile_series_length', session_id=environment.murfey_session)}"
+                        length_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tilt_series_length', session_id=environment.murfey_session)}"
                         capture_post(
                             length_url,
                             json={
