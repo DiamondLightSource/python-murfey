@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
+from logging import getLogger
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 import murfey.util
+
+logger = getLogger("murfey.util.api")
 
 route_manifest_file = Path(murfey.util.__path__[0]) / "route_manifest.yaml"
 
@@ -44,9 +47,13 @@ def find_unique_index(
             matches.append(candidate)
             index = i
     if counter == 0:
-        raise KeyError(f"No match found for {pattern!r}")
+        message = f"No match found for {pattern!r}"
+        logger.error(message)
+        raise KeyError(message)
     if counter > 1:
-        raise KeyError(f"Ambiguous match for {pattern!r}: {matches}")
+        message = f"Ambiguous match for {pattern!r}: {matches}"
+        logger.error(message)
+        raise KeyError(message)
     return index
 
 
@@ -62,7 +69,9 @@ def render_path(path_template: str, kwargs: dict) -> str:
         raw_str = match.group(1)
         param_name = raw_str.split(":")[0]  # Ignore :converter in the field
         if param_name not in kwargs:
-            raise KeyError(f"Missing path parameter: {param_name}")
+            message = f"Missing path parameter: {param_name}"
+            logger.error(message)
+            raise KeyError(message)
         return str(kwargs[param_name])
 
     return pattern.sub(replace, path_template)
@@ -100,16 +109,20 @@ def url_path_for(
     for param, value in kwargs.items():
         # Check if the name is not a match
         if param not in [p["name"] for p in path_params] and path_params:
-            raise KeyError(f"Unknown path parameter provided: {param}")
+            message = f"Unknown path parameter provided: {param}"
+            logger.error(message)
+            raise KeyError(message)
         for path_param in path_params:
             if (
                 path_param["name"] == param
                 and type(value).__name__ != path_param["type"]
             ):
-                raise TypeError(
+                message = (
                     f"'{param}' must be {path_param['type']!r}; "
                     f"received {type(value).__name__!r}"
                 )
+                logger.error(message)
+                raise TypeError(message)
 
     # Render and return the path
     return render_path(route_path, kwargs)
@@ -118,8 +131,7 @@ def url_path_for(
 if __name__ == "__main__":
     # Run test on some existing routes
     url_path = url_path_for(
-        "api.router",
-        "register_processing_parameters",
-        session_id=3,
+        "bootstrap.pypi",
+        "get_pypi_index",
     )
     print(url_path)
