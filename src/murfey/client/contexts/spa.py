@@ -15,10 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.server.api.file_manip import router as file_manip_router
-from murfey.server.api.session_control import router as session_router
-from murfey.server.api.session_control import spa_router as session_spa_router
-from murfey.server.api.workflow import spa_router as workflow_spa_router
+from murfey.util.api import url_path_for
 from murfey.util.client import (
     authorised_requests,
     capture_get,
@@ -266,7 +263,7 @@ class SPAModularContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}{session_router.url_path_for('machine_info_by_instrument', instrument_name=environment.instrument_name)}"
+                f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
             )
             if server_config_response is None:
                 return None
@@ -430,7 +427,7 @@ class SPAModularContext(Context):
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
-            gs_url = f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
+            gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
             gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
@@ -471,7 +468,7 @@ class SPAModularContext(Context):
             )
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
-            fh_url = f"{str(environment.url.geturl())}{session_spa_router.url_path_for('register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
+            fh_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
             if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,
@@ -584,7 +581,7 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}{file_manip_router.url_path_for('write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
+                                f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
@@ -613,7 +610,7 @@ class SPAModularContext(Context):
                             )
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}{workflow_spa_router.url_path_for('request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
+                        preproc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.spa_router', 'request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",

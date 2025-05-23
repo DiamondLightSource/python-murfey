@@ -26,7 +26,7 @@ from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.server.api.session_control import router as session_router
+from murfey.util.api import url_path_for
 from murfey.util.client import authorised_requests, read_config
 from murfey.util.models import Visit
 
@@ -38,7 +38,7 @@ requests.get, requests.post, requests.put, requests.delete = authorised_requests
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
     proxy_path = api_base.path.rstrip("/")
     get_visits_url = api_base._replace(
-        path=f"{proxy_path}{session_router.url_path_for('get_current_visits', instrument_name=instrument_name)}"
+        path=f"{proxy_path}{url_path_for('session_control.router', 'get_current_visits', instrument_name=instrument_name)}"
     )
     server_reply = requests.get(get_visits_url.geturl())
     if server_reply.status_code != 200:
