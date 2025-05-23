@@ -33,7 +33,7 @@ def find_unique_index(
     candidates: list[str],
 ) -> int:
     """
-    Finds the index of a unique entry in a list
+    Finds the index of a unique entry in a list.
     """
     counter = 0
     matches = []
@@ -52,8 +52,8 @@ def find_unique_index(
 
 def render_path(path_template: str, kwargs: dict) -> str:
     """
-    Replace all FastAPI-style {param[:converter]} path parameters
-    with corresponding values from kwargs.
+    Replace all FastAPI-style {param[:converter]} path parameters with corresponding
+    values from kwargs.
     """
 
     pattern = re.compile(r"{([^}]+)}")  # Look for all path params
@@ -73,6 +73,11 @@ def url_path_for(
     function_name: str,  # With logic for partial matches
     **kwargs,  # Takes any path param and matches it against curly bracket contents
 ):
+    """
+    Utility function that takes the function name and API router name, along with all
+    necessary path parameters, retrieves the matching URL path template from the route
+    manifest, and returns a correctly populated instance of the URL path.
+    """
     # Use 'Any' first and slowly reveal types as it is unpacked
     route_manifest: dict[str, list[Any]] = load_route_manifest()
 
