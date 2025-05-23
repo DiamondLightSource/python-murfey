@@ -678,6 +678,13 @@ murfey.server.api.session_control.router:
         type: int
     methods:
       - POST
+  - path: /session_control/visits/{visit_name}
+    function: register_client_to_visit
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
   - path: /session_control/sessions
     function: get_sessions
     path_params: []
