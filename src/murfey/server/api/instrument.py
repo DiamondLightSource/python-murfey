@@ -21,6 +21,7 @@ from murfey.server.api.auth import (
 )
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise, secure_path
+from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
 from murfey.util.models import File, MultigridWatcherSetup
@@ -65,7 +66,7 @@ async def activate_instrument_server_for_session(
         ]
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/token",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'token_handshake_for_session', session_id=session_id)}",
                 json={"access_token": token, "token_type": "bearer"},
             ) as response:
                 success = response.status == 200
@@ -88,7 +89,7 @@ async def check_if_session_is_active(instrument_name: str, session_id: int):
                 instrument_name
             ]
             async with clientsession.get(
-                f"{machine_config.instrument_server_url}/sessions/{int(sanitise(str(session_id)))}/check_token",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_token', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -120,7 +121,7 @@ async def setup_multigrid_watcher(
         }
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/multigrid_watcher",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={
                     "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
@@ -158,7 +159,7 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
         )
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/start_multigrid_watcher?process={'true' if process else 'false'}",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'start_multigrid_watcher', session_id=session_id)}?process={'true' if process else 'false'}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -202,7 +203,7 @@ async def pass_proc_params_to_instrument_server(
         label = db.exec(select(Session).where(Session.id == session_id)).one().name
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/processing_parameters",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'register_processing_parameters', session_id=session_id)}",
                 json={
                     "label": label,
                     "params": {
@@ -231,7 +232,7 @@ async def check_instrument_server(instrument_name: str):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.get(
-                f"{machine_config.instrument_server_url}/health",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'health')}",
             ) as resp:
                 data = await resp.json()
     return data
@@ -252,7 +253,7 @@ async def get_possible_gain_references(
             token = instrument_server_tokens[session_id]["access_token"]
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.get(
-                f"{machine_config.instrument_server_url}/instruments/{sanitise(instrument_name)}/sessions/{sanitise(str(session_id))}/possible_gain_references",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'get_possible_gain_references', instrument_name=sanitise(instrument_name), session_id=session_id)}",
                 headers={"Authorization": f"Bearer {token}"},
             ) as resp:
                 data = await resp.json()
@@ -281,7 +282,7 @@ async def request_gain_reference_upload(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'upload_gain_reference', instrument_name=instrument_name, session_id=session_id)}",
                 json={
                     "gain_path": str(gain_reference_request.gain_path),
                     "visit_path": visit_path,
@@ -314,7 +315,7 @@ async def request_upstream_tiff_data_download(
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.post(
-                    f"{machine_config.instrument_server_url}/visits/{secure_filename(visit_name)}/sessions/{sanitise(str(session_id))}/upstream_tiff_data_request",
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'gather_upstream_tiffs', visit_name=secure_filename(visit_name), session_id=session_id)}",
                     json={"download_dir": download_dir},
                     headers={
                         "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
@@ -342,7 +343,7 @@ async def stop_rsyncer(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/stop_rsyncer",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'stop_rsyncer', session_id=session_id)}",
                 json={
                     "label": session_id,
                     "source": str(secure_path(Path(rsyncer_source.source))),
@@ -369,7 +370,7 @@ async def finalise_rsyncer(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/finalise_rsyncer",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'finalise_rsyncer', session_id=session_id)}",
                 json={
                     "label": session_id,
                     "source": str(secure_path(Path(rsyncer_source.source))),
@@ -394,7 +395,7 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/finalise_session",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'finalise_session', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -415,7 +416,7 @@ async def abandon_session(session_id: MurfeySessionID, db=murfey_db):
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}/sessions/{session_id}/abandon_controller",
+                f"{machine_config.instrument_server_url}{url_path_for('api_router', 'abandon_controller', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -439,7 +440,7 @@ async def remove_rsyncer(
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.post(
-                    f"{machine_config.instrument_server_url}/sessions/{session_id}/remove_rsyncer",
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'remove_rsyncer', session_id=session_id)}",
                     json={
                         "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),
@@ -467,7 +468,7 @@ async def restart_rsyncer(
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.post(
-                    f"{machine_config.instrument_server_url}/sessions/{session_id}/restart_rsyncer",
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'restart_rsyncer', session_id=session_id)}",
                     json={
                         "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),
@@ -516,7 +517,7 @@ async def get_rsyncer_info(
                 token = instrument_server_tokens[session_id]["access_token"]
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.get(
-                    f"{machine_config.instrument_server_url}/sessions/{session_id}/rsyncer_info",
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'get_rsyncer_info', session_id=session_id)}",
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     if resp.status == 200:
@@ -536,7 +537,7 @@ async def get_rsyncer_info(
                 token = instrument_server_tokens[session_id]["access_token"]
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.get(
-                    f"{machine_config.instrument_server_url}/sessions/{session_id}/analyser_info",
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'get_analyser_info', session_id=session_id)}",
                     headers={"Authorization": f"Bearer {token}"},
                 ) as resp:
                     if resp.status == 200:

@@ -699,12 +699,12 @@ class VisitSelection(SwitchSelection):
         self.app._visit = text
         self.app._environment.visit = text
         response = requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{text}",
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'register_client_to_visit', visit_name=text)}",
             json={"id": self.app._environment.client_id},
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
 
         if self._switch_status:
@@ -766,7 +766,7 @@ class VisitCreation(Screen):
         self.app._visit = text
         self.app._environment.visit = text
         response = requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{text}",
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'register_client_to_visit', visit_name=text)}",
             json={"id": self.app._environment.client_id},
         )
         log.info(f"Posted visit registration: {response.status_code}")

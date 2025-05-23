@@ -275,7 +275,9 @@ def run():
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     # Set up websocket app and handler
-    client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
+    client_id = requests.get(
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
+    ).json()
     ws = murfey.client.websocket.WSApp(
         server=args.server,
         id=client_id["new_id"],
@@ -292,7 +294,7 @@ def run():
 
     # Load machine data for subsequent sections
     machine_data = requests.get(
-        f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
     ).json()
     gain_ref: Path | None = None
 

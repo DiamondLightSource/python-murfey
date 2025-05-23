@@ -63,7 +63,7 @@ class MultigridController:
                 requests.delete, headers={"Authorization": f"Bearer {self.token}"}
             )
         machine_data = requests.get(
-            f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
+            f"{self.murfey_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         self.rsync_url = machine_data.get("rsync_url", "")
         self.rsync_module = machine_data.get("rsync_module", "data")
@@ -209,10 +209,10 @@ class MultigridController:
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
-            remove_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer?source={quote(str(source), safe='')}"
+            remove_url = f"{self.murfey_url}{url_path_for('session_control.router', 'delete_rsyncer', session_id=self.session_id)}?source={quote(str(source), safe='')}"
             requests.delete(remove_url)
         else:
-            stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"
+            stop_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_stopped_rsyncer', session_id=self.session_id)}"
             capture_post(stop_url, json={"source": str(source)})
 
     def _finalise_rsyncer(self, source: Path):
@@ -228,7 +228,7 @@ class MultigridController:
 
     def _restart_rsyncer(self, source: Path):
         self.rsync_processes[source].restart()
-        restarted_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
+        restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
         capture_post(restarted_url, json={"source": str(source)})
 
     def _request_watcher_stop(self, source: Path):
@@ -251,9 +251,7 @@ class MultigridController:
         log.info(f"starting rsyncer: {source}")
         if transfer:
             # Always make sure the destination directory exists
-            make_directory_url = (
-                f"{self.murfey_url}/sessions/{self.session_id}/make_rsyncer_destination"
-            )
+            make_directory_url = f"{self.murfey_url}{url_path_for('file_manip.router', 'make_rsyncer_destination', session_id=self.session_id)}"
             capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
@@ -323,12 +321,10 @@ class MultigridController:
                 secondary=True,
             )
             if restarted:
-                restarted_url = (
-                    f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
-                )
+                restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
                 capture_post(restarted_url, json={"source": str(source)})
             else:
-                url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+                url = f"{str(self._environment.url.geturl())}{url_path_for('session_control.router', 'register_rsyncer', session_id=self._environment.murfey_session)}"
                 rsyncer_data = {
                     "source": str(source),
                     "destination": destination,

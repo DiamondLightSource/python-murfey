@@ -621,7 +621,7 @@ class MurfeyTUI(App):
 
     async def on_mount(self) -> None:
         exisiting_sessions = requests.get(
-            f"{self._environment.url.geturl()}/sessions"
+            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'get_sessions')}"
         ).json()
         if self.visits:
             self.install_screen(VisitSelection(self.visits), "visit-select-screen")

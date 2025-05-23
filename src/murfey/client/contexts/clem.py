@@ -14,6 +14,7 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util.api import url_path_for
 from murfey.util.client import capture_post, get_machine_config_client
 
 # Create logger object
@@ -351,7 +352,7 @@ class CLEMContext(Context):
         """
         try:
             # Construct URL to post to post the request to
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/lif_files?lif_file={quote(str(lif_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_lif_file', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
             # Validate
             if not url:
                 logger.error(
@@ -381,7 +382,7 @@ class CLEMContext(Context):
 
         try:
             # Construct the URL to post the request to
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_lifs?lif_file={quote(str(lif_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_lifs', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
             # Validate
             if not url:
                 logger.error(
@@ -408,7 +409,7 @@ class CLEMContext(Context):
         """
 
         try:
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/tiff_files?tiff_file={quote(str(tiff_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_tiff_file', session_id=environment.murfey_session)}?tiff_file={quote(str(tiff_file), safe='')}"
             if not url:
                 logger.error(
                     "URL could not be constructed from the environment and file path"
@@ -437,7 +438,7 @@ class CLEMContext(Context):
 
         try:
             # Construct URL for Murfey server to communicate with
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_tiffs"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_tiffs', session_id=environment.murfey_session)}"
             if not url:
                 logger.error(
                     "URL could not be constructed from the environment and file path"

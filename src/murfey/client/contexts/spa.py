@@ -405,7 +405,7 @@ class SPAModularContext(Context):
             ] = (None, None, None, None, None, None, None)
             data_collection_group = (
                 requests.get(
-                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                    f"{environment.url.geturl()}{url_path_for('session_info.router', 'get_dc_groups', session_id=environment.murfey_session)}"
                 )
                 .json()
                 .get(str(source), {})
@@ -567,7 +567,7 @@ class SPAModularContext(Context):
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
-                                f"{str(environment.url.geturl())}/num_movies",
+                                f"{environment.url.geturl()}{url_path_for('session_info.router', 'count_number_of_movies')}",
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(

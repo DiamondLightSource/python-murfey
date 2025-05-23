@@ -7,8 +7,10 @@ import os
 import pathlib
 import subprocess
 import sys
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 from urllib.request import urlopen
+
+from murfey.util.api import url_path_for
 
 """
 A script to simplify installing Murfey on a network-isolated machine.
@@ -64,10 +66,13 @@ if __name__ == "__main__":
     # Construct a minimal base path string
     # Extract the host name for pip installation purposes
     try:
-        murfey_url = urlparse(args.server)
+        murfey_url: ParseResult = urlparse(args.server)
     except Exception:
         exit(f"{args.server} is not a valid URL")
+    murfey_proxy_path = murfey_url.path.rstrip("/")
     murfey_base = f"{murfey_url.scheme}://{murfey_url.netloc}"
+    if murfey_proxy_path:
+        murfey_base = f"{murfey_base}{murfey_proxy_path}"
     murfey_hostname = murfey_url.netloc.split(":")[0]
 
     # Check that Python version is supported
@@ -82,7 +87,10 @@ if __name__ == "__main__":
     # Step 1: Download pip wheel
     print()
     print(f"1/4 -- Connecting to murfey server on {murfey_base}...")
-    _download_to_file(f"{murfey_base}/bootstrap/pip.whl", "pip.whl")
+    _download_to_file(
+        f"{murfey_base}{url_path_for('bootstrap.bootstrap', 'get_pip_wheel')}",
+        "pip.whl",
+    )
 
     # Step 2: Get pip to install itself
     print()
@@ -96,7 +104,7 @@ if __name__ == "__main__":
             "--trusted-host",
             murfey_hostname,
             "-i",
-            f"{murfey_base}/pypi",
+            f"{murfey_base}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
             "pip",
         ]
     )
@@ -116,7 +124,7 @@ if __name__ == "__main__":
             "--trusted-host",
             murfey_hostname,
             "-i",
-            f"{murfey_base}/pypi",
+            f"{murfey_base}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
             "--upgrade",
             "pip",
         ]
@@ -135,7 +143,7 @@ if __name__ == "__main__":
             "--trusted-host",
             murfey_hostname,
             "-i",
-            f"{murfey_base}/pypi",
+            f"{murfey_base}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
             "murfey[client]",
         ]
     )

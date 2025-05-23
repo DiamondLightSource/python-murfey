@@ -21,6 +21,8 @@ from urllib.parse import urlparse, urlunparse
 
 import requests
 
+from murfey.util.api import url_path_for
+
 logger = logging.getLogger("murfey.util.client")
 
 
@@ -57,7 +59,9 @@ def get_machine_config_client(
     _instrument_name: Optional[str] = instrument_name or os.getenv("BEAMLINE")
     if not _instrument_name:
         return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
+    return requests.get(
+        f"{url}{url_path_for('session_control.router', 'failed_client_post', instrument_name=_instrument_name)}"
+    ).json()
 
 
 def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:

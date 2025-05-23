@@ -22,6 +22,7 @@ from murfey.server.feedback import _murfey_id, _register
 from murfey.server.ispyb import ISPyBSession, TransportManager, get_session_id
 from murfey.server.murfey_db import url
 from murfey.util import db
+from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config, get_microscope, get_security_config
 
 
@@ -69,7 +70,7 @@ def run():
         help="Path to directory containing image files",
     )
     parser.add_argument(
-        "--suffic",
+        "--suffix",
         dest="suffix",
         required=True,
         type=str,
@@ -203,7 +204,9 @@ def run():
         ]
     )
     binning_factor = 1
-    server_config = requests.get(f"{args.url}/machine").json()
+    server_config = requests.get(
+        f"{args.url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=args.microscope)}"
+    ).json()
     if server_config.get("superres"):
         # If camera is capable of superres and collection is in superres
         binning_factor = 2
