@@ -70,7 +70,10 @@ def render_path(path_template: str, kwargs: dict) -> str:
         raw_str = match.group(1)
         param_name = raw_str.split(":")[0]  # Ignore :converter in the field
         if param_name not in kwargs:
-            message = f"Missing path parameter: {param_name}"
+            message = (
+                f"Error constructing URL for {path_template!r}; "
+                f"missing path parameter {param_name!r}"
+            )
             logger.error(message)
             raise KeyError(message)
         return str(kwargs[param_name])
@@ -112,7 +115,10 @@ def url_path_for(
             param_name = path_param["name"]
             param_type = path_param["type"]
             if param_name not in kwargs.keys():
-                message = f"Path param {param_name!r} was not provided"
+                message = (
+                    f"Error validating parameters for {function_name}; "
+                    f"path parameter {param_name!r} was not provided"
+                )
                 logger.error(message)
                 raise KeyError(message)
             # Skip complicated type resolution for now
@@ -120,7 +126,8 @@ def url_path_for(
                 continue
             elif type(kwargs[param_name]).__name__ not in param_type:
                 message = (
-                    f"{param_name!r} must be {param_type!r}; "
+                    f"Error validating parameters for {function_name}; "
+                    f"{param_name!r} must be {param_type!r}, "
                     f"received {type(kwargs[param_name]).__name__!r}"
                 )
                 logger.error(message)
