@@ -110,7 +110,7 @@ def determine_default_destination(
                                 _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = capture_post(
-                                    url=f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'suggest_path', visit_name=visit, sesion_id=environment.murfey_session)}",
+                                    url=f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'suggest_path', visit_name=visit, session_id=environment.murfey_session)}",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
