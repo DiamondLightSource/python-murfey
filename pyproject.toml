@@ -118,6 +118,7 @@ zip-safe = false
 
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
+"murfey.util" = ["route_manifest.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src", "tests"]
