@@ -60,7 +60,7 @@ def get_machine_config_client(
     if not _instrument_name:
         return {}
     return requests.get(
-        f"{url}{url_path_for('session_control.router', 'failed_client_post', instrument_name=_instrument_name)}"
+        f"{url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=_instrument_name)}"
     ).json()
 
 
