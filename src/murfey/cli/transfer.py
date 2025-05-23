@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 import requests
 from rich.console import Console
 from rich.prompt import Confirm
 
 from murfey.client import read_config
+from murfey.util.api import url_path_for
 from murfey.util.config import MachineConfig
 
 
@@ -35,11 +36,11 @@ def run():
     args = parser.parse_args()
 
     console = Console()
-    murfey_url = urlparse(args.server, allow_fragments=False)
+    murfey_url: ParseResult = urlparse(args.server, allow_fragments=False)
 
     machine_data = MachineConfig(
         requests.get(
-            f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+            f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
     )
     if Path(args.source or ".").resolve() in machine_data.data_directories:

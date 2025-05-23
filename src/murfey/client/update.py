@@ -7,6 +7,7 @@ from urllib.parse import ParseResult
 import requests
 
 import murfey
+from murfey.util.api import url_path_for
 
 
 def check(api_base: ParseResult, install: bool = True, force: bool = False):
@@ -17,7 +18,8 @@ def check(api_base: ParseResult, install: bool = True, force: bool = False):
     """
     proxy_path = api_base.path.rstrip("/")
     version_check_url = api_base._replace(
-        path=f"{proxy_path}/version/", query=f"client_version={murfey.__version__}"
+        path=f"{proxy_path}{url_path_for('bootstrap.version', 'get_version')}",
+        query=f"client_version={murfey.__version__}",
     )
     server_reply = requests.get(version_check_url.geturl())
     if server_reply.status_code != 200:
@@ -69,7 +71,10 @@ def install_murfey(api_base: ParseResult, version: str) -> bool:
             "--trusted-host",
             api_base.hostname,
             "-i",
-            api_base._replace(path=f"{proxy_path}/pypi", query="").geturl(),
+            api_base._replace(
+                path=f"{proxy_path}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
+                query="",
+            ).geturl(),
             f"murfey[client]=={version}",
         ]
     )

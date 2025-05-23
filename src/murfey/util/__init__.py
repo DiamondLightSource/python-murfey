@@ -16,6 +16,10 @@ def sanitise(in_string: str) -> str:
     return in_string.replace("\r\n", "").replace("\n", "")
 
 
+def sanitise_path(in_path: Path) -> Path:
+    return Path("/".join(secure_filename(p) for p in in_path.parts))
+
+
 def sanitise_nonpath(in_string: str) -> str:
     for c in ("\r\n", "\n", "/", "\\", ":", ";"):
         in_string = in_string.replace(c, "")

@@ -26,12 +26,13 @@ from ispyb.sqlalchemy import (
     ZcZocaloBuffer,
     url,
 )
+from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
-from murfey.util.models import FoilHoleParameters, GridSquareParameters, Sample, Visit
+from murfey.util.models import FoilHoleParameters, GridSquareParameters
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
@@ -48,6 +49,27 @@ try:
 except Exception:
     log.error("Error loading ISPyB session", exc_info=True)
     ISPyBSession = lambda: None
+
+
+class Visit(BaseModel):
+    start: datetime.datetime
+    end: datetime.datetime
+    session_id: int
+    name: str
+    beamline: str
+    proposal_title: str
+
+    def __repr__(self) -> str:
+        return (
+            "Visit("
+            f"start='{self.start:%Y-%m-%d %H:%M}', "
+            f"end='{self.end:%Y-%m-%d %H:%M}', "
+            f"session_id='{self.session_id!r}',"
+            f"name={self.name!r}, "
+            f"beamline={self.beamline!r}, "
+            f"proposal_title={self.proposal_title!r}"
+            ")"
+        )
 
 
 def _send_using_new_connection(transport_type: str, queue: str, message: dict) -> None:
@@ -558,8 +580,8 @@ def _get_session() -> Generator[Optional[Session], None, None]:
         db.close()
 
 
-DB = Depends(_get_session)
 # Shortcut to access the database in a FastAPI endpoint
+DB = Depends(_get_session)
 
 
 def get_session_id(
@@ -610,31 +632,6 @@ def get_proposal_id(proposal_code: str, proposal_number: str, db: Session) -> in
         .all()
     )
     return query[0].proposalId
-
-
-def get_sub_samples_from_visit(visit: str, db: Session) -> List[Sample]:
-    proposal_id = get_proposal_id(visit[:2], visit.split("-")[0][2:], db)
-    samples = (
-        db.query(BLSampleGroup, BLSampleGroupHasBLSample, BLSample, BLSubSample)
-        .join(BLSample, BLSample.blSampleId == BLSampleGroupHasBLSample.blSampleId)
-        .join(
-            BLSampleGroup,
-            BLSampleGroup.blSampleGroupId == BLSampleGroupHasBLSample.blSampleGroupId,
-        )
-        .join(BLSubSample, BLSubSample.blSampleId == BLSample.blSampleId)
-        .filter(BLSampleGroup.proposalId == proposal_id)
-        .all()
-    )
-    res = [
-        Sample(
-            sample_group_id=s[1].blSampleGroupId,
-            sample_id=s[2].blSampleId,
-            subsample_id=s[3].blSubSampleId,
-            image_path=s[3].imgFilePath,
-        )
-        for s in samples
-    ]
-    return res
 
 
 def get_all_ongoing_visits(microscope: str, db: Session | None) -> list[Visit]:

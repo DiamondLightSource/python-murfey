@@ -52,7 +52,9 @@ def login(test_user):
 @patch("murfey.server.api.auth.check_user", return_value=True)
 def test_movie_count(mock_check, test_user):
     token = login(test_user)
-    response = client.get("/num_movies", headers={"Authorization": f"Bearer {token}"})
+    response = client.get(
+        "/session_info/num_movies", headers={"Authorization": f"Bearer {token}"}
+    )
     assert mock_check.called_once()
     assert response.status_code == 200
     assert len(mock_session.method_calls) == 2

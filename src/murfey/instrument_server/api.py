@@ -21,6 +21,7 @@ from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import posix_path, sanitise, sanitise_nonpath, secure_path
+from murfey.util.api import url_path_for
 from murfey.util.client import read_config
 from murfey.util.instrument_models import MultigridWatcherSpec
 from murfey.util.models import File, Token
@@ -92,7 +93,7 @@ async def murfey_server_handshake(token: str, session_id: int | None = None) -> 
     # test provided token against Murfey server
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     handshake_response = requests.get(
-        f"{murfey_url.geturl()}/validate_token",
+        f"{murfey_url.geturl()}{url_path_for('auth.router', 'simple_token_validation')}",
         headers={"Authorization": f"Bearer {token}"},
     )
     res = handshake_response.status_code == 200 and handshake_response.json().get(
@@ -164,7 +165,7 @@ def setup_multigrid_watcher(
     )
     watcher_spec.source.mkdir(exist_ok=True)
     machine_config = requests.get(
-        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(watcher_spec.instrument_name)}/machine",
+        f"{_get_murfey_url()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=sanitise_nonpath(watcher_spec.instrument_name))}",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     for d in machine_config.get("create_directories", []):
@@ -326,7 +327,7 @@ def get_possible_gain_references(
     instrument_name: str, session_id: MurfeySessionID
 ) -> list[File]:
     machine_config = requests.get(
-        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
+        f"{_get_murfey_url()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=sanitise_nonpath(instrument_name))}",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
     candidates = []
@@ -365,7 +366,7 @@ def upload_gain_reference(
 
     # Load machine config and other needed properties
     machine_config: dict[str, Any] = requests.get(
-        f"{_get_murfey_url()}/instruments/{sanitise_nonpath(instrument_name)}/machine",
+        f"{_get_murfey_url()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=sanitise_nonpath(instrument_name))}",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
 
@@ -422,14 +423,14 @@ def gather_upstream_tiffs(
     upstream_tiff_info.download_dir.mkdir(exist_ok=True)
     upstream_tiff_paths = (
         requests.get(
-            f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff_paths",
+            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'gather_upstream_tiffs', session_id=session_id, visit_name=sanitised_visit_name)}",
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
         ).json()
         or []
     )
     for tiff_path in upstream_tiff_paths:
         tiff_data = requests.get(
-            f"{murfey_url.geturl()}/visits/{sanitised_visit_name}/upstream_tiff/{tiff_path}",
+            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff', session_id=session_id, visit_name=sanitised_visit_name, tiff_path=tiff_path)}",
             stream=True,
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
         )

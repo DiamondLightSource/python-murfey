@@ -15,6 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
+from murfey.util.api import url_path_for
 from murfey.util.client import (
     authorised_requests,
     capture_get,
@@ -262,7 +263,7 @@ class SPAModularContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
+                f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
             )
             if server_config_response is None:
                 return None
@@ -404,7 +405,7 @@ class SPAModularContext(Context):
             ] = (None, None, None, None, None, None, None)
             data_collection_group = (
                 requests.get(
-                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                    f"{environment.url.geturl()}{url_path_for('session_info.router', 'get_dc_groups', session_id=environment.murfey_session)}"
                 )
                 .json()
                 .get(str(source), {})
@@ -426,7 +427,7 @@ class SPAModularContext(Context):
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
-            gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+            gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
             gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
@@ -467,7 +468,7 @@ class SPAModularContext(Context):
             )
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
-            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
+            fh_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
             if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,
@@ -566,7 +567,7 @@ class SPAModularContext(Context):
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
-                                f"{str(environment.url.geturl())}/num_movies",
+                                f"{environment.url.geturl()}{url_path_for('session_info.router', 'count_number_of_movies')}",
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(
@@ -580,7 +581,7 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                                f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
@@ -609,7 +610,7 @@ class SPAModularContext(Context):
                             )
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.spa_router', 'request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",

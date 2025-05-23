@@ -10,6 +10,7 @@ import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util.api import url_path_for
 from murfey.util.client import authorised_requests
 
 logger = logging.getLogger("murfey.client.contexts.fib")
@@ -95,7 +96,7 @@ class FIBContext(Context):
                     ).name
                     # post gif list to gif making API call
                     requests.post(
-                        f"{str(environment.url.geturl())}/visits/{datetime.now().year}/{environment.visit}/{environment.murfey_session}/make_milling_gif",
+                        f"{environment.url.geturl()}{url_path_for('workflow.correlative_router', 'make_gif', year=datetime.now().year, visit_name=environment.visit, session_id=environment.murfey_session)}",
                         json={
                             "lamella_number": lamella_number,
                             "images": gif_list,
