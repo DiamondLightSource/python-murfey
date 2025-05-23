@@ -115,7 +115,10 @@ def url_path_for(
                 message = f"Path param {param_name!r} was not provided"
                 logger.error(message)
                 raise KeyError(message)
-            if type(kwargs[param_name]).__name__ != param_type:
+            # Skip complicated type resolution for now
+            if param_type.startswith("typing."):
+                continue
+            elif type(kwargs[param_name]).__name__ not in param_type:
                 message = (
                     f"{param_name!r} must be {param_type!r}; "
                     f"received {type(kwargs[param_name]).__name__!r}"
