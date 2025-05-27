@@ -6,13 +6,13 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 import murfey.server.prometheus as prom
-from murfey.server import (
+from murfey.server import _transport_object
+from murfey.server.feedback import (
     _app_id,
     _flush_class2d,
     _pj_id,
     _register_class_selection,
     _register_incomplete_2d_batch,
-    _transport_object,
 )
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
