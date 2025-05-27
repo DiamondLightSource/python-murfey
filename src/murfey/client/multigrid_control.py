@@ -503,7 +503,7 @@ class MultigridController:
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._environment.url.geturl())}{url_path_for('workflow.spa_router', 'start_dc', visit_name=self._environment.visit, session_id=self.session_id)}",
+                    f"{str(self._environment.url.geturl())}{url_path_for('workflow.router', 'start_dc', visit_name=self._environment.visit, session_id=self.session_id)}",
                     json=data,
                 )
                 for recipe in (
