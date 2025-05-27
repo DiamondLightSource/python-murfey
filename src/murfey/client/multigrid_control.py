@@ -523,7 +523,7 @@ class MultigridController:
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(
-                    f"{self._environment.url.geturl()}{url_path_for('workflow.router', 'register_spa_proc_params', session_id=self.session_id)}",
+                    f"{self._environment.url.geturl()}{url_path_for('workflow.spa_router', 'register_spa_proc_params', session_id=self.session_id)}",
                     json={
                         **{k: None if v == "None" else v for k, v in json.items()},
                         "tag": str(source),
