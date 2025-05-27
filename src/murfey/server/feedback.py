@@ -39,9 +39,9 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
 
+import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as db
-from murfey.server import _transport_object
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
@@ -410,11 +410,11 @@ def _release_2d_hold(message: dict, _db=murfey_db):
             _db.delete(first_class2d)
         _db.commit()
         _db.close()
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
     else:
@@ -486,11 +486,11 @@ def _release_3d_hold(message: dict, _db=murfey_db):
             },
             "recipes": ["em-spa-class3d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         class3d_params.run = False
@@ -567,11 +567,11 @@ def _release_refine_hold(message: dict, _db=murfey_db):
             },
             "recipes": ["em-spa-refine"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         refine_params.run = False
@@ -682,11 +682,13 @@ def _register_incomplete_2d_batch(message: dict, _db=murfey_db, demo: bool = Fal
         },
         "recipes": ["em-spa-class2d"],
     }
-    if _transport_object:
+    if murfey.server._transport_object:
         zocalo_message["parameters"][
             "feedback_queue"
-        ] = _transport_object.feedback_queue
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+        ] = murfey.server._transport_object.feedback_queue
+        murfey.server._transport_object.send(
+            "processing_recipe", zocalo_message, new_connection=True
+        )
         logger.info("2D classification requested")
     if demo:
         logger.info("Incomplete 2D batch registered in demo mode")
@@ -843,11 +845,11 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             },
             "recipes": ["em-spa-class2d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_class2d = True
@@ -912,11 +914,11 @@ def _register_complete_2d_batch(message: dict, _db=murfey_db, demo: bool = False
             },
             "recipes": ["em-spa-class2d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.next_job += (
@@ -1002,11 +1004,11 @@ def _flush_class2d(
             },
             "recipes": ["em-spa-class2d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.next_job += (
@@ -1338,11 +1340,11 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             },
             "recipes": ["em-spa-class3d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         _db.add(feedback_params)
@@ -1381,11 +1383,11 @@ def _register_3d_batch(message: dict, _db=murfey_db, demo: bool = False):
             },
             "recipes": ["em-spa-class3d"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_class3d = True
@@ -1499,11 +1501,11 @@ def _flush_tomography_preprocessing(message: dict):
         logger.info(
             f"Launching tomography preprocessing with Zocalo message: {zocalo_message}"
         )
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         else:
@@ -1681,11 +1683,11 @@ def _register_refinement(message: dict, _db=murfey_db, demo: bool = False):
             },
             "recipes": ["em-spa-refine"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_refine = True
@@ -1804,11 +1806,11 @@ def _register_bfactors(message: dict, _db=murfey_db, demo: bool = False):
             },
             "recipes": ["em-spa-bfactor"],
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"][
                 "feedback_queue"
-            ] = _transport_object.feedback_queue
-            _transport_object.send(
+            ] = murfey.server._transport_object.feedback_queue
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
     _db.close()
@@ -1840,8 +1842,8 @@ def _save_bfactor(message: dict, _db=murfey_db, demo: bool = False):
         refined_class_uuid = message["refined_class_uuid"]
 
         # Request an ispyb insert of the b-factor fitting parameters
-        if _transport_object:
-            _transport_object.send(
+        if murfey.server._transport_object:
+            murfey.server._transport_object.send(
                 "ispyb_connector",
                 {
                     "ispyb_command": "buffer",
@@ -1961,11 +1963,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "node_creator_queue": machine_config.node_creator_queue,
                     },
                 }
-                if _transport_object:
+                if murfey.server._transport_object:
                     logger.info(
                         f"Sending Zocalo message for processing: {zocalo_message}"
                     )
-                    _transport_object.send(
+                    murfey.server._transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
                 else:
@@ -1976,8 +1978,8 @@ def feedback_callback(header: dict, message: dict) -> None:
             prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             murfey_db.commit()
             murfey_db.close()
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection_group":
             ispyb_session_id = get_session_id(
@@ -2012,10 +2014,10 @@ def feedback_callback(header: dict, message: dict) -> None:
                         pixelSize=message.get("atlas_pixel_size", 0),
                         cassetteSlot=message.get("sample"),
                     )
-                    if _transport_object:
-                        atlas_id = _transport_object.do_insert_atlas(atlas_record)[
-                            "return_value"
-                        ]
+                    if murfey.server._transport_object:
+                        atlas_id = murfey.server._transport_object.do_insert_atlas(
+                            atlas_record
+                        )["return_value"]
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
                         atlas_id=atlas_id,
@@ -2025,12 +2027,12 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.add(murfey_dcg)
                 murfey_db.commit()
                 murfey_db.close()
-            if _transport_object:
+            if murfey.server._transport_object:
                 if dcgid is None:
                     time.sleep(2)
-                    _transport_object.transport.nack(header, requeue=True)
+                    murfey.server._transport_object.transport.nack(header, requeue=True)
                     return None
-                _transport_object.transport.ack(header)
+                murfey.server._transport_object.transport.ack(header)
             if dcg_hooks := entry_points().select(
                 group="murfey.hooks", name="data_collection_group"
             ):
@@ -2043,14 +2045,14 @@ def feedback_callback(header: dict, message: dict) -> None:
                     )
             return None
         elif message["register"] == "atlas_update":
-            if _transport_object:
-                _transport_object.do_update_atlas(
+            if murfey.server._transport_object:
+                murfey.server._transport_object.do_update_atlas(
                     message["atlas_id"],
                     message["atlas"],
                     message["atlas_pixel_size"],
                     message["sample"],
                 )
-                _transport_object.transport.ack(header)
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "data_collection":
             logger.debug(
@@ -2079,8 +2081,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                     f"{sanitise(message['image_directory'])} and source "
                     f"{sanitise(message['source'])}"
                 )
-                if _transport_object:
-                    _transport_object.transport.nack(header, requeue=True)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.nack(header, requeue=True)
                 return None
             if dc_murfey := murfey_db.exec(
                 select(db.DataCollection)
@@ -2130,11 +2132,11 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 dcid = murfey_dc.id
                 murfey_db.close()
-            if dcid is None and _transport_object:
-                _transport_object.transport.nack(header, requeue=True)
+            if dcid is None and murfey.server._transport_object:
+                murfey.server._transport_object.transport.nack(header, requeue=True)
                 return None
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
@@ -2152,8 +2154,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 logger.warning(
                     f"No data collection ID found for {sanitise(message['tag'])}"
                 )
-                if _transport_object:
-                    _transport_object.transport.nack(header, requeue=True)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.nack(header, requeue=True)
                 return None
             if pj_murfey := murfey_db.exec(
                 select(db.ProcessingJob)
@@ -2185,8 +2187,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.commit()
                 pid = murfey_pj.id
                 murfey_db.close()
-            if pid is None and _transport_object:
-                _transport_object.transport.nack(header, requeue=True)
+            if pid is None and murfey.server._transport_object:
+                murfey.server._transport_object.transport.nack(header, requeue=True)
                 return None
             prom.preprocessed_movies.labels(processing_job=pid)
             if not murfey_db.exec(
@@ -2199,20 +2201,22 @@ def feedback_callback(header: dict, message: dict) -> None:
                         processingJobId=pid, processingStartTime=datetime.now()
                     )
                     appid = _register(record, header)
-                    if appid is None and _transport_object:
-                        _transport_object.transport.nack(header, requeue=True)
+                    if appid is None and murfey.server._transport_object:
+                        murfey.server._transport_object.transport.nack(
+                            header, requeue=True
+                        )
                         return None
                     murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
                 murfey_db.add(murfey_app)
                 murfey_db.commit()
                 murfey_db.close()
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "flush_tomography_preprocess":
             _flush_tomography_preprocessing(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "spa_processing_parameters":
             session_id = message["session_id"]
@@ -2286,8 +2290,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                 logger.info(
                     f"SPA processing parameters already exist for processing job ID {pj_id}"
                 )
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "tomography_processing_parameters":
             session_id = message["session_id"]
@@ -2325,71 +2329,71 @@ def feedback_callback(header: dict, message: dict) -> None:
                 murfey_db.add(params)
                 murfey_db.commit()
                 murfey_db.close()
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_incomplete_2d_batch":
             _release_2d_hold(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "incomplete_particles_file":
             _register_incomplete_2d_batch(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "complete_particles_file":
             _register_complete_2d_batch(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "save_class_selection_score":
             _register_class_selection(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_3d_batch":
             _release_3d_hold(message)
             if message.get("do_refinement"):
                 _register_refinement(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "run_class3d":
             _register_3d_batch(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "save_initial_model":
             _register_initial_model(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_particle_selection":
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_class_selection":
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "atlas_registered":
             _flush_grid_square_records(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "done_refinement":
             bfactors_registered = _register_bfactors(message)
-            if _transport_object:
+            if murfey.server._transport_object:
                 if bfactors_registered:
-                    _transport_object.transport.ack(header)
+                    murfey.server._transport_object.transport.ack(header)
                 else:
-                    _transport_object.transport.nack(header)
+                    murfey.server._transport_object.transport.nack(header)
             return None
         elif message["register"] == "done_bfactor":
             _save_bfactor(message)
-            if _transport_object:
-                _transport_object.transport.ack(header)
+            if murfey.server._transport_object:
+                murfey.server._transport_object.transport.ack(header)
             return None
         elif (
             message["register"] in entry_points().select(group="murfey.workflows").names
@@ -2402,8 +2406,10 @@ def feedback_callback(header: dict, message: dict) -> None:
             )  # Returns either 1 item or empty list
             if not workflows:
                 logger.error(f"No workflow found for {sanitise(message['register'])}")
-                if _transport_object:
-                    _transport_object.transport.nack(header, requeue=False)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.nack(
+                        header, requeue=False
+                    )
                 return None
             # Run the workflow if a match is found
             workflow: EntryPoint = workflows[0]
@@ -2411,38 +2417,40 @@ def feedback_callback(header: dict, message: dict) -> None:
                 message=message,
                 murfey_db=murfey_db,
             )
-            if _transport_object:
+            if murfey.server._transport_object:
                 if result:
-                    _transport_object.transport.ack(header)
+                    murfey.server._transport_object.transport.ack(header)
                 else:
                     # Send it directly to DLQ without trying to rerun it
-                    _transport_object.transport.nack(header, requeue=False)
+                    murfey.server._transport_object.transport.nack(
+                        header, requeue=False
+                    )
             if not result:
                 logger.error(
                     f"Workflow {sanitise(message['register'])} returned {result}"
                 )
             return None
         logger.error(f"No workflow found for {sanitise(message['register'])}")
-        if _transport_object:
-            _transport_object.transport.nack(header, requeue=False)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.transport.nack(header, requeue=False)
         return None
     except PendingRollbackError:
         murfey_db.rollback()
         murfey_db.close()
         logger.warning("Murfey database required a rollback")
-        if _transport_object:
-            _transport_object.transport.nack(header, requeue=True)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.transport.nack(header, requeue=True)
     except OperationalError:
         logger.warning("Murfey database error encountered", exc_info=True)
         time.sleep(1)
-        if _transport_object:
-            _transport_object.transport.nack(header, requeue=True)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.transport.nack(header, requeue=True)
     except Exception:
         logger.warning(
             "Exception encountered in server RabbitMQ callback", exc_info=True
         )
-        if _transport_object:
-            _transport_object.transport.nack(header, requeue=False)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.transport.nack(header, requeue=False)
     return None
 
 
@@ -2453,33 +2461,37 @@ def _register(record, header: dict, **kwargs):
 
 @_register.register
 def _(record: Base, header: dict, **kwargs):  # type: ignore
-    if not _transport_object:
+    if not murfey.server._transport_object:
         logger.error(
             f"No transport object found when processing record {record}. Message header: {header}"
         )
         return None
     try:
         if isinstance(record, DataCollection):
-            return _transport_object.do_insert_data_collection(record, **kwargs)[
-                "return_value"
-            ]
+            return murfey.server._transport_object.do_insert_data_collection(
+                record, **kwargs
+            )["return_value"]
         if isinstance(record, DataCollectionGroup):
-            return _transport_object.do_insert_data_collection_group(record)[
+            return murfey.server._transport_object.do_insert_data_collection_group(
+                record
+            )["return_value"]
+        if isinstance(record, ProcessingJob):
+            return murfey.server._transport_object.do_create_ispyb_job(record)[
                 "return_value"
             ]
-        if isinstance(record, ProcessingJob):
-            return _transport_object.do_create_ispyb_job(record)["return_value"]
         if isinstance(record, AutoProcProgram):
-            return _transport_object.do_update_processing_status(record)["return_value"]
+            return murfey.server._transport_object.do_update_processing_status(record)[
+                "return_value"
+            ]
         # session = Session()
         # session.add(record)
         # session.commit()
-        # _transport_object.transport.ack(header, requeue=False)
+        # murfey.server._transport_object.transport.ack(header, requeue=False)
         return getattr(record, record.__table__.primary_key.columns[0].name)
 
     except SQLAlchemyError as e:
         logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
-        # _transport_object.transport.nack(header)
+        # murfey.server._transport_object.transport.nack(header)
         return None
     except AttributeError as e:
         logger.error(
@@ -2492,29 +2504,31 @@ def _(record: Base, header: dict, **kwargs):  # type: ignore
 
 @_register.register
 def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    if not _transport_object:
+    if not murfey.server._transport_object:
         raise ValueError(
             "Transport object should not be None if a database record is being updated"
         )
-    return _transport_object.do_create_ispyb_job(
+    return murfey.server._transport_object.do_create_ispyb_job(
         extended_record.record, params=extended_record.record_params
     )["return_value"]
 
 
 def feedback_listen():
-    if _transport_object:
-        if not _transport_object.feedback_queue:
-            _transport_object.feedback_queue = (
-                _transport_object.transport._subscribe_temporary(
+    if murfey.server._transport_object:
+        if not murfey.server._transport_object.feedback_queue:
+            murfey.server._transport_object.feedback_queue = (
+                murfey.server._transport_object.transport._subscribe_temporary(
                     channel_hint="", callback=None, sub_id=None
                 )
             )
-        _transport_object._connection_callback = partial(
-            _transport_object.transport.subscribe,
-            _transport_object.feedback_queue,
+        murfey.server._transport_object._connection_callback = partial(
+            murfey.server._transport_object.transport.subscribe,
+            murfey.server._transport_object.feedback_queue,
             feedback_callback,
             acknowledgement=True,
         )
-        _transport_object.transport.subscribe(
-            _transport_object.feedback_queue, feedback_callback, acknowledgement=True
+        murfey.server._transport_object.transport.subscribe(
+            murfey.server._transport_object.feedback_queue,
+            feedback_callback,
+            acknowledgement=True,
         )
