@@ -4,12 +4,9 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
-from murfey.util.config import MachineConfig
-
 
 class MultigridWatcherSpec(BaseModel):
     source: Path
-    configuration: MachineConfig
     label: str
     visit: str
     instrument_name: str

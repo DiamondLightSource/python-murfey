@@ -142,12 +142,22 @@ def check_token(session_id: MurfeySessionID):
 def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
+    # Return 'True' if controllers are already set up
     if controllers.get(session_id) is not None:
         return {"success": True}
+
     label = watcher_spec.label
     for sid, controller in controllers.items():
         if controller.dormant:
             del controllers[sid]
+
+    # Load machine config as dictionary
+    machine_config: dict[str, Any] = requests.get(
+        f"{_get_murfey_url()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=sanitise_nonpath(watcher_spec.instrument_name))}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
+
+    # Set up the multigrid controll controller
     controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,
@@ -157,22 +167,21 @@ def setup_multigrid_watcher(
         demo=True,
         do_transfer=True,
         processing_enabled=not watcher_spec.skip_existing_processing,
-        _machine_config=watcher_spec.configuration.dict(),
+        _machine_config=machine_config,
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
         rsync_restarts=watcher_spec.rsync_restarts,
         visit_end_time=watcher_spec.visit_end_time,
     )
+    # Make child directories, if specified
     watcher_spec.source.mkdir(exist_ok=True)
-    machine_config = requests.get(
-        f"{_get_murfey_url()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=sanitise_nonpath(watcher_spec.instrument_name))}",
-        headers={"Authorization": f"Bearer {tokens[session_id]}"},
-    ).json()
     for d in machine_config.get("create_directories", []):
         (watcher_spec.source / d).mkdir(exist_ok=True)
+
+    # Set up multigrid directory watcher
     watchers[session_id] = MultigridDirWatcher(
         watcher_spec.source,
-        watcher_spec.configuration.dict(),
+        machine_config,
         skip_existing_processing=watcher_spec.skip_existing_processing,
     )
     watchers[session_id].subscribe(

@@ -110,22 +110,12 @@ async def setup_multigrid_watcher(
     if machine_config.instrument_server_url:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
-        _config = {
-            "acquisition_software": machine_config.acquisition_software,
-            "calibrations": machine_config.calibrations,
-            "data_directories": [str(k) for k in machine_config.data_directories],
-            "create_directories": [str(k) for k in machine_config.create_directories],
-            "rsync_basepath": str(machine_config.rsync_basepath),
-            "visit": visit,
-            "default_model": str(machine_config.default_model),
-        }
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={
                     "source": str(secure_path(watcher_spec.source / visit)),
                     "visit": visit,
-                    "configuration": _config,
                     "label": visit,
                     "instrument_name": instrument_name,
                     "skip_existing_processing": watcher_spec.skip_existing_processing,
