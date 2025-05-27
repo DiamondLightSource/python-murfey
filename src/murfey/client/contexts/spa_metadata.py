@@ -248,11 +248,11 @@ class SPAMetadataContext(Context):
             }
             capture_post(url, json=dcg_data)
 
-            gs_name = transferred_file.stem.split("_")[1]
+            gs_name = int(transferred_file.stem.split("_")[1])
             logger.info(
-                f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
+                f"Collecting foil hole positions for {str(transferred_file)} and grid square {gs_name}"
             )
-            fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
+            fh_positions = _foil_hole_positions(transferred_file, gs_name)
             source = _get_source(transferred_file, environment=environment)
             if source is None:
                 return None
@@ -274,7 +274,7 @@ class SPAMetadataContext(Context):
                 gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=gs_name)}"
                 gs_info = grid_square_data(
                     transferred_file,
-                    int(gs_name),
+                    gs_name,
                 )
                 image_path = (
                     _file_transferred_to(environment, source, Path(gs_info.image))
