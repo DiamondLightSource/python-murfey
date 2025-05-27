@@ -83,7 +83,7 @@ class Analyser(Observer):
         )
 
     def __repr__(self) -> str:
-        return f"<Analyser ({self._basepath})"
+        return f"<Analyser ({self._basepath})>"
 
     def _find_extension(self, file_path: Path):
         """
