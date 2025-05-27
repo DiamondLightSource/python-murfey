@@ -109,7 +109,7 @@ class RSyncer(Observer):
         self._statusbar = status_bar
 
     def __repr__(self) -> str:
-        return f"<RSyncer {self._basepath} → {self._remote} ({self.status})"
+        return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
 
     @classmethod
     def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
