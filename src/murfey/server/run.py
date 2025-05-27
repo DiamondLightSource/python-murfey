@@ -164,8 +164,12 @@ def run():
                 security_config.rabbitmq_credentials
             )
             _set_up_transport("PikaTransport")
+            logger.info("Set up message transport manager")
         except WorkflowsError:
-            pass
+            logger.error(
+                "Error encountered setting up RabbitMQ connection",
+                exc_info=True,
+            )
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
