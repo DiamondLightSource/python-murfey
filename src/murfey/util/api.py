@@ -34,7 +34,7 @@ def load_route_manifest(
 def find_unique_index(
     pattern: str,
     candidates: list[str],
-    partial: bool = True,  # Allows partial matches
+    exact: bool = False,  # Allows partial matches
 ) -> int:
     """
     Finds the index of a unique entry in a list.
@@ -43,7 +43,7 @@ def find_unique_index(
     matches = []
     index = 0
     for i, candidate in enumerate(candidates):
-        if (partial and pattern in candidate) or (not partial and pattern == candidate):
+        if (not exact and pattern in candidate) or (exact and pattern == candidate):
             counter += 1
             matches.append(candidate)
             index = i
@@ -97,12 +97,12 @@ def url_path_for(
     # Load the routes in the desired router
     routers = list(route_manifest.keys())
     routes: list[dict[str, Any]] = route_manifest[
-        routers[find_unique_index(router_name, routers, partial=True)]
+        routers[find_unique_index(router_name, routers, exact=False)]
     ]
 
     # Search router for the function
     route_info = routes[
-        find_unique_index(function_name, [r["function"] for r in routes], partial=False)
+        find_unique_index(function_name, [r["function"] for r in routes], exact=True)
     ]
 
     # Unpack the dictionary
@@ -116,7 +116,7 @@ def url_path_for(
             param_type = path_param["type"]
             if param_name not in kwargs.keys():
                 message = (
-                    f"Error validating parameters for {function_name}; "
+                    f"Error validating parameters for {function_name!r}; "
                     f"path parameter {param_name!r} was not provided"
                 )
                 logger.error(message)
@@ -126,7 +126,7 @@ def url_path_for(
                 continue
             elif type(kwargs[param_name]).__name__ not in param_type:
                 message = (
-                    f"Error validating parameters for {function_name}; "
+                    f"Error validating parameters for {function_name!r}; "
                     f"{param_name!r} must be {param_type!r}, "
                     f"received {type(kwargs[param_name]).__name__!r}"
                 )
