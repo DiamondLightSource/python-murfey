@@ -12,6 +12,7 @@ from typing import Optional
 import websocket
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util.api import url_path_for
 
 log = logging.getLogger("murfey.client.websocket")
 
@@ -22,7 +23,7 @@ class WSApp:
     def __init__(
         self, *, server: str, id: int | str | None = None, register_client: bool = True
     ):
-        self.id = uuid.uuid4() if id is None else id
+        self.id = str(uuid.uuid4()) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
 
@@ -42,9 +43,13 @@ class WSApp:
         # Prepend the proxy path to the new URL path
         # It will evaluate to "" if nothing's there, and starts with "/" if present
         ws_url = (
-            url._replace(path=f"{proxy_path}/ws/test/{self.id}").geturl()
+            url._replace(
+                path=f"{proxy_path}{url_path_for('websocket.ws', 'websocket_endpoint', client_id=self.id)}"
+            ).geturl()
             if register_client
-            else url._replace(path=f"{proxy_path}/ws/connect/{self.id}").geturl()
+            else url._replace(
+                path=f"{proxy_path}{url_path_for('websocket.ws', 'websocket_connection_endpoint', client_id=self.id)}"
+            ).geturl()
         )
         self._ws = websocket.WebSocketApp(
             ws_url,

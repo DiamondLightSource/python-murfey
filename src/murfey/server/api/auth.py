@@ -16,8 +16,8 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlmodel import Session, create_engine, select
 
-from murfey.server import sanitise
 from murfey.server.murfey_db import murfey_db, url
+from murfey.util.api import url_path_for
 from murfey.util.config import get_security_config
 from murfey.util.db import MurfeyUser as User
 from murfey.util.db import Session as MurfeySession
@@ -26,7 +26,7 @@ from murfey.util.db import Session as MurfeySession
 logger = getLogger("murfey.server.api.auth")
 
 # Set up router
-router = APIRouter()
+router = APIRouter(tags=["Authentication"])
 
 
 class CookieScheme(HTTPBearer):
@@ -170,7 +170,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             )
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
-                    f"{auth_url}/validate_token",
+                    f"{auth_url}{url_path_for('auth.router', 'simple_token_validation')}",
                     headers=headers,
                 ) as response:
                     success = response.status == 200
@@ -225,7 +225,7 @@ def create_access_token(data: dict, token: str = "") -> str:
             # check the session ID is alphanumeric for security
             raise ValueError("Session ID was invalid (not alphanumeric)")
         minted_token_response = requests.get(
-            f"{auth_url}/sessions/{sanitise(str(session_id))}/token",
+            f"{auth_url}{url_path_for('auth.router', 'mint_session_token', session_id=session_id)}",
             headers={"Authorization": f"Bearer {token}"},
         )
         if minted_token_response.status_code != 200:
@@ -257,7 +257,7 @@ async def generate_token(
         data.add_field("password", form_data.password)
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{auth_url}/token",
+                f"{auth_url}{url_path_for('auth.router', 'generate_token')}",
                 data=data,
             ) as response:
                 validated = response.status == 200

@@ -21,6 +21,7 @@ from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
 from murfey.util import posix_path
+from murfey.util.api import url_path_for
 from murfey.util.client import capture_post, get_machine_config_client
 
 log = logging.getLogger("murfey.client.mutligrid_control")
@@ -62,7 +63,7 @@ class MultigridController:
                 requests.delete, headers={"Authorization": f"Bearer {self.token}"}
             )
         machine_data = requests.get(
-            f"{self.murfey_url}/instruments/{self.instrument_name}/machine"
+            f"{self.murfey_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         self.rsync_url = machine_data.get("rsync_url", "")
         self.rsync_module = machine_data.get("rsync_module", "data")
@@ -102,9 +103,9 @@ class MultigridController:
 
         if self.visit_end_time:
             current_time = datetime.now()
-            server_timestamp = requests.get(f"{self.murfey_url}/time").json()[
-                "timestamp"
-            ]
+            server_timestamp = requests.get(
+                f"{self.murfey_url}{url_path_for('session_control.router', 'get_current_timestamp')}"
+            ).json()["timestamp"]
             self.visit_end_time += current_time - datetime.fromtimestamp(
                 server_timestamp
             )
@@ -124,7 +125,7 @@ class MultigridController:
             ):
                 async with aiohttp.ClientSession() as clientsession:
                     async with clientsession.delete(
-                        f"{self._environment.url.geturl()}/sessions/{self.session_id}",
+                        f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.session_id)}",
                         json={"access_token": self.token, "token_type": "bearer"},
                     ) as response:
                         success = response.status == 200
@@ -164,7 +165,7 @@ class MultigridController:
         log.debug(f"Analysis of {source} is {('enabled' if analyse else 'disabled')}")
         destination_overrides = destination_overrides or {}
         machine_data = requests.get(
-            f"{self._environment.url.geturl()}/instruments/{self.instrument_name}/machine"
+            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         if destination_overrides.get(source):
             destination = (
@@ -208,10 +209,10 @@ class MultigridController:
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
-            remove_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer?source={quote(str(source), safe='')}"
+            remove_url = f"{self.murfey_url}{url_path_for('session_control.router', 'delete_rsyncer', session_id=self.session_id)}?source={quote(str(source), safe='')}"
             requests.delete(remove_url)
         else:
-            stop_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_stopped"
+            stop_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_stopped_rsyncer', session_id=self.session_id)}"
             capture_post(stop_url, json={"source": str(source)})
 
     def _finalise_rsyncer(self, source: Path):
@@ -227,7 +228,7 @@ class MultigridController:
 
     def _restart_rsyncer(self, source: Path):
         self.rsync_processes[source].restart()
-        restarted_url = f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
+        restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
         capture_post(restarted_url, json={"source": str(source)})
 
     def _request_watcher_stop(self, source: Path):
@@ -250,9 +251,7 @@ class MultigridController:
         log.info(f"starting rsyncer: {source}")
         if transfer:
             # Always make sure the destination directory exists
-            make_directory_url = (
-                f"{self.murfey_url}/sessions/{self.session_id}/make_rsyncer_destination"
-            )
+            make_directory_url = f"{self.murfey_url}{url_path_for('file_manip.router', 'make_rsyncer_destination', session_id=self.session_id)}"
             capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
@@ -322,12 +321,10 @@ class MultigridController:
                 secondary=True,
             )
             if restarted:
-                restarted_url = (
-                    f"{self.murfey_url}/sessions/{self.session_id}/rsyncer_started"
-                )
+                restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
                 capture_post(restarted_url, json={"source": str(source)})
             else:
-                url = f"{str(self._environment.url.geturl())}/sessions/{str(self._environment.murfey_session)}/rsyncer"
+                url = f"{str(self._environment.url.geturl())}{url_path_for('session_control.router', 'register_rsyncer', session_id=self._environment.murfey_session)}"
                 rsyncer_data = {
                     "source": str(source),
                     "destination": destination,
@@ -440,7 +437,7 @@ class MultigridController:
             log.info("Registering tomography processing parameters")
             if self._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
-                    f"{str(self._environment.url.geturl())}/visits/{self._environment.visit}/{self._environment.murfey_session}/eer_fractionation_file",
+                    f"{str(self._environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                     json={
                         "num_frames": self._environment.data_collection_parameters[
                             "num_eer_frames"
@@ -457,17 +454,17 @@ class MultigridController:
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 json.update({"eer_fractionation_file": eer_fractionation_file})
             capture_post(
-                f"{self._environment.url.geturl()}/sessions/{self._environment.murfey_session}/tomography_processing_parameters",
+                f"{self._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'register_tomo_proc_params', session_id=self._environment.murfey_session)}",
                 json=json,
             )
             capture_post(
-                f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self._environment.murfey_session}/flush_tomography_processing",
+                f"{self._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'flush_tomography_processing', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                 json={"rsync_source": str(source)},
             )
             log.info("Tomography processing flushed")
 
         elif isinstance(context, SPAModularContext):
-            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_data_collection_group"
+            url = f"{str(self._environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=self._environment.visit, session_id=self.session_id)}"
             dcg_data = {
                 "experiment_type": "single particle",
                 "experiment_type_id": 37,
@@ -506,7 +503,7 @@ class MultigridController:
                     "phase_plate": json.get("phase_plate", False),
                 }
                 capture_post(
-                    f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/start_data_collection",
+                    f"{str(self._environment.url.geturl())}{url_path_for('workflow.router', 'start_dc', visit_name=self._environment.visit, session_id=self.session_id)}",
                     json=data,
                 )
                 for recipe in (
@@ -517,7 +514,7 @@ class MultigridController:
                     "em-spa-refine",
                 ):
                     capture_post(
-                        f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/{self.session_id}/register_processing_job",
+                        f"{str(self._environment.url.geturl())}{url_path_for('workflow.router', 'register_proc', visit_name=self._environment.visit, session_id=self.session_id)}",
                         json={
                             "tag": str(source),
                             "source": str(source),
@@ -526,7 +523,7 @@ class MultigridController:
                     )
                 log.info(f"Posting SPA processing parameters: {json}")
                 response = capture_post(
-                    f"{self._environment.url.geturl()}/sessions/{self.session_id}/spa_processing_parameters",
+                    f"{self._environment.url.geturl()}{url_path_for('workflow.spa_router', 'register_spa_proc_params', session_id=self.session_id)}",
                     json={
                         **{k: None if v == "None" else v for k, v in json.items()},
                         "tag": str(source),
@@ -535,14 +532,14 @@ class MultigridController:
                 if response and not str(response.status_code).startswith("2"):
                     log.warning(f"{response.reason}")
                 capture_post(
-                    f"{self._environment.url.geturl()}/visits/{self._environment.visit}/{self.session_id}/flush_spa_processing",
+                    f"{self._environment.url.geturl()}{url_path_for('workflow.spa_router', 'flush_spa_processing', visit_name=self._environment.visit, session_id=self.session_id)}",
                     json={"tag": str(source)},
                 )
 
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str
     ):
-        url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_file_count"
+        url = f"{str(self._environment.url.geturl())}{url_path_for('prometheus.router', 'increment_rsync_file_count', visit_name=self._environment.visit)}"
         num_data_files = len(
             [
                 f
@@ -566,7 +563,7 @@ class MultigridController:
         self, update: RSyncerUpdate, source: str, destination: str
     ):
         if update.outcome is TransferResult.SUCCESS:
-            url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_transferred_files_prometheus"
+            url = f"{str(self._environment.url.geturl())}{url_path_for('prometheus.router', 'increment_rsync_transferred_files_prometheus', visit_name=self._environment.visit)}"
             data_files = (
                 [update]
                 if update.file_path.suffix in self._data_suffixes
@@ -595,7 +592,7 @@ class MultigridController:
         ]
         if not checked_updates:
             return
-        url = f"{str(self._environment.url.geturl())}/visits/{str(self._environment.visit)}/increment_rsync_transferred_files"
+        url = f"{str(self._environment.url.geturl())}{url_path_for('prometheus.router', 'increment_rsync_transferred_files', visit_name=self._environment.visit)}"
         data_files = [
             u
             for u in updates

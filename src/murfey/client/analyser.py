@@ -82,6 +82,9 @@ class Analyser(Observer):
             else {}
         )
 
+    def __repr__(self) -> str:
+        return f"<Analyser ({self._basepath})>"
+
     def _find_extension(self, file_path: Path):
         """
         Identifies the file extension and stores that information in the class.

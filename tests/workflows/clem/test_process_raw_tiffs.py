@@ -97,7 +97,7 @@ def test_zocalo_cluster_request(
 
     # Check that it sends the expected recipe
     mock_transport.send.assert_called_once_with(
-        "processing_recipe",
-        sent_recipe,
+        queue="processing_recipe",
+        message=sent_recipe,
         new_connection=True,
     )

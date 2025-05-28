@@ -8,6 +8,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
+from murfey.util.api import url_path_for
 from murfey.util.client import (
     authorised_requests,
     capture_post,
@@ -166,7 +167,7 @@ class SPAMetadataContext(Context):
                 environment.samples[source] = SampleInfo(
                     atlas=Path(partial_path), sample=sample
                 )
-                url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+                url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
                 dcg_search_dir = "/".join(
                     p for p in transferred_file.parent.parts if p != environment.visit
                 )
@@ -202,7 +203,7 @@ class SPAMetadataContext(Context):
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
                         capture_post(
-                            f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs}",
+                            f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=int(gs))}",
                             json={
                                 "tag": dcg_tag,
                                 "x_location": pos_data[0],
@@ -221,7 +222,7 @@ class SPAMetadataContext(Context):
             and environment
         ):
             # Make sure we have a data collection group before trying to register grid square
-            url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_data_collection_group"
+            url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
             dcg_search_dir = "/".join(
                 p
                 for p in transferred_file.parent.parent.parts
@@ -247,11 +248,11 @@ class SPAMetadataContext(Context):
             }
             capture_post(url, json=dcg_data)
 
-            gs_name = transferred_file.stem.split("_")[1]
+            gs_name = int(transferred_file.stem.split("_")[1])
             logger.info(
-                f"Collecting foil hole positions for {str(transferred_file)} and grid square {int(gs_name)}"
+                f"Collecting foil hole positions for {str(transferred_file)} and grid square {gs_name}"
             )
-            fh_positions = _foil_hole_positions(transferred_file, int(gs_name))
+            fh_positions = _foil_hole_positions(transferred_file, gs_name)
             source = _get_source(transferred_file, environment=environment)
             if source is None:
                 return None
@@ -270,10 +271,10 @@ class SPAMetadataContext(Context):
             visitless_source = str(visitless_source_images_dirs[-1])
 
             if fh_positions:
-                gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}"
+                gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=gs_name)}"
                 gs_info = grid_square_data(
                     transferred_file,
-                    int(gs_name),
+                    gs_name,
                 )
                 image_path = (
                     _file_transferred_to(environment, source, Path(gs_info.image))
@@ -295,7 +296,7 @@ class SPAMetadataContext(Context):
 
             for fh, fh_data in fh_positions.items():
                 capture_post(
-                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{gs_name}/foil_hole",
+                    f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=gs_name)}",
                     json={
                         "name": fh,
                         "x_location": fh_data.x_location,

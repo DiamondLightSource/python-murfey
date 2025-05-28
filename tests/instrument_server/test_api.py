@@ -11,6 +11,7 @@ from murfey.instrument_server.api import (
     upload_gain_reference,
 )
 from murfey.util import posix_path
+from murfey.util.api import url_path_for
 
 test_get_murfey_url_params_matrix = (
     # Server URL to use
@@ -119,7 +120,7 @@ def test_upload_gain_reference(
     )
 
     # Check that the machine config request was called
-    machine_config_url = f"{server_url}/instruments/{instrument_name}/machine"
+    machine_config_url = f"{server_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
     mock_request.get.assert_called_once_with(
         machine_config_url,
         headers={"Authorization": ANY},

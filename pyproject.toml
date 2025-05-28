@@ -87,9 +87,10 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
+"murfey.generate_route_manifest" = "murfey.cli.generate_route_manifest:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
 "murfey.repost_failed_calls" = "murfey.cli.repost_failed_calls:run"
-"murfey.server" = "murfey.server:run"
+"murfey.server" = "murfey.server.run:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
@@ -117,6 +118,7 @@ zip-safe = false
 
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
+"murfey.util" = ["route_manifest.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src", "tests"]

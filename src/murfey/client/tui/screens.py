@@ -57,6 +57,7 @@ from murfey.client.instance_environment import (
 from murfey.client.rsync import RSyncer
 from murfey.client.tui.forms import FormDependency
 from murfey.util import posix_path
+from murfey.util.api import url_path_for
 from murfey.util.client import capture_post, get_machine_config_client, read_config
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
@@ -84,7 +85,7 @@ def determine_default_destination(
     use_suggested_path: bool = True,
 ) -> str:
     machine_data = requests.get(
-        f"{environment.url.geturl()}/instruments/{environment.instrument_name}/machine"
+        f"{environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
     ).json()
     _default = ""
     if environment.processing_only_mode and environment.sources:
@@ -109,7 +110,7 @@ def determine_default_destination(
                                 _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = capture_post(
-                                    url=f"{str(environment.url.geturl())}/visits/{visit}/{environment.murfey_session}/suggested_path",
+                                    url=f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'suggest_path', visit_name=visit, session_id=environment.murfey_session)}",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
@@ -265,7 +266,7 @@ class LaunchScreen(Screen):
     def compose(self):
 
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
         self._dir_tree = _DirectoryTree(
             str(self._selected_dir),
@@ -476,16 +477,16 @@ class ProcessingForm(Screen):
             self.app._start_dc(params)
             if model == ProcessingParametersTomo:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/tomography_processing_parameters",
+                    f"{self.app._environment.url.geturl()}/{url_path_for('workflow.tomo_router', 'register_tomo_proc_params', session_id=self.app._environment.murfey_session)}",
                     json=params,
                 )
             elif model == ProcessingParametersSPA:
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/spa_processing_parameters",
+                    f"{self.app._environment.url.geturl()}{url_path_for('workflow.spa_router', 'register_spa_proc_params', session_id=self.app._environment.murfey_session)}",
                     json=params,
                 )
                 requests.post(
-                    f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/{self.app._environment.murfey_session}/flush_spa_processing"
+                    f"{self.app._environment.url.geturl()}{url_path_for('workflow.spa_router', 'flush_spa_processing', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
                 )
 
     def on_switch_changed(self, event):
@@ -645,14 +646,16 @@ class SessionSelection(Screen):
             self.app.pop_screen()
         session_name = "Client connection"
         self.app._environment.murfey_session = requests.post(
-            f"{self.app._environment.url.geturl()}/instruments/{self.app._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'link_client_to_session', instrument_name=self.app._environment.instrument_name, client_id=self.app._environment.client_id)}",
             json={"session_id": session_id, "session_name": session_name},
         ).json()
 
     def _remove_session(self, session_id: int, **kwargs):
-        requests.delete(f"{self.app._environment.url.geturl()}/sessions/{session_id}")
+        requests.delete(
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=session_id)}"
+        )
         exisiting_sessions = requests.get(
-            f"{self.app._environment.url.geturl()}/sessions"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'get_sessions')}"
         ).json()
         self.app.uninstall_screen("session-select-screen")
         if exisiting_sessions:
@@ -674,7 +677,7 @@ class SessionSelection(Screen):
         else:
             session_name = "Client connection"
             resp = capture_post(
-                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session",
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'link_client_to_session', instrument_name=self.app._environment.instrument_name, client_id=self.app._environment.client_id)}",
                 json={"session_id": None, "session_name": session_name},
             )
             if resp:
@@ -696,12 +699,12 @@ class VisitSelection(SwitchSelection):
         self.app._visit = text
         self.app._environment.visit = text
         response = requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{text}",
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'register_client_to_visit', visit_name=text)}",
             json={"id": self.app._environment.client_id},
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
 
         if self._switch_status:
@@ -735,7 +738,7 @@ class VisitSelection(SwitchSelection):
 
         if machine_data.get("upstream_data_directories"):
             upstream_downloads = requests.get(
-                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/upstream_visits"
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.correlative_router', 'find_upstream_visits', session_id=self.app._environment.murfey_session)}"
             ).json()
             self.app.install_screen(
                 UpstreamDownloads(upstream_downloads), "upstream-downloads"
@@ -763,12 +766,12 @@ class VisitCreation(Screen):
         self.app._visit = text
         self.app._environment.visit = text
         response = requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{text}",
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'register_client_to_visit', visit_name=text)}",
             json={"id": self.app._environment.client_id},
         )
         log.info(f"Posted visit registration: {response.status_code}")
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
 
         self.app.install_screen(
@@ -797,7 +800,7 @@ class VisitCreation(Screen):
 
         if machine_data.get("upstream_data_directories"):
             upstream_downloads = requests.get(
-                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/upstream_visits"
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.correlative_router', 'find_upstream_visits', session_id=self.app._environment.murfey_session)}"
             ).json()
             self.app.install_screen(
                 UpstreamDownloads(upstream_downloads), "upstream-downloads"
@@ -819,7 +822,7 @@ class UpstreamDownloads(Screen):
 
     def on_button_pressed(self, event: Button.Pressed):
         machine_data = requests.get(
-            f"{self.app._environment.url.geturl()}/instruments/{instrument_name}/machine"
+            f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
         if machine_data.get("upstream_data_download_directory"):
             # Create the directory locally to save files to
@@ -830,7 +833,7 @@ class UpstreamDownloads(Screen):
 
             # Get the paths to the TIFF files generated previously under the same session ID
             upstream_tiff_paths_response = requests.get(
-                f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff_paths"
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.correlative_router', 'gather_upstream_tiffs', visit_name=event.button.label, session_id=self.app._environment.murfey_session)}"
             )
             upstream_tiff_paths = upstream_tiff_paths_response.json() or []
 
@@ -839,7 +842,7 @@ class UpstreamDownloads(Screen):
                 (download_dir / tp).parent.mkdir(exist_ok=True, parents=True)
                 # Write TIFF to the specified file path
                 stream_response = requests.get(
-                    f"{self.app._environment.url.geturl()}/visits/{event.button.label}/{self.app._environment.murfey_session}/upstream_tiff/{tp}",
+                    f"{self.app._environment.url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff', visit_name=event.button.label, session_id=self.app._environment.murfey_session, tiff_path=tp)}",
                     stream=True,
                 )
                 # Write the file chunk-by-chunk to avoid hogging memory
@@ -903,7 +906,7 @@ class GainReference(Screen):
                         f"Gain reference file {posix_path(self._dir_tree._gain_reference)!r} was not successfully transferred to {visit_path}/processing"
                     )
             process_gain_response = requests.post(
-                url=f"{str(self.app._environment.url.geturl())}/sessions/{self.app._environment.murfey_session}/process_gain",
+                url=f"{str(self.app._environment.url.geturl())}{url_path_for('file_manip.router', 'process_gain', session_id=self.app._environment.murfey_session)}",
                 json={
                     "gain_ref": str(self._dir_tree._gain_reference),
                     "eer": bool(
@@ -1231,10 +1234,10 @@ class WaitingScreen(Screen):
         self.query_one(ProgressBar).advance(1)
         if self.query_one(ProgressBar).progress == self.query_one(ProgressBar).total:
             requests.post(
-                f"{self.app._environment.url.geturl()}/sessions/{self.app._environment.murfey_session}/successful_processing"
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'register_processing_success_in_ispyb', session_id=self.app._environment.murfey_session)}"
             )
             requests.delete(
-                f"{self.app._environment.url.geturl()}/instruments/{self._environment.instrument_name}/clients/{self.app._environment.client_id}/session"
+                f"{self.app._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.app._environment.murfey_session)}"
             )
             self.app.exit()
 
@@ -1266,5 +1269,5 @@ class MainScreen(Screen):
 
     def on_mount(self, event):
         requests.post(
-            f"{self.app._environment.url.geturl()}/visits/{self.app._environment.visit}/monitoring/1"
+            f"{self.app._environment.url.geturl()}{url_path_for('prometheus.router', 'change_monitoring_status', visit_name=self.app._environment.visit, on=1)}"
         )

@@ -17,11 +17,11 @@ import shutil
 from functools import lru_cache, partial
 from pathlib import Path
 from typing import Awaitable, Callable, Optional, Union
-from urllib.parse import ParseResult, urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse
 
 import requests
 
-from murfey.util.models import Visit
+from murfey.util.api import url_path_for
 
 logger = logging.getLogger("murfey.util.client")
 
@@ -59,7 +59,9 @@ def get_machine_config_client(
     _instrument_name: Optional[str] = instrument_name or os.getenv("BEAMLINE")
     if not _instrument_name:
         return {}
-    return requests.get(f"{url}/instruments/{_instrument_name}/machine").json()
+    return requests.get(
+        f"{url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=_instrument_name)}"
+    ).json()
 
 
 def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:
@@ -72,17 +74,6 @@ def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:
 
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
-
-
-def _get_visit_list(api_base: ParseResult, instrument_name: str):
-    proxy_path = api_base.path.rstrip("/")
-    get_visits_url = api_base._replace(
-        path=f"{proxy_path}/instruments/{instrument_name}/visits_raw"
-    )
-    server_reply = requests.get(get_visits_url.geturl())
-    if server_reply.status_code != 200:
-        raise ValueError(f"Server unreachable ({server_reply.status_code})")
-    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def capture_post(url: str, json: Union[dict, list] = {}) -> Optional[requests.Response]:

@@ -17,6 +17,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
+from murfey.util.api import url_path_for
 from murfey.util.client import (
     authorised_requests,
     capture_post,
@@ -109,7 +110,7 @@ class TomographyContext(Context):
             )
             return
         try:
-            dcg_url = f"{str(environment.url.geturl())}/visits/{str(environment.visit)}/{environment.murfey_session}/register_data_collection_group"
+            dcg_url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
             dcg_data = {
                 "experiment_type": "tomo",
                 "experiment_type_id": 36,
@@ -121,7 +122,7 @@ class TomographyContext(Context):
 
             for tilt_series in self._tilt_series.keys():
                 if tilt_series not in self._tilt_series_with_pjids:
-                    dc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/start_data_collection"
+                    dc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'start_dc', visit_name=environment.visit, session_id=environment.murfey_session)}"
                     dc_data = {
                         "experiment_type": "tomography",
                         "file_extension": file_extension,
@@ -157,7 +158,7 @@ class TomographyContext(Context):
                         )
                         capture_post(dc_url, json=dc_data)
 
-                        proc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/register_processing_job"
+                        proc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_proc', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         for recipe in ("em-tomo-preprocess", "em-tomo-align"):
                             capture_post(
                                 proc_url,
@@ -262,7 +263,7 @@ class TomographyContext(Context):
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
-            rerun_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/rerun_tilt_series"
+            rerun_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tilt_series_for_rerun', visit_name=environment.visit)}"
             rerun_data = {
                 "session_id": environment.murfey_session,
                 "tag": tilt_series,
@@ -276,7 +277,7 @@ class TomographyContext(Context):
         if not self._tilt_series.get(tilt_series):
             logger.info(f"New tilt series found: {tilt_series}")
             self._tilt_series[tilt_series] = [file_path]
-            ts_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/tilt_series"
+            ts_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tilt_series', visit_name=environment.visit)}"
             ts_data = {
                 "session_id": environment.murfey_session,
                 "tag": tilt_series,
@@ -305,7 +306,7 @@ class TomographyContext(Context):
                     self._tilt_series[tilt_series].append(file_path)
 
         if environment:
-            tilt_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tilt"
+            tilt_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tilt', visit_name=environment.visit, session_id=environment.murfey_session)}"
             tilt_data = {
                 "movie_path": str(file_transferred_to),
                 "tilt_series_tag": tilt_series,
@@ -316,7 +317,7 @@ class TomographyContext(Context):
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
-                    f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                    f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                     json={
                         "num_frames": environment.data_collection_parameters[
                             "num_eer_frames"
@@ -331,7 +332,7 @@ class TomographyContext(Context):
                     },
                 )
                 eer_fractionation_file = response.json()["eer_fractionation_file"]
-            preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/tomography_preprocess"
+            preproc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'request_tomography_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
             preproc_data = {
                 "path": str(file_transferred_to),
                 "description": "",
@@ -491,7 +492,7 @@ class TomographyContext(Context):
 
                     # Always update the tilt series length in the database after an mdoc
                     if environment.murfey_session is not None:
-                        length_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/tilt_series_length"
+                        length_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_tilt_series_length', session_id=environment.murfey_session)}"
                         capture_post(
                             length_url,
                             json={
@@ -508,7 +509,7 @@ class TomographyContext(Context):
                 f"The following tilt series are considered complete: {completed_tilts} "
                 f"after {transferred_file}"
             )
-            complete_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/completed_tilt_series"
+            complete_url = f"{str(environment.url.geturl())}{url_path_for('workflow.tomo_router', 'register_completed_tilt_series', visit_name=environment.visit, session_id=environment.murfey_session)}"
             capture_post(
                 complete_url,
                 json={
@@ -592,7 +593,7 @@ class TomographyContext(Context):
             binning_factor = 1
             if environment:
                 server_config = requests.get(
-                    f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
+                    f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
                 ).json()
                 if (
                     server_config.get("superres")

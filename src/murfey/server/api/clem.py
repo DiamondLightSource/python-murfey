@@ -31,7 +31,7 @@ from murfey.util.db import Session as MurfeySession
 logger = getLogger("murfey.server.api.clem")
 
 # Create APIRouter class object
-router = APIRouter()
+router = APIRouter(tags=["Workflows: CLEM"])
 
 # Valid file types
 valid_file_types = (

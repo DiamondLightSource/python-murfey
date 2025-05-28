@@ -21,6 +21,7 @@ import random
 import re
 import zipfile
 from io import BytesIO
+from typing import Any
 from urllib.parse import quote
 
 import packaging.version
@@ -29,10 +30,11 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 import murfey
-from murfey.server import get_machine_config, respond_with_template
+from murfey.server.api import templates
+from murfey.util.config import get_hostname, get_machine_config, get_microscope
 
 tag = {
-    "name": "bootstrap",
+    "name": "Bootstrap",
     "description": __doc__,
     "externalDocs": {
         "description": "PEP 503",
@@ -42,13 +44,13 @@ tag = {
 
 # Set up API endpoint groups
 # NOTE: Routers MUST have prefixes. prefix="" causes an error
-version = APIRouter(prefix="/version", tags=["bootstrap"])
-bootstrap = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
-cygwin = APIRouter(prefix="/cygwin", tags=["bootstrap"])
-msys2 = APIRouter(prefix="/msys2", tags=["bootstrap"])
-rust = APIRouter(prefix="/rust", tags=["bootstrap"])
-pypi = APIRouter(prefix="/pypi", tags=["bootstrap"])
-plugins = APIRouter(prefix="/plugins", tags=["bootstrap"])
+version = APIRouter(prefix="/version", tags=["Bootstrap"])
+bootstrap = APIRouter(prefix="/bootstrap", tags=["Bootstrap"])
+cygwin = APIRouter(prefix="/cygwin", tags=["Bootstrap"])
+msys2 = APIRouter(prefix="/msys2", tags=["Bootstrap"])
+rust = APIRouter(prefix="/rust", tags=["Bootstrap"])
+pypi = APIRouter(prefix="/pypi", tags=["Bootstrap"])
+plugins = APIRouter(prefix="/plugins", tags=["Bootstrap"])
 
 logger = logging.getLogger("murfey.server.api.bootstrap")
 
@@ -97,6 +99,24 @@ def get_version(client_version: str = ""):
 GENERAL BOOTSTRAP-RELATED API ENDPOINTS
 =======================================================================================
 """
+
+
+def respond_with_template(
+    request: Request, filename: str, parameters: dict[str, Any] | None = None
+):
+    template_parameters = {
+        "hostname": get_hostname(),
+        "microscope": get_microscope(),
+        "version": murfey.__version__,
+        # Extra parameters to reconstruct URLs for forwarded requests
+        "netloc": request.url.netloc,
+        "proxy_path": "",
+    }
+    if parameters:
+        template_parameters.update(parameters)
+    return templates.TemplateResponse(
+        request=request, name=filename, context=template_parameters
+    )
 
 
 @bootstrap.get("/", response_class=HTMLResponse)

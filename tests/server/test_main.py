@@ -30,7 +30,7 @@ def login(test_user):
 @patch("murfey.server.api.auth.check_user", return_value=True)
 def test_read_main(mock_check, test_user):
     token = login(test_user)
-    response = client.get("/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/session_info", headers={"Authorization": f"Bearer {token}"})
     assert mock_check.called_once()
     assert response.status_code == 200
     assert "<title>" in response.text.lower()

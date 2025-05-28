@@ -9,8 +9,18 @@ from murfey.util.config import get_machine_config
 from murfey.util.db import DataCollectionGroup, FoilHole, GridSquare
 
 # Create APIRouter class object
-router = APIRouter(prefix="/display", tags=["display"])
+router = APIRouter(prefix="/display", tags=["Display"])
 machine_config = get_machine_config()
+
+
+@router.get("/instruments/{instrument_name}/instrument_name")
+def get_instrument_display_name(instrument_name: str) -> str:
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config:
+        return machine_config.display_name
+    return ""
 
 
 @router.get("/instruments/{instrument_name}/image/")

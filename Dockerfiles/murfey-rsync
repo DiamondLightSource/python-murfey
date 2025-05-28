@@ -1,7 +1,7 @@
 # Template build command
 # podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-rsync
 
-FROM docker.io/library/alpine:3.20
+FROM docker.io/library/alpine:3.21
 # FROM alpine:3.14
 
 ARG groupid

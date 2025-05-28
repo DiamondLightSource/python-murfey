@@ -11,7 +11,7 @@ logger = getLogger("murfey.api.hub")
 
 config = get_machine_config()
 
-router = APIRouter()
+router = APIRouter(tags=["Murfey Hub"])
 
 
 class InstrumentInfo(BaseModel):

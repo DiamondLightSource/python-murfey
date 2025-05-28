@@ -26,11 +26,24 @@ from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util.client import _get_visit_list, authorised_requests, read_config
+from murfey.util.api import url_path_for
+from murfey.util.client import authorised_requests, read_config
+from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
+
+
+def _get_visit_list(api_base: ParseResult, instrument_name: str):
+    proxy_path = api_base.path.rstrip("/")
+    get_visits_url = api_base._replace(
+        path=f"{proxy_path}{url_path_for('session_control.router', 'get_current_visits', instrument_name=instrument_name)}"
+    )
+    server_reply = requests.get(get_visits_url.geturl())
+    if server_reply.status_code != 200:
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
+    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def write_config(config: configparser.ConfigParser):
@@ -262,7 +275,9 @@ def run():
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     # Set up websocket app and handler
-    client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
+    client_id = requests.get(
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
+    ).json()
     ws = murfey.client.websocket.WSApp(
         server=args.server,
         id=client_id["new_id"],
@@ -279,7 +294,7 @@ def run():
 
     # Load machine data for subsequent sections
     machine_data = requests.get(
-        f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
     ).json()
     gain_ref: Path | None = None
 

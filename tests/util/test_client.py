@@ -6,11 +6,8 @@ from urllib.parse import urlparse
 
 from pytest import mark
 
-from murfey.util.client import (
-    _get_visit_list,
-    read_config,
-    set_default_acquisition_output,
-)
+from murfey.client import _get_visit_list
+from murfey.util.client import read_config, set_default_acquisition_output
 from murfey.util.models import Visit
 
 test_read_config_params_matrix = (
@@ -73,7 +70,7 @@ test_get_visit_list_params_matrix = (
 
 
 @mark.parametrize("test_params", test_get_visit_list_params_matrix)
-@patch("murfey.util.client.requests")
+@patch("murfey.client.requests")
 def test_get_visit_list(
     mock_request,
     test_params: tuple[str],
@@ -112,7 +109,9 @@ def test_get_visit_list(
         visits = _get_visit_list(urlparse(server_url), instrument_name)
 
     # Check that request was sent with the correct URL
-    expected_url = f"{server_url}/instruments/{instrument_name}/visits_raw"
+    expected_url = (
+        f"{server_url}/session_control/instruments/{instrument_name}/visits_raw"
+    )
     mock_request.get.assert_called_once_with(expected_url)
 
     # Check that expected outputs are correct (order-sensitive)
