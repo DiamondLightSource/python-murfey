@@ -203,7 +203,7 @@ class SPAMetadataContext(Context):
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
                         capture_post(
-                            f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=gs)}",
+                            f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=int(gs))}",
                             json={
                                 "tag": dcg_tag,
                                 "x_location": pos_data[0],
