@@ -127,10 +127,6 @@ def check_user(username: str) -> bool:
     return username in [u.username for u in users]
 
 
-def validate_instrument_server_token(timestamp: float) -> bool:
-    return timestamp in instrument_server_tokens.keys()
-
-
 def validate_instrument_server_session_token(session_id: int, visit: str):
     with Session(engine) as murfey_db:
         session_data = murfey_db.exec(
@@ -141,52 +137,58 @@ def validate_instrument_server_session_token(session_id: int, visit: str):
     return visit == session_data[0].visit
 
 
-def password_token_validation(token: str):
-    decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    # first check if the token has expired
-    if expiry_time := decoded_data.get("expiry_time"):
-        if expiry_time < time.time():
-            raise JWTError
-    if decoded_data.get("user"):
-        if not check_user(decoded_data["user"]):
-            raise JWTError
-    elif decoded_data.get("session") is not None:
-        if not validate_instrument_server_session_token(
-            decoded_data["session"], decoded_data["visit"]
-        ):
-            raise JWTError
-    else:
-        raise JWTError
-
-
 async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
-        if auth_url:
-            headers = (
-                {}
-                if security_config.auth_type == "cookie"
-                else {"Authorization": f"Bearer {token}"}
-            )
-            cookies = (
-                {security_config.cookie_key: token}
-                if security_config.auth_type == "cookie"
-                else {}
-            )
-            async with aiohttp.ClientSession(cookies=cookies) as session:
-                async with session.get(
-                    auth_url,
-                    headers=headers,
-                ) as response:
-                    success = response.status == 200
-                    validation_outcome = await response.json()
-            if not (success and validation_outcome.get("valid")):
+        try:
+            if security_config.auth_type == "password":
+                await validate_password_token(token)
+        except JWTError:
+            await validate_instrument_token(token)
+        decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # first check if the token has expired
+        if expiry_time := decoded_data.get("expiry_time"):
+            if expiry_time < time.time():
                 raise JWTError
+        if decoded_data.get("user"):
+            if not check_user(decoded_data["user"]):
+                raise JWTError
+        elif decoded_data.get("session") is not None:
+            if not validate_instrument_server_session_token(
+                decoded_data["session"], decoded_data["visit"]
+            ):
+                raise JWTError
+        else:
+            raise JWTError
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return None
+
+
+async def validate_password_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    if auth_url:
+        headers = (
+            {}
+            if security_config.auth_type == "cookie"
+            else {"Authorization": f"Bearer {token}"}
+        )
+        cookies = (
+            {security_config.cookie_key: token}
+            if security_config.auth_type == "cookie"
+            else {}
+        )
+        async with aiohttp.ClientSession(cookies=cookies) as session:
+            async with session.get(
+                f"{auth_url}/validate_token",
+                headers=headers,
+            ) as response:
+                success = response.status == 200
+                validation_outcome = await response.json()
+        if not (success and validation_outcome.get("valid")):
+            raise JWTError
     return None
 
 
@@ -202,7 +204,7 @@ async def validate_instrument_token(
                     else {"Authorization": f"Bearer {token}"}
                 )
                 async with session.get(
-                    security_config.instrument_auth_url,
+                    f"{security_config.instrument_auth_url}/validate_token",
                     headers=headers,
                 ) as response:
                     success = response.status == 200
