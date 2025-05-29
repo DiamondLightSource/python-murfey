@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionID, validate_instrument_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
@@ -60,7 +60,7 @@ logger = getLogger("murfey.server.api.session_control")
 
 router = APIRouter(
     prefix="/session_control",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: General"],
 )
 
@@ -297,7 +297,7 @@ def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
 
 spa_router = APIRouter(
     prefix="/session_control/spa",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: SPA"],
 )
 
@@ -355,7 +355,7 @@ def register_foil_hole(
 
 correlative_router = APIRouter(
     prefix="/session_control/correlative",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: Correlative Imaging"],
 )
 

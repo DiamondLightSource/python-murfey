@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionID, validate_instrument_token
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise, secure_path
@@ -20,7 +20,7 @@ logger = getLogger("murfey.server.api.file_manip")
 
 router = APIRouter(
     prefix="/file_manipulation",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["File Manipulation"],
 )
 

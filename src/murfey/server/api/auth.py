@@ -70,6 +70,10 @@ if security_config.auth_type == "password":
     oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 else:
     oauth2_scheme = CookieScheme(cookie_key=security_config.cookie_key)
+if security_config.instrument_auth_type == "token":
+    instrument_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+else:
+    instrument_oauth2_scheme = lambda *args, **kwargs: None
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 instrument_server_tokens: Dict[float, dict] = {}
@@ -170,7 +174,35 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             )
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
-                    f"{auth_url}{url_path_for('auth.router', 'simple_token_validation')}",
+                    auth_url,
+                    headers=headers,
+                ) as response:
+                    success = response.status == 200
+                    validation_outcome = await response.json()
+            if not (success and validation_outcome.get("valid")):
+                raise JWTError
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return None
+
+
+async def validate_instrument_token(
+    token: Annotated[str, Depends(instrument_oauth2_scheme)]
+):
+    try:
+        if security_config.instrument_auth_url:
+            async with aiohttp.ClientSession() as session:
+                headers = (
+                    {}
+                    if not security_config.instrument_auth_type
+                    else {"Authorization": f"Bearer {token}"}
+                )
+                async with session.get(
+                    security_config.instrument_auth_url,
                     headers=headers,
                 ) as response:
                     success = response.status == 200

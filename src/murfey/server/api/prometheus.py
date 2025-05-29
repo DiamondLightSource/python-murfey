@@ -8,7 +8,7 @@ from prometheus_client import Counter, Gauge
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
-from murfey.server.api.auth import validate_token
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.db import RsyncInstance
@@ -18,7 +18,7 @@ logger = getLogger("murfey.server.api.prometheus")
 
 router = APIRouter(
     prefix="/prometheus",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Prometheus"],
 )
 
