@@ -9,7 +9,7 @@ from murfey.util.config import get_machine_config
 
 
 @lru_cache(maxsize=5)
-def _cryolo_model_path(visit: str, instrument_name: str) -> Path:
+def cryolo_model_path(visit: str, instrument_name: str) -> Path:
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]

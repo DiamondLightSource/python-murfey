@@ -8,7 +8,6 @@ from sqlmodel import Session, select
 
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID
-from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
@@ -25,7 +24,7 @@ from murfey.util.db import (
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import cryolo_model_path, default_spa_parameters
 from murfey.util.spa_metadata import (
     GridSquareInfo,
     foil_hole_data,
@@ -423,7 +422,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
                 ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "cryolo_model_weights": str(
-                    _cryolo_model_path(
+                    cryolo_model_path(
                         murfey_session.visit, murfey_session.instrument_name
                     )
                 ),

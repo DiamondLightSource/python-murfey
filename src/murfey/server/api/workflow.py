@@ -27,7 +27,6 @@ except ImportError:
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionID, validate_token
-from murfey.server.api.spa import _cryolo_model_path
 from murfey.server.feedback import (
     _murfey_id,
     check_tilt_series_mc,
@@ -58,7 +57,7 @@ from murfey.util.db import (
     TiltSeries,
 )
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import cryolo_model_path, default_spa_parameters
 from murfey.util.tomo import midpoint
 
 logger = getLogger("murfey.server.api.workflow")
@@ -479,7 +478,7 @@ async def request_spa_preprocessing(
                 ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "cryolo_model_weights": str(
-                    _cryolo_model_path(visit_name, instrument_name)
+                    cryolo_model_path(visit_name, instrument_name)
                 ),
             },
         }
