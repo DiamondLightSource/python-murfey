@@ -22,7 +22,6 @@ import murfey.server.api.processing_parameters
 import murfey.server.api.prometheus
 import murfey.server.api.session_control
 import murfey.server.api.session_info
-import murfey.server.api.spa
 import murfey.server.api.websocket
 import murfey.server.api.workflow
 from murfey.server import template_files
@@ -90,7 +89,6 @@ app.include_router(murfey.server.api.workflow.router)
 app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
-app.include_router(murfey.server.api.spa.router)
 app.include_router(murfey.server.api.clem.router)
 
 app.include_router(murfey.server.api.prometheus.router)
