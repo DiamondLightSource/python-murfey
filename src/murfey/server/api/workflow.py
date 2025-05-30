@@ -643,10 +643,14 @@ async def request_tomography_preprocessing(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    visit_idx = Path(proc_file.path).parts.index(visit_name)
-    core = Path(*Path(proc_file.path).parts[: visit_idx + 1])
-    ppath = Path("/".join(secure_filename(p) for p in Path(proc_file.path).parts))
-    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
+    visit_idx = parts.index(visit_name)
+    core = Path("/") / Path(*parts[: visit_idx + 1])
+    ppath = Path("/") / Path(*parts)
+    if machine_config.process_multiple_datasets:
+        sub_dataset = ppath.relative_to(core).parts[0]
+    else:
+        sub_dataset = ""
     extra_path = machine_config.processed_extra_directory
     mrc_out = (
         core
