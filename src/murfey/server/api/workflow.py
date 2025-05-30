@@ -58,7 +58,7 @@ from murfey.util.db import (
     TiltSeries,
 )
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters, motion_corrected_mrc
 from murfey.util.tomo import midpoint
 
 logger = getLogger("murfey.server.api.workflow")
@@ -365,26 +365,7 @@ async def request_spa_preprocessing(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
-    visit_idx = parts.index(visit_name)
-    core = Path("/") / Path(*parts[: visit_idx + 1])
-    ppath = Path("/") / Path(*parts)
-    if machine_config.process_multiple_datasets:
-        sub_dataset = ppath.relative_to(core).parts[0]
-    else:
-        sub_dataset = ""
-    extra_path = machine_config.processed_extra_directory
-    mrc_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
-        / "MotionCorr"
-        / "job002"
-        / "Movies"
-        / ppath.parent.relative_to(core / sub_dataset)
-        / str(ppath.stem + "_motion_corrected.mrc")
-    )
+    mrc_out = motion_corrected_mrc(Path(proc_file.path), visit_name, machine_config)
     try:
         collected_ids = db.exec(
             select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
@@ -488,7 +469,8 @@ async def request_spa_preprocessing(
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(
-                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
+                f"Pre-processing was requested for {sanitise(Path(proc_file.path).name)} "
+                "but no Zocalo transport object was found"
             )
             return proc_file
 
@@ -643,26 +625,7 @@ async def request_tomography_preprocessing(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    parts = [secure_filename(p) for p in Path(proc_file.path).parts]
-    visit_idx = parts.index(visit_name)
-    core = Path("/") / Path(*parts[: visit_idx + 1])
-    ppath = Path("/") / Path(*parts)
-    if machine_config.process_multiple_datasets:
-        sub_dataset = ppath.relative_to(core).parts[0]
-    else:
-        sub_dataset = ""
-    extra_path = machine_config.processed_extra_directory
-    mrc_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
-        / "MotionCorr"
-        / "job002"
-        / "Movies"
-        / str(ppath.stem + "_motion_corrected.mrc")
-    )
-    mrc_out = Path("/".join(secure_filename(p) for p in mrc_out.parts))
+    mrc_out = motion_corrected_mrc(Path(proc_file.path), visit_name, machine_config)
 
     recipe_name = machine_config.recipes.get("em-tomo-preprocess", "em-tomo-preprocess")
 
@@ -733,7 +696,8 @@ async def request_tomography_preprocessing(
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(
-                f"Pe-processing was requested for {sanitise(ppath.name)} but no Zocalo transport object was found"
+                f"Pre-processing was requested for {sanitise(Path(proc_file.path).name)} "
+                f"but no Zocalo transport object was found"
             )
             return proc_file
     else:
