@@ -369,14 +369,11 @@ async def request_spa_preprocessing(
     visit_idx = parts.index(visit_name)
     core = Path("/") / Path(*parts[: visit_idx + 1])
     ppath = Path("/") / Path(*parts)
-    sub_dataset = ppath.relative_to(core).parts[0]
-    extra_path = machine_config.processed_extra_directory
-    for i, p in enumerate(ppath.parts):
-        if p.startswith("raw"):
-            movies_path_index = i
-            break
+    if machine_config.process_multiple_datasets:
+        sub_dataset = ppath.relative_to(core).parts[0]
     else:
-        raise ValueError(f"{proc_file.path} does not contain a raw directory")
+        sub_dataset = ""
+    extra_path = machine_config.processed_extra_directory
     mrc_out = (
         core
         / machine_config.processed_directory_name
@@ -385,7 +382,7 @@ async def request_spa_preprocessing(
         / "MotionCorr"
         / "job002"
         / "Movies"
-        / "/".join(ppath.parts[movies_path_index + 1 : -1])
+        / ppath.parent.relative_to(core / sub_dataset)
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     try:
