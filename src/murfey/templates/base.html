@@ -1,12 +1,9 @@
 <html>
   <head>
     <title>Murfey - {% block title %}{% endblock %}</title>
+    <link href="{{ proxy_path }}/static/styles.css" rel="stylesheet" />
     <link
-      href="{{ proxy_path }}{{ url_for('static', path='/styles.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ proxy_path }}{{ url_for('images', path='/icon_268.png') }}"
+      href="{{ proxy_path }}/images/icon_268.png"
       rel="icon"
       type="image/png"
     />
@@ -14,13 +11,10 @@
   <body>
     <div class="topnav">
       <a href="{{ proxy_path }}/docs">Home</a>
-      <a href="{{ proxy_path }}/bootstrap">Installation Instructions</a>
-      <a href="{{ proxy_path }}/pypi/fastapi">FastAPI (PyPI)</a>
+      <a href="{{ proxy_path }}/bootstrap/">Installation Instructions</a>
+      <a href="{{ proxy_path }}/pypi/fastapi/">FastAPI (PyPI)</a>
       <p style="text-align: right; margin: 8px 10px 0 auto">
-        <img
-          src="{{ proxy_path }}{{ url_for('images', path='/diamond.png') }}"
-          style="height: 25px"
-        />
+        <img src="{{ proxy_path }}/images/diamond.png" style="height: 25px" />
       </p>
     </div>
 
@@ -31,7 +25,8 @@
         For help please contact your local contact or the EM Data Analysis team.
       </p>
       <p style="font-size: 60%">
-        Murfey v{{ version }} running on {{ hostname }} ({{ microscope }})
+        Murfey v{{ version }} running on {{ hostname }} {{
+        "({})".format(microscope) if microscope else "" }}
       </p>
     </div>
   </body>
