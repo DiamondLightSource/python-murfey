@@ -51,7 +51,7 @@ from murfey.util.config import (
     get_microscope,
     get_security_config,
 )
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import default_spa_parameters, motion_corrected_mrc
 from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.server.feedback")
@@ -106,37 +106,16 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
     ).all()
     if not complete_results:
         return []
+    visit_name = complete_results[0][2].visit
     instrument_name = complete_results[0][2].instrument_name
     results = [r[0] for r in complete_results]
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-
-    def _mc_path(mov_path: Path) -> str:
-        for p in mov_path.parts:
-            if "-" in p and p.startswith(("bi", "nr", "nt", "cm", "sw")):
-                visit_name = p
-                break
-        else:
-            raise ValueError(f"No visit found in {mov_path}")
-        visit_idx = Path(mov_path).parts.index(visit_name)
-        core = Path(*Path(mov_path).parts[: visit_idx + 1])
-        ppath = Path(mov_path)
-        sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
-        extra_path = machine_config.processed_extra_directory
-        mrc_out = (
-            core
-            / machine_config.processed_directory_name
-            / sub_dataset
-            / extra_path
-            / "MotionCorr"
-            / "job002"
-            / "Movies"
-            / str(ppath.stem + "_motion_corrected.mrc")
-        )
-        return str(mrc_out)
-
-    return [_mc_path(Path(r.movie_path)) for r in results]
+    return [
+        motion_corrected_mrc(Path(r.movie_path), visit_name, machine_config)
+        for r in results
+    ]
 
 
 def get_job_ids(tilt_series_id: int, appid: int) -> JobIDs:
