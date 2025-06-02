@@ -980,14 +980,6 @@ murfey.server.api.session_info.tomo_router:
         type: str
     methods:
       - GET
-murfey.server.api.spa.router:
-  - path: /sessions/{session_id}/cryolo_model
-    function: get_cryolo_model_path
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - GET
 murfey.server.api.websocket.ws:
   - path: /ws/test/{client_id}
     function: websocket_endpoint

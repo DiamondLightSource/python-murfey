@@ -1,10 +1,12 @@
+from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
-from murfey.util.config import MachineConfig
+from murfey.util.config import MachineConfig, get_machine_config
 
 
 def motion_corrected_mrc(
@@ -31,6 +33,23 @@ def motion_corrected_mrc(
         / str(ppath.stem + "_motion_corrected.mrc")
     )
     return Path("/".join(secure_filename(p) for p in mrc_out.parts))
+
+
+@lru_cache(maxsize=5)
+def cryolo_model_path(visit: str, instrument_name: str) -> Path:
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.model_search_directory:
+        visit_directory = (
+            machine_config.rsync_basepath / str(datetime.now().year) / visit
+        )
+        possible_models = list(
+            (visit_directory / machine_config.model_search_directory).glob("*.h5")
+        )
+        if possible_models:
+            return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
+    return machine_config.default_model
 
 
 class CLEMAlignAndMergeParameters(BaseModel):
