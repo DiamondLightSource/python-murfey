@@ -4,8 +4,35 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import BaseModel
+from werkzeug.utils import secure_filename
 
-from murfey.util.config import get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
+
+
+def motion_corrected_mrc(
+    input_movie: Path, visit_name: str, machine_config: MachineConfig
+):
+    parts = [secure_filename(p) for p in input_movie.parts]
+    visit_idx = parts.index(visit_name)
+    core = Path("/") / Path(*parts[: visit_idx + 1])
+    ppath = Path("/") / Path(*parts)
+    if machine_config.process_multiple_datasets:
+        sub_dataset = ppath.relative_to(core).parts[0]
+    else:
+        sub_dataset = ""
+    extra_path = machine_config.processed_extra_directory
+    mrc_out = (
+        core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / extra_path
+        / "MotionCorr"
+        / "job002"
+        / "Movies"
+        / ppath.parent.relative_to(core / sub_dataset)
+        / str(ppath.stem + "_motion_corrected.mrc")
+    )
+    return Path("/".join(secure_filename(p) for p in mrc_out.parts))
 
 
 @lru_cache(maxsize=5)
