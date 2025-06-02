@@ -113,7 +113,7 @@ def get_all_tilts(tilt_series_id: int) -> List[str]:
         instrument_name
     ]
     return [
-        motion_corrected_mrc(Path(r.movie_path), visit_name, machine_config)
+        str(motion_corrected_mrc(Path(r.movie_path), visit_name, machine_config))
         for r in results
     ]
 
