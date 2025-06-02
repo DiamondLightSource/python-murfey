@@ -57,6 +57,7 @@ class MachineConfig(BaseModel):  # type: ignore
     processing_enabled: bool = True
     process_by_default: bool = True
     gain_directory_name: str = "processing"
+    process_multiple_datasets: bool = True
     processed_directory_name: str = "processed"
     processed_extra_directory: str = ""
     recipes: dict[str, str] = {

@@ -24,7 +24,7 @@ from murfey.util.db import (
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import cryolo_model_path, default_spa_parameters
 from murfey.util.spa_metadata import (
     GridSquareInfo,
     foil_hole_data,
@@ -314,15 +314,12 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
     ).all()
     if not stashed_files:
         return True
-    instrument_name = (
-        murfey_db.exec(
-            select(MurfeySession).where(MurfeySession.id == message["session_id"])
-        )
-        .one()
-        .instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
+
+    murfey_session = murfey_db.exec(
+        select(MurfeySession).where(MurfeySession.id == message["session_id"])
+    ).one()
+    machine_config = get_machine_config(instrument_name=murfey_session.instrument_name)[
+        murfey_session.instrument_name
     ]
     recipe_name = machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
     collected_ids = murfey_db.exec(
@@ -424,6 +421,11 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
                     else f.eer_fractionation_file
                 ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "cryolo_model_weights": str(
+                    cryolo_model_path(
+                        murfey_session.visit, murfey_session.instrument_name
+                    )
+                ),
                 "foil_hole_id": foil_hole_id,
             },
         }
