@@ -410,8 +410,14 @@ murfey.server.api.display.router:
         type: int
     methods:
       - GET
-murfey.server.api.file_manip.router:
-  - path: /file_manipulation/visits/{visit_name}/{session_id}/suggested_path
+murfey.server.api.file_io_frontend.router:
+  - path: /file_io/frontend/sessions/{session_id}/process_gain
+    function: process_gain
+    path_params: []
+    methods:
+      - POST
+murfey.server.api.file_io_instrument.router:
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/suggested_path
     function: suggest_path
     path_params:
       - name: visit_name
@@ -420,19 +426,19 @@ murfey.server.api.file_manip.router:
         type: int
     methods:
       - POST
-  - path: /file_manipulation/sessions/{session_id}/make_rsyncer_destination
+  - path: /file_io/instrument/sessions/{session_id}/make_rsyncer_destination
     function: make_rsyncer_destination
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /file_manipulation/sessions/{session_id}/process_gain
+  - path: /file_io/instrument/sessions/{session_id}/process_gain
     function: process_gain
     path_params: []
     methods:
       - POST
-  - path: /file_manipulation/visits/{visit_name}/{session_id}/eer_fractionation_file
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/eer_fractionation_file
     function: write_eer_fractionation_file
     path_params:
       - name: visit_name

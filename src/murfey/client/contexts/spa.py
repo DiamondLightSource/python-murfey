@@ -581,7 +581,7 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
+                                f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": environment.data_collection_parameters[
