@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-from murfey.server.api.auth import MurfeySessionID, validate_instrument_token
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.gain import Camera, prepare_eer_gain, prepare_gain
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise, secure_path

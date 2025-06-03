@@ -12,8 +12,8 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
 from murfey.server.api.auth import (
-    MurfeySessionID,
     create_access_token,
     instrument_server_tokens,
     oauth2_scheme,

@@ -26,7 +26,8 @@ except ImportError:
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionID, validate_instrument_token
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.feedback import (
     _murfey_id,
     check_tilt_series_mc,

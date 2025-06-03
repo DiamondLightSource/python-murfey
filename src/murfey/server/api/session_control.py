@@ -12,7 +12,8 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionID, validate_instrument_token
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
