@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import urllib
 from pathlib import Path
 from typing import Annotated, List, Optional
 
@@ -123,7 +124,7 @@ async def setup_multigrid_watcher(
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
-                    "visit_end_time": session.visit_end_time,
+                    "visit_end_time": str(session.visit_end_time),
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
@@ -394,9 +395,9 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
     return data
 
 
-@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time/{timestamp}")
+@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
 async def update_visit_end_time(
-    session_id: MurfeySessionID, timestamp: float, db=murfey_db
+    session_id: MurfeySessionID, end_time: datetime.datetime, db=murfey_db
 ):
     data = {}
     instrument_name = (
@@ -408,7 +409,7 @@ async def update_visit_end_time(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id, timestamp=timestamp)}",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={urllib.parse.quote(end_time.isoformat())}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },

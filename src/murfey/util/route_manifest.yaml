@@ -38,6 +38,11 @@ murfey.instrument_server.api.router:
         type: str
     methods:
       - DELETE
+  - path: /sessions/{session_id}/multigrid_controller/visit_end_time
+    function: update_multigrid_controller_visit_end_time
+    path_params: []
+    methods:
+      - POST
   - path: /sessions/{session_id}/stop_rsyncer
     function: stop_rsyncer
     path_params: []
@@ -532,6 +537,11 @@ murfey.server.api.instrument.router:
       - POST
   - path: /instrument_server/sessions/{session_id}/finalise_session
     function: finalise_session
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/multigrid_controller/visit_end_time
+    function: update_visit_end_time
     path_params: []
     methods:
       - POST
@@ -1065,14 +1075,14 @@ murfey.server.api.workflow.router:
     function: register_dc_group
     path_params:
       - name: visit_name
-        type: typing.Any
+        type: Any
     methods:
       - POST
   - path: /workflow/visits/{visit_name}/{session_id}/start_data_collection
     function: start_dc
     path_params:
       - name: visit_name
-        type: typing.Any
+        type: Any
     methods:
       - POST
   - path: /workflow/visits/{visit_name}/{session_id}/register_processing_job
