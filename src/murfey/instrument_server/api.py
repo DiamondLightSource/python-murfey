@@ -214,6 +214,13 @@ def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
     watchers[label].request_stop()
 
 
+@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time/{timestamp}")
+def update_multigrid_controller_visit_end_time(
+    session_id: MurfeySessionID, timestamp: float
+):
+    controllers[session_id].update_visit_time(datetime.fromtimestamp(timestamp))
+
+
 class RsyncerSource(BaseModel):
     source: Path
     label: str
