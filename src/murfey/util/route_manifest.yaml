@@ -73,6 +73,11 @@ murfey.instrument_server.api.router:
     path_params: []
     methods:
       - POST
+  - path: /sessions/{session_id}/flush_skipped_rsyncer
+    function: flush_skipped_rsyncer
+    path_params: []
+    methods:
+      - POST
   - path: /sessions/{session_id}/rsyncer_info
     function: get_rsyncer_info
     path_params: []
@@ -557,6 +562,11 @@ murfey.server.api.instrument.router:
       - POST
   - path: /instrument_server/sessions/{session_id}/restart_rsyncer
     function: restart_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/flush_skipped_rsyncer
+    function: flush_skipped_rsyncer
     path_params: []
     methods:
       - POST

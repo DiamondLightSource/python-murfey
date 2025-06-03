@@ -268,6 +268,12 @@ def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     return {"success": True}
 
 
+@router.post("/sessions/{session_id}/flush_skipped_rsyncer")
+def flush_skipped_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    controllers[session_id].rsync_processes[rsyncer_source.source].flush_skipped()
+    return {"success": True}
+
+
 class ObserverInfo(BaseModel):
     source: str
     num_files_transferred: int

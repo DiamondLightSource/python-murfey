@@ -495,6 +495,34 @@ async def restart_rsyncer(
     return data
 
 
+@router.post("/sessions/{session_id}/flush_skipped_rsyncer")
+async def flush_skipped_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if isinstance(session_id, int):
+        if machine_config.instrument_server_url:
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.post(
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'flush_skipped_rsyncer', session_id=session_id)}",
+                    json={
+                        "label": session_id,
+                        "source": str(secure_path(Path(rsyncer_source.source))),
+                    },
+                    headers={
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                    },
+                ) as resp:
+                    data = await resp.json()
+    return data
+
+
 class RSyncerInfo(BaseModel):
     source: str
     num_files_transferred: int

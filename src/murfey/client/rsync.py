@@ -222,6 +222,7 @@ class RSyncer(Observer):
     def flush_skipped(self):
         for f in self._skipped_files:
             self.queue.put(f)
+        self._skipped_files = []
 
     def _process(self):
         logger.info("RSync thread starting")
