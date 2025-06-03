@@ -25,7 +25,10 @@ from murfey.util.db import Session as MurfeySession
 logger = getLogger("murfey.server.api.auth")
 
 # Set up router
-router = APIRouter(tags=["Authentication"])
+router = APIRouter(
+    prefix="/auth",
+    tags=["Authentication"],
+)
 
 
 class CookieScheme(HTTPBearer):
