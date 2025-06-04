@@ -6,7 +6,6 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
@@ -260,14 +259,6 @@ def get_data_collections(
 async def get_clients(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
-
-
-@router.get("/num_movies")
-def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
-    res = db.exec(
-        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
-    ).all()
-    return {r[0]: r[1] for r in res}
 
 
 class CurrentGainRef(BaseModel):

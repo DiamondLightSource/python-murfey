@@ -567,7 +567,7 @@ class SPAModularContext(Context):
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
-                                f"{environment.url.geturl()}{url_path_for('session_info.router', 'count_number_of_movies')}",
+                                f"{environment.url.geturl()}{url_path_for('session_control.router', 'count_number_of_movies')}",
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(

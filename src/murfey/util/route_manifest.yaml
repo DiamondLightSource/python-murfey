@@ -706,6 +706,11 @@ murfey.server.api.session_control.router:
     path_params: []
     methods:
       - POST
+  - path: /session_control/num_movies
+    function: count_number_of_movies
+    path_params: []
+    methods:
+      - GET
   - path: /session_control/instruments/{instrument_name}/failed_client_post
     function: failed_client_post
     path_params:
@@ -918,11 +923,6 @@ murfey.server.api.session_info.router:
       - GET
   - path: /session_info/clients
     function: get_clients
-    path_params: []
-    methods:
-      - GET
-  - path: /session_info/num_movies
-    function: count_number_of_movies
     path_params: []
     methods:
       - GET

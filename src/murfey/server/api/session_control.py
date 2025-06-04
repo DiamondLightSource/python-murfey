@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
@@ -39,6 +40,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    Movie,
     ProcessingJob,
     RsyncInstance,
     Session,
@@ -176,6 +178,14 @@ def register_processing_success_in_ispyb(
             for updated in apps:
                 updated.processingStatus = True
                 _transport_object.do_update_processing_status(updated)
+
+
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
 
 
 class PostInfo(BaseModel):
