@@ -105,17 +105,17 @@ murfey.instrument_server.api.router:
     methods:
       - POST
 murfey.server.api.auth.router:
-  - path: /token
+  - path: /auth/token
     function: generate_token
     path_params: []
     methods:
       - POST
-  - path: /sessions/{session_id}/token
+  - path: /auth/sessions/{session_id}/token
     function: mint_session_token
     path_params: []
     methods:
       - GET
-  - path: /validate_token
+  - path: /auth/validate_token
     function: simple_token_validation
     path_params: []
     methods:
@@ -315,56 +315,56 @@ murfey.server.api.bootstrap.version:
     methods:
       - GET
 murfey.server.api.clem.router:
-  - path: /sessions/{session_id}/clem/lif_files
+  - path: /workflow/clem/sessions/{session_id}/clem/lif_files
     function: register_lif_file
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/tiff_files
+  - path: /workflow/clem/sessions/{session_id}/clem/tiff_files
     function: register_tiff_file
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/metadata_files
+  - path: /workflow/clem/sessions/{session_id}/clem/metadata_files
     function: register_clem_metadata
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/image_series
+  - path: /workflow/clem/sessions/{session_id}/clem/image_series
     function: register_image_series
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/image_stacks
+  - path: /workflow/clem/sessions/{session_id}/clem/image_stacks
     function: register_image_stack
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/preprocessing/process_raw_lifs
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_lifs
     function: process_raw_lifs
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/preprocessing/process_raw_tiffs
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_tiffs
     function: process_raw_tiffs
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/processing/align_and_merge_stacks
+  - path: /workflow/clem/sessions/{session_id}/clem/processing/align_and_merge_stacks
     function: align_and_merge_stacks
     path_params:
       - name: session_id
