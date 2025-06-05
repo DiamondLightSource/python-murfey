@@ -35,12 +35,11 @@ def login(test_user):
 def test_read_main(mock_check, test_user):
     token = login(test_user)
     response = client.get(
-        "/session_info/",
-        headers={"Authorization": f"Bearer {token}"},
+        "/session_info/connections", 
+        headers={"Authorization": f"Bearer {token}"}
     )
     assert mock_check.called_once()
     assert response.status_code == 200
-    assert "<title>" in response.text.lower()
 
 
 def test_pypi_proxy():

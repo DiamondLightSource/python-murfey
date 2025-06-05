@@ -4,12 +4,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-import murfey
 import murfey.server.api.websocket as ws
 from murfey.server import _transport_object
 from murfey.server.api import templates
@@ -32,12 +31,7 @@ from murfey.server.ispyb import DB as ispyb_db
 from murfey.server.ispyb import get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
-from murfey.util.config import (
-    MachineConfig,
-    get_hostname,
-    get_machine_config,
-    get_microscope,
-)
+from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     ClientEnvironment,
     DataCollection,
@@ -62,20 +56,6 @@ router = APIRouter(
     dependencies=[Depends(validate_token)],
     tags=["Session Info: General"],
 )
-
-
-# This will be the homepage for a given microscope.
-@router.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="home.html",
-        context={
-            "hostname": get_hostname(),
-            "microscope": get_microscope(),
-            "version": murfey.__version__,
-        },
-    )
 
 
 @router.get("/health/")
