@@ -42,7 +42,10 @@ def login(test_user):
     with patch(
         "murfey.server.api.auth.validate_user", return_value=True
     ) as mock_validate:
-        response = client.post("/token", data=test_user)
+        response = client.post(
+            f"{url_path_for('auth.router', 'generate_token')}",
+            data=test_user,
+        )
         assert mock_validate.called_once()
         assert response.status_code == 200
         token = response.json()["access_token"]
