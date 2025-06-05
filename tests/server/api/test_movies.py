@@ -1,75 +1,68 @@
-from unittest.mock import Mock, create_autospec, patch
+from unittest.mock import ANY
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.main import app
-from murfey.server.murfey_db import murfey_db_session
+from murfey.server.murfey_db import murfey_db
 from murfey.util.api import url_path_for
+from murfey.util.db import Movie
+
+# @pytest.fixture(scope="module")
+# def test_user():
+#     return {"username": "testuser", "password": "testpass"}
 
 
-@pytest.fixture(scope="module")
-def test_user():
-    return {"username": "testuser", "password": "testpass"}
+# def movies_return():
+#     return [("Supervisor_1", 2)]
 
 
-def movies_return():
-    return [("Supervisor_1", 2)]
+# expression = Mock()
+# expression.all = movies_return
+
+# mock_session = create_autospec(Session, instance=True)
+# mock_session.exec.return_value = expression
 
 
-expression = Mock()
-expression.all = movies_return
-
-mock_session = create_autospec(Session, instance=True)
-mock_session.exec.return_value = expression
-
-
-def override_murfey_db():
-    try:
-        db = mock_session
-        yield db
-    finally:
-        db.close()
+# def override_murfey_db():
+#     try:
+#         db = mock_session
+#         yield db
+#     finally:
+#         db.close()
 
 
-app.dependency_overrides[murfey_db_session] = override_murfey_db
+# app.dependency_overrides[murfey_db] = override_murfey_db
 
 client = TestClient(app)
 
 
-def login(test_user):
-    with patch(
-        "murfey.server.api.auth.validate_user", return_value=True
-    ) as mock_validate:
-        response = client.post(
-            f"{url_path_for('auth.router', 'mint_session_token', session_id=1)}",
-            data=test_user,
-        )
-        assert mock_validate.called_once()
-        assert response.status_code == 200
-        token = response.json()["access_token"]
-        assert token is not None
-        return token
-
-
-@patch("murfey.server.api.auth.check_user", return_value=True)
-@patch("murfey.server.api.auth.murfey_db")
 def test_movie_count(
-    mock_check,
-    mock_murfey_db,
-    test_user,
-    murfey_db_session,
+    murfey_db_session: Session,
 ):
 
-    mock_murfey_db = murfey_db_session
-    token = login(test_user)
+    # Insert test movies into Murfey DB
+    tag = "test_movie"
+    num_movies = 5
+    murfey_db_session
+    for i in range(num_movies):
+        movie_db_entry = Movie(
+            murfey_id=i,
+            path="/some/path",
+            image_number=i,
+            tag=tag,
+        )
+        murfey_db_session.add(movie_db_entry)
+        murfey_db_session.commit()
+
+    # Replace the murfey_db instance in endpoint with properly initialised pytest one
+    app.dependency_overrides[murfey_db] = murfey_db_session
+    # Disable instrument token validation
+    app.dependency_overrides[validate_instrument_token] = lambda: None
+
     response = client.get(
         f"{url_path_for('session_control.router', 'count_number_of_movies')}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {ANY}"},
     )
-    assert mock_murfey_db
-    assert mock_check.called_once()
-    assert response.status_code == 200
-    assert len(mock_session.method_calls) == 2
-    assert response.json() == {"Supervisor_1": 2}
+    assert response.json() == {tag: num_movies}
