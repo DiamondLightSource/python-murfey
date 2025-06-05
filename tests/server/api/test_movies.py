@@ -7,7 +7,16 @@ from murfey.server.api.auth import validate_instrument_token
 from murfey.server.main import app
 from murfey.server.murfey_db import murfey_db
 from murfey.util.api import url_path_for
-from murfey.util.db import Movie
+from murfey.util.db import (
+    AutoProcProgram,
+    DataCollection,
+    DataCollectionGroup,
+    Movie,
+    MurfeyLedger,
+    ProcessingJob,
+)
+from murfey.util.db import Session as MurfeySession
+from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 # @pytest.fixture(scope="module")
 # def test_user():
@@ -42,19 +51,67 @@ def test_movie_count(
     murfey_db_session: Session,
 ):
 
-    # Insert test movies into Murfey DB
+    # Insert table dependencies
+    session_entry: MurfeySession = get_or_create_db_entry(
+        murfey_db_session,
+        MurfeySession,
+        lookup_kwargs={"id": ExampleVisit.murfey_session_id},
+    )
+    dcg_entry: DataCollectionGroup = get_or_create_db_entry(
+        murfey_db_session,
+        DataCollectionGroup,
+        lookup_kwargs={
+            "id": 0,
+            "session_id": session_entry.id,
+            "tag": "test_dcg",
+        },
+    )
+    dc_entry: DataCollection = get_or_create_db_entry(
+        murfey_db_session,
+        DataCollection,
+        lookup_kwargs={"id": 0, "tag": "test_dc", "dcg_id": dcg_entry.id},
+    )
+    processing_job_entry: ProcessingJob = get_or_create_db_entry(
+        murfey_db_session,
+        ProcessingJob,
+        lookup_kwargs={
+            "id": 0,
+            "recipe": "test_recipe",
+            "dc_id": dc_entry.id,
+        },
+    )
+    autoproc_entry: AutoProcProgram = get_or_create_db_entry(
+        murfey_db_session,
+        AutoProcProgram,
+        lookup_kwargs={
+            "id": 0,
+            "pj_id": processing_job_entry.id,
+        },
+    )
+
+    # Insert test movies and one-to-one dependencies into Murfey DB
     tag = "test_movie"
     num_movies = 5
     murfey_db_session
     for i in range(num_movies):
-        movie_db_entry = Movie(
-            murfey_id=i,
-            path="/some/path",
-            image_number=i,
-            tag=tag,
+        murfey_ledger_entry: MurfeyLedger = get_or_create_db_entry(
+            murfey_db_session,
+            MurfeyLedger,
+            lookup_kwargs={
+                "id": i,
+                "app_id": autoproc_entry.id,
+            },
         )
-        murfey_db_session.add(movie_db_entry)
-        murfey_db_session.commit()
+        _: Movie = get_or_create_db_entry(
+            murfey_db_session,
+            Movie,
+            lookup_kwargs={
+                "murfey_id": murfey_ledger_entry.id,
+                "path": "/some/path",
+                "image_number": i,
+                "tag": tag,
+            },
+        )
 
     # Replace the murfey_db instance in endpoint with properly initialised pytest one
     app.dependency_overrides[murfey_db] = murfey_db_session
