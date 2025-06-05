@@ -209,7 +209,7 @@ class MurfeyTUI(App):
         log.info(f"starting rsyncer: {source}")
         if transfer:
             # Always make sure the destination directory exists
-            make_directory_url = f"{str(self._url.geturl())}{url_path_for('file_manip.router', 'make_rsyncer_destination', session_id=self._environment.murfey_session)}"
+            make_directory_url = f"{str(self._url.geturl())}{url_path_for('file_io_instrument.router', 'make_rsyncer_destination', session_id=self._environment.murfey_session)}"
             capture_post(make_directory_url, json={"destination": destination})
         if self._environment:
             self._environment.default_destinations[source] = destination
@@ -488,7 +488,7 @@ class MurfeyTUI(App):
             log.info("Registering tomography processing parameters")
             if self.app._environment.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
-                    f"{str(self.app._environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
+                    f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
                     json={
                         "num_frames": self.app._environment.data_collection_parameters[
                             "num_eer_frames"

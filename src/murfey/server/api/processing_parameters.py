@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
+from murfey.server.api.auth import validate_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util.db import SessionProcessingParameters
 

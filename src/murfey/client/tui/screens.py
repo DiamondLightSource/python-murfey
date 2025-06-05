@@ -110,7 +110,7 @@ def determine_default_destination(
                                 _default = environment.destination_registry[source_name]
                             else:
                                 suggested_path_response = capture_post(
-                                    url=f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'suggest_path', visit_name=visit, session_id=environment.murfey_session)}",
+                                    url=f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'suggest_path', visit_name=visit, session_id=environment.murfey_session)}",
                                     json={
                                         "base_path": f"{destination}/{visit}/{mid_path.parent if include_mid_path else ''}/raw",
                                         "touch": touch,
@@ -906,7 +906,7 @@ class GainReference(Screen):
                         f"Gain reference file {posix_path(self._dir_tree._gain_reference)!r} was not successfully transferred to {visit_path}/processing"
                     )
             process_gain_response = requests.post(
-                url=f"{str(self.app._environment.url.geturl())}{url_path_for('file_manip.router', 'process_gain', session_id=self.app._environment.murfey_session)}",
+                url=f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'process_gain', session_id=self.app._environment.murfey_session)}",
                 json={
                     "gain_ref": str(self._dir_tree._gain_reference),
                     "eer": bool(

@@ -285,14 +285,15 @@ Fixtures for setting up test Murfey database
 =======================================================================================
 """
 
+murfey_db_url = (
+    f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
+    f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
+)
+
 
 @pytest.fixture(scope="session")
 def murfey_db_engine():
-    url = (
-        f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
-        f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
-    )
-    engine = create_engine(url)
+    engine = create_engine(murfey_db_url)
     SQLModel.metadata.create_all(engine)
     yield engine
     engine.dispose()

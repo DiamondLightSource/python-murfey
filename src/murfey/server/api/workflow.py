@@ -26,7 +26,8 @@ except ImportError:
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.feedback import (
     _murfey_id,
     check_tilt_series_mc,
@@ -68,7 +69,7 @@ logger = getLogger("murfey.server.api.workflow")
 
 router = APIRouter(
     prefix="/workflow",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Workflows: General"],
 )
 
@@ -288,7 +289,7 @@ def register_proc(
 
 spa_router = APIRouter(
     prefix="/workflow/spa",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Workflows: SPA"],
 )
 
@@ -496,7 +497,7 @@ async def request_spa_preprocessing(
 
 tomo_router = APIRouter(
     prefix="/workflow/tomo",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Workflows: CryoET"],
 )
 
@@ -880,7 +881,7 @@ async def register_tilt(
 
 correlative_router = APIRouter(
     prefix="/workflow/correlative",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Workflows: Correlative Imaging"],
 )
 

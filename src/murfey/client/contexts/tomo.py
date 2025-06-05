@@ -317,7 +317,7 @@ class TomographyContext(Context):
             eer_fractionation_file = None
             if environment.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
-                    f"{str(environment.url.geturl())}{url_path_for('file_manip.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
+                    f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                     json={
                         "num_frames": environment.data_collection_parameters[
                             "num_eer_frames"
