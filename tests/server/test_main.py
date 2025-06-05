@@ -45,7 +45,7 @@ def test_read_main(mock_check, test_user):
 
 def test_pypi_proxy():
     response = client.get(
-        f"{url_path_for('boostrap.pypi', 'get_pypi_package_downloads_list', package='fastapi')}"
+        f"{url_path_for('bootstrap.pypi', 'get_pypi_package_downloads_list', package='fastapi')}"
     )
     assert response.status_code == 200
     assert "<a href" in response.text.lower()
