@@ -45,35 +45,37 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry, murfey_db_url
 # app.dependency_overrides[murfey_db] = override_murfey_db
 
 
-@patch("murfey.server.murfey_db.get_security_config")
-@patch("murfey.server.murfey_db.url")
 @pytest.fixture
-def fastapi_client(
-    mock_get_url,
-    mock_get_security_config,
+def fastapi_test_client(
     mock_security_configuration,
     murfey_db_session,
 ):
     # Set up mock security configs for
-    mock_get_url.return_value = murfey_db_url
-    mock_get_security_config.return_value = security_from_file(
-        mock_security_configuration
-    )
+    with (
+        patch(
+            "murfey.server.murfey_db.get_security_config"
+        ) as mock_get_security_config,
+        patch("murfey.server.murfey_db.url") as mock_get_url,
+    ):
 
-    # Defer import of 'murfey_db' until after mocks are configured
-    from murfey.server.murfey_db import murfey_db
+        # Defer import of 'murfey_db' until after mocks are configured
+        mock_get_url.return_value = murfey_db_url
+        mock_get_security_config.return_value = security_from_file(
+            mock_security_configuration
+        )
+        from murfey.server.murfey_db import murfey_db
 
-    # Replace the murfey_db instance in endpoint with properly initialised pytest one
-    app.dependency_overrides[murfey_db] = murfey_db_session
-    # Disable instrument token validation
-    app.dependency_overrides[validate_instrument_token] = lambda: None
+        # Replace the murfey_db instance in endpoint with properly initialised pytest one
+        app.dependency_overrides[murfey_db] = murfey_db_session
+        # Disable instrument token validation
+        app.dependency_overrides[validate_instrument_token] = lambda: None
 
-    with TestClient(app) as client:
-        yield client
+        with TestClient(app) as client:
+            yield client
 
 
 def test_movie_count(
-    fastapi_client: TestClient,
+    fastapi_test_client: TestClient,
     murfey_db_session: Session,  # From conftest.py
 ):
 
@@ -138,7 +140,7 @@ def test_movie_count(
             },
         )
 
-    response = fastapi_client.get(
+    response = fastapi_test_client.get(
         f"{url_path_for('session_control.router', 'count_number_of_movies')}",
         headers={"Authorization": f"Bearer {ANY}"},
     )
