@@ -1,6 +1,5 @@
 from unittest.mock import ANY, patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -45,11 +44,11 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry, murfey_db_url
 # app.dependency_overrides[murfey_db] = override_murfey_db
 
 
-@pytest.fixture
-def fastapi_test_client(
-    mock_security_configuration,
-    murfey_db_session,
+def test_movie_count(
+    mock_security_configuration,  # From conftest.py
+    murfey_db_session: Session,  # From conftest.py
 ):
+
     # Set up mock security configs for
     with (
         patch(
@@ -71,77 +70,70 @@ def fastapi_test_client(
         app.dependency_overrides[validate_instrument_token] = lambda: None
 
         with TestClient(app) as client:
-            yield client
 
+            # Insert table dependencies
+            dcg_entry: DataCollectionGroup = get_or_create_db_entry(
+                murfey_db_session,
+                DataCollectionGroup,
+                lookup_kwargs={
+                    "id": 0,
+                    "session_id": ExampleVisit.murfey_session_id,
+                    "tag": "test_dcg",
+                },
+            )
+            dc_entry: DataCollection = get_or_create_db_entry(
+                murfey_db_session,
+                DataCollection,
+                lookup_kwargs={
+                    "id": 0,
+                    "tag": "test_dc",
+                    "dcg_id": dcg_entry.id,
+                },
+            )
+            processing_job_entry: ProcessingJob = get_or_create_db_entry(
+                murfey_db_session,
+                ProcessingJob,
+                lookup_kwargs={
+                    "id": 0,
+                    "recipe": "test_recipe",
+                    "dc_id": dc_entry.id,
+                },
+            )
+            autoproc_entry: AutoProcProgram = get_or_create_db_entry(
+                murfey_db_session,
+                AutoProcProgram,
+                lookup_kwargs={
+                    "id": 0,
+                    "pj_id": processing_job_entry.id,
+                },
+            )
 
-def test_movie_count(
-    fastapi_test_client: TestClient,
-    murfey_db_session: Session,  # From conftest.py
-):
+            # Insert test movies and one-to-one dependencies into Murfey DB
+            tag = "test_movie"
+            num_movies = 5
+            murfey_db_session
+            for i in range(num_movies):
+                murfey_ledger_entry: MurfeyLedger = get_or_create_db_entry(
+                    murfey_db_session,
+                    MurfeyLedger,
+                    lookup_kwargs={
+                        "id": i,
+                        "app_id": autoproc_entry.id,
+                    },
+                )
+                _: Movie = get_or_create_db_entry(
+                    murfey_db_session,
+                    Movie,
+                    lookup_kwargs={
+                        "murfey_id": murfey_ledger_entry.id,
+                        "path": "/some/path",
+                        "image_number": i,
+                        "tag": tag,
+                    },
+                )
 
-    # Insert table dependencies
-    dcg_entry: DataCollectionGroup = get_or_create_db_entry(
-        murfey_db_session,
-        DataCollectionGroup,
-        lookup_kwargs={
-            "id": 0,
-            "session_id": ExampleVisit.murfey_session_id,
-            "tag": "test_dcg",
-        },
-    )
-    dc_entry: DataCollection = get_or_create_db_entry(
-        murfey_db_session,
-        DataCollection,
-        lookup_kwargs={
-            "id": 0,
-            "tag": "test_dc",
-            "dcg_id": dcg_entry.id,
-        },
-    )
-    processing_job_entry: ProcessingJob = get_or_create_db_entry(
-        murfey_db_session,
-        ProcessingJob,
-        lookup_kwargs={
-            "id": 0,
-            "recipe": "test_recipe",
-            "dc_id": dc_entry.id,
-        },
-    )
-    autoproc_entry: AutoProcProgram = get_or_create_db_entry(
-        murfey_db_session,
-        AutoProcProgram,
-        lookup_kwargs={
-            "id": 0,
-            "pj_id": processing_job_entry.id,
-        },
-    )
-
-    # Insert test movies and one-to-one dependencies into Murfey DB
-    tag = "test_movie"
-    num_movies = 5
-    murfey_db_session
-    for i in range(num_movies):
-        murfey_ledger_entry: MurfeyLedger = get_or_create_db_entry(
-            murfey_db_session,
-            MurfeyLedger,
-            lookup_kwargs={
-                "id": i,
-                "app_id": autoproc_entry.id,
-            },
-        )
-        _: Movie = get_or_create_db_entry(
-            murfey_db_session,
-            Movie,
-            lookup_kwargs={
-                "murfey_id": murfey_ledger_entry.id,
-                "path": "/some/path",
-                "image_number": i,
-                "tag": tag,
-            },
-        )
-
-    response = fastapi_test_client.get(
-        f"{url_path_for('session_control.router', 'count_number_of_movies')}",
-        headers={"Authorization": f"Bearer {ANY}"},
-    )
-    assert response.json() == {tag: num_movies}
+            response = client.get(
+                f"{url_path_for('session_control.router', 'count_number_of_movies')}",
+                headers={"Authorization": f"Bearer {ANY}"},
+            )
+            assert response.json() == {tag: num_movies}
