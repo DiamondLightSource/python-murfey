@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from murfey.server.main import app
 from murfey.server.murfey_db import murfey_db_session
+from murfey.util.api import url_path_for
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +54,8 @@ def login(test_user):
 def test_movie_count(mock_check, test_user):
     token = login(test_user)
     response = client.get(
-        "/session_info/num_movies", headers={"Authorization": f"Bearer {token}"}
+        f"{url_path_for('session_control.router', 'count_number_of_movies')}",
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert mock_check.called_once()
     assert response.status_code == 200
