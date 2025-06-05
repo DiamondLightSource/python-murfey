@@ -15,7 +15,6 @@ from murfey.util.db import (
     MurfeyLedger,
     ProcessingJob,
 )
-from murfey.util.db import Session as MurfeySession
 from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 # @pytest.fixture(scope="module")
@@ -52,24 +51,23 @@ def test_movie_count(
 ):
 
     # Insert table dependencies
-    session_entry: MurfeySession = get_or_create_db_entry(
-        murfey_db_session,
-        MurfeySession,
-        lookup_kwargs={"id": ExampleVisit.murfey_session_id},
-    )
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
         murfey_db_session,
         DataCollectionGroup,
         lookup_kwargs={
             "id": 0,
-            "session_id": session_entry.id,
+            "session_id": ExampleVisit.murfey_session_id,
             "tag": "test_dcg",
         },
     )
     dc_entry: DataCollection = get_or_create_db_entry(
         murfey_db_session,
         DataCollection,
-        lookup_kwargs={"id": 0, "tag": "test_dc", "dcg_id": dcg_entry.id},
+        lookup_kwargs={
+            "id": 0,
+            "tag": "test_dc",
+            "dcg_id": dcg_entry.id,
+        },
     )
     processing_job_entry: ProcessingJob = get_or_create_db_entry(
         murfey_db_session,
