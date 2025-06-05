@@ -53,10 +53,9 @@ def test_movie_count(
         },
     )
 
-    # Insert test movies and one-to-one dependencies into Murfey DB
+    # Insert test movies and one-to-one dependencies
     tag = "test_movie"
     num_movies = 5
-    murfey_db_session
     for i in range(num_movies):
         murfey_ledger_entry: MurfeyLedger = get_or_create_db_entry(
             murfey_db_session,
