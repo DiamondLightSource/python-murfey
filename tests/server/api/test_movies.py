@@ -1,4 +1,4 @@
-from unittest.mock import ANY
+from unittest.mock import ANY, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,8 +6,8 @@ from sqlmodel import Session
 
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.main import app
-from murfey.server.murfey_db import murfey_db
 from murfey.util.api import url_path_for
+from murfey.util.config import security_from_file
 from murfey.util.db import (
     AutoProcProgram,
     DataCollection,
@@ -16,7 +16,7 @@ from murfey.util.db import (
     MurfeyLedger,
     ProcessingJob,
 )
-from tests.conftest import ExampleVisit, get_or_create_db_entry
+from tests.conftest import ExampleVisit, get_or_create_db_entry, murfey_db_url
 
 # @pytest.fixture(scope="module")
 # def test_user():
@@ -45,8 +45,24 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry
 # app.dependency_overrides[murfey_db] = override_murfey_db
 
 
+@patch("murfey.server.murfey_db.get_security_config")
+@patch("murfey.server.murfey_db.url")
 @pytest.fixture
-def fastapi_client(murfey_db_session):
+def fastapi_client(
+    mock_get_url,
+    mock_get_security_config,
+    mock_security_configuration,
+    murfey_db_session,
+):
+    # Set up mock security configs for
+    mock_get_url.return_value = murfey_db_url
+    mock_get_security_config.return_value = security_from_file(
+        mock_security_configuration
+    )
+
+    # Defer import of 'murfey_db' until after mocks are configured
+    from murfey.server.murfey_db import murfey_db
+
     # Replace the murfey_db instance in endpoint with properly initialised pytest one
     app.dependency_overrides[murfey_db] = murfey_db_session
     # Disable instrument token validation
