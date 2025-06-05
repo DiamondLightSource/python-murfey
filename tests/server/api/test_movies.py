@@ -43,7 +43,7 @@ def login(test_user):
         "murfey.server.api.auth.validate_user", return_value=True
     ) as mock_validate:
         response = client.post(
-            f"{url_path_for('auth.router', 'generate_token')}",
+            f"{url_path_for('auth.router', 'mint_session_token', session_id=1)}",
             data=test_user,
         )
         assert mock_validate.called_once()
@@ -54,12 +54,21 @@ def login(test_user):
 
 
 @patch("murfey.server.api.auth.check_user", return_value=True)
-def test_movie_count(mock_check, test_user):
+@patch("murfey.server.api.auth.murfey_db")
+def test_movie_count(
+    mock_check,
+    mock_murfey_db,
+    test_user,
+    murfey_db_session,
+):
+
+    mock_murfey_db = murfey_db_session
     token = login(test_user)
     response = client.get(
         f"{url_path_for('session_control.router', 'count_number_of_movies')}",
         headers={"Authorization": f"Bearer {token}"},
     )
+    assert mock_murfey_db
     assert mock_check.called_once()
     assert response.status_code == 200
     assert len(mock_session.method_calls) == 2
