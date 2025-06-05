@@ -360,15 +360,14 @@ async def generate_token(
                     access_token = token.get("access_token")
         else:
             validated = validate_user(form_data.username, form_data.password)
+            access_token = create_access_token(
+                data={"user": form_data.username},
+            )
         if not validated:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
-        if not auth_url:
-            access_token = create_access_token(
-                data={"user": form_data.username},
             )
         return Token(access_token=access_token, token_type="bearer")
 
