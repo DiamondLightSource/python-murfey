@@ -6,14 +6,14 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.api.websocket as ws
 from murfey.server import _transport_object
 from murfey.server.api import templates
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
+from murfey.server.api.auth import validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
@@ -239,14 +239,6 @@ def get_data_collections(
 async def get_clients(db=murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
-
-
-@router.get("/num_movies")
-def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
-    res = db.exec(
-        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
-    ).all()
-    return {r[0]: r[1] for r in res}
 
 
 class CurrentGainRef(BaseModel):

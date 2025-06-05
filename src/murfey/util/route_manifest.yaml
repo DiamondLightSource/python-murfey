@@ -105,17 +105,17 @@ murfey.instrument_server.api.router:
     methods:
       - POST
 murfey.server.api.auth.router:
-  - path: /token
+  - path: /auth/token
     function: generate_token
     path_params: []
     methods:
       - POST
-  - path: /sessions/{session_id}/token
+  - path: /auth/sessions/{session_id}/token
     function: mint_session_token
     path_params: []
     methods:
       - GET
-  - path: /validate_token
+  - path: /auth/validate_token
     function: simple_token_validation
     path_params: []
     methods:
@@ -315,56 +315,56 @@ murfey.server.api.bootstrap.version:
     methods:
       - GET
 murfey.server.api.clem.router:
-  - path: /sessions/{session_id}/clem/lif_files
+  - path: /workflow/clem/sessions/{session_id}/clem/lif_files
     function: register_lif_file
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/tiff_files
+  - path: /workflow/clem/sessions/{session_id}/clem/tiff_files
     function: register_tiff_file
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/metadata_files
+  - path: /workflow/clem/sessions/{session_id}/clem/metadata_files
     function: register_clem_metadata
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/image_series
+  - path: /workflow/clem/sessions/{session_id}/clem/image_series
     function: register_image_series
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/image_stacks
+  - path: /workflow/clem/sessions/{session_id}/clem/image_stacks
     function: register_image_stack
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/preprocessing/process_raw_lifs
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_lifs
     function: process_raw_lifs
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/preprocessing/process_raw_tiffs
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_tiffs
     function: process_raw_tiffs
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /sessions/{session_id}/clem/processing/align_and_merge_stacks
+  - path: /workflow/clem/sessions/{session_id}/clem/processing/align_and_merge_stacks
     function: align_and_merge_stacks
     path_params:
       - name: session_id
@@ -410,8 +410,14 @@ murfey.server.api.display.router:
         type: int
     methods:
       - GET
-murfey.server.api.file_manip.router:
-  - path: /file_manipulation/visits/{visit_name}/{session_id}/suggested_path
+murfey.server.api.file_io_frontend.router:
+  - path: /file_io/frontend/sessions/{session_id}/process_gain
+    function: process_gain
+    path_params: []
+    methods:
+      - POST
+murfey.server.api.file_io_instrument.router:
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/suggested_path
     function: suggest_path
     path_params:
       - name: visit_name
@@ -420,19 +426,19 @@ murfey.server.api.file_manip.router:
         type: int
     methods:
       - POST
-  - path: /file_manipulation/sessions/{session_id}/make_rsyncer_destination
+  - path: /file_io/instrument/sessions/{session_id}/make_rsyncer_destination
     function: make_rsyncer_destination
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /file_manipulation/sessions/{session_id}/process_gain
+  - path: /file_io/instrument/sessions/{session_id}/process_gain
     function: process_gain
     path_params: []
     methods:
       - POST
-  - path: /file_manipulation/visits/{visit_name}/{session_id}/eer_fractionation_file
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/eer_fractionation_file
     function: write_eer_fractionation_file
     path_params:
       - name: visit_name
@@ -700,6 +706,11 @@ murfey.server.api.session_control.router:
     path_params: []
     methods:
       - POST
+  - path: /session_control/num_movies
+    function: count_number_of_movies
+    path_params: []
+    methods:
+      - GET
   - path: /session_control/instruments/{instrument_name}/failed_client_post
     function: failed_client_post
     path_params:
@@ -912,11 +923,6 @@ murfey.server.api.session_info.router:
       - GET
   - path: /session_info/clients
     function: get_clients
-    path_params: []
-    methods:
-      - GET
-  - path: /session_info/num_movies
-    function: count_number_of_movies
     path_params: []
     methods:
       - GET

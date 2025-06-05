@@ -51,6 +51,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def validate_session_token(
     session_id: int, token: Annotated[str, Depends(oauth2_scheme)]
 ):
+    """
+    Validates the token received from the backend server
+    """
     try:
         decoded_data = jwt.decode(
             token,
@@ -62,7 +65,7 @@ def validate_session_token(
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Could not validate credentials from backend",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return session_id

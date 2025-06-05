@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionID, validate_token
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.api.auth import validate_instrument_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
 from murfey.server.api.shared import (
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
@@ -38,6 +40,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    Movie,
     ProcessingJob,
     RsyncInstance,
     Session,
@@ -60,7 +63,7 @@ logger = getLogger("murfey.server.api.session_control")
 
 router = APIRouter(
     prefix="/session_control",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: General"],
 )
 
@@ -175,6 +178,14 @@ def register_processing_success_in_ispyb(
             for updated in apps:
                 updated.processingStatus = True
                 _transport_object.do_update_processing_status(updated)
+
+
+@router.get("/num_movies")
+def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
+    res = db.exec(
+        select(Movie.tag, func.count(Movie.murfey_id)).group_by(Movie.tag)
+    ).all()
+    return {r[0]: r[1] for r in res}
 
 
 class PostInfo(BaseModel):
@@ -297,7 +308,7 @@ def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
 
 spa_router = APIRouter(
     prefix="/session_control/spa",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: SPA"],
 )
 
@@ -355,7 +366,7 @@ def register_foil_hole(
 
 correlative_router = APIRouter(
     prefix="/session_control/correlative",
-    dependencies=[Depends(validate_token)],
+    dependencies=[Depends(validate_instrument_token)],
     tags=["Session Control: Correlative Imaging"],
 )
 
