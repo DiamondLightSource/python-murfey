@@ -1,7 +1,7 @@
 from unittest.mock import ANY
 
+import pytest
 from fastapi.testclient import TestClient
-from pytest import fixture
 from sqlmodel import Session
 
 from murfey.server.api.auth import validate_instrument_token
@@ -45,7 +45,7 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry
 # app.dependency_overrides[murfey_db] = override_murfey_db
 
 
-@fixture(scope="module")
+@pytest.fixture
 def fastapi_client(murfey_db_session):
     # Replace the murfey_db instance in endpoint with properly initialised pytest one
     app.dependency_overrides[murfey_db] = murfey_db_session
