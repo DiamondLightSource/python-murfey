@@ -70,6 +70,32 @@ def _sanitise_str(input: str) -> str:
     return input_clean
 
 
+def resolve_netloc(request: Request) -> str:
+    """
+    Helper function to construct the correct netloc (hostname[:port]) to use based on
+    the request received. It will prioritise parsing the request headers for the host,
+    port, protocol and using them to construct the netloc before defaulting to parsing
+    the FastAPI Request object to do so.
+    """
+
+    # Prefer headers added by reverse proxies
+    host = request.headers.get("X-Forwarded-Host", request.url.hostname)
+    port = request.headers.get(
+        "X-Forwarded-Port", str(request.url.port) if request.url.port else None
+    )
+    proto = request.headers.get("X-Forwarded-Proto", request.url.scheme)
+
+    # Default ports shouldn't be included; if no ports are found, return just the host
+    if (
+        (proto == "http" and port == "80")
+        or (proto == "https" and port == "443")
+        or not port
+    ):
+        return host
+
+    return f"{host}:{port}"
+
+
 """
 =======================================================================================
 VERSION-RELATED API ENDPOINTS
@@ -126,15 +152,10 @@ def get_bootstrap_instructions(request: Request):
     machine with no internet access.
     """
 
-    # Constructs the netloc (hostname + port) and proxy path depending on if the
-    # request was forwarded via proxy
-    netloc = (
-        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
-        if request.headers.get("X-Forwarded-Host")
-        and request.headers.get("X-Forwarded-Port")
-        else request.url.netloc
-    )
-    # Additional bit in URL path after the netloc caused by the proxy reroute
+    # Check if this is a forwarded request from somewhere else and construct netloc
+    netloc = resolve_netloc(request)
+
+    # Find path to 'bootstrap' router using current URL path
     proxy_path = request.url.path.removesuffix(f"{bootstrap.prefix}/")
 
     return respond_with_template(
@@ -362,12 +383,7 @@ def get_pacman_mirrors(request: Request):
     """
 
     # Check if this is a forwarded request from somewhere else and construct netloc
-    netloc = (
-        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
-        if request.headers.get("X-Forwarded-Host")
-        and request.headers.get("X-Forwarded-Port")
-        else request.url.netloc
-    )
+    netloc = resolve_netloc(request)
 
     # Find path to Rust router using current URL Path
     path_to_router = request.url.path.removesuffix("/config/pacman.d.zip")
@@ -641,12 +657,7 @@ def get_cargo_config(request: Request):
     """
 
     # Check if this is a forwarded request from somewhere else and construct netloc
-    netloc = (
-        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
-        if request.headers.get("X-Forwarded-Host")
-        and request.headers.get("X-Forwarded-Port")
-        else request.url.netloc
-    )
+    netloc = resolve_netloc(request)
 
     # Find path to Rust router using current URL Path
     path_to_router = request.url.path.removesuffix("/cargo/config.toml")
@@ -723,12 +734,7 @@ def get_index_config(request: Request):
     """
 
     # Check if this is a forwarded request from somewhere else and construct netloc
-    netloc = (
-        f"{request.headers['X-Forwarded-Host']}:{request.headers['X-Forwarded-Port']}"
-        if request.headers.get("X-Forwarded-Host")
-        and request.headers.get("X-Forwarded-Port")
-        else request.url.netloc
-    )
+    netloc = resolve_netloc(request)
 
     # Find path to Rust router using current URL Path
     path_to_router = request.url.path.removesuffix("/index/config.json")

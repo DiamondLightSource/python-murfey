@@ -1,9 +1,9 @@
 <html>
   <head>
-    <title>{{ microscope }}</title>
-    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet" />
+    <title>Visits {{ "({})".format(microscope) if microscope else "" }}</title>
+    <link href="{{ proxy_path }}/static/styles.css" rel="stylesheet" />
     <link
-      href="{{ url_for('images', path='/icon_268.png') }}"
+      href="{{ proxy_path }}/images/icon_268.png"
       rel="icon"
       type="image/png"
     />
