@@ -175,11 +175,15 @@ async def validate_instrument_token(
             if expiry_time := decoded_data.get("expiry_time"):
                 if expiry_time < time.time():
                     raise JWTError
+            # Check that the decoded session corresponds to the visit
             elif decoded_data.get("session") is not None:
-                # Check that the decoded session corresponds to the visit
                 if not validate_session_against_visit(
                     decoded_data["session"], decoded_data["visit"]
                 ):
+                    raise JWTError
+            # Verify 'user' token if enabled
+            elif security_config.allow_user_token:
+                if not decoded_data.get("user"):
                     raise JWTError
             else:
                 raise JWTError
