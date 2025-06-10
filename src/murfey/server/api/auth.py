@@ -181,9 +181,10 @@ async def validate_instrument_token(
                     decoded_data["session"], decoded_data["visit"]
                 ):
                     raise JWTError
-            # Check for Murfey TUI tokens (just a 'user' key)
-            elif decoded_data.get("user") is not None:
-                pass
+            # Verify 'user' token if enabled
+            elif security_config.allow_user_token:
+                if not decoded_data.get("user"):
+                    raise JWTError
             else:
                 raise JWTError
     except JWTError:
