@@ -175,12 +175,15 @@ async def validate_instrument_token(
             if expiry_time := decoded_data.get("expiry_time"):
                 if expiry_time < time.time():
                     raise JWTError
+            # Check that the decoded session corresponds to the visit
             elif decoded_data.get("session") is not None:
-                # Check that the decoded session corresponds to the visit
                 if not validate_session_against_visit(
                     decoded_data["session"], decoded_data["visit"]
                 ):
                     raise JWTError
+            # Check for Murfey TUI tokens (just a 'user' key)
+            elif decoded_data.get("user") is not None:
+                pass
             else:
                 raise JWTError
     except JWTError:
