@@ -1126,7 +1126,7 @@ class DestinationSelect(Screen):
             else:
                 self.app._start_rsyncer(s, d)
         for k, v in self._user_params.items():
-            setattr(self.app._environment.data_collection_parameters, k, v)
+            setattr(self.app._environment, k, v)
         self.app.pop_screen()
         self.app.push_screen("main")
 
