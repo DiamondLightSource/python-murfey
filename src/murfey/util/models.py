@@ -77,7 +77,7 @@ Models related to the single-particle analysis workflow.
 
 class ProcessingParametersSPA(BaseModel):
     tag: str
-    dose_per_frame: float
+    dose_per_frame: Optional[float]
     gain_ref: Optional[str]
     experiment_type: str
     voltage: float
