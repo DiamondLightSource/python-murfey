@@ -87,14 +87,8 @@ class ProcessingParametersSPA(BaseModel):
     motion_corr_binning: int
     file_extension: str
     acquisition_software: str
-    use_cryolo: bool
     symmetry: str
-    mask_diameter: Optional[int]
-    boxsize: Optional[int]
-    downscale: bool
-    small_boxsize: Optional[int]
     eer_fractionation_file: str = ""
-    particle_diameter: Optional[float]
     magnification: Optional[int] = None
     total_exposed_dose: Optional[float] = None
     c2aperture: Optional[float] = None
@@ -105,12 +99,7 @@ class ProcessingParametersSPA(BaseModel):
     class Base(BaseModel):
         dose_per_frame: Optional[float]
         gain_ref: Optional[str]
-        use_cryolo: bool
         symmetry: str
-        mask_diameter: Optional[int]
-        boxsize: Optional[int]
-        downscale: bool
-        small_boxsize: Optional[int]
         eer_fractionation: int
 
 
