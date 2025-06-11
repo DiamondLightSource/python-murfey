@@ -419,6 +419,10 @@ class MultigridController:
             json = json.get("form", {})
             # Safely convert all entries into strings, but leave None as-is
             json = {k: str(v) if v is not None else None for k, v in json.items()}
+        self._environment.dose_per_frame = json.get("dose_per_frame")
+        self._environment.gain_ref = json.get("gain_ref")
+        self._environment.symmetry = json.get("symmetry")
+        self._environment.eer_fractionation = json.get("eer_fractionation")
         source = Path(json["source"])
         context = self.analysers[source]._context
         if context:

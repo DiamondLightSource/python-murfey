@@ -265,6 +265,8 @@ class SPAModularContext(Context):
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
+        metadata["gain_ref"] = environment.gain_ref if environment else None
+        metadata["dose_per_frame"] = environment.dose_per_frame if environment else None
         metadata["symmetry"] = (environment.symmetry if environment else None) or "C1"
         metadata["eer_fractionation"] = (
             environment.eer_fractionation if environment else None

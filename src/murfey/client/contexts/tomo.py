@@ -600,6 +600,10 @@ class TomographyContext(Context):
                     float(mdoc_data["PixelSpacing"]) * 1e-10
                 )
             mdoc_metadata["motion_corr_binning"] = binning_factor
+            mdoc_metadata["gain_ref"] = environment.gain_ref if environment else None
+            mdoc_metadata["dose_per_frame"] = (
+                environment.dose_per_frame if environment else None
+            )
             mdoc_metadata["source"] = str(self._basepath)
             mdoc_metadata["tag"] = str(self._basepath)
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
@@ -610,6 +614,9 @@ class TomographyContext(Context):
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )
+            mdoc_metadata["eer_fractionation"] = (
+                environment.eer_fractionation if environment else None
+            ) or 20
 
             data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
             if data_file.split(".")[-1] == "eer":
