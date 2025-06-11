@@ -2245,7 +2245,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                 )
                 feedback_params = db.SPAFeedbackParameters(
                     pj_id=collected_ids[2].id,
-                    estimate_particle_diameter=not bool(message["particle_diameter"]),
+                    estimate_particle_diameter=True,
                     hold_class2d=False,
                     hold_class3d=False,
                     class_selection_score=0,
