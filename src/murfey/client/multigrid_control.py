@@ -408,7 +408,6 @@ class MultigridController:
             )
             if self._form_values.get("gain_ref") in (None, "None"):
                 self._form_values["gain_ref"] = self._environment.gain_ref
-            self._form_dependencies = response.get("dependencies", {})
             self._data_collection_form_complete = True
         elif self._register_dc is None:
             self._data_collection_form_complete = True

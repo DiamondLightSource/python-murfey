@@ -21,28 +21,11 @@ from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
-from murfey.client.tui.forms import FormDependency
 from murfey.util.client import Observer, get_machine_config_client
 from murfey.util.mdoc import get_block
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
-
-spa_form_dependencies: dict = {
-    "use_cryolo": FormDependency(
-        dependencies={"estimate_particle_diameter": False}, trigger_value=False
-    ),
-    "estimate_particle_diameter": FormDependency(
-        dependencies={
-            "use_cryolo": True,
-            "boxsize": "None",
-            "small_boxsize": "None",
-            "mask_diameter": "None",
-            "particle_diameter": "None",
-        },
-        trigger_value=True,
-    ),
-}
 
 
 class Analyser(Observer):
@@ -326,13 +309,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
 
@@ -388,13 +364,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
                 elif isinstance(

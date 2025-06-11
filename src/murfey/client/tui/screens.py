@@ -46,7 +46,7 @@ from textual.widgets import (
 )
 from werkzeug.utils import secure_filename
 
-from murfey.client.analyser import Analyser, spa_form_dependencies
+from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.gain_ref import determine_gain_ref
@@ -55,7 +55,6 @@ from murfey.client.instance_environment import (
     global_env_lock,
 )
 from murfey.client.rsync import RSyncer
-from murfey.client.tui.forms import FormDependency
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
 from murfey.util.client import capture_post, get_machine_config_client, read_config
@@ -346,9 +345,7 @@ class LaunchScreen(Screen):
                     )
                 transfer_routes[s] = _default
             self.app.install_screen(
-                DestinationSelect(
-                    transfer_routes, self._context, dependencies=spa_form_dependencies
-                ),
+                DestinationSelect(transfer_routes, self._context),
                 "destination-select-screen",
             )
             self.app.pop_screen()
@@ -423,13 +420,11 @@ class ProcessingForm(Screen):
         self,
         form: dict,
         *args,
-        dependencies: Dict[str, FormDependency] | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._form = form
         self._inputs: Dict[Input, str] = {}
-        self._dependencies = dependencies or {}
 
     def compose(self):
         inputs = []
@@ -447,8 +442,6 @@ class ProcessingForm(Screen):
                 i.value = "None" if default is None else default
             self._inputs[i] = k.name
             inputs.append(i)
-        for i, k in self._inputs.items():
-            self._check_dependency(k, i.value)
         confirm_btn = Button("Confirm", id="confirm-btn")
         if self._form.get("motion_corr_binning") == "2":
             self._vert = VerticalScroll(
@@ -502,23 +495,6 @@ class ProcessingForm(Screen):
         else:
             k = self._inputs[event.switch]
             self._form[k] = event.value
-            self._check_dependency(k, event.value)
-
-    def _check_dependency(self, key: str, value: Any):
-        if x := self._dependencies.get(key):
-            for d, v in x.dependencies.items():
-                if value == x.trigger_value:
-                    self._form[d] = v
-                    for i, dk in self._inputs.items():
-                        if dk == d:
-                            i.value = v
-                            i.disabled = True
-                            break
-                else:
-                    for i, dk in self._inputs.items():
-                        if dk == d:
-                            i.disabled = False
-                            break
 
     def on_input_changed(self, event):
         k = self._inputs[event.input]
@@ -967,7 +943,6 @@ class DestinationSelect(Screen):
         transfer_routes: Dict[Path, str],
         context: Type[SPAModularContext] | Type[TomographyContext],
         *args,
-        dependencies: Dict[str, FormDependency] | None = None,
         destination_overrides: Optional[Dict[Path, str]] = None,
         use_transfer_routes: bool = False,
         **kwargs,
@@ -976,7 +951,6 @@ class DestinationSelect(Screen):
         self._transfer_routes = transfer_routes
         self._destination_overrides: Dict[Path, str] = destination_overrides or {}
         self._user_params: Dict[str, str] = {}
-        self._dependencies = dependencies or {}
         self._inputs: Dict[Input, str] = {}
         self._context = context
         self._use_transfer_routes = use_transfer_routes
@@ -1089,29 +1063,11 @@ class DestinationSelect(Screen):
                     )
                 )
                 self.app._environment.superres = False
-            for i, k in self._inputs.items():
-                self._check_dependency(k, i.value)
         yield VerticalScroll(
             *params_bulk,
             id="user-params",
         )
         yield Button("Confirm", id="destination-btn")
-
-    def _check_dependency(self, key: str, value: Any):
-        if x := self._dependencies.get(key):
-            for d, v in x.dependencies.items():
-                if value == x.trigger_value:
-                    self._user_params[d] = str(v)
-                    for i, dk in self._inputs.items():
-                        if dk == d:
-                            i.value = v
-                            i.disabled = True
-                            break
-                else:
-                    for i, dk in self._inputs.items():
-                        if dk == d:
-                            i.disabled = False
-                            break
 
     def on_switch_changed(self, event):
         if event.switch.id == "superres-multigrid":
@@ -1120,7 +1076,6 @@ class DestinationSelect(Screen):
             for k in self._context.user_params:
                 if event.switch.id == k.name:
                     self._user_params[k.name] = event.value
-                    self._check_dependency(k.name, event.value)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
@@ -1133,7 +1088,6 @@ class DestinationSelect(Screen):
             DestinationSelect(
                 self._transfer_routes,
                 self._context,
-                dependencies=spa_form_dependencies,
                 destination_overrides=self._destination_overrides,
                 use_transfer_routes=True,
             ),
@@ -1249,9 +1203,7 @@ class MainScreen(Screen):
             if len(self.app.visits)
             else [Button("No ongoing visits found")]
         )
-        self.app.processing_form = ProcessingForm(
-            self.app._form_values, dependencies=self.app._form_dependencies
-        )
+        self.app.processing_form = ProcessingForm(self.app._form_values)
         yield Header()
         info_widget = RichLog(id="info", markup=True)
         yield info_widget
