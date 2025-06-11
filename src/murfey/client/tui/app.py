@@ -84,7 +84,7 @@ class MurfeyTUI(App):
         self._environment = environment or MurfeyInstanceEnvironment(
             urlparse("http://localhost:8000")
         )
-        self._environment.gain_ref = gain_ref
+        self._environment.gain_ref = str(gain_ref)
         self._sources = self._environment.sources or [Path(".")]
         self._url = self._environment.url
         self._default_destinations = self._environment.default_destinations
@@ -217,7 +217,7 @@ class MurfeyTUI(App):
                 # Set up rsync command
                 rsync_cmd = [
                     "rsync",
-                    f"{posix_path(self._environment.gain_ref)!r}",
+                    f"{posix_path(Path(self._environment.gain_ref))!r}",
                     f"{self._url.hostname}::{self._machine_config.get('rsync_module', 'data')}/{visit_path}/processing",
                 ]
                 # Encase in bash shell
@@ -230,7 +230,7 @@ class MurfeyTUI(App):
                 gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {posix_path(self._environment.gain_ref)!r} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(Path(self._environment.gain_ref))!r} was not successfully transferred to {visit_path}/processing"
                     )
         if transfer:
             self.rsync_processes[source] = RSyncer(

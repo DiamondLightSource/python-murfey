@@ -48,7 +48,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     visit: str = ""
     processing_only_mode: bool = False
     dose_per_frame: Optional[float] = None
-    gain_ref: Optional[Path] = None
+    gain_ref: Optional[str] = None
     symmetry: Optional[str] = None
     eer_fractionation: Optional[int] = None
     superres: bool = False
