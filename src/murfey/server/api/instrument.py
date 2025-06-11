@@ -178,6 +178,7 @@ async def pass_proc_params_to_instrument_server(
         dose_per_frame=proc_params.dose_per_frame,
         gain_ref=session.current_gain_ref,
         symmetry=proc_params.symmetry,
+        eer_fractionation=proc_params.eer_fractionation,
     )
     db.add(session_processing_parameters)
     db.commit()

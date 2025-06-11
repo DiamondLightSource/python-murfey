@@ -50,6 +50,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     dose_per_frame: Optional[float] = None
     gain_ref: Optional[Path] = None
     symmetry: Optional[str] = None
+    eer_fractionation: Optional[int] = None
     superres: bool = False
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
@@ -72,3 +73,4 @@ class MurfeyInstanceEnvironment(BaseModel):
         self.dose_per_frame = None
         self.gain_ref = None
         self.symmetry = None
+        self.eer_fractionation = None

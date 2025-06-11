@@ -108,27 +108,9 @@ class SPAModularContext(Context):
             "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
             default=1,
         ),
-        ProcessingParameter(
-            "estimate_particle_diameter",
-            "Use crYOLO to Estimate Particle Diameter",
-            default=True,
-        ),
-        ProcessingParameter(
-            "particle_diameter", "Particle Diameter (Angstroms)", default=None
-        ),
-        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
         ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
-        ProcessingParameter(
-            "mask_diameter", "Mask Diameter (2D classification)", default=190
-        ),
-        ProcessingParameter("boxsize", "Box Size", default=256),
-        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
-        ProcessingParameter(
-            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
-        ),
         ProcessingParameter("gain_ref", "Gain Reference"),
-        ProcessingParameter("gain_ref_superres", "Unbinned Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -283,29 +265,11 @@ class SPAModularContext(Context):
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
-
-        metadata["use_cryolo"] = (
-            self.data_collection_parameters.get("use_cryolo") or True
-        )
-        metadata["symmetry"] = self.data_collection_parameters.get("symmetry") or "C1"
-        metadata["mask_diameter"] = (
-            self.data_collection_parameters.get("mask_diameter") or 190
-        )
-        metadata["boxsize"] = self.data_collection_parameters.get("boxsize") or 256
-        metadata["downscale"] = self.data_collection_parameters.get("downscale") or True
-        metadata["small_boxsize"] = (
-            self.data_collection_parameters.get("small_boxsize") or 128
-        )
+        metadata["symmetry"] = (environment.symmetry if environment else None) or "C1"
         metadata["eer_fractionation"] = (
-            self.data_collection_parameters.get("eer_fractionation") or 20
-        )
+            environment.eer_fractionation if environment else None
+        ) or 20
         metadata["source"] = str(self._basepath)
-        metadata["particle_diameter"] = (
-            self.data_collection_parameters.get("particle_diameter") or 0
-        )
-        metadata["estimate_particle_diameter"] = (
-            self.data_collection_parameters.get("estimate_particle_diameter") or True
-        )
         return metadata
 
     def _position_analysis(

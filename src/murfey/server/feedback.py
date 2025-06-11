@@ -2242,11 +2242,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                     motion_corr_binning=message["motion_corr_binning"],
                     eer_fractionation_file=message["eer_fractionation_file"],
                     symmetry=message["symmetry"],
-                    particle_diameter=message["particle_diameter"],
-                    downscale=message["downscale"],
-                    boxsize=message["boxsize"],
-                    small_boxsize=message["small_boxsize"],
-                    mask_diameter=message["mask_diameter"],
                 )
                 feedback_params = db.SPAFeedbackParameters(
                     pj_id=collected_ids[2].id,
