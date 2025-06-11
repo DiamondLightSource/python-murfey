@@ -1062,9 +1062,7 @@ class DestinationSelect(Screen):
         if self.app._multigrid and self.app._processing_enabled:
             for k in self._context.user_params:
                 params_bulk.append(Label(k.label))
-                val = self.app._environment.data_collection_parameters.get(
-                    k.name
-                ) or str(k.default)
+                val = getattr(self.app._environment, k.name, str(k.default))
                 self._user_params[k.name] = val
                 if val in ("true", "True", True):
                     i = Switch(value=True, id=k.name, classes="input-destination")
@@ -1174,7 +1172,7 @@ class DestinationSelect(Screen):
             else:
                 self.app._start_rsyncer(s, d)
         for k, v in self._user_params.items():
-            self.app._environment.data_collection_parameters[k] = v
+            setattr(self.app._environment.data_collection_parameters, k, v)
         self.app.pop_screen()
         self.app.push_screen("main")
 

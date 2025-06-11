@@ -75,7 +75,10 @@ class MultigridController:
             default_destination=f"{datetime.now().year}",
             demo=self.demo,
             visit=self.visit,
-            data_collection_parameters=self.data_collection_parameters,
+            dose_per_frame=self.data_collection_parameters.get("dose_per_frame"),
+            gain_ref=self.data_collection_parameters.get("gain_ref"),
+            symmetry=self.data_collection_parameters.get("symmetry"),
+            eer_fractionation=self.data_collection_parameters.get("eer_fractionation"),
             instrument_name=self.instrument_name,
             # processing_only_mode=server_routing_prefix_found,
         )
