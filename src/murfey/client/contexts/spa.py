@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, Optional, OrderedDict, Tuple
@@ -164,7 +163,6 @@ class SPAModularContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         magnification = 0
-        num_fractions = 1
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
@@ -217,14 +215,6 @@ class SPAModularContext(Context):
                 )  # convert e / m^2 to e / A^2
             except ValueError:
                 metadata["total_exposed_dose"] = 1
-            try:
-                num_fractions = int(
-                    data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                        "CameraSpecificInput"
-                    ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
-                )
-            except (KeyError, IndexError):
-                pass
             c2_index = 3
             for i, el in enumerate(
                 data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"]
@@ -293,85 +283,29 @@ class SPAModularContext(Context):
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
-        if environment:
-            metadata["gain_ref"] = (
-                environment.data_collection_parameters.get("gain_ref")
-                if environment
-                and environment.data_collection_parameters.get("gain_ref")
-                not in (None, "None")
-                else f"{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-            )
-            metadata["gain_ref_superres"] = (
-                environment.data_collection_parameters.get("gain_ref_superres")
-                if environment
-                and environment.data_collection_parameters.get("gain_ref_superres")
-                not in (None, "None")
-                else f"{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
-            )
-        else:
-            metadata["gain_ref"] = None
-            metadata["gain_ref_superres"] = None
-        if metadata.get("total_exposed_dose"):
-            metadata["dose_per_frame"] = (
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                and environment.data_collection_parameters.get("dose_per_frame")
-                not in (None, "None")
-                else round(metadata["total_exposed_dose"] / num_fractions, 3)
-            )
-        else:
-            metadata["dose_per_frame"] = (
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                else None
-            )
 
         metadata["use_cryolo"] = (
-            environment.data_collection_parameters.get("use_cryolo")
-            if environment
-            else None
-        ) or True
-        metadata["symmetry"] = (
-            environment.data_collection_parameters.get("symmetry")
-            if environment
-            else None
-        ) or "C1"
+            self.data_collection_parameters.get("use_cryolo") or True
+        )
+        metadata["symmetry"] = self.data_collection_parameters.get("symmetry") or "C1"
         metadata["mask_diameter"] = (
-            environment.data_collection_parameters.get("mask_diameter")
-            if environment
-            else None
-        ) or 190
-        metadata["boxsize"] = (
-            environment.data_collection_parameters.get("boxsize")
-            if environment
-            else None
-        ) or 256
-        metadata["downscale"] = (
-            environment.data_collection_parameters.get("downscale")
-            if environment
-            else None
-        ) or True
+            self.data_collection_parameters.get("mask_diameter") or 190
+        )
+        metadata["boxsize"] = self.data_collection_parameters.get("boxsize") or 256
+        metadata["downscale"] = self.data_collection_parameters.get("downscale") or True
         metadata["small_boxsize"] = (
-            environment.data_collection_parameters.get("small_boxsize")
-            if environment
-            else None
-        ) or 128
+            self.data_collection_parameters.get("small_boxsize") or 128
+        )
         metadata["eer_fractionation"] = (
-            environment.data_collection_parameters.get("eer_fractionation")
-            if environment
-            else None
-        ) or 20
+            self.data_collection_parameters.get("eer_fractionation") or 20
+        )
         metadata["source"] = str(self._basepath)
         metadata["particle_diameter"] = (
-            environment.data_collection_parameters.get("particle_diameter")
-            if environment
-            else None
-        ) or 0
+            self.data_collection_parameters.get("particle_diameter") or 0
+        )
         metadata["estimate_particle_diameter"] = (
-            environment.data_collection_parameters.get("estimate_particle_diameter")
-            if environment
-            else None
-        ) or True
+            self.data_collection_parameters.get("estimate_particle_diameter") or True
+        )
         return metadata
 
     def _position_analysis(
@@ -584,10 +518,10 @@ class SPAModularContext(Context):
                                 f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
-                                    "fractionation": environment.data_collection_parameters[
+                                    "fractionation": self.data_collection_parameters[
                                         "eer_fractionation"
                                     ],
-                                    "dose_per_frame": environment.data_collection_parameters[
+                                    "dose_per_frame": self.data_collection_parameters[
                                         "dose_per_frame"
                                     ],
                                     "fractionation_file_name": "eer_fractionation_spa.txt",
@@ -619,20 +553,16 @@ class SPAModularContext(Context):
                             "image_number": environment.movies[
                                 file_transferred_to
                             ].movie_number,
-                            "pixel_size": environment.data_collection_parameters.get(
+                            "pixel_size": self.data_collection_parameters.get(
                                 "pixel_size_on_image"
                             ),
                             "autoproc_program_id": None,
-                            "dose_per_frame": environment.data_collection_parameters.get(
-                                "dose_per_frame"
-                            ),
-                            "mc_binning": environment.data_collection_parameters.get(
+                            "dose_per_frame": environment.dose_per_frame,
+                            "mc_binning": self.data_collection_parameters.get(
                                 "motion_corr_binning", 1
                             ),
-                            "gain_ref": environment.data_collection_parameters.get(
-                                "gain_ref"
-                            ),
-                            "extract_downscale": environment.data_collection_parameters.get(
+                            "gain_ref": environment.gain_ref,
+                            "extract_downscale": self.data_collection_parameters.get(
                                 "downscale", True
                             ),
                             "eer_fractionation_file": eer_fractionation_file,

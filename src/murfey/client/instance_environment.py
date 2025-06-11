@@ -41,14 +41,15 @@ class MurfeyInstanceEnvironment(BaseModel):
     destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
     demo: bool = False
-    data_collection_parameters: dict = {}
     movies: Dict[Path, MovieTracker] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}
     movie_counters: Dict[str, itertools.count] = {}
     visit: str = ""
     processing_only_mode: bool = False
+    dose_per_frame: Optional[float] = None
     gain_ref: Optional[Path] = None
+    symmetry: Optional[str] = None
     superres: bool = False
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
@@ -64,9 +65,10 @@ class MurfeyInstanceEnvironment(BaseModel):
         for w in self.watchers.values():
             w.stop()
         self.watchers = {}
-        self.data_collection_parameters = {}
         self.movies = {}
         self.movie_tilt_pair = {}
         self.tilt_angles = {}
         self.visit = ""
+        self.dose_per_frame = None
         self.gain_ref = None
+        self.symmetry = None

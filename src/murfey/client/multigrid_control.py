@@ -401,12 +401,10 @@ class MultigridController:
         if self._register_dc and response.get("form"):
             self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
             log.info(
-                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
+                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.gain_ref}"
             )
             if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values["gain_ref"] = (
-                    self._environment.data_collection_parameters.get("gain_ref")
-                )
+                self._form_values["gain_ref"] = self._environment.gain_ref
             self._form_dependencies = response.get("dependencies", {})
             self._data_collection_form_complete = True
         elif self._register_dc is None:
@@ -421,11 +419,12 @@ class MultigridController:
             json = json.get("form", {})
             # Safely convert all entries into strings, but leave None as-is
             json = {k: str(v) if v is not None else None for k, v in json.items()}
-        self._environment.data_collection_parameters = {
-            k: None if v == "None" else v for k, v in json.items()
-        }
         source = Path(json["source"])
         context = self.analysers[source]._context
+        if context:
+            context.data_collection_parameters = {
+                k: None if v == "None" else v for k, v in json.items()
+            }
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
             context.register_tomography_data_collections(
@@ -435,19 +434,15 @@ class MultigridController:
             )
 
             log.info("Registering tomography processing parameters")
-            if self._environment.data_collection_parameters.get("num_eer_frames"):
+            if context.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
                     f"{str(self._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                     json={
-                        "num_frames": self._environment.data_collection_parameters[
+                        "num_frames": context.data_collection_parameters[
                             "num_eer_frames"
                         ],
-                        "fractionation": self._environment.data_collection_parameters[
-                            "eer_fractionation"
-                        ],
-                        "dose_per_frame": self._environment.data_collection_parameters[
-                            "dose_per_frame"
-                        ],
+                        "fractionation": self._environment.eer_fractionation,
+                        "dose_per_frame": self._environment.dose_per_frame,
                         "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )

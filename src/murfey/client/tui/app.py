@@ -442,12 +442,10 @@ class MurfeyTUI(App):
         if self._register_dc and response.get("form"):
             self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
             log.info(
-                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
+                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.gain_ref}"
             )
             if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values["gain_ref"] = (
-                    self._environment.data_collection_parameters.get("gain_ref")
-                )
+                self._form_values["gain_ref"] = self._environment.gain_ref
             self._form_dependencies = response.get("dependencies", {})
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
@@ -472,11 +470,16 @@ class MurfeyTUI(App):
         if from_form:
             json = json.get("form", {})
             json = {k: v if v is None else str(v) for k, v in json.items()}
-        self._environment.data_collection_parameters = {
-            k: None if v == "None" else v for k, v in json.items()
-        }
+        self._environment.dose_per_frame = json.get("dose_per_frame")
+        self._environment.gain_ref = json.get("gain_ref")
+        self._environment.symmetry = json.get("symmetry")
+        self._environment.eer_fractionation = json.get("eer_fractionation")
         source = Path(json["source"])
         context = self.analysers[source]._context
+        if context:
+            context.data_collection_parameters = {
+                k: None if v == "None" else v for k, v in json.items()
+            }
         if isinstance(context, TomographyContext):
             source = Path(json["source"])
             context.register_tomography_data_collections(
@@ -486,19 +489,15 @@ class MurfeyTUI(App):
             )
 
             log.info("Registering tomography processing parameters")
-            if self.app._environment.data_collection_parameters.get("num_eer_frames"):
+            if context.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
                     f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
                     json={
-                        "num_frames": self.app._environment.data_collection_parameters[
+                        "num_frames": context.data_collection_parameters[
                             "num_eer_frames"
                         ],
-                        "fractionation": self.app._environment.data_collection_parameters[
-                            "eer_fractionation"
-                        ],
-                        "dose_per_frame": self.app._environment.data_collection_parameters[
-                            "dose_per_frame"
-                        ],
+                        "fractionation": self.app._environment.eer_fractionation,
+                        "dose_per_frame": self.app._environment.dose_per_frame,
                         "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )

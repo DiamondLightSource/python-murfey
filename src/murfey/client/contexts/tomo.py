@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Callable, Dict, List, OrderedDict
@@ -133,25 +132,23 @@ class TomographyContext(Context):
                         "tag": tilt_series,
                     }
                     if (
-                        environment.data_collection_parameters
-                        and environment.data_collection_parameters.get("voltage")
+                        self.data_collection_parameters
+                        and self.data_collection_parameters.get("voltage")
                     ):
                         # Once mdoc parameters are known register processing jobs
                         dc_data.update(
                             {
-                                "voltage": environment.data_collection_parameters[
-                                    "voltage"
-                                ],
-                                "pixel_size_on_image": environment.data_collection_parameters[
+                                "voltage": self.data_collection_parameters["voltage"],
+                                "pixel_size_on_image": self.data_collection_parameters[
                                     "pixel_size_on_image"
                                 ],
-                                "image_size_x": environment.data_collection_parameters[
+                                "image_size_x": self.data_collection_parameters[
                                     "image_size_x"
                                 ],
-                                "image_size_y": environment.data_collection_parameters[
+                                "image_size_y": self.data_collection_parameters[
                                     "image_size_y"
                                 ],
-                                "magnification": environment.data_collection_parameters[
+                                "magnification": self.data_collection_parameters[
                                     "magnification"
                                 ],
                             }
@@ -176,7 +173,7 @@ class TomographyContext(Context):
                         )
 
         except Exception as e:
-            logger.error(f"ERROR {e}, {environment.data_collection_parameters}")
+            logger.error(f"ERROR {e}, {self.data_collection_parameters}")
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -315,19 +312,15 @@ class TomographyContext(Context):
             capture_post(tilt_url, json=tilt_data)
 
             eer_fractionation_file = None
-            if environment.data_collection_parameters.get("num_eer_frames"):
+            if self.data_collection_parameters.get("num_eer_frames"):
                 response = requests.post(
                     f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                     json={
-                        "num_frames": environment.data_collection_parameters[
-                            "num_eer_frames"
-                        ],
-                        "fractionation": environment.data_collection_parameters[
+                        "num_frames": self.data_collection_parameters["num_eer_frames"],
+                        "fractionation": self.data_collection_parameters[
                             "eer_fractionation"
                         ],
-                        "dose_per_frame": environment.data_collection_parameters[
-                            "dose_per_frame"
-                        ],
+                        "dose_per_frame": environment.dose_per_frame or 0,
                         "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )
@@ -337,23 +330,17 @@ class TomographyContext(Context):
                 "path": str(file_transferred_to),
                 "description": "",
                 "image_number": environment.movies[file_transferred_to].movie_number,
-                "pixel_size": environment.data_collection_parameters.get(
+                "pixel_size": self.data_collection_parameters.get(
                     "pixel_size_on_image", 0
                 ),
-                "dose_per_frame": environment.data_collection_parameters.get(
-                    "dose_per_frame", 0
-                ),
-                "frame_count": environment.data_collection_parameters.get(
-                    "frame_count", 0
-                ),
-                "tilt_axis": environment.data_collection_parameters.get(
-                    "tilt_axis", 85
-                ),
-                "mc_binning": environment.data_collection_parameters.get(
+                "dose_per_frame": environment.dose_per_frame or 0,
+                "frame_count": self.data_collection_parameters.get("frame_count", 0),
+                "tilt_axis": self.data_collection_parameters.get("tilt_axis", 85),
+                "mc_binning": self.data_collection_parameters.get(
                     "motion_corr_binning", 1
                 ),
-                "gain_ref": environment.data_collection_parameters.get("gain_ref"),
-                "voltage": environment.data_collection_parameters.get("voltage", 300),
+                "gain_ref": environment.gain_ref,
+                "voltage": self.data_collection_parameters.get("voltage", 300),
                 "eer_fractionation_file": eer_fractionation_file,
                 "tag": tilt_series,
                 "group_tag": str(self._basepath),
@@ -565,9 +552,7 @@ class TomographyContext(Context):
                     metadata["motion_corr_binning"] = 1
                     metadata["gain_ref"] = None
                     metadata["dose_per_frame"] = (
-                        environment.data_collection_parameters.get("dose_per_frame")
-                        if environment
-                        else None
+                        environment.dose_per_frame if environment else None
                     )
                     metadata["source"] = str(self._basepath)
                 except KeyError:
@@ -615,20 +600,6 @@ class TomographyContext(Context):
                     float(mdoc_data["PixelSpacing"]) * 1e-10
                 )
             mdoc_metadata["motion_corr_binning"] = binning_factor
-            if environment:
-                mdoc_metadata["gain_ref"] = (
-                    environment.data_collection_parameters.get("gain_ref")
-                    if environment.data_collection_parameters.get("gain_ref")
-                    not in (None, "None")
-                    else f"{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-                )
-            else:
-                mdoc_metadata["gain_ref"] = None
-            mdoc_metadata["dose_per_frame"] = (
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                else None
-            )
             mdoc_metadata["source"] = str(self._basepath)
             mdoc_metadata["tag"] = str(self._basepath)
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
@@ -639,11 +610,6 @@ class TomographyContext(Context):
             mdoc_metadata["file_extension"] = (
                 f".{mdoc_data_block['SubFramePath'].split('.')[-1]}"
             )
-            mdoc_metadata["eer_fractionation"] = (
-                environment.data_collection_parameters.get("eer_fractionation")
-                if environment
-                else None
-            ) or 20
 
             data_file = mdoc_data_block["SubFramePath"].split("\\")[-1]
             if data_file.split(".")[-1] == "eer":
