@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 import murfey.server.api.websocket as ws
 from murfey.server import _transport_object
 from murfey.server.api import templates
+from murfey.server.api.auth import MurfeyInstrumentNameFrontend as MurfeyInstrumentName
 from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
 from murfey.server.api.auth import validate_token
 from murfey.server.api.shared import get_foil_hole as _get_foil_hole
@@ -74,12 +75,14 @@ def connections_check():
 
 
 @router.get("/instruments/{instrument_name}/machine")
-def machine_info_by_instrument(instrument_name: str) -> Optional[MachineConfig]:
+def machine_info_by_instrument(
+    instrument_name: MurfeyInstrumentName,
+) -> Optional[MachineConfig]:
     return get_machine_config_for_instrument(instrument_name)
 
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
-def get_current_visits(instrument_name: str, db=ispyb_db):
+def get_current_visits(instrument_name: MurfeyInstrumentName, db=ispyb_db):
     logger.debug(
         f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
     )
@@ -87,7 +90,9 @@ def get_current_visits(instrument_name: str, db=ispyb_db):
 
 
 @router.get("/instruments/{instrument_name}/visits/")
-def all_visit_info(instrument_name: str, request: Request, db=ispyb_db):
+def all_visit_info(
+    instrument_name: MurfeyInstrumentName, request: Request, db=ispyb_db
+):
     visits = get_all_ongoing_visits(instrument_name, db)
 
     if visits:
@@ -159,7 +164,7 @@ class VisitEndTime(BaseModel):
 
 @router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
 def create_session(
-    instrument_name: str,
+    instrument_name: MurfeyInstrumentName,
     visit: str,
     name: str,
     visit_end_time: VisitEndTime,
@@ -195,7 +200,7 @@ def remove_session(session_id: MurfeySessionID, db=murfey_db):
 
 @router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
 def get_sessions_with_visit(
-    instrument_name: str, visit_name: str, db=murfey_db
+    instrument_name: MurfeyInstrumentName, visit_name: str, db=murfey_db
 ) -> List[Session]:
     sessions = db.exec(
         select(Session)
@@ -207,7 +212,7 @@ def get_sessions_with_visit(
 
 @router.get("/instruments/{instrument_name}/sessions")
 async def get_sessions_by_instrument_name(
-    instrument_name: str, db=murfey_db
+    instrument_name: MurfeyInstrumentName, db=murfey_db
 ) -> List[Session]:
     sessions = db.exec(
         select(Session).where(Session.instrument_name == instrument_name)

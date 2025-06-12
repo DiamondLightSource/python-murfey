@@ -124,13 +124,14 @@ class Security(BaseModel):
     ispyb_credentials: Optional[Path] = None
 
     # Murfey server connection settings
+    auth_url: str = ""
+    auth_type: Literal["password", "cookie"] = "password"
     auth_algorithm: str = ""
     auth_key: str = ""
-    auth_type: Literal["password", "cookie"] = "password"
-    auth_url: str = ""
-    instrument_auth_type: Literal["token", ""] = "token"
-    instrument_auth_url: str = ""
     cookie_key: str = ""
+    instrument_auth_url: str = ""
+    instrument_auth_type: Literal["token", ""] = "token"
+    allow_user_token: bool = False  # TUI 'user' token support
     session_validation: str = ""
     session_token_timeout: Optional[int] = None
     allow_origins: list[str] = ["*"]

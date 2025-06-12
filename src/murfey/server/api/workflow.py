@@ -100,9 +100,11 @@ def register_dc_group(
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == dcg_params.tag)
     ).all():
-        dcg_murfey[0].atlas = dcg_params.atlas
-        dcg_murfey[0].sample = dcg_params.sample
-        dcg_murfey[0].atlas_pixel_size = dcg_params.atlas_pixel_size
+        dcg_murfey[0].atlas = dcg_params.atlas or dcg_murfey[0].atlas
+        dcg_murfey[0].sample = dcg_params.sample or dcg_murfey[0].sample
+        dcg_murfey[0].atlas_pixel_size = (
+            dcg_params.atlas_pixel_size or dcg_murfey[0].atlas_pixel_size
+        )
 
         if _transport_object:
             if dcg_murfey[0].atlas_id is not None:
@@ -114,6 +116,8 @@ def register_dc_group(
                         "atlas": dcg_params.atlas,
                         "sample": dcg_params.sample,
                         "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                        "dcgid": dcg_murfey[0].id,
+                        "session_id": session_id,
                     },
                 )
             else:

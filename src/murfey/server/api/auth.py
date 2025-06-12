@@ -175,11 +175,15 @@ async def validate_instrument_token(
             if expiry_time := decoded_data.get("expiry_time"):
                 if expiry_time < time.time():
                     raise JWTError
+            # Check that the decoded session corresponds to the visit
             elif decoded_data.get("session") is not None:
-                # Check that the decoded session corresponds to the visit
                 if not validate_session_against_visit(
                     decoded_data["session"], decoded_data["visit"]
                 ):
+                    raise JWTError
+            # Verify 'user' token if enabled
+            elif security_config.allow_user_token:
+                if not decoded_data.get("user"):
                     raise JWTError
             else:
                 raise JWTError
@@ -215,15 +219,7 @@ def get_visit_name(session_id: int) -> str:
         )
 
 
-async def validate_frontend_session_access(
-    session_id: int,
-    token: Annotated[str, Depends(oauth2_scheme)],
-) -> int:
-    """
-    Validates whether a frontend request can access information about this session
-    """
-    visit_name = get_visit_name(session_id)
-
+async def submit_to_auth_endpoint(url_subpath: str, token: str) -> None:
     if auth_url:
         headers = (
             {}
@@ -237,7 +233,7 @@ async def validate_frontend_session_access(
         )
         async with aiohttp.ClientSession(cookies=cookies) as session:
             async with session.get(
-                f"{auth_url}/validate_visit_access/{visit_name}",
+                f"{auth_url}/{url_subpath}",
                 headers=headers,
             ) as response:
                 success = response.status == 200
@@ -249,10 +245,21 @@ async def validate_frontend_session_access(
                 detail="You do not have access to this visit",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+
+async def validate_frontend_session_access(
+    session_id: int,
+    token: Annotated[str, Depends(oauth2_scheme)],
+) -> int:
+    """
+    Validates whether a frontend request can access information about this session
+    """
+    visit_name = get_visit_name(session_id)
+    await submit_to_auth_endpoint(f"validate_visit_access/{visit_name}", token)
     return session_id
 
 
-async def validate_instrument_session_access(
+async def validate_instrument_server_session_access(
     session_id: int,
     token: Annotated[str, Depends(instrument_oauth2_scheme)],
 ) -> int:
@@ -284,9 +291,26 @@ async def validate_instrument_session_access(
     return session_id
 
 
+async def validate_user_instrument_access(
+    instrument_name: str,
+    token: Annotated[str, Depends(oauth2_scheme)],
+) -> str:
+    """
+    Validates whether a frontend request can access information about this instrument
+    """
+    await submit_to_auth_endpoint(
+        f"validate_instrument_access/{instrument_name}", token
+    )
+    return instrument_name
+
+
 # Set validation conditions for the session ID based on where the request is from
 MurfeySessionIDFrontend = Annotated[int, Depends(validate_frontend_session_access)]
-MurfeySessionIDInstrument = Annotated[int, Depends(validate_instrument_session_access)]
+MurfeySessionIDInstrument = Annotated[
+    int, Depends(validate_instrument_server_session_access)
+]
+
+MurfeyInstrumentNameFrontend = Annotated[str, Depends(validate_user_instrument_access)]
 
 
 """

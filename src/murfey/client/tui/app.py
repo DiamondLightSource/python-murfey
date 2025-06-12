@@ -63,7 +63,6 @@ class MurfeyTUI(App):
     rsync_processes: Dict[Path, RSyncer] = {}
     analysers: Dict[Path, Analyser] = {}
     _form_values: dict = reactive({})
-    _form_dependencies: dict = {}
 
     def __init__(
         self,
@@ -84,7 +83,7 @@ class MurfeyTUI(App):
         self._environment = environment or MurfeyInstanceEnvironment(
             urlparse("http://localhost:8000")
         )
-        self._environment.gain_ref = gain_ref
+        self._environment.gain_ref = str(gain_ref)
         self._sources = self._environment.sources or [Path(".")]
         self._url = self._environment.url
         self._default_destinations = self._environment.default_destinations
@@ -217,7 +216,7 @@ class MurfeyTUI(App):
                 # Set up rsync command
                 rsync_cmd = [
                     "rsync",
-                    f"{posix_path(self._environment.gain_ref)!r}",
+                    f"{posix_path(Path(self._environment.gain_ref))!r}",
                     f"{self._url.hostname}::{self._machine_config.get('rsync_module', 'data')}/{visit_path}/processing",
                 ]
                 # Encase in bash shell
@@ -230,7 +229,7 @@ class MurfeyTUI(App):
                 gain_rsync = subprocess.run(cmd)
                 if gain_rsync.returncode:
                     log.warning(
-                        f"Gain reference file {posix_path(self._environment.gain_ref)!r} was not successfully transferred to {visit_path}/processing"
+                        f"Gain reference file {posix_path(Path(self._environment.gain_ref))!r} was not successfully transferred to {visit_path}/processing"
                     )
         if transfer:
             self.rsync_processes[source] = RSyncer(
@@ -442,13 +441,10 @@ class MurfeyTUI(App):
         if self._register_dc and response.get("form"):
             self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
             log.info(
-                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.data_collection_parameters.get('gain_ref')}"
+                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.gain_ref}"
             )
             if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values["gain_ref"] = (
-                    self._environment.data_collection_parameters.get("gain_ref")
-                )
-            self._form_dependencies = response.get("dependencies", {})
+                self._form_values["gain_ref"] = self._environment.gain_ref
             self.processing_btn.disabled = False
             self._data_collection_form_complete = True
         elif self._register_dc is None:
@@ -464,49 +460,52 @@ class MurfeyTUI(App):
             )
         )
 
-    def _start_dc(self, json, from_form: bool = False):
+    def _start_dc(self, metadata_json, from_form: bool = False):
         if self._dummy_dc:
             return
         # for multigrid the analyser sends the message straight to _start_dc by-passing user input
         # it is then necessary to extract the data from the message
         if from_form:
-            json = json.get("form", {})
-            json = {k: v if v is None else str(v) for k, v in json.items()}
-        self._environment.data_collection_parameters = {
-            k: None if v == "None" else v for k, v in json.items()
-        }
-        source = Path(json["source"])
+            metadata_json = metadata_json.get("form", {})
+            metadata_json = {
+                k: v if v is None else str(v) for k, v in metadata_json.items()
+            }
+        self._environment.dose_per_frame = metadata_json.get("dose_per_frame")
+        self._environment.gain_ref = metadata_json.get("gain_ref")
+        self._environment.symmetry = metadata_json.get("symmetry")
+        self._environment.eer_fractionation = metadata_json.get("eer_fractionation")
+        source = Path(metadata_json["source"])
         context = self.analysers[source]._context
+        if context:
+            context.data_collection_parameters = {
+                k: None if v == "None" else v for k, v in metadata_json.items()
+            }
         if isinstance(context, TomographyContext):
-            source = Path(json["source"])
+            source = Path(metadata_json["source"])
             context.register_tomography_data_collections(
-                file_extension=json["file_extension"],
+                file_extension=metadata_json["file_extension"],
                 image_directory=str(self._environment.default_destinations[source]),
                 environment=self._environment,
             )
 
             log.info("Registering tomography processing parameters")
-            if self.app._environment.data_collection_parameters.get("num_eer_frames"):
+            if context.data_collection_parameters.get("num_eer_frames"):
                 eer_response = requests.post(
                     f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
                     json={
-                        "num_frames": self.app._environment.data_collection_parameters[
+                        "num_frames": context.data_collection_parameters[
                             "num_eer_frames"
                         ],
-                        "fractionation": self.app._environment.data_collection_parameters[
-                            "eer_fractionation"
-                        ],
-                        "dose_per_frame": self.app._environment.data_collection_parameters[
-                            "dose_per_frame"
-                        ],
+                        "fractionation": self.app._environment.eer_fractionation,
+                        "dose_per_frame": self.app._environment.dose_per_frame,
                         "fractionation_file_name": "eer_fractionation_tomo.txt",
                     },
                 )
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
-                json.update({"eer_fractionation_file": eer_fractionation_file})
+                metadata_json.update({"eer_fractionation_file": eer_fractionation_file})
             requests.post(
                 f"{self.app._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'register_tomo_proc_params', session_id=self.app._environment.murfey_session)}",
-                json=json,
+                json=metadata_json,
             )
             capture_post(
                 f"{self.app._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'flush_tomography_processing', visit_name=self._visit, session_id=self.app._environment.murfey_session)}",
@@ -533,24 +532,24 @@ class MurfeyTUI(App):
             capture_post(url, json=dcg_data)
             if from_form:
                 data = {
-                    "voltage": json["voltage"],
-                    "pixel_size_on_image": json["pixel_size_on_image"],
-                    "experiment_type": json["experiment_type"],
-                    "image_size_x": json["image_size_x"],
-                    "image_size_y": json["image_size_y"],
-                    "file_extension": json["file_extension"],
-                    "acquisition_software": json["acquisition_software"],
+                    "voltage": metadata_json["voltage"],
+                    "pixel_size_on_image": metadata_json["pixel_size_on_image"],
+                    "experiment_type": metadata_json["experiment_type"],
+                    "image_size_x": metadata_json["image_size_x"],
+                    "image_size_y": metadata_json["image_size_y"],
+                    "file_extension": metadata_json["file_extension"],
+                    "acquisition_software": metadata_json["acquisition_software"],
                     "image_directory": str(
                         self._environment.default_destinations[source]
                     ),
                     "tag": str(source),
                     "source": str(source),
-                    "magnification": json["magnification"],
-                    "total_exposed_dose": json.get("total_exposed_dose"),
-                    "c2aperture": json.get("c2aperture"),
-                    "exposure_time": json.get("exposure_time"),
-                    "slit_width": json.get("slit_width"),
-                    "phase_plate": json.get("phase_plate", False),
+                    "magnification": metadata_json["magnification"],
+                    "total_exposed_dose": metadata_json.get("total_exposed_dose"),
+                    "c2aperture": metadata_json.get("c2aperture"),
+                    "exposure_time": metadata_json.get("exposure_time"),
+                    "slit_width": metadata_json.get("slit_width"),
+                    "phase_plate": metadata_json.get("phase_plate", False),
                 }
                 capture_post(
                     f"{str(self._url.geturl())}{url_path_for('workflow.router', 'start_dc', visit_name=self._visit, session_id=self._environment.murfey_session)}",
@@ -571,11 +570,14 @@ class MurfeyTUI(App):
                             "recipe": recipe,
                         },
                     )
-                log.info(f"Posting SPA processing parameters: {json}")
+                log.info(f"Posting SPA processing parameters: {metadata_json}")
                 response = capture_post(
                     f"{self.app._environment.url.geturl()}{url_path_for('workflow.spa_router', 'register_spa_proc_params', session_id=self.app._environment.murfey_session)}",
                     json={
-                        **{k: None if v == "None" else v for k, v in json.items()},
+                        **{
+                            k: None if v == "None" else v
+                            for k, v in metadata_json.items()
+                        },
                         "tag": str(source),
                     },
                 )
@@ -603,9 +605,7 @@ class MurfeyTUI(App):
         )
 
     def _install_processing_form(self):
-        self.processing_form = ProcessingForm(
-            self._form_values, dependencies=self._form_dependencies
-        )
+        self.processing_form = ProcessingForm(self._form_values)
         self.install_screen(self.processing_form, "processing-form")
 
     def on_input_submitted(self, event: Input.Submitted):

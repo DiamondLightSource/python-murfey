@@ -21,28 +21,11 @@ from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
-from murfey.client.tui.forms import FormDependency
 from murfey.util.client import Observer, get_machine_config_client
 from murfey.util.mdoc import get_block
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
-
-spa_form_dependencies: dict = {
-    "use_cryolo": FormDependency(
-        dependencies={"estimate_particle_diameter": False}, trigger_value=False
-    ),
-    "estimate_particle_diameter": FormDependency(
-        dependencies={
-            "use_cryolo": True,
-            "boxsize": "None",
-            "small_boxsize": "None",
-            "mask_diameter": "None",
-            "particle_diameter": "None",
-        },
-        trigger_value=True,
-    ),
-}
 
 
 class Analyser(Observer):
@@ -85,7 +68,7 @@ class Analyser(Observer):
     def __repr__(self) -> str:
         return f"<Analyser ({self._basepath})>"
 
-    def _find_extension(self, file_path: Path):
+    def _find_extension(self, file_path: Path) -> bool:
         """
         Identifies the file extension and stores that information in the class.
         """
@@ -101,22 +84,17 @@ class Analyser(Observer):
             .get(file_path.suffix)
         ):
             if not any(r in file_path.name for r in required_substrings):
-                return []
+                return False
 
-        # Checks for MRC, TIFF, TIF, and EER files if no extension has been defined
-        if (
-            file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
-            and not self._extension
-        ):
-            logger.info(f"File extension determined: {file_path.suffix}")
-            self._extension = file_path.suffix
-        # Check for TIFF, TIF, or EER if the file's already been assigned an extension
-        elif (
-            file_path.suffix in (".tiff", ".tif", ".eer")
-            and self._extension != file_path.suffix
-        ):
-            logger.info(f"File extension re-evaluated: {file_path.suffix}")
-            self._extension = file_path.suffix
+        # Checks for MRC, TIFF, TIF, and EER files
+        if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+            if not self._extension:
+                logger.info(f"File extension determined: {file_path.suffix}")
+                self._extension = file_path.suffix
+            elif self._extension != file_path.suffix:
+                logger.info(f"File extension re-evaluated: {file_path.suffix}")
+                self._extension = file_path.suffix
+            return True
         # If we see an .mdoc file first, use that to determine the file extensions
         elif file_path.suffix == ".mdoc":
             with open(file_path, "r") as md:
@@ -124,9 +102,12 @@ class Analyser(Observer):
                 mdoc_data_block = get_block(md)
             if subframe_path := mdoc_data_block.get("SubFramePath"):
                 self._extension = Path(subframe_path).suffix
+                return True
         # Check for LIF files separately
         elif file_path.suffix == ".lif":
             self._extension = file_path.suffix
+            return True
+        return False
 
     def _find_context(self, file_path: Path) -> bool:
         """
@@ -269,7 +250,10 @@ class Analyser(Observer):
                     elif transferred_file.suffix == ".mdoc":
                         mdoc_for_reading = transferred_file
                 if not self._context:
-                    self._find_extension(transferred_file)
+                    valid_extension = self._find_extension(transferred_file)
+                    if not valid_extension:
+                        logger.error(f"No extension found for {transferred_file}")
+                        break
                     found = self._find_context(transferred_file)
                     if not found:
                         logger.debug(
@@ -325,13 +309,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
 
@@ -344,7 +321,10 @@ class Analyser(Observer):
 
                 # Handle files with tomography and SPA context differently
                 elif not self._extension or self._unseen_xml:
-                    self._find_extension(transferred_file)
+                    valid_extension = self._find_extension(transferred_file)
+                    if not valid_extension:
+                        logger.error(f"No extension found for {transferred_file}")
+                        break
                     if self._extension:
                         logger.info(
                             f"Extension found successfully for {transferred_file}"
@@ -384,13 +364,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
                 elif isinstance(

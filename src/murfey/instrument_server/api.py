@@ -342,6 +342,9 @@ def register_processing_parameters(
         controllers[session_id].data_collection_parameters.update(
             data_collection_parameters[proc_param_block.label]
         )
+        for k, v in proc_param_block.params.dict().items():
+            if v is not None and hasattr(controllers[session_id]._environment, k):
+                setattr(controllers[session_id]._environment, k, v)
     return {"success": True}
 
 

@@ -7,6 +7,7 @@ from rich.logging import RichHandler
 
 import murfey
 import murfey.client.update
+import murfey.client.websocket
 from murfey.client.customlogging import CustomHandler
 from murfey.util import LogFilter
 from murfey.util.client import read_config

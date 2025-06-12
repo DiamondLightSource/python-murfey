@@ -275,9 +275,20 @@ def run():
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     # Set up websocket app and handler
-    client_id = requests.get(
+    client_id_response = requests.get(
         f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
-    ).json()
+    )
+    if client_id_response.status_code == 401:
+        exit(
+            "This instrument is not authorised to run the TUI app; please use the "
+            "Murfey web UI instead"
+        )
+    elif client_id_response.status_code != 200:
+        exit(
+            "Unable to establish connection to Murfey server: \n"
+            f"{client_id_response.json()}"
+        )
+    client_id: dict = client_id_response.json()
     ws = murfey.client.websocket.WSApp(
         server=args.server,
         id=client_id["new_id"],
