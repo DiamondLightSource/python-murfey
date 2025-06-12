@@ -1085,14 +1085,14 @@ murfey.server.api.workflow.router:
     function: register_dc_group
     path_params:
       - name: visit_name
-        type: Any
+        type: typing.Any
     methods:
       - POST
   - path: /workflow/visits/{visit_name}/{session_id}/start_data_collection
     function: start_dc
     path_params:
       - name: visit_name
-        type: Any
+        type: typing.Any
     methods:
       - POST
   - path: /workflow/visits/{visit_name}/{session_id}/register_processing_job
