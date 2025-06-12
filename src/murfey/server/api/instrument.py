@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+from murfey.server.api.auth import MurfeyInstrumentNameFrontend as MurfeyInstrumentName
 from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
 from murfey.server.api.auth import (
     create_access_token,
@@ -42,7 +43,7 @@ lock = asyncio.Lock()
     "/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server"
 )
 async def activate_instrument_server_for_session(
-    instrument_name: str,
+    instrument_name: MurfeyInstrumentName,
     session_id: int,
     token_in: Annotated[str, Depends(oauth2_scheme)],
     db=murfey_db,
@@ -80,7 +81,9 @@ async def activate_instrument_server_for_session(
 
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/active")
-async def check_if_session_is_active(instrument_name: str, session_id: int):
+async def check_if_session_is_active(
+    instrument_name: MurfeyInstrumentName, session_id: int
+):
     if instrument_server_tokens.get(session_id) is None:
         return {"active": False}
     async with lock:
@@ -214,7 +217,7 @@ async def pass_proc_params_to_instrument_server(
 
 
 @router.get("/instruments/{instrument_name}/instrument_server")
-async def check_instrument_server(instrument_name: str):
+async def check_instrument_server(instrument_name: MurfeyInstrumentName):
     data = None
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -232,7 +235,7 @@ async def check_instrument_server(instrument_name: str):
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )
 async def get_possible_gain_references(
-    instrument_name: str, session_id: MurfeySessionID
+    instrument_name: MurfeyInstrumentName, session_id: MurfeySessionID
 ) -> List[File]:
     data = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
@@ -491,7 +494,7 @@ class RSyncerInfo(BaseModel):
 
 @router.get("/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info")
 async def get_rsyncer_info(
-    instrument_name: str, session_id: MurfeySessionID, db=murfey_db
+    instrument_name: MurfeyInstrumentName, session_id: MurfeySessionID, db=murfey_db
 ) -> List[RSyncerInfo]:
     rsyncer_list = []
     analyser_list = []
