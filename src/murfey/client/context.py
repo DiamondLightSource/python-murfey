@@ -39,6 +39,7 @@ class Context:
     def __init__(self, name: str, acquisition_software: str):
         self._acquisition_software = acquisition_software
         self.name = name
+        self.data_collection_parameters: dict = {}
 
     def post_transfer(
         self,

@@ -336,6 +336,7 @@ class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     gain_ref: str
     dose_per_frame: float
+    eer_fractionation: int = 20
     eer_fractionation_file: str = ""
     symmetry: str = "C1"
     session: Optional[Session] = Relationship(
@@ -647,7 +648,7 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     eer_fractionation_file: str = ""
     symmetry: str
     particle_diameter: Optional[float]
-    downscale: bool
+    downscale: bool = True
     do_icebreaker_jobs: bool = True
     boxsize: Optional[int] = 256
     small_boxsize: Optional[int] = 64
