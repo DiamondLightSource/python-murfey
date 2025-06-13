@@ -127,7 +127,9 @@ async def setup_multigrid_watcher(
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
-                    "visit_end_time": str(session.visit_end_time),
+                    "visit_end_time": (
+                        str(session.visit_end_time) if session.visit_end_time else None
+                    ),
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
