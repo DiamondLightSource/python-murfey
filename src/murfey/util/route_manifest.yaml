@@ -841,11 +841,6 @@ murfey.server.api.session_info.correlative_router:
     methods:
       - GET
 murfey.server.api.session_info.router:
-  - path: /session_info/
-    function: root
-    path_params: []
-    methods:
-      - GET
   - path: /session_info/health/
     function: health_check
     path_params: []
