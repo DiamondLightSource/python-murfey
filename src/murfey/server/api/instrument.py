@@ -401,10 +401,17 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
 async def update_visit_end_time(
     session_id: MurfeySessionID, end_time: datetime.datetime, db=murfey_db
 ):
+    # Load data for session
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+
+    # Update visit end time in database
+    session_entry.visit_end_time = end_time
+    db.add(session_entry)
+    db.commit()
+
+    # Update the multigrid controller
     data = {}
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
