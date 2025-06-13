@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import urllib
 from pathlib import Path
 from typing import Annotated, List, Optional
 
@@ -126,7 +127,7 @@ async def setup_multigrid_watcher(
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
                     "rsync_restarts": watcher_spec.rsync_restarts,
-                    "visit_end_time": session.visit_end_time,
+                    "visit_end_time": str(session.visit_end_time),
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
@@ -396,6 +397,36 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
     return data
 
 
+@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
+async def update_visit_end_time(
+    session_id: MurfeySessionID, end_time: datetime.datetime, db=murfey_db
+):
+    # Load data for session
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+
+    # Update visit end time in database
+    session_entry.visit_end_time = end_time
+    db.add(session_entry)
+    db.commit()
+
+    # Update the multigrid controller
+    data = {}
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={urllib.parse.quote(end_time.isoformat())}",
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
 @router.post("/sessions/{session_id}/abandon_session")
 async def abandon_session(session_id: MurfeySessionID, db=murfey_db):
     data = {}
@@ -461,6 +492,34 @@ async def restart_rsyncer(
             async with aiohttp.ClientSession() as clientsession:
                 async with clientsession.post(
                     f"{machine_config.instrument_server_url}{url_path_for('api.router', 'restart_rsyncer', session_id=session_id)}",
+                    json={
+                        "label": session_id,
+                        "source": str(secure_path(Path(rsyncer_source.source))),
+                    },
+                    headers={
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                    },
+                ) as resp:
+                    data = await resp.json()
+    return data
+
+
+@router.post("/sessions/{session_id}/flush_skipped_rsyncer")
+async def flush_skipped_rsyncer(
+    session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
+):
+    data = {}
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if isinstance(session_id, int):
+        if machine_config.instrument_server_url:
+            async with aiohttp.ClientSession() as clientsession:
+                async with clientsession.post(
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'flush_skipped_rsyncer', session_id=session_id)}",
                     json={
                         "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),

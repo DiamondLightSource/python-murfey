@@ -152,6 +152,11 @@ class MultigridController:
         for p in self.rsync_processes.keys():
             self._finalise_rsyncer(p)
 
+    def update_visit_time(self, new_end_time: datetime):
+        self.visit_end_time = new_end_time
+        for rp in self.rsync_processes.values():
+            rp._end_time = new_end_time
+
     def _start_rsyncer_multigrid(
         self,
         source: Path,

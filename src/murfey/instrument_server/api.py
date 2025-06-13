@@ -214,6 +214,13 @@ def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
     watchers[label].request_stop()
 
 
+@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
+def update_multigrid_controller_visit_end_time(
+    session_id: MurfeySessionID, end_time: datetime
+):
+    controllers[session_id].update_visit_time(end_time)
+
+
 class RsyncerSource(BaseModel):
     source: Path
     label: str
@@ -258,6 +265,12 @@ def finalise_session(session_id: MurfeySessionID):
 @router.post("/sessions/{session_id}/restart_rsyncer")
 def restart_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
     controllers[session_id]._restart_rsyncer(rsyncer_source.source)
+    return {"success": True}
+
+
+@router.post("/sessions/{session_id}/flush_skipped_rsyncer")
+def flush_skipped_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource):
+    controllers[session_id].rsync_processes[rsyncer_source.source].flush_skipped()
     return {"success": True}
 
 
