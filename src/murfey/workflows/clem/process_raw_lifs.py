@@ -3,15 +3,16 @@ Script to allow Murfey to submit the LIF-to-STACK job to the cluster.
 The recipe referred to here is stored on GitLab.
 """
 
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
-
-from murfey.util.config import get_machine_config
 
 try:
     from murfey.server.ispyb import TransportManager  # Session
 except AttributeError:
     pass  # Ignore if ISPyB credentials environment variable not set
+
+logger = getLogger("murfey.workflows.clem.process_raw_lifs")
 
 
 def zocalo_cluster_request(
@@ -43,27 +44,30 @@ def zocalo_cluster_request(
         )
 
         # Load machine config to get the feedback queue
-        machine_config = get_machine_config()
-        feedback_queue = machine_config[instrument_name].feedback_queue
+        feedback_queue: str = messenger.feedback_queue
 
-        # Send the message
-        #   The keys under "parameters" will populate all the matching fields in {}
-        #   in the processing recipe
-        messenger.send(
-            "processing_recipe",
-            {
-                "recipes": ["clem-lif-to-stack"],
-                "parameters": {
-                    # Job parameters
-                    "lif_file": f"{str(file)}",
-                    "root_folder": root_folder,
-                    # Other recipe parameters
-                    "session_dir": f"{str(session_dir)}",
-                    "session_id": session_id,
-                    "job_name": job_name,
-                    "feedback_queue": feedback_queue,
-                },
+        # Construct recipe and submit it for processing
+        recipe = {
+            "recipes": ["clem-lif-to-stack"],
+            "parameters": {
+                # Job parameters
+                "lif_file": f"{str(file)}",
+                "root_folder": root_folder,
+                # Other recipe parameters
+                "session_dir": f"{str(session_dir)}",
+                "session_id": session_id,
+                "job_name": job_name,
+                "feedback_queue": feedback_queue,
             },
+        }
+        logger.debug(
+            f"Submitting LIF processing request to {messenger.feedback_queue!r} "
+            "with the following recipe: \n"
+            f"{recipe}"
+        )
+        messenger.send(
+            queue="processing_recipe",
+            message=recipe,
             new_connection=True,
         )
     else:

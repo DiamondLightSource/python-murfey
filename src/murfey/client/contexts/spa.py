@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, Optional, OrderedDict, Tuple
@@ -15,7 +14,8 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util import (
+from murfey.util.api import url_path_for
+from murfey.util.client import (
     authorised_requests,
     capture_get,
     capture_post,
@@ -61,8 +61,8 @@ def _grid_square_metadata_file(
 ) -> Path:
     for dd in data_directories:
         if str(f).startswith(str(dd)):
-            base_dir = dd
-            mid_dir = f.relative_to(dd).parent
+            base_dir = dd.absolute()
+            mid_dir = f.relative_to(base_dir).parent
             break
     else:
         raise ValueError(f"Could not determine grid square metadata path for {f}")
@@ -108,27 +108,9 @@ class SPAModularContext(Context):
             "Dose Per Frame [e- / Angstrom^2 / frame] (after EER grouping if relevant)",
             default=1,
         ),
-        ProcessingParameter(
-            "estimate_particle_diameter",
-            "Use crYOLO to Estimate Particle Diameter",
-            default=True,
-        ),
-        ProcessingParameter(
-            "particle_diameter", "Particle Diameter (Angstroms)", default=None
-        ),
-        ProcessingParameter("use_cryolo", "Use crYOLO Autopicking", default=True),
         ProcessingParameter("symmetry", "Symmetry Group", default="C1"),
         ProcessingParameter("eer_fractionation", "EER Fractionation", default=20),
-        ProcessingParameter(
-            "mask_diameter", "Mask Diameter (2D classification)", default=190
-        ),
-        ProcessingParameter("boxsize", "Box Size", default=256),
-        ProcessingParameter("downscale", "Downscale Extracted Particles", default=True),
-        ProcessingParameter(
-            "small_boxsize", "Downscaled Extracted Particle Size (pixels)", default=128
-        ),
         ProcessingParameter("gain_ref", "Gain Reference"),
-        ProcessingParameter("gain_ref_superres", "Unbinned Gain Reference"),
     ]
     metadata_params = [
         ProcessingParameter("voltage", "Voltage"),
@@ -163,7 +145,6 @@ class SPAModularContext(Context):
                 return OrderedDict({})
             data = xmltodict.parse(for_parsing)
         magnification = 0
-        num_fractions = 1
         metadata: OrderedDict = OrderedDict({})
         metadata["experiment_type"] = "SPA"
         if data.get("Acquisition"):
@@ -216,14 +197,6 @@ class SPAModularContext(Context):
                 )  # convert e / m^2 to e / A^2
             except ValueError:
                 metadata["total_exposed_dose"] = 1
-            try:
-                num_fractions = int(
-                    data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
-                        "CameraSpecificInput"
-                    ]["a:KeyValueOfstringanyType"][2]["a:Value"]["b:NumberOffractions"]
-                )
-            except (KeyError, IndexError):
-                pass
             c2_index = 3
             for i, el in enumerate(
                 data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"]
@@ -262,7 +235,7 @@ class SPAModularContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}/instruments/{environment.instrument_name}/machine"
+                f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
             )
             if server_config_response is None:
                 return None
@@ -292,85 +265,13 @@ class SPAModularContext(Context):
         metadata["image_size_x"] = str(int(metadata["image_size_x"]) * binning_factor)
         metadata["image_size_y"] = str(int(metadata["image_size_y"]) * binning_factor)
         metadata["motion_corr_binning"] = 1 if binning_factor_xml == 2 else 2
-        if environment:
-            metadata["gain_ref"] = (
-                environment.data_collection_parameters.get("gain_ref")
-                if environment
-                and environment.data_collection_parameters.get("gain_ref")
-                not in (None, "None")
-                else f"data/{datetime.now().year}/{environment.visit}/processing/gain.mrc"
-            )
-            metadata["gain_ref_superres"] = (
-                environment.data_collection_parameters.get("gain_ref_superres")
-                if environment
-                and environment.data_collection_parameters.get("gain_ref_superres")
-                not in (None, "None")
-                else f"data/{datetime.now().year}/{environment.visit}/processing/gain_superres.mrc"
-            )
-        else:
-            metadata["gain_ref"] = None
-            metadata["gain_ref_superres"] = None
-        if metadata.get("total_exposed_dose"):
-            metadata["dose_per_frame"] = (
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                and environment.data_collection_parameters.get("dose_per_frame")
-                not in (None, "None")
-                else round(metadata["total_exposed_dose"] / num_fractions, 3)
-            )
-        else:
-            metadata["dose_per_frame"] = (
-                environment.data_collection_parameters.get("dose_per_frame")
-                if environment
-                else None
-            )
-
-        metadata["use_cryolo"] = (
-            environment.data_collection_parameters.get("use_cryolo")
-            if environment
-            else None
-        ) or True
-        metadata["symmetry"] = (
-            environment.data_collection_parameters.get("symmetry")
-            if environment
-            else None
-        ) or "C1"
-        metadata["mask_diameter"] = (
-            environment.data_collection_parameters.get("mask_diameter")
-            if environment
-            else None
-        ) or 190
-        metadata["boxsize"] = (
-            environment.data_collection_parameters.get("boxsize")
-            if environment
-            else None
-        ) or 256
-        metadata["downscale"] = (
-            environment.data_collection_parameters.get("downscale")
-            if environment
-            else None
-        ) or True
-        metadata["small_boxsize"] = (
-            environment.data_collection_parameters.get("small_boxsize")
-            if environment
-            else None
-        ) or 128
+        metadata["gain_ref"] = environment.gain_ref if environment else None
+        metadata["dose_per_frame"] = environment.dose_per_frame if environment else None
+        metadata["symmetry"] = (environment.symmetry if environment else None) or "C1"
         metadata["eer_fractionation"] = (
-            environment.data_collection_parameters.get("eer_fractionation")
-            if environment
-            else None
+            environment.eer_fractionation if environment else None
         ) or 20
         metadata["source"] = str(self._basepath)
-        metadata["particle_diameter"] = (
-            environment.data_collection_parameters.get("particle_diameter")
-            if environment
-            else None
-        ) or 0
-        metadata["estimate_particle_diameter"] = (
-            environment.data_collection_parameters.get("estimate_particle_diameter")
-            if environment
-            else None
-        ) or True
         return metadata
 
     def _position_analysis(
@@ -404,7 +305,7 @@ class SPAModularContext(Context):
             ] = (None, None, None, None, None, None, None)
             data_collection_group = (
                 requests.get(
-                    f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/data_collection_groups"
+                    f"{environment.url.geturl()}{url_path_for('session_info.router', 'get_dc_groups', session_id=environment.murfey_session)}"
                 )
                 .json()
                 .get(str(source), {})
@@ -426,17 +327,20 @@ class SPAModularContext(Context):
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
-            gs_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}"
+            gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
             gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
             )
+            metadata_source_as_str = (
+                "/".join(source.parts[:-2])
+                + f"/{environment.visit}/"
+                + source.parts[-2]
+            )
             metadata_source = Path(
-                (
-                    "/".join(source.parts[:-2])
-                    + f"/{environment.visit}/"
-                    + source.parts[-2]
-                )[1:]
+                metadata_source_as_str[1:]
+                if metadata_source_as_str.startswith("//")
+                else metadata_source_as_str
             )
             image_path = (
                 _file_transferred_to(environment, metadata_source, Path(gs.image))
@@ -464,19 +368,22 @@ class SPAModularContext(Context):
             )
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
-            fh_url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/grid_square/{grid_square}/foil_hole"
+            fh_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
             if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,
                     foil_hole,
                     grid_square,
                 )
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{environment.visit}/"
+                    + source.parts[-2]
+                )
                 metadata_source = Path(
-                    (
-                        "/".join(source.parts[:-2])
-                        + f"/{environment.visit}/"
-                        + source.parts[-2]
-                    )[1:]
+                    metadata_source_as_str[1:]
+                    if metadata_source_as_str.startswith("//")
+                    else metadata_source_as_str
                 )
                 image_path = (
                     _file_transferred_to(environment, metadata_source, Path(fh.image))
@@ -560,7 +467,7 @@ class SPAModularContext(Context):
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
-                                f"{str(environment.url.geturl())}/num_movies",
+                                f"{environment.url.geturl()}{url_path_for('session_control.router', 'count_number_of_movies')}",
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(
@@ -574,13 +481,13 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/eer_fractionation_file",
+                                f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                                 json={
                                     "eer_path": str(file_transferred_to),
-                                    "fractionation": environment.data_collection_parameters[
+                                    "fractionation": self.data_collection_parameters[
                                         "eer_fractionation"
                                     ],
-                                    "dose_per_frame": environment.data_collection_parameters[
+                                    "dose_per_frame": self.data_collection_parameters[
                                         "dose_per_frame"
                                     ],
                                     "fractionation_file_name": "eer_fractionation_spa.txt",
@@ -603,7 +510,7 @@ class SPAModularContext(Context):
                             )
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}/visits/{environment.visit}/{environment.murfey_session}/spa_preprocess"
+                        preproc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.spa_router', 'request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
@@ -612,20 +519,16 @@ class SPAModularContext(Context):
                             "image_number": environment.movies[
                                 file_transferred_to
                             ].movie_number,
-                            "pixel_size": environment.data_collection_parameters.get(
+                            "pixel_size": self.data_collection_parameters.get(
                                 "pixel_size_on_image"
                             ),
                             "autoproc_program_id": None,
-                            "dose_per_frame": environment.data_collection_parameters.get(
-                                "dose_per_frame"
-                            ),
-                            "mc_binning": environment.data_collection_parameters.get(
+                            "dose_per_frame": environment.dose_per_frame,
+                            "mc_binning": self.data_collection_parameters.get(
                                 "motion_corr_binning", 1
                             ),
-                            "gain_ref": environment.data_collection_parameters.get(
-                                "gain_ref"
-                            ),
-                            "extract_downscale": environment.data_collection_parameters.get(
+                            "gain_ref": environment.gain_ref,
+                            "extract_downscale": self.data_collection_parameters.get(
                                 "downscale", True
                             ),
                             "eer_fractionation_file": eer_fractionation_file,

@@ -12,6 +12,7 @@ from typing import Optional
 import websocket
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
+from murfey.util.api import url_path_for
 
 log = logging.getLogger("murfey.client.websocket")
 
@@ -22,19 +23,33 @@ class WSApp:
     def __init__(
         self, *, server: str, id: int | str | None = None, register_client: bool = True
     ):
-        self.id = uuid.uuid4() if id is None else id
+        self.id = str(uuid.uuid4()) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
         websocket.enableTrace(True)
-        url = urllib.parse.urlparse(server)._replace(scheme="ws", path="")
+
+        # Parse server URL and get proxy path used, if any
+        url = urllib.parse.urlparse(server)._replace(
+            scheme="wss" if server.startswith("https") else "ws"
+        )
+        proxy_path = url.path.rstrip("/")
+
         self._address = url.geturl()
         self._alive = True
         self._ready = False
         self._send_queue: queue.Queue[Optional[str]] = queue.Queue()
         self._receive_queue: queue.Queue[Optional[str]] = queue.Queue()
+
+        # Construct the websocket URL
+        # Prepend the proxy path to the new URL path
+        # It will evaluate to "" if nothing's there, and starts with "/" if present
         ws_url = (
-            url._replace(path=f"/ws/test/{self.id}").geturl()
+            url._replace(
+                path=f"{proxy_path}{url_path_for('websocket.ws', 'websocket_endpoint', client_id=self.id)}"
+            ).geturl()
             if register_client
-            else url._replace(path=f"/ws/connect/{self.id}").geturl()
+            else url._replace(
+                path=f"{proxy_path}{url_path_for('websocket.ws', 'websocket_connection_endpoint', client_id=self.id)}"
+            ).geturl()
         )
         self._ws = websocket.WebSocketApp(
             ws_url,
@@ -77,7 +92,7 @@ class WSApp:
         backoff = 0
         while True:
             attempt_start = time.perf_counter()
-            connection_failure = self._ws.run_forever()
+            connection_failure = self._ws.run_forever(ping_interval=30, ping_timeout=10)
             if not connection_failure:
                 break
             if (time.perf_counter() - attempt_start) < 5:
@@ -98,7 +113,10 @@ class WSApp:
                 continue
             while not self._ready:
                 time.sleep(0.3)
-            self._ws.send(element)
+            try:
+                self._ws.send(element)
+            except Exception:
+                log.error("Error sending message through websocket", exc_info=True)
             self._send_queue.task_done()
         log.debug("Websocket send-queue-feeder thread stopped")
 
@@ -125,7 +143,10 @@ class WSApp:
             self._send_queue.put(None)
             self._feeder_thread.join()
             self._receiver_thread.join()
-        self._ws.close()
+        try:
+            self._ws.close()
+        except Exception:
+            log.error("Error closing websocket connection", exc_info=True)
 
     def on_message(self, ws: websocket.WebSocketApp, message: str):
         self._receive_queue.put(message)

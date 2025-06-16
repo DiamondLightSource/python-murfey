@@ -1,0 +1,1174 @@
+murfey.instrument_server.api.router:
+  - path: /health
+    function: health
+    path_params: []
+    methods:
+      - GET
+  - path: /token
+    function: token_handshake
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/token
+    function: token_handshake_for_session
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /sessions/{session_id}/check_token
+    function: check_token
+    path_params: []
+    methods:
+      - GET
+  - path: /sessions/{session_id}/multigrid_watcher
+    function: setup_multigrid_watcher
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/start_multigrid_watcher
+    function: start_multigrid_watcher
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/multigrid_watcher/{label}
+    function: stop_multigrid_watcher
+    path_params:
+      - name: label
+        type: str
+    methods:
+      - DELETE
+  - path: /sessions/{session_id}/multigrid_controller/visit_end_time
+    function: update_multigrid_controller_visit_end_time
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/stop_rsyncer
+    function: stop_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/remove_rsyncer
+    function: remove_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/abandon_controller
+    function: abandon_controller
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/finalise_rsyncer
+    function: finalise_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/finalise_session
+    function: finalise_session
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/restart_rsyncer
+    function: restart_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/flush_skipped_rsyncer
+    function: flush_skipped_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /sessions/{session_id}/rsyncer_info
+    function: get_rsyncer_info
+    path_params: []
+    methods:
+      - GET
+  - path: /sessions/{session_id}/analyser_info
+    function: get_analyser_info
+    path_params: []
+    methods:
+      - GET
+  - path: /sessions/{session_id}/processing_parameters
+    function: register_processing_parameters
+    path_params: []
+    methods:
+      - POST
+  - path: /instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
+    function: get_possible_gain_references
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /instruments/{instrument_name}/sessions/{session_id}/upload_gain_reference
+    function: upload_gain_reference
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - POST
+  - path: /visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
+    function: gather_upstream_tiffs
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+murfey.server.api.auth.router:
+  - path: /auth/token
+    function: generate_token
+    path_params: []
+    methods:
+      - POST
+  - path: /auth/sessions/{session_id}/token
+    function: mint_session_token
+    path_params: []
+    methods:
+      - GET
+  - path: /auth/validate_token
+    function: simple_token_validation
+    path_params: []
+    methods:
+      - GET
+murfey.server.api.bootstrap.bootstrap:
+  - path: /bootstrap/
+    function: get_bootstrap_instructions
+    path_params: []
+    methods:
+      - GET
+  - path: /bootstrap/pip.whl
+    function: get_pip_wheel
+    path_params: []
+    methods:
+      - GET
+  - path: /bootstrap/murfey.whl
+    function: get_murfey_wheel
+    path_params: []
+    methods:
+      - GET
+murfey.server.api.bootstrap.cygwin:
+  - path: /cygwin/setup-x86_64.exe
+    function: get_cygwin_setup
+    path_params: []
+    methods:
+      - GET
+  - path: /cygwin/{request_path:path}
+    function: parse_cygwin_request
+    path_params:
+      - name: request_path
+        type: str
+    methods:
+      - GET
+murfey.server.api.bootstrap.msys2:
+  - path: /msys2/config/pacman.d.zip
+    function: get_pacman_mirrors
+    path_params: []
+    methods:
+      - GET
+  - path: /msys2/repo/distrib/{setup_file}
+    function: get_msys2_setup
+    path_params:
+      - name: setup_file
+        type: str
+    methods:
+      - GET
+  - path: /msys2/repo/
+    function: get_msys2_main_index
+    path_params: []
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/
+    function: get_msys2_environment_index
+    path_params:
+      - name: system
+        type: str
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/{environment}/
+    function: get_msys2_package_index
+    path_params:
+      - name: system
+        type: str
+      - name: environment
+        type: str
+    methods:
+      - GET
+  - path: /msys2/repo/{system}/{environment}/{package}
+    function: get_msys2_package_file
+    path_params:
+      - name: system
+        type: str
+      - name: environment
+        type: str
+      - name: package
+        type: str
+    methods:
+      - GET
+murfey.server.api.bootstrap.plugins:
+  - path: /plugins/instruments/{instrument_name}/{package}
+    function: get_plugin_wheel
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: package
+        type: str
+    methods:
+      - GET
+murfey.server.api.bootstrap.pypi:
+  - path: /pypi/
+    function: get_pypi_index
+    path_params: []
+    methods:
+      - GET
+  - path: /pypi/{package}/
+    function: get_pypi_package_downloads_list
+    path_params:
+      - name: package
+        type: str
+    methods:
+      - GET
+  - path: /pypi/{package}/{filename}
+    function: get_pypi_file
+    path_params:
+      - name: package
+        type: str
+      - name: filename
+        type: str
+    methods:
+      - GET
+murfey.server.api.bootstrap.rust:
+  - path: /rust/cargo/config.toml
+    function: get_cargo_config
+    path_params: []
+    methods:
+      - GET
+  - path: /rust/index/
+    function: get_index_page
+    path_params: []
+    methods:
+      - GET
+  - path: /rust/index/config.json
+    function: get_index_config
+    path_params: []
+    methods:
+      - GET
+  - path: /rust/index/{c1}/{c2}/{package}
+    function: get_index_package_metadata
+    path_params:
+      - name: c1
+        type: str
+      - name: c2
+        type: str
+      - name: package
+        type: str
+    methods:
+      - GET
+  - path: /rust/index/{n}/{package}
+    function: get_index_package_metadata_for_short_package_names
+    path_params:
+      - name: n
+        type: str
+      - name: package
+        type: str
+    methods:
+      - GET
+  - path: /rust/crates/{package}/{version}/download
+    function: get_rust_package_download
+    path_params:
+      - name: package
+        type: str
+      - name: version
+        type: str
+    methods:
+      - GET
+  - path: /rust/api/v1/crates
+    function: get_rust_api_package_index
+    path_params: []
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}
+    function: get_rust_api_package_info
+    path_params:
+      - name: package
+        type: str
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}/versions
+    function: get_rust_api_package_versions
+    path_params:
+      - name: package
+        type: str
+    methods:
+      - GET
+  - path: /rust/api/v1/crates/{package}/{version}/download
+    function: get_rust_api_package_download
+    path_params:
+      - name: package
+        type: str
+      - name: version
+        type: str
+    methods:
+      - GET
+  - path: /rust/crates/{package}/{crate}
+    function: get_rust_package_crate
+    path_params:
+      - name: package
+        type: str
+      - name: crate
+        type: str
+    methods:
+      - GET
+murfey.server.api.bootstrap.version:
+  - path: /version/
+    function: get_version
+    path_params: []
+    methods:
+      - GET
+murfey.server.api.clem.router:
+  - path: /workflow/clem/sessions/{session_id}/clem/lif_files
+    function: register_lif_file
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/tiff_files
+    function: register_tiff_file
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/metadata_files
+    function: register_clem_metadata
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/image_series
+    function: register_image_series
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/image_stacks
+    function: register_image_stack
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_lifs
+    function: process_raw_lifs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/preprocessing/process_raw_tiffs
+    function: process_raw_tiffs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/clem/processing/align_and_merge_stacks
+    function: align_and_merge_stacks
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.display.router:
+  - path: /display/instruments/{instrument_name}/instrument_name
+    function: get_instrument_display_name
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /display/instruments/{instrument_name}/image/
+    function: get_mic_image
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /display/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{grid_square_name}/image
+    function: get_grid_square_img
+    path_params:
+      - name: session_id
+        type: int
+      - name: dcgid
+        type: int
+      - name: grid_square_name
+        type: int
+    methods:
+      - GET
+  - path: /display/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{grid_square_name}/foil_holes/{foil_hole_name}/image
+    function: get_foil_hole_img
+    path_params:
+      - name: session_id
+        type: int
+      - name: dcgid
+        type: int
+      - name: grid_square_name
+        type: int
+      - name: foil_hole_name
+        type: int
+    methods:
+      - GET
+murfey.server.api.file_io_frontend.router:
+  - path: /file_io/frontend/sessions/{session_id}/process_gain
+    function: process_gain
+    path_params: []
+    methods:
+      - POST
+murfey.server.api.file_io_instrument.router:
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/suggested_path
+    function: suggest_path
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /file_io/instrument/sessions/{session_id}/make_rsyncer_destination
+    function: make_rsyncer_destination
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /file_io/instrument/sessions/{session_id}/process_gain
+    function: process_gain
+    path_params: []
+    methods:
+      - POST
+  - path: /file_io/instrument/visits/{visit_name}/{session_id}/eer_fractionation_file
+    function: write_eer_fractionation_file
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.hub.router:
+  - path: /instruments
+    function: get_instrument_info
+    path_params: []
+    methods:
+      - GET
+  - path: /instrument/{instrument_name}/image
+    function: get_instrument_image
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+murfey.server.api.instrument.router:
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server
+    function: activate_instrument_server_for_session
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/active
+    function: check_if_session_is_active
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /instrument_server/sessions/{session_id}/multigrid_watcher
+    function: setup_multigrid_watcher
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/start_multigrid_watcher
+    function: start_multigrid_watcher
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/provided_processing_parameters
+    function: pass_proc_params_to_instrument_server
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/instrument_server
+    function: check_instrument_server
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
+    function: get_possible_gain_references
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /instrument_server/sessions/{session_id}/upload_gain_reference
+    function: request_gain_reference_upload
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/visits/{visit_name}/{session_id}/upstream_tiff_data_request
+    function: request_upstream_tiff_data_download
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/stop_rsyncer
+    function: stop_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/finalise_rsyncer
+    function: finalise_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/finalise_session
+    function: finalise_session
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/multigrid_controller/visit_end_time
+    function: update_visit_end_time
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/abandon_session
+    function: abandon_session
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/remove_rsyncer
+    function: remove_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/restart_rsyncer
+    function: restart_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/sessions/{session_id}/flush_skipped_rsyncer
+    function: flush_skipped_rsyncer
+    path_params: []
+    methods:
+      - POST
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/rsyncer_info
+    function: get_rsyncer_info
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+murfey.server.api.mag_table.router:
+  - path: /mag_table/mag_table/
+    function: get_mag_table
+    path_params: []
+    methods:
+      - GET
+  - path: /mag_table/mag_table/
+    function: add_to_mag_table
+    path_params: []
+    methods:
+      - POST
+  - path: /mag_table/mag_table/{mag}
+    function: remove_mag_table_row
+    path_params:
+      - name: mag
+        type: int
+    methods:
+      - DELETE
+murfey.server.api.processing_parameters.router:
+  - path: /session_parameters/sessions/{session_id}/session_processing_parameters
+    function: get_session_processing_parameters
+    path_params: []
+    methods:
+      - GET
+  - path: /session_parameters/sessions/{session_id}/session_processing_parameters
+    function: set_session_processing_parameters
+    path_params: []
+    methods:
+      - POST
+murfey.server.api.prometheus.router:
+  - path: /prometheus/visits/{visit_name}/increment_rsync_file_count
+    function: increment_rsync_file_count
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files
+    function: increment_rsync_transferred_files
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files_prometheus
+    function: increment_rsync_transferred_files_prometheus
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /prometheus/visits/{visit_name}/monitoring/{on}
+    function: change_monitoring_status
+    path_params:
+      - name: visit_name
+        type: str
+      - name: "on"
+        type: int
+    methods:
+      - POST
+  - path: /prometheus/metrics/{metric_name}
+    function: inspect_prometheus_metrics
+    path_params:
+      - name: metric_name
+        type: str
+    methods:
+      - GET
+murfey.server.api.session_control.correlative_router:
+  - path: /session_control/correlative/sessions/{session_id}/upstream_visits
+    function: find_upstream_visits
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+    function: gather_upstream_tiffs
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+    function: get_tiff
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+      - name: tiff_path
+        type: str
+    methods:
+      - GET
+murfey.server.api.session_control.router:
+  - path: /session_control/time
+    function: get_current_timestamp
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/machine
+    function: machine_info_by_instrument
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_control/new_client_id/
+    function: new_client_id
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/visits_raw
+    function: get_current_visits
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/clients/{client_id}/session
+    function: link_client_to_session
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: client_id
+        type: int
+    methods:
+      - POST
+  - path: /session_control/visits/{visit_name}
+    function: register_client_to_visit
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /session_control/sessions
+    function: get_sessions
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/sessions/{session_id}
+    function: remove_session
+    path_params: []
+    methods:
+      - DELETE
+  - path: /session_control/sessions/{session_id}/successful_processing
+    function: register_processing_success_in_ispyb
+    path_params: []
+    methods:
+      - POST
+  - path: /session_control/num_movies
+    function: count_number_of_movies
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/instruments/{instrument_name}/failed_client_post
+    function: failed_client_post
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer
+    function: register_rsyncer
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncers
+    function: get_rsyncers_for_session
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/sessions/{session_id}/rsyncer_stopped
+    function: register_stopped_rsyncer
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer_started
+    function: register_restarted_rsyncer
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /session_control/sessions/{session_id}/rsyncer
+    function: delete_rsyncer
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - DELETE
+murfey.server.api.session_control.spa_router:
+  - path: /session_control/spa/sessions/{session_id}/grid_squares
+    function: get_grid_squares
+    path_params: []
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares
+    function: get_grid_squares_from_dcg
+    path_params:
+      - name: dcgid
+        type: int
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes
+    function: get_foil_holes_from_grid_square
+    path_params:
+      - name: dcgid
+        type: int
+      - name: gsid
+        type: int
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/foil_hole/{fh_name}
+    function: get_foil_hole
+    path_params:
+      - name: fh_name
+        type: int
+    methods:
+      - GET
+  - path: /session_control/spa/sessions/{session_id}/grid_square/{gsid}
+    function: register_grid_square
+    path_params:
+      - name: gsid
+        type: int
+    methods:
+      - POST
+  - path: /session_control/spa/sessions/{session_id}/grid_square/{gs_name}/foil_hole
+    function: register_foil_hole
+    path_params:
+      - name: gs_name
+        type: int
+    methods:
+      - POST
+murfey.server.api.session_info.correlative_router:
+  - path: /session_info/correlative/sessions/{session_id}/upstream_visits
+    function: find_upstream_visits
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+    function: gather_upstream_tiffs
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+    function: get_tiff
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+      - name: tiff_path
+        type: str
+    methods:
+      - GET
+murfey.server.api.session_info.router:
+  - path: /session_info/health/
+    function: health_check
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/connections/
+    function: connections_check
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/machine
+    function: machine_info_by_instrument
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits_raw
+    function: get_current_visits
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits/
+    function: all_visit_info
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/rsyncers
+    function: get_rsyncers_for_client
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/session/{session_id}
+    function: get_session
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/sessions
+    function: get_sessions
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/visits/{visit}/session/{name}
+    function: create_session
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: visit
+        type: str
+      - name: name
+        type: str
+    methods:
+      - POST
+  - path: /session_info/sessions/{session_id}
+    function: update_session
+    path_params: []
+    methods:
+      - POST
+  - path: /session_info/sessions/{session_id}
+    function: remove_session
+    path_params: []
+    methods:
+      - DELETE
+  - path: /session_info/instruments/{instrument_name}/visits/{visit_name}/sessions
+    function: get_sessions_with_visit
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: visit_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/sessions
+    function: get_sessions_by_instrument_name
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/data_collection_groups
+    function: get_dc_groups
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections
+    function: get_data_collections
+    path_params:
+      - name: dcgid
+        type: int
+    methods:
+      - GET
+  - path: /session_info/clients
+    function: get_clients
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/current_gain_ref
+    function: update_current_gain_ref
+    path_params: []
+    methods:
+      - PUT
+murfey.server.api.session_info.spa_router:
+  - path: /session_info/spa/sessions/{session_id}/spa_processing_parameters
+    function: get_spa_proc_param_details
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies
+    function: get_number_of_movies_from_foil_hole
+    path_params:
+      - name: session_id
+        type: int
+      - name: dcgid
+        type: int
+      - name: gsid
+        type: int
+      - name: fhid
+        type: int
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/grid_squares
+    function: get_grid_squares
+    path_params: []
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares
+    function: get_grid_squares_from_dcg
+    path_params:
+      - name: dcgid
+        type: int
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes
+    function: get_foil_holes_from_grid_square
+    path_params:
+      - name: dcgid
+        type: int
+      - name: gsid
+        type: int
+    methods:
+      - GET
+  - path: /session_info/spa/sessions/{session_id}/foil_hole/{fh_name}
+    function: get_foil_hole
+    path_params:
+      - name: fh_name
+        type: int
+    methods:
+      - GET
+murfey.server.api.session_info.tomo_router:
+  - path: /session_info/tomo/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts
+    function: get_tilts
+    path_params:
+      - name: tilt_series_tag
+        type: str
+    methods:
+      - GET
+murfey.server.api.websocket.ws:
+  - path: /ws/test/{client_id}
+    function: websocket_endpoint
+    path_params:
+      - name: client_id
+        type: int
+    methods: []
+  - path: /ws/connect/{client_id}
+    function: websocket_connection_endpoint
+    path_params:
+      - name: client_id
+        type: typing.Union[int, str]
+    methods: []
+  - path: /ws/test/{client_id}
+    function: close_ws_connection
+    path_params:
+      - name: client_id
+        type: int
+    methods:
+      - DELETE
+  - path: /ws/connect/{client_id}
+    function: close_unrecorded_ws_connection
+    path_params:
+      - name: client_id
+        type: typing.Union[int, str]
+    methods:
+      - DELETE
+murfey.server.api.workflow.correlative_router:
+  - path: /workflow/correlative/visit/{visit_name}/samples
+    function: get_samples
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - GET
+  - path: /workflow/correlative/visit/{visit_name}/sample_group
+    function: register_sample_group
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/sample
+    function: register_sample
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/subsample
+    function: register_subsample
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/correlative/visit/{visit_name}/sample_image
+    function: register_sample_image
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/correlative/visits/{year}/{visit_name}/{session_id}/make_milling_gif
+    function: make_gif
+    path_params:
+      - name: year
+        type: int
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.workflow.router:
+  - path: /workflow/visits/{visit_name}/{session_id}/register_data_collection_group
+    function: register_dc_group
+    path_params:
+      - name: visit_name
+        type: typing.Any
+    methods:
+      - POST
+  - path: /workflow/visits/{visit_name}/{session_id}/start_data_collection
+    function: start_dc
+    path_params:
+      - name: visit_name
+        type: typing.Any
+    methods:
+      - POST
+  - path: /workflow/visits/{visit_name}/{session_id}/register_processing_job
+    function: register_proc
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+murfey.server.api.workflow.spa_router:
+  - path: /workflow/spa/sessions/{session_id}/spa_processing_parameters
+    function: register_spa_proc_params
+    path_params: []
+    methods:
+      - POST
+  - path: /workflow/spa/visits/{visit_name}/{session_id}/flush_spa_processing
+    function: flush_spa_processing
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/spa/visits/{visit_name}/{session_id}/spa_preprocess
+    function: request_spa_preprocessing
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+murfey.server.api.workflow.tomo_router:
+  - path: /workflow/tomo/sessions/{session_id}/tomography_processing_parameters
+    function: register_tomo_proc_params
+    path_params: []
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/flush_tomography_processing
+    function: flush_tomography_processing
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/tilt_series
+    function: register_tilt_series
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/tomo/sessions/{session_id}/tilt_series_length
+    function: register_tilt_series_length
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tomography_preprocess
+    function: request_tomography_preprocessing
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/completed_tilt_series
+    function: register_completed_tilt_series
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/rerun_tilt_series
+    function: register_tilt_series_for_rerun
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST
+  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tilt
+    function: register_tilt
+    path_params:
+      - name: visit_name
+        type: str
+    methods:
+      - POST

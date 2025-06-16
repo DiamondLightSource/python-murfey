@@ -3,6 +3,7 @@ Contains classes that are used to store information on the metadata and status o
 of the sessions that Murfey is overseeing, along with the relationships between them.
 """
 
+from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy
@@ -48,6 +49,8 @@ class Session(SQLModel, table=True):  # type: ignore
     started: bool = Field(default=False)
     current_gain_ref: str = Field(default="")
     instrument_name: str = Field(default="")
+    process: bool = Field(default=True)
+    visit_end_time: Optional[datetime] = Field(default=None)
 
     # CLEM Workflow
 
@@ -94,6 +97,9 @@ class Session(SQLModel, table=True):  # type: ignore
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
     rsync_instances: List[RsyncInstance] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    session_processing_parameters: List["SessionProcessingParameters"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -326,6 +332,18 @@ TEM SESSION AND PROCESSING WORKFLOW
 """
 
 
+class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    gain_ref: str
+    dose_per_frame: float
+    eer_fractionation: int = 20
+    eer_fractionation_file: str = ""
+    symmetry: str = "C1"
+    session: Optional[Session] = Relationship(
+        back_populates="session_processing_parameters"
+    )
+
+
 class TiltSeries(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     tag: str
@@ -360,11 +378,42 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    tomography_preprocessing_parameters: List["TomographyPreprocessingParameters"] = (
+    notification_parameters: List["NotificationParameter"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
         Relationship(
             back_populates="data_collection_group",
             sa_relationship_kwargs={"cascade": "delete"},
         )
+    )
+
+
+class NotificationParameter(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    name: str
+    min_value: float
+    max_value: float
+    num_instances_since_triggered: int = 0
+    notification_active: bool = False
+    data_collection_group: Optional[DataCollectionGroup] = Relationship(
+        back_populates="notification_parameters"
+    )
+    notification_values: List["NotificationValue"] = Relationship(
+        back_populates="notification_parameter",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class NotificationValue(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(default=None, primary_key=True)
+    notification_parameter_id: int = Field(foreign_key="notificationparameter.id")
+    index: int
+    within_bounds: bool
+    notification_parameter: Optional[NotificationParameter] = Relationship(
+        back_populates="notification_values"
     )
 
 
@@ -402,12 +451,6 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     )
     spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
-        Relationship(
-            back_populates="processing_job",
-            sa_relationship_kwargs={"cascade": "delete"},
-        )
     )
     ctf_parameters: List["CtfParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
@@ -454,24 +497,17 @@ class SelectionStash(SQLModel, table=True):  # type: ignore
     )
 
 
-class TomographyPreprocessingParameters(SQLModel, table=True):  # type: ignore
+class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
     pixel_size: float
     dose_per_frame: float
     frame_count: int
+    tilt_axis: float
     voltage: int
     eer_fractionation_file: Optional[str] = None
     motion_corr_binning: int = 1
     gain_ref: Optional[str] = None
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
-        back_populates="tomography_preprocessing_parameters"
-    )
-
-
-class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
-    manual_tilt_offset: int
-    processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="tomography_processing_parameters"
     )
 
@@ -609,10 +645,10 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     gain_ref: Optional[str]
     voltage: int
     motion_corr_binning: int
-    eer_grouping: int
+    eer_fractionation_file: str = ""
     symmetry: str
     particle_diameter: Optional[float]
-    downscale: bool
+    downscale: bool = True
     do_icebreaker_jobs: bool = True
     boxsize: Optional[int] = 256
     small_boxsize: Optional[int] = 64

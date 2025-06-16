@@ -4,7 +4,6 @@ the CLEM workflow should be processed.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
 from urllib.parse import quote
@@ -14,7 +13,8 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util import capture_post, get_machine_config_client
+from murfey.util.api import url_path_for
+from murfey.util.client import capture_post, get_machine_config_client
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
@@ -31,13 +31,16 @@ def _file_transferred_to(
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
-    # rsync basepath and modules are set in the microscope's configuration YAML file
-    return (
-        Path(machine_config.get("rsync_basepath", ""))
-        / str(datetime.now().year)
-        / source.name
-        / file_path.relative_to(source)
+
+    # Construct destination path
+    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
+        environment.default_destinations[source]
     )
+    # Add visit number to the path if it's not present in default destination
+    if environment.visit not in environment.default_destinations[source]:
+        base_destination = base_destination / environment.visit
+    destination = base_destination / file_path.relative_to(source)
+    return destination
 
 
 def _get_source(
@@ -291,7 +294,7 @@ class CLEMContext(Context):
                 post_result = self.process_tiff_series(tiff_dataset, environment)
                 if post_result is False:
                     return False
-
+                logger.info(f"Started preprocessing of TIFF series {series_name!r}")
             else:
                 logger.debug(f"TIFF series {series_name!r} is still being processed")
 
@@ -351,7 +354,7 @@ class CLEMContext(Context):
         """
         try:
             # Construct URL to post to post the request to
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/lif_files?lif_file={quote(str(lif_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_lif_file', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
             # Validate
             if not url:
                 logger.error(
@@ -381,7 +384,7 @@ class CLEMContext(Context):
 
         try:
             # Construct the URL to post the request to
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_lifs?lif_file={quote(str(lif_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_lifs', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
             # Validate
             if not url:
                 logger.error(
@@ -408,7 +411,7 @@ class CLEMContext(Context):
         """
 
         try:
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/tiff_files?tiff_file={quote(str(tiff_file), safe='')}"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_tiff_file', session_id=environment.murfey_session)}?tiff_file={quote(str(tiff_file), safe='')}"
             if not url:
                 logger.error(
                     "URL could not be constructed from the environment and file path"
@@ -437,7 +440,7 @@ class CLEMContext(Context):
 
         try:
             # Construct URL for Murfey server to communicate with
-            url = f"{str(environment.url.geturl())}/sessions/{environment.murfey_session}/clem/preprocessing/process_raw_tiffs"
+            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_tiffs', session_id=environment.murfey_session)}"
             if not url:
                 logger.error(
                     "URL could not be constructed from the environment and file path"

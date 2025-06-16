@@ -13,13 +13,14 @@ import queue
 import subprocess
 import threading
 import time
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable, List, NamedTuple
+from typing import Awaitable, Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util import Observer
+from murfey.util.client import Observer
 
 logger = logging.getLogger("murfey.client.rsync")
 
@@ -63,6 +64,7 @@ class RSyncer(Observer):
         remove_files: bool = False,
         required_substrings_for_removal: List[str] = [],
         notify: bool = True,
+        end_time: datetime | None = None,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -75,6 +77,10 @@ class RSyncer(Observer):
         self._local = local
         self._server_url = server_url
         self._notify = notify
+        self._finalised = False
+        self._end_time = end_time
+
+        self._skipped_files: List[Path] = []
 
         # Set rsync destination
         if local:
@@ -103,7 +109,7 @@ class RSyncer(Observer):
         self._statusbar = status_bar
 
     def __repr__(self) -> str:
-        return f"<RSyncer {self._basepath} → {self._remote} ({self.status})"
+        return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
 
     @classmethod
     def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
@@ -181,7 +187,15 @@ class RSyncer(Observer):
             self.thread.join()
         logger.debug("RSync thread stop completed")
 
-    def finalise(self, thread: bool = True):
+    def request_stop(self):
+        self._stopping = True
+        self._halt_thread = True
+
+    def finalise(
+        self,
+        thread: bool = True,
+        callback: Callable[..., Awaitable[None] | None] | None = None,
+    ):
         self.stop()
         self._remove_files = True
         self._notify = False
@@ -196,11 +210,20 @@ class RSyncer(Observer):
             self.stop()
         else:
             self._transfer(list(self._basepath.glob("**/*")))
+        self._finalised = True
+        if callback:
+            callback()
 
     def enqueue(self, file_path: Path):
         if not self._stopping:
-            absolute_path = (self._basepath / file_path).resolve()
+            absolute_path = self._basepath / file_path
             self.queue.put(absolute_path)
+
+    def flush_skipped(self):
+        self._end_time = datetime.now()
+        for f in self._skipped_files:
+            self.queue.put(f)
+        self._skipped_files = []
 
     def _process(self):
         logger.info("RSync thread starting")
@@ -292,14 +315,23 @@ class RSyncer(Observer):
 
         return True
 
-    def _transfer(self, files: list[Path]) -> bool:
+    def _transfer(self, infiles: list[Path]) -> bool:
         """
         Transfer files via an rsync sub-process, and parses the rsync stdout to verify
         the success of the transfer.
         """
 
         # Set up initial variables
-        files = [f for f in files if f.is_file()]
+        if self._end_time:
+            files = [
+                f
+                for f in infiles
+                if f.is_file() and f.stat().st_ctime < self._end_time.timestamp()
+            ]
+            self._skipped_files.extend(set(infiles).difference(set(files)))
+        else:
+            files = [f for f in infiles if f.is_file()]
+
         previously_transferred = self._files_transferred
         transfer_success: set[Path] = set()
         successful_updates: list[RSyncerUpdate] = []

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import configparser
-
-# import json
 import logging
 import os
 import platform
@@ -12,18 +10,15 @@ import sys
 import time
 import webbrowser
 from datetime import datetime
-from functools import partial
 from pathlib import Path
+from pprint import pprint
 from queue import Queue
-from typing import List, Literal
+from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
 import requests
-
-# from multiprocessing import Process, Queue
 from rich.prompt import Confirm
 
-import murfey.client.rsync
 import murfey.client.update
 import murfey.client.watchdir
 import murfey.client.websocket
@@ -31,38 +26,24 @@ from murfey.client.customlogging import CustomHandler, DirectableRichHandler
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
-from murfey.util import _get_visit_list
-
-# from asyncio import Queue
-
-
-# from rich.prompt import Prompt
-
+from murfey.util.api import url_path_for
+from murfey.util.client import authorised_requests, read_config
+from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
 
-
-def read_config() -> configparser.ConfigParser:
-    config = configparser.ConfigParser()
-    try:
-        mcch = os.environ.get("MURFEY_CLIENT_CONFIG_HOME")
-        murfey_client_config_home = Path(mcch) if mcch else Path.home()
-        with open(murfey_client_config_home / ".murfey") as configfile:
-            config.read_file(configfile)
-    except FileNotFoundError:
-        log.warning(
-            f"Murfey client configuration file {murfey_client_config_home / '.murfey'} not found"
-        )
-    if "Murfey" not in config:
-        config["Murfey"] = {}
-    return config
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-token = read_config()["Murfey"].get("token", "")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
+def _get_visit_list(api_base: ParseResult, instrument_name: str):
+    proxy_path = api_base.path.rstrip("/")
+    get_visits_url = api_base._replace(
+        path=f"{proxy_path}{url_path_for('session_control.router', 'get_current_visits', instrument_name=instrument_name)}"
+    )
+    server_reply = requests.get(get_visits_url.geturl())
+    if server_reply.status_code != 200:
+        raise ValueError(f"Server unreachable ({server_reply.status_code})")
+    return [Visit.parse_obj(v) for v in server_reply.json()]
 
 
 def write_config(config: configparser.ConfigParser):
@@ -73,7 +54,7 @@ def write_config(config: configparser.ConfigParser):
 
 
 def main_loop(
-    source_watchers: List[murfey.client.watchdir.DirWatcher],
+    source_watchers: list[murfey.client.watchdir.DirWatcher],
     appearance_time: float,
     transfer_all: bool,
 ):
@@ -124,6 +105,7 @@ def _check_for_updates(
 
 
 def run():
+    # Load client config and server information
     config = read_config()
     instrument_name = config["Murfey"]["instrument_name"]
     try:
@@ -142,6 +124,7 @@ def run():
     else:
         known_server = config["Murfey"].get("server")
 
+    # Set up argument parser with dynamic defaults based on client config
     parser = argparse.ArgumentParser(description="Start the Murfey client")
     parser.add_argument(
         "--server",
@@ -227,23 +210,23 @@ def run():
         default=False,
         help="Do not trigger processing for any data directories currently on disk (you may have started processing for them in a previous murfey run)",
     )
-
     args = parser.parse_args()
 
+    # Logic to exit early based on parsed args
     if not args.server:
         exit("Murfey server not set. Please run with --server host:port")
     if not args.server.startswith(("http://", "https://")):
         if "://" in args.server:
             exit("Unknown server protocol. Only http:// and https:// are allowed")
         args.server = f"http://{args.server}"
-
     if args.remove_files:
         remove_prompt = Confirm.ask(
-            f"Are you sure you want to remove files from {args.source or Path('.').resolve()}?"
+            f"Are you sure you want to remove files from {args.source or Path('.').absolute()}?"
         )
         if not remove_prompt:
             exit("Exiting")
 
+    # If a new server URL is provided, save info to config file
     murfey_url = urlparse(args.server, allow_fragments=False)
     if args.server != known_server:
         # New server specified. Verify that it is real
@@ -265,8 +248,7 @@ def run():
     if args.no_transfer:
         log.info("No files will be transferred as --no-transfer flag was specified")
 
-    from pprint import pprint
-
+    # Check ISPyB (if set up) for ongoing visits
     ongoing_visits = []
     if args.visit:
         ongoing_visits = [args.visit]
@@ -283,35 +265,51 @@ def run():
 
     _enable_webbrowser_in_cygwin()
 
+    # Set up additional log handlers
     log.setLevel(logging.DEBUG)
     log_queue = Queue()
     input_queue = Queue()
 
-    # rich_handler = DirectableRichHandler(log_queue, enable_link_path=False)
+    # Rich-based console handler
     rich_handler = DirectableRichHandler(enable_link_path=False)
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-    client_id = requests.get(f"{murfey_url.geturl()}/new_client_id/").json()
+    # Set up websocket app and handler
+    client_id_response = requests.get(
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
+    )
+    if client_id_response.status_code == 401:
+        exit(
+            "This instrument is not authorised to run the TUI app; please use the "
+            "Murfey web UI instead"
+        )
+    elif client_id_response.status_code != 200:
+        exit(
+            "Unable to establish connection to Murfey server: \n"
+            f"{client_id_response.json()}"
+        )
+    client_id: dict = client_id_response.json()
     ws = murfey.client.websocket.WSApp(
         server=args.server,
         id=client_id["new_id"],
     )
+    ws_handler = CustomHandler(ws.send)
 
+    # Add additional handlers and set logging levels
     logging.getLogger().addHandler(rich_handler)
-    handler = CustomHandler(ws.send)
-    logging.getLogger().addHandler(handler)
+    logging.getLogger().addHandler(ws_handler)
     logging.getLogger("murfey").setLevel(logging.INFO)
     logging.getLogger("websocket").setLevel(logging.WARNING)
 
     log.info("Starting Websocket connection")
 
-    status_bar = StatusBar()
-
+    # Load machine data for subsequent sections
     machine_data = requests.get(
-        f"{murfey_url.geturl()}/instruments/{instrument_name}/machine"
+        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
     ).json()
     gain_ref: Path | None = None
 
+    # Set up Murfey environment instance and map it to websocket app
     instance_environment = MurfeyInstanceEnvironment(
         url=murfey_url,
         client_id=ws.id,
@@ -319,14 +317,19 @@ def run():
         software_versions=machine_data.get("software_versions", {}),
         # sources=[Path(args.source)],
         # watchers=source_watchers,
-        default_destination=args.destination
-        or f"{machine_data.get('rsync_module') or 'data'}/{datetime.now().year}",
+        default_destination=args.destination or str(datetime.now().year),
         demo=args.demo,
         processing_only_mode=server_routing_prefix_found,
+        rsync_url=(
+            urlparse(machine_data["rsync_url"]).hostname
+            if machine_data.get("rsync_url")
+            else ""
+        ),
     )
-
     ws.environment = instance_environment
 
+    # Set up and run Murfey TUI app
+    status_bar = StatusBar()
     rich_handler.redirect = True
     app = MurfeyTUI(
         environment=instance_environment,

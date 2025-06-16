@@ -20,7 +20,10 @@ class CustomHandler(logging.Handler):
         self.format(record)
         record_dict = record.__dict__
         record_dict["type"] = "log"
-        return json.dumps(record_dict)
+        try:
+            return json.dumps(record_dict)
+        except TypeError:
+            return json.dumps({str(k): str(v) for k, v in record_dict.items()})
 
     def emit(self, record):
         try:

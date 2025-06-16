@@ -1,0 +1,9 @@
+apiVersion: v1
+name: murfey-services
+description: Umbrella Helm chart for deploying the servers and daemons needed to enable Murfey to transfer and process data
+version: 0.18.1
+dependencies:
+  - name: murfey-instrument-server-clem
+  - name: murfey-instrument-server-tem
+  - name: murfey-server
+  - name: murfey-rsync

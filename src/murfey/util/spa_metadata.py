@@ -157,9 +157,20 @@ def foil_hole_data(xml_path: Path, foil_hole: int, grid_square: int) -> FoilHole
             for_parsing = xml.read()
             data = xmltodict.parse(for_parsing)
         data = data["GridSquareXml"]
-        serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
-            "a:m_serializationArray"
-        ]
+        if "TargetLocationsEfficient" in data["TargetLocations"].keys():
+            # Grids with regular foil holes
+            serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
+                "a:m_serializationArray"
+            ]
+        elif "TargetLocations" in data["TargetLocations"].keys():
+            # Lacey grids
+            serialization_array = data["TargetLocations"]["TargetLocations"][
+                "a:m_serializationArray"
+            ]
+        else:
+            logger.warning(f"Target locations not found for {str(xml_path)}")
+            return FoilHoleInfo(id=foil_hole, grid_square_id=grid_square)
+
         if len(serialization_array.keys()) == 0:
             return FoilHoleInfo(id=foil_hole, grid_square_id=grid_square)
         for key in serialization_array.keys():

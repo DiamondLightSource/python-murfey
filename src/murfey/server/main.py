@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from backports.entry_points_selectable import entry_points
 from fastapi import FastAPI
@@ -15,20 +14,19 @@ import murfey.server.api.auth
 import murfey.server.api.bootstrap
 import murfey.server.api.clem
 import murfey.server.api.display
+import murfey.server.api.file_io_frontend
+import murfey.server.api.file_io_instrument
 import murfey.server.api.hub
 import murfey.server.api.instrument
-import murfey.server.api.spa
-import murfey.server.websocket
-import murfey.util.models
+import murfey.server.api.mag_table
+import murfey.server.api.processing_parameters
+import murfey.server.api.prometheus
+import murfey.server.api.session_control
+import murfey.server.api.session_info
+import murfey.server.api.websocket
+import murfey.server.api.workflow
 from murfey.server import template_files
 from murfey.util.config import get_security_config
-
-# Import Murfey server or demo server based on settings
-if os.getenv("MURFEY_DEMO"):
-    from murfey.server.demo_api import router
-else:
-    from murfey.server.api import router
-
 
 log = logging.getLogger("murfey.server.main")
 
@@ -60,20 +58,44 @@ app.mount("/static", StaticFiles(directory=template_files / "static"), name="sta
 app.mount("/images", StaticFiles(directory=template_files / "images"), name="images")
 
 # Add router endpoints to the API
-app.include_router(router)
 app.include_router(murfey.server.api.bootstrap.version)
 app.include_router(murfey.server.api.bootstrap.bootstrap)
 app.include_router(murfey.server.api.bootstrap.cygwin)
 app.include_router(murfey.server.api.bootstrap.msys2)
+app.include_router(murfey.server.api.bootstrap.rust)
 app.include_router(murfey.server.api.bootstrap.pypi)
 app.include_router(murfey.server.api.bootstrap.plugins)
-app.include_router(murfey.server.api.clem.router)
-app.include_router(murfey.server.api.spa.router)
+
 app.include_router(murfey.server.api.auth.router)
-app.include_router(murfey.server.api.display.router)
-app.include_router(murfey.server.api.instrument.router)
+
 app.include_router(murfey.server.api.hub.router)
-app.include_router(murfey.server.websocket.ws)
+app.include_router(murfey.server.api.display.router)
+app.include_router(murfey.server.api.processing_parameters.router)
+
+app.include_router(murfey.server.api.file_io_frontend.router)
+app.include_router(murfey.server.api.file_io_instrument.router)
+
+app.include_router(murfey.server.api.instrument.router)
+
+app.include_router(murfey.server.api.mag_table.router)
+
+app.include_router(murfey.server.api.session_control.router)
+app.include_router(murfey.server.api.session_control.spa_router)
+
+app.include_router(murfey.server.api.session_info.router)
+app.include_router(murfey.server.api.session_info.correlative_router)
+app.include_router(murfey.server.api.session_info.spa_router)
+app.include_router(murfey.server.api.session_info.tomo_router)
+
+app.include_router(murfey.server.api.workflow.router)
+app.include_router(murfey.server.api.workflow.correlative_router)
+app.include_router(murfey.server.api.workflow.spa_router)
+app.include_router(murfey.server.api.workflow.tomo_router)
+app.include_router(murfey.server.api.clem.router)
+
+app.include_router(murfey.server.api.prometheus.router)
+
+app.include_router(murfey.server.api.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey
 for r in entry_points(group="murfey.routers"):

@@ -1,11 +1,16 @@
 import argparse
 import logging
+from urllib.parse import urlparse
 
 import uvicorn
 from rich.logging import RichHandler
 
 import murfey
+import murfey.client.update
+import murfey.client.websocket
+from murfey.client.customlogging import CustomHandler
 from murfey.util import LogFilter
+from murfey.util.client import read_config
 
 logger = logging.getLogger("murfey.instrument_server")
 
@@ -25,6 +30,12 @@ def run():
     )
     args = parser.parse_args()
 
+    murfey_url = urlparse(read_config()["Murfey"].get("server"), allow_fragments=False)
+    try:
+        murfey.client.update.check(murfey_url)
+    except Exception as e:
+        print(f"Murfey update check failed with {e}")
+
     LogFilter.install()
 
     rich_handler = RichHandler(enable_link_path=False)
@@ -32,6 +43,16 @@ def run():
     logging.getLogger("murfey").addHandler(rich_handler)
     logging.getLogger("fastapi").addHandler(rich_handler)
     logging.getLogger("uvicorn").addHandler(rich_handler)
+
+    ws = murfey.client.websocket.WSApp(
+        server=read_config()["Murfey"].get("server"),
+        register_client=False,
+    )
+
+    handler = CustomHandler(ws.send)
+    logging.getLogger("murfey").addHandler(handler)
+    logging.getLogger("fastapi").addHandler(handler)
+    logging.getLogger("uvicorn").addHandler(handler)
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"

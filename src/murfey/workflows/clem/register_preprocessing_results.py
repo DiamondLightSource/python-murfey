@@ -62,24 +62,21 @@ def register_lif_preprocessing_result(
     )
 
     # Validate message and try and load results
-    if isinstance(message["result"], str):
-        try:
+    try:
+        if isinstance(message["result"], str):
             json_obj: dict = json.loads(message["result"])
             result = LIFPreprocessingResult(**json_obj)
-        except Exception:
-            logger.error(traceback.format_exc())
-            logger.error("Exception encountered when parsing LIF preprocessing result")
-            return False
-    elif isinstance(message["result"], dict):
-        try:
+        elif isinstance(message["result"], dict):
             result = LIFPreprocessingResult(**message["result"])
-        except Exception:
-            logger.error(traceback.format_exc())
-            logger.error("Exception encountered when parsing LIF preprocessing result")
+        else:
+            logger.error(
+                f"Invalid type for LIF preprocessing result: {type(message['result'])}"
+            )
             return False
-    else:
+    except Exception:
         logger.error(
-            f"Invalid type for LIF preprocessing result: {type(message['result'])}"
+            "Exception encountered when parsing LIF preprocessing result: \n"
+            f"{traceback.format_exc()}"
         )
         return False
 
@@ -122,19 +119,16 @@ def register_lif_preprocessing_result(
             clem_img_stk.channel_name = result.channel
             murfey_db.add(clem_img_stk)
             murfey_db.commit()
-            murfey_db.refresh(clem_img_stk)
 
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.parent_lif = clem_lif_file
             clem_img_series.number_of_members = result.number_of_members
             murfey_db.add(clem_img_series)
             murfey_db.commit()
-            murfey_db.refresh(clem_img_series)
 
             clem_metadata.parent_lif = clem_lif_file
             murfey_db.add(clem_metadata)
             murfey_db.commit()
-            murfey_db.refresh(clem_metadata)
 
             logger.info(
                 f"LIF preprocessing results registered for {result.series_name!r} "
@@ -142,10 +136,10 @@ def register_lif_preprocessing_result(
             )
 
         except Exception:
-            logger.error(traceback.format_exc())
             logger.error(
                 "Exception encountered when registering LIF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack"
+                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                f"{traceback.format_exc()}"
             )
             return False
 
@@ -170,9 +164,9 @@ def register_lif_preprocessing_result(
                 .instrument_name
             )
         except Exception:
-            logger.error(traceback.format_exc())
             logger.error(
-                f"Error requesting data from database for {result.series_name!r} series"
+                f"Error requesting data from database for {result.series_name!r} series: \n"
+                f"{traceback.format_exc()}"
             )
             return False
 
@@ -245,24 +239,21 @@ def register_tiff_preprocessing_result(
         if not isinstance(message["session_id"], int)
         else message["session_id"]
     )
-    if isinstance(message["result"], str):
-        try:
+    try:
+        if isinstance(message["result"], str):
             json_obj: dict = json.loads(message["result"])
             result = TIFFPreprocessingResult(**json_obj)
-        except Exception:
-            logger.error(traceback.format_exc())
-            logger.error("Exception encountered when parsing TIFF preprocessing result")
-            return False
-    elif isinstance(message["result"], dict):
-        try:
+        elif isinstance(message["result"], dict):
             result = TIFFPreprocessingResult(**message["result"])
-        except Exception:
-            logger.error(traceback.format_exc())
-            logger.error("Exception encountered when parsing TIFF preprocessing result")
+        else:
+            logger.error(
+                f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
+            )
             return False
-    else:
+    except Exception:
         logger.error(
-            f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
+            "Exception encountered when parsing TIFF preprocessing result: \n"
+            f"{traceback.format_exc()}"
         )
         return False
 
@@ -303,20 +294,17 @@ def register_tiff_preprocessing_result(
                 clem_tiff_file.child_stack = clem_img_stk
                 murfey_db.add(clem_tiff_file)
                 murfey_db.commit()
-                murfey_db.refresh(clem_tiff_file)
 
             clem_img_stk.associated_metadata = clem_metadata
             clem_img_stk.parent_series = clem_img_series
             clem_img_stk.channel_name = result.channel
             murfey_db.add(clem_img_stk)
             murfey_db.commit()
-            murfey_db.refresh(clem_img_stk)
 
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.number_of_members = result.number_of_members
             murfey_db.add(clem_img_series)
             murfey_db.commit()
-            murfey_db.refresh(clem_img_series)
 
             logger.info(
                 f"TIFF preprocessing results registered for {result.series_name!r} "
@@ -324,10 +312,10 @@ def register_tiff_preprocessing_result(
             )
 
         except Exception:
-            logger.error(traceback.format_exc())
             logger.error(
                 "Exception encountered when registering TIFF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack"
+                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                f"{traceback.format_exc()}"
             )
             return False
 
@@ -352,9 +340,9 @@ def register_tiff_preprocessing_result(
                 .instrument_name
             )
         except Exception:
-            logger.error(traceback.format_exc())
             logger.error(
-                f"Error requesting data from database for {result.series_name!r} series"
+                f"Error requesting data from database for {result.series_name!r} series: \n"
+                f"{traceback.format_exc()}"
             )
             return False
 

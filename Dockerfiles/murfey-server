@@ -1,0 +1,61 @@
+# Template build command
+# podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-server -t murfey-server:<version> path/to/python-murfey
+
+# Set up the base image to build with
+FROM docker.io/library/python:3.12.10-slim-bookworm AS base
+
+# Install Vim and PostgreSQL dependencies in base image
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        libpq-dev \
+        vim \
+        && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Build Murfey and IMOD in a branch image
+FROM base as build
+COPY ./ /python-murfey/
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        busybox \
+        curl \
+        net-tools \
+        && \
+    busybox --install && \
+    python -m venv /venv && \
+    /venv/bin/python -m pip install --upgrade \
+        pip \
+        build \
+        importlib-metadata \
+        psycopg2-binary \
+        && \
+    /venv/bin/python -m pip install /python-murfey[server] && \
+    curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.0_RHEL8-64_CUDA12.0.sh > imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
+    chmod +x imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
+    mkdir imod && \
+    ./imod_5.1.0_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
+
+
+# Transfer completed builds to base image
+FROM base
+
+# Pass external build arguments to this stage
+ARG groupid
+ARG groupname
+ARG userid
+
+# Copy completed Murfey and IMOD builds across and set user and group permissions
+COPY --from=build /venv/ /venv/
+COPY --from=build /imod/ /imod/
+RUN groupadd -r -g "${groupid}" "${groupname}" && \
+    useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
+    chown -R "${userid}":"${groupid}" /venv && \
+    chmod -R a+x /venv
+ENV PATH=/venv/bin:/imod/IMOD/bin:$PATH
+ENV IMOD_DIR=/imod/IMOD
+USER "${userid}":"${groupid}"

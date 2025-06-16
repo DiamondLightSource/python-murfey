@@ -1,89 +1,235 @@
-{% extends "base.html" %} {% block title %}Bootstrapping instructions{% endblock
+{% extends "base.html" %} {% block title %}Bootstrapping Instructions{% endblock
 %} {% block content %}
-<h1>Bootstrapping instructions</h1>
-<h2>Installing a Linux Terminal</h2>
-<h3>Installing Cygwin</h3>
+<h1>Bootstrapping Instructions</h1>
+<h2>1. Setting Up a POSIX Environment</h2>
+<h3>A. Installing MSYS2 (Recommended)</h3>
 <p>
-  If you already have a Cygwin install, rename it so that it doesn't get
-  overwritten (something like "[install name]-old").
+  MSYS2 is a POSIX environment which provides extensive compiler support for the
+  more modern programming languages used by Murfey's package dependencies.
 </p>
 <p>
-  Download the Cygwin setup executable using this
-  <a href="/cygwin/setup-x86_64.exe">mirror</a>, and then run the following from
-  a terminal (both Command Prompt and Windows Powershell work)
+  The Murfey server supports the forwarding of download requests to
+  network-restricted client PCs. To install MSYS2, download the setup executable
+  using this
+  <a href="{{ proxy_path }}/msys2/repo/distrib/msys2-x86_64-latest.exe"
+    >mirror</a
+  >, then run it using the default settings. This will install MSYS2 to
+  C:\msys64.
 </p>
-<pre style="font-family: monospace">
-    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ request.url.netloc }}/cygwin -P curl,python3,rsync -q
-</pre>
-<p>
-  The Cygwin install sometimes hangs even when it is finished, hit Enter to
-  return to a command prompt.
-</p>
-
-<h3>Installing MSYS2</h3>
-<p>
-  MSYS2 is a lightweight Linux environment which provides compiler support for
-  the more modern programming languages used in the backend of Murfey's package
-  dependencies.
-</p>
-<p>
-  The Murfey server supports the forwarding of download requests to client PCs
-  that cannot access the wider internet. Download the MSYS2 setup executable
-  using this <a href="/msys2/setup-x86_64.exe">mirror</a>, and run the
-  executable using the default settings.
-</p>
+<h4>Setting Up the MSYS2 Package Manager (If Network-Restricted)</h4>
 <p>
   By default, MSYS2 comes with preset lists of mirrors and servers that it
-  installs its packages from. These will need to be disabled, and replaced with
-  URLs of the same format that point to the Murfey server the client PC is
-  connected to.
+  installs its packages from. On a network-restricted PC, these will need to be
+  replaced with files that point to the Murfey server instead. They can be
+  downloaded via this
+  <a href="{{ proxy_path }}/msys2/config/pacman.d.zip">link</a>.
 </p>
 <p>
-  These lists can be found in the following folder, if the default installation
-  options were chosen:
+  Once downloaded, extract the files to
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >%MSYS64%\etc\pacman.d</span
+  >. If MSYS2 was installed at the default location, this will be:
 </p>
-<pre style="font-family: monospace">
-    C:\msys64\etc\pacman.d\mirrorlist.{environment}
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    C:\msys64\etc\pacman.d
 </pre>
-<p>This is an example of how the URL to the Murfey server should look like:</p>
-<pre style="font-family: monospace">
-    Server = https://repo.msys2.org/mingw/x86_64/  # Original URL
-    Server = {{ request.url.scheme }}://{{ request.url.netloc }}/msys2/mingw/x86_64  # Murfey URL
-</pre>
+<h4>Installing Dependencies</h4>
 <p>
   MSYS2 comes with multiple environments, but UCRT64 is the most modern one. In
   order for the Murfey client to be able to install and run its dependencies
   properly, the following packages will need to be installed in the UCRT64
   environment. This can be achieved using the following commands:
 </p>
-<pre style="font-family: monospace">
-    $ pacman -Syu --disable-download-timeout  # Downloads the package database and searches for updates
-    $ pacman -S rsync --disable-download-timeout
-    $ pacman -S mingw-w64-python-pip --disable-download-timeout
-    $ pacman -S mingw-w64-x86_64-rust --disable-download-timeout
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    $ pacman -Syu
+    $ pacman -S msys2-runtime-3.6
+    $ pacman -S rsync
+    $ pacman -S mingw-w64-ucrt-x86_64-python-pip
+    $ pacman -S mingw-w64-ucrt-x86_64-rust
 </pre>
-
-<h2>Setting Up Python</h2>
 <p>
-  Once Python and pip are installed in the terminal, you have the option to
-  install Murfey in either the base environment or a virtual environment. The
-  base environment is simpler, but uninstallation of the Python packages in the
-  future could potentially interfere with the base environment's functionality.
+  Other utility packages such as
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >vim</span
+  >
+  can also be installed by running
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pacman -S &lt;package-name&gt;</span
+  >. You can browse the other packages available on MSYS2 by searching the repo
+  using
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pacman -Ss &lt;package-name&gt;</span
+  >
 </p>
-<h3>Setting Up a Virtual Environment</h3>
+<h4>Configuring the Rust Package Manager (If Network-Restricted)</h4>
+<p>
+  Many newer Python packages now have dependencies written in Rust that allow
+  them to operate more efficiently. MSYS2 supports the compilation and
+  installation of such packages, and is thus our recommended POSIX environment
+  to use Murfey with.
+</p>
+<p>
+  Rust packages and their associated metadata are, by default, stored in
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >https://crates.io</span
+  >. Package download and installation is in turn conducted by the package
+  manager
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >. For network-restricted client PCs, Murfey also supports mirroring
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >https://crates.io</span
+  >
+  to facilitate the installation of Rust packages.
+</p>
+<p>
+  To configure
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >, simply download the pre-configured
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >config.toml</span
+  >
+  file via this <a href="{{ proxy_path }}/rust/cargo/config.toml">link</a>. This
+  file should then be pasted in a
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >.cargo</span
+  >
+  folder, which, by default, should be located in your User Profile homespace:
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    %USERPROFILE%\.cargo
+</pre>
+<p>For a user named Murfey, for example, this would take the form:</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    C:\Users\Murfey\.cargo
+</pre>
+<p>
+  With this file configured,
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >cargo</span
+  >
+  will know to look for package metadata and files via the Murfey mirror
+  instead.
+</p>
+
+<h4>Running MSYS2 Through Command Prompt</h4>
+<p>
+  In order to run Murfey via the terminal, MSYS2 will have to be run through
+  Window's Command Prompt terminal, as there is an ongoing bug with MSYS2's
+  pre-packaged terminal that prevents mouse interaction with interactive apps in
+  the terminal.
+</p>
+<p>
+  To do so, simply right-click on your desktop and navigate to
+  <span>New > Shortcut</span>. When prompted for the location of the item, enter
+  the following into the text box:
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    cmd.exe /k "C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -shell bash"
+</pre>
+<p>
+  After naming the shortcut, click Finish to create the shortcut. This will run
+  a UCRT64 instance of MSYS2 through the Command Prompt terminal that starts you
+  off in MSYS2's default home directory. You can proceed to customise the
+  shortcut icon to taste.
+</p>
+
+<h3>B. Installing Cygwin (Legacy)</h3>
+<p>
+  Cygwin is a lightweight POSIX environment that provides the minimum
+  requirements needed for a Windows client PC to run Murfey . However, it does
+  not support building and installing packages which have been written in Rust,
+  which many modern Python packages, including Murfey's dependencies, now make
+  use of. It is still possible to install and run Murfey via Cygwin, but older
+  versions of its dependencies will have to be installed.
+</p>
+<p>
+  To install, download the Cygwin setup executable using this
+  <a href="{{ proxy_path }}/cygwin/setup-x86_64.exe">mirror</a>, and then run
+  the following from a terminal (both Command Prompt and Windows Powershell
+  work):
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
+</pre>
+<p>
+  This will install Cygwin with the minimum packages needed to run Murfey. The
+  Cygwin install command will occasionally hang after completion. In such an
+  event, just hit Enter to return to a normal command prompt window.
+</p>
+<p>
+  If you already have a Cygwin install that you would like to preserve, rename
+  it so that it doesn't get overwritten (something like "cygwin64-old") before
+  running the command line above.
+</p>
+
+<h2>2. Setting Up Python</h2>
+<p>
+  Once Python and
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pip</span
+  >
+  are installed in the terminal, you have the option to install Murfey in either
+  the base environment or a virtual environment. The base environment is
+  simpler, but uninstallation of the Python packages in the future could
+  potentially interfere with the base environment's functionality.
+</p>
+<h3>A. (Optional) Setting Up a Virtual Environment</h3>
 <p>To set up a virtual environment, run the following commands:</p>
-<pre style="font-family: monospace">
-    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
     $ virtualenv your-env-name  # Create the virtual environment
     $ source your-env-name/bin/activate  # Activate the virtual environment
 </pre>
-<h3>Installing Murfey</h3>
+<h3>B. Installing Murfey</h3>
 <p>
   You can install Murfey in the Python environment (the base one or a virtual
   environment) in either the Cygwin or UCRT64 terminal using the following
   commands:
 </p>
-<pre style="font-family: monospace">
-    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ request.url.netloc }}/pypi --trusted-host {{ request.url.hostname }}
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
 </pre>
+<p>
+  If you wish to install the client-side dependencies needed to run Murfey via
+  the web UI, replace
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >murfey[client]</span
+  >
+  with
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >murfey[client,instrument-server]</span
+  >.
+</p>
 {% endblock %}

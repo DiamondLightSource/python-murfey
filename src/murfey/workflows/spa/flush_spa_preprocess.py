@@ -6,9 +6,10 @@ from PIL import Image
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
-from murfey.server import _murfey_id, _transport_object, sanitise
-from murfey.server.api.auth import MurfeySessionID
-from murfey.util import secure_path
+from murfey.server import _transport_object
+from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.feedback import _murfey_id
+from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
 from murfey.util.db import (
     AutoProcProgram,
@@ -23,7 +24,7 @@ from murfey.util.db import (
 from murfey.util.db import Session as MurfeySession
 from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
-from murfey.util.processing_params import default_spa_parameters
+from murfey.util.processing_params import cryolo_model_path, default_spa_parameters
 from murfey.util.spa_metadata import (
     GridSquareInfo,
     foil_hole_data,
@@ -57,6 +58,20 @@ def register_grid_square(
         grid_square.y_stage_position = (
             grid_square_params.y_stage_position or grid_square.y_stage_position
         )
+        grid_square.readout_area_x = (
+            grid_square_params.readout_area_x or grid_square.readout_area_x
+        )
+        grid_square.readout_area_y = (
+            grid_square_params.readout_area_y or grid_square.readout_area_y
+        )
+        grid_square.thumbnail_size_x = (
+            grid_square_params.thumbnail_size_x or grid_square.thumbnail_size_x
+        )
+        grid_square.thumbnail_size_y = (
+            grid_square_params.thumbnail_size_y or grid_square.thumbnail_size_y
+        )
+        grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
+        grid_square.image = grid_square_params.image or grid_square.image
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
@@ -198,12 +213,13 @@ def _grid_square_metadata_file(f: Path, grid_square: int) -> Optional[Path]:
     """Search through metadata directories to find the required grid square dm"""
     raw_dir = f.parent.parent.parent
     metadata_dirs = raw_dir.glob("metadata*")
+    gs_path = None
     for md_dir in metadata_dirs:
         gs_path = md_dir / f"Metadata/GridSquare_{grid_square}.dm"
         if gs_path.is_file():
             return gs_path
-    logger.error(f"Could not determine grid square metadata path for {f}")
-    return None
+    logger.error(f"Grid square metadata path {gs_path} does not exist for {f}")
+    return gs_path
 
 
 def _flush_position_analysis(
@@ -298,15 +314,12 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
     ).all()
     if not stashed_files:
         return True
-    instrument_name = (
-        murfey_db.exec(
-            select(MurfeySession).where(MurfeySession.id == message["session_id"])
-        )
-        .one()
-        .instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
+
+    murfey_session = murfey_db.exec(
+        select(MurfeySession).where(MurfeySession.id == message["session_id"])
+    ).one()
+    machine_config = get_machine_config(instrument_name=murfey_session.instrument_name)[
+        murfey_session.instrument_name
     ]
     recipe_name = machine_config.recipes.get("em-spa-preprocess", "em-spa-preprocess")
     collected_ids = murfey_db.exec(
@@ -402,8 +415,17 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
                 "picker_uuid": murfey_ids[2 * i + 1],
                 "session_id": session_id,
                 "particle_diameter": proc_params.particle_diameter or 0,
-                "fm_int_file": f.eer_fractionation_file,
+                "fm_int_file": (
+                    proc_params.eer_fractionation_file
+                    if proc_params.eer_fractionation_file
+                    else f.eer_fractionation_file
+                ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
+                "cryolo_model_weights": str(
+                    cryolo_model_path(
+                        murfey_session.visit, murfey_session.instrument_name
+                    )
+                ),
                 "foil_hole_id": foil_hole_id,
             },
         }

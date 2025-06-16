@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.appName }}
+spec:
+  ports:
+    {{- toYaml .Values.servicePorts | nindent 2 }}
+  selector:
+    app: {{ .Values.appName }}
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.global.runAsUser }}
+        runAsGroup: {{ .Values.global.runAsGroup }}
+      volumes:
+        - name: rsyncd-conf
+          secret:
+            secretName: {{ .Values.global.rsyncConfigSecretName }}
+            items:
+              - key: {{ .Values.global.rsyncConfigFileName }}
+                path: rsyncd.conf
+        # Mount data directories
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+      containers:
+        - name: {{ .Values.appName }}
+          image: {{ .Values.image }}
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: {{ .Values.cpuRequest }}
+            limits:
+              cpu: {{ .Values.cpuLimit }}
+              memory: {{ .Values.memoryLimit }}
+          volumeMounts:
+            # Mount rsync config files
+            - name: rsyncd-conf
+              mountPath: /murfey/rsync/rsyncd.conf
+              subPath: rsyncd.conf
+              readOnly: true
+            # Mount data directories
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
+          args:
+            {{- toYaml .Values.args | nindent 12 }}

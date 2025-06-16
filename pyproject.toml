@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.16.9"
+version = "0.18.1"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -53,9 +53,9 @@ developer = [
     "pytest", # Test code functionality
 ]
 instrument-server = [
+    "aiohttp",
     "fastapi[standard]",
-    "python-jose[cryptography]",
-    "uvicorn[standard]",
+    "python-jose",
 ]
 server = [
     "aiohttp",
@@ -64,7 +64,7 @@ server = [
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
-    "numpy",
+    "numpy<2",
     "packaging",
     "passlib",
     "pillow",
@@ -73,7 +73,6 @@ server = [
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
-    "uvicorn[standard]",
     "zocalo>=1",
 ]
 [project.urls]
@@ -81,23 +80,22 @@ Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
-murfey = "murfey.client:run"
 "murfey.add_user" = "murfey.cli.add_user:run"
+"murfey.client" = "murfey.client:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
-"murfey.dlq_murfey" = "murfey.cli.dlq_resubmit:run"
 "murfey.generate_key" = "murfey.cli.generate_crypto_key:run"
 "murfey.generate_password" = "murfey.cli.generate_db_password:run"
+"murfey.generate_route_manifest" = "murfey.cli.generate_route_manifest:run"
 "murfey.instrument_server" = "murfey.instrument_server:run"
-"murfey.server" = "murfey.server:run"
+"murfey.repost_failed_calls" = "murfey.cli.repost_failed_calls:run"
+"murfey.server" = "murfey.server.run:run"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
-[project.entry-points."murfey.auth.token_validation"]
-"password" = "murfey.server.api.auth:password_token_validation"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
@@ -107,6 +105,8 @@ murfey = "murfey.client:run"
 "clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
 "clem.register_lif_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_lif_preprocessing_result"
 "clem.register_tiff_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:register_tiff_preprocessing_result"
+"pato" = "murfey.workflows.notifications:notification_setup"
+"picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 
 [tool.setuptools]
@@ -116,6 +116,7 @@ zip-safe = false
 
 [tool.setuptools.package-data]
 "murfey.client.tui" = ["*.css"]
+"murfey.util" = ["route_manifest.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src", "tests"]

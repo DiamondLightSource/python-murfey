@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
-import murfey.util
 from murfey.client.tui.status_bar import StatusBar
+from murfey.util.client import Observer
 
 log = logging.getLogger("murfey.client.watchdir")
 
@@ -26,7 +26,7 @@ class _FileInfo(NamedTuple):
     settling_time: Optional[float] = None
 
 
-class DirWatcher(murfey.util.Observer):
+class DirWatcher(Observer):
     def __init__(
         self,
         path: str | os.PathLike,
@@ -63,6 +63,10 @@ class DirWatcher(murfey.util.Observer):
         log.info(f"DirWatcher thread starting for {self}")
         self.thread.start()
 
+    def request_stop(self):
+        self._stopping = True
+        self._halt_thread = True
+
     def stop(self):
         log.debug("DirWatcher thread stop requested")
         self._stopping = True
@@ -90,6 +94,7 @@ class DirWatcher(murfey.util.Observer):
                 modification_time=modification_time, transfer_all=self._transfer_all
             )
             time.sleep(15)
+        self.notify(final=True)
 
     def scan(self, modification_time: float | None = None, transfer_all: bool = False):
         """

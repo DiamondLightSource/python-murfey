@@ -7,12 +7,12 @@ import time
 from pathlib import Path
 from typing import List
 
-import murfey.util
+from murfey.util.client import Observer
 
 log = logging.getLogger("murfey.client.watchdir_multigrid")
 
 
-class MultigridDirWatcher(murfey.util.Observer):
+class MultigridDirWatcher(Observer):
     def __init__(
         self,
         path: str | os.PathLike,
@@ -21,15 +21,17 @@ class MultigridDirWatcher(murfey.util.Observer):
     ):
         super().__init__()
         self._basepath = Path(path)
-        self._skip_existing_processing = skip_existing_processing
-        self._seen_dirs: List[Path] = []
-        self._stopping = False
         self._machine_config = machine_config
+        self._seen_dirs: List[Path] = []
         self.thread = threading.Thread(
             name=f"MultigridDirWatcher {self._basepath}",
             target=self._process,
             daemon=True,
         )
+        # Toggleable settings
+        self._analyse = True
+        self._skip_existing_processing = skip_existing_processing
+        self._stopping = False
 
     def start(self):
         if self.thread.is_alive():
@@ -53,15 +55,21 @@ class MultigridDirWatcher(murfey.util.Observer):
         first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.name in self._machine_config["create_directories"].values():
+                if d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(
                             d,
                             include_mid_path=False,
                             use_suggested_path=False,
                             analyse=(
-                                d.name
-                                in self._machine_config["analyse_created_directories"]
+                                (
+                                    d.name
+                                    in self._machine_config[
+                                        "analyse_created_directories"
+                                    ]
+                                )
+                                if self._analyse
+                                else False
                             ),
                             tag="atlas",
                         )
@@ -72,7 +80,7 @@ class MultigridDirWatcher(murfey.util.Observer):
                             d,
                             extra_directory=f"metadata_{d.name}",
                             include_mid_path=False,
-                            analyse=True,  # not (first_loop and self._skip_existing_processing),
+                            analyse=self._analyse,
                             limited=True,
                             tag="metadata",
                         )
@@ -80,15 +88,17 @@ class MultigridDirWatcher(murfey.util.Observer):
                     processing_started = False
                     for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
                         if d02 not in self._seen_dirs:
-                            # if skip exisiting processing is set then do not process for any
-                            # data directories found on the first loop
-                            # this allows you to avoid triggering processing again if murfey is restarted
+                            # If 'skip_existing_processing' is set, do not process for
+                            # any data directories found on the first loop.
+                            # This allows you to avoid triggering processing again if Murfey is restarted
                             self.notify(
                                 d02,
                                 include_mid_path=False,
                                 remove_files=True,
-                                analyse=not (
-                                    first_loop and self._skip_existing_processing
+                                analyse=(
+                                    not (first_loop and self._skip_existing_processing)
+                                    if self._analyse
+                                    else False
                                 ),
                                 tag="fractions",
                             )
@@ -104,8 +114,10 @@ class MultigridDirWatcher(murfey.util.Observer):
                             self.notify(
                                 d02,
                                 include_mid_path=False,
-                                analyse=not (
-                                    first_loop and self._skip_existing_processing
+                                analyse=(
+                                    not (first_loop and self._skip_existing_processing)
+                                    if self._analyse
+                                    else False
                                 ),
                                 tag="fractions",
                             )
@@ -114,3 +126,5 @@ class MultigridDirWatcher(murfey.util.Observer):
             if first_loop:
                 first_loop = False
             time.sleep(15)
+
+        self.notify(final=True)

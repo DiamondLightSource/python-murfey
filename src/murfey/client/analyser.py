@@ -21,27 +21,11 @@ from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
-from murfey.client.tui.forms import FormDependency
-from murfey.util import Observer, get_machine_config_client
-from murfey.util.models import PreprocessingParametersTomo, ProcessingParametersSPA
+from murfey.util.client import Observer, get_machine_config_client
+from murfey.util.mdoc import get_block
+from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
-
-spa_form_dependencies: dict = {
-    "use_cryolo": FormDependency(
-        dependencies={"estimate_particle_diameter": False}, trigger_value=False
-    ),
-    "estimate_particle_diameter": FormDependency(
-        dependencies={
-            "use_cryolo": True,
-            "boxsize": "None",
-            "small_boxsize": "None",
-            "mask_diameter": "None",
-            "particle_diameter": "None",
-        },
-        trigger_value=True,
-    ),
-}
 
 
 class Analyser(Observer):
@@ -64,7 +48,7 @@ class Analyser(Observer):
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
         self.parameters_model: (
-            Type[ProcessingParametersSPA] | Type[PreprocessingParametersTomo] | None
+            Type[ProcessingParametersSPA] | Type[ProcessingParametersTomo] | None
         ) = None
 
         self.queue: queue.Queue = queue.Queue()
@@ -81,7 +65,10 @@ class Analyser(Observer):
             else {}
         )
 
-    def _find_extension(self, file_path: Path):
+    def __repr__(self) -> str:
+        return f"<Analyser ({self._basepath})>"
+
+    def _find_extension(self, file_path: Path) -> bool:
         """
         Identifies the file extension and stores that information in the class.
         """
@@ -97,25 +84,30 @@ class Analyser(Observer):
             .get(file_path.suffix)
         ):
             if not any(r in file_path.name for r in required_substrings):
-                return []
+                return False
 
-        # Checks for MRC, TIFF, TIF, and EER files if no extension has been defined
-        if (
-            file_path.suffix in (".mrc", ".tiff", ".tif", ".eer")
-            and not self._extension
-        ):
-            logger.info(f"File extension determined: {file_path.suffix}")
-            self._extension = file_path.suffix
-        # Check for TIFF, TIF, or EER if the file's already been assigned an extension
-        elif (
-            file_path.suffix in (".tiff", ".tif", ".eer")
-            and self._extension != file_path.suffix
-        ):
-            logger.info(f"File extension re-evaluated: {file_path.suffix}")
-            self._extension = file_path.suffix
+        # Checks for MRC, TIFF, TIF, and EER files
+        if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
+            if not self._extension:
+                logger.info(f"File extension determined: {file_path.suffix}")
+                self._extension = file_path.suffix
+            elif self._extension != file_path.suffix:
+                logger.info(f"File extension re-evaluated: {file_path.suffix}")
+                self._extension = file_path.suffix
+            return True
+        # If we see an .mdoc file first, use that to determine the file extensions
+        elif file_path.suffix == ".mdoc":
+            with open(file_path, "r") as md:
+                md.seek(0)
+                mdoc_data_block = get_block(md)
+            if subframe_path := mdoc_data_block.get("SubFramePath"):
+                self._extension = Path(subframe_path).suffix
+                return True
         # Check for LIF files separately
         elif file_path.suffix == ".lif":
             self._extension = file_path.suffix
+            return True
+        return False
 
     def _find_context(self, file_path: Path) -> bool:
         """
@@ -124,6 +116,7 @@ class Analyser(Observer):
         stages of processing. Actions to take for individual files will be determined
         in the Context classes themselves.
         """
+        logger.debug(f"Finding context using file {str(file_path)!r}")
         if "atlas" in file_path.parts:
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
@@ -174,7 +167,7 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
-                    self.parameters_model = PreprocessingParametersTomo
+                    self.parameters_model = ProcessingParametersTomo
                 return True
 
             # Files with these suffixes belong to the serial EM tomography workflow
@@ -198,7 +191,7 @@ class Analyser(Observer):
                 ):
                     return False
                 self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = PreprocessingParametersTomo
+                self.parameters_model = ProcessingParametersTomo
                 return True
         return False
 
@@ -209,7 +202,9 @@ class Analyser(Observer):
                     transferred_file, environment=self._environment
                 )
         except Exception as e:
-            logger.error(f"An exception was encountered post transfer: {e}")
+            logger.error(
+                f"An exception was encountered post transfer: {e}", exc_info=True
+            )
 
     def _analyse(self):
         logger.info("Analyser thread started")
@@ -255,12 +250,15 @@ class Analyser(Observer):
                     elif transferred_file.suffix == ".mdoc":
                         mdoc_for_reading = transferred_file
                 if not self._context:
-                    self._find_extension(transferred_file)
+                    valid_extension = self._find_extension(transferred_file)
+                    if not valid_extension:
+                        logger.error(f"No extension found for {transferred_file}")
+                        break
                     found = self._find_context(transferred_file)
                     if not found:
-                        # logger.warning(
-                        #     f"Context not understood for {transferred_file}, stopping analysis"
-                        # )
+                        logger.debug(
+                            f"Couldn't find context for {str(transferred_file)!r}"
+                        )
                         self.queue.task_done()
                         continue
                     elif self._extension:
@@ -293,6 +291,10 @@ class Analyser(Observer):
                                         f"Metadata gathering failed with a key error for key: {e.args[0]}"
                                     )
                                     raise e
+                                except ValueError as e:
+                                    logger.error(
+                                        f"Metadata gathering failed with a value error: {e}"
+                                    )
                             if not dc_metadata or not self._force_mdoc_metadata:
                                 self._unseen_xml.append(transferred_file)
                             else:
@@ -307,13 +309,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
 
@@ -326,7 +321,10 @@ class Analyser(Observer):
 
                 # Handle files with tomography and SPA context differently
                 elif not self._extension or self._unseen_xml:
-                    self._find_extension(transferred_file)
+                    valid_extension = self._find_extension(transferred_file)
+                    if not valid_extension:
+                        logger.error(f"No extension found for {transferred_file}")
+                        break
                     if self._extension:
                         logger.info(
                             f"Extension found successfully for {transferred_file}"
@@ -366,13 +364,6 @@ class Analyser(Observer):
                                 self.notify(
                                     {
                                         "form": dc_metadata,
-                                        "dependencies": (
-                                            spa_form_dependencies
-                                            if isinstance(
-                                                self._context, SPAModularContext
-                                            )
-                                            else {}
-                                        ),
                                     }
                                 )
                 elif isinstance(
@@ -383,8 +374,13 @@ class Analyser(Observer):
                         SPAMetadataContext,
                     ),
                 ):
+                    context = str(self._context).split(" ")[0].split(".")[-1]
+                    logger.debug(
+                        f"Transferring file {str(transferred_file)} with context {context!r}"
+                    )
                     self.post_transfer(transferred_file)
             self.queue.task_done()
+        self.notify(final=True)
 
     def _xml_file(self, data_file: Path) -> Path:
         if not self._environment:
@@ -393,8 +389,8 @@ class Analyser(Observer):
         data_directories = self._murfey_config.get("data_directories", [])
         for dd in data_directories:
             if str(data_file).startswith(dd):
-                base_dir = Path(dd)
-                mid_dir = data_file.relative_to(dd).parent
+                base_dir = Path(dd).absolute()
+                mid_dir = data_file.relative_to(base_dir).parent
                 break
         else:
             return data_file.with_suffix(".xml")
@@ -402,7 +398,7 @@ class Analyser(Observer):
 
     def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping and rsyncer.outcome == TransferResult.SUCCESS:
-            absolute_path = (self._basepath / rsyncer.file_path).resolve()
+            absolute_path = (self._basepath / rsyncer.file_path).absolute()
             self.queue.put(absolute_path)
 
     def start(self):
@@ -412,6 +408,10 @@ class Analyser(Observer):
             raise RuntimeError("Analyser has already stopped")
         logger.info(f"Analyser thread starting for {self}")
         self.thread.start()
+
+    def request_stop(self):
+        self._stopping = True
+        self._halt_thread = True
 
     def stop(self):
         logger.debug("Analyser thread stop requested")

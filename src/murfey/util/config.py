@@ -4,7 +4,7 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
@@ -12,39 +12,56 @@ from pydantic import BaseModel, Extra, field_validator
 from pydantic_settings import BaseSettings
 
 
-class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
-    acquisition_software: List[str]
-    calibrations: Dict[str, Dict[str, Union[dict, float]]]
-    data_directories: List[Path]
-    rsync_basepath: Path
-    default_model: Path
+class MachineConfig(BaseModel):  # type: ignore
+    """
+    Keys that describe the type of workflow conducted on the client side, and how
+    Murfey will handle its data transfer and processing
+    """
+
+    # General info --------------------------------------------------------------------
     display_name: str = ""
     instrument_name: str = ""
     image_path: Optional[Path] = None
-    software_versions: Dict[str, str] = {}
-    external_executables: Dict[str, str] = {}
-    external_executables_eer: Dict[str, str] = {}
-    external_environment: Dict[str, str] = {}
-    rsync_module: str = ""
-    create_directories: Dict[str, str] = {"atlas": "atlas"}
-    analyse_created_directories: List[str] = []
+    machine_override: str = ""
+
+    # Hardware and software -----------------------------------------------------------
+    camera: str = "FALCON"
+    superres: bool = False
+    calibrations: dict[str, dict[str, Union[dict, float]]]
+    acquisition_software: list[str]
+    software_versions: dict[str, str] = {}
+    software_settings_output_directories: dict[str, list[str]] = {}
+    data_required_substrings: dict[str, dict[str, list[str]]] = {}
+
+    # Client side directory setup -----------------------------------------------------
+    data_directories: list[Path]
+    create_directories: list[str] = ["atlas"]
+    analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
-    processed_directory_name: str = "processed"
-    gain_directory_name: str = "processing"
-    node_creator_queue: str = "node_creator"
-    superres: bool = False
-    camera: str = "FALCON"
-    data_required_substrings: Dict[str, Dict[str, List[str]]] = {}
-    allow_removal: bool = False
+
+    # Data transfer setup -------------------------------------------------------------
+    # Rsync setup
     data_transfer_enabled: bool = True
+    rsync_url: str = ""
+    rsync_module: str = ""
+    rsync_basepath: Path
+    allow_removal: bool = False
+
+    # Upstream data download setup
+    upstream_data_directories: list[Path] = []  # Previous sessions
+    upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
+    upstream_data_tiff_locations: list[str] = ["processed"]  # Location of CLEM TIFFs
+
+    # Data processing setup -----------------------------------------------------------
+    # General processing setup
     processing_enabled: bool = True
-    machine_override: str = ""
-    processed_extra_directory: str = ""
-    plugin_packages: Dict[str, Path] = {}
-    software_settings_output_directories: Dict[str, List[str]] = {}
     process_by_default: bool = True
-    recipes: Dict[str, str] = {
+    gain_directory_name: str = "processing"
+    process_multiple_datasets: bool = True
+    processed_directory_name: str = "processed"
+    processed_extra_directory: str = ""
+    recipes: dict[str, str] = {
         "em-spa-bfactor": "em-spa-bfactor",
         "em-spa-class2d": "em-spa-class2d",
         "em-spa-class3d": "em-spa-class3d",
@@ -54,25 +71,41 @@ class MachineConfig(BaseModel, extra=Extra.allow):  # type: ignore
         "em-tomo-align": "em-tomo-align",
     }
 
-    # Find and download upstream directories
-    upstream_data_directories: List[Path] = []  # Previous sessions
-    upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
-    upstream_data_tiff_locations: List[str] = ["processed"]  # Location of CLEM TIFFs
-
+    # Particle picking setup
+    default_model: Path
     picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
-    failure_queue: str = ""
-    instrument_server_url: str = "http://localhost:8001"
-    frontend_url: str = "http://localhost:3000"
-    murfey_url: str = "http://localhost:8000"
-    rsync_url: str = ""
+    # Data analysis plugins
+    external_executables: dict[str, str] = {}
+    external_executables_eer: dict[str, str] = {}
+    external_environment: dict[str, str] = {}
+    plugin_packages: dict[str, Path] = {}
 
+    # Server and network setup --------------------------------------------------------
+    # Configurations and URLs
     security_configuration_path: Optional[Path] = None
-    auth_url: str = ""
+    murfey_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:3000"
+    instrument_server_url: str = "http://localhost:8001"
+
+    # Messaging queues
+    failure_queue: str = ""
+    node_creator_queue: str = "node_creator"
+    notifications_queue: str = "pato_notification"
+
+    class Config:
+        """
+        Inner class that defines this model's parsing and serialising behaviour
+        """
+
+        extra = Extra.allow
+        json_encoders = {
+            Path: str,
+        }
 
 
-def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, MachineConfig]:
+def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
     return {
@@ -83,20 +116,39 @@ def from_file(config_file_path: Path, instrument: str = "") -> Dict[str, Machine
 
 
 class Security(BaseModel):
-    rabbitmq_credentials: str
-    murfey_db_credentials: str
+    # Murfey database settings
+    murfey_db_credentials: Path
     crypto_key: str
-    auth_key: str = ""
-    auth_algorithm: str = ""
     sqlalchemy_pooling: bool = True
-    allow_origins: List[str] = ["*"]
+
+    # ISPyB settings
+    ispyb_credentials: Optional[Path] = None
+
+    # Murfey server connection settings
+    auth_url: str = ""
+    auth_type: Literal["password", "cookie"] = "password"
+    auth_algorithm: str = ""
+    auth_key: str = ""
+    cookie_key: str = ""
+    instrument_auth_url: str = ""
+    instrument_auth_type: Literal["token", ""] = "token"
+    allow_user_token: bool = False  # TUI 'user' token support
     session_validation: str = ""
     session_token_timeout: Optional[int] = None
-    auth_type: Literal["password", "cookie"] = "password"
-    cookie_key: str = ""
+    allow_origins: list[str] = ["*"]
+
+    # RabbitMQ settings
+    rabbitmq_credentials: Path
     feedback_queue: str = "murfey_feedback"
+
+    # Graylog settings
     graylog_host: str = ""
     graylog_port: Optional[int] = None
+
+    class Config:
+        json_encoders = {
+            Path: str,
+        }
 
     @field_validator("graylog_port")
     def check_port_present_if_host_is(
@@ -156,7 +208,7 @@ def get_security_config() -> Security:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config(instrument_name: str = "") -> Dict[str, MachineConfig]:
+def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
     machine_config = {
         "": MachineConfig(
             acquisition_software=[],
