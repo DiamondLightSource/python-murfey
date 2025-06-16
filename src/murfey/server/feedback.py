@@ -1899,9 +1899,6 @@ def feedback_callback(header: dict, message: dict) -> None:
                 and not relevant_tilt_series.processing_requested
                 and relevant_tilt_series.tilt_series_length > 2
             ):
-                relevant_tilt_series.processing_requested = True
-                murfey_db.add(relevant_tilt_series)
-
                 instrument_name = (
                     murfey_db.exec(
                         select(db.Session).where(db.Session.id == session_id)
@@ -1953,6 +1950,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                     logger.info(
                         f"No transport object found. Zocalo message would be {zocalo_message}"
                     )
+                relevant_tilt_series.processing_requested = True
+                murfey_db.add(relevant_tilt_series)
 
             prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             murfey_db.commit()
