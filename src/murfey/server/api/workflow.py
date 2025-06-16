@@ -608,9 +608,9 @@ class TomoProcessFile(BaseModel):
     tag: str
     image_number: int
     pixel_size: float
-    dose_per_frame: Optional[float]
+    dose_per_frame: Optional[float] = None
     frame_count: int
-    tilt_axis: Optional[float]
+    tilt_axis: Optional[float] = None
     mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1

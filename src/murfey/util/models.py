@@ -156,7 +156,7 @@ Models related to the tomographic reconstruction workflow.
 
 
 class ProcessingParametersTomo(BaseModel):
-    dose_per_frame: Optional[float]
+    dose_per_frame: Optional[float] = None
     frame_count: int
     tilt_axis: float
     gain_ref: Optional[str] = None
