@@ -1163,8 +1163,6 @@ def get_pypi_file(
     headers: dict[str, str] = {}
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
-    # if response.headers.get("Content-Length"):
-    #     headers["Content-Length"] = response.headers["Content-Length"]
     return StreamingResponse(
         content=response.raw,
         status_code=response.status_code,
