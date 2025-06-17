@@ -215,22 +215,26 @@ murfey.server.api.bootstrap.plugins:
     methods:
       - GET
 murfey.server.api.bootstrap.pypi:
-  - path: /pypi/
+  - path: /pypi/index/
     function: get_pypi_index
     path_params: []
     methods:
       - GET
-  - path: /pypi/{package}/
+  - path: /pypi/index/{package}/
     function: get_pypi_package_downloads_list
     path_params:
       - name: package
         type: str
     methods:
       - GET
-  - path: /pypi/{package}/{filename}
+  - path: /pypi/packages/{a}/{b}/{c}/{filename}
     function: get_pypi_file
     path_params:
-      - name: package
+      - name: a
+        type: str
+      - name: b
+        type: str
+      - name: c
         type: str
       - name: filename
         type: str
