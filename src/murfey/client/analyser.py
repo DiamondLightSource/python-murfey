@@ -253,7 +253,7 @@ class Analyser(Observer):
                     valid_extension = self._find_extension(transferred_file)
                     if not valid_extension:
                         logger.error(f"No extension found for {transferred_file}")
-                        break
+                        continue
                     found = self._find_context(transferred_file)
                     if not found:
                         logger.debug(
@@ -324,7 +324,7 @@ class Analyser(Observer):
                     valid_extension = self._find_extension(transferred_file)
                     if not valid_extension:
                         logger.error(f"No extension found for {transferred_file}")
-                        break
+                        continue
                     if self._extension:
                         logger.info(
                             f"Extension found successfully for {transferred_file}"
