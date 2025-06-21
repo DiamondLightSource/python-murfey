@@ -196,7 +196,7 @@ def validate_form(form: dict, model: BaseModel) -> bool:
     try:
         convert = lambda x: None if x == "None" else x
         validated = model(**{k: convert(v) for k, v in form.items()})
-        log.info(validated.dict())
+        log.info(validated.model_dump())
         return True
     except (AttributeError, ValidationError) as e:
         log.warning(f"Form validation failed: {str(e)}")

@@ -8,7 +8,7 @@ from threading import RLock
 from typing import Dict, List, NamedTuple, Optional
 from urllib.parse import ParseResult
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from murfey.client.watchdir import DirWatcher
 
@@ -56,9 +56,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     samples: Dict[Path, SampleInfo] = {}
     rsync_url: str = ""
 
-    class Config:
-        validate_assignment: bool = True
-        arbitrary_types_allowed: bool = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def clear(self):
         self.sources = []

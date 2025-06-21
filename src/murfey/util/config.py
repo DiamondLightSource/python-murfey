@@ -8,7 +8,8 @@ from typing import Literal, Optional, Union
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra, validator
+from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic_settings import BaseSettings
 
 
 class MachineConfig(BaseModel):  # type: ignore
@@ -72,7 +73,7 @@ class MachineConfig(BaseModel):  # type: ignore
 
     # Particle picking setup
     default_model: Path
-    model_search_directory: str = "processing"
+    picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
     # Data analysis plugins
@@ -93,15 +94,7 @@ class MachineConfig(BaseModel):  # type: ignore
     node_creator_queue: str = "node_creator"
     notifications_queue: str = "pato_notification"
 
-    class Config:
-        """
-        Inner class that defines this model's parsing and serialising behaviour
-        """
-
-        extra = Extra.allow
-        json_encoders = {
-            Path: str,
-        }
+    model_config = ConfigDict(extra="allow")
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
@@ -144,12 +137,9 @@ class Security(BaseModel):
     graylog_host: str = ""
     graylog_port: Optional[int] = None
 
-    class Config:
-        json_encoders = {
-            Path: str,
-        }
+    model_config = ConfigDict()
 
-    @validator("graylog_port")
+    @field_validator("graylog_port")
     def check_port_present_if_host_is(
         cls, v: Optional[int], values: dict, **kwargs
     ) -> Optional[int]:

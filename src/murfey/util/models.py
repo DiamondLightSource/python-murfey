@@ -77,8 +77,8 @@ Models related to the single-particle analysis workflow.
 
 class ProcessingParametersSPA(BaseModel):
     tag: str
-    dose_per_frame: Optional[float]
-    gain_ref: Optional[str]
+    dose_per_frame: Optional[float] = None
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -97,8 +97,8 @@ class ProcessingParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
+        dose_per_frame: Optional[float] = None
+        gain_ref: Optional[str] = None
         symmetry: str
         eer_fractionation: int
 
@@ -156,10 +156,10 @@ Models related to the tomographic reconstruction workflow.
 
 
 class ProcessingParametersTomo(BaseModel):
-    dose_per_frame: Optional[float]
+    dose_per_frame: Optional[float] = None
     frame_count: int
     tilt_axis: float
-    gain_ref: Optional[str]
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -169,12 +169,12 @@ class ProcessingParametersTomo(BaseModel):
     file_extension: str
     tag: str
     tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
+    eer_fractionation_file: Optional[str] = None
     eer_fractionation: int
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
+        dose_per_frame: Optional[float] = None
+        gain_ref: Optional[str] = None
         eer_fractionation: int
 
 

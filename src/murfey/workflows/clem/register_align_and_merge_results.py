@@ -7,7 +7,7 @@ from ast import literal_eval
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlmodel import Session
 
 from murfey.util.db import CLEMImageSeries
@@ -24,10 +24,8 @@ class AlignAndMergeResult(BaseModel):
     align_across: Optional[str] = None
     composite_image: Path
 
-    @validator(
-        "image_stacks",
-        pre=True,
-    )
+    @field_validator("image_stacks", mode="before")
+    @classmethod
     def parse_stringified_list(cls, value):
         if isinstance(value, str):
             try:
