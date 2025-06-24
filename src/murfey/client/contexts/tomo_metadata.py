@@ -1,0 +1,316 @@
+import logging
+from pathlib import Path
+from typing import Optional
+
+import requests
+import xmltodict
+
+from murfey.client.context import Context
+from murfey.client.contexts.spa import _file_transferred_to, _get_source
+from murfey.client.contexts.spa_metadata import _atlas_destination
+from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
+from murfey.util.api import url_path_for
+from murfey.util.client import authorised_requests, capture_post
+
+logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
+
+requests.get, requests.post, requests.put, requests.delete = authorised_requests()
+
+
+def get_visitless_source(
+    transferred_file: Path, environment: MurfeyInstanceEnvironment
+) -> Optional[str]:
+    source = _get_source(transferred_file, environment=environment)
+    visitless_source_search_dir = str(source).replace(f"/{environment.visit}", "")
+    visitless_source_images_dirs = sorted(
+        Path(visitless_source_search_dir).glob("Images-Disc*"),
+        key=lambda x: x.stat().st_ctime,
+    )
+    if not visitless_source_images_dirs:
+        logger.warning(f"Cannot find Images-Disc* in {visitless_source_search_dir}")
+        return None
+    visitless_source = str(visitless_source_images_dirs[-1])
+    return visitless_source
+
+
+class TomographyMetadataContext(Context):
+    def __init__(self, acquisition_software: str, basepath: Path):
+        super().__init__("Tomography_metadata", acquisition_software)
+        self._basepath = basepath
+
+    def post_transfer(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
+        super().post_transfer(
+            transferred_file=transferred_file,
+            environment=environment,
+            **kwargs,
+        )
+
+        if transferred_file.name == "Session.xml" and environment:
+            logger.info("Tomography session metadata found")
+            with open(transferred_file, "r") as session_xml:
+                session_data = xmltodict.parse(session_xml.read())
+
+            windows_path = session_data["TomographySession"]["AtlasId"]["#text"]
+            logger.info(f"Windows path to atlas metadata found: {windows_path}")
+            visit_index = windows_path.split("\\").index(environment.visit)
+            partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+            logger.info("Partial Linux path successfully constructed from Windows path")
+
+            source = _get_source(transferred_file, environment)
+            if not source:
+                logger.warning(
+                    f"Source could not be identified for {str(transferred_file)}"
+                )
+                return
+
+            source_visit_dir = source.parent
+
+            logger.info(
+                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
+            )
+            atlas_xml_path = list(
+                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
+            )[0]
+            logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
+            with open(atlas_xml_path, "rb") as atlas_xml:
+                atlas_xml_data = xmltodict.parse(atlas_xml)
+                atlas_pixel_size = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
+                atlas_binning = int(
+                    atlas_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
+                        "camera"
+                    ]["Binning"]["a:x"]
+                )
+
+            for p in partial_path.split("/"):
+                if p.startswith("Sample"):
+                    sample = int(p.replace("Sample", ""))
+                    break
+            else:
+                logger.warning(f"Sample could not be identified for {transferred_file}")
+                return
+            if source:
+                environment.samples[source] = SampleInfo(
+                    atlas=Path(partial_path), sample=sample
+                )
+                url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
+                dcg_search_dir = "/".join(
+                    p for p in transferred_file.parent.parts if p != environment.visit
+                )
+                dcg_search_dir = (
+                    dcg_search_dir[1:]
+                    if dcg_search_dir.startswith("//")
+                    else dcg_search_dir
+                )
+                dcg_images_dirs = sorted(
+                    Path(dcg_search_dir).glob("Images-Disc*"),
+                    key=lambda x: x.stat().st_ctime,
+                )
+                if not dcg_images_dirs:
+                    logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
+                    return
+                dcg_tag = str(dcg_images_dirs[-1])
+                dcg_data = {
+                    "experiment_type": "tomo",
+                    "experiment_type_id": 36,
+                    "tag": dcg_tag,
+                    "atlas": str(
+                        _atlas_destination(environment, source, transferred_file)
+                        / environment.samples[source].atlas.parent
+                        / atlas_xml_path.with_suffix(".jpg").name
+                    ),
+                    "sample": environment.samples[source].sample,
+                    "atlas_pixel_size": atlas_pixel_size,
+                    "atlas_binning": atlas_binning,
+                }
+                capture_post(url, json=dcg_data)
+
+        elif transferred_file.name == "SearchMap.xml" and environment:
+            logger.info("Tomography session search map xml found")
+            with open(transferred_file, "r") as sm_xml:
+                sm_data = xmltodict.parse(sm_xml.read())
+
+            # This bit gets SearchMap location on Atlas
+            sm_pixel_size = float(
+                sm_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                    "numericValue"
+                ]
+            )
+            stage_position = sm_data["MicroscopeImage"]["microscopeData"]["stage"][
+                "Position"
+            ]
+            sm_binning = float(
+                sm_data["MicroscopeImage"]["microscopeData"]["acquisition"]["camera"][
+                    "Binning"
+                ]["a:x"]
+            )
+            readout_area = sm_data["MicroscopeImage"]["microscopeData"]["acquisition"][
+                "camera"
+            ]["ReadoutArea"]
+
+            # Get the stage transformation
+            sm_transformations = sm_data["MicroscopeImage"]["CustomData"][
+                "a:KeyValueOfstringanyType"
+            ]
+            stage_matrix: dict[str, float] = {}
+            image_matrix: dict[str, float] = {}
+            for key_val in sm_transformations:
+                if key_val["a:Key"] == "ReferenceCorrectionForStage":
+                    stage_matrix = {
+                        "m11": float(key_val["a:Value"]["b:_m11"]),
+                        "m12": float(key_val["a:Value"]["b:_m12"]),
+                        "m21": float(key_val["a:Value"]["b:_m21"]),
+                        "m22": float(key_val["a:Value"]["b:_m22"]),
+                    }
+                elif key_val["a:Key"] == "ReferenceCorrectionForImageShift":
+                    image_matrix = {
+                        "m11": float(key_val["a:Value"]["b:_m11"]),
+                        "m12": float(key_val["a:Value"]["b:_m12"]),
+                        "m21": float(key_val["a:Value"]["b:_m21"]),
+                        "m22": float(key_val["a:Value"]["b:_m22"]),
+                    }
+            if not stage_matrix or not image_matrix:
+                print("No matrix found")
+
+            ref_matrix = {
+                "m11": float(
+                    sm_data["MicroscopeImage"]["ReferenceTransformation"]["matrix"][
+                        "a:_m11"
+                    ]
+                ),
+                "m12": float(
+                    sm_data["MicroscopeImage"]["ReferenceTransformation"]["matrix"][
+                        "a:_m12"
+                    ]
+                ),
+                "m21": float(
+                    sm_data["MicroscopeImage"]["ReferenceTransformation"]["matrix"][
+                        "a:_m21"
+                    ]
+                ),
+                "m22": float(
+                    sm_data["MicroscopeImage"]["ReferenceTransformation"]["matrix"][
+                        "a:_m22"
+                    ]
+                ),
+            }
+
+            visitless_source = get_visitless_source(transferred_file, environment)
+            if not visitless_source:
+                return
+
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
+            source = _get_source(transferred_file, environment=environment)
+            image_path = (
+                _file_transferred_to(
+                    environment, source, transferred_file.parent / "SearchMap.jpg"
+                )
+                if source
+                else ""
+            )
+            capture_post(
+                sm_url,
+                json={
+                    "tag": visitless_source,
+                    "x_stage_position": float(stage_position["X"]),
+                    "y_stage_position": float(stage_position["Y"]),
+                    "readout_area_x": readout_area[0],
+                    "readout_area_y": readout_area[1],
+                    "thumbnail_size_x": int(
+                        (512 / max(readout_area)) * readout_area[0]
+                    ),
+                    "thumbnail_size_y": int(
+                        (512 / max(readout_area)) * readout_area[1]
+                    ),
+                    "pixel_size": sm_pixel_size,
+                    "image": str(image_path),
+                    "binning": sm_binning,
+                    "reference_matrix": ref_matrix,
+                    "stage_correction": stage_matrix,
+                    "image_shift_correction": image_matrix,
+                },
+            )
+
+        elif transferred_file.name == "SearchMap.dm" and environment:
+            logger.info("Tomography session search map dm found")
+            with open(transferred_file, "r") as sm_xml:
+                sm_data = xmltodict.parse(sm_xml.read())
+
+            visitless_source = get_visitless_source(transferred_file, environment)
+            if not visitless_source:
+                return
+
+            # This bit gets SearchMap location on Atlas
+            sm_width = int(sm_data["TileSetXml"]["ImageSize"]["a:width"])
+            sm_height = int(sm_data["TileSetXml"]["ImageSize"]["a:height"])
+
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
+            capture_post(
+                sm_url,
+                json={
+                    "tag": visitless_source,
+                    "height": sm_height,
+                    "width": sm_width,
+                },
+            )
+
+        elif transferred_file.name == "BatchPositionsList.xml" and environment:
+            with open(transferred_file) as xml:
+                for_parsing = xml.read()
+            batch_xml = xmltodict.parse(for_parsing)
+            visitless_source = get_visitless_source(transferred_file, environment)
+            if not visitless_source:
+                return
+
+            for batch_position in batch_xml["BatchPositionsList"]["BatchPositions"][
+                "BatchPositionParameters"
+            ]:
+                batch_name = batch_position["Name"]
+                search_map_name = batch_position["PositionOnTileSet"]["TileSetName"]
+                batch_stage_location_x = float(
+                    batch_position["PositionOnTileSet"]["StagePositionX"]
+                )
+                batch_stage_location_y = float(
+                    batch_position["PositionOnTileSet"]["StagePositionY"]
+                )
+                bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=batch_name)}"
+                capture_post(
+                    bp_url,
+                    json={
+                        "tag": visitless_source,
+                        "stage_position_x": batch_stage_location_x,
+                        "stage_position_y": batch_stage_location_y,
+                        "search_map": search_map_name,
+                    },
+                )
+
+                # Beamshifts
+                if batch_position["AdditionalExposureTemplateAreas"]:
+                    beamshifts = batch_position["AdditionalExposureTemplateAreas"][
+                        "ExposureTemplateAreaParameters"
+                    ]
+                    if type(beamshifts) is dict:
+                        beamshifts = [beamshifts]
+                    for beamshift in beamshifts:
+                        beamshift_name = beamshift["Name"]
+                        beamshift_position_x = float(beamshift["PositionX"])
+                        beamshift_position_y = float(beamshift["PositionY"])
+
+                        bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=beamshift_name)}"
+                        capture_post(
+                            bp_url,
+                            json={
+                                "tag": visitless_source,
+                                "stage_position_x": beamshift_position_x,
+                                "stage_position_y": beamshift_position_y,
+                                "search_map": search_map_name,
+                            },
+                        )
