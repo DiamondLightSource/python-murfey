@@ -33,6 +33,7 @@ dependencies = [
     "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
     "pydantic>=2",
+    "pydantic-settings",
     "requests",
     "rich",
     "werkzeug",
