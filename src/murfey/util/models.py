@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 """
 General Models
@@ -45,6 +46,15 @@ class File(BaseModel):
     size: int
     timestamp: datetime
     full_path: str
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def round_file_size_correctly(cls, v: Any) -> int:
+        if isinstance(v, float):
+            if v - math.floor(v) == 0.5:
+                return math.ceil(v)
+            return round(v)
+        return v
 
 
 class ConnectionFileParameters(BaseModel):
