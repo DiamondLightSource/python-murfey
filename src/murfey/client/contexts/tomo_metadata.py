@@ -277,7 +277,9 @@ class TomographyMetadataContext(Context):
                         "tag": visitless_source,
                         "x_stage_position": batch_stage_location_x,
                         "y_stage_position": batch_stage_location_y,
-                        "search_map": search_map_name,
+                        "x_beamshift": 0,
+                        "y_beamshift": 0,
+                        "search_map_name": search_map_name,
                     },
                 )
 
@@ -298,8 +300,10 @@ class TomographyMetadataContext(Context):
                             bp_url,
                             json={
                                 "tag": visitless_source,
-                                "x_stage_position": beamshift_position_x,
-                                "y_stage_position": beamshift_position_y,
-                                "search_map": search_map_name,
+                                "x_stage_position": batch_stage_location_x,
+                                "y_stage_position": batch_stage_location_y,
+                                "x_beamshift": beamshift_position_x,
+                                "y_beamshift": beamshift_position_y,
+                                "search_map_name": search_map_name,
                             },
                         )

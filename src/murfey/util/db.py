@@ -349,15 +349,20 @@ class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
+    ispyb_id: Optional[int] = None
     tag: str
     rsync_source: str
     session_id: int = Field(foreign_key="session.id")
+    search_map_id: int = Field(foreign_key="searchmap.id")
     tilt_series_length: int = -1
     processing_requested: bool = False
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
     session: Optional[Session] = Relationship(back_populates="tilt_series")
     tilts: List["Tilt"] = Relationship(
         back_populates="tilt_series", sa_relationship_kwargs={"cascade": "delete"}
     )
+    search_map: Optional["GridSquare"] = Relationship(back_populates="batch_positions")
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
@@ -620,7 +625,12 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     reference_matrix: Optional[dict[str, float]] = None
     stage_correction: Optional[dict[str, float]] = None
     image_shift_correction: Optional[dict[str, float]] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="search_maps")
+    batch_positions: List["TiltSeries"] = Relationship(
+        back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class Movie(SQLModel, table=True):  # type: ignore

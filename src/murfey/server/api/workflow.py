@@ -819,6 +819,9 @@ def register_completed_tilt_series(
                     "pixel_size": preproc_params.pixel_size,
                     "manual_tilt_offset": -tilt_offset,
                     "node_creator_queue": machine_config.node_creator_queue,
+                    "search_map_id": ts.search_map_id,
+                    "x_location": ts.x_location,
+                    "y_location": ts.y_location,
                 },
             }
             if _transport_object:

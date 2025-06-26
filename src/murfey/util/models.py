@@ -157,8 +157,10 @@ class SearchMapParameters:
 class BatchPositionParameters:
     tag: str
     x_stage_position: float
-    Y_stage_position: float
-    search_map: str
+    y_stage_position: float
+    x_beamshift: float
+    y_beamshift: float
+    search_map_name: str
 
 
 class MultigridWatcherSetup(BaseModel):

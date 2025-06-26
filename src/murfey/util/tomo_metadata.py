@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 from sqlmodel import Session, select
 
@@ -7,7 +9,10 @@ from murfey.server.gain import Camera
 from murfey.util.config import get_machine_config
 from murfey.util.db import DataCollectionGroup, SearchMap
 from murfey.util.db import Session as MurfeySession
+from murfey.util.db import TiltSeries
 from murfey.util.models import BatchPositionParameters, SearchMapParameters
+
+logger = logging.getLogger("murfey.client.util.tomo_metadata")
 
 
 def register_search_map_in_database(
@@ -127,12 +132,13 @@ def register_search_map_in_database(
                 ],
             ]
         )
-        M_corrected = np.matmul(np.linalg.inv(M), R)
-        vector_pixel = np.matmul(M_corrected, B)
+        vector_pixel = np.matmul(np.linalg.inv(M), np.matmul(R, np.matmul(M, B)))
 
         camera = getattr(Camera, machine_config.camera)
-        if camera == Camera.FALCON:
-            vector_pixel = np.matmul(np.array([[-1, 0], [0, -1]]), vector_pixel)
+        if camera == Camera.FALCON or Camera.K3_FLIPY:
+            vector_pixel = np.matmul(np.array([[1, 0], [0, -1]]), vector_pixel)
+        elif camera == Camera.K3_FLIPX:
+            vector_pixel = np.matmul(np.array([[-1, 0], [0, 1]]), vector_pixel)
 
         search_map_params.height_on_atlas = int(
             search_map.height * search_map.pixel_size / dcg.atlas_pixel_size
@@ -140,20 +146,8 @@ def register_search_map_in_database(
         search_map_params.width_on_atlas = int(
             search_map.width * search_map.pixel_size / dcg.atlas_pixel_size
         )
-        search_map_params.x_location = (
-            vector_pixel[0]
-            / dcg.atlas_binning
-            * search_map.pixel_size
-            / dcg.atlas_pixel_size
-            + 2003
-        )
-        search_map_params.y_location = (
-            vector_pixel[1]
-            / dcg.atlas_binning
-            * search_map.pixel_size
-            / dcg.atlas_pixel_size
-            + 2003
-        )
+        search_map_params.x_location = vector_pixel[0] / dcg.atlas_pixel_size + 2003
+        search_map_params.y_location = vector_pixel[1] / dcg.atlas_pixel_size + 2003
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location
         if _transport_object:
@@ -169,4 +163,86 @@ def register_batch_position_in_database(
     batch_parameters: BatchPositionParameters,
     murfey_db: Session,
 ):
-    pass
+    search_map = murfey_db.exec(
+        select(SearchMap)
+        .where(SearchMap.name == batch_parameters.search_map_name)
+        .where(SearchMap.tag == batch_parameters.tag)
+        .where(SearchMap.session_id == session_id)
+    ).one()
+
+    try:
+        tilt_series = murfey_db.exec(
+            select(TiltSeries)
+            .where(TiltSeries.tag == batch_name)
+            .where(TiltSeries.session_id == session_id)
+        ).one()
+        if tilt_series.x_location:
+            logger.info(f"Already did position analysis for tomogram {batch_name}")
+            return
+    except Exception:
+        tilt_series = TiltSeries(
+            tag=batch_name,
+            rsync_source=batch_parameters.tag,
+            session_id=session_id,
+            search_map_id=search_map.id,
+        )
+
+    # Get the pixel location on the searchmap
+    M = np.array(
+        [
+            [
+                search_map.reference_matrix["m11"],
+                search_map.reference_matrix["m12"],
+            ],
+            [
+                search_map.reference_matrix["m21"],
+                search_map.reference_matrix["m22"],
+            ],
+        ]
+    )
+    R1 = np.array(
+        [
+            [
+                search_map.stage_correction["m11"],
+                search_map.stage_correction["m12"],
+            ],
+            [
+                search_map.stage_correction["m21"],
+                search_map.stage_correction["m22"],
+            ],
+        ]
+    )
+    R2 = np.array(
+        [
+            [
+                search_map.image_shift_correction["m11"],
+                search_map.image_shift_correction["m12"],
+            ],
+            [
+                search_map.image_shift_correction["m21"],
+                search_map.image_shift_correction["m22"],
+            ],
+        ]
+    )
+
+    A = np.array([search_map.x_stage_position, search_map.y_stage_position])
+    B = np.array([batch_parameters.x_stage_position, batch_parameters.y_stage_position])
+
+    vector_pixel = np.matmul(
+        np.linalg.inv(M),
+        np.matmul(np.linalg.inv(R1), np.matmul(np.linalg.inv(R2), np.matmul(M, B - A))),
+    )
+    centre_batch_pixel = vector_pixel / search_map.pixel_size + [
+        search_map.width / 2,
+        search_map.height / 2,
+    ]
+    tilt_series.x_location = (
+        centre_batch_pixel[0]
+        - BatchPositionParameters.x_beamshift / search_map.pixel_size
+    )
+    tilt_series.y_location = (
+        centre_batch_pixel[1]
+        - BatchPositionParameters.y_beamshift / search_map.pixel_size
+    )
+    murfey_db.add(tilt_series)
+    murfey_db.commit()
