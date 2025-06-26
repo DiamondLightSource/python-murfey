@@ -81,7 +81,7 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas: str = ""
     sample: Optional[int] = None
-    atlas_pixel_size: int = 0
+    atlas_pixel_size: float = 0
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
