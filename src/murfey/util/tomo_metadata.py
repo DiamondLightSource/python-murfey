@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.server.gain import Camera
 from murfey.util.config import get_machine_config
 from murfey.util.db import DataCollectionGroup, SearchMap
 from murfey.util.db import Session as MurfeySession
@@ -128,7 +129,9 @@ def register_search_map_in_database(
         )
         M_corrected = np.matmul(np.linalg.inv(M), R)
         vector_pixel = np.matmul(M_corrected, B)
-        if machine_config.camera == "FALCON":
+
+        camera = getattr(Camera, machine_config.camera)
+        if camera == Camera.FALCON:
             vector_pixel = np.matmul(np.array([[-1, 0], [0, -1]]), vector_pixel)
 
         search_map_params.height_on_atlas = int(
