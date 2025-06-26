@@ -96,6 +96,9 @@ class Session(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    search_maps: List["SearchMap"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
     rsync_instances: List[RsyncInstance] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -617,7 +620,7 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     reference_matrix: Optional[dict[str, float]] = None
     stage_correction: Optional[dict[str, float]] = None
     image_shift_correction: Optional[dict[str, float]] = None
-    session: Optional[Session] = Relationship(back_populates="grid_squares")
+    session: Optional[Session] = Relationship(back_populates="search_maps")
 
 
 class Movie(SQLModel, table=True):  # type: ignore
