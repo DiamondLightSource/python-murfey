@@ -81,7 +81,10 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas: str = ""
     sample: Optional[int] = None
-    atlas_pixel_size: int = 0
+    atlas_pixel_size: float = 0
+    atlas_size_x: int = 0
+    atlas_size_y: int = 0
+    atlas_binning: int = 1
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
@@ -116,6 +119,9 @@ def register_dc_group(
                         "atlas": dcg_params.atlas,
                         "sample": dcg_params.sample,
                         "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                        "atlas_size_x": dcg_params.atlas_size_x,
+                        "atlas_size_y": dcg_params.atlas_size_y,
+                        "atlas_binning": dcg_params.atlas_binning,
                         "dcgid": dcg_murfey[0].id,
                         "session_id": session_id,
                     },

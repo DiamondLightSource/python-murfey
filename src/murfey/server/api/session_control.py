@@ -46,11 +46,17 @@ from murfey.util.db import (
     Session,
 )
 from murfey.util.models import (
+    BatchPositionParameters,
     ClientInfo,
     FoilHoleParameters,
     GridSquareParameters,
     RsyncerInfo,
+    SearchMapParameters,
     Visit,
+)
+from murfey.util.tomo_metadata import (
+    register_batch_position_in_database,
+    register_search_map_in_database,
 )
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
@@ -362,6 +368,33 @@ def register_foil_hole(
         f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
     )
     return _register_foil_hole(session_id, gs_name, foil_hole_params, db)
+
+
+tomography_router = APIRouter(
+    prefix="/session_control/tomography",
+    dependencies=[Depends(validate_instrument_token)],
+    tags=["Session Control: Tomography"],
+)
+
+
+@tomography_router.post("/sessions/{session_id}/search_map/{sm_name}")
+def register_search_map(
+    session_id: MurfeySessionID,
+    sm_name: str,
+    search_map_params: SearchMapParameters,
+    db=murfey_db,
+):
+    return register_search_map_in_database(session_id, sm_name, search_map_params, db)
+
+
+@tomography_router.post("/sessions/{session_id}/batch_position/{batch_name}")
+def register_batch_position(
+    session_id: MurfeySessionID,
+    batch_name: str,
+    batch_params: BatchPositionParameters,
+    db=murfey_db,
+):
+    return register_batch_position_in_database(session_id, batch_name, batch_params, db)
 
 
 correlative_router = APIRouter(

@@ -372,6 +372,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_id: Optional[int] = None
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
+    atlas_binning: Optional[int] = None
     sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
@@ -599,6 +600,24 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     preprocess_stashes: List[PreprocessStash] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
     )
+
+
+class SearchMap(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: str
+    tag: str
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+    binning: Optional[float] = None
+    reference_matrix: Optional[dict[str, float]] = None
+    stage_correction: Optional[dict[str, float]] = None
+    image_shift_correction: Optional[dict[str, float]] = None
+    session: Optional[Session] = Relationship(back_populates="grid_squares")
 
 
 class Movie(SQLModel, table=True):  # type: ignore

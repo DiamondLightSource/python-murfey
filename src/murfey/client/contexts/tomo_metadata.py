@@ -152,9 +152,6 @@ class TomographyMetadataContext(Context):
                     "Binning"
                 ]["a:x"]
             )
-            readout_area = sm_data["MicroscopeImage"]["microscopeData"]["acquisition"][
-                "camera"
-            ]["ReadoutArea"]
 
             # Get the stage transformation
             sm_transformations = sm_data["MicroscopeImage"]["CustomData"][
@@ -222,14 +219,6 @@ class TomographyMetadataContext(Context):
                     "tag": visitless_source,
                     "x_stage_position": float(stage_position["X"]),
                     "y_stage_position": float(stage_position["Y"]),
-                    "readout_area_x": readout_area[0],
-                    "readout_area_y": readout_area[1],
-                    "thumbnail_size_x": int(
-                        (512 / max(readout_area)) * readout_area[0]
-                    ),
-                    "thumbnail_size_y": int(
-                        (512 / max(readout_area)) * readout_area[1]
-                    ),
                     "pixel_size": sm_pixel_size,
                     "image": str(image_path),
                     "binning": sm_binning,
@@ -248,7 +237,7 @@ class TomographyMetadataContext(Context):
             if not visitless_source:
                 return
 
-            # This bit gets SearchMap location on Atlas
+            # This bit gets SearchMap size
             sm_width = int(sm_data["TileSetXml"]["ImageSize"]["a:width"])
             sm_height = int(sm_data["TileSetXml"]["ImageSize"]["a:height"])
 
@@ -286,8 +275,8 @@ class TomographyMetadataContext(Context):
                     bp_url,
                     json={
                         "tag": visitless_source,
-                        "stage_position_x": batch_stage_location_x,
-                        "stage_position_y": batch_stage_location_y,
+                        "x_stage_position": batch_stage_location_x,
+                        "y_stage_position": batch_stage_location_y,
                         "search_map": search_map_name,
                     },
                 )
@@ -309,8 +298,8 @@ class TomographyMetadataContext(Context):
                             bp_url,
                             json={
                                 "tag": visitless_source,
-                                "stage_position_x": beamshift_position_x,
-                                "stage_position_y": beamshift_position_y,
+                                "x_stage_position": beamshift_position_x,
+                                "y_stage_position": beamshift_position_y,
                                 "search_map": search_map_name,
                             },
                         )

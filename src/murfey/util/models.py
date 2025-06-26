@@ -136,6 +136,31 @@ class FoilHoleParameters(BaseModel):
     diameter: Optional[float] = None
 
 
+class SearchMapParameters:
+    tag: str
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    pixel_size: Optional[float] = None
+    image: Optional[str] = None
+    binning: Optional[float] = None
+    reference_matrix: Optional[dict[str, float]] = None
+    stage_correction: Optional[dict[str, float]] = None
+    image_shift_correction: Optional[dict[str, float]] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    height_on_atlas: Optional[int] = None
+    width_on_atlas: Optional[int] = None
+
+
+class BatchPositionParameters:
+    tag: str
+    x_stage_position: float
+    Y_stage_position: float
+    search_map: str
+
+
 class MultigridWatcherSetup(BaseModel):
     source: Path
     skip_existing_processing: bool = False
