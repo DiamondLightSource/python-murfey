@@ -162,7 +162,7 @@ def register_search_map_in_database(
             dcg.atlas_binning,
         ]
     ):
-        M = np.array(
+        reference_shift_matrix = np.array(
             [
                 [
                     search_map.reference_matrix_m11,
@@ -174,8 +174,10 @@ def register_search_map_in_database(
                 ],
             ]
         )
-        B = np.array([search_map.x_stage_position, search_map.y_stage_position])
-        R = np.array(
+        stage_vector = np.array(
+            [search_map.x_stage_position, search_map.y_stage_position]
+        )
+        stage_correction_matrix = np.array(
             [
                 [
                     search_map.stage_correction_m11,
@@ -187,13 +189,18 @@ def register_search_map_in_database(
                 ],
             ]
         )
-        vector_pixel = np.matmul(np.linalg.inv(M), np.matmul(R, np.matmul(M, B)))
+        corrected_vector = np.matmul(
+            np.linalg.inv(reference_shift_matrix),
+            np.matmul(
+                stage_correction_matrix, np.matmul(reference_shift_matrix, stage_vector)
+            ),
+        )
 
         camera = getattr(Camera, machine_config.camera)
         if camera == Camera.FALCON or Camera.K3_FLIPY:
-            vector_pixel = np.matmul(np.array([[1, 0], [0, -1]]), vector_pixel)
+            corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
         elif camera == Camera.K3_FLIPX:
-            vector_pixel = np.matmul(np.array([[-1, 0], [0, 1]]), vector_pixel)
+            corrected_vector = np.matmul(np.array([[-1, 0], [0, 1]]), corrected_vector)
 
         search_map_params.height_on_atlas = int(
             search_map.height * search_map.pixel_size / dcg.atlas_pixel_size
@@ -201,8 +208,8 @@ def register_search_map_in_database(
         search_map_params.width_on_atlas = int(
             search_map.width * search_map.pixel_size / dcg.atlas_pixel_size
         )
-        search_map_params.x_location = vector_pixel[0] / dcg.atlas_pixel_size + 2003
-        search_map_params.y_location = vector_pixel[1] / dcg.atlas_pixel_size + 2003
+        search_map_params.x_location = corrected_vector[0] / dcg.atlas_pixel_size + 2003
+        search_map_params.y_location = corrected_vector[1] / dcg.atlas_pixel_size + 2003
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location
         if _transport_object:
@@ -256,7 +263,7 @@ def register_batch_position_in_database(
             search_map.width,
         ]
     ):
-        M = np.array(
+        reference_shift_matrix = np.array(
             [
                 [
                     search_map.reference_matrix_m11,
@@ -268,7 +275,7 @@ def register_batch_position_in_database(
                 ],
             ]
         )
-        R1 = np.array(
+        stage_correction_matrix = np.array(
             [
                 [
                     search_map.stage_correction_m11,
@@ -280,7 +287,7 @@ def register_batch_position_in_database(
                 ],
             ]
         )
-        R2 = np.array(
+        image_shift_matrix = np.array(
             [
                 [
                     search_map.image_shift_correction_m11,
@@ -293,18 +300,24 @@ def register_batch_position_in_database(
             ]
         )
 
-        A = np.array([search_map.x_stage_position, search_map.y_stage_position])
-        B = np.array(
-            [batch_parameters.x_stage_position, batch_parameters.y_stage_position]
+        stage_vector = np.array(
+            [
+                batch_parameters.x_stage_position - search_map.x_stage_position,
+                batch_parameters.y_stage_position - search_map.y_stage_position,
+            ]
         )
 
-        vector_pixel = np.matmul(
-            np.linalg.inv(M),
+        corrected_vector = np.matmul(
+            np.linalg.inv(reference_shift_matrix),
             np.matmul(
-                np.linalg.inv(R1), np.matmul(np.linalg.inv(R2), np.matmul(M, B - A))
+                np.linalg.inv(stage_correction_matrix),
+                np.matmul(
+                    np.linalg.inv(image_shift_matrix),
+                    np.matmul(reference_shift_matrix, stage_vector),
+                ),
             ),
         )
-        centre_batch_pixel = vector_pixel / search_map.pixel_size + [
+        centre_batch_pixel = corrected_vector / search_map.pixel_size + [
             search_map.width / 2,
             search_map.height / 2,
         ]
