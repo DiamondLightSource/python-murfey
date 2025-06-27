@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.server.gain import Camera
+from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import DataCollectionGroup, SearchMap
 from murfey.util.db import Session as MurfeySession
@@ -215,7 +216,9 @@ def register_search_map_in_database(
         if _transport_object:
             _transport_object.do_update_search_map(search_map.id, search_map_params)
     else:
-        logger.info(f"Unable to register search map {search_map_name} position yet")
+        logger.info(
+            f"Unable to register search map {sanitise(search_map_name)} position yet"
+        )
     murfey_db.add(search_map)
     murfey_db.commit()
     murfey_db.close()
@@ -241,7 +244,9 @@ def register_batch_position_in_database(
             .where(TiltSeries.session_id == session_id)
         ).one()
         if tilt_series.x_location:
-            logger.info(f"Already did position analysis for tomogram {batch_name}")
+            logger.info(
+                f"Already did position analysis for tomogram {sanitise(batch_name)}"
+            )
             return
     except Exception:
         tilt_series = TiltSeries(
@@ -331,7 +336,7 @@ def register_batch_position_in_database(
         )
     else:
         logger.warning(
-            f"No search map information available to register position of {batch_name}"
+            f"No search map information available to register position of {sanitise(batch_name)}"
         )
     murfey_db.add(tilt_series)
     murfey_db.commit()
