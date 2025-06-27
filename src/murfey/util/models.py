@@ -136,7 +136,7 @@ class FoilHoleParameters(BaseModel):
     diameter: Optional[float] = None
 
 
-class SearchMapParameters:
+class SearchMapParameters(BaseModel):
     tag: str
     x_location: Optional[float] = None
     y_location: Optional[float] = None
@@ -154,7 +154,7 @@ class SearchMapParameters:
     width_on_atlas: Optional[int] = None
 
 
-class BatchPositionParameters:
+class BatchPositionParameters(BaseModel):
     tag: str
     x_stage_position: float
     y_stage_position: float
