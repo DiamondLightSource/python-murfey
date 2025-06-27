@@ -183,7 +183,7 @@ class TomographyMetadataContext(Context):
                 else ""
             )
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
                 sm_url,
                 json={
@@ -213,7 +213,7 @@ class TomographyMetadataContext(Context):
             sm_width = int(sm_data["TileSetXml"]["ImageSize"]["a:width"])
             sm_height = int(sm_data["TileSetXml"]["ImageSize"]["a:height"])
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
                 sm_url,
                 json={
