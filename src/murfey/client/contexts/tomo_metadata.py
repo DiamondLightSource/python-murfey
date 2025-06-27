@@ -50,7 +50,7 @@ class TomographyMetadataContext(Context):
             **kwargs,
         )
 
-        if transferred_file.name == "Session.xml" and environment:
+        if transferred_file.name == "Session.dm" and environment:
             logger.info("Tomography session metadata found")
             with open(transferred_file, "r") as session_xml:
                 session_data = xmltodict.parse(session_xml.read())
