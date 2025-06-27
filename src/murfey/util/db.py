@@ -362,7 +362,7 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
     tilts: List["Tilt"] = Relationship(
         back_populates="tilt_series", sa_relationship_kwargs={"cascade": "delete"}
     )
-    search_map: Optional["GridSquare"] = Relationship(back_populates="batch_positions")
+    search_map: Optional["SearchMap"] = Relationship(back_populates="tilt_series")
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
@@ -637,7 +637,7 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     width: Optional[int] = None
     height: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="search_maps")
-    batch_positions: List["TiltSeries"] = Relationship(
+    tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
 
