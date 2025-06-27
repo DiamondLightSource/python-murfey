@@ -17,22 +17,6 @@ logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-def get_visitless_source(
-    transferred_file: Path, environment: MurfeyInstanceEnvironment
-) -> Optional[str]:
-    source = _get_source(transferred_file, environment=environment)
-    visitless_source_search_dir = str(source).replace(f"/{environment.visit}", "")
-    visitless_source_images_dirs = sorted(
-        Path(visitless_source_search_dir).glob("Images-Disc*"),
-        key=lambda x: x.stat().st_ctime,
-    )
-    if not visitless_source_images_dirs:
-        logger.warning(f"Cannot find Images-Disc* in {visitless_source_search_dir}")
-        return None
-    visitless_source = str(visitless_source_images_dirs[-1])
-    return visitless_source
-
-
 class TomographyMetadataContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("Tomography_metadata", acquisition_software)
@@ -102,22 +86,9 @@ class TomographyMetadataContext(Context):
                     atlas=Path(partial_path), sample=sample
                 )
                 url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
-                dcg_search_dir = "/".join(
+                dcg_tag = "/".join(
                     p for p in transferred_file.parent.parts if p != environment.visit
                 )
-                dcg_search_dir = (
-                    dcg_search_dir[1:]
-                    if dcg_search_dir.startswith("//")
-                    else dcg_search_dir
-                )
-                dcg_images_dirs = sorted(
-                    Path(dcg_search_dir).glob("Images-Disc*"),
-                    key=lambda x: x.stat().st_ctime,
-                )
-                if not dcg_images_dirs:
-                    logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
-                    return
-                dcg_tag = str(dcg_images_dirs[-1])
                 dcg_data = {
                     "experiment_type": "tomo",
                     "experiment_type_id": 36,
@@ -202,12 +173,8 @@ class TomographyMetadataContext(Context):
                 ),
             }
 
-            visitless_source = get_visitless_source(transferred_file, environment)
-            if not visitless_source:
-                return
-
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
             source = _get_source(transferred_file, environment=environment)
+            visitless_source = str(source).replace(f"/{environment.visit}", "")
             image_path = (
                 _file_transferred_to(
                     environment, source, transferred_file.parent / "SearchMap.jpg"
@@ -215,6 +182,8 @@ class TomographyMetadataContext(Context):
                 if source
                 else ""
             )
+
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.stem)}"
             capture_post(
                 sm_url,
                 json={
@@ -235,7 +204,8 @@ class TomographyMetadataContext(Context):
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
-            visitless_source = get_visitless_source(transferred_file, environment)
+            source = _get_source(transferred_file, environment=environment)
+            visitless_source = str(source).replace(f"/{environment.visit}", "")
             if not visitless_source:
                 return
 
@@ -257,7 +227,8 @@ class TomographyMetadataContext(Context):
             with open(transferred_file) as xml:
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
-            visitless_source = get_visitless_source(transferred_file, environment)
+            source = _get_source(transferred_file, environment=environment)
+            visitless_source = str(source).replace(f"/{environment.visit}", "")
             if not visitless_source:
                 return
 
