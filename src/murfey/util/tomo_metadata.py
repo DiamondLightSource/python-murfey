@@ -42,15 +42,53 @@ def register_search_map_in_database(
         search_map.pixel_size = search_map_params.pixel_size or search_map.pixel_size
         search_map.image = search_map_params.image or search_map.image
         search_map.binning = search_map_params.binning or search_map.binning
-        search_map.reference_matrix = (
-            search_map_params.reference_matrix or search_map.reference_matrix
+        search_map.reference_matrix_m11 = (
+            search_map_params.reference_matrix.get("m11")
+            or search_map.reference_matrix_m11
         )
-        search_map.stage_correction = (
-            search_map_params.stage_correction or search_map.stage_correction
+        search_map.reference_matrix_m12 = (
+            search_map_params.reference_matrix.get("m12")
+            or search_map.reference_matrix_m12
         )
-        search_map.image_shift_correction = (
-            search_map_params.image_shift_correction
-            or search_map.image_shift_correction
+        search_map.reference_matrix_m21 = (
+            search_map_params.reference_matrix.get("m21")
+            or search_map.reference_matrix_m21
+        )
+        search_map.reference_matrix_m22 = (
+            search_map_params.reference_matrix.get("m22")
+            or search_map.reference_matrix_m22
+        )
+        search_map.stage_correction_m11 = (
+            search_map_params.stage_correction.get("m11")
+            or search_map.stage_correction_m11
+        )
+        search_map.stage_correction_m12 = (
+            search_map_params.stage_correction.get("m12")
+            or search_map.stage_correction_m12
+        )
+        search_map.stage_correction_m21 = (
+            search_map_params.stage_correction.get("m21")
+            or search_map.stage_correction_m21
+        )
+        search_map.stage_correction_m22 = (
+            search_map_params.stage_correction.get("m22")
+            or search_map.stage_correction_m22
+        )
+        search_map.image_shift_correction_m11 = (
+            search_map_params.image_shift_correction.get("m11")
+            or search_map.image_shift_correction_m11
+        )
+        search_map.image_shift_correction_m12 = (
+            search_map_params.image_shift_correction.get("m12")
+            or search_map.image_shift_correction_m12
+        )
+        search_map.image_shift_correction_m21 = (
+            search_map_params.image_shift_correction.get("m21")
+            or search_map.image_shift_correction_m21
+        )
+        search_map.image_shift_correction_m22 = (
+            search_map_params.image_shift_correction.get("m22")
+            or search_map.image_shift_correction_m22
         )
         search_map.height = search_map_params.height or search_map.height
         search_map.width = search_map_params.width or search_map.width
@@ -78,9 +116,26 @@ def register_search_map_in_database(
             pixel_size=search_map_params.pixel_size,
             image=search_map_params.image,
             binning=search_map_params.binning,
-            reference_matrix=search_map_params.reference_matrix,
-            stage_correction=search_map_params.stage_correction,
-            image_shift_correction=search_map_params.image_shift_correction,
+            reference_matrix_m11=search_map_params.reference_matrix.get("m11"),
+            reference_matrix_m12=search_map_params.reference_matrix.get("m12"),
+            reference_matrix_m21=search_map_params.reference_matrix.get("m21"),
+            reference_matrix_m22=search_map_params.reference_matrix.get("m22"),
+            stage_correction_m11=search_map_params.stage_correction.get("m11"),
+            stage_correction_m12=search_map_params.stage_correction.get("m12"),
+            stage_correction_m21=search_map_params.stage_correction.get("m21"),
+            stage_correction_m22=search_map_params.stage_correction.get("m22"),
+            image_shift_correction_m11=search_map_params.image_shift_correction.get(
+                "m11"
+            ),
+            image_shift_correction_m12=search_map_params.image_shift_correction.get(
+                "m12"
+            ),
+            image_shift_correction_m21=search_map_params.image_shift_correction.get(
+                "m21"
+            ),
+            image_shift_correction_m22=search_map_params.image_shift_correction.get(
+                "m22"
+            ),
             height=search_map_params.height,
             width=search_map_params.width,
         )
@@ -96,8 +151,8 @@ def register_search_map_in_database(
 
     if all(
         [
-            search_map.reference_matrix,
-            search_map.stage_correction,
+            search_map.reference_matrix_m11,
+            search_map.stage_correction_m11,
             search_map.x_stage_position,
             search_map.y_stage_position,
             search_map.pixel_size,
@@ -110,12 +165,12 @@ def register_search_map_in_database(
         M = np.array(
             [
                 [
-                    search_map.reference_matrix["m11"],
-                    search_map.reference_matrix["m12"],
+                    search_map.reference_matrix_m11,
+                    search_map.reference_matrix_m12,
                 ],
                 [
-                    search_map.reference_matrix["m21"],
-                    search_map.reference_matrix["m22"],
+                    search_map.reference_matrix_m21,
+                    search_map.reference_matrix_m22,
                 ],
             ]
         )
@@ -123,12 +178,12 @@ def register_search_map_in_database(
         R = np.array(
             [
                 [
-                    search_map.stage_correction["m11"],
-                    search_map.stage_correction["m12"],
+                    search_map.stage_correction_m11,
+                    search_map.stage_correction_m12,
                 ],
                 [
-                    search_map.stage_correction["m21"],
-                    search_map.stage_correction["m22"],
+                    search_map.stage_correction_m21,
+                    search_map.stage_correction_m22,
                 ],
             ]
         )
@@ -152,6 +207,8 @@ def register_search_map_in_database(
         search_map.y_location = search_map_params.y_location
         if _transport_object:
             _transport_object.do_update_search_map(search_map.id, search_map_params)
+    else:
+        logger.info(f"Unable to register search map {search_map_name} position yet")
     murfey_db.add(search_map)
     murfey_db.commit()
     murfey_db.close()
@@ -188,61 +245,80 @@ def register_batch_position_in_database(
         )
 
     # Get the pixel location on the searchmap
-    M = np.array(
+    if all(
         [
-            [
-                search_map.reference_matrix["m11"],
-                search_map.reference_matrix["m12"],
-            ],
-            [
-                search_map.reference_matrix["m21"],
-                search_map.reference_matrix["m22"],
-            ],
+            search_map.reference_matrix_m11,
+            search_map.stage_correction_m11,
+            search_map.x_stage_position,
+            search_map.y_stage_position,
+            search_map.pixel_size,
+            search_map.height,
+            search_map.width,
         ]
-    )
-    R1 = np.array(
-        [
+    ):
+        M = np.array(
             [
-                search_map.stage_correction["m11"],
-                search_map.stage_correction["m12"],
-            ],
+                [
+                    search_map.reference_matrix_m11,
+                    search_map.reference_matrix_m12,
+                ],
+                [
+                    search_map.reference_matrix_m21,
+                    search_map.reference_matrix_m22,
+                ],
+            ]
+        )
+        R1 = np.array(
             [
-                search_map.stage_correction["m21"],
-                search_map.stage_correction["m22"],
-            ],
-        ]
-    )
-    R2 = np.array(
-        [
+                [
+                    search_map.stage_correction_m11,
+                    search_map.stage_correction_m12,
+                ],
+                [
+                    search_map.stage_correction_m21,
+                    search_map.stage_correction_m22,
+                ],
+            ]
+        )
+        R2 = np.array(
             [
-                search_map.image_shift_correction["m11"],
-                search_map.image_shift_correction["m12"],
-            ],
-            [
-                search_map.image_shift_correction["m21"],
-                search_map.image_shift_correction["m22"],
-            ],
-        ]
-    )
+                [
+                    search_map.image_shift_correction_m11,
+                    search_map.image_shift_correction_m12,
+                ],
+                [
+                    search_map.image_shift_correction_m21,
+                    search_map.image_shift_correction_m22,
+                ],
+            ]
+        )
 
-    A = np.array([search_map.x_stage_position, search_map.y_stage_position])
-    B = np.array([batch_parameters.x_stage_position, batch_parameters.y_stage_position])
+        A = np.array([search_map.x_stage_position, search_map.y_stage_position])
+        B = np.array(
+            [batch_parameters.x_stage_position, batch_parameters.y_stage_position]
+        )
 
-    vector_pixel = np.matmul(
-        np.linalg.inv(M),
-        np.matmul(np.linalg.inv(R1), np.matmul(np.linalg.inv(R2), np.matmul(M, B - A))),
-    )
-    centre_batch_pixel = vector_pixel / search_map.pixel_size + [
-        search_map.width / 2,
-        search_map.height / 2,
-    ]
-    tilt_series.x_location = (
-        centre_batch_pixel[0]
-        - BatchPositionParameters.x_beamshift / search_map.pixel_size
-    )
-    tilt_series.y_location = (
-        centre_batch_pixel[1]
-        - BatchPositionParameters.y_beamshift / search_map.pixel_size
-    )
+        vector_pixel = np.matmul(
+            np.linalg.inv(M),
+            np.matmul(
+                np.linalg.inv(R1), np.matmul(np.linalg.inv(R2), np.matmul(M, B - A))
+            ),
+        )
+        centre_batch_pixel = vector_pixel / search_map.pixel_size + [
+            search_map.width / 2,
+            search_map.height / 2,
+        ]
+        tilt_series.x_location = (
+            centre_batch_pixel[0]
+            - BatchPositionParameters.x_beamshift / search_map.pixel_size
+        )
+        tilt_series.y_location = (
+            centre_batch_pixel[1]
+            - BatchPositionParameters.y_beamshift / search_map.pixel_size
+        )
+    else:
+        logger.warning(
+            f"No search map information available to register position of {batch_name}"
+        )
     murfey_db.add(tilt_series)
     murfey_db.commit()

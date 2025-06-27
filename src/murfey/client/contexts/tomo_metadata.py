@@ -175,7 +175,9 @@ class TomographyMetadataContext(Context):
                         "m22": float(key_val["a:Value"]["b:_m22"]),
                     }
             if not stage_matrix or not image_matrix:
-                print("No matrix found")
+                logger.error(
+                    f"No stage or image shift matrix found for {transferred_file}"
+                )
 
             ref_matrix = {
                 "m11": float(

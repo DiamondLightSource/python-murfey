@@ -145,9 +145,9 @@ class SearchMapParameters:
     pixel_size: Optional[float] = None
     image: Optional[str] = None
     binning: Optional[float] = None
-    reference_matrix: Optional[dict[str, float]] = None
-    stage_correction: Optional[dict[str, float]] = None
-    image_shift_correction: Optional[dict[str, float]] = None
+    reference_matrix: dict[str, float] = {}
+    stage_correction: dict[str, float] = {}
+    image_shift_correction: dict[str, float] = {}
     height: Optional[int] = None
     width: Optional[int] = None
     height_on_atlas: Optional[int] = None
