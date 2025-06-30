@@ -95,7 +95,8 @@ def register_search_map_in_database(
         search_map.width = search_map_params.width or search_map.width
         if _transport_object:
             _transport_object.do_update_search_map(search_map.id, search_map_params)
-    except Exception:
+    except Exception as e:
+        logger.info(f"Registering new search map due to {e}", exc_info=True)
         if _transport_object:
             sm_ispyb_response = _transport_object.do_insert_search_map(
                 dcg.atlas_id, search_map_params
@@ -140,8 +141,6 @@ def register_search_map_in_database(
             height=search_map_params.height,
             width=search_map_params.width,
         )
-    murfey_db.add(search_map)
-    murfey_db.commit()
 
     murfey_session = murfey_db.exec(
         select(MurfeySession).where(MurfeySession.id == session_id)
@@ -149,7 +148,6 @@ def register_search_map_in_database(
     machine_config = get_machine_config(instrument_name=murfey_session.instrument_name)[
         murfey_session.instrument_name
     ]
-
     if all(
         [
             search_map.reference_matrix_m11,
@@ -209,15 +207,22 @@ def register_search_map_in_database(
         search_map_params.width_on_atlas = int(
             search_map.width * search_map.pixel_size / dcg.atlas_pixel_size
         )
-        search_map_params.x_location = corrected_vector[0] / dcg.atlas_pixel_size + 2003
-        search_map_params.y_location = corrected_vector[1] / dcg.atlas_pixel_size + 2003
+        search_map_params.x_location = float(
+            corrected_vector[0] / dcg.atlas_pixel_size + 2003
+        )
+        search_map_params.y_location = float(
+            corrected_vector[1] / dcg.atlas_pixel_size + 2003
+        )
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location
         if _transport_object:
             _transport_object.do_update_search_map(search_map.id, search_map_params)
     else:
         logger.info(
-            f"Unable to register search map {sanitise(search_map_name)} position yet"
+            f"Unable to register search map {sanitise(search_map_name)} position yet: "
+            f"stage {search_map_params.x_stage_position}, "
+            f"width {search_map_params.width}, "
+            f"atlas pixel size {dcg.atlas_pixel_size}"
         )
     murfey_db.add(search_map)
     murfey_db.commit()
@@ -327,16 +332,16 @@ def register_batch_position_in_database(
             search_map.height / 2,
         ]
         tilt_series.x_location = (
-            centre_batch_pixel[0]
-            - BatchPositionParameters.x_beamshift / search_map.pixel_size
+            centre_batch_pixel[0] - batch_parameters.x_beamshift / search_map.pixel_size
         )
         tilt_series.y_location = (
-            centre_batch_pixel[1]
-            - BatchPositionParameters.y_beamshift / search_map.pixel_size
+            centre_batch_pixel[1] - batch_parameters.y_beamshift / search_map.pixel_size
         )
     else:
         logger.warning(
-            f"No search map information available to register position of {sanitise(batch_name)}"
+            f"Incomplete search map for position of {sanitise(batch_name)}: "
+            f"stage {search_map.x_stage_position}, "
+            f"width {search_map.width}, "
         )
     murfey_db.add(tilt_series)
     murfey_db.commit()

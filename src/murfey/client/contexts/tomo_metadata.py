@@ -55,7 +55,7 @@ class TomographyMetadataContext(Context):
             with open(transferred_file, "r") as session_xml:
                 session_data = xmltodict.parse(session_xml.read())
 
-            windows_path = session_data["TomographySession"]["AtlasId"]["#text"]
+            windows_path = session_data["TomographySession"]["AtlasId"]
             logger.info(f"Windows path to atlas metadata found: {windows_path}")
             visit_index = windows_path.split("\\").index(environment.visit)
             partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
@@ -97,28 +97,27 @@ class TomographyMetadataContext(Context):
             else:
                 logger.warning(f"Sample could not be identified for {transferred_file}")
                 return
-            if source:
-                environment.samples[source] = SampleInfo(
-                    atlas=Path(partial_path), sample=sample
-                )
-                url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
-                dcg_tag = "/".join(
-                    p for p in transferred_file.parent.parts if p != environment.visit
-                )
-                dcg_data = {
-                    "experiment_type": "tomo",
-                    "experiment_type_id": 36,
-                    "tag": dcg_tag,
-                    "atlas": str(
-                        _atlas_destination(environment, source, transferred_file)
-                        / environment.samples[source].atlas.parent
-                        / atlas_xml_path.with_suffix(".jpg").name
-                    ),
-                    "sample": environment.samples[source].sample,
-                    "atlas_pixel_size": atlas_pixel_size,
-                    "atlas_binning": atlas_binning,
-                }
-                capture_post(url, json=dcg_data)
+            environment.samples[source] = SampleInfo(
+                atlas=Path(partial_path), sample=sample
+            )
+            url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
+            dcg_tag = "/".join(
+                p for p in transferred_file.parent.parts if p != environment.visit
+            ).replace("//", "/")
+            dcg_data = {
+                "experiment_type": "tomo",
+                "experiment_type_id": 36,
+                "tag": dcg_tag,
+                "atlas": str(
+                    _atlas_destination(environment, source, transferred_file)
+                    / environment.samples[source].atlas.parent
+                    / atlas_xml_path.with_suffix(".jpg").name
+                ),
+                "sample": environment.samples[source].sample,
+                "atlas_pixel_size": atlas_pixel_size,
+                "atlas_binning": atlas_binning,
+            }
+            capture_post(url, json=dcg_data)
 
         elif transferred_file.name == "SearchMap.xml" and environment:
             logger.info("Tomography session search map xml found")
