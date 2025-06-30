@@ -370,14 +370,14 @@ def register_foil_hole(
     return _register_foil_hole(session_id, gs_name, foil_hole_params, db)
 
 
-tomography_router = APIRouter(
-    prefix="/session_control/tomography",
+tomo_router = APIRouter(
+    prefix="/session_control/tomo",
     dependencies=[Depends(validate_instrument_token)],
-    tags=["Session Control: Tomography"],
+    tags=["Session Control: CryoET"],
 )
 
 
-@tomography_router.post("/sessions/{session_id}/search_map/{sm_name}")
+@tomo_router.post("/sessions/{session_id}/search_map/{sm_name}")
 def register_search_map(
     session_id: MurfeySessionID,
     sm_name: str,
@@ -387,7 +387,7 @@ def register_search_map(
     return register_search_map_in_database(session_id, sm_name, search_map_params, db)
 
 
-@tomography_router.post("/sessions/{session_id}/batch_position/{batch_name}")
+@tomo_router.post("/sessions/{session_id}/batch_position/{batch_name}")
 def register_batch_position(
     session_id: MurfeySessionID,
     batch_name: str,

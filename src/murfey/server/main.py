@@ -81,7 +81,7 @@ app.include_router(murfey.server.api.mag_table.router)
 
 app.include_router(murfey.server.api.session_control.router)
 app.include_router(murfey.server.api.session_control.spa_router)
-app.include_router(murfey.server.api.session_control.tomography_router)
+app.include_router(murfey.server.api.session_control.tomo_router)
 
 app.include_router(murfey.server.api.session_info.router)
 app.include_router(murfey.server.api.session_info.correlative_router)

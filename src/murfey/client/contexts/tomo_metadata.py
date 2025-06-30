@@ -17,6 +17,22 @@ logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
+def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnvironment):
+    # Make sure we have a data collection group
+    source = _get_source(transferred_file, environment=environment)
+    if not source:
+        return None
+    dcg_tag = str(source).replace(f"/{environment.visit}", "")
+    url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
+    dcg_data = {
+        "experiment_type": "single particle",
+        "experiment_type_id": 37,
+        "tag": dcg_tag,
+    }
+    capture_post(url, json=dcg_data)
+    return dcg_tag
+
+
 class TomographyMetadataContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path):
         super().__init__("Tomography_metadata", acquisition_software)
@@ -106,6 +122,7 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "SearchMap.xml" and environment:
             logger.info("Tomography session search map xml found")
+            dcg_tag = ensure_dcg_exists(transferred_file, environment)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
@@ -174,7 +191,6 @@ class TomographyMetadataContext(Context):
             }
 
             source = _get_source(transferred_file, environment=environment)
-            visitless_source = str(source).replace(f"/{environment.visit}", "")
             image_path = (
                 _file_transferred_to(
                     environment, source, transferred_file.parent / "SearchMap.jpg"
@@ -183,11 +199,11 @@ class TomographyMetadataContext(Context):
                 else ""
             )
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
                 sm_url,
                 json={
-                    "tag": visitless_source,
+                    "tag": dcg_tag,
                     "x_stage_position": float(stage_position["X"]),
                     "y_stage_position": float(stage_position["Y"]),
                     "pixel_size": sm_pixel_size,
@@ -201,36 +217,30 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "SearchMap.dm" and environment:
             logger.info("Tomography session search map dm found")
+            dcg_tag = ensure_dcg_exists(transferred_file, environment)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
-
-            source = _get_source(transferred_file, environment=environment)
-            visitless_source = str(source).replace(f"/{environment.visit}", "")
-            if not visitless_source:
-                return
 
             # This bit gets SearchMap size
             sm_width = int(sm_data["TileSetXml"]["ImageSize"]["a:width"])
             sm_height = int(sm_data["TileSetXml"]["ImageSize"]["a:height"])
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
+            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
                 sm_url,
                 json={
-                    "tag": visitless_source,
+                    "tag": dcg_tag,
                     "height": sm_height,
                     "width": sm_width,
                 },
             )
 
         elif transferred_file.name == "BatchPositionsList.xml" and environment:
+            logger.info("Tomography session batch positions list found")
+            dcg_tag = ensure_dcg_exists(transferred_file, environment)
             with open(transferred_file) as xml:
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
-            source = _get_source(transferred_file, environment=environment)
-            visitless_source = str(source).replace(f"/{environment.visit}", "")
-            if not visitless_source:
-                return
 
             for batch_position in batch_xml["BatchPositionsList"]["BatchPositions"][
                 "BatchPositionParameters"
@@ -243,11 +253,22 @@ class TomographyMetadataContext(Context):
                 batch_stage_location_y = float(
                     batch_position["PositionOnTileSet"]["StagePositionY"]
                 )
-                bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=batch_name)}"
+
+                # Always need search map before batch position
+                sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=search_map_name)}"
+                capture_post(
+                    sm_url,
+                    json={
+                        "tag": dcg_tag,
+                    },
+                )
+
+                # Then register batch position
+                bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=batch_name)}"
                 capture_post(
                     bp_url,
                     json={
-                        "tag": visitless_source,
+                        "tag": dcg_tag,
                         "x_stage_position": batch_stage_location_x,
                         "y_stage_position": batch_stage_location_y,
                         "x_beamshift": 0,
@@ -268,11 +289,12 @@ class TomographyMetadataContext(Context):
                         beamshift_position_x = float(beamshift["PositionX"])
                         beamshift_position_y = float(beamshift["PositionY"])
 
-                        bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomography_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=beamshift_name)}"
+                        # Registration of beamshifted position
+                        bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=beamshift_name)}"
                         capture_post(
                             bp_url,
                             json={
-                                "tag": visitless_source,
+                                "tag": dcg_tag,
                                 "x_stage_position": batch_stage_location_x,
                                 "y_stage_position": batch_stage_location_y,
                                 "x_beamshift": beamshift_position_x,

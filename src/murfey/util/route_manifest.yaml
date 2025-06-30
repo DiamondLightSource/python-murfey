@@ -818,15 +818,15 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - POST
-murfey.server.api.session_control.tomography_router:
-  - path: /session_control/tomography/sessions/{session_id}/search_map/{sm_name}
+murfey.server.api.session_control.tomo_router:
+  - path: /session_control/tomo/sessions/{session_id}/search_map/{sm_name}
     function: register_search_map
     path_params:
       - name: sm_name
         type: str
     methods:
       - POST
-  - path: /session_control/tomography/sessions/{session_id}/batch_position/{batch_name}
+  - path: /session_control/tomo/sessions/{session_id}/batch_position/{batch_name}
     function: register_batch_position
     path_params:
       - name: batch_name
