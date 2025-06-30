@@ -25,7 +25,7 @@ class WSApp:
     ):
         self.id = str(uuid.uuid4()) if id is None else id
         log.info(f"Opening websocket connection for Client {self.id}")
-        websocket.enableTrace(True)
+        websocket.enableTrace(False)
 
         # Parse server URL and get proxy path used, if any
         url = urllib.parse.urlparse(server)._replace(
