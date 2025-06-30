@@ -39,7 +39,7 @@ def increment_rsync_file_count(
         logger.error(
             f"Failed to find rsync instance for visit {sanitise(visit_name)} "
             "with the following properties: \n"
-            f"{rsyncer_info.dict()}",
+            f"{rsyncer_info.model_dump()}",
             exc_info=True,
         )
         return None

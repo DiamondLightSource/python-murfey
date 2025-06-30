@@ -10,7 +10,7 @@ from typing import Literal, Optional, Type, Union
 
 from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -820,10 +820,8 @@ class AlignAndMergeParams(BaseModel):
     flatten: Literal["mean", "min", "max", ""] = ""
     align_across: Literal["enabled", ""] = ""
 
-    @validator(
-        "images",
-        pre=True,
-    )
+    @field_validator("images", mode="before")
+    @classmethod
     def parse_stringified_list(cls, value):
         if isinstance(value, str):
             try:

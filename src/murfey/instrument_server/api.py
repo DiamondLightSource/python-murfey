@@ -335,14 +335,14 @@ def register_processing_parameters(
     session_id: MurfeySessionID, proc_param_block: ProcessingParameterBlock
 ):
     data_collection_parameters[proc_param_block.label] = {}
-    for k, v in proc_param_block.params.dict().items():
+    for k, v in proc_param_block.params.model_dump().items():
         if v is not None:
             data_collection_parameters[proc_param_block.label][k] = v
     if controllers.get(session_id):
         controllers[session_id].data_collection_parameters.update(
             data_collection_parameters[proc_param_block.label]
         )
-        for k, v in proc_param_block.params.dict().items():
+        for k, v in proc_param_block.params.model_dump().items():
             if v is not None and hasattr(controllers[session_id]._environment, k):
                 setattr(controllers[session_id]._environment, k, v)
     return {"success": True}

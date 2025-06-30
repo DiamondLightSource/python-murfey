@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 """
 General Models
@@ -46,6 +47,15 @@ class File(BaseModel):
     timestamp: datetime
     full_path: str
 
+    @field_validator("size", mode="before")
+    @classmethod
+    def round_file_size_correctly(cls, v: Any) -> int:
+        if isinstance(v, float):
+            if v - math.floor(v) == 0.5:
+                return math.ceil(v)
+            return round(v)
+        return v
+
 
 class ConnectionFileParameters(BaseModel):
     filename: str
@@ -77,8 +87,8 @@ Models related to the single-particle analysis workflow.
 
 class ProcessingParametersSPA(BaseModel):
     tag: str
-    dose_per_frame: Optional[float]
-    gain_ref: Optional[str]
+    dose_per_frame: Optional[float] = None
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -97,8 +107,8 @@ class ProcessingParametersSPA(BaseModel):
     phase_plate: bool = False
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
+        dose_per_frame: Optional[float] = None
+        gain_ref: Optional[str] = None
         symmetry: str
         eer_fractionation: int
 
@@ -156,10 +166,10 @@ Models related to the tomographic reconstruction workflow.
 
 
 class ProcessingParametersTomo(BaseModel):
-    dose_per_frame: Optional[float]
+    dose_per_frame: Optional[float] = None
     frame_count: int
     tilt_axis: float
-    gain_ref: Optional[str]
+    gain_ref: Optional[str] = None
     experiment_type: str
     voltage: float
     image_size_x: int
@@ -169,12 +179,12 @@ class ProcessingParametersTomo(BaseModel):
     file_extension: str
     tag: str
     tilt_series_tag: str
-    eer_fractionation_file: Optional[str]
+    eer_fractionation_file: Optional[str] = None
     eer_fractionation: int
 
     class Base(BaseModel):
-        dose_per_frame: Optional[float]
-        gain_ref: Optional[str]
+        dose_per_frame: Optional[float] = None
+        gain_ref: Optional[str] = None
         eer_fractionation: int
 
 

@@ -32,7 +32,8 @@ classifiers = [
 dependencies = [
     "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
-    "pydantic<2", # Locked to <2 by cygwin terminal
+    "pydantic>=2",
+    "pydantic-settings",
     "requests",
     "rich",
     "werkzeug",
@@ -47,7 +48,7 @@ client = [
     "websocket-client",
 ]
 developer = [
-    "bump-my-version<0.11.0", # Version control
+    "bump-my-version", # Version control
     "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
@@ -61,7 +62,7 @@ server = [
     "aiohttp",
     "cryptography",
     "fastapi[standard]",
-    "ispyb", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python; v10.0.0: sqlalchemy <2, mysql-connector-python >=8.0.32
+    "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
     "numpy<2",
@@ -73,7 +74,7 @@ server = [
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
     "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
-    "zocalo",
+    "zocalo>=1",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
