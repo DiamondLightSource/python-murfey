@@ -229,7 +229,7 @@ class Analyser(Observer):
                     self._context = SPAMetadataContext("epu", self._basepath)
                 elif (
                     "Batch" in transferred_file.parts
-                    or "SearchMap" in transferred_file.parts
+                    or "SearchMaps" in transferred_file.parts
                     or transferred_file.name == "Session.dm"
                     and not self._context
                 ):
