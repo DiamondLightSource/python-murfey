@@ -21,6 +21,7 @@ def register_search_map_in_database(
     search_map_name: str,
     search_map_params: SearchMapParameters,
     murfey_db: Session,
+    close_db: bool = True,
 ):
     dcg = murfey_db.exec(
         select(DataCollectionGroup)
@@ -225,7 +226,8 @@ def register_search_map_in_database(
         )
     murfey_db.add(search_map)
     murfey_db.commit()
-    murfey_db.close()
+    if close_db:
+        murfey_db.close()
 
 
 def register_batch_position_in_database(

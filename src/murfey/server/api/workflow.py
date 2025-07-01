@@ -150,7 +150,10 @@ def register_dc_group(
         ).all()
         search_map_params = SearchMapParameters(tag=dcg_params.tag)
         for sm in search_maps:
-            register_search_map_in_database(session_id, sm.name, search_map_params, db)
+            register_search_map_in_database(
+                session_id, sm.name, search_map_params, db, close_db=False
+            )
+        db.close()
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),
