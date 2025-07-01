@@ -50,6 +50,7 @@ from murfey.util.db import (
     Movie,
     PreprocessStash,
     ProcessingJob,
+    SearchMap,
     Session,
     SessionProcessingParameters,
     SPAFeedbackParameters,
@@ -57,13 +58,18 @@ from murfey.util.db import (
     Tilt,
     TiltSeries,
 )
-from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.models import (
+    ProcessingParametersSPA,
+    ProcessingParametersTomo,
+    SearchMapParameters,
+)
 from murfey.util.processing_params import (
     cryolo_model_path,
     default_spa_parameters,
     motion_corrected_mrc,
 )
 from murfey.util.tomo import midpoint
+from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
 logger = getLogger("murfey.server.api.workflow")
 
@@ -136,6 +142,15 @@ def register_dc_group(
                 dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
         db.add(dcg_murfey[0])
         db.commit()
+
+        search_maps = db.exec(
+            select(SearchMap)
+            .where(SearchMap.session_id == session_id)
+            .where(SearchMap.tag == dcg_params.tag)
+        ).all()
+        search_map_params = SearchMapParameters(tag=dcg_params.tag)
+        for sm in search_maps:
+            register_search_map_in_database(session_id, sm.name, search_map_params, db)
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),

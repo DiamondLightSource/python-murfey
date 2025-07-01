@@ -54,15 +54,15 @@ from murfey.util.models import (
     SearchMapParameters,
     Visit,
 )
-from murfey.util.tomo_metadata import (
-    register_batch_position_in_database,
-    register_search_map_in_database,
-)
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
 )
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_grid_square as _register_grid_square,
+)
+from murfey.workflows.tomo.tomo_metadata import (
+    register_batch_position_in_database,
+    register_search_map_in_database,
 )
 
 logger = getLogger("murfey.server.api.session_control")
