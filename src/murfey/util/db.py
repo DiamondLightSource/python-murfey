@@ -380,7 +380,6 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_id: Optional[int] = None
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
-    atlas_binning: Optional[int] = None
     sample: Optional[int] = None
     session: Optional[Session] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(

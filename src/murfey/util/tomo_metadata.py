@@ -158,7 +158,6 @@ def register_search_map_in_database(
             search_map.height,
             search_map.width,
             dcg.atlas_pixel_size,
-            dcg.atlas_binning,
         ]
     ):
         reference_shift_matrix = np.array(

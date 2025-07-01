@@ -84,11 +84,6 @@ class TomographyMetadataContext(Context):
                         "numericValue"
                     ]
                 )
-                atlas_binning = int(
-                    atlas_xml_data["MicroscopeImage"]["microscopeData"]["acquisition"][
-                        "camera"
-                    ]["Binning"]["a:x"]
-                )
 
             for p in partial_path.split("/"):
                 if p.startswith("Sample"):
@@ -115,7 +110,6 @@ class TomographyMetadataContext(Context):
                 ),
                 "sample": environment.samples[source].sample,
                 "atlas_pixel_size": atlas_pixel_size,
-                "atlas_binning": atlas_binning,
             }
             capture_post(url, json=dcg_data)
 
