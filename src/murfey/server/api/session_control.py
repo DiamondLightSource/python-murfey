@@ -102,7 +102,7 @@ def get_current_visits(instrument_name: str, db=ispyb_db):
 
 
 class SessionInfo(BaseModel):
-    session_id: Optional[int]
+    session_id: Optional[int] = None
     session_name: str = ""
     rescale: bool = True
 

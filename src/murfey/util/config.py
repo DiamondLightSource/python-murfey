@@ -4,11 +4,21 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 import yaml
 from backports.entry_points_selectable import entry_points
-from pydantic import BaseModel, BaseSettings, Extra, validator
+from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
+from pydantic_settings import BaseSettings
+
+
+class MagnificationTable(RootModel[dict[int, float]]):
+    pass
+
+
+CALIBRATIONS_VALIDATION_SCHEMAS = {
+    "magnification": MagnificationTable,
+}
 
 
 class MachineConfig(BaseModel):  # type: ignore
@@ -26,7 +36,7 @@ class MachineConfig(BaseModel):  # type: ignore
     # Hardware and software -----------------------------------------------------------
     camera: str = "FALCON"
     superres: bool = False
-    calibrations: dict[str, dict[str, Union[dict, float]]]
+    calibrations: dict[str, Any]
     acquisition_software: list[str]
     software_versions: dict[str, str] = {}
     software_settings_output_directories: dict[str, list[str]] = {}
@@ -72,7 +82,7 @@ class MachineConfig(BaseModel):  # type: ignore
 
     # Particle picking setup
     default_model: Path
-    model_search_directory: str = "processing"
+    picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
     # Data analysis plugins
@@ -93,15 +103,43 @@ class MachineConfig(BaseModel):  # type: ignore
     node_creator_queue: str = "node_creator"
     notifications_queue: str = "pato_notification"
 
-    class Config:
-        """
-        Inner class that defines this model's parsing and serialising behaviour
-        """
+    # Pydantic BaseModel settings
+    model_config = ConfigDict(extra="allow")
 
-        extra = Extra.allow
-        json_encoders = {
-            Path: str,
-        }
+    @field_validator("calibrations", mode="before")
+    @classmethod
+    def validate_calibration_data(
+        cls, v: dict[str, dict[Any, Any]]
+    ) -> dict[str, dict[Any, Any]]:
+        # Pass the calibration dictionaries through their matching Pydantic models, if any are set
+        if isinstance(v, dict):
+            validated = {}
+            for (
+                key,
+                value,
+            ) in v.items():
+                model_cls = CALIBRATIONS_VALIDATION_SCHEMAS.get(key)
+                if model_cls:
+                    try:
+                        # Validate and store as a dict object with the corrected types
+                        validated[key] = model_cls.model_validate(value).root
+                    except Exception as e:
+                        raise ValueError(f"Validation failed for key '{key}': {e}")
+                else:
+                    validated[key] = value
+            return validated
+        # Let it validate and fail as-is
+        return v
+
+    @field_validator("software_versions", mode="before")
+    @classmethod
+    def validate_software_versions(cls, v: dict[str, Any]) -> dict[str, str]:
+        # Software versions should be numerical strings, even if they appear int- or float-like
+        if isinstance(v, dict):
+            validated = {key: str(value) for key, value in v.items()}
+            return validated
+        # Let it validate and fail as-is
+        return v
 
 
 def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
@@ -144,16 +182,13 @@ class Security(BaseModel):
     graylog_host: str = ""
     graylog_port: Optional[int] = None
 
-    class Config:
-        json_encoders = {
-            Path: str,
-        }
+    model_config = ConfigDict()
 
-    @validator("graylog_port")
+    @field_validator("graylog_port")
     def check_port_present_if_host_is(
-        cls, v: Optional[int], values: dict, **kwargs
+        cls, v: Optional[int], info: ValidationInfo, **kwargs
     ) -> Optional[int]:
-        if values["graylog_host"] and v is None:
+        if info.data.get("graylog_host") and v is None:
             raise ValueError("The Graylog port must be set if the Graylog host is")
         return v
 

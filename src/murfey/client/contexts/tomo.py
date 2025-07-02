@@ -173,7 +173,7 @@ class TomographyContext(Context):
                         )
 
         except Exception as e:
-            logger.error(f"ERROR {e}, {self.data_collection_parameters}")
+            logger.error(f"ERROR {e}, {self.data_collection_parameters}", exc_info=True)
 
     def _file_transferred_to(
         self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
@@ -533,7 +533,9 @@ class TomographyContext(Context):
                     try:
                         for_parsing = xml.read()
                     except Exception:
-                        logger.warning(f"Failed to parse file {metadata_file}")
+                        logger.warning(
+                            f"Failed to parse file {metadata_file}", exc_info=True
+                        )
                         return OrderedDict({})
                     data = xmltodict.parse(for_parsing)
                 try:
@@ -628,7 +630,9 @@ class TomographyContext(Context):
                     / int(mdoc_metadata["num_eer_frames"])
                 )
         except Exception as e:
-            logger.error(f"Exception encountered in metadata gathering: {str(e)}")
+            logger.error(
+                f"Exception encountered in metadata gathering: {str(e)}", exc_info=True
+            )
             return OrderedDict({})
 
         return mdoc_metadata

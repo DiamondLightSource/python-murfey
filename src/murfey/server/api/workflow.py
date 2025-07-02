@@ -88,8 +88,6 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
-    atlas_size_x: int = 0
-    atlas_size_y: int = 0
 
 
 @router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
@@ -124,8 +122,6 @@ def register_dc_group(
                         "atlas": dcg_params.atlas,
                         "sample": dcg_params.sample,
                         "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                        "atlas_size_x": dcg_params.atlas_size_x,
-                        "atlas_size_y": dcg_params.atlas_size_y,
                         "dcgid": dcg_murfey[0].id,
                         "session_id": session_id,
                     },
@@ -368,13 +364,13 @@ class SPAProcessFile(BaseModel):
     tag: str
     path: str
     description: str
-    processing_job: Optional[int]
-    data_collection_id: Optional[int]
+    processing_job: Optional[int] = None
+    data_collection_id: Optional[int] = None
     image_number: int
-    autoproc_program_id: Optional[int]
-    foil_hole_id: Optional[int]
-    pixel_size: Optional[float]
-    dose_per_frame: Optional[float]
+    autoproc_program_id: Optional[int] = None
+    foil_hole_id: Optional[int] = None
+    pixel_size: Optional[float] = None
+    dose_per_frame: Optional[float] = None
     mc_binning: Optional[int] = 1
     gain_ref: Optional[str] = None
     extract_downscale: bool = True
@@ -630,9 +626,9 @@ class TomoProcessFile(BaseModel):
     tag: str
     image_number: int
     pixel_size: float
-    dose_per_frame: Optional[float]
+    dose_per_frame: Optional[float] = None
     frame_count: int
-    tilt_axis: Optional[float]
+    tilt_axis: Optional[float] = None
     mc_uuid: Optional[int] = None
     voltage: float = 300
     mc_binning: int = 1
@@ -919,7 +915,7 @@ class Sample(BaseModel):
     sample_group_id: int
     sample_id: int
     subsample_id: int
-    image_path: Optional[Path]
+    image_path: Optional[Path] = None
 
 
 @correlative_router.get("/visit/{visit_name}/samples")
