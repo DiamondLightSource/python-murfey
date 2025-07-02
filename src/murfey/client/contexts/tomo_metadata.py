@@ -235,9 +235,14 @@ class TomographyMetadataContext(Context):
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
 
-            for batch_position in batch_xml["BatchPositionsList"]["BatchPositions"][
+            batch_positions_list = batch_xml["BatchPositionsList"]["BatchPositions"][
                 "BatchPositionParameters"
-            ]:
+            ]
+            if isinstance(batch_positions_list, dict):
+                # Case of a single batch
+                batch_positions_list = [batch_positions_list]
+
+            for batch_position in batch_positions_list:
                 batch_name = batch_position["Name"]
                 search_map_name = batch_position["PositionOnTileSet"]["TileSetName"]
                 batch_stage_location_x = float(
@@ -271,7 +276,7 @@ class TomographyMetadataContext(Context):
                 )
 
                 # Beamshifts
-                if batch_position["AdditionalExposureTemplateAreas"]:
+                if batch_position.get("AdditionalExposureTemplateAreas"):
                     beamshifts = batch_position["AdditionalExposureTemplateAreas"][
                         "ExposureTemplateAreaParameters"
                     ]
