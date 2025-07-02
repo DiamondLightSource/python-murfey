@@ -196,10 +196,10 @@ def register_search_map_in_database(
         )
 
         camera = getattr(Camera, machine_config.camera)
-        if camera == Camera.FALCON or Camera.K3_FLIPY:
+        if camera == Camera.K3_FLIPY:  # Camera.FALCON ?
             corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
         elif camera == Camera.K3_FLIPX:
-            corrected_vector = np.matmul(np.array([[-1, 0], [0, 1]]), corrected_vector)
+            corrected_vector = -1 * corrected_vector
 
         search_map_params.height_on_atlas = int(
             search_map.height * search_map.pixel_size / dcg.atlas_pixel_size
@@ -247,6 +247,7 @@ def register_batch_position_in_database(
         tilt_series = murfey_db.exec(
             select(TiltSeries)
             .where(TiltSeries.tag == batch_name)
+            .where(TiltSeries.rsync_source == batch_parameters.tag)
             .where(TiltSeries.session_id == session_id)
         ).one()
         if tilt_series.x_location:
