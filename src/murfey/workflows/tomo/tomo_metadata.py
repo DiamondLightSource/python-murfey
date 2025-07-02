@@ -196,9 +196,9 @@ def register_search_map_in_database(
         )
 
         camera = getattr(Camera, machine_config.camera)
-        if camera == Camera.K3_FLIPY:  # Camera.FALCON ?
+        if camera == Camera.K3_FLIPY:
             corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
-        elif camera == Camera.K3_FLIPX:
+        elif camera == Camera.K3_FLIPX or Camera.FALCON:
             corrected_vector = -1 * corrected_vector
 
         search_map_params.height_on_atlas = int(
