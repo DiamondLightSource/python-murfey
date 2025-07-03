@@ -2,8 +2,8 @@ from unittest import mock
 
 from sqlmodel import Session, select
 
-from murfey.util.db import DataCollectionGroup, SearchMap
-from murfey.util.models import SearchMapParameters
+from murfey.util.db import DataCollectionGroup, SearchMap, TiltSeries
+from murfey.util.models import BatchPositionParameters, SearchMapParameters
 from murfey.workflows.tomo import tomo_metadata
 from tests.conftest import ExampleVisit
 
@@ -12,8 +12,8 @@ from tests.conftest import ExampleVisit
 def test_register_search_map_update_with_dimensions(
     mock_transport, murfey_db_session: Session
 ):
-    """Test the updating of an existing grid square"""
-    # Create a grid square to update
+    """Test the updating of an existing search map, without enough to find location"""
+    # Create a search map to update
     search_map = SearchMap(
         id=1,
         name="SearchMap_1",
@@ -64,8 +64,8 @@ def test_register_search_map_update_with_dimensions(
 def test_register_search_map_update_with_all_parameters(
     mock_transport, murfey_db_session: Session
 ):
-    """Test the updating of an existing grid square"""
-    # Create a grid square to update
+    """Test the updating of an existing search map with all required parameters"""
+    # Create a search map to update
     search_map = SearchMap(
         id=1,
         name="SearchMap_1",
@@ -123,7 +123,7 @@ def test_register_search_map_update_with_all_parameters(
     assert sm_final_parameters.height == 4000
     assert sm_final_parameters.x_stage_position == 0.3
     assert sm_final_parameters.y_stage_position == 0.4
-    assert sm_final_parameters.pixel_size == 0.1
+    assert sm_final_parameters.pixel_size == 1e-7
     assert sm_final_parameters.image == "path/to/image"
     assert sm_final_parameters.binning == 1
     assert sm_final_parameters.reference_matrix_m11 == 1.01
@@ -156,6 +156,7 @@ def test_register_search_map_update_with_all_parameters(
 def test_register_search_map_insert_with_ispyb(
     mock_transport, murfey_db_session: Session, tmp_path
 ):
+    """Insert a new search map"""
     # Create a data collection group for lookups
     dcg = DataCollectionGroup(
         id=1,
@@ -199,3 +200,175 @@ def test_register_search_map_insert_with_ispyb(
     assert sm_final_parameters.y_stage_position == 1.4
     assert sm_final_parameters.pixel_size == 1.02
     assert sm_final_parameters.x_location is None
+
+
+def test_register_batch_position_update(murfey_db_session: Session):
+    """Test the updating of an existing tilt series with batch positions"""
+    # Create a tilt series to update
+    tilt_series = TiltSeries(
+        tag="Position_1",
+        rsync_source="session_tag",
+        session_id=ExampleVisit.murfey_session_id,
+        search_map_id=1,
+    )
+    murfey_db_session.add(tilt_series)
+    murfey_db_session.commit()
+
+    # Make sure search map is present
+    search_map = SearchMap(
+        id=1,
+        name="SearchMap_1",
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        x_stage_position=1,
+        y_stage_position=2,
+        pixel_size=0.01,
+        reference_matrix_m11=1,
+        reference_matrix_m12=0,
+        reference_matrix_m21=0,
+        reference_matrix_m22=1,
+        stage_correction_m11=1,
+        stage_correction_m12=0,
+        stage_correction_m21=0,
+        stage_correction_m22=1,
+        image_shift_correction_m11=1,
+        image_shift_correction_m12=0,
+        image_shift_correction_m21=0,
+        image_shift_correction_m22=1,
+        height=4000,
+        width=2000,
+    )
+    murfey_db_session.add(search_map)
+    murfey_db_session.commit()
+
+    # Parameters to update with
+    new_parameters = BatchPositionParameters(
+        tag="session_tag",
+        x_stage_position=0.1,
+        y_stage_position=0.2,
+        x_beamshift=0.3,
+        y_beamshift=0.4,
+        search_map_name="SearchMap_1",
+    )
+
+    # Run the registration
+    tomo_metadata.register_batch_position_in_database(
+        ExampleVisit.murfey_session_id, "Position_1", new_parameters, murfey_db_session
+    )
+
+    # These two should have been updated, values are known as used identity matrices
+    bp_final_parameters = murfey_db_session.exec(select(TiltSeries)).one()
+    assert bp_final_parameters.x_location == 880
+    assert bp_final_parameters.y_location == 1780
+
+
+def test_register_batch_position_update_skip(murfey_db_session: Session):
+    """Test the updating of an existing batch position, skipped as already done"""
+    # Create a tilt series to update
+    tilt_series = TiltSeries(
+        tag="Position_1",
+        rsync_source="session_tag",
+        session_id=ExampleVisit.murfey_session_id,
+        search_map_id=1,
+        x_location=100,
+        y_location=200,
+    )
+    murfey_db_session.add(tilt_series)
+    murfey_db_session.commit()
+
+    # Make sure search map is present
+    search_map = SearchMap(
+        id=1,
+        name="SearchMap_1",
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        x_stage_position=1,
+        y_stage_position=2,
+        pixel_size=0.01,
+        reference_matrix_m11=1,
+        reference_matrix_m12=0,
+        reference_matrix_m21=0,
+        reference_matrix_m22=1,
+        stage_correction_m11=1,
+        stage_correction_m12=0,
+        stage_correction_m21=0,
+        stage_correction_m22=1,
+        image_shift_correction_m11=1,
+        image_shift_correction_m12=0,
+        image_shift_correction_m21=0,
+        image_shift_correction_m22=1,
+        height=4000,
+        width=2000,
+    )
+    murfey_db_session.add(search_map)
+    murfey_db_session.commit()
+
+    # Parameters to update with
+    new_parameters = BatchPositionParameters(
+        tag="session_tag",
+        x_stage_position=0.1,
+        y_stage_position=0.2,
+        x_beamshift=0.3,
+        y_beamshift=0.4,
+        search_map_name="SearchMap_1",
+    )
+
+    # Run the registration
+    tomo_metadata.register_batch_position_in_database(
+        ExampleVisit.murfey_session_id, "Position_1", new_parameters, murfey_db_session
+    )
+
+    # These two should have been updated, values are known as used identity matrices
+    bp_final_parameters = murfey_db_session.exec(select(TiltSeries)).one()
+    assert bp_final_parameters.x_location == 100
+    assert bp_final_parameters.y_location == 200
+
+
+def test_register_batch_position_new(murfey_db_session: Session):
+    """Test the registration of a new tilt series with batch positions"""
+    # Make sure search map is present
+    search_map = SearchMap(
+        id=1,
+        name="SearchMap_1",
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        x_stage_position=1,
+        y_stage_position=2,
+        pixel_size=0.01,
+        reference_matrix_m11=1,
+        reference_matrix_m12=0,
+        reference_matrix_m21=0,
+        reference_matrix_m22=1,
+        stage_correction_m11=1,
+        stage_correction_m12=0,
+        stage_correction_m21=0,
+        stage_correction_m22=1,
+        image_shift_correction_m11=1,
+        image_shift_correction_m12=0,
+        image_shift_correction_m21=0,
+        image_shift_correction_m22=1,
+        height=4000,
+        width=2000,
+    )
+    murfey_db_session.add(search_map)
+    murfey_db_session.commit()
+
+    # Parameters to update with
+    new_parameters = BatchPositionParameters(
+        tag="session_tag",
+        x_stage_position=0.1,
+        y_stage_position=0.2,
+        x_beamshift=0.3,
+        y_beamshift=0.4,
+        search_map_name="SearchMap_1",
+    )
+
+    # Run the registration
+    tomo_metadata.register_batch_position_in_database(
+        ExampleVisit.murfey_session_id, "Position_1", new_parameters, murfey_db_session
+    )
+
+    # These two should have been updated, values are known as used identity matrices
+    bp_final_parameters = murfey_db_session.exec(select(TiltSeries)).one()
+    assert bp_final_parameters.x_location == 880
+    assert bp_final_parameters.y_location == 1780
