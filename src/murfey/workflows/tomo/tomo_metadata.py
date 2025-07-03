@@ -29,6 +29,7 @@ def register_search_map_in_database(
         .where(DataCollectionGroup.tag == search_map_params.tag)
     ).one()
     try:
+        # See if there is already a search map with this name and update if so
         search_map = murfey_db.exec(
             select(SearchMap)
             .where(SearchMap.name == search_map_name)
@@ -105,6 +106,7 @@ def register_search_map_in_database(
         else:
             # mock up response so that below still works
             sm_ispyb_response = {"success": False, "return_value": None}
+        # Register new search map
         search_map = SearchMap(
             id=(
                 sm_ispyb_response["return_value"]
@@ -161,6 +163,7 @@ def register_search_map_in_database(
             dcg.atlas_pixel_size,
         ]
     ):
+        # Work out the shifted positions if all required information is present
         reference_shift_matrix = np.array(
             [
                 [
@@ -195,12 +198,14 @@ def register_search_map_in_database(
             ),
         )
 
+        # Flip positions based on camera type
         camera = getattr(Camera, machine_config.camera)
         if camera == Camera.K3_FLIPY:
             corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
-        elif camera == Camera.K3_FLIPX or Camera.FALCON:
-            corrected_vector = -1 * corrected_vector
+        elif camera == Camera.K3_FLIPX:
+            corrected_vector = np.matmul(np.array([[-1, 0], [0, 1]]), corrected_vector)
 
+        # Convert from metres to pixels
         search_map_params.height_on_atlas = int(
             search_map.height * search_map.pixel_size / dcg.atlas_pixel_size
         )
