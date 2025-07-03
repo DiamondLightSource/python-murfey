@@ -19,6 +19,7 @@ from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
+from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.util.client import Observer, get_machine_config_client
@@ -226,6 +227,13 @@ class Analyser(Observer):
                     and not self._context
                 ):
                     self._context = SPAMetadataContext("epu", self._basepath)
+                elif (
+                    "Batch" in transferred_file.parts
+                    or "SearchMaps" in transferred_file.parts
+                    or transferred_file.name == "Session.dm"
+                    and not self._context
+                ):
+                    self._context = TomographyMetadataContext("tomo", self._basepath)
                 self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}
@@ -369,9 +377,10 @@ class Analyser(Observer):
                 elif isinstance(
                     self._context,
                     (
-                        TomographyContext,
                         SPAModularContext,
                         SPAMetadataContext,
+                        TomographyContext,
+                        TomographyMetadataContext,
                     ),
                 ):
                     context = str(self._context).split(" ")[0].split(".")[-1]

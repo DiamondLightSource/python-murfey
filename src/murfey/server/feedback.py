@@ -1937,6 +1937,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                         "pixel_size": preproc_params.pixel_size,
                         "manual_tilt_offset": -tilt_offset,
                         "node_creator_queue": machine_config.node_creator_queue,
+                        "search_map_id": relevant_tilt_series.search_map_id,
+                        "x_location": relevant_tilt_series.x_location,
+                        "y_location": relevant_tilt_series.y_location,
                     },
                 }
                 if murfey.server._transport_object:

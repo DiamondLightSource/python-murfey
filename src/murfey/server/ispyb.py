@@ -32,7 +32,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
-from murfey.util.models import FoilHoleParameters, GridSquareParameters
+from murfey.util.models import (
+    FoilHoleParameters,
+    GridSquareParameters,
+    SearchMapParameters,
+)
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
@@ -383,6 +387,90 @@ class TransportManager:
         except ispyb.ISPyBException as e:
             log.error(
                 "Updating FoilHole entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_search_map(
+        self,
+        atlas_id: int,
+        search_map_parameters: SearchMapParameters,
+    ):
+        if (
+            search_map_parameters.pixel_size
+            and search_map_parameters.height
+            and search_map_parameters.height_on_atlas
+        ):
+            search_map_parameters.pixel_size *= (
+                search_map_parameters.height / search_map_parameters.height_on_atlas
+            )
+        record = GridSquare(
+            atlasId=atlas_id,
+            gridSquareImage=search_map_parameters.image,
+            pixelLocationX=search_map_parameters.x_location,
+            pixelLocationY=search_map_parameters.y_location,
+            height=search_map_parameters.height_on_atlas,
+            width=search_map_parameters.width_on_atlas,
+            stageLocationX=search_map_parameters.x_stage_position,
+            stageLocationY=search_map_parameters.y_stage_position,
+            pixelSize=search_map_parameters.pixel_size,
+        )
+        try:
+            with ISPyBSession() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created SearchMap (GridSquare) {record.gridSquareId}")
+                return {"success": True, "return_value": record.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting SearchMap (GridSquare) entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_search_map(
+        self, search_map_id, search_map_parameters: SearchMapParameters
+    ):
+        try:
+            with ISPyBSession() as db:
+                grid_square = (
+                    db.query(GridSquare)
+                    .filter(GridSquare.gridSquareId == search_map_id)
+                    .one()
+                )
+                if (
+                    search_map_parameters.pixel_size
+                    and search_map_parameters.height
+                    and search_map_parameters.height_on_atlas
+                ):
+                    search_map_parameters.pixel_size *= (
+                        search_map_parameters.height
+                        / search_map_parameters.height_on_atlas
+                    )
+                if search_map_parameters.image:
+                    grid_square.gridSquareImage = search_map_parameters.image
+                if search_map_parameters.x_location:
+                    grid_square.pixelLocationX = search_map_parameters.x_location
+                if search_map_parameters.y_location:
+                    grid_square.pixelLocationY = search_map_parameters.y_location
+                if search_map_parameters.height_on_atlas:
+                    grid_square.height = search_map_parameters.height_on_atlas
+                if search_map_parameters.width_on_atlas:
+                    grid_square.width = search_map_parameters.width_on_atlas
+                if search_map_parameters.x_stage_position:
+                    grid_square.stageLocationX = search_map_parameters.x_stage_position
+                if search_map_parameters.y_stage_position:
+                    grid_square.stageLocationY = search_map_parameters.y_stage_position
+                if search_map_parameters.pixel_size:
+                    grid_square.pixelSize = search_map_parameters.pixel_size
+                db.add(grid_square)
+                db.commit()
+                return {"success": True, "return_value": grid_square.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating SearchMap (GridSquare) entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
