@@ -119,8 +119,8 @@ def test_register_search_map_update_with_all_parameters(
 
     # Confirm the database was updated
     sm_final_parameters = murfey_db_session.exec(select(SearchMap)).one()
-    assert sm_final_parameters.width == new_parameters.width
-    assert sm_final_parameters.height == new_parameters.height
+    assert sm_final_parameters.width == 2000
+    assert sm_final_parameters.height == 4000
     assert sm_final_parameters.x_stage_position == 0.3
     assert sm_final_parameters.y_stage_position == 0.4
     assert sm_final_parameters.pixel_size == 0.1
@@ -187,9 +187,7 @@ def test_register_search_map_insert_with_ispyb(
     )
 
     # Check this would have updated ispyb
-    mock_transport.do_insert_search_map.assert_called_with(
-        90, "SearchMap_1", new_parameters
-    )
+    mock_transport.do_insert_search_map.assert_called_with(90, new_parameters)
 
     # Confirm the database entry was made
     sm_final_parameters = murfey_db_session.exec(select(SearchMap)).one()
