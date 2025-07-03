@@ -98,18 +98,9 @@ def test_register_search_map_update_with_all_parameters(
         pixel_size=1e-7,
         image="path/to/image",
         binning=1,
-        reference_matrix_m11=1.01,
-        reference_matrix_m12=0.01,
-        reference_matrix_m21=0.02,
-        reference_matrix_m22=1.02,
-        stage_correction_m11=0.99,
-        stage_correction_m12=-0.01,
-        stage_correction_m21=-0.02,
-        stage_correction_m22=0.98,
-        image_shift_correction_m11=1.03,
-        image_shift_correction_m12=0.03,
-        image_shift_correction_m21=-0.03,
-        image_shift_correction_m22=0.97,
+        reference_matrix={"m11": 1.01, "m12": 0.01, "m21": 0.02, "m22": 1.02},
+        stage_correction={"m11": 0.99, "m12": -0.01, "m21": -0.02, "m22": 0.98},
+        image_shift_correction={"m11": 1.03, "m12": 0.03, "m21": -0.03, "m22": 0.97},
     )
 
     # Run the registration
@@ -204,16 +195,6 @@ def test_register_search_map_insert_with_ispyb(
 
 def test_register_batch_position_update(murfey_db_session: Session):
     """Test the updating of an existing tilt series with batch positions"""
-    # Create a tilt series to update
-    tilt_series = TiltSeries(
-        tag="Position_1",
-        rsync_source="session_tag",
-        session_id=ExampleVisit.murfey_session_id,
-        search_map_id=1,
-    )
-    murfey_db_session.add(tilt_series)
-    murfey_db_session.commit()
-
     # Make sure search map is present
     search_map = SearchMap(
         id=1,
@@ -239,6 +220,16 @@ def test_register_batch_position_update(murfey_db_session: Session):
         width=2000,
     )
     murfey_db_session.add(search_map)
+    murfey_db_session.commit()
+
+    # Create a tilt series to update
+    tilt_series = TiltSeries(
+        tag="Position_1",
+        rsync_source="session_tag",
+        session_id=ExampleVisit.murfey_session_id,
+        search_map_id=1,
+    )
+    murfey_db_session.add(tilt_series)
     murfey_db_session.commit()
 
     # Parameters to update with
@@ -264,18 +255,6 @@ def test_register_batch_position_update(murfey_db_session: Session):
 
 def test_register_batch_position_update_skip(murfey_db_session: Session):
     """Test the updating of an existing batch position, skipped as already done"""
-    # Create a tilt series to update
-    tilt_series = TiltSeries(
-        tag="Position_1",
-        rsync_source="session_tag",
-        session_id=ExampleVisit.murfey_session_id,
-        search_map_id=1,
-        x_location=100,
-        y_location=200,
-    )
-    murfey_db_session.add(tilt_series)
-    murfey_db_session.commit()
-
     # Make sure search map is present
     search_map = SearchMap(
         id=1,
@@ -301,6 +280,18 @@ def test_register_batch_position_update_skip(murfey_db_session: Session):
         width=2000,
     )
     murfey_db_session.add(search_map)
+    murfey_db_session.commit()
+
+    # Create a tilt series to update
+    tilt_series = TiltSeries(
+        tag="Position_1",
+        rsync_source="session_tag",
+        session_id=ExampleVisit.murfey_session_id,
+        search_map_id=1,
+        x_location=100,
+        y_location=200,
+    )
+    murfey_db_session.add(tilt_series)
     murfey_db_session.commit()
 
     # Parameters to update with
