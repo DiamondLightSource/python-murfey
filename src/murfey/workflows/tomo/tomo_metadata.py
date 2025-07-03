@@ -225,9 +225,9 @@ def register_search_map_in_database(
     else:
         logger.info(
             f"Unable to register search map {sanitise(search_map_name)} position yet: "
-            f"stage {search_map_params.x_stage_position}, "
-            f"width {search_map_params.width}, "
-            f"atlas pixel size {dcg.atlas_pixel_size}"
+            f"stage {sanitise(str(search_map_params.x_stage_position))}, "
+            f"width {sanitise(str(search_map_params.width))}, "
+            f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}"
         )
     murfey_db.add(search_map)
     murfey_db.commit()
