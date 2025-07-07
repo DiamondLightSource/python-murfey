@@ -561,7 +561,9 @@ class RSyncer(Observer):
             success = False
 
         if result is None:
-            logger.error(f"No rsync process ran for files: {files}")
+            # Only log this as an error if files were scheduled for transfer
+            if files:
+                logger.error(f"No rsync process ran for files: {files}")
         else:
             logger.log(
                 logging.WARNING if result.returncode else logging.DEBUG,
