@@ -220,7 +220,6 @@ class RSyncer(Observer):
             self.queue.put(absolute_path)
 
     def flush_skipped(self):
-        self._end_time = datetime.now()
         for f in self._skipped_files:
             self.queue.put(f)
         self._skipped_files = []
