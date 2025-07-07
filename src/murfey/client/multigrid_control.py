@@ -104,14 +104,18 @@ class MultigridController:
             register_client=False,
         )
 
+        # Calculate the time offset between the client and the server
+        current_time = datetime.now()
+        server_timestamp = requests.get(
+            f"{self.murfey_url}{url_path_for('session_control.router', 'get_current_timestamp')}"
+        ).json()["timestamp"]
+        self.server_time_offset = current_time - datetime.fromtimestamp(
+            server_timestamp
+        )
+
+        # Store the visit end time in the current device's equivalent time
         if self.visit_end_time:
-            current_time = datetime.now()
-            server_timestamp = requests.get(
-                f"{self.murfey_url}{url_path_for('session_control.router', 'get_current_timestamp')}"
-            ).json()["timestamp"]
-            self.visit_end_time += current_time - datetime.fromtimestamp(
-                server_timestamp
-            )
+            self.visit_end_time += self.server_time_offset
 
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
@@ -153,9 +157,10 @@ class MultigridController:
             self._finalise_rsyncer(p)
 
     def update_visit_time(self, new_end_time: datetime):
-        self.visit_end_time = new_end_time
+        # Convert the received server timestamp into the local equivalent
+        self.visit_end_time = new_end_time + self.server_time_offset
         for rp in self.rsync_processes.values():
-            rp._end_time = new_end_time
+            rp._end_time = self.visit_end_time
 
     def _start_rsyncer_multigrid(
         self,
