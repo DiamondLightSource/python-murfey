@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import urllib
 from pathlib import Path
 from typing import Annotated, List, Optional
+from urllib.parse import quote
 
 import aiohttp
 from fastapi import APIRouter, Depends
@@ -418,7 +418,7 @@ async def update_visit_end_time(
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
-                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={urllib.parse.quote(end_time.isoformat())}",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={quote(end_time.isoformat())}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -506,16 +506,41 @@ async def restart_rsyncer(
 async def flush_skipped_rsyncer(
     session_id: MurfeySessionID, rsyncer_source: RsyncerSource, db=murfey_db
 ):
-    data = {}
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    # Load data for session
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+
+    # Define a new visit end time that's slightly ahead of current time
+    new_end_time = datetime.datetime.now().replace(
+        second=0, microsecond=0
+    ) + datetime.timedelta(minutes=5)
+    # Update the stored visit end time if the new one exceeds it
+    if session_entry.visit_end_time:
+        if new_end_time > session_entry.visit_end_time:
+            session_entry.visit_end_time = new_end_time
+            db.add(session_entry)
+            db.commit()
+
+    # Send request to flush rsyncer
+    data: dict = {}
+    update_result: dict = {}
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
     if isinstance(session_id, int):
         if machine_config.instrument_server_url:
             async with aiohttp.ClientSession() as clientsession:
+                # Send request to instrument server to update multigrid controller
+                async with clientsession.post(
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={quote(session_entry.visit_end_time.isoformat())}",
+                    headers={
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                    },
+                ) as resp:
+                    update_result = await resp.json()
+                if not update_result.get("success", False):
+                    return {"success": False}
+                # Send request to flush the rsyncer
                 async with clientsession.post(
                     f"{machine_config.instrument_server_url}{url_path_for('api.router', 'flush_skipped_rsyncer', session_id=session_id)}",
                     json={
