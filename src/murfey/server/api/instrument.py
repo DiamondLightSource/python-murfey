@@ -340,7 +340,6 @@ async def stop_rsyncer(
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'stop_rsyncer', session_id=session_id)}",
                 json={
-                    "label": session_id,
                     "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
@@ -367,7 +366,6 @@ async def finalise_rsyncer(
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'finalise_rsyncer', session_id=session_id)}",
                 json={
-                    "label": session_id,
                     "source": str(secure_path(Path(rsyncer_source.source))),
                 },
                 headers={
@@ -467,7 +465,6 @@ async def remove_rsyncer(
                 async with clientsession.post(
                     f"{machine_config.instrument_server_url}{url_path_for('api.router', 'remove_rsyncer', session_id=session_id)}",
                     json={
-                        "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
@@ -495,7 +492,6 @@ async def restart_rsyncer(
                 async with clientsession.post(
                     f"{machine_config.instrument_server_url}{url_path_for('api.router', 'restart_rsyncer', session_id=session_id)}",
                     json={
-                        "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={
@@ -523,7 +519,6 @@ async def flush_skipped_rsyncer(
                 async with clientsession.post(
                     f"{machine_config.instrument_server_url}{url_path_for('api.router', 'flush_skipped_rsyncer', session_id=session_id)}",
                     json={
-                        "label": session_id,
                         "source": str(secure_path(Path(rsyncer_source.source))),
                     },
                     headers={

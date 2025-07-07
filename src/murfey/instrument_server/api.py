@@ -223,7 +223,6 @@ def update_multigrid_controller_visit_end_time(
 
 class RsyncerSource(BaseModel):
     source: Path
-    label: str
 
 
 @router.post("/sessions/{session_id}/stop_rsyncer")
