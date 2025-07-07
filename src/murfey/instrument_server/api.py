@@ -212,6 +212,7 @@ def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
 @router.delete("/sessions/{session_id}/multigrid_watcher/{label}")
 def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
     watchers[label].request_stop()
+    return {"success": True}
 
 
 @router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
@@ -219,6 +220,7 @@ def update_multigrid_controller_visit_end_time(
     session_id: MurfeySessionID, end_time: datetime
 ):
     controllers[session_id].update_visit_time(end_time)
+    return {"success": True}
 
 
 class RsyncerSource(BaseModel):
