@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import quote, urlparse
 
-import aiohttp
 import requests
 
 import murfey.client.websocket
@@ -22,7 +21,7 @@ from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
-from murfey.util.client import capture_post, get_machine_config_client
+from murfey.util.client import capture_delete, capture_post, get_machine_config_client
 
 log = logging.getLogger("murfey.client.mutligrid_control")
 
@@ -121,7 +120,7 @@ class MultigridController:
         self.multigrid_watcher_active = False
         self.dormancy_check()
 
-    async def dormancy_check(self):
+    def dormancy_check(self):
         if not self.multigrid_watcher_active:
             if (
                 all(r._finalised for r in self.rsync_processes.values())
@@ -130,14 +129,22 @@ class MultigridController:
                     w.thread.is_alive() for w in self._environment.watchers.values()
                 )
             ):
-                async with aiohttp.ClientSession() as clientsession:
-                    async with clientsession.delete(
+
+                def call_remove_session():
+                    response = capture_delete(
                         f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.session_id)}",
-                        json={"access_token": self.token, "token_type": "bearer"},
-                    ) as response:
-                        success = response.status == 200
-                if not success:
-                    log.warning(f"Could not delete database data for {self.session_id}")
+                    )
+                    success = response.status_code == 200 if response else False
+                    if not success:
+                        log.warning(
+                            f"Could not delete database data for {self.session_id}"
+                        )
+
+                dormancy_thread = threading.Thread(
+                    name=f"Session deletion thread {self.session_id}",
+                    target=call_remove_session,
+                )
+                dormancy_thread.start()
                 self.dormant = True
 
     def abandon(self):

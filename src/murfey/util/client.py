@@ -123,6 +123,20 @@ def capture_get(url: str) -> Optional[requests.Response]:
     return response
 
 
+def capture_delete(url: str) -> Optional[requests.Response]:
+    try:
+        response = requests.delete(url)
+    except Exception as e:
+        logger.error(f"Exception encountered in delete of {url}: {e}")
+        response = None
+    if response and response.status_code != 200:
+        logger.warning(
+            f"Response to delete of {url} had status code {response.status_code}. "
+            f"The reason given was {response.reason}"
+        )
+    return response
+
+
 def set_default_acquisition_output(
     new_output_dir: Path,
     software_settings_output_directories: dict[str, list[str]],
