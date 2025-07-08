@@ -63,4 +63,6 @@ def test_get_visit_list(
 
     # Check that expected outputs are correct (order-sensitive)
     for v, visit in enumerate(visits):
-        assert visit.dict() == Visit.parse_obj(example_visits[v]).dict()
+        assert (
+            visit.model_dump() == Visit.model_validate(example_visits[v]).model_dump()
+        )
