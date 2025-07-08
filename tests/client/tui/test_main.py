@@ -17,7 +17,7 @@ test_get_visit_list_params_matrix = (
 
 
 @pytest.mark.parametrize("test_params", test_get_visit_list_params_matrix)
-@mock.patch("murfey.client.requests")
+@mock.patch("murfey.client.tui.main.requests")
 def test_get_visit_list(
     mock_request,
     test_params: tuple[str],
