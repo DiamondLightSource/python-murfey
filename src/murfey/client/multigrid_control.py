@@ -127,10 +127,10 @@ class MultigridController:
             ):
 
                 def call_remove_session():
-                    with capture_delete(
+                    response = capture_delete(
                         f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.session_id)}",
-                    ) as response:
-                        success = response.status_code == 200 if response else False
+                    )
+                    success = response.status_code == 200 if response else False
                     if not success:
                         log.warning(
                             f"Could not delete database data for {self.session_id}"
