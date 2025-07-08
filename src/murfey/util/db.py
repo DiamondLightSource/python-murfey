@@ -353,7 +353,10 @@ class TiltSeries(SQLModel, table=True):  # type: ignore
     tag: str
     rsync_source: str
     session_id: int = Field(foreign_key="session.id")
-    search_map_id: int = Field(foreign_key="searchmap.id")
+    search_map_id: Optional[int] = Field(
+        foreign_key="searchmap.id",
+        default=None,
+    )
     tilt_series_length: int = -1
     processing_requested: bool = False
     x_location: Optional[float] = None

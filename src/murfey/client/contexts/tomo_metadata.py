@@ -222,12 +222,12 @@ class TomographyMetadataContext(Context):
                 logger.warning(f"Unable to find size for SearchMap {transferred_file}")
                 readout_width = int(
                     sm_data["TileSetXml"]["AcquisitionSettings"]["a:camera"][
-                        "ReadoutArea"
+                        "a:ReadoutArea"
                     ]["b:width"]
                 )
                 readout_height = int(
                     sm_data["TileSetXml"]["AcquisitionSettings"]["a:camera"][
-                        "ReadoutArea"
+                        "a:ReadoutArea"
                     ]["b:height"]
                 )
                 sm_width = int(
