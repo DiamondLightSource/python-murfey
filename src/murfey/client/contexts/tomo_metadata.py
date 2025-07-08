@@ -236,6 +236,9 @@ class TomographyMetadataContext(Context):
                 sm_height = int(
                     8005 * readout_height / max(readout_height, readout_width)
                 )
+                logger.warning(
+                    f"Inserting incorrect width {sm_width}, height {sm_height} for SearchMap display"
+                )
 
             sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
