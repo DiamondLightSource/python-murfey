@@ -220,7 +220,6 @@ class RSyncer(Observer):
             self.queue.put(absolute_path)
 
     def flush_skipped(self):
-        self._end_time = datetime.now()
         for f in self._skipped_files:
             self.queue.put(f)
         self._skipped_files = []
@@ -561,7 +560,9 @@ class RSyncer(Observer):
             success = False
 
         if result is None:
-            logger.error(f"No rsync process ran for files: {files}")
+            # Only log this as an error if files were scheduled for transfer
+            if files:
+                logger.error(f"No rsync process ran for files: {files}")
         else:
             logger.log(
                 logging.WARNING if result.returncode else logging.DEBUG,
