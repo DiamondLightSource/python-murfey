@@ -10,6 +10,7 @@ import ispyb
 import pytest
 from ispyb.sqlalchemy import BLSession, ExperimentType, Person, Proposal, url
 from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, select
+from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.orm import sessionmaker
@@ -206,51 +207,54 @@ def ispyb_db_session_factory(ispyb_engine):
 
 @pytest.fixture(scope="session")
 def seed_ispyb_db(ispyb_db_session_factory):
-
-    # Populate the ISPyB table with some initial values
-    # Return existing table entry if already present
-    ispyb_db_session: SQLAlchemySession = ispyb_db_session_factory()
-    person_db_entry = get_or_create_db_entry(
-        session=ispyb_db_session,
-        table=Person,
-        lookup_kwargs={
-            "givenName": ExampleVisit.given_name,
-            "familyName": ExampleVisit.family_name,
-            "login": ExampleVisit.login,
-        },
-    )
-    proposal_db_entry = get_or_create_db_entry(
-        session=ispyb_db_session,
-        table=Proposal,
-        lookup_kwargs={
-            "personId": person_db_entry.personId,
-            "proposalCode": ExampleVisit.proposal_code,
-            "proposalNumber": str(ExampleVisit.proposal_number),
-        },
-    )
-    _ = get_or_create_db_entry(
-        session=ispyb_db_session,
-        table=BLSession,
-        lookup_kwargs={
-            "proposalId": proposal_db_entry.proposalId,
-            "beamLineName": ExampleVisit.instrument_name,
-            "visit_number": ExampleVisit.visit_number,
-        },
-    )
-    _ = [
-        get_or_create_db_entry(
+    try:
+        # Populate the ISPyB table with some initial values
+        # Return existing table entry if already present
+        ispyb_db_session: SQLAlchemySession = ispyb_db_session_factory()
+        person_db_entry = get_or_create_db_entry(
             session=ispyb_db_session,
-            table=ExperimentType,
+            table=Person,
             lookup_kwargs={
-                "experimentTypeId": id,
-                "name": name,
-                "proposalType": "em",
-                "active": 1,
+                "givenName": ExampleVisit.given_name,
+                "familyName": ExampleVisit.family_name,
+                "login": ExampleVisit.login,
             },
         )
-        for name, id in ISPyBTableValues.experiment_types.items()
-    ]
-    ispyb_db_session.close()
+        proposal_db_entry = get_or_create_db_entry(
+            session=ispyb_db_session,
+            table=Proposal,
+            lookup_kwargs={
+                "personId": person_db_entry.personId,
+                "proposalCode": ExampleVisit.proposal_code,
+                "proposalNumber": str(ExampleVisit.proposal_number),
+            },
+        )
+        _ = get_or_create_db_entry(
+            session=ispyb_db_session,
+            table=BLSession,
+            lookup_kwargs={
+                "proposalId": proposal_db_entry.proposalId,
+                "beamLineName": ExampleVisit.instrument_name,
+                "visit_number": ExampleVisit.visit_number,
+            },
+        )
+        _ = [
+            get_or_create_db_entry(
+                session=ispyb_db_session,
+                table=ExperimentType,
+                lookup_kwargs={
+                    "experimentTypeId": id,
+                    "name": name,
+                    "proposalType": "em",
+                    "active": 1,
+                },
+            )
+            for name, id in ISPyBTableValues.experiment_types.items()
+        ]
+        ispyb_db_session.close()
+    # Skip ISPyB-related tests if the connection fails
+    except InterfaceError:
+        pytest.skip("ISPyB database has not been set up; skipping test")
 
 
 @pytest.fixture
@@ -285,14 +289,21 @@ Fixtures for setting up test Murfey database
 =======================================================================================
 """
 
-murfey_db_url = (
-    f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
-    f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
-)
+
+@pytest.fixture(scope="session")
+def murfey_db_url():
+    try:
+        return (
+            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
+            f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
+        )
+    # Skip Murfey database-related tests if the environment for it hasn't been set up
+    except KeyError:
+        pytest.skip("Murfey PostgreSQL database has not been set up; skipping test")
 
 
 @pytest.fixture(scope="session")
-def murfey_db_engine():
+def murfey_db_engine(murfey_db_url):
     engine = create_engine(murfey_db_url)
     SQLModel.metadata.create_all(engine)
     yield engine
