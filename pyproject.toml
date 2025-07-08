@@ -55,13 +55,13 @@ developer = [
 ]
 instrument-server = [
     "aiohttp",
-    "fastapi[standard]",
+    "fastapi[standard]<0.116.0",
     "python-jose",
 ]
 server = [
     "aiohttp",
     "cryptography",
-    "fastapi[standard]",
+    "fastapi[standard]<0.116.0",
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
@@ -82,7 +82,7 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 "murfey.add_user" = "murfey.cli.add_user:run"
-"murfey.client" = "murfey.client:run"
+"murfey.client" = "murfey.client.tui.main:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
