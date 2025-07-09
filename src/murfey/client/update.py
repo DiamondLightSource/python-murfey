@@ -9,6 +9,10 @@ import requests
 import murfey
 from murfey.util.api import url_path_for
 
+# Standardised messages to print upon exit
+UPDATE_SUCCESS = "Murfey has been updated. Please restart Murfey."
+UPDATE_FAILURE = "Error occurred while updating Murfey."
+
 
 def check(api_base: ParseResult, install: bool = True, force: bool = False):
     """
@@ -40,21 +44,20 @@ def check(api_base: ParseResult, install: bool = True, force: bool = False):
             )
         result = install_murfey(api_base, versions["server"])
         if result:
-            print("\nMurfey has been updated. Please restart Murfey")
-            exit()
+            exit(UPDATE_SUCCESS)
         else:
-            exit("Error occurred while updating Murfey")
+            exit(UPDATE_FAILURE)
 
     if versions["server"] != murfey.__version__:
         if force:
             result = install_murfey(api_base, versions["server"])
             if result:
-                print("\nMurfey has been updated. Please restart Murfey")
-                exit()
+                exit(UPDATE_SUCCESS)
             else:
-                exit("Error occurred while updating Murfey")
+                exit(UPDATE_FAILURE)
         else:
-            print("An update is available, install with 'murfey update'.")
+            # Allow Murfey to start, but print an update prompt
+            print("An update is available, install with 'murfey.client --update'.")
 
 
 def install_murfey(api_base: ParseResult, version: str) -> bool:
