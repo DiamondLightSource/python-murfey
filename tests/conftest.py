@@ -305,6 +305,7 @@ def murfey_db_url():
         if os.getenv("GITHUB_ACTIONS") == "true":
             raise KeyError
         pytest.skip("Murfey PostgreSQL database has not been set up; skipping test")
+        return ""
 
 
 @pytest.fixture(scope="session")
