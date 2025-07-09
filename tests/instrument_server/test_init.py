@@ -1,6 +1,9 @@
+import sys
+from typing import Optional
 from urllib.parse import urlparse
 
 import pytest
+import uvicorn
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from packaging.version import Version
@@ -8,7 +11,7 @@ from pytest_mock import MockerFixture
 
 import murfey
 from murfey.client.update import UPDATE_SUCCESS
-from murfey.instrument_server import check_for_updates
+from murfey.instrument_server import check_for_updates, start_instrument_server
 from murfey.server.api.bootstrap import pypi as pypi_router
 from murfey.server.api.bootstrap import version as version_router
 from murfey.util.api import url_path_for
@@ -19,6 +22,7 @@ for router in [pypi_router, version_router]:
     app.include_router(router)
 client = TestClient(app)
 base_url = str(client.base_url)
+
 
 check_for_updates_test_matrix = (
     # Downgrade, upgrade, or keep client version?
@@ -113,3 +117,65 @@ def test_check_for_updates(
 
     # Check that the query URL is correct
     mock_get.assert_called_once_with(version_check_url.geturl())
+
+
+start_instrument_server_test_matrix = (
+    # Host | Port
+    (
+        None,
+        None,
+    ),  # Test default values
+    (
+        "127.0.0.1",
+        8000,
+    ),  # Test manually included values
+)
+
+
+@pytest.mark.parametrize("test_params", start_instrument_server_test_matrix)
+def test_start_instrument_server(
+    mocker: MockerFixture, test_params: tuple[Optional[str], Optional[int]]
+):
+
+    # Unpack test params
+    host, port = test_params
+
+    # Patch the Uvicorn Server instance
+    mock_server = mocker.patch("uvicorn.Server")
+    # Disable 'run'; we just want to confirm it's called correctly
+    mock_server.run.return_value = lambda: None
+
+    # Patch the websocket instance
+    mock_wsapp = mocker.patch("murfey.client.websocket.WSApp")
+    mock_wsapp.return_value = mocker.Mock()  # Disable functionality
+
+    # Construct the expected Uvicorn Config object and save it as a dict
+    expected_config = vars(
+        uvicorn.Config(
+            "murfey.instrument_server.main:app",
+            host=host if host is not None else "0.0.0.0",
+            port=port if port is not None else 8001,
+            log_config=None,
+            ws_ping_interval=300,
+            ws_ping_timeout=300,
+        )
+    )
+
+    # Construct the arguments to pass to the instrument server
+    sys.argv = [
+        "murfey.instrument_server",
+    ]
+
+    # Add host and port if they're present
+    if host is not None:
+        sys.argv.extend(["--host", host])
+    if port is not None:
+        sys.argv.extend(["--port", str(port)])
+
+    # Run the function
+    start_instrument_server()
+
+    # Check that the server was called with the correct arguments
+    args, kwargs = mock_server.call_args
+    actual_config = vars(kwargs["config"])
+    assert expected_config == actual_config
