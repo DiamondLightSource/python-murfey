@@ -252,8 +252,10 @@ def seed_ispyb_db(ispyb_db_session_factory):
             for name, id in ISPyBTableValues.experiment_types.items()
         ]
         ispyb_db_session.close()
-    # Skip ISPyB-related tests if the connection fails
     except InterfaceError:
+        # If this fails in the GitHub test environment, raise it as a genuine error
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            raise InterfaceError
         pytest.skip("ISPyB database has not been set up; skipping test")
 
 
@@ -299,6 +301,9 @@ def murfey_db_url():
         )
     # Skip Murfey database-related tests if the environment for it hasn't been set up
     except KeyError:
+        # If this fails in the GitHub test environment, raise it as a genuine error
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            raise KeyError
         pytest.skip("Murfey PostgreSQL database has not been set up; skipping test")
 
 
