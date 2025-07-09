@@ -1,22 +1,24 @@
-from unittest import mock
 from urllib.parse import urlparse
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from packaging.version import Version
+from pytest_mock import MockerFixture
 
 import murfey
+from murfey.client.update import UPDATE_SUCCESS
 from murfey.instrument_server import check_for_updates
-from murfey.server.api.bootstrap import bootstrap as bootstrap_router
 from murfey.server.api.bootstrap import pypi as pypi_router
+from murfey.server.api.bootstrap import version as version_router
 from murfey.util.api import url_path_for
 
 # Set up a test router with only the essential endpoints
 app = FastAPI()
-for router in [pypi_router, bootstrap_router]:
+for router in [pypi_router, version_router]:
     app.include_router(router)
 client = TestClient(app)
-
+base_url = str(client.base_url)
 
 check_for_updates_test_matrix = (
     # Downgrade, upgrade, or keep client version?
@@ -29,41 +31,85 @@ check_for_updates_test_matrix = (
 @pytest.mark.parametrize("test_params", check_for_updates_test_matrix)
 def test_check_for_updates(
     test_params: tuple[str],
+    mocker: MockerFixture,
 ):
 
     # Unpack test params
-    (handle_client_version,) = test_params
+    (bump_client_version,) = test_params
 
-    with (
-        mock.patch("murfey.instrument_server.urlparse") as mock_parse,
-        mock.patch("murfey.client.update.requests.get") as mock_get,
-    ):
-        # Return the test client URL
-        api_base = urlparse("http://testserver", allow_fragments=False)
-        mock_parse.return_value = api_base
+    # Modify client version as needed
+    current_version = murfey.__version__
+    supported_client_version = murfey.__supported_client_version__
+
+    major, minor, patch = Version(current_version).release
+
+    # Adjust the perceived client version in the function being tested
+    if bump_client_version == "downgrade":
+        support_client_version_parts = Version(supported_client_version).release
+        if patch == 0:
+            if minor == 0:
+                if major == 0:
+                    # This can't be downgraded, so skip
+                    pytest.skip("This version can't be downgraded anymore; skipping")
+                else:
+                    major = support_client_version_parts[0] - 1
+                    print(f"Downgraded major version to {major}")
+            else:
+                minor = support_client_version_parts[1] - 1
+                print(f"Downgraded minor version to {minor}")
+        else:
+            patch = support_client_version_parts[2] - 1
+            print(f"Downgraded patch version to {patch}")
+    elif bump_client_version == "upgrade":
+        patch += 1
+        print(f"Bumped patch version to {patch}")
+    mock_client_version = f"{major}.{minor}.{patch}"
+
+    # Run the version check query and get a response to patch in later
+    api_base = urlparse(base_url, allow_fragments=False)
+    proxy_path = api_base.path.rstrip("/")
+    version_check_path = url_path_for("bootstrap.version", "get_version")
+    version_check_query = f"client_version={mock_client_version}"
+    version_check_url = api_base._replace(
+        path=f"{proxy_path}{version_check_path}",
+        query=version_check_query,
+    )
+    version_check_response = client.get(f"{version_check_path}?{version_check_query}")
+
+    # Check that the endpoint works as expected
+    assert version_check_response.status_code == 200
+    assert version_check_response.json() == {
+        "server": current_version,
+        "oldest-supported-client": supported_client_version,
+        "client-needs-update": True if bump_client_version == "downgrade" else False,
+        "client-needs-downgrade": True if bump_client_version == "upgrade" else False,
+    }
+
+    # Patch the URL parse result
+    mock_parse = mocker.patch("murfey.instrument_server.urlparse")
+    mock_parse.return_value = api_base
+
+    # Patch the result of get
+    mock_get = mocker.patch("murfey.client.update.requests.get")
+    mock_get.return_value = version_check_response
+
+    # Patch the installation function
+    mock_install = mocker.patch("murfey.client.update.install_murfey")
+
+    # Patch the perceived client version
+    mocker.patch("murfey.client.update.murfey.__version__", new=mock_client_version)
+
+    # If changing the client version, check that 'install_murfey' and 'exit' are called
+    if bump_client_version in ("upgrade", "downgrade"):
+        with pytest.raises(SystemExit) as exc_info:
+            check_for_updates()
+        mock_install.assert_called_once()
+        # Check that 'exit' is called with the correct message
+        assert exc_info.value.code == UPDATE_SUCCESS
+    # If client version is the same, 'install_murfey' shouldn't be called
+    else:
         check_for_updates()
+        mock_install.assert_not_called()
 
-        # Modify client version as needed
-        current_version = murfey.__version__
-        supported_client_version = murfey.__supported_client_version__
-
-        # Check that a request was sent to the test_client with the correct URL
-        proxy_path = api_base.path.rstrip("/")
-        version_check_url = api_base._replace(
-            path=f"{proxy_path}{url_path_for('bootstrap.version', 'get_version')}",
-            query=f"client_version={current_version}",
-        )
-        mock_get.assert_any_call(version_check_url.geturl())
-
-        # Construct the mock response
-        mock_response = mock.Mock()
-        mock_response.json.return_value = {
-            "server": current_version,
-            "oldest-supported-client": supported_client_version,
-            "client-needs-update": True,
-            "client-needs-downgrade": False,
-        }
-        mock_response.status_code = 200
-        mock_get.return_value = mock_response
-
-    pass
+    # Check that the query URL is correct
+    mock_get.assert_called_once_with(version_check_url.geturl())
