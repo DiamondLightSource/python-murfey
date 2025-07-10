@@ -96,6 +96,9 @@ class Session(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
+    search_maps: List["SearchMap"] = Relationship(
+        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
+    )
     rsync_instances: List[RsyncInstance] = Relationship(
         back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -346,15 +349,23 @@ class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
 
 class TiltSeries(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
+    ispyb_id: Optional[int] = None
     tag: str
     rsync_source: str
     session_id: int = Field(foreign_key="session.id")
+    search_map_id: Optional[int] = Field(
+        foreign_key="searchmap.id",
+        default=None,
+    )
     tilt_series_length: int = -1
     processing_requested: bool = False
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
     session: Optional[Session] = Relationship(back_populates="tilt_series")
     tilts: List["Tilt"] = Relationship(
         back_populates="tilt_series", sa_relationship_kwargs={"cascade": "delete"}
     )
+    search_map: Optional["SearchMap"] = Relationship(back_populates="tilt_series")
 
 
 class Tilt(SQLModel, table=True):  # type: ignore
@@ -598,6 +609,38 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     )
     preprocess_stashes: List[PreprocessStash] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
+    )
+
+
+class SearchMap(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: str
+    tag: str
+    x_location: Optional[float] = None
+    y_location: Optional[float] = None
+    x_stage_position: Optional[float] = None
+    y_stage_position: Optional[float] = None
+    pixel_size: Optional[float] = None
+    image: str = ""
+    binning: Optional[float] = None
+    reference_matrix_m11: Optional[float] = None
+    reference_matrix_m12: Optional[float] = None
+    reference_matrix_m21: Optional[float] = None
+    reference_matrix_m22: Optional[float] = None
+    stage_correction_m11: Optional[float] = None
+    stage_correction_m12: Optional[float] = None
+    stage_correction_m21: Optional[float] = None
+    stage_correction_m22: Optional[float] = None
+    image_shift_correction_m11: Optional[float] = None
+    image_shift_correction_m12: Optional[float] = None
+    image_shift_correction_m21: Optional[float] = None
+    image_shift_correction_m22: Optional[float] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    session: Optional[Session] = Relationship(back_populates="search_maps")
+    tilt_series: List["TiltSeries"] = Relationship(
+        back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
 
 
