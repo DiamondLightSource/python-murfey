@@ -71,7 +71,6 @@ class MultigridController:
             client_id=0,
             murfey_session=self.session_id,
             software_versions=machine_data.get("software_versions", {}),
-            default_destination=f"{datetime.now().year}",
             demo=self.demo,
             visit=self.visit,
             dose_per_frame=self.data_collection_parameters.get("dose_per_frame"),
