@@ -1,4 +1,4 @@
 apiVersion: v1
 name: murfey-server
 description: Helm chart for deploying a Murfey backend server, which is responsible for orchestrating the data transfer and processing workflow between the client PC and the storage system
-version: 0.19.1
+version: 0.19.2
