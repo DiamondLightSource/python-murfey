@@ -257,9 +257,12 @@ class TomographyMetadataContext(Context):
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
 
-            batch_positions_list = batch_xml["BatchPositionsList"]["BatchPositions"][
-                "BatchPositionParameters"
-            ]
+            batch_positions_from_xml = batch_xml["BatchPositionsList"]["BatchPositions"]
+            if not batch_positions_from_xml:
+                logger.info("No batch positions yet")
+                return
+
+            batch_positions_list = batch_positions_from_xml["BatchPositionParameters"]
             if isinstance(batch_positions_list, dict):
                 # Case of a single batch
                 batch_positions_list = [batch_positions_list]
