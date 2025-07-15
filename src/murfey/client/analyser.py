@@ -122,6 +122,17 @@ class Analyser(Observer):
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
 
+        if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
+            self._context = SPAMetadataContext("epu", self._basepath)
+            return True
+        elif (
+            "Batch" in file_path.parts
+            or "SearchMaps" in file_path.parts
+            or file_path.name == "Session.dm"
+        ):
+            self._context = TomographyMetadataContext("tomo", self._basepath)
+            return True
+
         # CLEM workflow checks
         # Look for LIF and XLIF files
         if file_path.suffix in (".lif", ".xlif"):
