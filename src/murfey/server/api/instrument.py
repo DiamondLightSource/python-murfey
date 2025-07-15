@@ -177,7 +177,7 @@ async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murf
             f"Submitting request to inspect multigrid controller for session {session_id}"
         )
         async with aiohttp.ClientSession() as clientsession:
-            async with clientsession.post(
+            async with clientsession.get(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_exists', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
