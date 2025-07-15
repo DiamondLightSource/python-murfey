@@ -128,6 +128,7 @@ class Analyser(Observer):
         elif (
             "Batch" in file_path.parts
             or "SearchMaps" in file_path.parts
+            or "Thumbnails" in file_path.parts
             or file_path.name == "Session.dm"
         ):
             self._context = TomographyMetadataContext("tomo", self._basepath)
@@ -160,6 +161,9 @@ class Analyser(Observer):
         # Tomography and SPA workflow checks
         split_file_name = file_path.name.split("_")
         if split_file_name:
+            if "gain" in split_file_name[-1]:
+                return False
+
             # Files starting with "FoilHole" belong to the SPA workflow
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
@@ -175,6 +179,7 @@ class Analyser(Observer):
                 or "Fractions" in split_file_name[-1]
                 or "fractions" in split_file_name[-1]
                 or "EER" in split_file_name[-1]
+                or file_path.suffix == ".mdoc"
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
