@@ -57,6 +57,9 @@ class TomographyMetadataContext(Context):
 
             windows_path = session_data["TomographySession"]["AtlasId"]
             logger.info(f"Windows path to atlas metadata found: {windows_path}")
+            if not windows_path:
+                logger.warning("No atlas metadata path found")
+                return
             visit_index = windows_path.split("\\").index(environment.visit)
             partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
             logger.info("Partial Linux path successfully constructed from Windows path")
