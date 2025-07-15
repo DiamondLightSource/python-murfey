@@ -165,7 +165,7 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
     return data
 
 
-@router.post("/sessions/{session_id}/multigrid_controller/status")
+@router.get("/sessions/{session_id}/multigrid_controller/status")
 async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     instrument_name = session.instrument_name

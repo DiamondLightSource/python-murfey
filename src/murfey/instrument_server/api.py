@@ -223,7 +223,7 @@ def update_multigrid_controller_visit_end_time(
     return {"success": True}
 
 
-@router.post("/sessions/{session_id}/multigrid_controller/status")
+@router.get("/sessions/{session_id}/multigrid_controller/status")
 def check_multigrid_controller_exists(
     session_id: MurfeySessionID,
 ):
