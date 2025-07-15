@@ -181,30 +181,6 @@ class Analyser(Observer):
                     self._context = TomographyContext("tomo", self._basepath)
                     self.parameters_model = ProcessingParametersTomo
                 return True
-
-            # Files with these suffixes belong to the serial EM tomography workflow
-            if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
-                # Ignore batch files and search maps
-                if any(p in file_path.parts for p in ("Batch", "SearchMaps")):
-                    return False
-                # Ignore JPG files
-                if file_path.with_suffix(".jpg").is_file():
-                    return False
-                # Ignore the averaged movies written out by the Falcon
-                if (
-                    len(
-                        list(
-                            file_path.parent.glob(
-                                f"{file_path.name}*{file_path.suffix}"
-                            )
-                        )
-                    )
-                    > 1
-                ):
-                    return False
-                self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = ProcessingParametersTomo
-                return True
         return False
 
     def post_transfer(self, transferred_file: Path):
@@ -295,12 +271,7 @@ class Analyser(Observer):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
-                                        (
-                                            transferred_file.with_suffix(".mdoc")
-                                            if self._context._acquisition_software
-                                            == "serialem"
-                                            else self._xml_file(transferred_file)
-                                        ),
+                                        self._xml_file(transferred_file),
                                         environment=self._environment,
                                     )
                                 except NotImplementedError:

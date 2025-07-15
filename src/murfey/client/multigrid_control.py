@@ -23,7 +23,7 @@ from murfey.util import posix_path
 from murfey.util.api import url_path_for
 from murfey.util.client import capture_delete, capture_post, get_machine_config_client
 
-log = logging.getLogger("murfey.client.mutligrid_control")
+log = logging.getLogger("murfey.client.multigrid_control")
 
 
 @dataclass
