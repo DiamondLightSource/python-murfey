@@ -186,6 +186,7 @@ async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murf
                 data: dict[str, Any] = await resp.json()
     else:
         data = {"detail": "No instrument server URL found"}
+    log.debug(f"Received response: {data}")
     return data
 
 
