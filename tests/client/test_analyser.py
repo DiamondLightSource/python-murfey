@@ -45,6 +45,9 @@ contextless_files = [
     "visit/Position_1_gain.tiff",
     "visit/FoilHole_01234_gain.tiff",
     "visit/file_1.mrc",
+    "visit/FoilHole_01234.mrc",
+    "visit/FoilHole_01234.jpg",
+    "visit/FoilHole_01234.xml",
 ]
 
 
@@ -66,7 +69,7 @@ def test_analyser_setup_and_stopping(tmp_path):
 
 
 def test_analyser_tomo_determination(tmp_path):
-    tomo_file = tmp_path / "Position_1_[30.0].tiff"
+    tomo_file = tmp_path / "Position_1_[30.0]_fractions.tiff"
     analyser = Analyser(tmp_path)
     analyser.start()
     analyser.queue.put(tomo_file)
@@ -75,7 +78,7 @@ def test_analyser_tomo_determination(tmp_path):
 
 
 def test_analyser_epu_determination(tmp_path):
-    tomo_file = tmp_path / "FoilHole_12345_Data_6789.tiff"
+    tomo_file = tmp_path / "FoilHole_12345_Data_6789_Fractions.tiff"
     analyser = Analyser(tmp_path)
     analyser.start()
     analyser.queue.put(tomo_file)

@@ -159,13 +159,17 @@ class Analyser(Observer):
                 return True
 
         # Tomography and SPA workflow checks
-        split_file_name = file_path.name.split("_")
-        if split_file_name:
-            if "gain" in split_file_name[-1]:
+        split_file_stem = file_path.stem.split("_")
+        if split_file_stem:
+            if split_file_stem[-1] == "gain":
                 return False
 
             # Files starting with "FoilHole" belong to the SPA workflow
-            if split_file_name[0].startswith("FoilHole"):
+            if split_file_stem[0].startswith("FoilHole") and split_file_stem[-1] in [
+                "Fractions",
+                "fractions",
+                "EER",
+            ]:
                 if not self._context:
                     logger.info("Acquisition software: EPU")
                     self._context = SPAModularContext("epu", self._basepath)
@@ -174,11 +178,8 @@ class Analyser(Observer):
 
             # Files starting with "Position" belong to the standard tomography workflow
             if (
-                split_file_name[0] == "Position"
-                or "[" in file_path.name
-                or "Fractions" in split_file_name[-1]
-                or "fractions" in split_file_name[-1]
-                or "EER" in split_file_name[-1]
+                split_file_stem[0] == "Position"
+                or split_file_stem[-1] in ["Fractions", "fractions", "EER"]
                 or file_path.suffix == ".mdoc"
             ):
                 if not self._context:
