@@ -25,8 +25,8 @@ def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnviron
     dcg_tag = str(source).replace(f"/{environment.visit}", "")
     url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
     dcg_data = {
-        "experiment_type": "single particle",
-        "experiment_type_id": 37,
+        "experiment_type": "tomo",
+        "experiment_type_id": 36,
         "tag": dcg_tag,
     }
     capture_post(url, json=dcg_data)
