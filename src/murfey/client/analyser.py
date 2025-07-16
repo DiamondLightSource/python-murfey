@@ -149,6 +149,10 @@ class Analyser(Observer):
         # Tomography and SPA workflow checks
         split_file_name = file_path.name.split("_")
         if split_file_name:
+            # Skip context for gain files
+            if "gain" in split_file_name[-1]:
+                return False
+
             # Files starting with "FoilHole" belong to the SPA workflow
             if split_file_name[0].startswith("FoilHole"):
                 if not self._context:
