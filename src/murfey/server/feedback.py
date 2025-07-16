@@ -1982,6 +1982,7 @@ def feedback_callback(header: dict, message: dict) -> None:
                         session_id=message["session_id"],
                         tag=message.get("tag"),
                     )
+                    dcgid = murfey_dcg.id
                 else:
                     record = DataCollectionGroup(
                         sessionId=ispyb_session_id,
@@ -1999,6 +2000,8 @@ def feedback_callback(header: dict, message: dict) -> None:
                         atlas_id = murfey.server._transport_object.do_insert_atlas(
                             atlas_record
                         )["return_value"]
+                    else:
+                        atlas_id = None
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
                         atlas_id=atlas_id,
