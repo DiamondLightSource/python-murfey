@@ -2002,6 +2002,9 @@ def feedback_callback(header: dict, message: dict) -> None:
                     murfey_dcg = db.DataCollectionGroup(
                         id=dcgid,
                         atlas_id=atlas_id,
+                        atlas=message.get("atlas", ""),
+                        atlas_pixel_size=message.get("atlas_pixel_size"),
+                        sample=message.get("sample"),
                         session_id=message["session_id"],
                         tag=message.get("tag"),
                     )
