@@ -249,8 +249,8 @@ def test_register_batch_position_update(murfey_db_session: Session):
 
     # These two should have been updated, values are known as used identity matrices
     bp_final_parameters = murfey_db_session.exec(select(TiltSeries)).one()
-    assert bp_final_parameters.x_location == 880
-    assert bp_final_parameters.y_location == 1780
+    assert bp_final_parameters.x_location == 880 * 512 / search_map.width
+    assert bp_final_parameters.y_location == 1780 * 512 / search_map.width
 
 
 def test_register_batch_position_update_skip(murfey_db_session: Session):
@@ -361,5 +361,5 @@ def test_register_batch_position_new(murfey_db_session: Session):
 
     # These two should have been updated, values are known as used identity matrices
     bp_final_parameters = murfey_db_session.exec(select(TiltSeries)).one()
-    assert bp_final_parameters.x_location == 880
-    assert bp_final_parameters.y_location == 1780
+    assert bp_final_parameters.x_location == 880 * 512 / search_map.width
+    assert bp_final_parameters.y_location == 1780 * 512 / search_map.width
