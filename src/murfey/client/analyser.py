@@ -132,16 +132,8 @@ class Analyser(Observer):
             and file_path.suffix in (".tiff", ".tif")
             and self._environment
         ):
-            created_directories = set(
-                get_machine_config_client(
-                    str(self._environment.url.geturl()),
-                    instrument_name=self._environment.instrument_name,
-                    demo=self._environment.demo,
-                ).get("analyse_created_directories", [])
-            )
-            if created_directories.intersection(set(file_path.parts)):
-                self._context = CLEMContext("leica", self._basepath)
-                return True
+            self._context = CLEMContext("leica", self._basepath)
+            return True
 
         # Tomography and SPA workflow checks
         if "atlas" in file_path.parts:
