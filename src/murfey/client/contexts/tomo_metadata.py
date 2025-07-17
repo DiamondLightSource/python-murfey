@@ -25,8 +25,8 @@ def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnviron
     dcg_tag = str(source).replace(f"/{environment.visit}", "")
     url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
     dcg_data = {
-        "experiment_type": "single particle",
-        "experiment_type_id": 37,
+        "experiment_type": "tomo",
+        "experiment_type_id": 36,
         "tag": dcg_tag,
     }
     capture_post(url, json=dcg_data)
@@ -57,6 +57,9 @@ class TomographyMetadataContext(Context):
 
             windows_path = session_data["TomographySession"]["AtlasId"]
             logger.info(f"Windows path to atlas metadata found: {windows_path}")
+            if not windows_path:
+                logger.warning("No atlas metadata path found")
+                return
             visit_index = windows_path.split("\\").index(environment.visit)
             partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
             logger.info("Partial Linux path successfully constructed from Windows path")
@@ -257,9 +260,12 @@ class TomographyMetadataContext(Context):
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
 
-            batch_positions_list = batch_xml["BatchPositionsList"]["BatchPositions"][
-                "BatchPositionParameters"
-            ]
+            batch_positions_from_xml = batch_xml["BatchPositionsList"]["BatchPositions"]
+            if not batch_positions_from_xml:
+                logger.info("No batch positions yet")
+                return
+
+            batch_positions_list = batch_positions_from_xml["BatchPositionParameters"]
             if isinstance(batch_positions_list, dict):
                 # Case of a single batch
                 batch_positions_list = [batch_positions_list]

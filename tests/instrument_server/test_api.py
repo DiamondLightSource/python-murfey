@@ -1,17 +1,32 @@
 from pathlib import Path
 from typing import Optional
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, MagicMock, patch
 from urllib.parse import urlparse
 
-from pytest import mark
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture
 
-from murfey.instrument_server.api import (
-    GainReference,
-    _get_murfey_url,
-    upload_gain_reference,
-)
+from murfey.instrument_server.api import _get_murfey_url
+from murfey.instrument_server.api import router as client_router
+from murfey.instrument_server.api import validate_session_token
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
+
+
+def set_up_test_client(session_id: Optional[int] = None):
+    """
+    Helper function to set up a test client for the instrument server with validation
+    checks disabled.
+    """
+    # Set up the instrument server
+    client_app = FastAPI()
+    if session_id:
+        client_app.dependency_overrides[validate_session_token] = lambda: session_id
+    client_app.include_router(client_router)
+    return TestClient(client_app)
+
 
 test_get_murfey_url_params_matrix = (
     # Server URL to use
@@ -23,7 +38,7 @@ test_get_murfey_url_params_matrix = (
 )
 
 
-@mark.parametrize("test_params", test_get_murfey_url_params_matrix)
+@pytest.mark.parametrize("test_params", test_get_murfey_url_params_matrix)
 def test_get_murfey_url(
     test_params: tuple[str],
     mock_client_configuration,  # From conftest.py
@@ -57,6 +72,24 @@ def test_get_murfey_url(
     assert parsed_server.path == parsed_original.path
 
 
+def test_check_multigrid_controller_exists(mocker: MockerFixture):
+    session_id = 1
+
+    # Patch out the multigrid controllers that have been stored in memory
+    mocker.patch("murfey.instrument_server.api.controllers", {session_id: MagicMock()})
+
+    # Set up the test client
+    client_server = set_up_test_client(session_id=session_id)
+    url_path = url_path_for(
+        "api.router", "check_multigrid_controller_exists", session_id=session_id
+    )
+    response = client_server.get(url_path)
+
+    # Check that the result is as expected
+    assert response.status_code == 200
+    assert response.json() == {"exists": True}
+
+
 test_upload_gain_reference_params_matrix = (
     # Rsync URL settings
     ("http://1.1.1.1",),  # When rsync_url is provided
@@ -65,24 +98,22 @@ test_upload_gain_reference_params_matrix = (
 )
 
 
-@mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
-@patch("murfey.instrument_server.api.subprocess")
-@patch("murfey.instrument_server.api.tokens")
-@patch("murfey.instrument_server.api._get_murfey_url")
-@patch("murfey.instrument_server.api.requests")
+@pytest.mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 def test_upload_gain_reference(
-    mock_request,
-    mock_get_server_url,
-    mock_tokens,
-    mock_subprocess,
+    mocker: MockerFixture,
     test_params: tuple[Optional[str]],
 ):
-
     # Unpack test parameters and define other ones
     (rsync_url_setting,) = test_params
-    server_url = "http://0.0.0.0:8000"
+    server_url = "https://murfey.server.test"
     instrument_name = "murfey"
     session_id = 1
+
+    # Mock out objects
+    mock_request = mocker.patch("murfey.instrument_server.api.requests")
+    mock_get_server_url = mocker.patch("murfey.instrument_server.api._get_murfey_url")
+    mock_subprocess = mocker.patch("murfey.instrument_server.api.subprocess")
+    mocker.patch("murfey.instrument_server.api.tokens", {session_id: ANY})
 
     # Create a mock machine config base on the test params
     rsync_module = "data"
@@ -95,12 +126,12 @@ def test_upload_gain_reference(
         mock_machine_config["rsync_url"] = rsync_url_setting
 
     # Assign expected values to the mock objects
-    mock_response = Mock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = mock_machine_config
     mock_request.get.return_value = mock_response
     mock_get_server_url.return_value = server_url
-    mock_subprocess.run.return_value = Mock(returncode=0)
+    mock_subprocess.run.return_value = MagicMock(returncode=0)
 
     # Construct payload and pass request to function
     gain_ref_file = f"{gain_ref_dir}/gain.mrc"
@@ -111,13 +142,18 @@ def test_upload_gain_reference(
         "visit_path": visit_path,
         "gain_destination_dir": gain_dest_dir,
     }
-    result = upload_gain_reference(
+
+    # Set up instrument server test client
+    client_server = set_up_test_client(session_id=session_id)
+
+    # Poke the endpoint with the expected data
+    url_path = url_path_for(
+        "api.router",
+        "upload_gain_reference",
         instrument_name=instrument_name,
         session_id=session_id,
-        gain_reference=GainReference(
-            **payload,
-        ),
     )
+    response = client_server.post(url_path, json=payload)
 
     # Check that the machine config request was called
     machine_config_url = f"{server_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
@@ -145,4 +181,4 @@ def test_upload_gain_reference(
     )
 
     # Check that the function ran through to completion successfully
-    assert result == {"success": True}
+    assert response.json() == {"success": True}
