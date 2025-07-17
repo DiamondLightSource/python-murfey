@@ -405,6 +405,26 @@ class TransportManager:
             search_map_parameters.pixel_size *= (
                 search_map_parameters.height / search_map_parameters.height_on_atlas
             )
+        search_map_parameters.height = (
+            int(search_map_parameters.height / 7.8)
+            if search_map_parameters.height
+            else None
+        )
+        search_map_parameters.width = (
+            int(search_map_parameters.width / 7.8)
+            if search_map_parameters.width
+            else None
+        )
+        search_map_parameters.x_location = (
+            int(search_map_parameters.x_location / 7.8)
+            if search_map_parameters.x_location
+            else None
+        )
+        search_map_parameters.y_location = (
+            int(search_map_parameters.y_location / 7.8)
+            if search_map_parameters.y_location
+            else None
+        )
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareImage=search_map_parameters.image,
@@ -412,6 +432,7 @@ class TransportManager:
             pixelLocationY=search_map_parameters.y_location,
             height=search_map_parameters.height_on_atlas,
             width=search_map_parameters.width_on_atlas,
+            angle=0,
             stageLocationX=search_map_parameters.x_stage_position,
             stageLocationY=search_map_parameters.y_stage_position,
             pixelSize=search_map_parameters.pixel_size,
@@ -452,13 +473,19 @@ class TransportManager:
                 if search_map_parameters.image:
                     grid_square.gridSquareImage = search_map_parameters.image
                 if search_map_parameters.x_location:
-                    grid_square.pixelLocationX = search_map_parameters.x_location
+                    grid_square.pixelLocationX = int(
+                        search_map_parameters.x_location / 7.8
+                    )
                 if search_map_parameters.y_location:
-                    grid_square.pixelLocationY = search_map_parameters.y_location
+                    grid_square.pixelLocationY = int(
+                        search_map_parameters.y_location / 7.8
+                    )
                 if search_map_parameters.height_on_atlas:
-                    grid_square.height = search_map_parameters.height_on_atlas
+                    grid_square.height = int(
+                        search_map_parameters.height_on_atlas / 7.8
+                    )
                 if search_map_parameters.width_on_atlas:
-                    grid_square.width = search_map_parameters.width_on_atlas
+                    grid_square.width = int(search_map_parameters.width_on_atlas / 7.8)
                 if search_map_parameters.x_stage_position:
                     grid_square.stageLocationX = search_map_parameters.x_stage_position
                 if search_map_parameters.y_stage_position:

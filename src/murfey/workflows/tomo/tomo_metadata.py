@@ -339,10 +339,20 @@ def register_batch_position_in_database(
             search_map.height / 2,
         ]
         tilt_series.x_location = (
-            centre_batch_pixel[0] - batch_parameters.x_beamshift / search_map.pixel_size
+            (
+                centre_batch_pixel[0]
+                - batch_parameters.x_beamshift / search_map.pixel_size
+            )
+            * 512
+            / search_map.width
         )
         tilt_series.y_location = (
-            centre_batch_pixel[1] - batch_parameters.y_beamshift / search_map.pixel_size
+            (
+                centre_batch_pixel[1]
+                - batch_parameters.y_beamshift / search_map.pixel_size
+            )
+            * 512
+            / search_map.width
         )
     else:
         logger.warning(
