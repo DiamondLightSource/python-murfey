@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.client.analyser import Analyser
+from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -10,6 +12,7 @@ from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 example_files = [
+    # Tomography
     ["visit/Position_1_001_0.0_20250715_012434_fractions.tiff", TomographyContext],
     ["visit/Position_1_2_002_3.0_20250715_012434_Fractions.mrc", TomographyContext],
     ["visit/Position_1_2_003_6.0_20250715_012434_EER.eer", TomographyContext],
@@ -17,24 +20,88 @@ example_files = [
     ["visit/Position_1_[30.0].tiff", TomographyContext],
     ["visit/Position_1.mdoc", TomographyContext],
     ["visit/name1_2.mdoc", TomographyContext],
+    # Tomography metadata
     ["visit/Session.dm", TomographyMetadataContext],
     ["visit/SearchMaps/SearchMap.xml", TomographyMetadataContext],
     ["visit/Batch/BatchPositionsList.xml", TomographyMetadataContext],
     ["visit/Thumbnails/file.mrc", TomographyMetadataContext],
+    # SPA
     ["visit/FoilHole_01234_fractions.tiff", SPAModularContext],
+    # SPA metadata
     ["atlas/atlas.mrc", SPAMetadataContext],
     ["visit/EpuSession.dm", SPAMetadataContext],
     ["visit/Metadata/GridSquare.dm", SPAMetadataContext],
+    # CLEM LIF file
+    ["visit/images/test_file.lif", CLEMContext],
+    # CLEM TIFF files
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12--Z02--C01.tif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12_Lng_LVCC--Z02--C01.tif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001--Z00--C00.tif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001_Lng_LVCC--Z00--C00.tif",
+        CLEMContext,
+    ],
+    # CLEM TIFF file accompanying metadata
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12.xlif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12_Lng_LVCC.xlif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001.xlif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001_Lng_LVCC.xlif",
+        CLEMContext,
+    ],
 ]
 
 
 @pytest.mark.parametrize("file_and_context", example_files)
-def test_find_context(file_and_context, tmp_path):
+def test_find_context(mocker: MockerFixture, file_and_context, tmp_path):
+    # Unpack parametrised variables
     file_name, context = file_and_context
 
-    analyser = Analyser(tmp_path)
+    # The CLEM Context requires a MurfeyInstanceEnvironment
+    if context is CLEMContext:
+        # Mock the MurfeyInstanceEnvironment
+        mock_environment = mocker.patch(
+            "murfey.client.analyser.MurfeyInstanceEnvironment"
+        )
+        mock_environment.url.geturl.return_value = "https://murfey.server.test"
+        mock_environment.instrument_name = "Test"
+        mock_environment.demo = False
+
+        # Mock the call to get the machine config
+        mocker.patch(
+            "murfey.client.analyser.get_machine_config_client",
+            return_value={"analyse_created_directories": ["images"]},
+        )
+
+    # Pass the file to the Analyser; add environment as needed
+    analyser = Analyser(
+        basepath_local=tmp_path,
+        environment=(mock_environment if context is CLEMContext else None),
+    )
+
+    # Check that the results are as expected
     assert analyser._find_context(tmp_path / file_name)
     assert isinstance(analyser._context, context)
+
+    # Checks for the specific workflow contexts
     if isinstance(analyser._context, TomographyContext):
         assert analyser.parameters_model == ProcessingParametersTomo
     if isinstance(analyser._context, SPAModularContext):
