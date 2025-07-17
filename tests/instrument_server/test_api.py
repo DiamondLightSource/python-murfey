@@ -8,9 +8,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from murfey.instrument_server.api import GainReference, _get_murfey_url
+from murfey.instrument_server.api import _get_murfey_url
 from murfey.instrument_server.api import router as client_router
-from murfey.instrument_server.api import upload_gain_reference, validate_session_token
+from murfey.instrument_server.api import validate_session_token
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
 
@@ -105,7 +105,7 @@ def test_upload_gain_reference(
 ):
     # Unpack test parameters and define other ones
     (rsync_url_setting,) = test_params
-    server_url = "http://0.0.0.0:8000"
+    server_url = "https://murfey.server.test"
     instrument_name = "murfey"
     session_id = 1
 
@@ -142,13 +142,18 @@ def test_upload_gain_reference(
         "visit_path": visit_path,
         "gain_destination_dir": gain_dest_dir,
     }
-    result = upload_gain_reference(
+
+    # Set up instrument server test client
+    client_server = set_up_test_client(session_id=session_id)
+
+    # Poke the endpoint with the expected data
+    url_path = url_path_for(
+        "api.router",
+        "upload_gain_reference",
         instrument_name=instrument_name,
         session_id=session_id,
-        gain_reference=GainReference(
-            **payload,
-        ),
     )
+    response = client_server.post(url_path, json=payload)
 
     # Check that the machine config request was called
     machine_config_url = f"{server_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
@@ -176,4 +181,4 @@ def test_upload_gain_reference(
     )
 
     # Check that the function ran through to completion successfully
-    assert result == {"success": True}
+    assert response.json() == {"success": True}
