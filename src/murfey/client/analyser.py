@@ -118,6 +118,32 @@ class Analyser(Observer):
         in the Context classes themselves.
         """
         logger.debug(f"Finding context using file {str(file_path)!r}")
+
+        # CLEM workflow checks
+        # Look for LIF and XLIF files
+        if file_path.suffix in (".lif", ".xlif"):
+            self._context = CLEMContext("leica", self._basepath)
+            return True
+        # Look for TIFF files associated with CLEM workflow
+        # Leica's autosave mode seems to name the TIFFs in the format
+        # PostionXX--ZXX--CXX.tif
+        if (
+            all(pattern in file_path.name for pattern in ("--Z", "--C"))
+            and file_path.suffix in (".tiff", ".tif")
+            and self._environment
+        ):
+            created_directories = set(
+                get_machine_config_client(
+                    str(self._environment.url.geturl()),
+                    instrument_name=self._environment.instrument_name,
+                    demo=self._environment.demo,
+                ).get("analyse_created_directories", [])
+            )
+            if created_directories.intersection(set(file_path.parts)):
+                self._context = CLEMContext("leica", self._basepath)
+                return True
+
+        # Tomography and SPA workflow checks
         if "atlas" in file_path.parts:
             self._context = SPAMetadataContext("epu", self._basepath)
             return True
@@ -134,31 +160,6 @@ class Analyser(Observer):
             self._context = TomographyMetadataContext("tomo", self._basepath)
             return True
 
-        # CLEM workflow checks
-        # Look for LIF and XLIF files
-        if file_path.suffix in (".lif", ".xlif"):
-            self._context = CLEMContext("leica", self._basepath)
-            return True
-        # Look for TIFF files associated with CLEM workflow
-        # Leica's autosave mode seems to name the TIFFs in the format
-        # PostionXX--ZXX-CXX.tif
-        if (
-            "--" in file_path.name
-            and file_path.suffix in (".tiff", ".tif")
-            and self._environment
-        ):
-            created_directories = set(
-                get_machine_config_client(
-                    str(self._environment.url.geturl()),
-                    instrument_name=self._environment.instrument_name,
-                    demo=self._environment.demo,
-                ).get("analyse_created_directories", [])
-            )
-            if created_directories.intersection(set(file_path.parts)):
-                self._context = CLEMContext("leica", self._basepath)
-                return True
-
-        # Tomography and SPA workflow checks
         split_file_stem = file_path.stem.split("_")
         if split_file_stem:
             if split_file_stem[-1] == "gain":
