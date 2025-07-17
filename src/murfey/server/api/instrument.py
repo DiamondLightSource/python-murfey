@@ -4,7 +4,7 @@ import asyncio
 import datetime
 import logging
 from pathlib import Path
-from typing import Annotated, List, Optional
+from typing import Annotated, Any, List, Optional
 from urllib.parse import quote
 
 import aiohttp
@@ -101,6 +101,31 @@ async def check_if_session_is_active(
                 return {"active": response.status == 200}
 
 
+@router.get("/sessions/{session_id}/multigrid_controller/status")
+async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murfey_db):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        log.debug(
+            f"Submitting request to inspect multigrid controller for session {session_id}"
+        )
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.get(
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_exists', session_id=session_id)}",
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as resp:
+                data: dict[str, Any] = await resp.json()
+    else:
+        data = {"detail": "No instrument server URL found"}
+    log.debug(f"Received response: {data}")
+    return data
+
+
 @router.post("/sessions/{session_id}/multigrid_watcher")
 async def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSetup, db=murfey_db
@@ -162,6 +187,36 @@ async def start_multigrid_watcher(session_id: MurfeySessionID, db=murfey_db):
             ) as resp:
                 data = await resp.json()
     log.debug(f"Received response: {data}")
+    return data
+
+
+@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
+async def update_visit_end_time(
+    session_id: MurfeySessionID, end_time: datetime.datetime, db=murfey_db
+):
+    # Load data for session
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+
+    # Update visit end time in database
+    session_entry.visit_end_time = end_time
+    db.add(session_entry)
+    db.commit()
+
+    # Update the multigrid controller
+    data = {}
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as clientsession:
+            async with clientsession.post(
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={quote(end_time.isoformat())}",
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
     return data
 
 
@@ -389,36 +444,6 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'finalise_session', session_id=session_id)}",
-                headers={
-                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
-                },
-            ) as resp:
-                data = await resp.json()
-    return data
-
-
-@router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
-async def update_visit_end_time(
-    session_id: MurfeySessionID, end_time: datetime.datetime, db=murfey_db
-):
-    # Load data for session
-    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
-    instrument_name = session_entry.instrument_name
-
-    # Update visit end time in database
-    session_entry.visit_end_time = end_time
-    db.add(session_entry)
-    db.commit()
-
-    # Update the multigrid controller
-    data = {}
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    if machine_config.instrument_server_url:
-        async with aiohttp.ClientSession() as clientsession:
-            async with clientsession.post(
-                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_multigrid_controller_visit_end_time', session_id=session_id)}?end_time={quote(end_time.isoformat())}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },

@@ -215,6 +215,15 @@ def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
     return {"success": True}
 
 
+@router.get("/sessions/{session_id}/multigrid_controller/status")
+def check_multigrid_controller_exists(
+    session_id: MurfeySessionID,
+):
+    if controllers.get(session_id, None) is not None:
+        return {"exists": True}
+    return {"exists": False}
+
+
 @router.post("/sessions/{session_id}/multigrid_controller/visit_end_time")
 def update_multigrid_controller_visit_end_time(
     session_id: MurfeySessionID, end_time: datetime

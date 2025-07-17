@@ -43,6 +43,11 @@ murfey.instrument_server.api.router:
     path_params: []
     methods:
       - POST
+  - path: /sessions/{session_id}/multigrid_controller/status
+    function: check_multigrid_controller_exists
+    path_params: []
+    methods:
+      - GET
   - path: /sessions/{session_id}/stop_rsyncer
     function: stop_rsyncer
     path_params: []
@@ -503,6 +508,11 @@ murfey.server.api.instrument.router:
     path_params: []
     methods:
       - POST
+  - path: /instrument_server/sessions/{session_id}/multigrid_controller/status
+    function: check_multigrid_controller_exists
+    path_params: []
+    methods:
+      - GET
   - path: /instrument_server/sessions/{session_id}/provided_processing_parameters
     function: pass_proc_params_to_instrument_server
     path_params: []
