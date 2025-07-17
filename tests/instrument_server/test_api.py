@@ -1,17 +1,32 @@
 from pathlib import Path
 from typing import Optional
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, MagicMock, Mock, patch
 from urllib.parse import urlparse
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pytest import mark
+from pytest_mock import MockerFixture
 
-from murfey.instrument_server.api import (
-    GainReference,
-    _get_murfey_url,
-    upload_gain_reference,
-)
+from murfey.instrument_server.api import GainReference, _get_murfey_url
+from murfey.instrument_server.api import router as client_router
+from murfey.instrument_server.api import upload_gain_reference, validate_session_token
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
+
+
+def set_up_test_client(session_id: Optional[int] = None):
+    """
+    Helper function to set up a test client for the instrument server with validation
+    checks disabled.
+    """
+    # Set up the instrument server
+    client_app = FastAPI()
+    if session_id:
+        client_app.dependency_overrides[validate_session_token] = lambda: session_id
+    client_app.include_router(client_router)
+    return TestClient(client_app)
+
 
 test_get_murfey_url_params_matrix = (
     # Server URL to use
@@ -55,6 +70,24 @@ def test_get_murfey_url(
     assert parsed_server.port == parsed_original.port
     assert parsed_server.netloc == parsed_original.netloc
     assert parsed_server.path == parsed_original.path
+
+
+def test_check_multigrid_controller_exists(mocker: MockerFixture):
+    session_id = 1
+
+    # Patch out the multigrid controllers that have been stored in memory
+    mocker.patch("murfey.instrument_server.api.controllers", {session_id: MagicMock()})
+
+    # Set up the test client
+    client_server = set_up_test_client(session_id=session_id)
+    url_path = url_path_for(
+        "api.router", "check_multigrid_controller_exists", session_id=session_id
+    )
+    response = client_server.get(url_path)
+
+    # Check that the result is as expected
+    assert response.status_code == 200
+    assert response.json() == {"exists": True}
 
 
 test_upload_gain_reference_params_matrix = (
