@@ -99,23 +99,21 @@ test_upload_gain_reference_params_matrix = (
 
 
 @pytest.mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
-@patch("murfey.instrument_server.api.subprocess")
-@patch("murfey.instrument_server.api.tokens")
-@patch("murfey.instrument_server.api._get_murfey_url")
-@patch("murfey.instrument_server.api.requests")
 def test_upload_gain_reference(
-    mock_request,
-    mock_get_server_url,
-    mock_tokens,
-    mock_subprocess,
+    mocker: MockerFixture,
     test_params: tuple[Optional[str]],
 ):
-
     # Unpack test parameters and define other ones
     (rsync_url_setting,) = test_params
     server_url = "http://0.0.0.0:8000"
     instrument_name = "murfey"
     session_id = 1
+
+    # Mock out objects
+    mock_request = mocker.patch("murfey.instrument_server.api.requests")
+    mock_get_server_url = mocker.patch("murfey.instrument_server.api._get_murfey_url")
+    mock_subprocess = mocker.patch("murfey.instrument_server.api.subprocess")
+    mocker.patch("murfey.instrument_server.api.tokens", {session_id: ANY})
 
     # Create a mock machine config base on the test params
     rsync_module = "data"
