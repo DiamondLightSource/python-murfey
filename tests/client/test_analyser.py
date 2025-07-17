@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from pytest_mock import MockerFixture
 
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.clem import CLEMContext
@@ -71,31 +70,12 @@ example_files = [
 
 
 @pytest.mark.parametrize("file_and_context", example_files)
-def test_find_context(mocker: MockerFixture, file_and_context, tmp_path):
+def test_find_context(file_and_context, tmp_path):
     # Unpack parametrised variables
     file_name, context = file_and_context
 
-    # The CLEM Context requires a MurfeyInstanceEnvironment
-    if context is CLEMContext:
-        # Mock the MurfeyInstanceEnvironment
-        mock_environment = mocker.patch(
-            "murfey.client.analyser.MurfeyInstanceEnvironment"
-        )
-        mock_environment.url.geturl.return_value = "https://murfey.server.test"
-        mock_environment.instrument_name = "Test"
-        mock_environment.demo = False
-
-        # Mock the call to get the machine config
-        mocker.patch(
-            "murfey.client.analyser.get_machine_config_client",
-            return_value={"analyse_created_directories": ["images"]},
-        )
-
     # Pass the file to the Analyser; add environment as needed
-    analyser = Analyser(
-        basepath_local=tmp_path,
-        environment=(mock_environment if context is CLEMContext else None),
-    )
+    analyser = Analyser(basepath_local=tmp_path)
 
     # Check that the results are as expected
     assert analyser._find_context(tmp_path / file_name)

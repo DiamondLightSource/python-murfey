@@ -127,11 +127,9 @@ class Analyser(Observer):
         # Look for TIFF files associated with CLEM workflow
         # Leica's autosave mode seems to name the TIFFs in the format
         # PostionXX--ZXX--CXX.tif
-        if (
-            all(pattern in file_path.name for pattern in ("--Z", "--C"))
-            and file_path.suffix in (".tiff", ".tif")
-            and self._environment
-        ):
+        if all(
+            pattern in file_path.name for pattern in ("--Z", "--C")
+        ) and file_path.suffix in (".tiff", ".tif"):
             self._context = CLEMContext("leica", self._basepath)
             return True
 
