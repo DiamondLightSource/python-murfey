@@ -3,9 +3,9 @@ from typing import Optional
 from unittest.mock import ANY, MagicMock, Mock, patch
 from urllib.parse import urlparse
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pytest import mark
 from pytest_mock import MockerFixture
 
 from murfey.instrument_server.api import GainReference, _get_murfey_url
@@ -38,7 +38,7 @@ test_get_murfey_url_params_matrix = (
 )
 
 
-@mark.parametrize("test_params", test_get_murfey_url_params_matrix)
+@pytest.mark.parametrize("test_params", test_get_murfey_url_params_matrix)
 def test_get_murfey_url(
     test_params: tuple[str],
     mock_client_configuration,  # From conftest.py
@@ -98,7 +98,7 @@ test_upload_gain_reference_params_matrix = (
 )
 
 
-@mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
+@pytest.mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 @patch("murfey.instrument_server.api.subprocess")
 @patch("murfey.instrument_server.api.tokens")
 @patch("murfey.instrument_server.api._get_murfey_url")
