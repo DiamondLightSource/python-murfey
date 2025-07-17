@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Optional
-from unittest.mock import ANY, MagicMock, Mock, patch
+from unittest.mock import ANY, MagicMock, patch
 from urllib.parse import urlparse
 
 import pytest
@@ -128,12 +128,12 @@ def test_upload_gain_reference(
         mock_machine_config["rsync_url"] = rsync_url_setting
 
     # Assign expected values to the mock objects
-    mock_response = Mock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = mock_machine_config
     mock_request.get.return_value = mock_response
     mock_get_server_url.return_value = server_url
-    mock_subprocess.run.return_value = Mock(returncode=0)
+    mock_subprocess.run.return_value = MagicMock(returncode=0)
 
     # Construct payload and pass request to function
     gain_ref_file = f"{gain_ref_dir}/gain.mrc"
