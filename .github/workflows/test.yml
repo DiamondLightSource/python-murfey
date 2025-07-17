@@ -3,7 +3,7 @@ name: Build and test
 on: [push, pull_request]
 
 env:
-  ISPYB_DATABASE_SCHEMA: 4.6.0
+  ISPYB_DATABASE_SCHEMA: 4.8.0
   # Installs from GitHub
   # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
   # Previous version(s):
