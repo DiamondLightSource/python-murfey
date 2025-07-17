@@ -59,6 +59,14 @@ example_files = [
         CLEMContext,
     ],
     [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_histo.xlif",
+        CLEMContext,
+    ],
+    [
+        "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_Lng_LVCC_histo.xlif",
+        CLEMContext,
+    ],
+    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001.xlif",
         CLEMContext,
     ],
@@ -95,6 +103,11 @@ contextless_files = [
     "visit/FoilHole_01234.mrc",
     "visit/FoilHole_01234.jpg",
     "visit/FoilHole_01234.xml",
+    "visit/images/test_file.lifext",
+    "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef",
+    "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef.lock",
+    "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Position 12_histo.lof",
+    "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Series001_histo.lof",
 ]
 
 
