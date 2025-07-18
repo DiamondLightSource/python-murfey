@@ -27,7 +27,7 @@ def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
         core
         / machine_config.processed_directory_name
         / "atlas"
-        / f"{sample_id}_{atlas_mrc.stem}_fullres.jpg"
+        / secure_filename(f"{sample_id}_{atlas_mrc.stem}_fullres.jpg")
     )
     atlas_jpg_file.parent.mkdir(parents=True, exist_ok=True)
 
