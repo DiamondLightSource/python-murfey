@@ -168,6 +168,7 @@ class Analyser(Observer):
                 return True
 
             # Files starting with "Position" belong to the standard tomography workflow
+            # NOTE: not completely reliable, mdocs can be in tomography metadata as well
             if (
                 split_file_stem[0] == "Position"
                 or "[" in file_path.name
