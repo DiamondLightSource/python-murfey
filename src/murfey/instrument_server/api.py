@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import partial
 from logging import getLogger
 from pathlib import Path
+from threading import Lock
 from typing import Annotated, Any, Optional
 from urllib.parse import urlparse
 
@@ -31,6 +32,7 @@ logger = getLogger("murfey.instrument_server.api")
 watchers: dict[str | int, MultigridDirWatcher] = {}
 rsyncers: dict[str, RSyncer] = {}
 controllers: dict[int, MultigridController] = {}
+controller_lock = Lock()
 data_collection_parameters: dict = {}
 tokens = {}
 
@@ -145,14 +147,17 @@ def check_token(session_id: MurfeySessionID):
 def setup_multigrid_watcher(
     session_id: MurfeySessionID, watcher_spec: MultigridWatcherSpec
 ):
+    # Remove dormant controllers from memory
+    with controller_lock:
+        controllers_to_remove = [
+            sid for sid, controller in controllers.items() if controller.dormant
+        ]
+        for sid in controllers_to_remove:
+            del controllers[sid]
+
     # Return 'True' if controllers are already set up
     if controllers.get(session_id) is not None:
         return {"success": True}
-
-    label = watcher_spec.label
-    for sid, controller in controllers.items():
-        if controller.dormant:
-            del controllers[sid]
 
     # Load machine config as dictionary
     machine_config: dict[str, Any] = requests.get(
@@ -160,7 +165,8 @@ def setup_multigrid_watcher(
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
 
-    # Set up the multigrid controll controller
+    # Set up the multigrid controller
+    label = watcher_spec.label
     controllers[session_id] = MultigridController(
         [],
         watcher_spec.visit,
@@ -268,7 +274,9 @@ def finalise_rsyncer(session_id: MurfeySessionID, rsyncer_source: RsyncerSource)
 @router.post("/sessions/{session_id}/finalise_session")
 def finalise_session(session_id: MurfeySessionID):
     watchers[session_id].request_stop()
+    logger.debug(f"Stop request sent to multigrid watcher for session {session_id}")
     controllers[session_id].finalise()
+    logger.debug(f"Stop orders sent to multigrid controller for session {session_id} ")
     return {"success": True}
 
 
