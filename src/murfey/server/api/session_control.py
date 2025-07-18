@@ -320,12 +320,6 @@ spa_router = APIRouter(
 )
 
 
-@spa_router.get("/sessions/{session_id}/make_atlas_jpg")
-def make_atlas_jpg(session_id: MurfeySessionID, atlas_mrc: str, db=murfey_db):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
-    return atlas_jpg_from_mrc(session.instrument_name, session.visit, Path(atlas_mrc))
-
-
 @spa_router.get("/sessions/{session_id}/grid_squares")
 def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
     return _get_grid_squares(session_id, db)
@@ -352,6 +346,12 @@ def get_foil_hole(
     session_id: MurfeySessionID, fh_name: int, db=murfey_db
 ) -> Dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
+
+
+@spa_router.post("/sessions/{session_id}/make_atlas_jpg")
+def make_atlas_jpg(session_id: MurfeySessionID, atlas_mrc: str, db=murfey_db):
+    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    return atlas_jpg_from_mrc(session.instrument_name, session.visit, Path(atlas_mrc))
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gsid}")
