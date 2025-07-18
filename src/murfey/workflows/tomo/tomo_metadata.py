@@ -200,10 +200,12 @@ def register_search_map_in_database(
 
         # Flip positions based on camera type
         camera = getattr(Camera, machine_config.camera)
-        if camera == Camera.K3_FLIPY:
+        if camera == Camera.FALCON:
             corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
         elif camera == Camera.K3_FLIPX:
             corrected_vector = np.matmul(np.array([[-1, 0], [0, 1]]), corrected_vector)
+        elif camera == Camera.K3_FLIPY:
+            corrected_vector = np.matmul(np.array([[0, 1], [1, 0]]), corrected_vector)
 
         # Convert from metres to pixels
         search_map_params.height_on_atlas = int(
