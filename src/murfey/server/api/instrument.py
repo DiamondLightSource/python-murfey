@@ -433,6 +433,7 @@ async def finalise_rsyncer(
 
 @router.post("/sessions/{session_id}/finalise_session")
 async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
+    log.debug(f"Finalising session {session_id}")
     data = {}
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -449,6 +450,7 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
                 },
             ) as resp:
                 data = await resp.json()
+                log.debug(f"Received response {data}")
     return data
 
 
