@@ -26,6 +26,7 @@ example_files = [
     ["visit/Thumbnails/file.mrc", TomographyMetadataContext],
     # SPA
     ["visit/FoilHole_01234_fractions.tiff", SPAModularContext],
+    ["visit/FoilHole_01234_EER.eer", SPAModularContext],
     # SPA metadata
     ["atlas/atlas.mrc", SPAMetadataContext],
     ["visit/EpuSession.dm", SPAMetadataContext],
@@ -129,7 +130,7 @@ def test_analyser_setup_and_stopping(tmp_path):
 
 
 def test_analyser_tomo_determination(tmp_path):
-    tomo_file = tmp_path / "Position_1_[30.0]_fractions.tiff"
+    tomo_file = tmp_path / "Position_1_[30.0].tiff"
     analyser = Analyser(tmp_path)
     analyser.start()
     analyser.queue.put(tomo_file)

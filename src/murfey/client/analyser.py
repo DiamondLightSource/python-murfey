@@ -170,6 +170,7 @@ class Analyser(Observer):
             # Files starting with "Position" belong to the standard tomography workflow
             if (
                 split_file_stem[0] == "Position"
+                or "[" in file_path.name
                 or split_file_stem[-1] in ["Fractions", "fractions", "EER"]
                 or file_path.suffix == ".mdoc"
             ):
