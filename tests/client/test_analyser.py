@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from murfey.client.analyser import Analyser
+from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
@@ -28,7 +29,7 @@ example_files = [
     ["visit/FoilHole_01234_fractions.tiff", SPAModularContext],
     ["visit/FoilHole_01234_EER.eer", SPAModularContext],
     # SPA metadata
-    ["atlas/atlas.mrc", SPAMetadataContext],
+    ["atlas/atlas.mrc", AtlasContext],
     ["visit/EpuSession.dm", SPAMetadataContext],
     ["visit/Metadata/GridSquare.dm", SPAMetadataContext],
     # CLEM LIF file

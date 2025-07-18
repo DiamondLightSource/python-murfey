@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Type
 
 from murfey.client.context import Context
+from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
@@ -135,7 +136,7 @@ class Analyser(Observer):
 
         # Tomography and SPA workflow checks
         if "atlas" in file_path.parts:
-            self._context = SPAMetadataContext("epu", self._basepath)
+            self._context = AtlasContext("epu", self._basepath)
             return True
 
         if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
@@ -266,7 +267,7 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if "atlas" not in transferred_file.parts:
+                        if not isinstance(self._context, AtlasContext):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -308,6 +309,10 @@ class Analyser(Observer):
                     )
                     self.post_transfer(transferred_file)
 
+                elif isinstance(self._context, AtlasContext):
+                    logger.debug(f"File {transferred_file.name!r} is part of the atlas")
+                    self.post_transfer(transferred_file)
+
                 # Handle files with tomography and SPA context differently
                 elif not self._extension or self._unseen_xml:
                     valid_extension = self._find_extension(transferred_file)
@@ -325,36 +330,35 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if "atlas" not in transferred_file.parts:
-                            if not dc_metadata:
-                                try:
-                                    dc_metadata = self._context.gather_metadata(
-                                        mdoc_for_reading
-                                        or self._xml_file(transferred_file),
-                                        environment=self._environment,
-                                    )
-                                except KeyError as e:
-                                    logger.error(
-                                        f"Metadata gathering failed with a key error for key: {e.args[0]}"
-                                    )
-                                    raise e
-                            if not dc_metadata or not self._force_mdoc_metadata:
-                                mdoc_for_reading = None
-                                self._unseen_xml.append(transferred_file)
-                            if dc_metadata:
-                                self._unseen_xml = []
-                                if dc_metadata.get("file_extension"):
-                                    self._extension = dc_metadata["file_extension"]
-                                else:
-                                    dc_metadata["file_extension"] = self._extension
-                                dc_metadata["acquisition_software"] = (
-                                    self._context._acquisition_software
+                        if not dc_metadata:
+                            try:
+                                dc_metadata = self._context.gather_metadata(
+                                    mdoc_for_reading
+                                    or self._xml_file(transferred_file),
+                                    environment=self._environment,
                                 )
-                                self.notify(
-                                    {
-                                        "form": dc_metadata,
-                                    }
+                            except KeyError as e:
+                                logger.error(
+                                    f"Metadata gathering failed with a key error for key: {e.args[0]}"
                                 )
+                                raise e
+                        if not dc_metadata or not self._force_mdoc_metadata:
+                            mdoc_for_reading = None
+                            self._unseen_xml.append(transferred_file)
+                        if dc_metadata:
+                            self._unseen_xml = []
+                            if dc_metadata.get("file_extension"):
+                                self._extension = dc_metadata["file_extension"]
+                            else:
+                                dc_metadata["file_extension"] = self._extension
+                            dc_metadata["acquisition_software"] = (
+                                self._context._acquisition_software
+                            )
+                            self.notify(
+                                {
+                                    "form": dc_metadata,
+                                }
+                            )
                 elif isinstance(
                     self._context,
                     (
