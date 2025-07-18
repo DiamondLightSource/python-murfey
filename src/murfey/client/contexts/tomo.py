@@ -400,33 +400,6 @@ class TomographyContext(Context):
             required_strings=required_strings,
         )
 
-    def _add_serialem_tilt(
-        self, file_path: Path, environment: MurfeyInstanceEnvironment | None = None
-    ) -> List[str]:
-        delimiters = ("_", "-")
-        for d in delimiters:
-            if file_path.name.count(d) > 1:
-                delimiter = d
-                break
-        else:
-            delimiter = delimiters[0]
-
-        def _extract_tilt_series(p: Path) -> str:
-            split = p.name.split(delimiter)
-            for s in split:
-                if s.isdigit():
-                    return s
-            raise ValueError(
-                f"No digits found in {p.name} after splitting on {delimiter}"
-            )
-
-        return self._add_tilt(
-            file_path,
-            lambda x: ".".join(x.name.split(delimiter)[-1].split(".")[:-1]),
-            environment=environment,
-            required_strings=[],
-        )
-
     def post_transfer(
         self,
         transferred_file: Path,
@@ -464,10 +437,8 @@ class TomographyContext(Context):
                         required_strings=kwargs.get("required_strings")
                         or required_strings,
                     )
-                elif self._acquisition_software == "serialem":
-                    completed_tilts = self._add_serialem_tilt(
-                        transferred_file, environment=environment
-                    )
+                else:
+                    logger.warning(f"Unknown data file {transferred_file}")
             if transferred_file.suffix == ".mdoc":
                 with open(transferred_file, "r") as md:
                     tilt_series = transferred_file.stem

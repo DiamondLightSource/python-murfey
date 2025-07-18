@@ -118,9 +118,6 @@ class Analyser(Observer):
         in the Context classes themselves.
         """
         logger.debug(f"Finding context using file {str(file_path)!r}")
-        if "atlas" in file_path.parts:
-            self._context = SPAMetadataContext("epu", self._basepath)
-            return True
 
         # CLEM workflow checks
         # Look for LIF and XLIF files
@@ -129,32 +126,41 @@ class Analyser(Observer):
             return True
         # Look for TIFF files associated with CLEM workflow
         # Leica's autosave mode seems to name the TIFFs in the format
-        # PostionXX--ZXX-CXX.tif
-        if (
-            "--" in file_path.name
-            and file_path.suffix in (".tiff", ".tif")
-            and self._environment
-        ):
-            created_directories = set(
-                get_machine_config_client(
-                    str(self._environment.url.geturl()),
-                    instrument_name=self._environment.instrument_name,
-                    demo=self._environment.demo,
-                ).get("analyse_created_directories", [])
-            )
-            if created_directories.intersection(set(file_path.parts)):
-                self._context = CLEMContext("leica", self._basepath)
-                return True
+        # PostionXX--ZXX--CXX.tif
+        if all(
+            pattern in file_path.name for pattern in ("--Z", "--C")
+        ) and file_path.suffix in (".tiff", ".tif"):
+            self._context = CLEMContext("leica", self._basepath)
+            return True
 
         # Tomography and SPA workflow checks
-        split_file_name = file_path.name.split("_")
-        if split_file_name:
-            # Skip context for gain files
-            if "gain" in split_file_name[-1]:
+        if "atlas" in file_path.parts:
+            self._context = SPAMetadataContext("epu", self._basepath)
+            return True
+
+        if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
+            self._context = SPAMetadataContext("epu", self._basepath)
+            return True
+        elif (
+            "Batch" in file_path.parts
+            or "SearchMaps" in file_path.parts
+            or "Thumbnails" in file_path.parts
+            or file_path.name == "Session.dm"
+        ):
+            self._context = TomographyMetadataContext("tomo", self._basepath)
+            return True
+
+        split_file_stem = file_path.stem.split("_")
+        if split_file_stem:
+            if split_file_stem[-1] == "gain":
                 return False
 
             # Files starting with "FoilHole" belong to the SPA workflow
-            if split_file_name[0].startswith("FoilHole"):
+            if split_file_stem[0].startswith("FoilHole") and split_file_stem[-1] in [
+                "Fractions",
+                "fractions",
+                "EER",
+            ]:
                 if not self._context:
                     logger.info("Acquisition software: EPU")
                     self._context = SPAModularContext("epu", self._basepath)
@@ -162,41 +168,17 @@ class Analyser(Observer):
                 return True
 
             # Files starting with "Position" belong to the standard tomography workflow
+            # NOTE: not completely reliable, mdocs can be in tomography metadata as well
             if (
-                split_file_name[0] == "Position"
+                split_file_stem[0] == "Position"
                 or "[" in file_path.name
-                or "Fractions" in split_file_name[-1]
-                or "fractions" in split_file_name[-1]
-                or "EER" in split_file_name[-1]
+                or split_file_stem[-1] in ["Fractions", "fractions", "EER"]
+                or file_path.suffix == ".mdoc"
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext("tomo", self._basepath)
                     self.parameters_model = ProcessingParametersTomo
-                return True
-
-            # Files with these suffixes belong to the serial EM tomography workflow
-            if file_path.suffix in (".mrc", ".tiff", ".tif", ".eer"):
-                # Ignore batch files and search maps
-                if any(p in file_path.parts for p in ("Batch", "SearchMaps")):
-                    return False
-                # Ignore JPG files
-                if file_path.with_suffix(".jpg").is_file():
-                    return False
-                # Ignore the averaged movies written out by the Falcon
-                if (
-                    len(
-                        list(
-                            file_path.parent.glob(
-                                f"{file_path.name}*{file_path.suffix}"
-                            )
-                        )
-                    )
-                    > 1
-                ):
-                    return False
-                self._context = TomographyContext("serialem", self._basepath)
-                self.parameters_model = ProcessingParametersTomo
                 return True
         return False
 
@@ -288,12 +270,7 @@ class Analyser(Observer):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
-                                        (
-                                            transferred_file.with_suffix(".mdoc")
-                                            if self._context._acquisition_software
-                                            == "serialem"
-                                            else self._xml_file(transferred_file)
-                                        ),
+                                        self._xml_file(transferred_file),
                                         environment=self._environment,
                                     )
                                 except NotImplementedError:
