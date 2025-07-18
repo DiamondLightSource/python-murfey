@@ -201,10 +201,13 @@ def register_search_map_in_database(
         # Flip positions based on camera type
         camera = getattr(Camera, machine_config.camera)
         if camera == Camera.FALCON:
+            # Flip in y
             corrected_vector = np.matmul(np.array([[1, 0], [0, -1]]), corrected_vector)
         elif camera == Camera.K3_FLIPX:
+            # Flip in x
             corrected_vector = np.matmul(np.array([[-1, 0], [0, 1]]), corrected_vector)
         elif camera == Camera.K3_FLIPY:
+            # Inversion (camera mounted upside-down)
             corrected_vector = np.matmul(np.array([[0, 1], [1, 0]]), corrected_vector)
 
         # Convert from metres to pixels
