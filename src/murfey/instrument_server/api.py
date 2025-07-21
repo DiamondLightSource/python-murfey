@@ -211,7 +211,11 @@ def start_multigrid_watcher(session_id: MurfeySessionID, process: bool = True):
         return {"success": False}
     if not process:
         watchers[session_id]._analyse = False
-    watchers[session_id].start()
+    try:
+        watchers[session_id].start()
+    # Ignore RuntimeError; this happens when reconnecting after a backend server restart
+    except RuntimeError:
+        logger.debug(f"MultigridWatcher for session {session_id} is already active")
     return {"success": True}
 
 
