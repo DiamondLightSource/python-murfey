@@ -158,7 +158,7 @@ class MultigridController:
         while not self.is_ready_for_dormancy():
             time.sleep(10)
 
-        # Once all threads are stopped, remove it from the database
+        # Once all threads are stopped, remove session from the database
         log.debug(
             f"Submitting request to remove session {self.session_id} from database"
         )
@@ -168,6 +168,11 @@ class MultigridController:
         success = response.status_code == 200 if response else False
         if not success:
             log.warning(f"Could not delete database data for {self.session_id}")
+
+        # Send message to frontend to trigger a refresh
+        self.ws.send(json.dumps({"message": "refresh"}))
+
+        # Mark as dormant
         self.dormant = True
 
     def abandon(self):
