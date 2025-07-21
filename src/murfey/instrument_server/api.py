@@ -222,11 +222,15 @@ def stop_multigrid_watcher(session_id: MurfeySessionID, label: str):
 
 
 @router.get("/sessions/{session_id}/multigrid_controller/status")
-def check_multigrid_controller_exists(
+def check_multigrid_controller_status(
     session_id: MurfeySessionID,
 ):
     if controllers.get(session_id, None) is not None:
-        return {"exists": True}
+        return {
+            "dormant": controllers[session_id].dormant,
+            "exists": True,
+            "finalising": controllers[session_id].finalising,
+        }
     return {"exists": False}
 
 

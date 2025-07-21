@@ -102,7 +102,7 @@ async def check_if_session_is_active(
 
 
 @router.get("/sessions/{session_id}/multigrid_controller/status")
-async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murfey_db):
+async def check_multigrid_controller_status(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     instrument_name = session.instrument_name
     machine_config = get_machine_config(instrument_name=instrument_name)[
@@ -114,7 +114,7 @@ async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murf
         )
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.get(
-                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_exists', session_id=session_id)}",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_status', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
