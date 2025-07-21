@@ -91,6 +91,7 @@ def remove_session_by_id(session_id: int, db):
         )
     db.delete(session)
     db.commit()
+    logger.debug(f"Successfully removed session {session_id} from database")
     return
 
 
