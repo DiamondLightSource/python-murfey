@@ -37,6 +37,7 @@ class MultigridController:
     rsync_url: str = ""
     rsync_module: str = "data"
     demo: bool = False
+    finalising: bool = False
     dormant: bool = False
     multigrid_watcher_active: bool = True
     processing_enabled: bool = True
@@ -184,6 +185,7 @@ class MultigridController:
             p.request_stop()
 
     def finalise(self):
+        self.finalising = True
         for a in self.analysers.values():
             a.request_stop()
             log.debug(f"Stop request sent to analyser {a}")
