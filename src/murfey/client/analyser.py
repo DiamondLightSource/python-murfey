@@ -370,6 +370,7 @@ class Analyser(Observer):
                     )
                     self.post_transfer(transferred_file)
             self.queue.task_done()
+        logger.debug("Analyer thread has stopped analysing incoming files")
         self.notify(final=True)
 
     def _xml_file(self, data_file: Path) -> Path:
@@ -403,6 +404,12 @@ class Analyser(Observer):
         self._stopping = True
         self._halt_thread = True
 
+    def is_safe_to_stop(self):
+        """
+        Checks that the analyser thread is safe to stop
+        """
+        return self._stopping and self._halt_thread and not self.queue.qsize()
+
     def stop(self):
         logger.debug("Analyser thread stop requested")
         self._stopping = True
@@ -412,5 +419,8 @@ class Analyser(Observer):
                 self.queue.put(None)
                 self.thread.join()
         except Exception as e:
-            logger.error(f"Exception encountered while stopping analyser: {e}")
+            logger.error(
+                f"Exception encountered while stopping Analyser: {e}",
+                exc_info=True,
+            )
         logger.debug("Analyser thread stop completed")
