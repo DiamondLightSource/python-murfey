@@ -45,21 +45,32 @@ def start_instrument_server():
 
     LogFilter.install()
 
+    # Log everything from Murfey by default
+    logging.getLogger("murfey").setLevel(logging.DEBUG)
+
+    # Show only logs at INFO level and above in the console
     rich_handler = RichHandler(enable_link_path=False)
-    logging.getLogger("murfey").setLevel(logging.INFO)
+    rich_handler.setLevel(logging.INFO)
     logging.getLogger("murfey").addHandler(rich_handler)
     logging.getLogger("fastapi").addHandler(rich_handler)
     logging.getLogger("uvicorn").addHandler(rich_handler)
 
+    # Create a websocket app to connect to the backend
     ws = murfey.client.websocket.WSApp(
         server=read_config().get("Murfey", "server", fallback=""),
         register_client=False,
     )
 
-    handler = CustomHandler(ws.send)
-    logging.getLogger("murfey").addHandler(handler)
-    logging.getLogger("fastapi").addHandler(handler)
-    logging.getLogger("uvicorn").addHandler(handler)
+    # Forward DEBUG levels logs and above from Murfey to the backend
+    murfey_ws_handler = CustomHandler(ws.send)
+    murfey_ws_handler.setLevel(logging.DEBUG)
+    logging.getLogger("murfey").addHandler(murfey_ws_handler)
+
+    # Forward only INFO level logs and above for other packages
+    other_ws_handler = CustomHandler(ws.send)
+    other_ws_handler.setLevel(logging.INFO)
+    logging.getLogger("fastapi").addHandler(other_ws_handler)
+    logging.getLogger("uvicorn").addHandler(other_ws_handler)
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"
