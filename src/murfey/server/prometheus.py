@@ -24,6 +24,12 @@ transferred_data_files_bytes = Gauge(
     ["rsync_source", "visit"],
 )
 
+skipped_files = Gauge(
+    "skipped_files",
+    "Number of files not transferred due to end time",
+    ["visit"],
+)
+
 preprocessed_movies = Counter(
     "preprocessed_movies",
     "Number of movies that have been preprocessed",
