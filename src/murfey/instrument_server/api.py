@@ -311,7 +311,10 @@ class ObserverInfo(BaseModel):
 
 @router.get("/sessions/{session_id}/rsyncer_info")
 def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
-    info = []
+    info: list[ObserverInfo] = []
+    if controllers.get(session_id, None) is None:
+        logger.debug(f"Multigrid controller for session {session_id} doesn't exist")
+        return info
     for k, v in controllers[session_id].rsync_processes.items():
         info.append(
             ObserverInfo(
@@ -328,7 +331,10 @@ def get_rsyncer_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
 
 @router.get("/sessions/{session_id}/analyser_info")
 def get_analyser_info(session_id: MurfeySessionID) -> list[ObserverInfo]:
-    info = []
+    info: list[ObserverInfo] = []
+    if controllers.get(session_id, None) is None:
+        logger.debug(f"Multigrid controller for session {session_id} doesn't exist")
+        return info
     for k, v in controllers[session_id].analysers.items():
         info.append(
             ObserverInfo(
