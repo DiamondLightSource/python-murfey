@@ -171,7 +171,15 @@ class MultigridController:
             log.warning(f"Could not delete database data for {self.session_id}")
 
         # Send message to frontend to trigger a refresh
-        self.ws.send(json.dumps({"message": "refresh"}))
+        self.ws.send(
+            json.dumps(
+                {
+                    "message": "refresh",
+                    "target": "sessions",
+                    "instrument_name": self.instrument_name,
+                }
+            )
+        )
 
         # Mark as dormant
         self.dormant = True
@@ -268,7 +276,15 @@ class MultigridController:
             transfer=machine_data.get("data_transfer_enabled", True),
             restarted=str(source) in self.rsync_restarts,
         )
-        self.ws.send(json.dumps({"message": "refresh"}))
+        self.ws.send(
+            json.dumps(
+                {
+                    "message": "refresh",
+                    "target": "rsyncer",
+                    "session_id": self.session_id,
+                }
+            )
+        )
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
