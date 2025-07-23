@@ -51,7 +51,7 @@ def mock_aiohttp_clientsession(
     return mock_clientsession, mock_response
 
 
-def test_check_multigrid_controller_exists(mocker: MockerFixture):
+def test_check_multigrid_controller_status(mocker: MockerFixture):
     # Set up the objects to mock
     instrument_name = "test"
     session_id = 1
@@ -107,12 +107,12 @@ def test_check_multigrid_controller_exists(mocker: MockerFixture):
     # Construct the URL paths for poking and sending to
     backend_url_path = url_path_for(
         "api.instrument.router",
-        "check_multigrid_controller_exists",
+        "check_multigrid_controller_status",
         session_id=session_id,
     )
     client_url_path = url_path_for(
         "api.router",
-        "check_multigrid_controller_exists",
+        "check_multigrid_controller_status",
         session_id=session_id,
     )
 

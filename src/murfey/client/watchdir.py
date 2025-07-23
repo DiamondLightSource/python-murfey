@@ -67,16 +67,27 @@ class DirWatcher(Observer):
         self._stopping = True
         self._halt_thread = True
 
+    def is_safe_to_stop(self):
+        """
+        Checks that the directory watcher thread is safe to stop
+        """
+        return self._stopping and self._halt_thread and not self.queue.qsize()
+
     def stop(self):
-        log.debug("DirWatcher thread stop requested")
         self._stopping = True
         if self.thread.is_alive():
             self.queue.join()
 
         self._halt_thread = True
-        if self.thread.is_alive():
-            self.queue.put(None)
-            self.thread.join()
+        try:
+            if self.thread.is_alive():
+                self.queue.put(None)
+                self.thread.join()
+        except Exception as e:
+            log.error(
+                f"Exception encountered while stopping DirWatcher: {e}",
+                exc_info=True,
+            )
         log.debug("DirWatcher thread stop completed")
 
     def _process(self):
@@ -94,6 +105,7 @@ class DirWatcher(Observer):
                 modification_time=modification_time, transfer_all=self._transfer_all
             )
             time.sleep(15)
+        log.debug(f"DirWatcher {self} has stopped scanning")
         self.notify(final=True)
 
     def scan(self, modification_time: float | None = None, transfer_all: bool = False):

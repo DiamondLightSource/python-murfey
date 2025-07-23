@@ -102,7 +102,7 @@ async def check_if_session_is_active(
 
 
 @router.get("/sessions/{session_id}/multigrid_controller/status")
-async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murfey_db):
+async def check_multigrid_controller_status(session_id: MurfeySessionID, db=murfey_db):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     instrument_name = session.instrument_name
     machine_config = get_machine_config(instrument_name=instrument_name)[
@@ -112,9 +112,15 @@ async def check_multigrid_controller_exists(session_id: MurfeySessionID, db=murf
         log.debug(
             f"Submitting request to inspect multigrid controller for session {session_id}"
         )
+        # Treat it as absent if the server-side has no stored token for the session
+        if (
+            instrument_server_tokens.get(session_id, {}).get("access_token", None)
+            is None
+        ):
+            return {"exists": False}
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.get(
-                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_exists', session_id=session_id)}",
+                f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_status', session_id=session_id)}",
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                 },
@@ -433,6 +439,7 @@ async def finalise_rsyncer(
 
 @router.post("/sessions/{session_id}/finalise_session")
 async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
+    log.debug(f"Finalising session {session_id}")
     data = {}
     instrument_name = (
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
@@ -449,6 +456,7 @@ async def finalise_session(session_id: MurfeySessionID, db=murfey_db):
                 },
             ) as resp:
                 data = await resp.json()
+                log.debug(f"Received response {data}")
     return data
 
 
