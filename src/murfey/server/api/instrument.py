@@ -112,6 +112,12 @@ async def check_multigrid_controller_status(session_id: MurfeySessionID, db=murf
         log.debug(
             f"Submitting request to inspect multigrid controller for session {session_id}"
         )
+        # Treat it as absent if the server-side has no stored token for the session
+        if (
+            instrument_server_tokens.get(session_id, {}).get("access_token", None)
+            is None
+        ):
+            return {"exists": False}
         async with aiohttp.ClientSession() as clientsession:
             async with clientsession.get(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'check_multigrid_controller_status', session_id=session_id)}",
