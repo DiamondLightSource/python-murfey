@@ -358,7 +358,7 @@ def register_batch_position_in_database(
         tilt_series.y_location = (
             (
                 centre_batch_pixel[1]
-                - batch_parameters.y_beamshift / search_map.pixel_size
+                + batch_parameters.y_beamshift / search_map.pixel_size
             )
             * 512
             / search_map.width
