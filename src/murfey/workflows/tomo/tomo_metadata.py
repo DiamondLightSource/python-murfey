@@ -329,6 +329,7 @@ def register_batch_position_in_database(
             ]
         )
 
+        # Apply stage corrections to the location
         corrected_vector = np.matmul(
             np.linalg.inv(reference_shift_matrix),
             np.matmul(
@@ -339,7 +340,10 @@ def register_batch_position_in_database(
                 ),
             ),
         )
-        centre_batch_pixel = corrected_vector / search_map.pixel_size + [
+        # Invert y coordinate
+        inverted_corrected_vector = np.matmul([[1, 0], [0, -1]], corrected_vector)
+        # Apply shift from centre
+        centre_batch_pixel = inverted_corrected_vector / search_map.pixel_size + [
             search_map.width / 2,
             search_map.height / 2,
         ]
