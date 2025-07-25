@@ -38,16 +38,16 @@ murfey.instrument_server.api.router:
         type: str
     methods:
       - DELETE
+  - path: /sessions/{session_id}/multigrid_controller/status
+    function: check_multigrid_controller_status
+    path_params: []
+    methods:
+      - GET
   - path: /sessions/{session_id}/multigrid_controller/visit_end_time
     function: update_multigrid_controller_visit_end_time
     path_params: []
     methods:
       - POST
-  - path: /sessions/{session_id}/multigrid_controller/status
-    function: check_multigrid_controller_exists
-    path_params: []
-    methods:
-      - GET
   - path: /sessions/{session_id}/stop_rsyncer
     function: stop_rsyncer
     path_params: []
@@ -498,6 +498,11 @@ murfey.server.api.instrument.router:
         type: int
     methods:
       - GET
+  - path: /instrument_server/sessions/{session_id}/multigrid_controller/status
+    function: check_multigrid_controller_status
+    path_params: []
+    methods:
+      - GET
   - path: /instrument_server/sessions/{session_id}/multigrid_watcher
     function: setup_multigrid_watcher
     path_params: []
@@ -508,11 +513,11 @@ murfey.server.api.instrument.router:
     path_params: []
     methods:
       - POST
-  - path: /instrument_server/sessions/{session_id}/multigrid_controller/status
-    function: check_multigrid_controller_exists
+  - path: /instrument_server/sessions/{session_id}/multigrid_controller/visit_end_time
+    function: update_visit_end_time
     path_params: []
     methods:
-      - GET
+      - POST
   - path: /instrument_server/sessions/{session_id}/provided_processing_parameters
     function: pass_proc_params_to_instrument_server
     path_params: []
@@ -556,11 +561,6 @@ murfey.server.api.instrument.router:
       - POST
   - path: /instrument_server/sessions/{session_id}/finalise_session
     function: finalise_session
-    path_params: []
-    methods:
-      - POST
-  - path: /instrument_server/sessions/{session_id}/multigrid_controller/visit_end_time
-    function: update_visit_end_time
     path_params: []
     methods:
       - POST
@@ -821,6 +821,11 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - GET
+  - path: /session_control/spa/sessions/{session_id}/make_atlas_jpg
+    function: make_atlas_jpg
+    path_params: []
+    methods:
+      - POST
   - path: /session_control/spa/sessions/{session_id}/grid_square/{gsid}
     function: register_grid_square
     path_params:

@@ -2,6 +2,7 @@ import json
 import logging
 import subprocess
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
@@ -36,6 +37,7 @@ class MultigridController:
     rsync_url: str = ""
     rsync_module: str = "data"
     demo: bool = False
+    finalising: bool = False
     dormant: bool = False
     multigrid_watcher_active: bool = True
     processing_enabled: bool = True
@@ -117,34 +119,70 @@ class MultigridController:
 
     def _multigrid_watcher_finalised(self):
         self.multigrid_watcher_active = False
-        self.dormancy_check()
 
-    def dormancy_check(self):
+    def is_ready_for_dormancy(self):
+        """
+        When the multigrid watcher is no longer active, sends a request to safely stop
+        the analyser and file watcher threads, then checks to see that those threads
+        and the RSyncer processes associated with the current session have all been
+        safely stopped
+        """
+        log.debug(
+            f"Starting dormancy check for MultigridController for session {self.session_id}"
+        )
         if not self.multigrid_watcher_active:
-            if (
+            for a in self.analysers.values():
+                if a.is_safe_to_stop():
+                    a.stop()
+            for w in self._environment.watchers.values():
+                if w.is_safe_to_stop():
+                    w.stop()
+            return (
                 all(r._finalised for r in self.rsync_processes.values())
                 and not any(a.thread.is_alive() for a in self.analysers.values())
                 and not any(
                     w.thread.is_alive() for w in self._environment.watchers.values()
                 )
-            ):
+            )
+        log.debug(f"Multigrid watcher for session {self.session_id} is still active")
+        return False
 
-                def call_remove_session():
-                    response = capture_delete(
-                        f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.session_id)}",
-                    )
-                    success = response.status_code == 200 if response else False
-                    if not success:
-                        log.warning(
-                            f"Could not delete database data for {self.session_id}"
-                        )
+    def clean_up_once_dormant(self, running_threads: list[threading.Thread]):
+        """
+        A function run in a separate thread that runs the post-session cleanup logic
+        once all threads associated with this current session are halted, and marks
+        the controller as being fully dormant after doing so.
+        """
+        for thread in running_threads:
+            thread.join()
+            log.debug(f"RSyncer cleanup thread {thread.ident} has stopped safely")
+        while not self.is_ready_for_dormancy():
+            time.sleep(10)
 
-                dormancy_thread = threading.Thread(
-                    name=f"Session deletion thread {self.session_id}",
-                    target=call_remove_session,
-                )
-                dormancy_thread.start()
-                self.dormant = True
+        # Once all threads are stopped, remove session from the database
+        log.debug(
+            f"Submitting request to remove session {self.session_id} from database"
+        )
+        response = capture_delete(
+            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self.session_id)}",
+        )
+        success = response.status_code == 200 if response else False
+        if not success:
+            log.warning(f"Could not delete database data for {self.session_id}")
+
+        # Send message to frontend to trigger a refresh
+        self.ws.send(
+            json.dumps(
+                {
+                    "message": "refresh",
+                    "target": "sessions",
+                    "instrument_name": self.instrument_name,
+                }
+            )
+        )
+
+        # Mark as dormant
+        self.dormant = True
 
     def abandon(self):
         for a in self.analysers.values():
@@ -155,12 +193,26 @@ class MultigridController:
             p.request_stop()
 
     def finalise(self):
+        self.finalising = True
         for a in self.analysers.values():
             a.request_stop()
+            log.debug(f"Stop request sent to analyser {a}")
         for w in self._environment.watchers.values():
             w.request_stop()
+            log.debug(f"Stop request sent to watcher {w}")
+        rsync_finaliser_threads = []
         for p in self.rsync_processes.keys():
-            self._finalise_rsyncer(p)
+            # Collect the running rsyncer finaliser threads to pass to the dormancy checker
+            rsync_finaliser_threads.append(self._finalise_rsyncer(p))
+            log.debug(f"Finalised rsyncer {p}")
+
+        # Run the session cleanup function in a separate thread
+        cleanup_upon_dormancy_thread = threading.Thread(
+            target=self.clean_up_once_dormant,
+            args=[rsync_finaliser_threads],
+            daemon=True,
+        )
+        cleanup_upon_dormancy_thread.start()
 
     def update_visit_time(self, new_end_time: datetime):
         # Convert the received server timestamp into the local equivalent
@@ -224,7 +276,15 @@ class MultigridController:
             transfer=machine_data.get("data_transfer_enabled", True),
             restarted=str(source) in self.rsync_restarts,
         )
-        self.ws.send(json.dumps({"message": "refresh"}))
+        self.ws.send(
+            json.dumps(
+                {
+                    "message": "refresh",
+                    "target": "rsyncer",
+                    "session_id": self.session_id,
+                }
+            )
+        )
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
@@ -232,23 +292,27 @@ class MultigridController:
             requests.delete(remove_url)
         else:
             stop_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_stopped_rsyncer', session_id=self.session_id)}"
-            capture_post(stop_url, json={"source": str(source)})
+            capture_post(stop_url, json={"path": str(source)})
 
     def _finalise_rsyncer(self, source: Path):
+        """
+        Starts a new Rsyncer thread that cleans up the directories, and returns that
+        thread to be managed by a central thread.
+        """
         finalise_thread = threading.Thread(
             name=f"Controller finaliser thread ({source})",
-            target=partial(
-                self.rsync_processes[source].finalise, callback=self.dormancy_check
-            ),
+            target=self.rsync_processes[source].finalise,
             kwargs={"thread": False},
             daemon=True,
         )
         finalise_thread.start()
+        log.debug(f"Started RSync cleanup for {str(source)}")
+        return finalise_thread
 
     def _restart_rsyncer(self, source: Path):
         self.rsync_processes[source].restart()
         restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
-        capture_post(restarted_url, json={"source": str(source)})
+        capture_post(restarted_url, json={"path": str(source)})
 
     def _request_watcher_stop(self, source: Path):
         self._environment.watchers[source]._stopping = True
@@ -368,7 +432,6 @@ class MultigridController:
                 )
             else:
                 self.analysers[source].subscribe(self._data_collection_form)
-            self.analysers[source].subscribe(self.dormancy_check, final=True)
             self.analysers[source].start()
             if transfer:
                 self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
@@ -407,9 +470,6 @@ class MultigridController:
                         source=str(source),
                     ),
                     secondary=True,
-                )
-                self._environment.watchers[source].subscribe(
-                    self.dormancy_check, final=True
                 )
                 self._environment.watchers[source].start()
 
