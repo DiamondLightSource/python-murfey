@@ -292,7 +292,7 @@ class MultigridController:
             requests.delete(remove_url)
         else:
             stop_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_stopped_rsyncer', session_id=self.session_id)}"
-            capture_post(stop_url, json={"source": str(source)})
+            capture_post(stop_url, json={"path": str(source)})
 
     def _finalise_rsyncer(self, source: Path):
         """
@@ -312,7 +312,7 @@ class MultigridController:
     def _restart_rsyncer(self, source: Path):
         self.rsync_processes[source].restart()
         restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
-        capture_post(restarted_url, json={"source": str(source)})
+        capture_post(restarted_url, json={"path": str(source)})
 
     def _request_watcher_stop(self, source: Path):
         self._environment.watchers[source]._stopping = True
