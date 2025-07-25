@@ -90,6 +90,15 @@ def increment_rsync_transferred_files_prometheus(
     ).inc(rsyncer_info.data_bytes)
 
 
+@router.post(
+    "/visits/{visit_name}/increment_rsync_skipped_files_prometheus/{increment_count}"
+)
+def increment_rsync_skipped_files_prometheus(
+    visit_name: str, increment_count: int, db=murfey_db
+):
+    prom.skipped_files.labels(visit=visit_name).inc(increment_count)
+
+
 @router.post("/visits/{visit_name}/monitoring/{on}")
 def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name)

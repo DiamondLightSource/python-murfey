@@ -309,7 +309,7 @@ class RSyncer(Observer):
             self.notify(update)
             updates.append(update)
             time.sleep(0.01)
-            self.notify([update], secondary=True)
+            self.notify([update], num_skipped_files=0, secondary=True)
         # self.notify(updates, secondary=True)
 
         return True
@@ -328,8 +328,10 @@ class RSyncer(Observer):
                 if f.is_file() and f.stat().st_ctime < self._end_time.timestamp()
             ]
             self._skipped_files.extend(set(infiles).difference(set(files)))
+            num_skipped_files = len(set(infiles).difference(set(files)))
         else:
             files = [f for f in infiles if f.is_file()]
+            num_skipped_files = 0
 
         previously_transferred = self._files_transferred
         transfer_success: set[Path] = set()
@@ -528,7 +530,9 @@ class RSyncer(Observer):
             if success:
                 success = result.returncode == 0
 
-        self.notify(successful_updates, secondary=True)
+        self.notify(
+            successful_updates, num_skipped_files=num_skipped_files, secondary=True
+        )
 
         # Print out a summary message for each file transfer batch instead of individual messages
         # List out file paths as stored in memory to see if issue is due to file path mismatch
