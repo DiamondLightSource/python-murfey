@@ -5,13 +5,16 @@ import mrcfile
 import PIL.Image
 from werkzeug.utils import secure_filename
 
+from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 
 logger = logging.getLogger("murfey.workflows.spa.atlas")
 
 
 def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
-    logger.debug(f"Starting workflow to create JPG image of atlas {atlas_mrc}")
+    logger.debug(
+        f"Starting workflow to create JPG image of atlas {sanitise(str(atlas_mrc))}"
+    )
     with mrcfile.open(atlas_mrc) as mrc:
         data = mrc.data
 
