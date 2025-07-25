@@ -32,4 +32,4 @@ def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
     atlas_jpg_file.parent.mkdir(parents=True, exist_ok=True)
 
     im = PIL.Image.fromarray(data)
-    im.save(atlas_jpg_file)
+    im.convert(mode="L").save(atlas_jpg_file)
