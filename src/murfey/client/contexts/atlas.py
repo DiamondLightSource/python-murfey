@@ -11,7 +11,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.api import url_path_for
 from murfey.util.client import authorised_requests, capture_post
 
-logger = logging.getLogger("murfey.client.contexts.spa_metadata")
+logger = logging.getLogger("murfey.client.contexts.atlas")
 
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
@@ -40,11 +40,9 @@ class AtlasContext(Context):
         ):
             source = _get_source(transferred_file, environment)
             if source:
-                transferred_atlas_name = (
-                    _atlas_destination(environment, source, transferred_file)
-                    / environment.samples[source].atlas.parent
-                    / transferred_file.name
-                )
+                transferred_atlas_name = _atlas_destination(
+                    environment, source, transferred_file
+                ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'make_atlas_jpg', session_id=environment.murfey_session)}",
                     json={"atlas_mrc": transferred_atlas_name},
