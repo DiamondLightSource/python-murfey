@@ -352,6 +352,7 @@ def get_foil_hole(
 def make_atlas_jpg(
     session_id: MurfeySessionID, atlas_mrc: StringOfPathModel, db=murfey_db
 ):
+    logger.debug(f"Received request to create JPG image of atlas {atlas_mrc.path!r}")
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     return atlas_jpg_from_mrc(
         session.instrument_name, session.visit, Path(atlas_mrc.path)

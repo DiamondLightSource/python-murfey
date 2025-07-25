@@ -47,3 +47,6 @@ class AtlasContext(Context):
                     f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'make_atlas_jpg', session_id=environment.murfey_session)}",
                     json={"path": str(transferred_atlas_name)},
                 )
+                logger.info(
+                    f"Submitted request to create JPG image of atlas {str(transferred_atlas_name)!r}"
+                )

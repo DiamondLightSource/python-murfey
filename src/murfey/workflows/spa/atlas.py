@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import mrcfile
@@ -6,8 +7,11 @@ from werkzeug.utils import secure_filename
 
 from murfey.util.config import get_machine_config
 
+logger = logging.getLogger("murfey.workflows.spa.atlas")
+
 
 def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
+    logger.debug(f"Starting workflow to create JPG image of atlas {atlas_mrc}")
     with mrcfile.read(atlas_mrc) as mrc:
         data = mrc.data
 
@@ -33,3 +37,4 @@ def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
 
     im = PIL.Image.fromarray(data)
     im.convert(mode="L").save(atlas_jpg_file)
+    logger.debug(f"JPG image of atlas saved as {atlas_jpg_file}")
