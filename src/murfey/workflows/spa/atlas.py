@@ -12,7 +12,7 @@ logger = logging.getLogger("murfey.workflows.spa.atlas")
 
 def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
     logger.debug(f"Starting workflow to create JPG image of atlas {atlas_mrc}")
-    with mrcfile.read(atlas_mrc) as mrc:
+    with mrcfile.open(atlas_mrc) as mrc:
         data = mrc.data
 
     machine_config = get_machine_config(instrument_name=instrument_name)[
