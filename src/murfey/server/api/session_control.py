@@ -263,18 +263,18 @@ def get_rsyncers_for_session(session_id: MurfeySessionID, db=murfey_db):
     return rsync_instances.all()
 
 
-class RsyncerSource(BaseModel):
-    source: str
+class StringOfPathModel(BaseModel):
+    path: str
 
 
 @router.post("/sessions/{session_id}/rsyncer_stopped")
 def register_stopped_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+    session_id: int, rsyncer_source: StringOfPathModel, db=murfey_db
 ):
     rsyncer = db.exec(
         select(RsyncInstance)
         .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
+        .where(RsyncInstance.source == rsyncer_source.path)
     ).one()
     rsyncer.transferring = False
     db.add(rsyncer)
@@ -283,12 +283,12 @@ def register_stopped_rsyncer(
 
 @router.post("/sessions/{session_id}/rsyncer_started")
 def register_restarted_rsyncer(
-    session_id: int, rsyncer_source: RsyncerSource, db=murfey_db
+    session_id: int, rsyncer_source: StringOfPathModel, db=murfey_db
 ):
     rsyncer = db.exec(
         select(RsyncInstance)
         .where(RsyncInstance.session_id == session_id)
-        .where(RsyncInstance.source == rsyncer_source.source)
+        .where(RsyncInstance.source == rsyncer_source.path)
     ).one()
     rsyncer.transferring = True
     db.add(rsyncer)
@@ -349,9 +349,13 @@ def get_foil_hole(
 
 
 @spa_router.post("/sessions/{session_id}/make_atlas_jpg")
-def make_atlas_jpg(session_id: MurfeySessionID, atlas_mrc: str, db=murfey_db):
+def make_atlas_jpg(
+    session_id: MurfeySessionID, atlas_mrc: StringOfPathModel, db=murfey_db
+):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
-    return atlas_jpg_from_mrc(session.instrument_name, session.visit, Path(atlas_mrc))
+    return atlas_jpg_from_mrc(
+        session.instrument_name, session.visit, Path(atlas_mrc.path)
+    )
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gsid}")
