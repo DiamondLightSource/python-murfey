@@ -72,22 +72,31 @@ def test_get_murfey_url(
     assert parsed_server.path == parsed_original.path
 
 
-def test_check_multigrid_controller_exists(mocker: MockerFixture):
+def test_check_multigrid_controller_status(mocker: MockerFixture):
     session_id = 1
 
     # Patch out the multigrid controllers that have been stored in memory
-    mocker.patch("murfey.instrument_server.api.controllers", {session_id: MagicMock()})
+    mock_controller = MagicMock()
+    mock_controller.dormant = False
+    mock_controller.finalising = False
+    mocker.patch(
+        "murfey.instrument_server.api.controllers", {session_id: mock_controller}
+    )
 
     # Set up the test client
     client_server = set_up_test_client(session_id=session_id)
     url_path = url_path_for(
-        "api.router", "check_multigrid_controller_exists", session_id=session_id
+        "api.router", "check_multigrid_controller_status", session_id=session_id
     )
     response = client_server.get(url_path)
 
     # Check that the result is as expected
     assert response.status_code == 200
-    assert response.json() == {"exists": True}
+    assert response.json() == {
+        "dormant": False,
+        "exists": True,
+        "finalising": False,
+    }
 
 
 test_upload_gain_reference_params_matrix = (
