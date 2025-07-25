@@ -814,7 +814,7 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - GET
-  - path: /sessions/{session_id}/make_atlas_jpg
+  - path: /session_control/spa/sessions/{session_id}/make_atlas_jpg
     function: make_atlas_jpg
     path_params: []
     methods:

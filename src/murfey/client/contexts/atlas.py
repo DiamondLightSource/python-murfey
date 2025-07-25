@@ -45,5 +45,5 @@ class AtlasContext(Context):
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'make_atlas_jpg', session_id=environment.murfey_session)}",
-                    json={"atlas_mrc": transferred_atlas_name},
+                    json={"atlas_mrc": str(transferred_atlas_name)},
                 )
