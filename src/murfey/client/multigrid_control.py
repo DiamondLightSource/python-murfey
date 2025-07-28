@@ -667,8 +667,22 @@ class MultigridController:
             requests.post(url, json=data)
 
     def _increment_transferred_files(
-        self, updates: List[RSyncerUpdate], source: str, destination: str
+        self,
+        updates: List[RSyncerUpdate],
+        num_skipped_files: int,
+        source: str,
+        destination: str,
     ):
+        skip_url = f"{str(self._environment.url.geturl())}{url_path_for('prometheus.router', 'increment_rsync_skipped_files_prometheus', visit_name=self._environment.visit)}"
+        requests.post(
+            skip_url,
+            json={
+                "source": source,
+                "session_id": self.session_id,
+                "increment_count": num_skipped_files,
+            },
+        )
+
         checked_updates = [
             update for update in updates if update.outcome is TransferResult.SUCCESS
         ]

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+import murfey.server.prometheus as prom
 from murfey.server.api.auth import MurfeyInstrumentNameFrontend as MurfeyInstrumentName
 from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
 from murfey.server.api.auth import (
@@ -555,8 +556,8 @@ async def flush_skipped_rsyncer(
             db.commit()
 
     # Send request to flush rsyncer
-    data: dict = {}
     update_result: dict = {}
+    flush_result: dict = {}
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -583,8 +584,14 @@ async def flush_skipped_rsyncer(
                         "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
                     },
                 ) as resp:
-                    data = await resp.json()
-    return data
+                    flush_result = await resp.json()
+                if not flush_result.get("success", False):
+                    return {"success": False}
+                # Reset the skipped file count for the specific Prometheus gauge to 0
+                prom.skipped_files.labels(
+                    rsync_source=rsyncer_source.source, visit=session_entry.visit
+                ).set(0)
+    return flush_result
 
 
 class RSyncerInfo(BaseModel):

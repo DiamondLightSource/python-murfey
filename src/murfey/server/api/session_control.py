@@ -224,18 +224,6 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.transferred_files.labels(rsync_source=rsyncer_info.source, visit=visit_name)
-    prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
-    prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
-    prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
-    )
     prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
     prom.transferred_files.labels(
         rsync_source=rsyncer_info.source, visit=visit_name
@@ -252,6 +240,7 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     prom.transferred_data_files_bytes.labels(
         rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
+    prom.skipped_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
     return rsyncer_info
 
 

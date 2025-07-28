@@ -77,6 +77,11 @@ def remove_session_by_id(session_id: int, db):
                 args=(ri.source, session.visit),
                 label="transferred_data_file_bytes",
             )
+            safe_run(
+                prom.skipped_files.remove,
+                args=(ri.source, session.visit),
+                label="skipped_files",
+            )
     collected_ids = db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob)
         .where(DataCollectionGroup.session_id == session_id)

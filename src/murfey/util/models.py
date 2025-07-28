@@ -78,6 +78,12 @@ class RsyncerInfo(BaseModel):
     tag: str = ""
 
 
+class RsyncerSkippedFiles(BaseModel):
+    source: str
+    session_id: int
+    increment_count: int = 1
+
+
 """
 Single Particle Analysis
 ========================
