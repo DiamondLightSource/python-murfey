@@ -12,7 +12,7 @@ from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.db import RsyncInstance
-from murfey.util.models import RsyncerInfo
+from murfey.util.models import RsyncerInfo, RsyncerSkippedFiles
 
 logger = getLogger("murfey.server.api.prometheus")
 
@@ -90,13 +90,13 @@ def increment_rsync_transferred_files_prometheus(
     ).inc(rsyncer_info.data_bytes)
 
 
-@router.post(
-    "/visits/{visit_name}/increment_rsync_skipped_files_prometheus/{increment_count}"
-)
+@router.post("/visits/{visit_name}/increment_rsync_skipped_files_prometheus")
 def increment_rsync_skipped_files_prometheus(
-    visit_name: str, increment_count: int, db=murfey_db
+    visit_name: str, rsyncer_skipped_files: RsyncerSkippedFiles, db=murfey_db
 ):
-    prom.skipped_files.labels(visit=visit_name).inc(increment_count)
+    prom.skipped_files.labels(
+        rsync_source=rsyncer_skipped_files.source, visit=visit_name
+    ).inc(rsyncer_skipped_files.increment_count)
 
 
 @router.post("/visits/{visit_name}/monitoring/{on}")
