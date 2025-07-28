@@ -642,13 +642,13 @@ murfey.server.api.prometheus.router:
         type: str
     methods:
       - POST
-  - path: /prometheus/visits/{visit_name}/increment_rsync_skipped_files_prometheus/{increment_count}
+  - path: /prometheus/visits/{visit_name}/increment_rsync_skipped_files_prometheus
     function: increment_rsync_skipped_files_prometheus
     path_params:
       - name: visit_name
         type: str
-      - name: increment_count
-        type: int
+    methods:
+      - POST
   - path: /prometheus/visits/{visit_name}/monitoring/{on}
     function: change_monitoring_status
     path_params:
