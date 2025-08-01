@@ -91,7 +91,11 @@ def capture_post(url: str, json: Union[dict, list] = {}) -> Optional[requests.Re
         client_config = read_config()
         failure_url = urlunparse(
             split_url._replace(
-                path=f"/instruments/{client_config['Murfey']['instrument_name']}/failed_client_post"
+                path=url_path_for(
+                    "session_control.router",
+                    "failed_client_post",
+                    instrument_name=client_config["Murfey"]["instrument_name"],
+                )
             )
         )
         try:
