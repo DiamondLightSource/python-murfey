@@ -377,7 +377,9 @@ class Tilt(SQLModel, table=True):  # type: ignore
 
 
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True, unique=True, sa_column_kwargs={"autoincrement": True}
+    )
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
     atlas_id: Optional[int] = None
@@ -429,7 +431,9 @@ class NotificationValue(SQLModel, table=True):  # type: ignore
 
 
 class DataCollection(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True, unique=True, sa_column_kwargs={"autoincrement": True}
+    )
     tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
@@ -441,7 +445,9 @@ class DataCollection(SQLModel, table=True):  # type: ignore
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True, unique=True, sa_column_kwargs={"autoincrement": True}
+    )
     recipe: str = Field(primary_key=True)
     dc_id: int = Field(foreign_key="datacollection.id")
     data_collection: Optional[DataCollection] = Relationship(
@@ -524,7 +530,9 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True, unique=True, sa_column_kwargs={"autoincrement": True}
+    )
     pj_id: int = Field(foreign_key="processingjob.id")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
