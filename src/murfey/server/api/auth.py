@@ -45,10 +45,7 @@ if security_config.auth_type == "password":
     oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 else:
     oauth2_scheme = APIKeyCookie(name=security_config.cookie_key)
-if security_config.instrument_auth_type == "token":
-    instrument_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-else:
-    instrument_oauth2_scheme = lambda *args, **kwargs: None
+instrument_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 instrument_server_tokens: Dict[float, dict] = {}
@@ -169,7 +166,7 @@ async def validate_instrument_token(
                     validation_outcome = await response.json()
             if not (success and validation_outcome.get("valid")):
                 raise JWTError
-        else:
+        elif security_config.instrument_auth_type == "token":
             # First, check if the token has expired
             decoded_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             if expiry_time := decoded_data.get("expiry_time"):
@@ -187,6 +184,8 @@ async def validate_instrument_token(
                     raise JWTError
             else:
                 raise JWTError
+        else:
+            return None
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
