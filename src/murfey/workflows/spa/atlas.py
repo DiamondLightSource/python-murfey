@@ -38,6 +38,8 @@ def atlas_jpg_from_mrc(instrument_name: str, visit_name: str, atlas_mrc: Path):
     )
     atlas_jpg_file.parent.mkdir(parents=True, exist_ok=True)
 
-    im = PIL.Image.fromarray(data)
-    im.convert(mode="L").save(atlas_jpg_file)
+    data = data - data.min()
+    data = data.astype(float) * 255 / data.max()
+    data = data.astype("uint8")
+    PIL.Image.fromarray(data).save(atlas_jpg_file)
     logger.debug(f"JPG image of atlas saved as {str(atlas_jpg_file)!r}")
