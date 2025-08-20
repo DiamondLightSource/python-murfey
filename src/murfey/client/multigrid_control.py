@@ -405,7 +405,7 @@ class MultigridController:
             )
             if restarted:
                 restarted_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_restarted_rsyncer', session_id=self.session_id)}"
-                capture_post(restarted_url, json={"source": str(source)})
+                capture_post(restarted_url, json={"path": str(source)})
             else:
                 url = f"{str(self._environment.url.geturl())}{url_path_for('session_control.router', 'register_rsyncer', session_id=self._environment.murfey_session)}"
                 rsyncer_data = {
