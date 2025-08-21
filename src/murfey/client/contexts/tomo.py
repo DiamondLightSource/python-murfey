@@ -5,7 +5,6 @@ from pathlib import Path
 from threading import RLock
 from typing import Callable, Dict, List, OrderedDict
 
-import requests
 import xmltodict
 
 import murfey.util.eer
@@ -17,16 +16,10 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util.api import url_path_for
-from murfey.util.client import (
-    authorised_requests,
-    capture_post,
-    get_machine_config_client,
-)
+from murfey.util.client import capture_get, capture_post, get_machine_config_client
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _get_tilt_angle_v5_7(p: Path) -> str:
@@ -313,8 +306,8 @@ class TomographyContext(Context):
 
             eer_fractionation_file = None
             if self.data_collection_parameters.get("num_eer_frames"):
-                response = requests.post(
-                    f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
+                response = capture_post(
+                    url=f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
                     json={
                         "num_frames": self.data_collection_parameters["num_eer_frames"],
                         "fractionation": self.data_collection_parameters[
@@ -550,8 +543,8 @@ class TomographyContext(Context):
             superres_binning = int(mdoc_data_block["Binning"])
             binning_factor = 1
             if environment:
-                server_config = requests.get(
-                    f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
+                server_config = capture_get(
+                    url=f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
                 ).json()
                 if (
                     server_config.get("superres")

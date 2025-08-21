@@ -2,18 +2,13 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util.api import url_path_for
-from murfey.util.client import (
-    authorised_requests,
-    capture_post,
-    get_machine_config_client,
-)
+from murfey.util.client import capture_post, get_machine_config_client
 from murfey.util.spa_metadata import (
     FoilHoleInfo,
     get_grid_square_atlas_positions,
@@ -21,8 +16,6 @@ from murfey.util.spa_metadata import (
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHoleInfo]:

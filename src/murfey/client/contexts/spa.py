@@ -5,7 +5,6 @@ from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
@@ -15,12 +14,7 @@ from murfey.client.instance_environment import (
     MurfeyInstanceEnvironment,
 )
 from murfey.util.api import url_path_for
-from murfey.util.client import (
-    authorised_requests,
-    capture_get,
-    capture_post,
-    get_machine_config_client,
-)
+from murfey.util.client import capture_get, capture_post, get_machine_config_client
 from murfey.util.spa_metadata import (
     foil_hole_data,
     foil_hole_from_file,
@@ -30,8 +24,6 @@ from murfey.util.spa_metadata import (
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _file_transferred_to(
@@ -304,7 +296,7 @@ class SPAModularContext(Context):
                 Optional[float],
             ] = (None, None, None, None, None, None, None)
             data_collection_group = (
-                requests.get(
+                capture_get(
                     f"{environment.url.geturl()}{url_path_for('session_info.router', 'get_dc_groups', session_id=environment.murfey_session)}"
                 )
                 .json()

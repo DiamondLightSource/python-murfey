@@ -76,7 +76,7 @@ def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-def capture_post(url: str, json: Union[dict, list] = {}) -> Optional[requests.Response]:
+def capture_post(url: str, json: Union[dict, list] = {}) -> requests.Response:
     try:
         response = requests.post(url, json=json)
     except Exception as e:
@@ -113,13 +113,13 @@ def capture_post(url: str, json: Union[dict, list] = {}) -> Optional[requests.Re
     return response
 
 
-def capture_get(url: str) -> Optional[requests.Response]:
+def capture_get(url: str) -> requests.Response:
     try:
         response = requests.get(url)
     except Exception as e:
         logger.error(f"Exception encountered in get from {url}: {e}")
-        response = None
-    if response and response.status_code != 200:
+        response = requests.Response()
+    if response.status_code != 200:
         logger.warning(
             f"Response to get from {url} had status code {response.status_code}. "
             f"The reason given was {response.reason}"
@@ -127,12 +127,12 @@ def capture_get(url: str) -> Optional[requests.Response]:
     return response
 
 
-def capture_delete(url: str) -> Optional[requests.Response]:
+def capture_delete(url: str) -> requests.Response:
     try:
         response = requests.delete(url)
     except Exception as e:
         logger.error(f"Exception encountered in delete of {url}: {e}")
-        response = None
+        response = requests.Response()
     if response and response.status_code != 200:
         logger.warning(
             f"Response to delete of {url} had status code {response.status_code}. "

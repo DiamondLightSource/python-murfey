@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context
@@ -10,11 +9,9 @@ from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.contexts.spa_metadata import _atlas_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
 from murfey.util.api import url_path_for
-from murfey.util.client import authorised_requests, capture_post
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnvironment):

@@ -9,7 +9,6 @@ from queue import Queue
 from typing import Awaitable, Callable, Dict, List, OrderedDict, TypeVar
 from urllib.parse import urlparse
 
-import requests
 from textual.app import App
 from textual.reactive import reactive
 from textual.widgets import Button, Input
@@ -36,6 +35,8 @@ from murfey.client.watchdir_multigrid import MultigridDirWatcher
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
 from murfey.util.client import (
+    capture_delete,
+    capture_get,
     capture_post,
     get_machine_config_client,
     read_config,
@@ -48,10 +49,6 @@ ReactiveType = TypeVar("ReactiveType")
 
 token = read_config()["Murfey"].get("token", "")
 instrument_name = read_config()["Murfey"].get("instrument_name", "")
-
-requests.get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-requests.post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-requests.delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
 
 
 class MurfeyTUI(App):
@@ -155,8 +152,8 @@ class MurfeyTUI(App):
     ):
         log.info(f"starting multigrid rsyncer: {source}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
+        machine_data = capture_get(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
         ).json()
         if destination_overrides.get(source):
             destination = destination_overrides[source] + f"/{extra_directory}"
@@ -281,7 +278,7 @@ class MurfeyTUI(App):
                 "session_id": self._environment.murfey_session,
                 "transferring": self._do_transfer,
             }
-            requests.post(url, json=rsyncer_data)
+            capture_post(url=url, json=rsyncer_data)
 
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
@@ -360,7 +357,7 @@ class MurfeyTUI(App):
                 "increment_count": len(observed_files),
                 "increment_data_count": num_data_files,
             }
-            requests.post(url, json=data)
+            capture_post(url=url, json=data)
 
     # Prometheus can handle higher traffic so update for every transferred file rather
     # than batching as we do for the Murfey database updates in _increment_transferred_files
@@ -387,7 +384,7 @@ class MurfeyTUI(App):
                 "increment_data_count": len(data_files),
                 "data_bytes": sum(f.file_size for f in data_files),
             }
-            requests.post(url, json=data)
+            capture_post(url=url, json=data)
 
     def _increment_transferred_files(
         self, updates: List[RSyncerUpdate], source: str, destination: str
@@ -415,7 +412,7 @@ class MurfeyTUI(App):
             "increment_data_count": len(data_files),
             "data_bytes": sum(f.file_size for f in data_files),
         }
-        requests.post(url, json=data)
+        capture_post(url=url, json=data)
 
     def _set_register_dc(self, response: str):
         if response == "y":
@@ -490,8 +487,8 @@ class MurfeyTUI(App):
 
             log.info("Registering tomography processing parameters")
             if context.data_collection_parameters.get("num_eer_frames"):
-                eer_response = requests.post(
-                    f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
+                eer_response = capture_post(
+                    url=f"{str(self.app._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self.app._environment.visit, session_id=self.app._environment.murfey_session)}",
                     json={
                         "num_frames": context.data_collection_parameters[
                             "num_eer_frames"
@@ -503,8 +500,8 @@ class MurfeyTUI(App):
                 )
                 eer_fractionation_file = eer_response.json()["eer_fractionation_file"]
                 metadata_json.update({"eer_fractionation_file": eer_fractionation_file})
-            requests.post(
-                f"{self.app._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'register_tomo_proc_params', session_id=self.app._environment.murfey_session)}",
+            capture_post(
+                url=f"{self.app._environment.url.geturl()}{url_path_for('workflow.tomo_router', 'register_tomo_proc_params', session_id=self.app._environment.murfey_session)}",
                 json=metadata_json,
             )
             capture_post(
@@ -620,8 +617,8 @@ class MurfeyTUI(App):
             await self.reset()
 
     async def on_mount(self) -> None:
-        exisiting_sessions = requests.get(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'get_sessions')}"
+        exisiting_sessions = capture_get(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'get_sessions')}"
         ).json()
         if self.visits:
             self.install_screen(VisitSelection(self.visits), "visit-select-screen")
@@ -666,8 +663,8 @@ class MurfeyTUI(App):
         if self.rsync_processes and machine_config.get("allow_removal"):
             sources = "\n".join(str(k) for k in self.rsync_processes.keys())
             prompt = f"Remove files from the following:\n {sources} \n"
-            rsync_instances = requests.get(
-                f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'get_rsyncers_for_session', session_id=self._environment.murfey_session)}"
+            rsync_instances = capture_get(
+                url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'get_rsyncers_for_session', session_id=self._environment.murfey_session)}"
             ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
             self.install_screen(
@@ -690,8 +687,8 @@ class MurfeyTUI(App):
         self.exit()
 
     async def action_remove_session(self) -> None:
-        requests.delete(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
+        capture_delete(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
         )
         if self.rsync_processes:
             for rp in self.rsync_processes.values():
@@ -704,8 +701,8 @@ class MurfeyTUI(App):
         self.exit()
 
     def clean_up_quit(self) -> None:
-        requests.delete(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
+        capture_delete(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
         )
         self.exit()
 
@@ -747,11 +744,11 @@ class MurfeyTUI(App):
                 removal_rp.queue.put(f)
             removal_rp.stop()
             log.info(f"rsyncer {rp} rerun with removal")
-        requests.post(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'register_processing_success_in_ispyb', session_id=self._environment.murfey_session)}"
+        capture_post(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'register_processing_success_in_ispyb', session_id=self._environment.murfey_session)}"
         )
-        requests.delete(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
+        capture_delete(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'remove_session', session_id=self._environment.murfey_session)}"
         )
         self.exit()
 

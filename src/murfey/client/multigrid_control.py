@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import quote, urlparse
 
-import requests
-
 import murfey.client.websocket
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAModularContext
@@ -22,7 +20,12 @@ from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
-from murfey.util.client import capture_delete, capture_post, get_machine_config_client
+from murfey.util.client import (
+    capture_delete,
+    capture_get,
+    capture_post,
+    get_machine_config_client,
+)
 
 log = logging.getLogger("murfey.client.multigrid_control")
 
@@ -53,18 +56,8 @@ class MultigridController:
     visit_end_time: Optional[datetime] = None
 
     def __post_init__(self):
-        if self.token:
-            requests.get = partial(
-                requests.get, headers={"Authorization": f"Bearer {self.token}"}
-            )
-            requests.post = partial(
-                requests.post, headers={"Authorization": f"Bearer {self.token}"}
-            )
-            requests.delete = partial(
-                requests.delete, headers={"Authorization": f"Bearer {self.token}"}
-            )
-        machine_data = requests.get(
-            f"{self.murfey_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
+        machine_data = capture_get(
+            url=f"{self.murfey_url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         self.rsync_url = machine_data.get("rsync_url", "")
         self.rsync_module = machine_data.get("rsync_module", "data")
@@ -106,8 +99,8 @@ class MultigridController:
 
         # Calculate the time offset between the client and the server
         current_time = datetime.now()
-        server_timestamp = requests.get(
-            f"{self.murfey_url}{url_path_for('session_control.router', 'get_current_timestamp')}"
+        server_timestamp = capture_get(
+            url=f"{self.murfey_url}{url_path_for('session_control.router', 'get_current_timestamp')}"
         ).json()["timestamp"]
         self.server_time_offset = current_time - datetime.fromtimestamp(
             server_timestamp
@@ -235,8 +228,8 @@ class MultigridController:
         log.info(f"Starting multigrid rsyncer: {source}")
         log.debug(f"Analysis of {source} is {('enabled' if analyse else 'disabled')}")
         destination_overrides = destination_overrides or {}
-        machine_data = requests.get(
-            f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
+        machine_data = capture_get(
+            url=f"{self._environment.url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=self.instrument_name)}"
         ).json()
         if destination_overrides.get(source):
             destination = (
@@ -289,7 +282,7 @@ class MultigridController:
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
         if explicit_stop:
             remove_url = f"{self.murfey_url}{url_path_for('session_control.router', 'delete_rsyncer', session_id=self.session_id)}?source={quote(str(source), safe='')}"
-            requests.delete(remove_url)
+            capture_delete(url=remove_url)
         else:
             stop_url = f"{self.murfey_url}{url_path_for('session_control.router', 'register_stopped_rsyncer', session_id=self.session_id)}"
             capture_post(stop_url, json={"path": str(source)})
@@ -415,7 +408,7 @@ class MultigridController:
                     "transferring": self.do_transfer or self._environment.demo,
                     "tag": tag,
                 }
-                requests.post(url, json=rsyncer_data)
+                capture_post(url=url, json=rsyncer_data)
         self._environment.watchers[source] = DirWatcher(source, settling_time=30)
 
         if not self.analysers.get(source) and analyse:
@@ -519,8 +512,8 @@ class MultigridController:
 
             log.info("Registering tomography processing parameters")
             if context.data_collection_parameters.get("num_eer_frames"):
-                eer_response = requests.post(
-                    f"{str(self._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
+                eer_response = capture_post(
+                    url=f"{str(self._environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=self._environment.visit, session_id=self._environment.murfey_session)}",
                     json={
                         "num_frames": context.data_collection_parameters[
                             "num_eer_frames"
@@ -637,7 +630,7 @@ class MultigridController:
             "increment_count": len(observed_files),
             "increment_data_count": num_data_files,
         }
-        requests.post(url, json=data)
+        capture_post(url=url, json=data)
 
     # Prometheus can handle higher traffic so update for every transferred file rather
     # than batching as we do for the Murfey database updates in _increment_transferred_files
@@ -664,7 +657,7 @@ class MultigridController:
                 "increment_data_count": len(data_files),
                 "data_bytes": sum(f.file_size for f in data_files),
             }
-            requests.post(url, json=data)
+            capture_post(url=url, json=data)
 
     def _increment_transferred_files(
         self,
@@ -674,8 +667,8 @@ class MultigridController:
         destination: str,
     ):
         skip_url = f"{str(self._environment.url.geturl())}{url_path_for('prometheus.router', 'increment_rsync_skipped_files_prometheus', visit_name=self._environment.visit)}"
-        requests.post(
-            skip_url,
+        capture_post(
+            url=skip_url,
             json={
                 "source": source,
                 "session_id": self.session_id,
@@ -706,4 +699,4 @@ class MultigridController:
             "increment_data_count": len(data_files),
             "data_bytes": sum(f.file_size for f in data_files),
         }
-        requests.post(url, json=data)
+        capture_post(url=url, json=data)

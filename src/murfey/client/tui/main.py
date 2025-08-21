@@ -15,7 +15,6 @@ from queue import Queue
 from typing import Literal
 from urllib.parse import ParseResult, urlparse
 
-import requests
 from rich.prompt import Confirm
 
 import murfey.client.update
@@ -26,12 +25,10 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.tui.app import MurfeyTUI
 from murfey.client.tui.status_bar import StatusBar
 from murfey.util.api import url_path_for
-from murfey.util.client import authorised_requests, read_config
+from murfey.util.client import capture_get, read_config
 from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
@@ -39,10 +36,10 @@ def _get_visit_list(api_base: ParseResult, instrument_name: str):
     get_visits_url = api_base._replace(
         path=f"{proxy_path}{url_path_for('session_control.router', 'get_current_visits', instrument_name=instrument_name)}"
     )
-    server_reply = requests.get(get_visits_url.geturl())
+    server_reply = capture_get(url=get_visits_url.geturl())
     if server_reply.status_code != 200:
         raise ValueError(f"Server unreachable ({server_reply.status_code})")
-    return [Visit.parse_obj(v) for v in server_reply.json()]
+    return [Visit.model_validate(v) for v in server_reply.json()]
 
 
 def write_config(config: configparser.ConfigParser):
@@ -274,8 +271,8 @@ def run():
     rich_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     # Set up websocket app and handler
-    client_id_response = requests.get(
-        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
+    client_id_response = capture_get(
+        url=f"{murfey_url.geturl()}{url_path_for('session_control.router', 'new_client_id')}"
     )
     if client_id_response.status_code == 401:
         exit(
@@ -303,8 +300,8 @@ def run():
     log.info("Starting Websocket connection")
 
     # Load machine data for subsequent sections
-    machine_data = requests.get(
-        f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
+    machine_data = capture_get(
+        url=f"{murfey_url.geturl()}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=instrument_name)}"
     ).json()
     gain_ref: Path | None = None
 
