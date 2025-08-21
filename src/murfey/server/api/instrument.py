@@ -353,7 +353,7 @@ async def request_gain_reference_upload(
     return data
 
 
-@router.post("/visits/{visit_name}/{session_id}/upstream_tiff_data_request")
+@router.post("/visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request")
 async def request_upstream_tiff_data_download(
     visit_name: str, session_id: MurfeySessionID, db=murfey_db
 ):

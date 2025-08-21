@@ -90,7 +90,9 @@ class DCGroupParameters(BaseModel):
     atlas_pixel_size: float = 0
 
 
-@router.post("/visits/{visit_name}/{session_id}/register_data_collection_group")
+@router.post(
+    "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
+)
 def register_dc_group(
     visit_name, session_id: MurfeySessionID, dcg_params: DCGroupParameters, db=murfey_db
 ):
@@ -197,7 +199,7 @@ class DCParameters(BaseModel):
     data_collection_tag: str = ""
 
 
-@router.post("/visits/{visit_name}/{session_id}/start_data_collection")
+@router.post("/visits/{visit_name}/sessions/{session_id}/start_data_collection")
 def start_dc(
     visit_name, session_id: MurfeySessionID, dc_params: DCParameters, db=murfey_db
 ):
@@ -263,7 +265,7 @@ class ProcessingJobParameters(BaseModel):
     experiment_type: str = "spa"
 
 
-@router.post("/visits/{visit_name}/{session_id}/register_processing_job")
+@router.post("/visits/{visit_name}/sessions/{session_id}/register_processing_job")
 def register_proc(
     visit_name: str,
     session_id: MurfeySessionID,
@@ -346,7 +348,7 @@ class Tag(BaseModel):
     tag: str
 
 
-@spa_router.post("/visits/{visit_name}/{session_id}/flush_spa_processing")
+@spa_router.post("/visits/{visit_name}/sessions/{session_id}/flush_spa_processing")
 def flush_spa_processing(
     visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
 ):
@@ -378,7 +380,7 @@ class SPAProcessFile(BaseModel):
     source: str = ""
 
 
-@spa_router.post("/visits/{visit_name}/{session_id}/spa_preprocess")
+@spa_router.post("/visits/{visit_name}/sessions/{session_id}/spa_preprocess")
 async def request_spa_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
@@ -553,7 +555,9 @@ class Source(BaseModel):
     rsync_source: str
 
 
-@tomo_router.post("/visits/{visit_name}/{session_id}/flush_tomography_processing")
+@tomo_router.post(
+    "/visits/{visit_name}/sessions/{session_id}/flush_tomography_processing"
+)
 def flush_tomography_processing(
     visit_name: str, session_id: MurfeySessionID, rsync_source: Source, db=murfey_db
 ):
@@ -638,7 +642,7 @@ class TomoProcessFile(BaseModel):
     group_tag: Optional[str] = None
 
 
-@tomo_router.post("/visits/{visit_name}/{session_id}/tomography_preprocess")
+@tomo_router.post("/visits/{visit_name}/sessions/{session_id}/tomography_preprocess")
 async def request_tomography_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
@@ -741,7 +745,7 @@ async def request_tomography_preprocessing(
     return proc_file
 
 
-@tomo_router.post("/visits/{visit_name}/{session_id}/completed_tilt_series")
+@tomo_router.post("/visits/{visit_name}/sesisons{session_id}/completed_tilt_series")
 def register_completed_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
@@ -872,7 +876,7 @@ class TiltInfo(BaseModel):
     source: str
 
 
-@tomo_router.post("/visits/{visit_name}/{session_id}/tilt")
+@tomo_router.post("/visits/{visit_name}/sessions{session_id}/tilt")
 async def register_tilt(
     visit_name: str, session_id: MurfeySessionID, tilt_info: TiltInfo, db=murfey_db
 ):
@@ -1006,7 +1010,9 @@ class MillingParameters(BaseModel):
     raw_directory: str
 
 
-@correlative_router.post("/visits/{year}/{visit_name}/{session_id}/make_milling_gif")
+@correlative_router.post(
+    "/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif"
+)
 async def make_gif(
     year: int,
     visit_name: str,

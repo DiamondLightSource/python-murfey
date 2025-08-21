@@ -34,7 +34,7 @@ class SuggestedPathParameters(BaseModel):
     extra_directory: str = ""
 
 
-@router.post("/visits/{visit_name}/{session_id}/suggested_path")
+@router.post("/visits/{visit_name}/sessions/{session_id}/suggested_path")
 def suggest_path(
     visit_name: str, session_id: int, params: SuggestedPathParameters, db=murfey_db
 ):
@@ -125,7 +125,7 @@ class FractionationParameters(BaseModel):
     fractionation_file_name: str = "eer_fractionation.txt"
 
 
-@router.post("/visits/{visit_name}/{session_id}/eer_fractionation_file")
+@router.post("/visits/{visit_name}/sessions/{session_id}/eer_fractionation_file")
 async def write_eer_fractionation_file(
     visit_name: str,
     session_id: int,

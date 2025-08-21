@@ -436,7 +436,7 @@ murfey.server.api.file_io_frontend.router:
     methods:
       - POST
 murfey.server.api.file_io_instrument.router:
-  - path: /file_io/instrument/visits/{visit_name}/{session_id}/suggested_path
+  - path: /file_io/instrument/visits/{visit_name}/sessions/{session_id}/suggested_path
     function: suggest_path
     path_params:
       - name: visit_name
@@ -457,7 +457,7 @@ murfey.server.api.file_io_instrument.router:
     path_params: []
     methods:
       - POST
-  - path: /file_io/instrument/visits/{visit_name}/{session_id}/eer_fractionation_file
+  - path: /file_io/instrument/visits/{visit_name}/sessions/{session_id}/eer_fractionation_file
     function: write_eer_fractionation_file
     path_params:
       - name: visit_name
@@ -542,7 +542,7 @@ murfey.server.api.instrument.router:
     path_params: []
     methods:
       - POST
-  - path: /instrument_server/visits/{visit_name}/{session_id}/upstream_tiff_data_request
+  - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
     function: request_upstream_tiff_data_download
     path_params:
       - name: visit_name
@@ -671,7 +671,7 @@ murfey.server.api.session_control.correlative_router:
     path_params: []
     methods:
       - GET
-  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths
     function: gather_upstream_tiffs
     path_params:
       - name: visit_name
@@ -680,7 +680,7 @@ murfey.server.api.session_control.correlative_router:
         type: int
     methods:
       - GET
-  - path: /session_control/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}
     function: get_tiff
     path_params:
       - name: visit_name
@@ -861,7 +861,7 @@ murfey.server.api.session_info.correlative_router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff_paths
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths
     function: gather_upstream_tiffs
     path_params:
       - name: visit_name
@@ -870,7 +870,7 @@ murfey.server.api.session_info.correlative_router:
         type: int
     methods:
       - GET
-  - path: /session_info/correlative/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}
     function: get_tiff
     path_params:
       - name: visit_name
@@ -918,7 +918,7 @@ murfey.server.api.session_info.router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/session/{session_id}
+  - path: /session_info/sessions/{session_id}
     function: get_session
     path_params: []
     methods:
@@ -1105,7 +1105,7 @@ murfey.server.api.workflow.correlative_router:
         type: str
     methods:
       - POST
-  - path: /workflow/correlative/visits/{year}/{visit_name}/{session_id}/make_milling_gif
+  - path: /workflow/correlative/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif
     function: make_gif
     path_params:
       - name: year
@@ -1117,21 +1117,21 @@ murfey.server.api.workflow.correlative_router:
     methods:
       - POST
 murfey.server.api.workflow.router:
-  - path: /workflow/visits/{visit_name}/{session_id}/register_data_collection_group
+  - path: /workflow/visits/{visit_name}/sessions/{session_id}/register_data_collection_group
     function: register_dc_group
     path_params:
       - name: visit_name
         type: typing.Any
     methods:
       - POST
-  - path: /workflow/visits/{visit_name}/{session_id}/start_data_collection
+  - path: /workflow/visits/{visit_name}/sessions/{session_id}/start_data_collection
     function: start_dc
     path_params:
       - name: visit_name
         type: typing.Any
     methods:
       - POST
-  - path: /workflow/visits/{visit_name}/{session_id}/register_processing_job
+  - path: /workflow/visits/{visit_name}/sessions/{session_id}/register_processing_job
     function: register_proc
     path_params:
       - name: visit_name
@@ -1144,14 +1144,14 @@ murfey.server.api.workflow.spa_router:
     path_params: []
     methods:
       - POST
-  - path: /workflow/spa/visits/{visit_name}/{session_id}/flush_spa_processing
+  - path: /workflow/spa/visits/{visit_name}/sessions/{session_id}/flush_spa_processing
     function: flush_spa_processing
     path_params:
       - name: visit_name
         type: str
     methods:
       - POST
-  - path: /workflow/spa/visits/{visit_name}/{session_id}/spa_preprocess
+  - path: /workflow/spa/visits/{visit_name}/sessions/{session_id}/spa_preprocess
     function: request_spa_preprocessing
     path_params:
       - name: visit_name
@@ -1164,7 +1164,7 @@ murfey.server.api.workflow.tomo_router:
     path_params: []
     methods:
       - POST
-  - path: /workflow/tomo/visits/{visit_name}/{session_id}/flush_tomography_processing
+  - path: /workflow/tomo/visits/{visit_name}/sessions/{session_id}/flush_tomography_processing
     function: flush_tomography_processing
     path_params:
       - name: visit_name
@@ -1185,14 +1185,14 @@ murfey.server.api.workflow.tomo_router:
         type: int
     methods:
       - POST
-  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tomography_preprocess
+  - path: /workflow/tomo/visits/{visit_name}/sessions/{session_id}/tomography_preprocess
     function: request_tomography_preprocessing
     path_params:
       - name: visit_name
         type: str
     methods:
       - POST
-  - path: /workflow/tomo/visits/{visit_name}/{session_id}/completed_tilt_series
+  - path: /workflow/tomo/visits/{visit_name}/sessions/{session_id}/completed_tilt_series
     function: register_completed_tilt_series
     path_params:
       - name: visit_name
@@ -1206,7 +1206,7 @@ murfey.server.api.workflow.tomo_router:
         type: str
     methods:
       - POST
-  - path: /workflow/tomo/visits/{visit_name}/{session_id}/tilt
+  - path: /workflow/tomo/visits/{visit_name}/sessions/{session_id}/tilt
     function: register_tilt
     path_params:
       - name: visit_name
