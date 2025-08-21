@@ -17,7 +17,6 @@ import shutil
 from functools import lru_cache, partial
 from pathlib import Path
 from typing import Awaitable, Callable, Optional, Union
-from urllib.parse import urlparse, urlunparse
 
 import requests
 
@@ -76,9 +75,16 @@ def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:
 requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
-def capture_post(url: str, json: Union[dict, list] = {}) -> requests.Response:
+def capture_post(
+    base_url: str,
+    router_name: str,
+    function_name: str,
+    data: Optional[dict] = None,
+    **kwargs,
+) -> requests.Response:
+    url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
-        response = requests.post(url, json=json)
+        response = requests.post(url, json=data)
     except Exception as e:
         logger.error(f"Exception encountered in post to {url}: {e}")
         response = requests.Response()
@@ -87,20 +93,22 @@ def capture_post(url: str, json: Union[dict, list] = {}) -> requests.Response:
             f"Response to post to {url} with data {json} had status code "
             f"{response.status_code}. The reason given was {response.reason}"
         )
-        split_url = urlparse(url)
         client_config = read_config()
-        failure_url = urlunparse(
-            split_url._replace(
-                path=url_path_for(
-                    "session_control.router",
-                    "failed_client_post",
-                    instrument_name=client_config["Murfey"]["instrument_name"],
-                )
-            )
+        failure_address = url_path_for(
+            "session_control.router",
+            "failed_client_post",
+            instrument_name=client_config["Murfey"]["instrument_name"],
         )
+        failure_url = f"{base_url}{failure_address}"
         try:
             resend_response = requests.post(
-                failure_url, json={"url": url, "data": json}
+                failure_url,
+                json={
+                    "router_name": router_name,
+                    "function_name": function_name,
+                    "data": data,
+                    "kwargs": kwargs,
+                },
             )
         except Exception as e:
             logger.error(f"Exception encountered in post to {failure_url}: {e}")
@@ -113,7 +121,10 @@ def capture_post(url: str, json: Union[dict, list] = {}) -> requests.Response:
     return response
 
 
-def capture_get(url: str) -> requests.Response:
+def capture_get(
+    base_url: str, router_name: str, function_name: str, **kwargs
+) -> requests.Response:
+    url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
         response = requests.get(url)
     except Exception as e:
@@ -127,7 +138,10 @@ def capture_get(url: str) -> requests.Response:
     return response
 
 
-def capture_delete(url: str) -> requests.Response:
+def capture_delete(
+    base_url: str, router_name: str, function_name: str, **kwargs
+) -> requests.Response:
+    url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
         response = requests.delete(url)
     except Exception as e:
@@ -135,7 +149,7 @@ def capture_delete(url: str) -> requests.Response:
         response = requests.Response()
     if response and response.status_code != 200:
         logger.warning(
-            f"Response to delete of {url} had status code {response.status_code}. "
+            f"Response to delete on {url} had status code {response.status_code}. "
             f"The reason given was {response.reason}"
         )
     return response
