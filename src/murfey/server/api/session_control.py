@@ -296,8 +296,8 @@ def delete_rsyncer(session_id: int, rsyncer_source: StringOfPathModel, db=murfey
         db.commit()
     except Exception:
         logger.error(
-            "Failed to delete rsyncer for source directory "
-            f"{sanitise(str(rsyncer_source.path))!r} in session {session_id}.",
+            f"Failed to delete rsyncer for source directory {sanitise(str(rsyncer_source.path))!r} "
+            f"in session {session_id}.",
             exc_info=True,
         )
 
