@@ -115,9 +115,13 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
             )
             continue
 
-        function_to_call = getattr(
-            getattr(murfey.server.api, router_base), function_name
-        )
+        try:
+            function_to_call = getattr(
+                getattr(murfey.server.api, router_base), function_name
+            )
+        except AttributeError:
+            print(f"Cannot repost {json_file} as {function_name} does not exist")
+            continue
         expected_args = getfullargspec(function_to_call).args
 
         call_kwargs = message.get("kwargs", {})
