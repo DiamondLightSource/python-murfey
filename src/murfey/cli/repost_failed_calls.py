@@ -1,8 +1,9 @@
 import argparse
+import asyncio
 import json
 from datetime import datetime
 from functools import partial
-from inspect import getfullargspec
+from inspect import getfullargspec, iscoroutinefunction
 from pathlib import Path
 from queue import Empty, Queue
 
@@ -106,9 +107,9 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
     for json_file in messages_path:
         with open(json_file, "r") as json_data:
             message = json.load(json_data)
-        router_name = message.get("router_name", "")
+        router_name = message.get("message", {}).get("router_name", "")
         router_base = router_name.split(".")[0]
-        function_name = message.get("function_name", "")
+        function_name = message.get("message", {}).get("function_name", "")
         if not router_name or not function_name:
             print(
                 f"Cannot repost {json_file} as it does not have a router or function name"
@@ -122,22 +123,31 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
         except AttributeError:
             print(f"Cannot repost {json_file} as {function_name} does not exist")
             continue
-        expected_args = getfullargspec(function_to_call).args
+        expected_args = getfullargspec(function_to_call)
 
-        call_kwargs = message.get("kwargs", {})
-        call_data = message.get("data", {})
+        call_kwargs = message.get("message", {}).get("kwargs", {})
+        call_data = message.get("message", {}).get("data", {})
         function_call_dict = {}
 
-        for call_arg in expected_args:
-            if call_arg in call_kwargs.keys():
-                function_call_dict[call_arg] = call_kwargs[call_arg]
-            elif call_arg == "db":
-                function_call_dict["db"] = murfey_db
-            else:
-                function_call_dict[call_arg] = call_data
+        try:
+            for call_arg in expected_args.args:
+                call_arg_type = expected_args.annotations.get(call_arg, str)
+                if call_arg in call_kwargs.keys():
+                    function_call_dict[call_arg] = call_arg_type(call_kwargs[call_arg])
+                elif call_arg == "db":
+                    function_call_dict["db"] = murfey_db
+                else:
+                    print(call_data, call_arg_type, call_arg)
+                    function_call_dict[call_arg] = call_arg_type(**call_data)
+        except TypeError as e:
+            print(f"Cannot repost {json_file} due to argument error: {e}")
+            continue
 
         try:
-            function_to_call(**function_call_dict)
+            if iscoroutinefunction(function_to_call):
+                asyncio.run(function_to_call(**function_call_dict))
+            else:
+                function_to_call(**function_call_dict)
             print(f"Reposted {json_file}")
             json_file.unlink()
         except Exception as e:

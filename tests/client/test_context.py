@@ -26,6 +26,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         default_destinations={tmp_path: str(tmp_path)},
         instrument_name="",
         visit="test",
+        murfey_session=1,
     )
     context = TomographyContext("tomo", tmp_path)
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
@@ -82,6 +83,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         default_destinations={tmp_path: str(tmp_path)},
         instrument_name="",
         visit="test",
+        murfey_session=1,
     )
     context = TomographyContext("tomo", tmp_path)
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
@@ -166,6 +168,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         default_destinations={tmp_path: str(tmp_path)},
         instrument_name="",
         visit="test",
+        murfey_session=1,
     )
     context = TomographyContext("tomo", tmp_path)
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
@@ -230,6 +233,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
         default_destinations={tmp_path: str(tmp_path)},
         instrument_name="",
         visit="test",
+        murfey_session=1,
     )
     context = TomographyContext("tomo", tmp_path)
     assert len(context._tilt_series_sizes) == 0
