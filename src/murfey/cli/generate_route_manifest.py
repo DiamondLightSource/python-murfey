@@ -81,6 +81,18 @@ def get_route_manifest(routers: dict[str, APIRouter]):
                     ),
                 }
                 path_params.append(param_info)
+            for route_dependency in route.dependant.dependencies:
+                for param in route_dependency.path_params:
+                    param_type = param.type_ if param.type_ is not None else Any
+                    param_info = {
+                        "name": param.name if hasattr(param, "name") else "",
+                        "type": (
+                            param_type.__name__
+                            if hasattr(param_type, "__name__")
+                            else str(param_type)
+                        ),
+                    }
+                    path_params.append(param_info)
             route_info = {
                 "path": route.path if hasattr(route, "path") else "",
                 "function": route.name if hasattr(route, "name") else "",

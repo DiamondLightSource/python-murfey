@@ -745,7 +745,7 @@ async def request_tomography_preprocessing(
     return proc_file
 
 
-@tomo_router.post("/visits/{visit_name}/sesisons{session_id}/completed_tilt_series")
+@tomo_router.post("/visits/{visit_name}/sessions/{session_id}/completed_tilt_series")
 def register_completed_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
@@ -876,7 +876,7 @@ class TiltInfo(BaseModel):
     source: str
 
 
-@tomo_router.post("/visits/{visit_name}/sessions{session_id}/tilt")
+@tomo_router.post("/visits/{visit_name}/sessions/{session_id}/tilt")
 async def register_tilt(
     visit_name: str, session_id: MurfeySessionID, tilt_info: TiltInfo, db=murfey_db
 ):
