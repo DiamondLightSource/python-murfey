@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -227,8 +228,9 @@ def test_run_repost_failed_calls(
     )
 
 
-def test_repost_failed_calls_exists():
+def test_repost_failed_calls_exists(mock_security_configuration):
     """Test the CLI is made"""
+    os.environ["MURFEY_SECURITY_CONFIGURATION"] = str(mock_security_configuration)
     result = subprocess.run(
         [
             "murfey.repost_failed_calls",
