@@ -94,7 +94,10 @@ class DCGroupParameters(BaseModel):
     "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
 )
 def register_dc_group(
-    visit_name, session_id: MurfeySessionID, dcg_params: DCGroupParameters, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    dcg_params: DCGroupParameters,
+    db=murfey_db,
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
@@ -201,7 +204,7 @@ class DCParameters(BaseModel):
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/start_data_collection")
 def start_dc(
-    visit_name, session_id: MurfeySessionID, dc_params: DCParameters, db=murfey_db
+    visit_name: str, session_id: MurfeySessionID, dc_params: DCParameters, db=murfey_db
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]

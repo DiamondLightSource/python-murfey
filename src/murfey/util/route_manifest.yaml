@@ -1187,7 +1187,7 @@ murfey.server.api.websocket.ws:
     function: websocket_connection_endpoint
     path_params:
       - name: client_id
-        type: Union
+        type: typing.Union[int, str]
     methods: []
   - path: /ws/test/{client_id}
     function: close_ws_connection
@@ -1200,7 +1200,7 @@ murfey.server.api.websocket.ws:
     function: close_unrecorded_ws_connection
     path_params:
       - name: client_id
-        type: Union
+        type: typing.Union[int, str]
     methods:
       - DELETE
 murfey.server.api.workflow.correlative_router:
@@ -1255,7 +1255,7 @@ murfey.server.api.workflow.router:
     function: register_dc_group
     path_params:
       - name: visit_name
-        type: Any
+        type: str
       - name: session_id
         type: int
     methods:
@@ -1264,7 +1264,7 @@ murfey.server.api.workflow.router:
     function: start_dc
     path_params:
       - name: visit_name
-        type: Any
+        type: str
       - name: session_id
         type: int
     methods:
