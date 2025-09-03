@@ -85,7 +85,7 @@ def test_find_context(file_and_context, tmp_path):
     file_name, context = file_and_context
 
     # Pass the file to the Analyser; add environment as needed
-    analyser = Analyser(basepath_local=tmp_path)
+    analyser = Analyser(basepath_local=tmp_path, token="")
 
     # Check that the results are as expected
     assert analyser._find_context(tmp_path / file_name)
@@ -115,13 +115,13 @@ contextless_files = [
 
 @pytest.mark.parametrize("bad_file", contextless_files)
 def test_ignore_contextless_files(bad_file, tmp_path):
-    analyser = Analyser(tmp_path)
+    analyser = Analyser(tmp_path, "")
     assert not analyser._find_context(tmp_path / bad_file)
     assert not analyser._context
 
 
 def test_analyser_setup_and_stopping(tmp_path):
-    analyser = Analyser(tmp_path)
+    analyser = Analyser(tmp_path, "")
     assert analyser.queue.empty()
     analyser.start()
     assert analyser.thread.is_alive()
@@ -132,7 +132,7 @@ def test_analyser_setup_and_stopping(tmp_path):
 
 def test_analyser_tomo_determination(tmp_path):
     tomo_file = tmp_path / "Position_1_[30.0].tiff"
-    analyser = Analyser(tmp_path)
+    analyser = Analyser(tmp_path, "")
     analyser.start()
     analyser.queue.put(tomo_file)
     analyser.stop()
@@ -141,7 +141,7 @@ def test_analyser_tomo_determination(tmp_path):
 
 def test_analyser_epu_determination(tmp_path):
     tomo_file = tmp_path / "FoilHole_12345_Data_6789_Fractions.tiff"
-    analyser = Analyser(tmp_path)
+    analyser = Analyser(tmp_path, "")
     analyser.start()
     analyser.queue.put(tomo_file)
     analyser.stop()
