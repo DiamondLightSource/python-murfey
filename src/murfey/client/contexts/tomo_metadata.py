@@ -2,19 +2,15 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.contexts.spa_metadata import _atlas_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util.api import url_path_for
-from murfey.util.client import authorised_requests, capture_post
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnvironment):
@@ -23,13 +19,19 @@ def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnviron
     if not source:
         return None
     dcg_tag = str(source).replace(f"/{environment.visit}", "")
-    url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
     dcg_data = {
         "experiment_type": "tomo",
         "experiment_type_id": 36,
         "tag": dcg_tag,
     }
-    capture_post(url, json=dcg_data)
+    capture_post(
+        base_url=str(environment.url.geturl()),
+        router_name="workflow.router",
+        function_name="register_dc_group",
+        visit_name=environment.visit,
+        session_id=environment.murfey_session,
+        data=dcg_data,
+    )
     return dcg_tag
 
 
@@ -98,7 +100,6 @@ class TomographyMetadataContext(Context):
             environment.samples[source] = SampleInfo(
                 atlas=Path(partial_path), sample=sample
             )
-            url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
             dcg_tag = "/".join(
                 p for p in transferred_file.parent.parts if p != environment.visit
             ).replace("//", "/")
@@ -114,7 +115,14 @@ class TomographyMetadataContext(Context):
                 "sample": environment.samples[source].sample,
                 "atlas_pixel_size": atlas_pixel_size,
             }
-            capture_post(url, json=dcg_data)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow.router",
+                function_name="register_dc_group",
+                visit_name=environment.visit,
+                session_id=environment.murfey_session,
+                data=dcg_data,
+            )
 
         elif transferred_file.name == "SearchMap.xml" and environment:
             logger.info("Tomography session search map xml found")
@@ -195,10 +203,13 @@ class TomographyMetadataContext(Context):
                 else ""
             )
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
-                sm_url,
-                json={
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.tomo_router",
+                function_name="register_search_map",
+                session_id=environment.murfey_session,
+                sm_name=transferred_file.parent.name,
+                data={
                     "tag": dcg_tag,
                     "x_stage_position": float(stage_position["X"]),
                     "y_stage_position": float(stage_position["Y"]),
@@ -243,10 +254,13 @@ class TomographyMetadataContext(Context):
                     f"Inserting incorrect width {sm_width}, height {sm_height} for SearchMap display"
                 )
 
-            sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=transferred_file.parent.name)}"
             capture_post(
-                sm_url,
-                json={
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.tomo_router",
+                function_name="register_search_map",
+                session_id=environment.murfey_session,
+                sm_name=transferred_file.parent.name,
+                data={
                     "tag": dcg_tag,
                     "height": sm_height,
                     "width": sm_width,
@@ -281,19 +295,25 @@ class TomographyMetadataContext(Context):
                 )
 
                 # Always need search map before batch position
-                sm_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_search_map', session_id=environment.murfey_session, sm_name=search_map_name)}"
                 capture_post(
-                    sm_url,
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.tomo_router",
+                    function_name="register_search_map",
+                    session_id=environment.murfey_session,
+                    sm_name=search_map_name,
+                    data={
                         "tag": dcg_tag,
                     },
                 )
 
                 # Then register batch position
-                bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=batch_name)}"
                 capture_post(
-                    bp_url,
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.tomo_router",
+                    function_name="register_batch_position",
+                    session_id=environment.murfey_session,
+                    batch_name=batch_name,
+                    data={
                         "tag": dcg_tag,
                         "x_stage_position": batch_stage_location_x,
                         "y_stage_position": batch_stage_location_y,
@@ -316,10 +336,13 @@ class TomographyMetadataContext(Context):
                         beamshift_position_y = float(beamshift["PositionY"])
 
                         # Registration of beamshifted position
-                        bp_url = f"{str(environment.url.geturl())}{url_path_for('session_control.tomo_router', 'register_batch_position', session_id=environment.murfey_session, batch_name=beamshift_name)}"
                         capture_post(
-                            bp_url,
-                            json={
+                            base_url=str(environment.url.geturl()),
+                            router_name="session_control.tomo_router",
+                            function_name="register_batch_position",
+                            session_id=environment.murfey_session,
+                            batch_name=beamshift_name,
+                            data={
                                 "tag": dcg_tag,
                                 "x_stage_position": batch_stage_location_x,
                                 "y_stage_position": batch_stage_location_y,

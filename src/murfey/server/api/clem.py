@@ -196,14 +196,25 @@ API ENDPOINTS FOR FILE REGISTRATION
 """
 
 
+class LifInfo(BaseModel):
+    lif_file: Path
+    master_metadata: Optional[Path] = None
+    child_metadata: list[Path] = []
+    child_series: list[str] = []
+    child_stacks: list[Path] = []
+
+
+class TiffInfo(BaseModel):
+    tiff_file: Path
+    associated_metadata: Optional[Path] = None
+    associated_series: Optional[str] = None
+    associated_stack: Optional[Path] = None
+
+
 @router.post("/sessions/{session_id}/clem/lif_files")
 def register_lif_file(
-    lif_file: Path,
+    lif_file: LifInfo,
     session_id: int,
-    master_metadata: Optional[Path] = None,
-    child_metadata: list[Path] = [],
-    child_series: list[str] = [],
-    child_stacks: list[Path] = [],
     db: Session = murfey_db,
 ):
     # Return or register the LIF file entry
@@ -212,7 +223,7 @@ def register_lif_file(
             db=db,
             table=CLEMLIFFile,
             session_id=session_id,
-            file_path=lif_file,
+            file_path=lif_file.lif_file,
         )
     except Exception:
         logger.error(
@@ -223,9 +234,11 @@ def register_lif_file(
         return False
 
     # Add metadata information if provided
-    if master_metadata is not None:
+    if lif_file.master_metadata is not None:
         try:
-            master_metadata = validate_and_sanitise(master_metadata, session_id, db)
+            master_metadata = validate_and_sanitise(
+                lif_file.master_metadata, session_id, db
+            )
             clem_lif_file.master_metadata = str(master_metadata)
         except Exception:
             logger.warning(
@@ -235,7 +248,7 @@ def register_lif_file(
             )
 
     # Register child metadata if provided
-    for metadata in child_metadata:
+    for metadata in lif_file.child_metadata:
         try:
             metadata_db_entry: CLEMImageMetadata = get_db_entry(
                 db=db,
@@ -255,7 +268,7 @@ def register_lif_file(
             continue
 
     # Register child image series if provided
-    for series in child_series:
+    for series in lif_file.child_series:
         try:
             series_db_entry: CLEMImageSeries = get_db_entry(
                 db=db,
@@ -275,7 +288,7 @@ def register_lif_file(
             continue
 
     # Register child image stacks if provided
-    for stack in child_stacks:
+    for stack in lif_file.child_stacks:
         try:
             stack_db_entry: CLEMImageStack = get_db_entry(
                 db=db,
@@ -303,11 +316,8 @@ def register_lif_file(
 
 @router.post("/sessions/{session_id}/clem/tiff_files")
 def register_tiff_file(
-    tiff_file: Path,
+    tiff_file: TiffInfo,
     session_id: int,
-    associated_metadata: Optional[Path] = None,
-    associated_series: Optional[str] = None,
-    associated_stack: Optional[Path] = None,
     db: Session = murfey_db,
 ):
     # Get or register the database entry
@@ -316,7 +326,7 @@ def register_tiff_file(
             db=db,
             table=CLEMTIFFFile,
             session_id=session_id,
-            file_path=tiff_file,
+            file_path=tiff_file.tiff_file,
         )
     except Exception:
         logger.error(
@@ -327,58 +337,58 @@ def register_tiff_file(
         return False
 
     # Add metadata if provided
-    if associated_metadata is not None:
+    if tiff_file.associated_metadata is not None:
         try:
             metadata_db_entry: CLEMImageMetadata = get_db_entry(
                 db=db,
                 table=CLEMImageMetadata,
                 session_id=session_id,
-                file_path=associated_metadata,
+                file_path=tiff_file.associated_metadata,
             )
             # Link database entries
             clem_tiff_file.associated_metadata = metadata_db_entry
         except Exception:
             logger.warning(
                 "Unable to register "
-                f"metadata file {sanitise(str(associated_metadata))!r} in association with "
+                f"metadata file {sanitise(str(tiff_file.associated_metadata))!r} in association with "
                 f"TIFF file {sanitise(str(tiff_file))!r}: \n"
                 f"{traceback.format_exc()}"
             )
 
     # Add series information if provided
-    if associated_series is not None:
+    if tiff_file.associated_series is not None:
         try:
             series_db_entry: CLEMImageSeries = get_db_entry(
                 db=db,
                 table=CLEMImageSeries,
                 session_id=session_id,
-                series_name=associated_series,
+                series_name=tiff_file.associated_series,
             )
             # Link database entries
             clem_tiff_file.child_series = series_db_entry
         except Exception:
             logger.warning(
                 "Unable to register "
-                f"CLEM series {sanitise(associated_series)!r} in association with "
+                f"CLEM series {sanitise(tiff_file.associated_series)!r} in association with "
                 f"TIFF file {sanitise(str(tiff_file))!r}: \n"
                 f"{traceback.format_exc()}"
             )
 
     # Add image stack information if provided
-    if associated_stack is not None:
+    if tiff_file.associated_stack is not None:
         try:
             stack_db_entry: CLEMImageStack = get_db_entry(
                 db=db,
                 table=CLEMImageStack,
                 session_id=session_id,
-                file_path=associated_stack,
+                file_path=tiff_file.associated_stack,
             )
             # Link database entries
             clem_tiff_file.child_stack = stack_db_entry
         except Exception:
             logger.warning(
                 "Unable to register "
-                f"image stack {sanitise(str(associated_stack))!r} in association with "
+                f"image stack {sanitise(str(tiff_file.associated_stack))!r} in association with "
                 f"{traceback.format_exc()}"
             )
 
@@ -737,7 +747,7 @@ API ENDPOINTS FOR FILE PROCESSING
 )  # API posts to this URL
 def process_raw_lifs(
     session_id: int,
-    lif_file: Path,
+    lif_file: LifInfo,
     db: Session = murfey_db,
 ):
     try:
@@ -759,7 +769,7 @@ def process_raw_lifs(
     # Pass arguments along to the correct workflow
     workflow.load()(
         # Match the arguments found in murfey.workflows.clem.process_raw_lifs
-        file=lif_file,
+        file=lif_file.lif_file,
         root_folder="images",
         session_id=session_id,
         instrument_name=instrument_name,

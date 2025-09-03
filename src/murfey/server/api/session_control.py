@@ -285,18 +285,18 @@ def register_restarted_rsyncer(
 
 
 @router.delete("/sessions/{session_id}/rsyncer")
-def delete_rsyncer(session_id: int, source: Path, db=murfey_db):
+def delete_rsyncer(session_id: int, rsyncer_source: StringOfPathModel, db=murfey_db):
     try:
         rsync_instance = db.exec(
             select(RsyncInstance)
             .where(RsyncInstance.session_id == session_id)
-            .where(RsyncInstance.source == str(source))
+            .where(RsyncInstance.source == str(rsyncer_source.path))
         ).one()
         db.delete(rsync_instance)
         db.commit()
     except Exception:
         logger.error(
-            f"Failed to delete rsyncer for source directory {sanitise(str(source))!r} "
+            f"Failed to delete rsyncer for source directory {sanitise(str(rsyncer_source.path))!r} "
             f"in session {session_id}.",
             exc_info=True,
         )
@@ -424,7 +424,9 @@ async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     return upstream_visits
 
 
-@correlative_router.get("/visits/{visit_name}/{session_id}/upstream_tiff_paths")
+@correlative_router.get(
+    "/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths"
+)
 async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
     """
     Looks for TIFF files associated with the current session in the permitted storage
@@ -446,7 +448,7 @@ async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
 
 
 @correlative_router.get(
-    "/visits/{visit_name}/{session_id}/upstream_tiff/{tiff_path:path}"
+    "/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}"
 )
 async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_db):
     instrument_name = (

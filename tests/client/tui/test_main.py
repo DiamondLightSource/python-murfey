@@ -17,9 +17,9 @@ test_get_visit_list_params_matrix = (
 
 
 @pytest.mark.parametrize("test_params", test_get_visit_list_params_matrix)
-@mock.patch("murfey.client.tui.main.requests")
+@mock.patch("murfey.client.tui.main.capture_get")
 def test_get_visit_list(
-    mock_request,
+    mock_request_get,
     test_params: tuple[str],
     mock_client_configuration,
 ):
@@ -49,17 +49,19 @@ def test_get_visit_list(
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.json.return_value = example_visits
-    mock_request.get.return_value = mock_response
+    mock_request_get.return_value = mock_response
 
     # read_config() has to be patched using fixture, so has to be done in function
     with mock.patch("murfey.util.client.read_config", mock_client_configuration):
         visits = _get_visit_list(urlparse(server_url), instrument_name)
 
     # Check that request was sent with the correct URL
-    expected_url = (
-        f"{server_url}/session_control/instruments/{instrument_name}/visits_raw"
+    mock_request_get.assert_called_once_with(
+        base_url=server_url,
+        router_name="session_control.router",
+        function_name="get_current_visits",
+        instrument_name=instrument_name,
     )
-    mock_request.get.assert_called_once_with(expected_url)
 
     # Check that expected outputs are correct (order-sensitive)
     for v, visit in enumerate(visits):

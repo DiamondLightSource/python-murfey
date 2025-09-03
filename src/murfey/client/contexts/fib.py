@@ -5,17 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.api import url_path_for
-from murfey.util.client import authorised_requests
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.fib")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 class Lamella(NamedTuple):
@@ -95,9 +91,14 @@ class FIBContext(Context):
                         environment.default_destinations[self._basepath]
                     ).name
                     # post gif list to gif making API call
-                    requests.post(
-                        f"{environment.url.geturl()}{url_path_for('workflow.correlative_router', 'make_gif', year=datetime.now().year, visit_name=environment.visit, session_id=environment.murfey_session)}",
-                        json={
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="workflow.correlative_router",
+                        function_name="make_gif",
+                        year=datetime.now().year,
+                        visit_name=environment.visit,
+                        session_id=environment.murfey_session,
+                        data={
                             "lamella_number": lamella_number,
                             "images": gif_list,
                             "raw_directory": raw_directory,

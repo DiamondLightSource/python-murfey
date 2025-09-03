@@ -5,7 +5,6 @@ from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
@@ -14,13 +13,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.api import url_path_for
-from murfey.util.client import (
-    authorised_requests,
-    capture_get,
-    capture_post,
-    get_machine_config_client,
-)
+from murfey.util.client import capture_get, capture_post, get_machine_config_client
 from murfey.util.spa_metadata import (
     foil_hole_data,
     foil_hole_from_file,
@@ -30,8 +23,6 @@ from murfey.util.spa_metadata import (
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _file_transferred_to(
@@ -235,7 +226,10 @@ class SPAModularContext(Context):
         binning_factor = 1
         if environment:
             server_config_response = capture_get(
-                f"{str(environment.url.geturl())}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=environment.instrument_name)}"
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.router",
+                function_name="machine_info_by_instrument",
+                instrument_name=environment.instrument_name,
             )
             if server_config_response is None:
                 return None
@@ -304,8 +298,11 @@ class SPAModularContext(Context):
                 Optional[float],
             ] = (None, None, None, None, None, None, None)
             data_collection_group = (
-                requests.get(
-                    f"{environment.url.geturl()}{url_path_for('session_info.router', 'get_dc_groups', session_id=environment.murfey_session)}"
+                capture_get(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_info.router",
+                    function_name="get_dc_groups",
+                    session_id=environment.murfey_session,
                 )
                 .json()
                 .get(str(source), {})
@@ -327,7 +324,6 @@ class SPAModularContext(Context):
                         local_atlas_path,
                         grid_square=str(grid_square),
                     )[str(grid_square)]
-            gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=grid_square)}"
             gs = grid_square_data(
                 grid_square_metadata_file,
                 grid_square,
@@ -348,8 +344,12 @@ class SPAModularContext(Context):
                 else ""
             )
             capture_post(
-                gs_url,
-                json={
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.spa_router",
+                function_name="register_grid_square",
+                session_id=environment.murfey_session,
+                gsid=grid_square,
+                data={
                     "tag": str(source),
                     "readout_area_x": gs.readout_area_x,
                     "readout_area_y": gs.readout_area_y,
@@ -368,7 +368,6 @@ class SPAModularContext(Context):
             )
         foil_hole = foil_hole_from_file(transferred_file)
         if foil_hole not in self._foil_holes[grid_square]:
-            fh_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=grid_square)}"
             if environment.murfey_session is not None:
                 fh = foil_hole_data(
                     grid_square_metadata_file,
@@ -391,8 +390,12 @@ class SPAModularContext(Context):
                     else ""
                 )
                 capture_post(
-                    fh_url,
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_foil_hole",
+                    session_id=environment.murfey_session,
+                    gs_name=grid_square,
+                    data={
                         "name": foil_hole,
                         "x_location": fh.x_location,
                         "y_location": fh.y_location,
@@ -410,8 +413,12 @@ class SPAModularContext(Context):
                 )
             else:
                 capture_post(
-                    fh_url,
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_foil_hole",
+                    session_id=environment.murfey_session,
+                    gs_name=grid_square,
+                    data={
                         "name": foil_hole,
                         "tag": str(source),
                     },
@@ -467,7 +474,9 @@ class SPAModularContext(Context):
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
-                                f"{environment.url.geturl()}{url_path_for('session_control.router', 'count_number_of_movies')}",
+                                base_url=str(environment.url.geturl()),
+                                router_name="session_control.router",
+                                function_name="count_number_of_movies",
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(
@@ -481,8 +490,12 @@ class SPAModularContext(Context):
                         eer_fractionation_file = None
                         if file_transferred_to.suffix == ".eer":
                             response = capture_post(
-                                f"{str(environment.url.geturl())}{url_path_for('file_io_instrument.router', 'write_eer_fractionation_file', visit_name=environment.visit, session_id=environment.murfey_session)}",
-                                json={
+                                base_url=str(environment.url.geturl()),
+                                router_name="file_io_instrument.router",
+                                function_name="write_eer_fractionation_file",
+                                visit_name=environment.visit,
+                                session_id=environment.murfey_session,
+                                data={
                                     "eer_path": str(file_transferred_to),
                                     "fractionation": self.data_collection_parameters[
                                         "eer_fractionation"
@@ -511,7 +524,6 @@ class SPAModularContext(Context):
                             )
                             foil_hole = None
 
-                        preproc_url = f"{str(environment.url.geturl())}{url_path_for('workflow.spa_router', 'request_spa_preprocessing', visit_name=environment.visit, session_id=environment.murfey_session)}"
                         preproc_data = {
                             "path": str(file_transferred_to),
                             "description": "",
@@ -537,8 +549,12 @@ class SPAModularContext(Context):
                             "foil_hole_id": foil_hole,
                         }
                         capture_post(
-                            preproc_url,
-                            json={
+                            base_url=str(environment.url.geturl()),
+                            router_name="workflow.spa_router",
+                            function_name="request_spa_preprocessing",
+                            visit_name=environment.visit,
+                            session_id=environment.murfey_session,
+                            data={
                                 k: None if v == "None" else v
                                 for k, v in preproc_data.items()
                             },

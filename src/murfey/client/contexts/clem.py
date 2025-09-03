@@ -13,7 +13,6 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.api import url_path_for
 from murfey.util.client import capture_post, get_machine_config_client
 
 # Create logger object
@@ -353,19 +352,14 @@ class CLEMContext(Context):
         register the LIF file in the database correctly as part of the CLEM workflow.
         """
         try:
-            # Construct URL to post to post the request to
-            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_lif_file', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
-            # Validate
-            if not url:
-                logger.error(
-                    "URL could not be constructed from the environment and file path"
-                )
-                return False
-
-            # Send the message
-            capture_post(url)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="clem.router",
+                function_name="register_lif_file",
+                session_id=environment.murfey_session,
+                data={"lif_file": quote(str(lif_file), safe="")},
+            )
             return True
-
         except Exception as e:
             logger.error(
                 f"Error encountered when registering the LIF file in the database: {e}"
@@ -383,19 +377,14 @@ class CLEMContext(Context):
         """
 
         try:
-            # Construct the URL to post the request to
-            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_lifs', session_id=environment.murfey_session)}?lif_file={quote(str(lif_file), safe='')}"
-            # Validate
-            if not url:
-                logger.error(
-                    "URL could not be constructed from the environment and file path"
-                )
-                return False
-
-            # Send the message
-            capture_post(url)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="clem.router",
+                function_name="process_raw_lifs",
+                session_id=environment.murfey_session,
+                data={"lif_file": quote(str(lif_file), safe="")},
+            )
             return True
-
         except Exception as e:
             logger.error(f"Error encountered processing LIF file: {e}")
             return False
@@ -411,17 +400,14 @@ class CLEMContext(Context):
         """
 
         try:
-            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'register_tiff_file', session_id=environment.murfey_session)}?tiff_file={quote(str(tiff_file), safe='')}"
-            if not url:
-                logger.error(
-                    "URL could not be constructed from the environment and file path"
-                )
-                return False
-
-            # Send the message
-            capture_post(url)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="clem.router",
+                function_name="register_tiff_file",
+                session_id=environment.murfey_session,
+                data={"tiff_file": quote(str(tiff_file), safe="")},
+            )
             return True
-
         except Exception as e:
             logger.error(
                 f"Error encountered when registering the TIFF file in the database: {e}"
@@ -439,18 +425,14 @@ class CLEMContext(Context):
         """
 
         try:
-            # Construct URL for Murfey server to communicate with
-            url = f"{environment.url.geturl()}{url_path_for('clem.router', 'process_raw_tiffs', session_id=environment.murfey_session)}"
-            if not url:
-                logger.error(
-                    "URL could not be constructed from the environment and file path"
-                )
-                return False
-
-            # Send the message
-            capture_post(url, json=tiff_dataset)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="clem.router",
+                function_name="process_raw_tiffs",
+                session_id=environment.murfey_session,
+                data=tiff_dataset,
+            )
             return True
-
         except Exception as e:
             logger.error(f"Error encountered processing the TIFF series: {e}")
             return False

@@ -2,18 +2,12 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional
 
-import requests
 import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.contexts.spa import _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util.api import url_path_for
-from murfey.util.client import (
-    authorised_requests,
-    capture_post,
-    get_machine_config_client,
-)
+from murfey.util.client import capture_post, get_machine_config_client
 from murfey.util.spa_metadata import (
     FoilHoleInfo,
     get_grid_square_atlas_positions,
@@ -21,8 +15,6 @@ from murfey.util.spa_metadata import (
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHoleInfo]:
@@ -167,7 +159,6 @@ class SPAMetadataContext(Context):
                 environment.samples[source] = SampleInfo(
                     atlas=Path(partial_path), sample=sample
                 )
-                url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
                 dcg_search_dir = "/".join(
                     p for p in transferred_file.parent.parts if p != environment.visit
                 )
@@ -196,15 +187,26 @@ class SPAMetadataContext(Context):
                     "sample": environment.samples[source].sample,
                     "atlas_pixel_size": atlas_pixel_size,
                 }
-                capture_post(url, json=dcg_data)
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow.router",
+                    function_name="register_dc_group",
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
+                    data=dcg_data,
+                )
                 gs_pix_positions = get_grid_square_atlas_positions(
                     source_visit_dir / partial_path
                 )
                 for gs, pos_data in gs_pix_positions.items():
                     if pos_data:
                         capture_post(
-                            f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=int(gs))}",
-                            json={
+                            base_url=str(environment.url.geturl()),
+                            router_name="session_control.spa_router",
+                            function_name="register_grid_square",
+                            session_id=environment.murfey_session,
+                            gsid=int(gs),
+                            data={
                                 "tag": dcg_tag,
                                 "x_location": pos_data[0],
                                 "y_location": pos_data[1],
@@ -222,7 +224,6 @@ class SPAMetadataContext(Context):
             and environment
         ):
             # Make sure we have a data collection group before trying to register grid square
-            url = f"{str(environment.url.geturl())}{url_path_for('workflow.router', 'register_dc_group', visit_name=environment.visit, session_id=environment.murfey_session)}"
             dcg_search_dir = "/".join(
                 p
                 for p in transferred_file.parent.parent.parts
@@ -246,7 +247,14 @@ class SPAMetadataContext(Context):
                 "experiment_type_id": 37,
                 "tag": dcg_tag,
             }
-            capture_post(url, json=dcg_data)
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow.router",
+                function_name="register_dc_group",
+                visit_name=environment.visit,
+                session_id=environment.murfey_session,
+                data=dcg_data,
+            )
 
             gs_name = int(transferred_file.stem.split("_")[1])
             logger.info(
@@ -271,7 +279,6 @@ class SPAMetadataContext(Context):
             visitless_source = str(visitless_source_images_dirs[-1])
 
             if fh_positions:
-                gs_url = f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_grid_square', session_id=environment.murfey_session, gsid=gs_name)}"
                 gs_info = grid_square_data(
                     transferred_file,
                     gs_name,
@@ -282,8 +289,12 @@ class SPAMetadataContext(Context):
                     else ""
                 )
                 capture_post(
-                    gs_url,
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_grid_square",
+                    session_id=environment.murfey_session,
+                    gsid=gs_name,
+                    data={
                         "tag": visitless_source,
                         "readout_area_x": gs_info.readout_area_x,
                         "readout_area_y": gs_info.readout_area_y,
@@ -296,8 +307,12 @@ class SPAMetadataContext(Context):
 
             for fh, fh_data in fh_positions.items():
                 capture_post(
-                    f"{str(environment.url.geturl())}{url_path_for('session_control.spa_router', 'register_foil_hole', session_id=environment.murfey_session, gs_name=gs_name)}",
-                    json={
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_foil_hole",
+                    session_id=environment.murfey_session,
+                    gs_name=gs_name,
+                    data={
                         "name": fh,
                         "x_location": fh_data.x_location,
                         "y_location": fh_data.y_location,
