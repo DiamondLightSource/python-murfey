@@ -190,6 +190,7 @@ class TomographyContext(Context):
     ):
         machine_config = get_machine_config_client(
             str(environment.url.geturl()),
+            self._token,
             instrument_name=environment.instrument_name,
             demo=environment.demo,
         )
@@ -462,6 +463,7 @@ class TomographyContext(Context):
                     if environment:
                         machine_config = get_machine_config_client(
                             str(environment.url.geturl()),
+                            self._token,
                             instrument_name=environment.instrument_name,
                             demo=environment.demo,
                         )

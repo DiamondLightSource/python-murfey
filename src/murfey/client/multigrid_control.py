@@ -80,6 +80,7 @@ class MultigridController:
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            self.token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )

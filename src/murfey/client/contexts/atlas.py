@@ -36,7 +36,7 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 transferred_atlas_name = _atlas_destination(
-                    environment, source, transferred_file
+                    environment, source, transferred_file, self._token
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     base_url=str(environment.url.geturl()),

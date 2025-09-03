@@ -70,10 +70,11 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
 
 
 def _atlas_destination(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
 ) -> Path:
     machine_config = get_machine_config_client(
         str(environment.url.geturl()),
+        token,
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
@@ -180,7 +181,9 @@ class SPAMetadataContext(Context):
                     "experiment_type_id": 37,
                     "tag": dcg_tag,
                     "atlas": str(
-                        _atlas_destination(environment, source, transferred_file)
+                        _atlas_destination(
+                            environment, source, transferred_file, self._token
+                        )
                         / environment.samples[source].atlas.parent
                         / atlas_xml_path.with_suffix(".jpg").name
                     ),
@@ -287,7 +290,9 @@ class SPAMetadataContext(Context):
                     gs_name,
                 )
                 image_path = (
-                    _file_transferred_to(environment, source, Path(gs_info.image))
+                    _file_transferred_to(
+                        environment, source, Path(gs_info.image), self._token
+                    )
                     if gs_info.image
                     else ""
                 )

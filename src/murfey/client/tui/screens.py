@@ -1010,6 +1010,7 @@ class DirectorySelection(SwitchSelection):
         self.app._set_default_acquisition_directories(visit_dir)
         machine_config = get_machine_config_client(
             str(self.app._environment.url.geturl()),
+            token,
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
         )
@@ -1048,6 +1049,7 @@ class DestinationSelect(Screen):
         if self.app._multigrid:
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
             )
             destinations = []
@@ -1104,6 +1106,7 @@ class DestinationSelect(Screen):
         else:
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
             )
             for s, d in self._transfer_routes.items():
@@ -1133,6 +1136,7 @@ class DestinationSelect(Screen):
                 self._inputs[i] = k.name
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
                 demo=self.app._environment.demo,
             )

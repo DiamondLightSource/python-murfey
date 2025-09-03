@@ -111,7 +111,9 @@ class TomographyMetadataContext(Context):
                 "experiment_type_id": 36,
                 "tag": dcg_tag,
                 "atlas": str(
-                    _atlas_destination(environment, source, transferred_file)
+                    _atlas_destination(
+                        environment, source, transferred_file, self._token
+                    )
                     / environment.samples[source].atlas.parent
                     / atlas_xml_path.with_suffix(".jpg").name
                 ),
@@ -201,7 +203,10 @@ class TomographyMetadataContext(Context):
             source = _get_source(transferred_file, environment=environment)
             image_path = (
                 _file_transferred_to(
-                    environment, source, transferred_file.parent / "SearchMap.jpg"
+                    environment,
+                    source,
+                    transferred_file.parent / "SearchMap.jpg",
+                    self._token,
                 )
                 if source
                 else ""

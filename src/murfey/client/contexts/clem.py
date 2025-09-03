@@ -20,13 +20,14 @@ logger = logging.getLogger("murfey.client.contexts.clem")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
 ) -> Optional[Path]:
     """
     Returns the Path of the transferred file on the DLS file system.
     """
     machine_config = get_machine_config_client(
         str(environment.url.geturl()),
+        token,
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
@@ -128,6 +129,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
+                token=self._token,
             )
             if not destination_file:
                 logger.warning(
@@ -320,6 +322,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
+                token=self._token,
             )
             if not destination_file:
                 logger.warning(

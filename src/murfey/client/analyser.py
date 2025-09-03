@@ -62,6 +62,7 @@ class Analyser(Observer):
         self._murfey_config = (
             get_machine_config_client(
                 str(environment.url.geturl()),
+                self._token,
                 instrument_name=environment.instrument_name,
                 demo=environment.demo,
             )

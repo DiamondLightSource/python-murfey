@@ -26,10 +26,11 @@ logger = logging.getLogger("murfey.client.contexts.spa")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
 ):
     machine_config = get_machine_config_client(
         str(environment.url.geturl()),
+        token,
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
@@ -341,7 +342,9 @@ class SPAModularContext(Context):
                 else metadata_source_as_str
             )
             image_path = (
-                _file_transferred_to(environment, metadata_source, Path(gs.image))
+                _file_transferred_to(
+                    environment, metadata_source, Path(gs.image), self._token
+                )
                 if gs.image
                 else ""
             )
@@ -388,7 +391,9 @@ class SPAModularContext(Context):
                     else metadata_source_as_str
                 )
                 image_path = (
-                    _file_transferred_to(environment, metadata_source, Path(fh.image))
+                    _file_transferred_to(
+                        environment, metadata_source, Path(fh.image), self._token
+                    )
                     if fh.image
                     else ""
                 )
@@ -449,6 +454,7 @@ class SPAModularContext(Context):
                     if environment:
                         machine_config = get_machine_config_client(
                             str(environment.url.geturl()),
+                            self._token,
                             instrument_name=environment.instrument_name,
                             demo=environment.demo,
                         )
@@ -475,7 +481,7 @@ class SPAModularContext(Context):
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
-                            environment, source, transferred_file
+                            environment, source, transferred_file, self._token
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(

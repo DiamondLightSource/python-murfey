@@ -103,6 +103,7 @@ class MurfeyTUI(App):
         self._skip_existing_processing = skip_existing_processing
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -121,6 +122,7 @@ class MurfeyTUI(App):
         log.info(f"Launching multigrid watcher for source {source}")
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -739,6 +741,7 @@ class MurfeyTUI(App):
     async def reset(self):
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -803,6 +806,7 @@ class MurfeyTUI(App):
     async def action_clear(self) -> None:
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
