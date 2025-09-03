@@ -36,8 +36,9 @@ class Context:
     user_params: List[ProcessingParameter] = []
     metadata_params: List[ProcessingParameter] = []
 
-    def __init__(self, name: str, acquisition_software: str):
+    def __init__(self, name: str, acquisition_software: str, token: str):
         self._acquisition_software = acquisition_software
+        self._token = token
         self.name = name
         self.data_collection_parameters: dict = {}
 

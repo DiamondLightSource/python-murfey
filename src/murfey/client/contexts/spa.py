@@ -111,8 +111,8 @@ class SPAModularContext(Context):
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("SPA", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("SPA", acquisition_software, token)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
         self._foil_holes: Dict[int, List[int]] = {}
@@ -229,6 +229,7 @@ class SPAModularContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="machine_info_by_instrument",
+                token=self._token,
                 instrument_name=environment.instrument_name,
             )
             if server_config_response is None:
@@ -302,6 +303,7 @@ class SPAModularContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_info.router",
                     function_name="get_dc_groups",
+                    token=self._token,
                     session_id=environment.murfey_session,
                 )
                 .json()
@@ -347,6 +349,7 @@ class SPAModularContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="session_control.spa_router",
                 function_name="register_grid_square",
+                token=self._token,
                 session_id=environment.murfey_session,
                 gsid=grid_square,
                 data={
@@ -393,6 +396,7 @@ class SPAModularContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -416,6 +420,7 @@ class SPAModularContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -477,6 +482,7 @@ class SPAModularContext(Context):
                                 base_url=str(environment.url.geturl()),
                                 router_name="session_control.router",
                                 function_name="count_number_of_movies",
+                                token=self._token,
                             )
                             if movie_counts_get is not None:
                                 environment.movie_counters[str(source)] = count(
@@ -493,6 +499,7 @@ class SPAModularContext(Context):
                                 base_url=str(environment.url.geturl()),
                                 router_name="file_io_instrument.router",
                                 function_name="write_eer_fractionation_file",
+                                token=self._token,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -552,6 +559,7 @@ class SPAModularContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="workflow.spa_router",
                             function_name="request_spa_preprocessing",
+                            token=self._token,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data={

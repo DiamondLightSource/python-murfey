@@ -14,7 +14,7 @@ import json
 import logging
 import os
 import shutil
-from functools import lru_cache, partial
+from functools import lru_cache
 from pathlib import Path
 from typing import Awaitable, Callable, Optional, Union
 
@@ -53,38 +53,33 @@ def read_config() -> configparser.ConfigParser:
 
 @lru_cache(maxsize=1)
 def get_machine_config_client(
-    url: str, instrument_name: str = "", demo: bool = False
+    url: str, token: str, instrument_name: str = "", demo: bool = False
 ) -> dict:
     _instrument_name: Optional[str] = instrument_name or os.getenv("BEAMLINE")
     if not _instrument_name:
         return {}
-    return requests.get(
-        f"{url}{url_path_for('session_control.router', 'machine_info_by_instrument', instrument_name=_instrument_name)}"
+    return capture_get(
+        url,
+        "session_control.router",
+        "machine_info_by_instrument",
+        token,
+        instrument_name=_instrument_name,
     ).json()
-
-
-def authorised_requests() -> tuple[Callable, Callable, Callable, Callable]:
-    token = read_config()["Murfey"].get("token", "")
-    _get = partial(requests.get, headers={"Authorization": f"Bearer {token}"})
-    _post = partial(requests.post, headers={"Authorization": f"Bearer {token}"})
-    _put = partial(requests.put, headers={"Authorization": f"Bearer {token}"})
-    _delete = partial(requests.delete, headers={"Authorization": f"Bearer {token}"})
-    return _get, _post, _put, _delete
-
-
-requests.get, requests.post, requests.put, requests.delete = authorised_requests()
 
 
 def capture_post(
     base_url: str,
     router_name: str,
     function_name: str,
+    token: str,
     data: Optional[dict] = None,
     **kwargs,
 ) -> requests.Response:
     url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
-        response = requests.post(url, json=data)
+        response = requests.post(
+            url, json=data, headers={"Authorization": f"Bearer {token}"}
+        )
     except Exception as e:
         logger.error(f"Exception encountered in post to {url}: {e}")
         response = requests.Response()
@@ -109,6 +104,7 @@ def capture_post(
                     "data": data,
                     "kwargs": kwargs,
                 },
+                headers={"Authorization": f"Bearer {token}"},
             )
         except Exception as e:
             logger.error(f"Exception encountered in post to {failure_url}: {e}")
@@ -122,11 +118,11 @@ def capture_post(
 
 
 def capture_get(
-    base_url: str, router_name: str, function_name: str, **kwargs
+    base_url: str, router_name: str, function_name: str, token: str, **kwargs
 ) -> requests.Response:
     url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers={"Authorization": f"Bearer {token}"})
     except Exception as e:
         logger.error(f"Exception encountered in get from {url}: {e}")
         response = requests.Response()
@@ -139,11 +135,11 @@ def capture_get(
 
 
 def capture_delete(
-    base_url: str, router_name: str, function_name: str, **kwargs
+    base_url: str, router_name: str, function_name: str, token: str, **kwargs
 ) -> requests.Response:
     url = f"{base_url}{url_path_for(router_name, function_name, **kwargs)}"
     try:
-        response = requests.delete(url)
+        response = requests.delete(url, headers={"Authorization": f"Bearer {token}"})
     except Exception as e:
         logger.error(f"Exception encountered in delete of {url}: {e}")
         response = requests.Response()

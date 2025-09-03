@@ -92,8 +92,8 @@ def _atlas_destination(
 
 
 class SPAMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("SPA_metadata", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("SPA_metadata", acquisition_software, token)
         self._basepath = basepath
 
     def post_transfer(
@@ -191,6 +191,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="workflow.router",
                     function_name="register_dc_group",
+                    token=self._token,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data=dcg_data,
@@ -204,6 +205,7 @@ class SPAMetadataContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="session_control.spa_router",
                             function_name="register_grid_square",
+                            token=self._token,
                             session_id=environment.murfey_session,
                             gsid=int(gs),
                             data={
@@ -251,6 +253,7 @@ class SPAMetadataContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=dcg_data,
@@ -292,6 +295,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_grid_square",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gsid=gs_name,
                     data={
@@ -310,6 +314,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gs_name=gs_name,
                     data={

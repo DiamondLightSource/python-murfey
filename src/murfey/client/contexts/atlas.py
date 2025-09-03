@@ -12,8 +12,8 @@ logger = logging.getLogger("murfey.client.contexts.atlas")
 
 
 class AtlasContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("Atlas", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("Atlas", acquisition_software, token)
         self._basepath = basepath
 
     def post_transfer(
@@ -42,6 +42,7 @@ class AtlasContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="make_atlas_jpg",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     data={"path": str(transferred_atlas_name)},
                 )

@@ -77,8 +77,8 @@ class TomographyContext(Context):
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("Tomography", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("Tomography", acquisition_software, token)
         self._basepath = basepath
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_with_pjids: List[str] = []
@@ -112,6 +112,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=dcg_data,
@@ -154,6 +155,7 @@ class TomographyContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="workflow.router",
                             function_name="start_dc",
+                            token=self._token,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data=dc_data,
@@ -164,6 +166,7 @@ class TomographyContext(Context):
                                 base_url=str(environment.url.geturl()),
                                 router_name="workflow.router",
                                 function_name="register_proc",
+                                token=self._token,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -276,6 +279,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series_for_rerun",
+                token=self._token,
                 visit_name=environment.visit,
                 data=rerun_data,
             )
@@ -295,6 +299,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series",
+                token=self._token,
                 visit_name=environment.visit,
                 data=ts_data,
             )
@@ -329,6 +334,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_tilt",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=tilt_data,
@@ -340,6 +346,7 @@ class TomographyContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
+                    token=self._token,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data={
@@ -375,6 +382,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="request_tomography_preprocessing",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=preproc_data,
@@ -487,6 +495,7 @@ class TomographyContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="workflow.tomo_router",
                             function_name="register_tilt_series_length",
+                            token=self._token,
                             session_id=environment.murfey_session,
                             data={
                                 "tags": [tilt_series],
@@ -506,6 +515,7 @@ class TomographyContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_completed_tilt_series",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
@@ -592,6 +602,7 @@ class TomographyContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.router",
                     function_name="machine_info_by_instrument",
+                    token=self._token,
                     instrument_name=environment.instrument_name,
                 ).json()
                 if (

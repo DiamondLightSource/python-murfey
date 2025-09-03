@@ -89,8 +89,8 @@ def _get_image_elements(root: ET.Element) -> List[ET.Element]:
 
 
 class CLEMContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("CLEM", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("CLEM", acquisition_software, token)
         self._basepath = basepath
         # CLEM contexts for "auto-save" acquisition mode
         self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
@@ -356,6 +356,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="register_lif_file",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"lif_file": quote(str(lif_file), safe="")},
             )
@@ -381,6 +382,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="process_raw_lifs",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"lif_file": quote(str(lif_file), safe="")},
             )
@@ -404,6 +406,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="register_tiff_file",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"tiff_file": quote(str(tiff_file), safe="")},
             )
@@ -429,6 +432,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="process_raw_tiffs",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data=tiff_dataset,
             )
