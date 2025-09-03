@@ -9,7 +9,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 
 def test_tomography_context_initialisation_for_tomo(tmp_path):
-    context = TomographyContext("tomo", tmp_path)
+    context = TomographyContext("tomo", tmp_path, "")
     assert not context._completed_tilt_series
     assert context._acquisition_software == "tomo"
 
