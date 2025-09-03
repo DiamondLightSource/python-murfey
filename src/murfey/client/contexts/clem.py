@@ -20,13 +20,14 @@ logger = logging.getLogger("murfey.client.contexts.clem")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
 ) -> Optional[Path]:
     """
     Returns the Path of the transferred file on the DLS file system.
     """
     machine_config = get_machine_config_client(
         str(environment.url.geturl()),
+        token,
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
@@ -89,8 +90,8 @@ def _get_image_elements(root: ET.Element) -> List[ET.Element]:
 
 
 class CLEMContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("CLEM", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("CLEM", acquisition_software, token)
         self._basepath = basepath
         # CLEM contexts for "auto-save" acquisition mode
         self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
@@ -128,6 +129,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
+                token=self._token,
             )
             if not destination_file:
                 logger.warning(
@@ -320,6 +322,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
+                token=self._token,
             )
             if not destination_file:
                 logger.warning(
@@ -356,6 +359,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="register_lif_file",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"lif_file": quote(str(lif_file), safe="")},
             )
@@ -381,6 +385,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="process_raw_lifs",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"lif_file": quote(str(lif_file), safe="")},
             )
@@ -404,6 +409,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="register_tiff_file",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data={"tiff_file": quote(str(tiff_file), safe="")},
             )
@@ -429,6 +435,7 @@ class CLEMContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="clem.router",
                 function_name="process_raw_tiffs",
+                token=self._token,
                 session_id=environment.murfey_session,
                 data=tiff_dataset,
             )

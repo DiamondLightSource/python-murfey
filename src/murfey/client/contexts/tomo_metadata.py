@@ -13,7 +13,9 @@ from murfey.util.client import capture_post
 logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 
 
-def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnvironment):
+def ensure_dcg_exists(
+    transferred_file: Path, environment: MurfeyInstanceEnvironment, token: str
+):
     # Make sure we have a data collection group
     source = _get_source(transferred_file, environment=environment)
     if not source:
@@ -28,6 +30,7 @@ def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnviron
         base_url=str(environment.url.geturl()),
         router_name="workflow.router",
         function_name="register_dc_group",
+        token=token,
         visit_name=environment.visit,
         session_id=environment.murfey_session,
         data=dcg_data,
@@ -36,8 +39,8 @@ def ensure_dcg_exists(transferred_file: Path, environment: MurfeyInstanceEnviron
 
 
 class TomographyMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("Tomography_metadata", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("Tomography_metadata", acquisition_software, token)
         self._basepath = basepath
 
     def post_transfer(
@@ -108,7 +111,9 @@ class TomographyMetadataContext(Context):
                 "experiment_type_id": 36,
                 "tag": dcg_tag,
                 "atlas": str(
-                    _atlas_destination(environment, source, transferred_file)
+                    _atlas_destination(
+                        environment, source, transferred_file, self._token
+                    )
                     / environment.samples[source].atlas.parent
                     / atlas_xml_path.with_suffix(".jpg").name
                 ),
@@ -119,6 +124,7 @@ class TomographyMetadataContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=dcg_data,
@@ -126,7 +132,7 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "SearchMap.xml" and environment:
             logger.info("Tomography session search map xml found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment)
+            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
@@ -197,7 +203,10 @@ class TomographyMetadataContext(Context):
             source = _get_source(transferred_file, environment=environment)
             image_path = (
                 _file_transferred_to(
-                    environment, source, transferred_file.parent / "SearchMap.jpg"
+                    environment,
+                    source,
+                    transferred_file.parent / "SearchMap.jpg",
+                    self._token,
                 )
                 if source
                 else ""
@@ -207,6 +216,7 @@ class TomographyMetadataContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
+                token=self._token,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -224,7 +234,7 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "SearchMap.dm" and environment:
             logger.info("Tomography session search map dm found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment)
+            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
@@ -258,6 +268,7 @@ class TomographyMetadataContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
+                token=self._token,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -269,7 +280,7 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "BatchPositionsList.xml" and environment:
             logger.info("Tomography session batch positions list found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment)
+            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
             with open(transferred_file) as xml:
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)
@@ -299,6 +310,7 @@ class TomographyMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.tomo_router",
                     function_name="register_search_map",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     sm_name=search_map_name,
                     data={
@@ -311,6 +323,7 @@ class TomographyMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.tomo_router",
                     function_name="register_batch_position",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     batch_name=batch_name,
                     data={
@@ -340,6 +353,7 @@ class TomographyMetadataContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="session_control.tomo_router",
                             function_name="register_batch_position",
+                            token=self._token,
                             session_id=environment.murfey_session,
                             batch_name=beamshift_name,
                             data={

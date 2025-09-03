@@ -87,6 +87,7 @@ def determine_default_destination(
         base_url=str(environment.url.geturl()),
         router_name="session_control.router",
         function_name="machine_info_by_instrument",
+        token=token,
         instrument_name=environment.instrument_name,
     ).json()
     _default = ""
@@ -115,6 +116,7 @@ def determine_default_destination(
                                     base_url=str(environment.url.geturl()),
                                     router_name="file_io_instrument.router",
                                     function_name="suggest_path",
+                                    token=token,
                                     visit_name=visit,
                                     session_id=environment.murfey_session,
                                     data={
@@ -275,6 +277,7 @@ class LaunchScreen(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=token,
             instrument_name=instrument_name,
         ).json()
         self._dir_tree = _DirectoryTree(
@@ -483,6 +486,7 @@ class ProcessingForm(Screen):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="workflow.tomo_router",
                     function_name="register_tomo_proc_params",
+                    token=token,
                     session_id=self.app._environment.murfey_session,
                     data=params,
                 )
@@ -491,6 +495,7 @@ class ProcessingForm(Screen):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="register_spa_proc_params",
+                    token=token,
                     session_id=self.app._environment.murfey_session,
                     data=params,
                 )
@@ -498,6 +503,7 @@ class ProcessingForm(Screen):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="flush_spa_processing",
+                    token=token,
                     visit_name=self.app._environment.visit,
                     session_id=self.app._environment.murfey_session,
                 )
@@ -645,6 +651,7 @@ class SessionSelection(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="link_client_to_session",
+            token=token,
             instrument_name=self.app._environment.instrument_name,
             client_id=self.app._environment.client_id,
             data={"session_id": session_id, "session_name": session_name},
@@ -655,12 +662,14 @@ class SessionSelection(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="remove_session",
+            token=token,
             session_id=session_id,
         )
         exisiting_sessions = capture_get(
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="get_sessions",
+            token=token,
         ).json()
         self.app.uninstall_screen("session-select-screen")
         if exisiting_sessions:
@@ -685,6 +694,7 @@ class SessionSelection(Screen):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="link_client_to_session",
+                token=token,
                 instrument_name=self.app._environment.instrument_name,
                 client_id=self.app._environment.client_id,
                 data={"session_id": None, "session_name": session_name},
@@ -711,6 +721,7 @@ class VisitSelection(SwitchSelection):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="register_client_to_visit",
+            token=token,
             visit_name=text,
             data={"id": self.app._environment.client_id},
         )
@@ -719,6 +730,7 @@ class VisitSelection(SwitchSelection):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=token,
             instrument_name=instrument_name,
         ).json()
 
@@ -756,6 +768,7 @@ class VisitSelection(SwitchSelection):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.correlative_router",
                 function_name="find_upstream_visits",
+                token=token,
                 session_id=self.app._environment.murfey_session,
             ).json()
             self.app.install_screen(
@@ -787,6 +800,7 @@ class VisitCreation(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="register_client_to_visit",
+            token=token,
             visit_name=text,
             data={"id": self.app._environment.client_id},
         )
@@ -795,6 +809,7 @@ class VisitCreation(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=token,
             instrument_name=instrument_name,
         ).json()
 
@@ -827,6 +842,7 @@ class VisitCreation(Screen):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.correlative_router",
                 function_name="find_upstream_visits",
+                token=token,
                 session_id=self.app._environment.murfey_session,
             ).json()
             self.app.install_screen(
@@ -852,6 +868,7 @@ class UpstreamDownloads(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=token,
             instrument_name=instrument_name,
         ).json()
         if machine_data.get("upstream_data_download_directory"):
@@ -866,6 +883,7 @@ class UpstreamDownloads(Screen):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.correlative_router",
                 function_name="gather_upstream_tiffs",
+                token=token,
                 visit_name=event.button.label,
                 session_id=self.app._environment.murfey_session,
             )
@@ -879,6 +897,7 @@ class UpstreamDownloads(Screen):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="session_control.correlative_router",
                     function_name="get_tiff",
+                    token=token,
                     visit_name=event.button.label,
                     session_id=self.app._environment.murfey_session,
                     tiff_path=tp,
@@ -947,6 +966,7 @@ class GainReference(Screen):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="file_io_instrument.router",
                 function_name="process_gain",
+                token=token,
                 session_id=self.app._environment.murfey_session,
                 data={
                     "gain_ref": str(self._dir_tree._gain_reference),
@@ -990,6 +1010,7 @@ class DirectorySelection(SwitchSelection):
         self.app._set_default_acquisition_directories(visit_dir)
         machine_config = get_machine_config_client(
             str(self.app._environment.url.geturl()),
+            token,
             instrument_name=self.app._environment.instrument_name,
             demo=self.app._environment.demo,
         )
@@ -1028,6 +1049,7 @@ class DestinationSelect(Screen):
         if self.app._multigrid:
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
             )
             destinations = []
@@ -1084,6 +1106,7 @@ class DestinationSelect(Screen):
         else:
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
             )
             for s, d in self._transfer_routes.items():
@@ -1113,6 +1136,7 @@ class DestinationSelect(Screen):
                 self._inputs[i] = k.name
             machine_config = get_machine_config_client(
                 str(self.app._environment.url.geturl()),
+                token,
                 instrument_name=self.app._environment.instrument_name,
                 demo=self.app._environment.demo,
             )
@@ -1251,12 +1275,14 @@ class WaitingScreen(Screen):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="register_processing_success_in_ispyb",
+                token=token,
                 session_id=self.app._environment.murfey_session,
             )
             capture_delete(
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="remove_session",
+                token=token,
                 session_id=self.app._environment.murfey_session,
             )
             self.app.exit()
@@ -1290,6 +1316,7 @@ class MainScreen(Screen):
             base_url=str(self.app._environment.url.geturl()),
             router_name="prometheus.router",
             function_name="change_monitoring_status",
+            token=token,
             visit_name=self.app._environment.visit,
             on=1,
         )

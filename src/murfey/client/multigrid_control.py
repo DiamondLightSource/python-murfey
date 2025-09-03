@@ -59,6 +59,7 @@ class MultigridController:
             base_url=self.murfey_url,
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=self.token,
             instrument_name=self.instrument_name,
         ).json()
         self.rsync_url = machine_data.get("rsync_url", "")
@@ -79,6 +80,7 @@ class MultigridController:
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            self.token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -105,6 +107,7 @@ class MultigridController:
             base_url=self.murfey_url,
             router_name="session_control.router",
             function_name="get_current_timestamp",
+            token=self.token,
         ).json()["timestamp"]
         self.server_time_offset = current_time - datetime.fromtimestamp(
             server_timestamp
@@ -164,6 +167,7 @@ class MultigridController:
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="remove_session",
+            token=self.token,
             session_id=self.session_id,
         )
         success = response.status_code == 200 if response else False
@@ -239,6 +243,7 @@ class MultigridController:
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=self.token,
             instrument_name=self.instrument_name,
         ).json()
         if destination_overrides.get(source):
@@ -295,6 +300,7 @@ class MultigridController:
                 base_url=self.murfey_url,
                 router_name="session_control.router",
                 function_name="delete_rsyncer",
+                token=self.token,
                 session_id=self.session_id,
                 data={"path": str(source)},
             )
@@ -303,6 +309,7 @@ class MultigridController:
                 base_url=self.murfey_url,
                 router_name="session_control.router",
                 function_name="register_stopped_rsyncer",
+                token=self.token,
                 session_id=self.session_id,
                 data={"path": str(source)},
             )
@@ -328,6 +335,7 @@ class MultigridController:
             base_url=self.murfey_url,
             router_name="session_control.router",
             function_name="register_restarted_rsyncer",
+            token=self.token,
             session_id=self.session_id,
             data={"path": str(source)},
         )
@@ -356,6 +364,7 @@ class MultigridController:
                 base_url=self.murfey_url,
                 router_name="file_io_instrument.router",
                 function_name="make_rsyncer_destination",
+                token=self.token,
                 session_id=self.session_id,
                 data={"destination": destination},
             )
@@ -431,6 +440,7 @@ class MultigridController:
                     base_url=self.murfey_url,
                     router_name="session_control.router",
                     function_name="register_restarted_rsyncer",
+                    token=self.token,
                     session_id=self.session_id,
                     data={"path": str(source)},
                 )
@@ -446,6 +456,7 @@ class MultigridController:
                     base_url=self.murfey_url,
                     router_name="session_control.router",
                     function_name="register_rsyncer",
+                    token=self.token,
                     session_id=self._environment.murfey_session,
                     data=rsyncer_data,
                 )
@@ -455,6 +466,7 @@ class MultigridController:
             log.info(f"Starting analyser for {source}")
             self.analysers[source] = Analyser(
                 source,
+                self.token,
                 environment=self._environment if not self.dummy_dc else None,
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
@@ -556,6 +568,7 @@ class MultigridController:
                     base_url=str(self._environment.url.geturl()),
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
+                    token=self.token,
                     visit_name=self._environment.visit,
                     session_id=self._environment.murfey_session,
                     data={
@@ -573,6 +586,7 @@ class MultigridController:
                 base_url=str(self._environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_tomo_proc_params",
+                token=self.token,
                 session_id=self._environment.murfey_session,
                 data=metadata_json,
             )
@@ -580,6 +594,7 @@ class MultigridController:
                 base_url=str(self._environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="flush_tomography_processing",
+                token=self.token,
                 visit_name=self._environment.visit,
                 session_id=self._environment.murfey_session,
                 data={"rsync_source": str(source)},
@@ -606,6 +621,7 @@ class MultigridController:
                 base_url=str(self._environment.url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=self.token,
                 visit_name=self._environment.visit,
                 session_id=self.session_id,
                 data=dcg_data,
@@ -635,6 +651,7 @@ class MultigridController:
                     base_url=str(self._environment.url.geturl()),
                     router_name="workflow.router",
                     function_name="start_dc",
+                    token=self.token,
                     visit_name=self._environment.visit,
                     session_id=self.session_id,
                     data=data,
@@ -650,6 +667,7 @@ class MultigridController:
                         base_url=str(self._environment.url.geturl()),
                         router_name="workflow.router",
                         function_name="register_proc",
+                        token=self.token,
                         visit_name=self._environment.visit,
                         session_id=self.session_id,
                         data={
@@ -663,6 +681,7 @@ class MultigridController:
                     base_url=str(self._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="register_spa_proc_params",
+                    token=self.token,
                     session_id=self.session_id,
                     data={
                         **{
@@ -678,6 +697,7 @@ class MultigridController:
                     base_url=str(self._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="flush_spa_processing",
+                    token=self.token,
                     visit_name=self._environment.visit,
                     session_id=self.session_id,
                     data={"tag": str(source)},
@@ -705,6 +725,7 @@ class MultigridController:
             base_url=str(self._environment.url.geturl()),
             router_name="prometheus.router",
             function_name="increment_rsync_file_count",
+            token=self.token,
             visit_name=self._environment.visit,
             data=data,
         )
@@ -737,6 +758,7 @@ class MultigridController:
                 base_url=str(self._environment.url.geturl()),
                 router_name="prometheus.router",
                 function_name="increment_rsync_transferred_files_prometheus",
+                token=self.token,
                 visit_name=self._environment.visit,
                 data=data,
             )
@@ -752,6 +774,7 @@ class MultigridController:
             base_url=str(self._environment.url.geturl()),
             router_name="prometheus.router",
             function_name="increment_rsync_skipped_files_prometheus",
+            token=self.token,
             visit_name=self._environment.visit,
             data={
                 "source": source,
@@ -786,6 +809,7 @@ class MultigridController:
             base_url=str(self._environment.url.geturl()),
             router_name="prometheus.router",
             function_name="increment_rsync_transferred_files",
+            token=self.token,
             visit_name=self._environment.visit,
             data=data,
         )

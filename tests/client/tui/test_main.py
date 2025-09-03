@@ -60,6 +60,7 @@ def test_get_visit_list(
         base_url=server_url,
         router_name="session_control.router",
         function_name="get_current_visits",
+        token="",
         instrument_name=instrument_name,
     )
 

@@ -70,10 +70,11 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
 
 
 def _atlas_destination(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
 ) -> Path:
     machine_config = get_machine_config_client(
         str(environment.url.geturl()),
+        token,
         instrument_name=environment.instrument_name,
         demo=environment.demo,
     )
@@ -92,8 +93,8 @@ def _atlas_destination(
 
 
 class SPAMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("SPA_metadata", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("SPA_metadata", acquisition_software, token)
         self._basepath = basepath
 
     def post_transfer(
@@ -180,7 +181,9 @@ class SPAMetadataContext(Context):
                     "experiment_type_id": 37,
                     "tag": dcg_tag,
                     "atlas": str(
-                        _atlas_destination(environment, source, transferred_file)
+                        _atlas_destination(
+                            environment, source, transferred_file, self._token
+                        )
                         / environment.samples[source].atlas.parent
                         / atlas_xml_path.with_suffix(".jpg").name
                     ),
@@ -191,6 +194,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="workflow.router",
                     function_name="register_dc_group",
+                    token=self._token,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data=dcg_data,
@@ -204,6 +208,7 @@ class SPAMetadataContext(Context):
                             base_url=str(environment.url.geturl()),
                             router_name="session_control.spa_router",
                             function_name="register_grid_square",
+                            token=self._token,
                             session_id=environment.murfey_session,
                             gsid=int(gs),
                             data={
@@ -251,6 +256,7 @@ class SPAMetadataContext(Context):
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=self._token,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=dcg_data,
@@ -284,7 +290,9 @@ class SPAMetadataContext(Context):
                     gs_name,
                 )
                 image_path = (
-                    _file_transferred_to(environment, source, Path(gs_info.image))
+                    _file_transferred_to(
+                        environment, source, Path(gs_info.image), self._token
+                    )
                     if gs_info.image
                     else ""
                 )
@@ -292,6 +300,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_grid_square",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gsid=gs_name,
                     data={
@@ -310,6 +319,7 @@ class SPAMetadataContext(Context):
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
+                    token=self._token,
                     session_id=environment.murfey_session,
                     gs_name=gs_name,
                     data={

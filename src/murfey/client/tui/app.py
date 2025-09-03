@@ -103,6 +103,7 @@ class MurfeyTUI(App):
         self._skip_existing_processing = skip_existing_processing
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -121,6 +122,7 @@ class MurfeyTUI(App):
         log.info(f"Launching multigrid watcher for source {source}")
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -155,6 +157,7 @@ class MurfeyTUI(App):
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="machine_info_by_instrument",
+            token=token,
             instrument_name=instrument_name,
         ).json()
         if destination_overrides.get(source):
@@ -211,6 +214,7 @@ class MurfeyTUI(App):
                 base_url=str(self._url.geturl()),
                 router_name="file_io_instrument.router",
                 function_name="make_rsyncer_destination",
+                token=token,
                 session_id=self._environment.murfey_session,
                 data={"destination": destination},
             )
@@ -288,6 +292,7 @@ class MurfeyTUI(App):
                 base_url=str(self._url.geturl()),
                 router_name="session_control.router",
                 function_name="register_rsyncer",
+                token=token,
                 session_id=self._environment.murfey_session,
                 data=rsyncer_data,
             )
@@ -298,6 +303,7 @@ class MurfeyTUI(App):
             log.info(f"Starting analyser for {source}")
             self.analysers[source] = Analyser(
                 source,
+                token,
                 environment=self._environment if not self._dummy_dc else None,
                 force_mdoc_metadata=self._force_mdoc_metadata,
                 limited=limited,
@@ -372,6 +378,7 @@ class MurfeyTUI(App):
                 base_url=str(self._url.geturl()),
                 router_name="prometheus.router",
                 function_name="increment_rsync_file_count",
+                token=token,
                 visit_name=self._visit,
                 data=data,
             )
@@ -404,6 +411,7 @@ class MurfeyTUI(App):
                 base_url=str(self._url.geturl()),
                 router_name="prometheus.router",
                 function_name="increment_rsync_transferred_files_prometheus",
+                token=token,
                 visit_name=self._visit,
                 data=data,
             )
@@ -437,6 +445,7 @@ class MurfeyTUI(App):
             base_url=str(self._url.geturl()),
             router_name="prometheus.router",
             function_name="increment_rsync_transferred_files",
+            token=token,
             visit_name=self._visit,
             data=data,
         )
@@ -518,6 +527,7 @@ class MurfeyTUI(App):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
+                    token=token,
                     visit_name=self.app._environment.visit,
                     session_id=self.app._environment.murfey_session,
                     data={
@@ -535,6 +545,7 @@ class MurfeyTUI(App):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="register_tomo_proc_params",
+                token=token,
                 session_id=self.app._environment.murfey_session,
                 data=metadata_json,
             )
@@ -542,6 +553,7 @@ class MurfeyTUI(App):
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="workflow.tomo_router",
                 function_name="flush_tomography_processing",
+                token=token,
                 visit_name=self._visit,
                 session_id=self.app._environment.murfey_session,
                 data={"rsync_source": str(source)},
@@ -567,6 +579,7 @@ class MurfeyTUI(App):
                 base_url=str(self._url.geturl()),
                 router_name="workflow.router",
                 function_name="register_dc_group",
+                token=token,
                 visit_name=self._visit,
                 session_id=self._environment.murfey_session,
                 data=dcg_data,
@@ -596,6 +609,7 @@ class MurfeyTUI(App):
                     base_url=str(self._url.geturl()),
                     router_name="workflow.router",
                     function_name="start_dc",
+                    token=token,
                     visit_name=self._visit,
                     session_id=self._environment.murfey_session,
                     data=data,
@@ -611,6 +625,7 @@ class MurfeyTUI(App):
                         base_url=str(self._url.geturl()),
                         router_name="workflow.router",
                         function_name="register_proc",
+                        token=token,
                         visit_name=self._visit,
                         session_id=self._environment.murfey_session,
                         data={
@@ -624,6 +639,7 @@ class MurfeyTUI(App):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="register_spa_proc_params",
+                    token=token,
                     session_id=self.app._environment.murfey_session,
                     data={
                         **{
@@ -644,6 +660,7 @@ class MurfeyTUI(App):
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="workflow.spa_router",
                     function_name="flush_spa_processing",
+                    token=token,
                     visit_name=self.app._environment.visit,
                     session_id=self.app._environment.murfey_session,
                     data={"tag": str(source)},
@@ -680,6 +697,7 @@ class MurfeyTUI(App):
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="get_sessions",
+            token=token,
         ).json()
         if self.visits:
             self.install_screen(VisitSelection(self.visits), "visit-select-screen")
@@ -709,6 +727,7 @@ class MurfeyTUI(App):
                 base_url=str(self._environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="link_client_to_session",
+                token=token,
                 instrument_name=self._environment.instrument_name,
                 client_id=self._environment.client_id,
                 data={"session_id": None, "session_name": session_name},
@@ -722,6 +741,7 @@ class MurfeyTUI(App):
     async def reset(self):
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -732,6 +752,7 @@ class MurfeyTUI(App):
                 base_url=str(self._environment.url.geturl()),
                 router_name="session_control.router",
                 function_name="get_rsyncers_for_session",
+                token=token,
                 session_id=self._environment.murfey_session,
             ).json()
             prompt += f"Copied {sum(r['files_counted'] for r in rsync_instances)} / {sum(r['files_transferred'] for r in rsync_instances)}"
@@ -759,6 +780,7 @@ class MurfeyTUI(App):
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="remove_session",
+            token=token,
             session_id=self._environment.murfey_session,
         )
         if self.rsync_processes:
@@ -776,6 +798,7 @@ class MurfeyTUI(App):
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="remove_session",
+            token=token,
             session_id=self._environment.murfey_session,
         )
         self.exit()
@@ -783,6 +806,7 @@ class MurfeyTUI(App):
     async def action_clear(self) -> None:
         machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
+            token,
             instrument_name=self._environment.instrument_name,
             demo=self._environment.demo,
         )
@@ -822,12 +846,14 @@ class MurfeyTUI(App):
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="register_processing_success_in_ispyb",
+            token=token,
             session_id=self._environment.murfey_session,
         )
         capture_delete(
             base_url=str(self._environment.url.geturl()),
             router_name="session_control.router",
             function_name="remove_session",
+            token=token,
             session_id=self._environment.murfey_session,
         )
         self.exit()

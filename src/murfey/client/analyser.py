@@ -34,6 +34,7 @@ class Analyser(Observer):
     def __init__(
         self,
         basepath_local: Path,
+        token: str,
         environment: MurfeyInstanceEnvironment | None = None,
         force_mdoc_metadata: bool = False,
         limited: bool = False,
@@ -49,6 +50,7 @@ class Analyser(Observer):
         self._batch_store: dict = {}
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
+        self._token = token
         self.parameters_model: (
             Type[ProcessingParametersSPA] | Type[ProcessingParametersTomo] | None
         ) = None
@@ -60,6 +62,7 @@ class Analyser(Observer):
         self._murfey_config = (
             get_machine_config_client(
                 str(environment.url.geturl()),
+                self._token,
                 instrument_name=environment.instrument_name,
                 demo=environment.demo,
             )
@@ -123,7 +126,7 @@ class Analyser(Observer):
         # CLEM workflow checks
         # Look for LIF and XLIF files
         if file_path.suffix in (".lif", ".xlif"):
-            self._context = CLEMContext("leica", self._basepath)
+            self._context = CLEMContext("leica", self._basepath, self._token)
             return True
         # Look for TIFF files associated with CLEM workflow
         # Leica's autosave mode seems to name the TIFFs in the format
@@ -131,16 +134,16 @@ class Analyser(Observer):
         if all(
             pattern in file_path.name for pattern in ("--Z", "--C")
         ) and file_path.suffix in (".tiff", ".tif"):
-            self._context = CLEMContext("leica", self._basepath)
+            self._context = CLEMContext("leica", self._basepath, self._token)
             return True
 
         # Tomography and SPA workflow checks
         if "atlas" in file_path.parts:
-            self._context = AtlasContext("epu", self._basepath)
+            self._context = AtlasContext("epu", self._basepath, self._token)
             return True
 
         if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
-            self._context = SPAMetadataContext("epu", self._basepath)
+            self._context = SPAMetadataContext("epu", self._basepath, self._token)
             return True
         elif (
             "Batch" in file_path.parts
@@ -148,7 +151,9 @@ class Analyser(Observer):
             or "Thumbnails" in file_path.parts
             or file_path.name == "Session.dm"
         ):
-            self._context = TomographyMetadataContext("tomo", self._basepath)
+            self._context = TomographyMetadataContext(
+                "tomo", self._basepath, self._token
+            )
             return True
 
         split_file_stem = file_path.stem.split("_")
@@ -164,7 +169,9 @@ class Analyser(Observer):
             ]:
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    self._context = SPAModularContext("epu", self._basepath)
+                    self._context = SPAModularContext(
+                        "epu", self._basepath, self._token
+                    )
                 self.parameters_model = ProcessingParametersSPA
                 return True
 
@@ -178,7 +185,9 @@ class Analyser(Observer):
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
-                    self._context = TomographyContext("tomo", self._basepath)
+                    self._context = TomographyContext(
+                        "tomo", self._basepath, self._token
+                    )
                     self.parameters_model = ProcessingParametersTomo
                 return True
         return False
@@ -213,14 +222,18 @@ class Analyser(Observer):
                     or transferred_file.name == "EpuSession.dm"
                     and not self._context
                 ):
-                    self._context = SPAMetadataContext("epu", self._basepath)
+                    self._context = SPAMetadataContext(
+                        "epu", self._basepath, self._token
+                    )
                 elif (
                     "Batch" in transferred_file.parts
                     or "SearchMaps" in transferred_file.parts
                     or transferred_file.name == "Session.dm"
                     and not self._context
                 ):
-                    self._context = TomographyMetadataContext("tomo", self._basepath)
+                    self._context = TomographyMetadataContext(
+                        "tomo", self._basepath, self._token
+                    )
                 self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}

@@ -32,8 +32,8 @@ def _number_from_name(name: str) -> int:
 
 
 class FIBContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path):
-        super().__init__("FIB", acquisition_software)
+    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+        super().__init__("FIB", acquisition_software, token)
         self._basepath = basepath
         self._milling: Dict[int, List[MillingProgress]] = {}
         self._lamellae: Dict[int, Lamella] = {}
@@ -95,6 +95,7 @@ class FIBContext(Context):
                         base_url=str(environment.url.geturl()),
                         router_name="workflow.correlative_router",
                         function_name="make_gif",
+                        token=self._token,
                         year=datetime.now().year,
                         visit_name=environment.visit,
                         session_id=environment.murfey_session,

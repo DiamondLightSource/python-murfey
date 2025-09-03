@@ -29,6 +29,8 @@ from murfey.util.models import Visit
 
 log = logging.getLogger("murfey.client")
 
+token = read_config()["Murfey"].get("token", "")
+
 
 def _get_visit_list(api_base: ParseResult, instrument_name: str):
     proxy_path = api_base.path.rstrip("/")
@@ -37,6 +39,7 @@ def _get_visit_list(api_base: ParseResult, instrument_name: str):
         base_url=str(get_visits_url.geturl()),
         router_name="session_control.router",
         function_name="get_current_visits",
+        token=token,
         instrument_name=instrument_name,
     )
     if server_reply.status_code != 200:
@@ -277,6 +280,7 @@ def run():
         base_url=str(murfey_url.geturl()),
         router_name="session_control.router",
         function_name="new_client_id",
+        token=token,
     )
     if client_id_response.status_code == 401:
         exit(
@@ -308,6 +312,7 @@ def run():
         base_url=str(murfey_url.geturl()),
         router_name="session_control.router",
         function_name="machine_info_by_instrument",
+        token=token,
         instrument_name=instrument_name,
     ).json()
     gain_ref: Path | None = None
