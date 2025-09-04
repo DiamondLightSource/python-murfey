@@ -206,16 +206,20 @@ def count_number_of_movies(db=murfey_db) -> Dict[str, int]:
 
 
 class PostInfo(BaseModel):
-    url: str
+    router_name: str
+    function_name: str
     data: dict
+    kwargs: dict
 
 
 @router.post("/instruments/{instrument_name}/failed_client_post")
 def failed_client_post(instrument_name: str, post_info: PostInfo):
     zocalo_message = {
         "register": "failed_client_post",
-        "url": post_info.url,
-        "json": post_info.data,
+        "router_name": post_info.router_name,
+        "function_name": post_info.function_name,
+        "data": post_info.data,
+        "kwargs": post_info.kwargs,
     }
     if _transport_object:
         _transport_object.send(_transport_object.feedback_queue, zocalo_message)
