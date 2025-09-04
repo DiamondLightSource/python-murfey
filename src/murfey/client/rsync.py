@@ -421,6 +421,8 @@ class RSyncer(Observer):
                     # This marks the start of a transfer, wait for the progress line
                     next_file = update
                 return
+            logger.warning(f"Unknown line from rsync {line}")
+            return
 
         def parse_stderr(line: str):
             if line.strip():
@@ -563,13 +565,19 @@ class RSyncer(Observer):
             self.notify(update)
             success = False
 
-        if result is None:
+        if result is None and files:
             # Only log this as an error if files were scheduled for transfer
-            if files:
-                logger.error(f"No rsync process ran for files: {files}")
-        else:
-            logger.log(
-                logging.WARNING if result.returncode else logging.DEBUG,
+            logger.error(f"No rsync process ran for files: {files}")
+        elif result and result.returncode:
+            logger.warning(
                 f"rsync process finished with return code {result.returncode}",
             )
+        elif not success:
+            logger.info(
+                "rsync process failed for some files: "
+                f"requested {len(relative_filenames)}, transferred {len(transfer_success)}",
+            )
+        else:
+            logger.debug("rsync process finished successfully")
+
         return success
