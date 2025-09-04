@@ -85,7 +85,7 @@ def capture_post(
         response = requests.Response()
     if response.status_code != 200:
         logger.warning(
-            f"Response to post to {url} with data {json} had status code "
+            f"Response to post to {url} with data {data} had status code "
             f"{response.status_code}. The reason given was {response.reason}"
         )
         client_config = read_config()
