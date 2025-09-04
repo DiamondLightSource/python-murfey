@@ -165,6 +165,16 @@ def remove_session(session_id: MurfeySessionID, db=murfey_db):
     remove_session_by_id(session_id, db)
 
 
+@router.get("/sessions/{session_id}/data_collection_groups")
+def get_dc_groups(
+    session_id: MurfeySessionID, db=murfey_db
+) -> Dict[str, DataCollectionGroup]:
+    data_collection_groups = db.exec(
+        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+    ).all()
+    return {dcg.tag: dcg for dcg in data_collection_groups}
+
+
 @router.post("/sessions/{session_id}/successful_processing")
 def register_processing_success_in_ispyb(
     session_id: MurfeySessionID, db=ispyb_db, murfey_db=murfey_db

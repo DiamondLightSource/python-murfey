@@ -302,7 +302,7 @@ class SPAModularContext(Context):
             data_collection_group = (
                 capture_get(
                     base_url=str(environment.url.geturl()),
-                    router_name="session_info.router",
+                    router_name="session_control.router",
                     function_name="get_dc_groups",
                     token=self._token,
                     session_id=environment.murfey_session,
