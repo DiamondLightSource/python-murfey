@@ -16,6 +16,7 @@ from textual.widgets import Button, Input
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
+from murfey.client.destinations import determine_default_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
 from murfey.client.tui.screens import (
@@ -27,7 +28,6 @@ from murfey.client.tui.screens import (
     VisitCreation,
     VisitSelection,
     WaitingScreen,
-    determine_default_destination,
 )
 from murfey.client.tui.status_bar import StatusBar
 from murfey.client.watchdir import DirWatcher
@@ -177,6 +177,7 @@ class MurfeyTUI(App):
                     self._default_destinations[source],
                     self._environment,
                     self.analysers,
+                    token,
                     touch=True,
                     extra_directory=extra_directory,
                     include_mid_path=include_mid_path,
