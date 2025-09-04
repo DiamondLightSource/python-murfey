@@ -826,6 +826,13 @@ murfey.server.api.session_control.router:
         type: int
     methods:
       - DELETE
+  - path: /session_info/sessions/{session_id}/data_collection_groups
+    function: get_dc_groups
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - GET
   - path: /session_control/sessions/{session_id}/successful_processing
     function: register_processing_success_in_ispyb
     path_params:
@@ -1040,7 +1047,7 @@ murfey.server.api.session_info.router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/instruments/{instrument_name}/visits/{visit}/session/{name}
+  - path: /session_info/instruments/{instrument_name}/visits/{visit}/sessions/{name}
     function: create_session
     path_params:
       - name: visit

@@ -14,9 +14,9 @@ import murfey.client.websocket
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
+from murfey.client.destinations import determine_default_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncer, RSyncerUpdate, TransferResult
-from murfey.client.tui.screens import determine_default_destination
 from murfey.client.watchdir import DirWatcher
 from murfey.util import posix_path
 from murfey.util.client import (
@@ -267,6 +267,7 @@ class MultigridController:
                     self._environment.default_destinations[source],
                     self._environment,
                     self.analysers or {},
+                    self.token,
                     touch=True,
                     extra_directory=extra_directory,
                     include_mid_path=include_mid_path,

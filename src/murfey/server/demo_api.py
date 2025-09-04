@@ -228,7 +228,7 @@ class SessionClients(BaseModel):
     clients: List[ClientEnvironment]
 
 
-@router.get("/session/{session_id}")
+@router.get("/sessions/{session_id}")
 async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClients:
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     clients = db.exec(
@@ -996,7 +996,7 @@ async def get_tiff(visit_name: str, session_id: int, tiff_path: str, db=murfey_d
     return FileResponse(path=test_path)
 
 
-@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
+@router.post("/instruments/{instrument_name}/visits/{visit}/sessions/{name}")
 def create_session(instrument_name: str, visit: str, name: str, db=murfey_db) -> int:
     s = Session(name=name, visit=visit, instrument_name=instrument_name)
     db.add(s)
