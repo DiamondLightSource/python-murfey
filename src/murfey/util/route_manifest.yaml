@@ -1047,7 +1047,7 @@ murfey.server.api.session_info.router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/instruments/{instrument_name}/visits/{visit}/session/{name}
+  - path: /session_info/instruments/{instrument_name}/visits/{visit}/sessions/{name}
     function: create_session
     path_params:
       - name: visit

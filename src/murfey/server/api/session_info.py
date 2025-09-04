@@ -162,7 +162,7 @@ class VisitEndTime(BaseModel):
     end_time: Optional[datetime] = None
 
 
-@router.post("/instruments/{instrument_name}/visits/{visit}/session/{name}")
+@router.post("/instruments/{instrument_name}/visits/{visit}/sessions/{name}")
 def create_session(
     instrument_name: MurfeyInstrumentName,
     visit: str,
