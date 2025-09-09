@@ -51,6 +51,55 @@ class MultigridDirWatcher(Observer):
             self.thread.join()
         log.debug("MultigridDirWatcher thread stop completed")
 
+    def _handle_metadata(self, directory: Path):
+        self.notify(
+            directory,
+            extra_directory=f"metadata_{directory.name}",
+            include_mid_path=False,
+            analyse=self._analyse,
+            limited=True,
+            tag="metadata",
+        )
+        self._seen_dirs.append(directory)
+
+    def _handle_fractions(self, directory: Path, first_loop: bool):
+        processing_started = False
+        for d02 in directory.glob("Images-Disc*"):
+            if d02 not in self._seen_dirs:
+                # If 'skip_existing_processing' is set, do not process for
+                # any data directories found on the first loop.
+                # This allows you to avoid triggering processing again if Murfey is restarted
+                self.notify(
+                    d02,
+                    include_mid_path=False,
+                    remove_files=True,
+                    analyse=(
+                        not (first_loop and self._skip_existing_processing)
+                        if self._analyse
+                        else False
+                    ),
+                    tag="fractions",
+                )
+                self._seen_dirs.append(d02)
+            processing_started = d02 in self._seen_dirs
+        if not processing_started:
+            if (
+                directory.is_dir()
+                and directory not in self._seen_dirs
+                and list(directory.iterdir())
+            ):
+                self.notify(
+                    directory,
+                    include_mid_path=False,
+                    analyse=(
+                        not (first_loop and self._skip_existing_processing)
+                        if self._analyse
+                        else False
+                    ),
+                    tag="fractions",
+                )
+                self._seen_dirs.append(directory)
+
     def _process(self):
         first_loop = True
         while not self._stopping:
@@ -75,53 +124,23 @@ class MultigridDirWatcher(Observer):
                         )
                         self._seen_dirs.append(d)
                 else:
-                    if d.is_dir() and d not in self._seen_dirs:
-                        self.notify(
-                            d,
-                            extra_directory=f"metadata_{d.name}",
-                            include_mid_path=False,
-                            analyse=self._analyse,
-                            limited=True,
-                            tag="metadata",
-                        )
-                        self._seen_dirs.append(d)
-                    processing_started = False
-                    for d02 in (d.parent.parent / d.name).glob("Images-Disc*"):
-                        if d02 not in self._seen_dirs:
-                            # If 'skip_existing_processing' is set, do not process for
-                            # any data directories found on the first loop.
-                            # This allows you to avoid triggering processing again if Murfey is restarted
-                            self.notify(
-                                d02,
-                                include_mid_path=False,
-                                remove_files=True,
-                                analyse=(
-                                    not (first_loop and self._skip_existing_processing)
-                                    if self._analyse
-                                    else False
-                                ),
-                                tag="fractions",
-                            )
-                            self._seen_dirs.append(d02)
-                        processing_started = d02 in self._seen_dirs
-                    if not processing_started:
-                        d02 = d.parent.parent / d.name
-                        if (
-                            d02.is_dir()
-                            and d02 not in self._seen_dirs
-                            and list((d.parent.parent / d.name).iterdir())
-                        ):
-                            self.notify(
-                                d02,
-                                include_mid_path=False,
-                                analyse=(
-                                    not (first_loop and self._skip_existing_processing)
-                                    if self._analyse
-                                    else False
-                                ),
-                                tag="fractions",
-                            )
-                            self._seen_dirs.append(d02)
+                    # hack for tomo multigrid metadata structure
+                    sample_dirs = list(d.glob("Sample*"))
+                    if d.is_dir() and len(sample_dirs):
+                        for sample in sample_dirs:
+                            if len(list(sample.glob("*.mdoc"))):
+                                if sample not in self._seen_dirs:
+                                    self._handle_metadata(sample)
+                                self._handle_fractions(
+                                    d.parent.parent.parent
+                                    / f"{d.parent.name}_{d.name}",
+                                    first_loop,
+                                )
+
+                    else:
+                        if d.is_dir() and d not in self._seen_dirs:
+                            self._handle_metadata(d)
+                        self._handle_fractions(d.parent.parent / d.name, first_loop)
 
             if first_loop:
                 first_loop = False
