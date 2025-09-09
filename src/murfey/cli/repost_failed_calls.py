@@ -7,7 +7,7 @@ from inspect import getfullargspec, iscoroutinefunction
 from pathlib import Path
 from queue import Empty, Queue
 
-from sqlmodel import Session
+from sqlmodel import Session, create_engine
 from workflows.transport.pika_transport import PikaTransport
 
 import murfey.server.api.auth
@@ -25,7 +25,7 @@ import murfey.server.api.session_control
 import murfey.server.api.session_info
 import murfey.server.api.websocket
 import murfey.server.api.workflow
-from murfey.server.murfey_db import get_murfey_db_session
+from murfey.server.murfey_db import url
 from murfey.util.config import security_from_file
 
 
@@ -162,7 +162,10 @@ def run():
     - feedback messages that can be sent back to rabbitmq
     """
     parser = argparse.ArgumentParser(
-        description="Purge and reinject failed murfey messages"
+        description=(
+            "Purge and reinject failed murfey messages. "
+            "Provide security configuration and set machine configuration."
+        )
     )
     parser.add_argument(
         "-c",
@@ -177,7 +180,6 @@ def run():
 
     # Read the security config file
     security_config = security_from_file(args.config)
-    murfey_db = get_murfey_db_session(security_config)
 
     # Purge the queue and repost/reinject any messages found
     dlq_dump_path = Path(args.dir)
@@ -187,7 +189,14 @@ def run():
         security_config.feedback_queue,
         security_config.rabbitmq_credentials,
     )
-    handle_failed_posts(exported_messages, murfey_db)
+
+    # Set up database and retry api calls
+    _url = url(security_config)
+    engine = create_engine(_url)
+    with Session(engine) as murfey_db:
+        handle_failed_posts(exported_messages, murfey_db)
+
+    # Reinject all remaining messages to rabbitmq
     handle_dlq_messages(exported_messages, security_config.rabbitmq_credentials)
 
     # Clean up any created directories
