@@ -132,8 +132,8 @@ class MultigridDirWatcher(Observer):
                                 if sample not in self._seen_dirs:
                                     self._handle_metadata(sample)
                                 self._handle_fractions(
-                                    d.parent.parent.parent
-                                    / f"{d.parent.name}_{d.name}",
+                                    sample.parent.parent.parent
+                                    / f"{sample.parent.name}_{sample.name}",
                                     first_loop,
                                 )
 
