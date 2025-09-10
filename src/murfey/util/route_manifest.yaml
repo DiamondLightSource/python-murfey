@@ -826,7 +826,7 @@ murfey.server.api.session_control.router:
         type: int
     methods:
       - DELETE
-  - path: /session_info/sessions/{session_id}/data_collection_groups
+  - path: /session_control/sessions/{session_id}/data_collection_groups
     function: get_dc_groups
     path_params:
       - name: session_id

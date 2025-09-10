@@ -2300,10 +2300,10 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
             ).one()
             if not _db.exec(
-                select(func.count(db.TomographyProcessingParameters.dcg_id)).where(
+                select(db.TomographyProcessingParameters.dcg_id).where(
                     db.TomographyProcessingParameters.dcg_id == collected_ids[0].id
                 )
-            ).one():
+            ).all():
                 params = db.TomographyProcessingParameters(
                     dcg_id=collected_ids[0].id,
                     pixel_size=float(message["pixel_size_on_image"]) * 10**10,
