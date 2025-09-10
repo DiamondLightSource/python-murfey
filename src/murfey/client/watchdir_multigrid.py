@@ -51,10 +51,10 @@ class MultigridDirWatcher(Observer):
             self.thread.join()
         log.debug("MultigridDirWatcher thread stop completed")
 
-    def _handle_metadata(self, directory: Path):
+    def _handle_metadata(self, directory: Path, extra_directory: str):
         self.notify(
             directory,
-            extra_directory=f"metadata_{directory.name}",
+            extra_directory=extra_directory,
             include_mid_path=False,
             analyse=self._analyse,
             limited=True,
@@ -130,16 +130,21 @@ class MultigridDirWatcher(Observer):
                         for sample in sample_dirs:
                             if len(list(sample.glob("*.mdoc"))):
                                 if sample not in self._seen_dirs:
-                                    self._handle_metadata(sample)
+                                    self._handle_metadata(
+                                        sample,
+                                        extra_directory=f"metadata_{sample.parent.name}_{sample.name}",
+                                    )
                                 self._handle_fractions(
-                                    d.parent.parent.parent
-                                    / f"{d.parent.name}_{d.name}",
+                                    sample.parent.parent.parent
+                                    / f"{sample.parent.name}_{sample.name}",
                                     first_loop,
                                 )
 
                     else:
                         if d.is_dir() and d not in self._seen_dirs:
-                            self._handle_metadata(d)
+                            self._handle_metadata(
+                                d, extra_directory=f"metadata_{d.name}"
+                            )
                         self._handle_fractions(d.parent.parent / d.name, first_loop)
 
             if first_loop:

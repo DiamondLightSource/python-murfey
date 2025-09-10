@@ -47,11 +47,12 @@ def determine_default_destination(
                     mid_path = source.absolute().relative_to(Path(data_dir).absolute())
                     if use_suggested_path:
                         with global_env_lock:
-                            source_name = (
-                                source.name
-                                if source.name != "Images-Disc1"
-                                else source.parent.name
-                            )
+                            if source.name == "Images-Disc1":
+                                source_name = source.parent.name
+                            elif source.name.startswith("Sample"):
+                                source_name = f"{source.parent.name}_{source.name}"
+                            else:
+                                source_name = source.name
                             if environment.destination_registry.get(source_name):
                                 _default = environment.destination_registry[source_name]
                             else:
