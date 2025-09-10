@@ -768,7 +768,7 @@ def register_completed_tilt_series(
     db.commit()
     for ts in tilt_series_db:
         if (
-            check_tilt_series_mc(ts.id)
+            check_tilt_series_mc(ts.id, db)
             and not ts.processing_requested
             and ts.tilt_series_length > 2
         ):
@@ -795,9 +795,9 @@ def register_completed_tilt_series(
             machine_config = get_machine_config(instrument_name=instrument_name)[
                 instrument_name
             ]
-            tilts = get_all_tilts(ts.id)
-            ids = get_job_ids(ts.id, collected_ids[3].id)
-            preproc_params = get_tomo_proc_params(ids.dcgid)
+            tilts = get_all_tilts(ts.id, db)
+            ids = get_job_ids(ts.id, collected_ids[3].id, db)
+            preproc_params = get_tomo_proc_params(ids.dcgid, db)
 
             first_tilt = db.exec(
                 select(Tilt).where(Tilt.tilt_series_id == ts.id)

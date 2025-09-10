@@ -190,15 +190,23 @@ def test_handle_failed_posts(tmp_path):
 @mock.patch("murfey.cli.repost_failed_calls.dlq_purge")
 @mock.patch("murfey.cli.repost_failed_calls.handle_failed_posts")
 @mock.patch("murfey.cli.repost_failed_calls.handle_dlq_messages")
-@mock.patch("murfey.cli.repost_failed_calls.get_murfey_db_session")
+@mock.patch("murfey.cli.repost_failed_calls.url")
+@mock.patch("murfey.cli.repost_failed_calls.create_engine")
+@mock.patch("murfey.cli.repost_failed_calls.Session")
 def test_run_repost_failed_calls(
-    mock_db,
+    mock_db_session,
+    mock_db_engine,
+    mock_db_url,
     mock_reinject,
     mock_repost,
     mock_purge,
     mock_security_configuration,
 ):
-    mock_db.return_value = "db"
+    mock_session = mock.MagicMock()
+
+    mock_db_url.return_value = "db_url"
+    mock_db_engine.return_value = "db_engine"
+    mock_db_session.return_value = mock_session
     mock_purge.return_value = ["/path/to/msg1"]
 
     config_file = mock_security_configuration
@@ -215,14 +223,16 @@ def test_run_repost_failed_calls(
     repost_failed_calls.run()
 
     security_config_class = security_from_file(config_file)
-    mock_db.assert_called_with(security_config_class)
+    mock_db_url.assert_called_with(security_config_class)
+    mock_db_engine.assert_called_with("db_url")
+    mock_db_session.assert_called_with("db_engine")
 
     mock_purge.assert_called_once_with(
         Path("DLQ_dir"),
         "murfey_feedback",
         Path(security_config_dict["rabbitmq_credentials"]),
     )
-    mock_repost.assert_called_once_with(["/path/to/msg1"], "db")
+    mock_repost.assert_called_once_with(["/path/to/msg1"], mock_session.__enter__())
     mock_reinject.assert_called_once_with(
         ["/path/to/msg1"], Path(security_config_dict["rabbitmq_credentials"])
     )
