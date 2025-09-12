@@ -199,6 +199,7 @@ class RSyncer(Observer):
         self.stop()
         self._remove_files = True
         self._notify = False
+        self._end_time = datetime.now()
         if thread:
             self.thread = threading.Thread(
                 name=f"RSync finalisation {self._basepath}:{self._remote}",
