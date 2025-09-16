@@ -80,6 +80,7 @@ app.include_router(murfey.server.api.instrument.router)
 app.include_router(murfey.server.api.mag_table.router)
 
 app.include_router(murfey.server.api.session_control.router)
+app.include_router(murfey.server.api.session_control.correlative_router)
 app.include_router(murfey.server.api.session_control.spa_router)
 app.include_router(murfey.server.api.session_control.tomo_router)
 
