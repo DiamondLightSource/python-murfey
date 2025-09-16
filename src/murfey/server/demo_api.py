@@ -748,7 +748,7 @@ def register_dc_group(
 
     if dcg_params.atlas:
         _flush_grid_square_records(
-            {"session_id": session_id, "tag": dcg_params.tag}, demo=True
+            {"session_id": session_id, "tag": dcg_params.tag}, _db=db, demo=True
         )
     return dcg_params
 
