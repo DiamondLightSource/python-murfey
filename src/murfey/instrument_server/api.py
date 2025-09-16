@@ -494,6 +494,9 @@ def gather_upstream_tiffs(
             stream=True,
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
         )
+        (upstream_tiff_info.download_dir / tiff_path).parent.mkdir(
+            parents=True, exist_ok=True
+        )
         with open(upstream_tiff_info.download_dir / tiff_path, "wb") as utiff:
             for chunk in tiff_data.iter_content(chunk_size=32 * 1024**2):
                 utiff.write(chunk)
