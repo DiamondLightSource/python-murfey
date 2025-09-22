@@ -6,7 +6,6 @@ the CLEM workflow should be processed.
 import logging
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
-from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
@@ -361,7 +360,7 @@ class CLEMContext(Context):
                 function_name="register_lif_file",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"lif_file": quote(str(lif_file), safe="")},
+                data={"lif_file": str(lif_file)},
             )
             return True
         except Exception as e:
@@ -387,7 +386,7 @@ class CLEMContext(Context):
                 function_name="process_raw_lifs",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"lif_file": quote(str(lif_file), safe="")},
+                data={"lif_file": str(lif_file)},
             )
             return True
         except Exception as e:
@@ -411,7 +410,7 @@ class CLEMContext(Context):
                 function_name="register_tiff_file",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"tiff_file": quote(str(tiff_file), safe="")},
+                data={"tiff_file": str(tiff_file)},
             )
             return True
         except Exception as e:
