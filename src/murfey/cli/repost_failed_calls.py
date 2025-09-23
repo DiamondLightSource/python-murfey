@@ -10,21 +10,6 @@ from queue import Empty, Queue
 from sqlmodel import Session, create_engine
 from workflows.transport.pika_transport import PikaTransport
 
-import murfey.server.api.auth
-import murfey.server.api.bootstrap
-import murfey.server.api.clem
-import murfey.server.api.display
-import murfey.server.api.file_io_frontend
-import murfey.server.api.file_io_instrument
-import murfey.server.api.hub
-import murfey.server.api.instrument
-import murfey.server.api.mag_table
-import murfey.server.api.processing_parameters
-import murfey.server.api.prometheus
-import murfey.server.api.session_control
-import murfey.server.api.session_info
-import murfey.server.api.websocket
-import murfey.server.api.workflow
 from murfey.server.murfey_db import url
 from murfey.server.run import _set_up_transport
 from murfey.util.config import security_from_file
@@ -118,6 +103,23 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
             continue
 
         try:
+            # These imports need to happen after transport object is configured
+            import murfey.server.api.auth
+            import murfey.server.api.bootstrap
+            import murfey.server.api.clem
+            import murfey.server.api.display
+            import murfey.server.api.file_io_frontend
+            import murfey.server.api.file_io_instrument
+            import murfey.server.api.hub
+            import murfey.server.api.instrument
+            import murfey.server.api.mag_table
+            import murfey.server.api.processing_parameters
+            import murfey.server.api.prometheus
+            import murfey.server.api.session_control
+            import murfey.server.api.session_info
+            import murfey.server.api.websocket
+            import murfey.server.api.workflow
+
             function_to_call = getattr(
                 getattr(murfey.server.api, router_base), function_name
             )
@@ -179,11 +181,17 @@ def run():
     )
     args = parser.parse_args()
 
-    # Read the security config file and configure the transport
+    # Read the security config file
     security_config = security_from_file(args.config)
+
+    # Configure the transport
     PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
     _set_up_transport("PikaTransport")
-    murfey.server._transport_object.feedback_queue = security_config.feedback_queue
+
+    # Now import transport object which was set up in the above step
+    from murfey.server import _transport_object
+
+    _transport_object.feedback_queue = security_config.feedback_queue
 
     # Purge the queue and repost/reinject any messages found
     dlq_dump_path = Path(args.dir)
