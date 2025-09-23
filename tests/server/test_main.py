@@ -24,7 +24,7 @@ def login(test_user):
             f"{url_path_for('auth.router', 'generate_token')}",
             data=test_user,
         )
-        assert mock_validate.called_once()
+        mock_validate.assert_called_once()
         assert response.status_code == 200
         token = response.json()["access_token"]
         assert token is not None
@@ -35,10 +35,9 @@ def login(test_user):
 def test_read_main(mock_check, test_user):
     token = login(test_user)
     response = client.get(
-        "/session_info/connections", 
-        headers={"Authorization": f"Bearer {token}"}
+        "/session_info/connections", headers={"Authorization": f"Bearer {token}"}
     )
-    assert mock_check.called_once()
+    mock_check.assert_called_once()
     assert response.status_code == 200
 
 
