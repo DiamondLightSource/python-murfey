@@ -183,6 +183,7 @@ def run():
     security_config = security_from_file(args.config)
     PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
     _set_up_transport("PikaTransport")
+    murfey.server._transport_object.feedback_queue = security_config.feedback_queue
 
     # Purge the queue and repost/reinject any messages found
     dlq_dump_path = Path(args.dir)

@@ -187,6 +187,8 @@ def test_handle_failed_posts(tmp_path):
     assert (tmp_path / "msg6").is_file()  # function does not exist
 
 
+@mock.patch("workflows.transport.pika_transport.PikaTransport")
+@mock.patch("murfey.cli.repost_failed_calls.PikaTransport")
 @mock.patch("murfey.cli.repost_failed_calls.dlq_purge")
 @mock.patch("murfey.cli.repost_failed_calls.handle_failed_posts")
 @mock.patch("murfey.cli.repost_failed_calls.handle_dlq_messages")
@@ -200,6 +202,8 @@ def test_run_repost_failed_calls(
     mock_reinject,
     mock_repost,
     mock_purge,
+    mock_pika,
+    mock_workflows,
     mock_security_configuration,
 ):
     mock_session = mock.MagicMock()
@@ -226,6 +230,11 @@ def test_run_repost_failed_calls(
     mock_db_url.assert_called_with(security_config_class)
     mock_db_engine.assert_called_with("db_url")
     mock_db_session.assert_called_with("db_engine")
+
+    mock_pika().load_configuration_file.assert_called_with(
+        Path("/path/to/rabbitmq.yaml")
+    )
+    mock_workflows().connect.assert_called_once()
 
     mock_purge.assert_called_once_with(
         Path("DLQ_dir"),
