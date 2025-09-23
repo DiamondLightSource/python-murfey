@@ -26,6 +26,7 @@ import murfey.server.api.session_info
 import murfey.server.api.websocket
 import murfey.server.api.workflow
 from murfey.server.murfey_db import url
+from murfey.server.run import _set_up_transport
 from murfey.util.config import security_from_file
 
 
@@ -178,8 +179,10 @@ def run():
     )
     args = parser.parse_args()
 
-    # Read the security config file
+    # Read the security config file and configure the transport
     security_config = security_from_file(args.config)
+    PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+    _set_up_transport("PikaTransport")
 
     # Purge the queue and repost/reinject any messages found
     dlq_dump_path = Path(args.dir)
