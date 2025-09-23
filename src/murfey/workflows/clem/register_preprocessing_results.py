@@ -10,10 +10,10 @@ from __future__ import annotations
 import json
 import logging
 import traceback
-from ast import literal_eval
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
@@ -35,12 +35,21 @@ logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results
 
 
 class LIFPreprocessingResult(BaseModel):
-    image_stack: Path
-    metadata: Path
     series_name: str
-    channel: str
     number_of_members: int
+    is_stack: bool
+    is_montage: bool
+    output_files: dict[
+        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
+    ]
+    metadata: Path
     parent_lif: Path
+    pixels_x: int
+    pixels_y: int
+    units: str
+    pixel_size: float
+    resolution: float
+    extent: list[float]
 
 
 def register_lif_preprocessing_result(
@@ -84,13 +93,6 @@ def register_lif_preprocessing_result(
     try:
         # Register items in database if not already present
         try:
-            clem_img_stk: CLEMImageStack = get_db_entry(
-                db=murfey_db,
-                table=CLEMImageStack,
-                session_id=session_id,
-                file_path=result.image_stack,
-            )
-
             clem_img_series: CLEMImageSeries = get_db_entry(
                 db=murfey_db,
                 table=CLEMImageSeries,
@@ -112,14 +114,24 @@ def register_lif_preprocessing_result(
                 file_path=result.parent_lif,
             )
 
-            # Link tables to one another and populate fields
-            clem_img_stk.associated_metadata = clem_metadata
-            clem_img_stk.parent_lif = clem_lif_file
-            clem_img_stk.parent_series = clem_img_series
-            clem_img_stk.channel_name = result.channel
-            murfey_db.add(clem_img_stk)
-            murfey_db.commit()
+            # Iterate through image stacks and start populating them first
+            for channel, output_file in result.output_files.items():
+                clem_img_stk: CLEMImageStack = get_db_entry(
+                    db=murfey_db,
+                    table=CLEMImageStack,
+                    session_id=session_id,
+                    file_path=output_file,
+                )
 
+                # Link tables to one another and populate fields
+                clem_img_stk.associated_metadata = clem_metadata
+                clem_img_stk.parent_lif = clem_lif_file
+                clem_img_stk.parent_series = clem_img_series
+                clem_img_stk.channel_name = channel
+                murfey_db.add(clem_img_stk)
+                murfey_db.commit()
+
+            # Link other tables together
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.parent_lif = clem_lif_file
             clem_img_series.number_of_members = result.number_of_members
@@ -132,30 +144,18 @@ def register_lif_preprocessing_result(
 
             logger.info(
                 f"LIF preprocessing results registered for {result.series_name!r} "
-                f"{result.channel!r} image stack"
             )
 
         except Exception:
             logger.error(
                 "Exception encountered when registering LIF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                f"{result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
             return False
 
-        # Load all image stacks associated with current series from database
+        # Load instrument name
         try:
-            image_stacks = [
-                Path(row)
-                for row in murfey_db.exec(
-                    select(CLEMImageStack.file_path).where(
-                        CLEMImageStack.series_id == clem_img_series.id
-                    )
-                ).all()
-            ]
-            logger.debug(
-                f"Found the following images: {[str(file) for file in image_stacks]}"
-            )
             instrument_name = (
                 murfey_db.exec(
                     select(MurfeySession).where(MurfeySession.id == session_id)
@@ -170,20 +170,12 @@ def register_lif_preprocessing_result(
             )
             return False
 
-        # Check if all image stacks for this series are accounted for
-        if not len(image_stacks) == clem_img_series.number_of_members:
-            logger.info(
-                f"Members of the series {result.series_name!r} are still missing; "
-                "the next stage of processing will not be triggered yet"
-            )
-            return True
-
         # Request for next stage of processing if all members are present
         cluster_response = submit_cluster_request(
             session_id=session_id,
             instrument_name=instrument_name,
             series_name=result.series_name,
-            images=image_stacks,
+            images=list(result.output_files.values()),
             metadata=result.metadata,
             crop_to_n_frames=processing_params.crop_to_n_frames,
             align_self=processing_params.align_self,
@@ -208,26 +200,23 @@ def register_lif_preprocessing_result(
 
 
 class TIFFPreprocessingResult(BaseModel):
-    image_stack: Path
-    metadata: Path
     series_name: str
-    channel: str
     number_of_members: int
-    parent_tiffs: list[Path]
-
-    @field_validator("parent_tiffs", mode="before")
-    @classmethod
-    def parse_stringified_list(cls, value):
-        if isinstance(value, str):
-            try:
-                eval_result = literal_eval(value)
-                if isinstance(eval_result, list):
-                    parent_tiffs = [Path(p) for p in eval_result]
-                    return parent_tiffs
-            except (SyntaxError, ValueError):
-                raise ValueError("Unable to parse input")
-        # Return value as-is; if it fails, it fails
-        return value
+    is_stack: bool
+    is_montage: bool
+    output_files: dict[
+        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
+    ]
+    metadata: Path
+    parent_tiffs: dict[
+        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], list[Path]
+    ]
+    pixels_x: int
+    pixels_y: int
+    units: str
+    pixel_size: float
+    resolution: float
+    extent: list[float]
 
 
 def register_tiff_preprocessing_result(
@@ -261,12 +250,6 @@ def register_tiff_preprocessing_result(
     try:
         # Register items in database if not already present
         try:
-            clem_img_stk: CLEMImageStack = get_db_entry(
-                db=murfey_db,
-                table=CLEMImageStack,
-                session_id=session_id,
-                file_path=result.image_stack,
-            )
             clem_img_series: CLEMImageSeries = get_db_entry(
                 db=murfey_db,
                 table=CLEMImageSeries,
@@ -279,27 +262,37 @@ def register_tiff_preprocessing_result(
                 session_id=session_id,
                 file_path=result.metadata,
             )
-
-            # Link tables to one another and populate fields
-            # Register TIFF files and populate them iteratively first
-            for file in result.parent_tiffs:
-                clem_tiff_file: CLEMTIFFFile = get_db_entry(
+            # Iteratively register the output image stacks
+            for channel, output_file in result.output_files.items():
+                clem_img_stk: CLEMImageStack = get_db_entry(
                     db=murfey_db,
-                    table=CLEMTIFFFile,
+                    table=CLEMImageStack,
                     session_id=session_id,
-                    file_path=file,
+                    file_path=output_file,
                 )
-                clem_tiff_file.associated_metadata = clem_metadata
-                clem_tiff_file.child_series = clem_img_series
-                clem_tiff_file.child_stack = clem_img_stk
-                murfey_db.add(clem_tiff_file)
+
+                # Link associated metadata
+                clem_img_stk.associated_metadata = clem_metadata
+                clem_img_stk.parent_series = clem_img_series
+                clem_img_stk.channel_name = channel
+                murfey_db.add(clem_img_stk)
                 murfey_db.commit()
 
-            clem_img_stk.associated_metadata = clem_metadata
-            clem_img_stk.parent_series = clem_img_series
-            clem_img_stk.channel_name = result.channel
-            murfey_db.add(clem_img_stk)
-            murfey_db.commit()
+                # Register parent TIFF files iteratively for each channel
+                for file in result.parent_tiffs[channel]:
+                    clem_tiff_file: CLEMTIFFFile = get_db_entry(
+                        db=murfey_db,
+                        table=CLEMTIFFFile,
+                        session_id=session_id,
+                        file_path=file,
+                    )
+
+                    # Link associated metadata
+                    clem_tiff_file.associated_metadata = clem_metadata
+                    clem_tiff_file.child_series = clem_img_series
+                    clem_tiff_file.child_stack = clem_img_stk
+                    murfey_db.add(clem_tiff_file)
+                    murfey_db.commit()
 
             clem_img_series.associated_metadata = clem_metadata
             clem_img_series.number_of_members = result.number_of_members
@@ -308,30 +301,18 @@ def register_tiff_preprocessing_result(
 
             logger.info(
                 f"TIFF preprocessing results registered for {result.series_name!r} "
-                f"{result.channel!r} image stack"
             )
 
         except Exception:
             logger.error(
                 "Exception encountered when registering TIFF preprocessing result for "
-                f"{result.series_name!r} {result.channel!r} image stack: \n"
+                f"{result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
             return False
 
-        # Load all image stacks associated with current series from database
+        # Load instrument name
         try:
-            image_stacks = [
-                Path(row)
-                for row in murfey_db.exec(
-                    select(CLEMImageStack.file_path).where(
-                        CLEMImageStack.series_id == clem_img_series.id
-                    )
-                ).all()
-            ]
-            logger.debug(
-                f"Found the following images: {[str(file) for file in image_stacks]}"
-            )
             instrument_name = (
                 murfey_db.exec(
                     select(MurfeySession).where(MurfeySession.id == session_id)
@@ -346,20 +327,12 @@ def register_tiff_preprocessing_result(
             )
             return False
 
-        # Check if all image stacks for this series are accounted for
-        if not len(image_stacks) == clem_img_series.number_of_members:
-            logger.info(
-                f"Members of the series {result.series_name!r} are still missing; "
-                "the next stage of processing will not be triggered yet"
-            )
-            return True
-
         # Request for next stage of processing if all members are present
         cluster_response = submit_cluster_request(
             session_id=session_id,
             instrument_name=instrument_name,
             series_name=result.series_name,
-            images=image_stacks,
+            images=list(result.output_files.values()),
             metadata=result.metadata,
             crop_to_n_frames=processing_params.crop_to_n_frames,
             align_self=processing_params.align_self,
