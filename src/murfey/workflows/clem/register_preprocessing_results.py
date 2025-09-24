@@ -327,27 +327,44 @@ def register_tiff_preprocessing_result(
             )
             return False
 
-        # Request for next stage of processing if all members are present
-        cluster_response = submit_cluster_request(
-            session_id=session_id,
-            instrument_name=instrument_name,
-            series_name=result.series_name,
-            images=list(result.output_files.values()),
-            metadata=result.metadata,
-            crop_to_n_frames=processing_params.crop_to_n_frames,
-            align_self=processing_params.align_self,
-            flatten=processing_params.flatten,
-            align_across=processing_params.align_across,
-            messenger=_transport_object,
-        )
-        if cluster_response is False:
-            logger.error(
-                "Error requesting align-and-merge processing job for "
-                f"{result.series_name!r} series"
+        # Construct list of files to use for image alignment and merging steps
+        image_combos_to_process = [
+            list(result.output_files.values())  # Composite image of all channels
+        ]
+        # Create additional job for fluorescent-only composite image if fluorescent channels are present
+        if ("gray" in result.output_files.keys()) and len(result.output_files) > 1:
+            image_combos_to_process.append(
+                [
+                    file
+                    for channel, file in result.output_files.items()
+                    if channel != "gray"
+                ]
             )
-            return False
+
+        # Request for image alignment and processing for the requested combinations
+        for image_combo in image_combos_to_process:
+            try:
+                submit_cluster_request(
+                    session_id=session_id,
+                    instrument_name=instrument_name,
+                    series_name=result.series_name,
+                    images=image_combo,
+                    metadata=result.metadata,
+                    crop_to_n_frames=processing_params.crop_to_n_frames,
+                    align_self=processing_params.align_self,
+                    flatten=processing_params.flatten,
+                    align_across=processing_params.align_across,
+                    messenger=_transport_object,
+                )
+            except Exception:
+                logger.error(
+                    "Error requesting image alignment and merging job for "
+                    f"{result.series_name!r} series",
+                    exc_info=True,
+                )
+                return False
         logger.info(
-            "Successfully requested align-and-merge processing job for "
+            "Successfully requested image alignment and merging job for "
             f"{result.series_name!r} series"
         )
         return True
