@@ -55,7 +55,7 @@ def zocalo_cluster_request(
 
         # Construct recipe and submit it for processing
         recipe = {
-            "recipes": ["clem-tiff-to-stack"],
+            "recipes": ["clem-process-raw-tiffs"],
             "parameters": {
                 # Job parameters
                 "tiff_list": "null",
