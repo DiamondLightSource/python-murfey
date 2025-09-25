@@ -267,7 +267,7 @@ class CLEMContext(Context):
                 # Post the message and log any errors that arise
                 tiff_dataset = {
                     "series_name": series_name,
-                    "tiff_files": self._tiff_series[series_name],
+                    "tiff_files": self._tiff_series[series_name][0:1],
                     "series_metadata": self._series_metadata[series_name],
                 }
                 post_result = self.process_tiff_series(tiff_dataset, environment)
