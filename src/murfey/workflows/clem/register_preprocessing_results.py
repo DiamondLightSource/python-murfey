@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import traceback
 from pathlib import Path
 from typing import Literal, Optional
@@ -114,7 +115,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
             murfey_db.commit()
 
             # Iteratively register the output image stacks
-            for channel, output_file in result.output_files.items():
+            for c, (channel, output_file) in enumerate(result.output_files.items()):
                 clem_img_stk: CLEMImageStack = get_db_entry(
                     db=murfey_db,
                     table=CLEMImageStack,
@@ -133,8 +134,27 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
 
                 # Register and link parent TIFF files if present
                 if result.parent_tiffs:
-                    tiff_files_to_register = []
-                    for file in result.parent_tiffs[channel]:
+                    seed_file = result.parent_tiffs[channel][0]
+                    if c == 0:
+                        # Load list of files to register from seed file
+                        series_identifier = seed_file.stem.split("--")[0] + "--"
+                        tiff_list = list(
+                            seed_file.parent.glob(f"{series_identifier}--")
+                        )
+
+                    # Load TIFF files by colour channel if "--C" in file stem
+                    match = re.search(r"--C[\d]{2,3}", seed_file.stem)
+                    tiff_file_subset = [
+                        file
+                        for file in tiff_list
+                        if file.stem.startswith(series_identifier)
+                        and (match.group(0) in file.stem if match else True)
+                    ]
+                    tiff_file_subset.sort()
+
+                    # Register TIFF file subset
+                    clem_tiff_files = []
+                    for file in tiff_file_subset:
                         clem_tiff_file: CLEMTIFFFile = get_db_entry(
                             db=murfey_db,
                             table=CLEMTIFFFile,
@@ -146,8 +166,10 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
                         clem_tiff_file.associated_metadata = clem_metadata
                         clem_tiff_file.child_series = clem_img_series
                         clem_tiff_file.child_stack = clem_img_stk
-                        tiff_files_to_register.append(clem_tiff_file)
-                    murfey_db.add_all(tiff_files_to_register)
+
+                        clem_tiff_files.append(clem_tiff_file)
+
+                    murfey_db.add_all(clem_tiff_files)
                     murfey_db.commit()
 
             logger.info(
