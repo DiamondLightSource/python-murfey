@@ -610,7 +610,7 @@ class TomographyContext(Context):
                 if (
                     server_config.get("superres")
                     and superres_binning == 1
-                    and environment.superres
+                    and not environment.superres
                 ):
                     binning_factor = 2
                 ps_from_mag = (
