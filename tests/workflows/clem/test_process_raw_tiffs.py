@@ -80,7 +80,7 @@ def test_zocalo_cluster_request(
         ]
     )
     sent_recipe = {
-        "recipes": ["clem-tiff-to-stack"],
+        "recipes": ["clem-process-raw-tiffs"],
         "parameters": {
             # Job parameters
             "tiff_list": "null",

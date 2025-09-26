@@ -48,7 +48,7 @@ def zocalo_cluster_request(
 
         # Construct recipe and submit it for processing
         recipe = {
-            "recipes": ["clem-lif-to-stack"],
+            "recipes": ["clem-process-raw-lifs"],
             "parameters": {
                 # Job parameters
                 "lif_file": f"{str(file)}",

@@ -6,7 +6,6 @@ the CLEM workflow should be processed.
 import logging
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
-from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
@@ -146,58 +145,40 @@ class CLEMContext(Context):
 
             # Process TIF/TIFF files
             if transferred_file.suffix in (".tif", ".tiff"):
-
-                # Files should be named "PositionX--ZXX--CXX.tif" by default
-                # If Position is repeated, it will add an additional --00X to the end
-                if len(transferred_file.stem.split("--")) not in [3, 4]:
+                # CLEM TIFF files will have "--Stage", "--C", and/or "--Z" in their file stem
+                if not any(
+                    pattern in transferred_file.stem
+                    for pattern in ("--Stage", "--Z", "--C")
+                ):
                     logger.warning(
                         f"File {transferred_file.name!r} is likely not part of the CLEM workflow"
                     )
                     return False
-
                 logger.debug(
                     f"File {transferred_file.name!r} is part of a TIFF image series"
                 )
 
                 # Create a unique name for the series
-                # For standard file name
-                if len(transferred_file.stem.split("--")) == 3:
-                    series_name = "--".join(
-                        [
-                            *destination_file.parent.parts[
-                                -2:
-                            ],  # Upper 2 parent directories
-                            destination_file.stem.split("--")[0],
-                        ]
-                    )
-                # When this a repeated position
-                elif len(transferred_file.stem.split("--")) == 4:
-                    series_name = "--".join(
-                        [
-                            *destination_file.parent.parts[
-                                -2:
-                            ],  # Upper 2 parent directories
-                            "--".join(
-                                destination_file.stem.split("--")[i] for i in [0, -1]
-                            ),
-                        ]
-                    )
-                else:
-                    logger.error(
-                        f"Series name could not be generated from file {transferred_file.name!r}"
-                    )
-                    return False
-                logger.debug(
-                    f"File {transferred_file.name!r} given the series name {series_name!r}"
+                series_name = "--".join(
+                    [
+                        *destination_file.parent.parts[
+                            -2:
+                        ],  # Upper 2 parent directories
+                        destination_file.stem.split("--")[0].replace(" ", "_"),
+                    ]
                 )
 
                 # Create key-value pairs containing empty list if not already present
                 if series_name not in self._tiff_series.keys():
                     self._tiff_series[series_name] = []
+                    logger.debug(
+                        f"Created new dictionary entry for TIFF series {series_name!r}"
+                    )
+
                 # Append information to list
                 self._tiff_series[series_name].append(str(destination_file))
                 logger.debug(
-                    f"Created TIFF file dictionary entries for {series_name!r}"
+                    f"File {transferred_file.name!r} added to series {series_name!r}"
                 )
 
                 # Register the TIFF file in the database
@@ -231,32 +212,30 @@ class CLEMContext(Context):
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
                 series_name = "--".join(
-                    [*destination_file.parent.parent.parts[-2:], destination_file.stem]
+                    [
+                        *destination_file.parent.parent.parts[-2:],
+                        destination_file.stem.replace(" ", "_"),
+                    ]
                 )  # The previous 2 parent directories should be unique enough
-                logger.debug(
-                    f"File {transferred_file.name!r} given the series name {series_name!r}"
-                )
 
                 # Extract metadata to get the expected size of the series
                 metadata = parse(transferred_file).getroot()
                 metadata = _get_image_elements(metadata)[0]
 
                 # Get channel and dimension information
-                channels = metadata.findall(
-                    "Data/Image/ImageDescription/Channels/ChannelDescription"
-                )
-                dimensions = metadata.findall(
-                    "Data/Image/ImageDescription/Dimensions/DimensionDescription"
-                )
+                channels = metadata.findall(".//ChannelDescription")
+                dimensions = metadata.findall(".//DimensionDescription")
 
                 # Calculate expected number of files for this series
                 num_channels = len(channels)
-                num_frames = (
-                    int(dimensions[2].attrib["NumberOfElements"])
-                    if len(dimensions) > 2
-                    else 1
-                )
-                num_files = num_channels * num_frames
+                num_frames = 1
+                num_tiles = 1
+                for dim in dimensions:
+                    if dim.attrib["DimID"] == "3":
+                        num_frames = int(dim.attrib["NumberOfElements"])
+                    if dim.attrib["DimID"] == "10":
+                        num_tiles = int(dim.attrib["NumberOfElements"])
+                num_files = num_channels * num_frames * num_tiles
                 logger.debug(
                     f"Expected number of files in {series_name!r}: {num_files}"
                 )
@@ -264,10 +243,9 @@ class CLEMContext(Context):
                 # Update dictionary entries
                 self._files_in_series[series_name] = num_files
                 self._series_metadata[series_name] = str(destination_file)
-                logger.debug(f"Created dictionary entries for {series_name!r} metadata")
-
-                # A new copy of the metadata file is created in 'processed', so no need
-                # to register this instance of it
+                logger.debug(
+                    f"File {transferred_file.name!r} added to series {series_name!r}"
+                )
 
             # Post message if all files for the associated series have been collected
             # .get(series_name, 0) returns 0 if no associated key is found
@@ -281,7 +259,7 @@ class CLEMContext(Context):
                 return True
             elif len(
                 self._tiff_series.get(series_name, [])
-            ) == self._files_in_series.get(series_name, 0):
+            ) >= self._files_in_series.get(series_name, 0):
                 logger.debug(
                     f"Collected expected number of TIFF files for series {series_name!r}; posting job to server"
                 )
@@ -289,13 +267,18 @@ class CLEMContext(Context):
                 # Post the message and log any errors that arise
                 tiff_dataset = {
                     "series_name": series_name,
-                    "tiff_files": self._tiff_series[series_name],
+                    "tiff_files": self._tiff_series[series_name][0:1],
                     "series_metadata": self._series_metadata[series_name],
                 }
                 post_result = self.process_tiff_series(tiff_dataset, environment)
                 if post_result is False:
                     return False
                 logger.info(f"Started preprocessing of TIFF series {series_name!r}")
+
+                # Clean up memory after posting
+                del self._tiff_series[series_name]
+                del self._series_metadata[series_name]
+                del self._files_in_series[series_name]
             else:
                 logger.debug(f"TIFF series {series_name!r} is still being processed")
 
@@ -361,7 +344,7 @@ class CLEMContext(Context):
                 function_name="register_lif_file",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"lif_file": quote(str(lif_file), safe="")},
+                data={"lif_file": str(lif_file)},
             )
             return True
         except Exception as e:
@@ -387,7 +370,7 @@ class CLEMContext(Context):
                 function_name="process_raw_lifs",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"lif_file": quote(str(lif_file), safe="")},
+                data={"lif_file": str(lif_file)},
             )
             return True
         except Exception as e:
@@ -411,7 +394,7 @@ class CLEMContext(Context):
                 function_name="register_tiff_file",
                 token=self._token,
                 session_id=environment.murfey_session,
-                data={"tiff_file": quote(str(tiff_file), safe="")},
+                data={"tiff_file": str(tiff_file)},
             )
             return True
         except Exception as e:

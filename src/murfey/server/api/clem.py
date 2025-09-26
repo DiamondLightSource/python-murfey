@@ -204,13 +204,6 @@ class LifInfo(BaseModel):
     child_stacks: list[Path] = []
 
 
-class TiffInfo(BaseModel):
-    tiff_file: Path
-    associated_metadata: Optional[Path] = None
-    associated_series: Optional[str] = None
-    associated_stack: Optional[Path] = None
-
-
 @router.post("/sessions/{session_id}/clem/lif_files")
 def register_lif_file(
     lif_file: LifInfo,
@@ -312,6 +305,13 @@ def register_lif_file(
     db.commit()
     db.close()
     return True
+
+
+class TiffInfo(BaseModel):
+    tiff_file: Path
+    associated_metadata: Optional[Path] = None
+    associated_series: Optional[str] = None
+    associated_stack: Optional[Path] = None
 
 
 @router.post("/sessions/{session_id}/clem/tiff_files")
