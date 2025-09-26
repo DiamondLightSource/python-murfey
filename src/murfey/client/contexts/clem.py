@@ -274,6 +274,11 @@ class CLEMContext(Context):
                 if post_result is False:
                     return False
                 logger.info(f"Started preprocessing of TIFF series {series_name!r}")
+
+                # Clean up memory after posting
+                del self._tiff_series[series_name]
+                del self._series_metadata[series_name]
+                del self._files_in_series[series_name]
             else:
                 logger.debug(f"TIFF series {series_name!r} is still being processed")
 
