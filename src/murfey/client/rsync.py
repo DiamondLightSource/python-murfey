@@ -79,6 +79,7 @@ class RSyncer(Observer):
         self._notify = notify
         self._finalised = False
         self._end_time = end_time
+        self._finalising = False
 
         self._skipped_files: List[Path] = []
 
@@ -199,7 +200,8 @@ class RSyncer(Observer):
         self.stop()
         self._remove_files = True
         self._notify = False
-        self._end_time = datetime.now()
+        self._end_time = None
+        self._finalising = True
         if thread:
             self.thread = threading.Thread(
                 name=f"RSync finalisation {self._basepath}:{self._remote}",
@@ -330,6 +332,9 @@ class RSyncer(Observer):
             ]
             self._skipped_files.extend(set(infiles).difference(set(files)))
             num_skipped_files = len(set(infiles).difference(set(files)))
+        elif self._finalising:
+            files = [f for f in infiles if f.is_file() and f not in self._skipped_files]
+            num_skipped_files = 0
         else:
             files = [f for f in infiles if f.is_file()]
             num_skipped_files = 0
