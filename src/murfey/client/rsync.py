@@ -186,7 +186,7 @@ class RSyncer(Observer):
         if self.thread.is_alive():
             self.queue.put(None)
             self.thread.join()
-        logger.debug("RSync thread stop completed")
+        logger.debug("RSync thread successfully stopped")
 
     def request_stop(self):
         self._stopping = True
@@ -286,7 +286,6 @@ class RSyncer(Observer):
                 continue
 
         self._stop_callback(self._basepath, explicit_stop=self._stopping)
-        logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:
         previously_transferred = self._files_transferred

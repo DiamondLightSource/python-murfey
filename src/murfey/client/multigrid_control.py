@@ -145,7 +145,10 @@ class MultigridController:
                 w.thread.is_alive() for w in self._environment.watchers.values()
             )
             log.debug(
-                f"Dormancy check: rsyncers {rsyncers_finalised}, analysers {not analysers_alive}, watchers {not watchers_alive}"
+                "Dormancy check: \n"
+                f"  rsyncers: {rsyncers_finalised} \n"
+                f"  analysers: {not analysers_alive} \n"
+                f"  watchers: {not watchers_alive}"
             )
             return rsyncers_finalised and not analysers_alive and not watchers_alive
         log.debug(f"Multigrid watcher for session {self.session_id} is still active")
