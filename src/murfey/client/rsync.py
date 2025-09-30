@@ -79,6 +79,7 @@ class RSyncer(Observer):
         self._notify = notify
         self._finalised = False
         self._end_time = end_time
+        self._finalising = False
 
         self._skipped_files: List[Path] = []
 
@@ -185,7 +186,7 @@ class RSyncer(Observer):
         if self.thread.is_alive():
             self.queue.put(None)
             self.thread.join()
-        logger.debug("RSync thread stop completed")
+        logger.debug("RSync thread successfully stopped")
 
     def request_stop(self):
         self._stopping = True
@@ -199,7 +200,8 @@ class RSyncer(Observer):
         self.stop()
         self._remove_files = True
         self._notify = False
-        self._end_time = datetime.now()
+        self._end_time = None
+        self._finalising = True
         if thread:
             self.thread = threading.Thread(
                 name=f"RSync finalisation {self._basepath}:{self._remote}",
@@ -284,7 +286,6 @@ class RSyncer(Observer):
                 continue
 
         self._stop_callback(self._basepath, explicit_stop=self._stopping)
-        logger.info("RSync thread finished")
 
     def _fake_transfer(self, files: list[Path]) -> bool:
         previously_transferred = self._files_transferred
@@ -330,6 +331,9 @@ class RSyncer(Observer):
             ]
             self._skipped_files.extend(set(infiles).difference(set(files)))
             num_skipped_files = len(set(infiles).difference(set(files)))
+        elif self._finalising:
+            files = [f for f in infiles if f.is_file() and f not in self._skipped_files]
+            num_skipped_files = 0
         else:
             files = [f for f in infiles if f.is_file()]
             num_skipped_files = 0
