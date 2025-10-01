@@ -119,7 +119,7 @@ async def process_gain(
 
 class FractionationParameters(BaseModel):
     fractionation: int
-    dose_per_frame: float
+    dose_per_frame: Optional[float] = None
     num_frames: int = 0
     eer_path: Optional[str] = None
     fractionation_file_name: str = "eer_fractionation.txt"
@@ -160,6 +160,7 @@ async def write_eer_fractionation_file(
         )
     ).all()
     if session_parameters:
+        fractionation_params.dose_per_frame = session_parameters[0].dose_per_frame
         fractionation_params.fractionation = session_parameters[0].eer_fractionation
         session_parameters[0].eer_fractionation_file = str(file_path)
         db.add(session_parameters[0])
@@ -167,6 +168,10 @@ async def write_eer_fractionation_file(
 
     if file_path.is_file():
         return {"eer_fractionation_file": str(file_path)}
+
+    if not fractionation_params.dose_per_frame:
+        logger.error("EER fractionation dose not set")
+        return {"eer_fractionation_file": None}
 
     if fractionation_params.num_frames:
         num_eer_frames = fractionation_params.num_frames
