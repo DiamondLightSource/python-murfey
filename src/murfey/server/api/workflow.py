@@ -869,6 +869,7 @@ def register_tilt_series_for_rerun(
     ).all()
     for ts in tilt_series_db:
         ts.processing_requested = False
+        ts.tilt_series_length = -1
         db.add(ts)
     db.commit()
 

@@ -267,10 +267,11 @@ class TomographyContext(Context):
                     [str(file_transferred_to), tilt_angle]
                 ]
         if tilt_series in self._completed_tilt_series:
-            logger.info(
+            logger.warning(
                 f"Tilt series {tilt_series} was previously thought complete but now {file_path} has been seen"
             )
             self._completed_tilt_series.remove(tilt_series)
+            self._tilt_series_sizes[tilt_series] = 0
             rerun_data = {
                 "session_id": environment.murfey_session,
                 "tag": tilt_series,
