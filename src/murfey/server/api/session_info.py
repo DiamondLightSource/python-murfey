@@ -43,6 +43,7 @@ from murfey.util.db import (
     ProcessingJob,
     RsyncInstance,
     Session,
+    SessionProcessingParameters,
     SPAFeedbackParameters,
     SPARelionParameters,
     Tilt,
@@ -257,6 +258,16 @@ def update_current_gain_ref(
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     session.current_gain_ref = new_gain_ref.path
     db.add(session)
+
+    session_processing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if session_processing_parameters:
+        session_processing_parameters[0].gain_ref = new_gain_ref.path
+        db.add(session_processing_parameters[0])
+
     db.commit()
 
 
