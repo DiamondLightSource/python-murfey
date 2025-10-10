@@ -3,8 +3,10 @@ CLI to generate a manifest of the FastAPI router paths present in both the instr
 server and backend server to enable lookup of the URLs based on function name.
 """
 
+import contextlib
 import importlib
 import inspect
+import io
 import pkgutil
 from argparse import ArgumentParser
 from pathlib import Path
@@ -28,6 +30,43 @@ class PrettierDumper(yaml.Dumper):
         return super(PrettierDumper, self).increase_indent(flow, indentless=False)
 
 
+def prettier_str_representer(dumper, data):
+    """
+    Helper function to format strings according to Prettier's standards:
+    - No quoting unless it can be misinterpreted as another data type
+    - When quoting, use double quotes unless string already contains double quotes
+    """
+
+    def is_implicitly_resolved(value: str) -> bool:
+        for (
+            first_char,
+            resolvers,
+        ) in yaml.resolver.Resolver.yaml_implicit_resolvers.items():
+            if first_char is None or (value and value[0] in first_char):
+                for resolver in resolvers:
+                    if len(resolver) == 3:
+                        _, regexp, _ = resolver
+                    else:
+                        _, regexp = resolver
+                    if regexp.match(value):
+                        return True
+        return False
+
+    # If no quoting is needed, use default plain style
+    if not is_implicitly_resolved(data):
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data)
+
+    # If the string already contains double quotes, fall back to single quotes
+    if '"' in data and "'" not in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="'")
+
+    # Otherwise, prefer double quotes
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style='"')
+
+
+PrettierDumper.add_representer(str, prettier_str_representer)
+
+
 def find_routers(name: str) -> dict[str, APIRouter]:
 
     def _extract_routers_from_module(module: ModuleType):
@@ -41,34 +80,36 @@ def find_routers(name: str) -> dict[str, APIRouter]:
 
     routers = {}
 
-    # Import the module or package
-    try:
-        root = importlib.import_module(name)
-    except ImportError:
-        raise ImportError(
-            f"Cannot import '{name}'. Please ensure that you've installed all the "
-            "dependencies for the client, instrument server, and backend server "
-            "before running this command."
-        )
+    # Silence output during import and only return messages if imports fail
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+        # Import the module or package
+        try:
+            root = importlib.import_module(name)
+        except Exception as e:
+            captured_logs = buffer.getvalue().strip()
+            message = f"Cannot import '{name}': {e}"
+            if captured_logs:
+                message += f"\n--- Captured output ---\n{captured_logs}"
+            raise ImportError(message) from e
 
-    # If it's a package, walk through submodules and extract routers from each
-    if hasattr(root, "__path__"):
-        module_list = pkgutil.walk_packages(root.__path__, prefix=name + ".")
-        for _, module_name, _ in module_list:
-            try:
-                module = importlib.import_module(module_name)
-            except ImportError:
-                raise ImportError(
-                    f"Cannot import '{module_name}'. Please ensure that you've "
-                    "installed all the dependencies for the client, instrument "
-                    "server, and backend server before running this command."
-                )
+        # If it's a package, walk through submodules and extract routers from each
+        if hasattr(root, "__path__"):
+            module_list = pkgutil.walk_packages(root.__path__, prefix=name + ".")
+            for _, module_name, _ in module_list:
+                try:
+                    module = importlib.import_module(module_name)
+                except Exception as e:
+                    captured_logs = buffer.getvalue().strip()
+                    message = f"Cannot import '{name}': {e}"
+                    if captured_logs:
+                        message += f"\n--- Captured output ---\n{captured_logs}"
+                    raise ImportError(message) from e
+                routers.update(_extract_routers_from_module(module))
 
-            routers.update(_extract_routers_from_module(module))
-
-    # Extract directly from single module
-    else:
-        routers.update(_extract_routers_from_module(root))
+        # Extract directly from single module
+        else:
+            routers.update(_extract_routers_from_module(root))
 
     return routers
 
