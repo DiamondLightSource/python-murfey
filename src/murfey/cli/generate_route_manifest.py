@@ -17,6 +17,17 @@ from fastapi import APIRouter
 import murfey
 
 
+class PrettierDumper(yaml.Dumper):
+    """
+    Custom YAML Dumper class that sets `indentless` to False. This generates a YAML
+    file that is then compliant with Prettier's formatting style
+    """
+
+    def increase_indent(self, flow=False, indentless=False):
+        # Force 'indentless=False' so list items align with Prettier
+        return super(PrettierDumper, self).increase_indent(flow, indentless=False)
+
+
 def find_routers(name: str) -> dict[str, APIRouter]:
 
     def _extract_routers_from_module(module: ModuleType):
@@ -138,7 +149,14 @@ def run():
     murfey_dir = Path(murfey.__path__[0])
     manifest_file = murfey_dir / "util" / "route_manifest.yaml"
     with open(manifest_file, "w") as file:
-        yaml.dump(manifest, file, default_flow_style=False, sort_keys=False)
+        yaml.dump(
+            manifest,
+            file,
+            Dumper=PrettierDumper,
+            default_flow_style=False,
+            sort_keys=False,
+            indent=2,
+        )
     print(
         "Route manifest for instrument and backend servers saved to "
         f"{str(manifest_file)!r}"
