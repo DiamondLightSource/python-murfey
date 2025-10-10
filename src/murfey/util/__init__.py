@@ -31,12 +31,9 @@ def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
     for p, part in enumerate(in_path.parts):
         if p == 0 and ":" in part:
             secured_parts.append(secure_filename(part) + ":")
-            continue  # Skip subsequent conditions and move to next part
-        if keep_spaces:
-            if " " in part:
-                secured_parts.append(part)
-                continue  # Skip subsequent conditions and move to next part
-        if part.endswith("_"):
+        elif " " in part and keep_spaces:
+            secured_parts.append(part)
+        elif part.endswith("_"):
             # Preserve all trailing underscores
             num_underscores = len(part) - len(part.rstrip("_"))
             secured_parts.append(secure_filename(part) + (num_underscores * "_"))
