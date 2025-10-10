@@ -121,10 +121,11 @@ def url_path_for(
                 )
                 logger.error(message)
                 raise KeyError(message)
-            # Skip complicated type resolution for now
+            # Skip complicated type resolution
             if param_type.startswith("typing."):
                 continue
-            elif type(kwargs[param_name]).__name__ not in param_type:
+            # Validate incoming type against allowed ones
+            if type(kwargs[param_name]).__name__ not in param_type:
                 message = (
                     f"Error validating parameters for {function_name!r}; "
                     f"{param_name!r} must be {param_type!r}, "
