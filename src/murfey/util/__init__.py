@@ -27,24 +27,18 @@ def sanitise_nonpath(in_string: str) -> str:
 
 
 def secure_path(in_path: Path, keep_spaces: bool = False) -> Path:
-    if keep_spaces:
-        secured_parts = []
-        for p, part in enumerate(in_path.parts):
-            if " " in part:
-                secured_parts.append(part)
-            elif ":" in part and not p:
-                secured_parts.append(secure_filename(part) + ":")
-            else:
-                secured_parts.append(secure_filename(part))
-    else:
-        secured_parts = [
-            (
-                secure_filename(part) + ":"
-                if p == 0 and ":" in part
-                else secure_filename(part)
-            )
-            for p, part in enumerate(in_path.parts)
-        ]
+    secured_parts = []
+    for p, part in enumerate(in_path.parts):
+        if p == 0 and ":" in part:
+            secured_parts.append(secure_filename(part) + ":")
+        elif " " in part and keep_spaces:
+            secured_parts.append(part)
+        elif part.endswith("_"):
+            # Preserve all trailing underscores
+            num_underscores = len(part) - len(part.rstrip("_"))
+            secured_parts.append(secure_filename(part) + (num_underscores * "_"))
+        else:
+            secured_parts.append(secure_filename(part))
     return Path("/".join(secured_parts))
 
 
