@@ -136,14 +136,3 @@ def url_path_for(
 
     # Render and return the path
     return render_path(route_path, kwargs)
-
-
-if __name__ == "__main__":
-    # Run test on some existing routes
-    url_path = url_path_for(
-        "workflow.tomo_router",
-        "register_tilt",
-        visit_name="nt15587-15",
-        session_id=2,
-    )
-    print(url_path)
