@@ -14,9 +14,9 @@ from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
-from murfey.server.api.auth import MurfeyInstrumentNameFrontend as MurfeyInstrumentName
-from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
 from murfey.server.api.auth import (
+    MurfeyInstrumentNameFrontend as MurfeyInstrumentName,
+    MurfeySessionIDFrontend as MurfeySessionID,
     create_access_token,
     instrument_server_tokens,
     oauth2_scheme,

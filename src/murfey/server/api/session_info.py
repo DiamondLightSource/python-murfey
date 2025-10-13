@@ -12,24 +12,21 @@ from werkzeug.utils import secure_filename
 import murfey.server.api.websocket as ws
 from murfey.server import _transport_object
 from murfey.server.api import templates
-from murfey.server.api.auth import MurfeyInstrumentNameFrontend as MurfeyInstrumentName
-from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
-from murfey.server.api.auth import validate_token
-from murfey.server.api.shared import get_foil_hole as _get_foil_hole
+from murfey.server.api.auth import (
+    MurfeyInstrumentNameFrontend as MurfeyInstrumentName,
+    MurfeySessionIDFrontend as MurfeySessionID,
+    validate_token,
+)
 from murfey.server.api.shared import (
+    get_foil_hole as _get_foil_hole,
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
-)
-from murfey.server.api.shared import get_grid_squares as _get_grid_squares
-from murfey.server.api.shared import (
+    get_grid_squares as _get_grid_squares,
     get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
-)
-from murfey.server.api.shared import (
     get_machine_config_for_instrument,
     get_upstream_tiff_dirs,
     remove_session_by_id,
 )
-from murfey.server.ispyb import DB as ispyb_db
-from murfey.server.ispyb import get_all_ongoing_visits
+from murfey.server.ispyb import DB as ispyb_db, get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import MachineConfig, get_machine_config

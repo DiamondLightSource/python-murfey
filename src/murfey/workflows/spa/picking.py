@@ -25,9 +25,10 @@ from murfey.util.db import (
     ParticleSizes,
     ProcessingJob,
     SelectionStash,
+    Session as MurfeySession,
+    SPAFeedbackParameters,
+    SPARelionParameters,
 )
-from murfey.util.db import Session as MurfeySession
-from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.processing_params import default_spa_parameters
 
 logger = getLogger("murfey.workflows.spa.picking")

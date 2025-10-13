@@ -24,8 +24,8 @@ from murfey.util.db import (
     CLEMImageStack,
     CLEMLIFFile,
     CLEMTIFFFile,
+    Session as MurfeySession,
 )
-from murfey.util.db import Session as MurfeySession
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")

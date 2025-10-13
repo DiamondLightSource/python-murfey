@@ -23,8 +23,7 @@ from typing_extensions import Annotated
 from murfey.server.murfey_db import murfey_db, url
 from murfey.util.api import url_path_for
 from murfey.util.config import get_security_config
-from murfey.util.db import MurfeyUser as User
-from murfey.util.db import Session as MurfeySession
+from murfey.util.db import MurfeyUser as User, Session as MurfeySession
 
 # Set up logger
 logger = getLogger("murfey.server.api.auth")

@@ -24,8 +24,8 @@ from murfey.util.db import (
     CLEMImageStack,
     CLEMLIFFile,
     CLEMTIFFFile,
+    Session as MurfeySession,
 )
-from murfey.util.db import Session as MurfeySession
 from murfey.util.processing_params import (
     default_clem_align_and_merge_parameters as processing_params,
 )

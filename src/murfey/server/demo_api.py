@@ -22,8 +22,10 @@ from werkzeug.utils import secure_filename
 import murfey.server.api.bootstrap
 import murfey.server.prometheus as prom
 from murfey.server.api import templates
-from murfey.server.api.auth import MurfeySessionIDFrontend as MurfeySessionID
-from murfey.server.api.auth import validate_token
+from murfey.server.api.auth import (
+    MurfeySessionIDFrontend as MurfeySessionID,
+    validate_token,
+)
 from murfey.server.api.session_info import Visit
 from murfey.server.api.workflow import (
     DCGroupParameters,

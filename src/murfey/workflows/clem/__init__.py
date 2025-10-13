@@ -15,8 +15,8 @@ from murfey.util.db import (
     CLEMImageStack,
     CLEMLIFFile,
     CLEMTIFFFile,
+    Session as MurfeySession,
 )
-from murfey.util.db import Session as MurfeySession
 
 logger = logging.getLogger("murfey.workflows.clem")
 

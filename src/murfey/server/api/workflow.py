@@ -26,8 +26,10 @@ except ImportError:
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
-from murfey.server.api.auth import validate_instrument_token
+from murfey.server.api.auth import (
+    MurfeySessionIDInstrument as MurfeySessionID,
+    validate_instrument_token,
+)
 from murfey.server.feedback import (
     _murfey_id,
     check_tilt_series_mc,
@@ -36,8 +38,7 @@ from murfey.server.feedback import (
     get_job_ids,
     get_tomo_proc_params,
 )
-from murfey.server.ispyb import DB as ispyb_db
-from murfey.server.ispyb import get_proposal_id
+from murfey.server.ispyb import DB as ispyb_db, get_proposal_id
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config

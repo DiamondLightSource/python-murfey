@@ -8,9 +8,12 @@ from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.server.gain import Camera
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config
-from murfey.util.db import DataCollectionGroup, SearchMap
-from murfey.util.db import Session as MurfeySession
-from murfey.util.db import TiltSeries
+from murfey.util.db import (
+    DataCollectionGroup,
+    SearchMap,
+    Session as MurfeySession,
+    TiltSeries,
+)
 from murfey.util.models import BatchPositionParameters, SearchMapParameters
 
 logger = logging.getLogger("murfey.client.util.tomo_metadata")
