@@ -9,7 +9,7 @@ import requests
 from rich.console import Console
 from rich.prompt import Confirm
 
-from murfey.client import read_config
+from murfey.util.client import read_config
 from murfey.util.api import url_path_for
 from murfey.util.config import MachineConfig
 
