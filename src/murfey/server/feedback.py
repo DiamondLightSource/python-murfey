@@ -1151,6 +1151,34 @@ def _resize_intial_model(
     executables: Dict[str, str],
     env: Dict[str, str],
 ) -> None:
+    with mrcfile.open(input_path) as input_mrc:
+        input_size_x = input_mrc.nx
+        input_size_y = input_mrc.ny
+        input_size_z = input_mrc.nz
+    if executables.get("clip") and not input_size_x == input_size_y == input_size_z:
+        # If the initial model is not a cube, do some padding
+        clip_proc = subprocess.run(
+            [
+                f"{executables['clip']}",
+                "resize",
+                "-ox",
+                str(max(input_size_x, input_size_y, input_size_z)),
+                "-oy",
+                str(max(input_size_x, input_size_y, input_size_z)),
+                "-oz",
+                str(max(input_size_x, input_size_y, input_size_z)),
+                str(input_path),
+                str(input_path.with_suffix("_cube.mrc")),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        input_path = input_path.with_suffix("_cube.mrc")
+        if clip_proc.returncode:
+            logger.error(
+                f"Clipping initial model {input_path} failed \n {clip_proc.stdout}"
+            )
     if executables.get("relion_image_handler"):
         comp_proc = subprocess.run(
             [
@@ -1167,6 +1195,9 @@ def _resize_intial_model(
             capture_output=True,
             text=True,
             env=env,
+        )
+        logger.info(
+            f"Initial model rescaling finished with code {comp_proc.returncode}"
         )
         with mrcfile.open(output_path) as rescaled_mrc:
             rescaled_mrc.header.cella = (
@@ -1223,7 +1254,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
         if not rescaled_initial_model_path.is_file():
             _resize_intial_model(
                 *_downscaled_box_size(
-                    message["particle_diameter"],
+                    relion_options["particle_diameter"],
                     relion_options["angpix"],
                 ),
                 provided_initial_model,
