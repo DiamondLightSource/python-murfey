@@ -13,7 +13,7 @@ def test_run(
     mock_exit = mocker.patch("builtins.exit")
 
     # Run the function with its args
-    sys.argv = ["--debug"]
+    sys.argv = ["", "--debug"]
     run()
 
     # Check that the final print message and exit() are called
