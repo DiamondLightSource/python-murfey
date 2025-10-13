@@ -1012,7 +1012,7 @@ class DestinationSelect(Screen):
                                     name_root += st
                                 if dest_num:
                                     dest = str(
-                                        dest_path.parent / f"{name_root}{dest_num+1}"
+                                        dest_path.parent / f"{name_root}{dest_num + 1}"
                                     )
                                 else:
                                     dest = str(dest_path.parent / f"{name_root}2")

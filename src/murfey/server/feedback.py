@@ -1266,7 +1266,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
             other_options["initial_model"] = str(rescaled_initial_model_path)
             next_job = feedback_params.next_job
             class3d_dir = (
-                f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+                f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
             )
             feedback_params.next_job += 1
             _db.add(feedback_params)
@@ -1305,7 +1305,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
         # For the first batch, start a container and set the database to wait
         next_job = feedback_params.next_job
         class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
         class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
         class_uuids = _murfey_id(message["program_id"], _db, number=4)

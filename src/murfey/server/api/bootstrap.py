@@ -308,7 +308,7 @@ def parse_cygwin_request(
         raise ValueError(f"{request_path!r} is not a valid request path")
 
     try:
-        url = f'{find_cygwin_mirror()}{quote(request_path, safe="/")}'
+        url = f"{find_cygwin_mirror()}{quote(request_path, safe='/')}"
     except Exception:
         raise HTTPException(
             status_code=503, detail="Could not identify a suitable Cygwin mirror"
@@ -533,7 +533,7 @@ def get_msys2_environment_index(
         raise ValueError(f"{system!r} is not a valid msys2 environment")
 
     # Construct URL to main MSYS repo and get response
-    arch_url = f'{msys2_url}/{quote(system, safe="/")}'
+    arch_url = f"{msys2_url}/{quote(system, safe='/')}"
     response = http_session.get(arch_url)
 
     # Parse and rewrite package index content
@@ -579,7 +579,7 @@ def get_msys2_package_index(
 
     # Construct URL to main MSYS repo and get response
     package_list_url = (
-        f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}'
+        f"{msys2_url}/{quote(system, safe='/')}/{quote(environment, safe='/')}"
     )
     response = http_session.get(package_list_url)
     return Response(
@@ -617,7 +617,7 @@ def get_msys2_package_file(
         raise ValueError(f"{package!r} is not a valid package name")
 
     # Construct URL to main MSYS repo and get response
-    package_url = f'{msys2_url}/{quote(system, safe="/")}/{quote(environment, safe="/")}/{quote(package, safe="/")}'
+    package_url = f"{msys2_url}/{quote(system, safe='/')}/{quote(environment, safe='/')}/{quote(package, safe='/')}"
     response = http_session.get(package_url)
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code)
