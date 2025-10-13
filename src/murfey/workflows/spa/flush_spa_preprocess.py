@@ -430,9 +430,9 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
             },
         }
         if _transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = _transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                _transport_object.feedback_queue
+            )
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )

@@ -173,7 +173,6 @@ def run():
             / str(ppath.stem + "_motion_corrected.mrc")
         )
         if proc_params:
-
             detached_ids = [c.id for c in collected_ids]
 
             if not mrc_out.parent.exists():

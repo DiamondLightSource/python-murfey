@@ -68,7 +68,6 @@ PrettierDumper.add_representer(str, prettier_str_representer)
 
 
 def find_routers(name: str) -> dict[str, APIRouter]:
-
     def _extract_routers_from_module(module: ModuleType):
         routers = {}
         for name, obj in inspect.getmembers(module):
@@ -115,7 +114,6 @@ def find_routers(name: str) -> dict[str, APIRouter]:
 
 
 def get_route_manifest(routers: dict[str, APIRouter]):
-
     manifest = {}
 
     for router_name, router in routers.items():

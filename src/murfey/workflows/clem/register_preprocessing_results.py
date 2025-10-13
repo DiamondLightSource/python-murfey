@@ -57,7 +57,6 @@ class CLEMPreprocessingResult(BaseModel):
 
 
 def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
-
     session_id: int = (
         int(message["session_id"])
         if not isinstance(message["session_id"], int)

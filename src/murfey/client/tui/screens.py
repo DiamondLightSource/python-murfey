@@ -193,7 +193,6 @@ class LaunchScreen(Screen):
         self._context = SPAModularContext
 
     def compose(self):
-
         machine_data = capture_get(
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",

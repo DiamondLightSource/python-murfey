@@ -147,7 +147,7 @@ def validate_session_against_visit(session_id: int, visit: str):
 
 
 async def validate_instrument_token(
-    token: Annotated[str, Depends(instrument_oauth2_scheme)]
+    token: Annotated[str, Depends(instrument_oauth2_scheme)],
 ):
     """
     Used by the backend routers to check the incoming instrument server token.
@@ -334,7 +334,6 @@ def validate_user(username: str, password: str) -> bool:
 
 
 def create_access_token(data: dict, token: str = "") -> str:
-
     # If authenticating with password, auth URL needs a 'mint_session_token' endpoint
     if security_config.auth_type == "password":
         if auth_url and data.get("session"):
@@ -420,6 +419,6 @@ async def mint_session_token(session_id: MurfeySessionIDFrontend, db=murfey_db):
 
 @router.get("/validate_token")
 async def simple_token_validation(
-    token: Annotated[str, Depends(validate_instrument_token)]
+    token: Annotated[str, Depends(validate_instrument_token)],
 ):
     return {"valid": True}

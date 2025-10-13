@@ -435,7 +435,6 @@ async def request_spa_preprocessing(
         )
         foil_hole_id = None
     if proc_params:
-
         detached_ids = [c.id for c in collected_ids]
 
         murfey_ids = _murfey_id(detached_ids[3], db, number=2, close=False)
@@ -494,9 +493,9 @@ async def request_spa_preprocessing(
         }
         # log.info(f"Sending Zocalo message {zocalo_message}")
         if _transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = _transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                _transport_object.feedback_queue
+            )
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(
@@ -723,9 +722,9 @@ async def request_tomography_preprocessing(
             },
         }
         if _transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = _transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                _transport_object.feedback_queue
+            )
             _transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(

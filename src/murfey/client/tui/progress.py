@@ -71,7 +71,6 @@ class BlockProgressBar(rich.progress_bar.ProgressBar):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-
         width = min(self.width or options.max_width, options.max_width)
         ascii = options.ascii_only
         if self.pulse:

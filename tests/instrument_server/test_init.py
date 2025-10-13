@@ -37,7 +37,6 @@ def test_check_for_updates(
     test_params: tuple[str],
     mocker: MockerFixture,
 ):
-
     # Unpack test params
     (bump_client_version,) = test_params
 
@@ -136,7 +135,6 @@ start_instrument_server_test_matrix = (
 def test_start_instrument_server(
     mocker: MockerFixture, test_params: tuple[Optional[str], Optional[int]]
 ):
-
     # Unpack test params
     host, port = test_params
 

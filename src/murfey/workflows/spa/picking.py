@@ -154,9 +154,9 @@ def _register_picked_particles_use_diameter(
                     "recipes": ["em-spa-extract"],
                 }
                 if _transport_object:
-                    zocalo_message["parameters"][
-                        "feedback_queue"
-                    ] = _transport_object.feedback_queue
+                    zocalo_message["parameters"]["feedback_queue"] = (
+                        _transport_object.feedback_queue
+                    )
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
@@ -194,9 +194,9 @@ def _register_picked_particles_use_diameter(
                 "recipes": ["em-spa-extract"],
             }
             if _transport_object:
-                zocalo_message["parameters"][
-                    "feedback_queue"
-                ] = _transport_object.feedback_queue
+                zocalo_message["parameters"]["feedback_queue"] = (
+                    _transport_object.feedback_queue
+                )
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
@@ -316,9 +316,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         "recipes": ["em-spa-extract"],
     }
     if _transport_object:
-        zocalo_message["parameters"][
-            "feedback_queue"
-        ] = _transport_object.feedback_queue
+        zocalo_message["parameters"]["feedback_queue"] = (
+            _transport_object.feedback_queue
+        )
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     _db.close()
 
