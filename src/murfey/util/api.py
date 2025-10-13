@@ -121,10 +121,11 @@ def url_path_for(
                 )
                 logger.error(message)
                 raise KeyError(message)
-            # Skip complicated type resolution for now
+            # Skip complicated type resolution
             if param_type.startswith("typing."):
                 continue
-            elif type(kwargs[param_name]).__name__ not in param_type:
+            # Validate incoming type against allowed ones
+            if type(kwargs[param_name]).__name__ not in param_type:
                 message = (
                     f"Error validating parameters for {function_name!r}; "
                     f"{param_name!r} must be {param_type!r}, "
@@ -135,14 +136,3 @@ def url_path_for(
 
     # Render and return the path
     return render_path(route_path, kwargs)
-
-
-if __name__ == "__main__":
-    # Run test on some existing routes
-    url_path = url_path_for(
-        "workflow.tomo_router",
-        "register_tilt",
-        visit_name="nt15587-15",
-        session_id=2,
-    )
-    print(url_path)

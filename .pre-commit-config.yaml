@@ -1,6 +1,18 @@
 # YAML formatting specifications: https://yaml.org/spec/1.2.2/
 
 repos:
+  # Generate up-to-date Murfey route manifest
+  # NOTE: This will only work if Murfey is installed in the current Python environment
+  - repo: local
+    hooks:
+      - id: generate-route-manifest
+        name: Generating Murfey route manifest
+        entry: murfey.generate_route_manifest
+        language: system
+        # Only run if FastAPI router-related modules are changed
+        files: ^src/murfey/(instrument_server/.+\.py|server/(main|api/.+)\.py)$
+        pass_filenames: false
+
   # Syntax validation and some basic sanity checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0 # Released 2023-10-09
