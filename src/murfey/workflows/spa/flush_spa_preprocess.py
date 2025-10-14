@@ -20,9 +20,10 @@ from murfey.util.db import (
     Movie,
     PreprocessStash,
     ProcessingJob,
+    Session as MurfeySession,
+    SPAFeedbackParameters,
+    SPARelionParameters,
 )
-from murfey.util.db import Session as MurfeySession
-from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
 from murfey.util.processing_params import cryolo_model_path, default_spa_parameters
 from murfey.util.spa_metadata import (
@@ -430,9 +431,9 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
             },
         }
         if _transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = _transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                _transport_object.feedback_queue
+            )
             _transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )

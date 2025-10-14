@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,9 +25,9 @@ feedback_queue = "murfey_feedback"
 
 # Align and merge settings
 crop_to_n_frames = 20
-align_self = "enabled"
-flatten = "max"
-align_across = "enabled"
+align_self: Literal["enabled", ""] = "enabled"
+flatten: Literal["mean", "min", "max", ""] = "max"
+align_across: Literal["enabled", ""] = "enabled"
 
 
 @pytest.fixture
@@ -38,7 +39,6 @@ def processed_dir(tmp_path: Path):
 
 @pytest.fixture
 def image_stacks(processed_dir: Path):
-
     image_dir = processed_dir / area_name / series_name
     image_dir.mkdir(parents=True, exist_ok=True)
 
@@ -52,7 +52,6 @@ def image_stacks(processed_dir: Path):
 
 @pytest.fixture
 def metadata(processed_dir: Path):
-
     metadata_dir = processed_dir / area_name / series_name / "metadata"
     metadata_dir.mkdir(parents=True, exist_ok=True)
 
@@ -70,7 +69,6 @@ def test_submit_cluster_request(
     metadata: Path,
     processed_dir: Path,
 ):
-
     # Construct the long series name
     series_name_long = "--".join(
         image_stacks[0].parent.relative_to(processed_dir).parts

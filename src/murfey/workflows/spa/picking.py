@@ -25,9 +25,10 @@ from murfey.util.db import (
     ParticleSizes,
     ProcessingJob,
     SelectionStash,
+    Session as MurfeySession,
+    SPAFeedbackParameters,
+    SPARelionParameters,
 )
-from murfey.util.db import Session as MurfeySession
-from murfey.util.db import SPAFeedbackParameters, SPARelionParameters
 from murfey.util.processing_params import default_spa_parameters
 
 logger = getLogger("murfey.workflows.spa.picking")
@@ -154,9 +155,9 @@ def _register_picked_particles_use_diameter(
                     "recipes": ["em-spa-extract"],
                 }
                 if _transport_object:
-                    zocalo_message["parameters"][
-                        "feedback_queue"
-                    ] = _transport_object.feedback_queue
+                    zocalo_message["parameters"]["feedback_queue"] = (
+                        _transport_object.feedback_queue
+                    )
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
@@ -194,9 +195,9 @@ def _register_picked_particles_use_diameter(
                 "recipes": ["em-spa-extract"],
             }
             if _transport_object:
-                zocalo_message["parameters"][
-                    "feedback_queue"
-                ] = _transport_object.feedback_queue
+                zocalo_message["parameters"]["feedback_queue"] = (
+                    _transport_object.feedback_queue
+                )
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
@@ -316,9 +317,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         "recipes": ["em-spa-extract"],
     }
     if _transport_object:
-        zocalo_message["parameters"][
-            "feedback_queue"
-        ] = _transport_object.feedback_queue
+        zocalo_message["parameters"]["feedback_queue"] = (
+            _transport_object.feedback_queue
+        )
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     _db.close()
 

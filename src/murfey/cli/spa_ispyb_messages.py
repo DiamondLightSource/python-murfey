@@ -14,8 +14,7 @@ from ispyb.sqlalchemy._auto_db_schema import (
     DataCollectionGroup,
     ProcessingJob,
 )
-from sqlmodel import Session as MurfeySession
-from sqlmodel import create_engine, select
+from sqlmodel import Session as MurfeySession, create_engine, select
 
 from murfey.client.contexts.spa import _get_xml_list_index
 from murfey.server.feedback import _murfey_id, _register

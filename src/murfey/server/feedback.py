@@ -390,9 +390,9 @@ def _release_2d_hold(message: dict, _db):
         _db.commit()
         _db.close()
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -466,9 +466,9 @@ def _release_3d_hold(message: dict, _db):
             "recipes": ["em-spa-class3d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -547,9 +547,9 @@ def _release_refine_hold(message: dict, _db):
             "recipes": ["em-spa-refine"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -662,9 +662,9 @@ def _register_incomplete_2d_batch(message: dict, _db, demo: bool = False):
         "recipes": ["em-spa-class2d"],
     }
     if murfey.server._transport_object:
-        zocalo_message["parameters"][
-            "feedback_queue"
-        ] = murfey.server._transport_object.feedback_queue
+        zocalo_message["parameters"]["feedback_queue"] = (
+            murfey.server._transport_object.feedback_queue
+        )
         murfey.server._transport_object.send(
             "processing_recipe", zocalo_message, new_connection=True
         )
@@ -825,9 +825,9 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-class2d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -894,9 +894,9 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-class2d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -984,9 +984,9 @@ def _flush_class2d(
             "recipes": ["em-spa-class2d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1266,7 +1266,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
             other_options["initial_model"] = str(rescaled_initial_model_path)
             next_job = feedback_params.next_job
             class3d_dir = (
-                f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+                f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
             )
             feedback_params.next_job += 1
             _db.add(feedback_params)
@@ -1305,7 +1305,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
         # For the first batch, start a container and set the database to wait
         next_job = feedback_params.next_job
         class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job+1):03}"
+            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
         class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
         class_uuids = _murfey_id(message["program_id"], _db, number=4)
@@ -1351,9 +1351,9 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-class3d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1394,9 +1394,9 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-class3d"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1512,9 +1512,9 @@ def _flush_tomography_preprocessing(message: dict, _db):
             f"Launching tomography preprocessing with Zocalo message: {zocalo_message}"
         )
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1695,9 +1695,9 @@ def _register_refinement(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-refine"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
@@ -1818,9 +1818,9 @@ def _register_bfactors(message: dict, _db, demo: bool = False):
             "recipes": ["em-spa-bfactor"],
         }
         if murfey.server._transport_object:
-            zocalo_message["parameters"][
-                "feedback_queue"
-            ] = murfey.server._transport_object.feedback_queue
+            zocalo_message["parameters"]["feedback_queue"] = (
+                murfey.server._transport_object.feedback_queue
+            )
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )

@@ -24,8 +24,8 @@ from murfey.util.db import (
     CLEMImageStack,
     CLEMLIFFile,
     CLEMTIFFFile,
+    Session as MurfeySession,
 )
-from murfey.util.db import Session as MurfeySession
 
 # Set up logger
 logger = getLogger("murfey.server.api.clem")
@@ -409,7 +409,6 @@ def register_clem_metadata(
     associated_stacks: list[Path] = [],
     db: Session = murfey_db,
 ):
-
     # Return database entry if it already exists
     try:
         clem_metadata: CLEMImageMetadata = get_db_entry(

@@ -12,10 +12,8 @@ from ispyb.sqlalchemy import BLSession, ExperimentType, Person, Proposal, url
 from sqlalchemy import Engine, RootTransaction, and_, create_engine, event, select
 from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from sqlalchemy.orm import Session as SQLAlchemySession
-from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session as SQLModelSession
-from sqlmodel import SQLModel
+from sqlalchemy.orm import Session as SQLAlchemySession, sessionmaker
+from sqlmodel import Session as SQLModelSession, SQLModel
 
 from murfey.util.db import Session as MurfeySession
 

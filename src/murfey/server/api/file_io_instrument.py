@@ -8,10 +8,14 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
-from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
-from murfey.server.api.auth import validate_instrument_token
-from murfey.server.api.file_io_shared import GainReference
-from murfey.server.api.file_io_shared import process_gain as _process_gain
+from murfey.server.api.auth import (
+    MurfeySessionIDInstrument as MurfeySessionID,
+    validate_instrument_token,
+)
+from murfey.server.api.file_io_shared import (
+    GainReference,
+    process_gain as _process_gain,
+)
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config

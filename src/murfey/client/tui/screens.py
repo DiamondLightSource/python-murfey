@@ -193,7 +193,6 @@ class LaunchScreen(Screen):
         self._context = SPAModularContext
 
     def compose(self):
-
         machine_data = capture_get(
             base_url=str(self.app._environment.url.geturl()),
             router_name="session_control.router",
@@ -1013,7 +1012,7 @@ class DestinationSelect(Screen):
                                     name_root += st
                                 if dest_num:
                                     dest = str(
-                                        dest_path.parent / f"{name_root}{dest_num+1}"
+                                        dest_path.parent / f"{name_root}{dest_num + 1}"
                                     )
                                 else:
                                     dest = str(dest_path.parent / f"{name_root}2")

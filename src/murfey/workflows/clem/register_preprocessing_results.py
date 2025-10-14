@@ -24,8 +24,8 @@ from murfey.util.db import (
     CLEMImageStack,
     CLEMLIFFile,
     CLEMTIFFFile,
+    Session as MurfeySession,
 )
-from murfey.util.db import Session as MurfeySession
 from murfey.util.processing_params import (
     default_clem_align_and_merge_parameters as processing_params,
 )
@@ -57,7 +57,6 @@ class CLEMPreprocessingResult(BaseModel):
 
 
 def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
-
     session_id: int = (
         int(message["session_id"])
         if not isinstance(message["session_id"], int)

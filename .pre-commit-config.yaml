@@ -45,53 +45,15 @@ repos:
         name: Formatting the pyproject.toml file
         additional_dependencies: ["tox>=4.9"]
 
-  # Automatic source code formatting
-  - repo: https://github.com/psf/black
-    rev: 24.3.0 # Released 2024-03-15
+  # Format and lint using Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
     hooks:
-      - id: black
-        name: Formatting Python scripts according to Black
-        args: [--safe, --quiet]
-
-  # Automatically sort imports
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2 # Released 2023-12-13
-    hooks:
-      - id: isort
-        name: Tidying Python imports via Isort
-        args: [
-            #'-a', 'from __future__ import annotations',        # 3.7-3.11
-            "--rm",
-            "from __future__ import absolute_import", # -3.0
-            "--rm",
-            "from __future__ import division", # -3.0
-            "--rm",
-            "from __future__ import generator_stop", # -3.7
-            "--rm",
-            "from __future__ import generators", # -2.3
-            "--rm",
-            "from __future__ import nested_scopes", # -2.2
-            "--rm",
-            "from __future__ import print_function", # -3.0
-            "--rm",
-            "from __future__ import unicode_literals", # -3.0
-            "--rm",
-            "from __future__ import with_statement", # -2.6
-          ]
-
-  # Linting
-  - repo: https://github.com/PyCQA/flake8
-    # Release history: https://flake8.pycqa.org/en/latest/release-notes/index.html
-    rev: 7.0.0 # Released 2024-01-05
-    hooks:
-      - id: flake8
-        name: Running Flake8 linter on Python files
-        additional_dependencies: [
-            # Added Flake8-pyproject plugin for .toml compatibility
-            "Flake8-pyproject==1.2.3", # Released 2023-03-21
-            # flake8-comprehensions URL: https://github.com/adamchainz/flake8-comprehensions
-            "flake8-comprehensions==3.14.0", # Released 2023-07-10
-          ]
+      - id: ruff
+        name: Running Ruff linter
+        args: ["--fix"]
+      - id: ruff-format
+        name: Running Ruff formatter
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy

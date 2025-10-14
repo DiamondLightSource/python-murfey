@@ -232,7 +232,9 @@ class Observer:
         listeners = (
             self._secondary_listeners
             if secondary
-            else self._final_listeners if final else self._listeners
+            else self._final_listeners
+            if final
+            else self._listeners
         )
         for notify_function in listeners:
             result = notify_function(*args, **kwargs)
@@ -253,7 +255,9 @@ class Observer:
         listeners = (
             self._secondary_listeners
             if secondary
-            else self._final_listeners if final else self._listeners
+            else self._final_listeners
+            if final
+            else self._listeners
         )
         for notify_function in listeners:
             result = notify_function(*args, **kwargs)

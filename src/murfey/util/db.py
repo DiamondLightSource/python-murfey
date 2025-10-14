@@ -195,7 +195,6 @@ class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
 
 
 class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
-
     id: Optional[int] = Field(default=None, primary_key=True)
     file_path: str = Field(index=True)  # Full path to metadata file
 

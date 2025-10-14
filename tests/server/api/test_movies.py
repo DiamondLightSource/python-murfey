@@ -15,7 +15,6 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry
 def test_movie_count(
     murfey_db_session: Session,  # From conftest.py
 ):
-
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
         murfey_db_session,

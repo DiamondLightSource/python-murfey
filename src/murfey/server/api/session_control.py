@@ -13,23 +13,20 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
-from murfey.server.api.auth import validate_instrument_token
-from murfey.server.api.shared import get_foil_hole as _get_foil_hole
+from murfey.server.api.auth import (
+    MurfeySessionIDInstrument as MurfeySessionID,
+    validate_instrument_token,
+)
 from murfey.server.api.shared import (
+    get_foil_hole as _get_foil_hole,
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
-)
-from murfey.server.api.shared import get_grid_squares as _get_grid_squares
-from murfey.server.api.shared import (
+    get_grid_squares as _get_grid_squares,
     get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
-)
-from murfey.server.api.shared import (
     get_machine_config_for_instrument,
     get_upstream_tiff_dirs,
     remove_session_by_id,
 )
-from murfey.server.ispyb import DB as ispyb_db
-from murfey.server.ispyb import get_all_ongoing_visits
+from murfey.server.ispyb import DB as ispyb_db, get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import MachineConfig, get_machine_config
@@ -57,8 +54,6 @@ from murfey.util.models import (
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
-)
-from murfey.workflows.spa.flush_spa_preprocess import (
     register_grid_square as _register_grid_square,
 )
 from murfey.workflows.tomo.tomo_metadata import (

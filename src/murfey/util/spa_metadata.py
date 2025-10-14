@@ -49,7 +49,9 @@ def foil_hole_from_file(f: Path) -> int:
     return int(f.name.split("_")[1])
 
 
-def get_grid_square_atlas_positions(xml_path: Path, grid_square: str = "") -> Dict[
+def get_grid_square_atlas_positions(
+    xml_path: Path, grid_square: str = ""
+) -> Dict[
     str,
     Tuple[
         Optional[int],

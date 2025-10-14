@@ -8,9 +8,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from murfey.instrument_server.api import _get_murfey_url
-from murfey.instrument_server.api import router as client_router
-from murfey.instrument_server.api import validate_session_token
+from murfey.instrument_server.api import (
+    _get_murfey_url,
+    router as client_router,
+    validate_session_token,
+)
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
 

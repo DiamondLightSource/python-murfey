@@ -54,7 +54,6 @@ def test_zocalo_cluster_request(
     metadata: Path,
     raw_dir: Path,
 ):
-
     # Create a mock tranpsort object
     mock_transport = MagicMock(spec=TransportManager)
     mock_transport.feedback_queue = feedback_queue

@@ -706,7 +706,6 @@ def get_session_id(
     visit_number: str,
     db: Session | None,
 ) -> int | None:
-
     # Log received lookup parameters
     log.debug(
         "Looking up ISPyB BLSession ID using the following values:\n"
