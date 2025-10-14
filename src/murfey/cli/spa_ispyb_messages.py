@@ -363,7 +363,7 @@ def run():
         small_boxsize=metadata["small_boxsize"],
         mask_diameter=metadata["mask_diameter"],
     )
-    feedback_params = db.SPAFeedbackParameters(
+    feedback_params = db.ClassificationFeedbackParameters(
         pj_id=collected_ids[2].id,
         estimate_particle_diameter=not bool(metadata["particle_diameter"]),
         hold_class2d=False,

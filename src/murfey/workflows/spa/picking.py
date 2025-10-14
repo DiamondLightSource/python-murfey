@@ -17,6 +17,7 @@ from murfey.server.feedback import (
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     CtfParameters,
     DataCollection,
     Movie,
@@ -26,7 +27,6 @@ from murfey.util.db import (
     ProcessingJob,
     SelectionStash,
     Session as MurfeySession,
-    SPAFeedbackParameters,
     SPARelionParameters,
 )
 from murfey.util.processing_params import default_spa_parameters
@@ -78,7 +78,9 @@ def _register_picked_particles_use_diameter(
         ).one()
         relion_options = dict(relion_params)
         feedback_params = _db.exec(
-            select(SPAFeedbackParameters).where(SPAFeedbackParameters.pj_id == pj_id)
+            select(ClassificationFeedbackParameters).where(
+                ClassificationFeedbackParameters.pj_id == pj_id
+            )
         ).one()
 
         particle_diameter = relion_params.particle_diameter
@@ -263,7 +265,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         select(SPARelionParameters).where(SPARelionParameters.pj_id == pj_id)
     ).one()
     feedback_params = _db.exec(
-        select(SPAFeedbackParameters).where(SPAFeedbackParameters.pj_id == pj_id)
+        select(ClassificationFeedbackParameters).where(
+            ClassificationFeedbackParameters.pj_id == pj_id
+        )
     ).one()
 
     if feedback_params.picker_ispyb_id is None and _transport_object:
@@ -448,8 +452,9 @@ def particles_picked(message: dict, murfey_db: Session) -> bool:
     murfey_db.add(movie)
     murfey_db.commit()
     feedback_params = murfey_db.exec(
-        select(SPAFeedbackParameters).where(
-            SPAFeedbackParameters.pj_id == _pj_id(message["program_id"], murfey_db)
+        select(ClassificationFeedbackParameters).where(
+            ClassificationFeedbackParameters.pj_id
+            == _pj_id(message["program_id"], murfey_db)
         )
     ).one()
     if feedback_params.estimate_particle_diameter:

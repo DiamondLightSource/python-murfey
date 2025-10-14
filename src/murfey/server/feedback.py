@@ -313,13 +313,15 @@ def _pj_id(app_id: int, _db, recipe: str = "") -> int:
 
 def _get_spa_params(
     app_id: int, _db
-) -> Tuple[db.SPARelionParameters, db.SPAFeedbackParameters]:
+) -> Tuple[db.SPARelionParameters, db.ClassificationFeedbackParameters]:
     pj_id = _pj_id(app_id, _db, recipe="em-spa-preprocess")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
     ).one()
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(db.SPAFeedbackParameters.pj_id == pj_id)
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id
+        )
     ).one()
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
@@ -412,8 +414,8 @@ def _release_3d_hold(message: dict, _db):
         )
     ).one()
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     class3d_params = _db.exec(
@@ -490,8 +492,8 @@ def _release_refine_hold(message: dict, _db):
         )
     ).one()
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     refine_params = _db.exec(
@@ -582,8 +584,8 @@ def _register_incomplete_2d_batch(message: dict, _db, demo: bool = False):
         )
     ).one()
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     if feedback_params.hold_class2d:
@@ -706,8 +708,8 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
         )
     ).one()
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     _db.expunge(relion_params)
@@ -913,7 +915,7 @@ def _flush_class2d(
     app_id: int,
     _db,
     relion_params: db.SPARelionParameters | None = None,
-    feedback_params: db.SPAFeedbackParameters | None = None,
+    feedback_params: db.ClassificationFeedbackParameters | None = None,
 ):
     instrument_name = (
         _db.exec(select(db.Session).where(db.Session.id == session_id))
@@ -934,8 +936,8 @@ def _flush_class2d(
         _db.expunge(relion_params)
     if not feedback_params:
         feedback_params = _db.exec(
-            select(db.SPAFeedbackParameters).where(
-                db.SPAFeedbackParameters.pj_id == pj_id_params
+            select(db.ClassificationFeedbackParameters).where(
+                db.ClassificationFeedbackParameters.pj_id == pj_id_params
             )
         ).one()
         _db.expunge(feedback_params)
@@ -1012,8 +1014,8 @@ def _register_class_selection(message: dict, _db, demo: bool = False):
     ).all()
     # Add the class selection score to the database
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     _db.expunge(feedback_params)
@@ -1233,8 +1235,8 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
     ).one()
     relion_options = dict(relion_params)
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     other_options = dict(feedback_params)
@@ -1411,8 +1413,8 @@ def _register_initial_model(message: dict, _db, demo: bool = False):
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     # Add the initial model file to the database
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     feedback_params.initial_model = message.get("initial_model")
@@ -1578,8 +1580,8 @@ def _register_refinement(message: dict, _db, demo: bool = False):
     ).one()
     relion_options = dict(relion_params)
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
     other_options = dict(feedback_params)
@@ -1726,8 +1728,8 @@ def _register_bfactors(message: dict, _db, demo: bool = False):
     ).one()
     relion_options = dict(relion_params)
     feedback_params = _db.exec(
-        select(db.SPAFeedbackParameters).where(
-            db.SPAFeedbackParameters.pj_id == pj_id_params
+        select(db.ClassificationFeedbackParameters).where(
+            db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
 
@@ -2289,7 +2291,7 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     eer_fractionation_file=message["eer_fractionation_file"],
                     symmetry=message["symmetry"],
                 )
-                feedback_params = db.SPAFeedbackParameters(
+                feedback_params = db.ClassificationFeedbackParameters(
                     pj_id=collected_ids[2].id,
                     estimate_particle_diameter=True,
                     hold_class2d=False,
