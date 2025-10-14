@@ -82,8 +82,8 @@ default_spa_parameters = SPAParameters()
 
 
 class TomographyParameters(BaseModel):
-    batch_size_2d: int = 50000
-    nr_picks_before_diameter: int = 10000
+    batch_size_2d: int = 10000
+    nr_classes_2d: int = 5
 
 
 default_tomo_parameters = TomographyParameters()

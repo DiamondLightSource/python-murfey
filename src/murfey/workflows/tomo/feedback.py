@@ -7,9 +7,15 @@ from sqlmodel import Session, select
 from murfey.server import _transport_object
 from murfey.server.feedback import _app_id, _murfey_id
 from murfey.util.config import get_machine_config
-from murfey.util.db import AutoProcProgram, DataCollection, ParticleSizes, ProcessingJob
-from murfey.util.db import Session as MurfeySession
-from murfey.util.db import TomogramPicks, TomographyProcessingParameters
+from murfey.util.db import (
+    AutoProcProgram,
+    DataCollection,
+    ParticleSizes,
+    ProcessingJob,
+    Session as MurfeySession,
+    TomogramPicks,
+    TomographyProcessingParameters,
+)
 from murfey.util.processing_params import default_tomo_parameters
 
 logger = getLogger("murfey.workflows.tomo.feedback")
@@ -58,7 +64,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
     picking_db_len = _db.exec(
         select(func.count(ParticleSizes.id)).where(ParticleSizes.pj_id == pj_id)
     ).one()
-    if picking_db_len > default_tomo_parameters.nr_picks_before_diameter:
+    if picking_db_len > default_tomo_parameters.batch_size_2d:
         # If there are enough particles to get a diameter
         instrument_name = (
             _db.exec(
@@ -112,16 +118,17 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                         "session_id": message["session_id"],
                         "autoproc_program_id": _app_id(pj_id, _db),
                         "batch_size": default_tomo_parameters.batch_size_2d,
+                        "nr_classes": default_tomo_parameters.nr_classes_2d,
                         "picker_id": None,
                         "class2d_grp_uuid": class2d_grp_uuid,
                         "class_uuids": class_uuids,
                     },
-                    "recipes": ["em-spa-extract"],
+                    "recipes": ["em-tomo-class2d"],
                 }
                 if _transport_object:
-                    zocalo_message["parameters"][
-                        "feedback_queue"
-                    ] = _transport_object.feedback_queue
+                    zocalo_message["parameters"]["feedback_queue"] = (
+                        _transport_object.feedback_queue
+                    )
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
@@ -144,6 +151,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(pj_id, _db),
                     "batch_size": default_tomo_parameters.batch_size_2d,
+                    "nr_classes": default_tomo_parameters.nr_classes_2d,
                     "picker_id": None,
                     "class2d_grp_uuid": class2d_grp_uuid,
                     "class_uuids": class_uuids,
@@ -151,9 +159,9 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                 "recipes": ["em-tomo-class2d"],
             }
             if _transport_object:
-                zocalo_message["parameters"][
-                    "feedback_queue"
-                ] = _transport_object.feedback_queue
+                zocalo_message["parameters"]["feedback_queue"] = (
+                    _transport_object.feedback_queue
+                )
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
