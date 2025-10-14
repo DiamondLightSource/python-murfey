@@ -817,7 +817,7 @@ class UpstreamDownloads(Screen):
                 stream_response = capture_get(
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="session_control.correlative_router",
-                    function_name="get_tiff",
+                    function_name="get_tiff_file",
                     token=token,
                     visit_name=event.button.label,
                     session_id=self.app._environment.murfey_session,
