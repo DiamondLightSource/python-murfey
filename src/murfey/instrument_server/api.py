@@ -490,7 +490,7 @@ def gather_upstream_tiffs(
     )
     for tiff_path in upstream_tiff_paths:
         tiff_data = requests.get(
-            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff', session_id=session_id, visit_name=sanitised_visit_name, tiff_path=tiff_path)}",
+            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff_file', session_id=session_id, visit_name=sanitised_visit_name, tiff_path=tiff_path)}",
             stream=True,
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
         )

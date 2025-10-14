@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from sqlmodel import select
+from sqlmodel.orm.session import Session as SQLModelSession
 from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
@@ -16,7 +17,7 @@ from murfey.util.db import (
     GridSquare,
     ProcessingJob,
     RsyncInstance,
-    Session,
+    Session as MurfeySession,
 )
 
 logger = logging.getLogger("murfey.server.api.shared")
@@ -32,9 +33,9 @@ def get_machine_config_for_instrument(instrument_name: str) -> Optional[MachineC
 
 
 def remove_session_by_id(session_id: int, db):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     sessions_for_visit = db.exec(
-        select(Session).where(Session.visit == session.visit)
+        select(MurfeySession).where(MurfeySession.visit == session.visit)
     ).all()
     # Don't remove prometheus metrics if there are other sessions using them
     if len(sessions_for_visit) == 1:
@@ -145,6 +146,24 @@ def get_foil_hole(session_id: int, fh_name: int, db) -> Dict[str, int]:
     return {f[1].tag: f[0].id for f in foil_holes}
 
 
+def find_upstream_visits(session_id: int, db: SQLModelSession):
+    murfey_session = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    upstream_visits = {}
+    # Iterates through provided upstream directories
+    for p in machine_config.upstream_data_directories:
+        # Looks for visit name in file path
+        for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
+            upstream_visits[v.name] = v / machine_config.processed_directory_name
+    return upstream_visits
+
+
 def get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
     tiff_dirs = []
     machine_config = get_machine_config(instrument_name=instrument_name)[
@@ -161,3 +180,49 @@ def get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
             f"No candidate directory found for upstream download from visit {sanitise(visit_name)}"
         )
     return tiff_dirs
+
+
+def gather_upstream_tiffs(visit_name: str, session_id: int, db: SQLModelSession):
+    """
+    Looks for TIFF files associated with the current session in the permitted storage
+    servers, and returns their relative file paths as a list.
+    """
+    instrument_name = (
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
+    )
+    upstream_tiff_paths = []
+    tiff_dirs = get_upstream_tiff_dirs(visit_name, instrument_name)
+    if not tiff_dirs:
+        return None
+    for tiff_dir in tiff_dirs:
+        for f in tiff_dir.glob("**/*.tiff"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+        for f in tiff_dir.glob("**/*.tif"):
+            upstream_tiff_paths.append(str(f.relative_to(tiff_dir)))
+    return upstream_tiff_paths
+
+
+def get_tiff_file(
+    visit_name: str, session_id: int, tiff_path: str, db: SQLModelSession
+):
+    instrument_name = (
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
+    )
+    tiff_dirs = get_upstream_tiff_dirs(visit_name, instrument_name)
+    if not tiff_dirs:
+        return None
+
+    tiff_path = "/".join(secure_filename(p) for p in tiff_path.split("/"))
+    for tiff_dir in tiff_dirs:
+        tiff_file = tiff_dir / tiff_path
+        if tiff_file.is_file():
+            break
+    else:
+        logger.warning(f"TIFF {tiff_path} not found")
+        return None
+
+    return tiff_file
