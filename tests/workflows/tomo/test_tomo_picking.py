@@ -89,8 +89,6 @@ def test_picked_tomogram_run_class2d(
     mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    mock_ids.return_value = [2, 1]
-
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
         murfey_db_session,
@@ -142,6 +140,8 @@ def test_picked_tomogram_run_class2d(
                 "particle_size": 100,
             },
         )
+
+    mock_ids.return_value = [dcg_entry.id, 1]
 
     message = {
         "session_id": 1,
