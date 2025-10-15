@@ -144,7 +144,7 @@ def test_picked_tomogram_run_class2d(
         )
 
     message = {
-        "session_id": 11,
+        "session_id": 1,
         "program_id": 0,
         "cbox_3d": f"{tmp_path}/AutoPick/job007/CBOX_3d/sample.cbox",
         "particle_count": 2,
