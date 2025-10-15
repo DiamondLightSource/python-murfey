@@ -70,7 +70,7 @@ def test_picked_tomogram_not_run_class2d(
     assert tomograms_db.tomogram == message["tomogram"]
     assert tomograms_db.cbox_3d == message["cbox_3d"]
     assert tomograms_db.particle_count == 2
-    assert tomograms_db.pixel_size == 5.3
+    assert tomograms_db.tomogram_pixel_size == 5.3
 
     added_picks = murfey_db_session.exec(
         select(ParticleSizes).where(ParticleSizes.pj_id == 1)
@@ -167,7 +167,7 @@ def test_picked_tomogram_run_class2d(
     assert tomograms_db.tomogram == message["tomogram"]
     assert tomograms_db.cbox_3d == message["cbox_3d"]
     assert tomograms_db.particle_count == 2
-    assert tomograms_db.pixel_size == 5.3
+    assert tomograms_db.tomogram_pixel_size == 5.3
 
     mock_transport.send.assert_called_once_with(
         "processing_recipe",
