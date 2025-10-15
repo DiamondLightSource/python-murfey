@@ -90,6 +90,8 @@ def test_picked_tomogram_run_class2d(
     mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
+    mock_transport.feedback_queue = "murfey_feedback"
+
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
         murfey_db_session,
@@ -192,16 +194,16 @@ def test_picked_tomogram_run_class2d(
                 "tomogram": message["tomogram"],
                 "cbox_3d": message["cbox_3d"],
                 "pixel_size": message["pixel_size"],
-                "particle_diameter": 200,
+                "particle_diameter": 200.0,
                 "kv": 300,
                 "node_creator_queue": "node_creator",
                 "session_id": message["session_id"],
                 "autoproc_program_id": 0,
                 "batch_size": 10000,
-                "nr_classes": 10,
+                "nr_classes": 5,
                 "picker_id": None,
-                "class2d_grp_uuid": 0,
-                "class_uuids": {str(i): i for i in range(10)},
+                "class2d_grp_uuid": 6,
+                "class_uuids": {str(i): i for i in range(1, 6)},
                 "feedback_queue": "murfey_feedback",
             },
             "recipes": ["em-tomo-class2d"],
