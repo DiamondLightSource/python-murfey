@@ -15,12 +15,12 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
-@mock.patch("murfey.workflows.tomo.picking._pj_id_tomo_classification")
+@mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
 def test_picked_tomogram_not_run_class2d(
-    mock_pjid, mock_transport, murfey_db_session: Session, tmp_path
+    mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    mock_pjid.return_value = [2, 1]
+    mock_ids.return_value = [2, 1]
 
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
@@ -63,7 +63,7 @@ def test_picked_tomogram_not_run_class2d(
 
     picking._register_picked_tomogram_use_diameter(message, murfey_db_session)
 
-    mock_pjid.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
+    mock_ids.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
 
     tomograms_db = murfey_db_session.exec(
         select(TomogramPicks).where(TomogramPicks.pj_id == 1)
@@ -84,12 +84,12 @@ def test_picked_tomogram_not_run_class2d(
 
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
-@mock.patch("murfey.workflows.tomo.picking._pj_id_tomo_classification")
+@mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
 def test_picked_tomogram_run_class2d(
-    mock_pjid, mock_transport, murfey_db_session: Session, tmp_path
+    mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    mock_pjid.return_value = [2, 1]
+    mock_ids.return_value = [2, 1]
 
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
@@ -166,7 +166,7 @@ def test_picked_tomogram_run_class2d(
 
     picking._register_picked_tomogram_use_diameter(message, murfey_db_session)
 
-    mock_pjid.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
+    mock_ids.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
 
     tomograms_db = murfey_db_session.exec(
         select(TomogramPicks).where(TomogramPicks.pj_id == 1)
