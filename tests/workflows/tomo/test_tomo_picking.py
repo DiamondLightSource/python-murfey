@@ -44,7 +44,7 @@ def test_picked_tomogram_not_run_class2d(
         murfey_db_session,
         ProcessingJob,
         lookup_kwargs={
-            "id": 0,
+            "id": 1,
             "recipe": "test_recipe",
             "dc_id": dc_entry.id,
         },
@@ -111,7 +111,7 @@ def test_picked_tomogram_run_class2d(
         murfey_db_session,
         ProcessingJob,
         lookup_kwargs={
-            "id": 0,
+            "id": 1,
             "recipe": "test_recipe",
             "dc_id": dc_entry.id,
         },
@@ -137,6 +137,7 @@ def test_picked_tomogram_run_class2d(
         )
 
     message = {
+        "session_id": 11,
         "program_id": 0,
         "cbox_3d": f"{tmp_path}/AutoPick/job007/CBOX_3d/sample.cbox",
         "particle_count": 2,
@@ -168,4 +169,26 @@ def test_picked_tomogram_run_class2d(
     assert tomograms_db.particle_count == 2
     assert tomograms_db.pixel_size == 5.3
 
-    mock_transport.assert_called_once()
+    mock_transport.send.assert_called_once_with(
+        "processing_recipe",
+        {
+            "parameters": {
+                "tomogram": message["tomogram"],
+                "cbox_3d": message["cbox_3d"],
+                "pixel_size": message["pixel_size"],
+                "particle_diameter": 100,
+                "kv": 300,
+                "node_creator_queue": "node_creator",
+                "session_id": message["session_id"],
+                "autoproc_program_id": 0,
+                "batch_size": 10000,
+                "nr_classes": 10,
+                "picker_id": None,
+                "class2d_grp_uuid": 0,
+                "class_uuids": {str(i): i for i in range(10)},
+                "feedback_queue": "murfey_feedback",
+            },
+            "recipes": ["em-tomo-class2d"],
+        },
+        new_connection=True,
+    )
