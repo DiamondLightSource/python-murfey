@@ -20,7 +20,7 @@ def test_picked_tomogram_not_run_class2d(
     mock_pjid, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    mock_pjid.return_value = 1
+    mock_pjid.return_value = [2, 1]
 
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
@@ -89,7 +89,7 @@ def test_picked_tomogram_run_class2d(
     mock_pjid, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    mock_pjid.return_value = 1
+    mock_pjid.return_value = [2, 1]
 
     # Insert table dependencies
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(

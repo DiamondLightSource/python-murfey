@@ -1,4 +1,5 @@
 from logging import getLogger
+from typing import Tuple
 
 import numpy as np
 from sqlalchemy import func
@@ -21,7 +22,7 @@ from murfey.util.processing_params import default_tomo_parameters
 logger = getLogger("murfey.workflows.tomo.feedback")
 
 
-def _pj_id_tomo_classification(app_id: int, recipe: str, _db) -> int:
+def _ids_tomo_classification(app_id: int, recipe: str, _db) -> Tuple[int, int]:
     dcg_id = (
         _db.exec(
             select(AutoProcProgram, ProcessingJob, DataCollection)
@@ -42,13 +43,15 @@ def _pj_id_tomo_classification(app_id: int, recipe: str, _db) -> int:
         .one()[0]
         .id
     )
-    return pj_id
+    return dcg_id, pj_id
 
 
 def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
     """Received picked particles from the tomogram autopick service"""
     # Add this message to the table of seen messages
-    pj_id = _pj_id_tomo_classification(message["program_id"], "em-tomo-class2d", _db)
+    dcg_id, pj_id = _ids_tomo_classification(
+        message["program_id"], "em-tomo-class2d", _db
+    )
 
     pick_params = TomogramPicks(
         pj_id=pj_id,
@@ -78,7 +81,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
         ]
         tomo_params = _db.exec(
             select(TomographyProcessingParameters).where(
-                TomographyProcessingParameters.pj_id == pj_id
+                TomographyProcessingParameters.dcg_id == dcg_id
             )
         ).one()
 
