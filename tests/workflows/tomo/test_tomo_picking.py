@@ -14,9 +14,10 @@ from murfey.workflows.tomo import picking
 from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 
+@mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._pj_id_tomo_classification")
 def test_picked_tomogram_not_run_class2d(
-    mock_pjid, murfey_db_session: Session, tmp_path
+    mock_pjid, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
     mock_pjid.return_value = 1
@@ -79,6 +80,8 @@ def test_picked_tomogram_not_run_class2d(
     assert added_picks[0].particle_size == 10.1
     assert added_picks[1].particle_size == 20.2
 
+    mock_transport.send.assert_not_called()
+
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._pj_id_tomo_classification")
@@ -133,7 +136,11 @@ def test_picked_tomogram_run_class2d(
         get_or_create_db_entry(
             murfey_db_session,
             ParticleSizes,
-            lookup_kwargs={"pj_id": processing_job_entry.id, "particle_size": 100},
+            lookup_kwargs={
+                "id": particle,
+                "pj_id": processing_job_entry.id,
+                "particle_size": 100,
+            },
         )
 
     message = {
@@ -176,7 +183,7 @@ def test_picked_tomogram_run_class2d(
                 "tomogram": message["tomogram"],
                 "cbox_3d": message["cbox_3d"],
                 "pixel_size": message["pixel_size"],
-                "particle_diameter": 100,
+                "particle_diameter": 200,
                 "kv": 300,
                 "node_creator_queue": "node_creator",
                 "session_id": message["session_id"],
