@@ -140,7 +140,13 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
             particle_diameter = tomo_params.particle_diameter
             class_uuids = {
                 str(i + 1): m
-                for i, m in enumerate(_murfey_id(_app_id(pj_id, _db), _db, number=50))
+                for i, m in enumerate(
+                    _murfey_id(
+                        _app_id(pj_id, _db),
+                        _db,
+                        number=default_tomo_parameters.nr_classes_2d,
+                    )
+                )
             }
             class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
             zocalo_message = {

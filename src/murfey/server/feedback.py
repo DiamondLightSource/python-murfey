@@ -625,7 +625,9 @@ def _register_incomplete_2d_batch(message: dict, _db, demo: bool = False):
         )
         _db.add(class2d_params)
         _db.commit()
-        murfey_ids = _murfey_id(message["program_id"], _db, number=50)
+        murfey_ids = _murfey_id(
+            message["program_id"], _db, number=default_spa_parameters.nr_classes_2d
+        )
         _murfey_class2ds(
             murfey_ids, class2d_message["particles_file"], message["program_id"], _db
         )
@@ -749,7 +751,9 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
             _db.add(class2d_params)
             _db.commit()
             _db.close()
-            murfey_ids = _murfey_id(_app_id(pj_id, _db), _db, number=50)
+            murfey_ids = _murfey_id(
+                _app_id(pj_id, _db), _db, number=default_spa_parameters.nr_classes_2d
+            )
             _murfey_class2ds(
                 murfey_ids, class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
@@ -798,7 +802,13 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
         else:
             class_uuids = {
                 str(i + 1): m
-                for i, m in enumerate(_murfey_id(_app_id(pj_id, _db), _db, number=50))
+                for i, m in enumerate(
+                    _murfey_id(
+                        _app_id(pj_id, _db),
+                        _db,
+                        number=default_spa_parameters.nr_classes_2d,
+                    )
+                )
             }
             class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
         zocalo_message: dict = {
@@ -867,7 +877,13 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
         else:
             class_uuids = {
                 str(i + 1): m
-                for i, m in enumerate(_murfey_id(_app_id(pj_id, _db), _db, number=50))
+                for i, m in enumerate(
+                    _murfey_id(
+                        _app_id(pj_id, _db),
+                        _db,
+                        number=default_spa_parameters.nr_classes_2d,
+                    )
+                )
             }
             class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
         zocalo_message = {

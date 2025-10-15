@@ -3,6 +3,7 @@ from unittest import mock
 from sqlmodel import Session, select
 
 from murfey.util.db import (
+    AutoProcProgram,
     DataCollection,
     DataCollectionGroup,
     ParticleSizes,
@@ -115,6 +116,14 @@ def test_picked_tomogram_run_class2d(
             "id": 1,
             "recipe": "test_recipe",
             "dc_id": dc_entry.id,
+        },
+    )
+    get_or_create_db_entry(
+        murfey_db_session,
+        AutoProcProgram,
+        lookup_kwargs={
+            "id": 0,
+            "pj_id": processing_job_entry.id,
         },
     )
     get_or_create_db_entry(
