@@ -258,6 +258,8 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
             and db.Class3D.pj_id == pj_id
         )
     ).all()
+    if not classes:
+        raise ValueError(f"No 3D classification IDs found for {particles_file}")
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
