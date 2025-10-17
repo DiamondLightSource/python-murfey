@@ -44,6 +44,7 @@ from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
@@ -54,7 +55,6 @@ from murfey.util.db import (
     SearchMap,
     Session,
     SessionProcessingParameters,
-    SPAFeedbackParameters,
     SPARelionParameters,
     Tilt,
     TiltSeries,
@@ -409,9 +409,9 @@ async def request_spa_preprocessing(
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
         params = db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters)
+            select(SPARelionParameters, ClassificationFeedbackParameters)
             .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+            .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
         proc_params: Optional[dict] = dict(params[0])
         feedback_params = params[1]

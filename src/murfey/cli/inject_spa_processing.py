@@ -13,12 +13,12 @@ from murfey.server.murfey_db import url
 from murfey.util.config import get_machine_config, get_microscope, get_security_config
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
     Movie,
     ProcessingJob,
-    SPAFeedbackParameters,
     SPARelionParameters,
 )
 from murfey.util.processing_params import default_spa_parameters
@@ -137,9 +137,9 @@ def run():
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
         params = murfey_db.exec(
-            select(SPARelionParameters, SPAFeedbackParameters)
+            select(SPARelionParameters, ClassificationFeedbackParameters)
             .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+            .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
         ).one()
         proc_params: dict | None = dict(params[0])
         feedback_params = params[1]
