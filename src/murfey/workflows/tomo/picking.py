@@ -203,6 +203,6 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
     _db.close()
 
 
-def particles_tomogram(message: dict, murfey_db: Session) -> bool:
+def picked_tomogram(message: dict, murfey_db: Session) -> bool:
     _register_picked_tomogram_use_diameter(message, murfey_db)
     return True
