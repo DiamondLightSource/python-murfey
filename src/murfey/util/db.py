@@ -681,9 +681,8 @@ class CtfParameters(SQLModel, table=True):  # type: ignore
 
 
 class TomogramPicks(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(default=None, primary_key=True)
+    tomogram: str = Field(primary_key=True)
     pj_id: int = Field(foreign_key="processingjob.id")
-    tomogram: str
     cbox_3d: str
     particle_count: int
     tomogram_pixel_size: float

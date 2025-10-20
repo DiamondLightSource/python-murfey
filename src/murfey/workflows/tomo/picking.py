@@ -63,7 +63,6 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
     )
     _db.add(pick_params)
     _db.commit()
-    _db.close()
 
     picking_db_len = _db.exec(
         select(func.count(ParticleSizes.id)).where(ParticleSizes.pj_id == pj_id)
@@ -150,6 +149,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                         "processing_recipe", zocalo_message, new_connection=True
                     )
                 feedback_params.next_job += 2
+                _db.delete(saved_message)
         else:
             # If the diameter is known then just send the new message
             particle_diameter = tomo_params.particle_diameter
