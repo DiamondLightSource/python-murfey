@@ -2364,7 +2364,18 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     gain_ref=message["gain_ref"],
                     eer_fractionation_file=message["eer_fractionation_file"],
                 )
+                feedback_params = db.ClassificationFeedbackParameters(
+                    pj_id=collected_ids[2].id,
+                    estimate_particle_diameter=True,
+                    hold_class2d=False,
+                    hold_class3d=False,
+                    class_selection_score=0,
+                    star_combination_job=0,
+                    initial_model="",
+                    next_job=0,
+                )
                 _db.add(params)
+                _db.add(feedback_params)
                 _db.commit()
                 _db.close()
             if murfey.server._transport_object:

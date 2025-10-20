@@ -10,6 +10,7 @@ from murfey.server.feedback import _app_id, _murfey_id
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     DataCollection,
     ParticleSizes,
     ProcessingJob,
@@ -87,6 +88,14 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
 
         particle_diameter = tomo_params.particle_diameter
 
+        feedback_params = _db.exec(
+            select(ClassificationFeedbackParameters).where(
+                ClassificationFeedbackParameters.pj_id == pj_id
+            )
+        ).one()
+        if not feedback_params.next_job:
+            feedback_params.next_job = 9
+
         if not particle_diameter:
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
@@ -125,6 +134,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                         "picker_id": None,
                         "class2d_grp_uuid": class2d_grp_uuid,
                         "class_uuids": class_uuids,
+                        "next_job": feedback_params.next_job,
                     },
                     "recipes": ["em-tomo-class2d"],
                 }
@@ -135,6 +145,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     _transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
+                feedback_params.next_job += 2
         else:
             # If the diameter is known then just send the new message
             particle_diameter = tomo_params.particle_diameter
@@ -164,6 +175,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     "picker_id": None,
                     "class2d_grp_uuid": class2d_grp_uuid,
                     "class_uuids": class_uuids,
+                    "next_job": feedback_params.next_job,
                 },
                 "recipes": ["em-tomo-class2d"],
             }
@@ -174,6 +186,9 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
+            feedback_params.next_job += 2
+        _db.add(feedback_params)
+        _db.commit()
     else:
         # If not enough particles then save the new sizes
         particle_list = message.get("particle_diameters")
