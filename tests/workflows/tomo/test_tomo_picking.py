@@ -71,7 +71,7 @@ def set_up_picking_db(murfey_db_session: Session):
 
 
 def test_ids_tomo_classification(murfey_db_session: Session):
-    dcg_id, first_dc, first_pj = set_up_picking_db(murfey_db_session)
+    dcg_id, first_dc_id, first_pj_id = set_up_picking_db(murfey_db_session)
 
     # Insert a second data collection, processing job and autoproc program
     second_dc: DataCollection = get_or_create_db_entry(
@@ -105,7 +105,7 @@ def test_ids_tomo_classification(murfey_db_session: Session):
         11, "test_recipe", murfey_db_session
     )
     assert returned_ids[0] == dcg_id
-    assert returned_ids[1] == first_pj.id
+    assert returned_ids[1] == first_pj_id
 
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
