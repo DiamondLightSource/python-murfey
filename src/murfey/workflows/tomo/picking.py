@@ -121,7 +121,6 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     )
                 }
                 class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
-                _db.expunge(saved_message)
                 zocalo_message: dict = {
                     "parameters": {
                         "tomogram": saved_message.tomogram,
