@@ -16,7 +16,7 @@ from murfey.workflows.tomo import picking
 from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 
-def set_up_picking_db(murfey_db_session):
+def set_up_picking_db(murfey_db_session: Session):
     # Insert common elements needed in all picking tests
     dcg_entry: DataCollectionGroup = get_or_create_db_entry(
         murfey_db_session,
@@ -68,6 +68,44 @@ def set_up_picking_db(murfey_db_session):
         },
     )
     return dcg_entry.id, dc_entry.id, processing_job_entry.id
+
+
+def test_ids_tomo_classification(murfey_db_session: Session):
+    dcg_id, first_dc, first_pj = set_up_picking_db(murfey_db_session)
+
+    # Insert a second data collection, processing job and autoproc program
+    second_dc: DataCollection = get_or_create_db_entry(
+        murfey_db_session,
+        DataCollection,
+        lookup_kwargs={
+            "id": 1,
+            "tag": "second_dc",
+            "dcg_id": dcg_id,
+        },
+    )
+    second_pj: ProcessingJob = get_or_create_db_entry(
+        murfey_db_session,
+        ProcessingJob,
+        lookup_kwargs={
+            "id": 10,
+            "recipe": "second_recipe",
+            "dc_id": second_dc.id,
+        },
+    )
+    get_or_create_db_entry(
+        murfey_db_session,
+        AutoProcProgram,
+        lookup_kwargs={
+            "id": 11,
+            "pj_id": second_pj.id,
+        },
+    )
+
+    returned_ids = picking._ids_tomo_classification(
+        11, "test_recipe", murfey_db_session
+    )
+    assert returned_ids[0] == dcg_id
+    assert returned_ids[1] == first_pj.id
 
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
