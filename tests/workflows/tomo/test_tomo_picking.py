@@ -298,6 +298,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
 
     # Two mock calls - one flushed tomogram and one new
     assert mock_transport.send.call_count == 2
+    print(mock_transport.send.mock_calls)
     mock_transport.send.assert_any_call(
         "processing_recipe",
         {
@@ -314,7 +315,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
                 "nr_classes": 5,
                 "picker_id": None,
                 "class2d_grp_uuid": 12,
-                "class_uuids": {str(i): i for i in range(7, 12)},
+                "class_uuids": {str(i): i + 6 for i in range(1, 6)},
                 "next_job": 9,
                 "feedback_queue": "murfey_feedback",
             },
@@ -338,7 +339,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
                 "nr_classes": 5,
                 "picker_id": None,
                 "class2d_grp_uuid": 18,
-                "class_uuids": {str(i): i for i in range(13, 18)},
+                "class_uuids": {str(i): i + 12 for i in range(1, 6)},
                 "next_job": 11,
                 "feedback_queue": "murfey_feedback",
             },
