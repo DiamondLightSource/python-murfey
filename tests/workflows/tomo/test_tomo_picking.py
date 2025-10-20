@@ -152,7 +152,7 @@ def test_picked_tomogram_not_run_class2d(
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
-@mock.patch("murfey.workflows.tomo.picking.sqlalchemy.func")
+@mock.patch("murfey.workflows.tomo.picking.func")
 def test_picked_tomogram_run_class2d_with_diameter(
     mock_func, mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
@@ -239,7 +239,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
-@mock.patch("murfey.workflows.tomo.picking.sqlalchemy.func")
+@mock.patch("murfey.workflows.tomo.picking.func")
 def test_picked_tomogram_run_class2d_estimate_diameter(
     mock_func, mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
