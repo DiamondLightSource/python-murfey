@@ -152,11 +152,13 @@ def test_picked_tomogram_not_run_class2d(
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
+@mock.patch("murfey.workflows.tomo.picking.sqlalchemy.func")
 def test_picked_tomogram_run_class2d_with_diameter(
-    mock_ids, mock_transport, murfey_db_session: Session, tmp_path
+    mock_func, mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with a pre-determined particle diameter"""
     mock_transport.feedback_queue = "murfey_feedback"
+    mock_func.count.return_value = 10001
 
     # Insert table dependencies
     dcg_id, dc_id, pj_id = set_up_picking_db(murfey_db_session)
@@ -173,7 +175,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
             "particle_diameter": 200,
         },
     )
-    for particle in range(10001):
+    for particle in range(10):
         get_or_create_db_entry(
             murfey_db_session,
             ParticleSizes,
@@ -199,6 +201,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
     picking._register_picked_tomogram_use_diameter(message, murfey_db_session)
 
     mock_ids.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
+    mock_func.count.assert_called_once()
 
     tomograms_db = murfey_db_session.exec(
         select(TomogramPicks).where(TomogramPicks.pj_id == 1)
@@ -236,11 +239,13 @@ def test_picked_tomogram_run_class2d_with_diameter(
 
 @mock.patch("murfey.workflows.tomo.picking._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
+@mock.patch("murfey.workflows.tomo.picking.sqlalchemy.func")
 def test_picked_tomogram_run_class2d_estimate_diameter(
-    mock_ids, mock_transport, murfey_db_session: Session, tmp_path
+    mock_func, mock_ids, mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback for Class2D, including diameter estimation"""
     mock_transport.feedback_queue = "murfey_feedback"
+    mock_func.count.return_value = 10001
 
     # Insert table dependencies
     dcg_id, dc_id, pj_id = set_up_picking_db(murfey_db_session)
@@ -257,7 +262,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
             "particle_diameter": None,
         },
     )
-    for particle in range(10001):
+    for particle in range(10):
         get_or_create_db_entry(
             murfey_db_session,
             ParticleSizes,
@@ -295,10 +300,10 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
     picking._register_picked_tomogram_use_diameter(message, murfey_db_session)
 
     mock_ids.assert_called_once_with(0, "em-tomo-class2d", murfey_db_session)
+    mock_func.count.assert_called_once()
 
     # Two mock calls - one flushed tomogram and one new
     assert mock_transport.send.call_count == 2
-    print(mock_transport.send.mock_calls)
     mock_transport.send.assert_any_call(
         "processing_recipe",
         {
