@@ -58,7 +58,7 @@ class MachineConfig(BaseModel):  # type: ignore
     allow_removal: bool = False
 
     # Upstream data download setup
-    upstream_data_directories: list[Path] = []  # Previous sessions
+    upstream_data_directories: dict[str, Path] = {}  # Previous sessions
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
     upstream_data_tiff_locations: list[str] = ["processed"]  # Location of CLEM TIFFs
 

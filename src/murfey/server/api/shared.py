@@ -147,6 +147,10 @@ def get_foil_hole(session_id: int, fh_name: int, db) -> Dict[str, int]:
 
 
 def find_upstream_visits(session_id: int, db: SQLModelSession):
+    """
+    Returns a nested dictionary, in which visits and the full paths to their directories
+    are further grouped by instrument name.
+    """
     murfey_session = db.exec(
         select(MurfeySession).where(MurfeySession.id == session_id)
     ).one()
@@ -155,12 +159,19 @@ def find_upstream_visits(session_id: int, db: SQLModelSession):
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    upstream_visits = {}
+    upstream_visits: dict[str, dict[str, Path]] = {}
     # Iterates through provided upstream directories
-    for p in machine_config.upstream_data_directories:
+    for (
+        upstream_instrument,
+        upstream_data_dir,
+    ) in machine_config.upstream_data_directories.items():
         # Looks for visit name in file path
-        for v in Path(p).glob(f"{visit_name.split('-')[0]}-*"):
-            upstream_visits[v.name] = v / machine_config.processed_directory_name
+        current_upstream_visits = {}
+        for visit_path in Path(upstream_data_dir).glob(f"{visit_name.split('-')[0]}-*"):
+            current_upstream_visits[visit_path.name] = (
+                visit_path / machine_config.processed_directory_name
+            )
+        upstream_visits[upstream_instrument] = current_upstream_visits
     return upstream_visits
 
 
@@ -170,7 +181,7 @@ def get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:
         instrument_name
     ]
     for directory_name in machine_config.upstream_data_tiff_locations:
-        for p in machine_config.upstream_data_directories:
+        for _, p in machine_config.upstream_data_directories.items():
             if (Path(p) / secure_filename(visit_name)).is_dir():
                 processed_dir = Path(p) / secure_filename(visit_name) / directory_name
                 tiff_dirs.append(processed_dir)
