@@ -477,6 +477,13 @@ murfey.server.api.file_io_frontend.router:
         type: int
     methods:
       - POST
+  - path: /file_io/frontend/sessions/{session_id}/symlink
+    function: create_symlink
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.file_io_instrument.router:
   - path: /file_io/instrument/visits/{visit_name}/sessions/{session_id}/suggested_path
     function: suggest_path
