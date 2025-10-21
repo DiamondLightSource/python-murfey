@@ -233,6 +233,7 @@ class ProvidedProcessingParameters(BaseModel):
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
+    run_class3d: bool = True
 
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
@@ -247,6 +248,7 @@ async def pass_proc_params_to_instrument_server(
         gain_ref=session.current_gain_ref,
         symmetry=proc_params.symmetry,
         eer_fractionation=proc_params.eer_fractionation,
+        run_class3d=proc_params.run_class3d,
     )
     db.add(session_processing_parameters)
     db.commit()
