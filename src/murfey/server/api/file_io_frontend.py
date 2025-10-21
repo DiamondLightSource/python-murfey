@@ -55,5 +55,5 @@ async def create_symlink(
         symlink_full_path.unlink()
     if symlink_full_path.exists():
         return ""
-    symlink_full_path.symlink_to(symlink_params.target)
+    symlink_full_path.symlink_to(machine_config.rsync_basepath / symlink_params.target)
     return str(symlink_params.symlink)
