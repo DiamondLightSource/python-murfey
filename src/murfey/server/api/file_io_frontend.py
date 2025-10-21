@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import select
 
 from murfey.server.api.auth import (
     MurfeySessionIDFrontend as MurfeySessionID,
@@ -15,6 +15,7 @@ from murfey.server.api.file_io_shared import (
 )
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
+from murfey.util.db import Session
 
 logger = getLogger("murfey.server.api.file_io_frontend")
 
