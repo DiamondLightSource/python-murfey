@@ -2400,7 +2400,16 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "run_class3d":
-            _register_3d_batch(message, _db)
+            session_processing_parameters = _db.exec(
+                select(db.SessionProcessingParameters).where(
+                    db.SessionProcessingParameters.session_id == message["session_id"]
+                )
+            ).all()
+            if (
+                not session_processing_parameters
+                or session_processing_parameters[0].run_class3d
+            ):
+                _register_3d_batch(message, _db)
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
