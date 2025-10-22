@@ -60,6 +60,7 @@ class MachineConfig(BaseModel):  # type: ignore
     # Upstream data download setup
     upstream_data_directories: dict[str, Path] = {}  # Previous sessions
     upstream_data_download_directory: Optional[Path] = None  # Set by microscope config
+    upstream_data_search_strings: dict[str, list[str]] = {}  # For glob search
     upstream_data_tiff_locations: list[str] = ["processed"]  # Location of CLEM TIFFs
 
     # Data processing setup -----------------------------------------------------------
