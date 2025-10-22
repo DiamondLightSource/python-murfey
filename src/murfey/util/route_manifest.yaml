@@ -148,6 +148,15 @@ murfey.instrument_server.api.router:
         type: int
     methods:
       - POST
+  - path: /visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
     function: gather_upstream_tiffs
     path_params:
@@ -616,6 +625,15 @@ murfey.server.api.instrument.router:
         type: int
     methods:
       - POST
+  - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
+    function: request_upstream_file_data_download
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /instrument_server/sessions/{session_id}/stop_rsyncer
     function: stop_rsyncer
     path_params:
@@ -756,6 +774,26 @@ murfey.server.api.session_control.correlative_router:
   - path: /session_control/correlative/sessions/{session_id}/upstream_visits
     function: find_upstream_visits
     path_params:
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file_paths
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file/{upstream_file_path:path}
+    function: get_upstream_file
+    path_params:
+      - name: visit_name
+        type: str
+      - name: upstream_file_path
+        type: str
       - name: session_id
         type: int
     methods:
@@ -979,6 +1017,26 @@ murfey.server.api.session_info.correlative_router:
   - path: /session_info/correlative/sessions/{session_id}/upstream_visits
     function: find_upstream_visits
     path_params:
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file_paths
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file/{upstream_file_path:path}
+    function: get_upstream_file
+    path_params:
+      - name: visit_name
+        type: str
+      - name: upstream_file_path
+        type: Path
       - name: session_id
         type: int
     methods:

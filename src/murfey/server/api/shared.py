@@ -168,11 +168,60 @@ def find_upstream_visits(session_id: int, db: SQLModelSession):
         # Looks for visit name in file path
         current_upstream_visits = {}
         for visit_path in Path(upstream_data_dir).glob(f"{visit_name.split('-')[0]}-*"):
-            current_upstream_visits[visit_path.name] = (
-                visit_path / machine_config.processed_directory_name
-            )
+            current_upstream_visits[visit_path.name] = visit_path
         upstream_visits[upstream_instrument] = current_upstream_visits
     return upstream_visits
+
+
+def gather_upstream_files(
+    session_id: int,
+    upstream_instrument: str,
+    upstream_visit_path: Path,
+    db: SQLModelSession,
+):
+    """
+    Searches the specified upstream instrument for files based on the search strings
+    set in the MachineConfig and retursn them as a list of file paths.
+    """
+    # Load the current instrument's machine config
+    murfey_session = db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    instrument_name = murfey_session.instrument_name
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    # Search for files using the configured strings for that upstream instrument
+    file_list: list[Path] = []
+    logger.info(f"Searching for files in {upstream_visit_path}")
+    if (
+        machine_config.upstream_data_search_strings.get(upstream_instrument, None)
+        is not None
+    ):
+        for search_string in machine_config.upstream_data_search_strings[
+            upstream_instrument
+        ]:
+            logger.info(f"Using search string {search_string}")
+            for file in upstream_visit_path.glob(search_string):
+                if file.is_file():
+                    file_list.append(file)
+        logger.info(
+            f"Found {len(file_list)} files for download from {upstream_instrument}"
+        )
+    else:
+        logger.warning(
+            f"Upstream file searching has not been configured for {upstream_instrument} on {instrument_name}"
+        )
+    return file_list
+
+
+def get_upstream_file(file_path: str | Path):
+    file_path = Path(file_path) if isinstance(file_path, str) else file_path
+    if file_path.exists() and file_path.is_file():
+        return file_path
+    logger.warning(f"Requested file {str(file_path)!r} was not found")
+    return None
 
 
 def get_upstream_tiff_dirs(visit_name: str, instrument_name: str) -> List[Path]:

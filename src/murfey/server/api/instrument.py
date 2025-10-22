@@ -396,6 +396,69 @@ async def request_upstream_tiff_data_download(
     return data
 
 
+class UpstreamFileRequestInfo(BaseModel):
+    upstream_instrument: str
+    upstream_visit_path: Path
+
+
+@router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
+async def request_upstream_file_data_download(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_file_request: UpstreamFileRequestInfo,
+    db=murfey_db,
+):
+    """
+    Forwards a request to the instrument server to trigger a file download request.
+    """
+    # Load the current instrument's machine config
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    # Log and return errors if download directory or URL weren't specified
+    if not machine_config.upstream_data_download_directory:
+        log.error("No download directory was configured for this instrument")
+        return {
+            "success": False,
+            "detail": "No download directory configured",
+        }
+    if not machine_config.instrument_server_url:
+        log.error("Couldn't find instrument server URL to post request to")
+        return {
+            "success": False,
+            "detail": "No instrument server URL",
+        }
+
+    # Forward the download request
+    download_dir = str(
+        machine_config.upstream_data_download_directory / secure_filename(visit_name)
+    )
+    async with aiohttp.ClientSession() as clientsession:
+        url_path = url_path_for(
+            "api.router",
+            "gather_upstream_files",
+            visit_name=secure_filename(visit_name),
+            session_id=session_id,
+        )
+        async with clientsession.post(
+            f"{machine_config.instrument_server_url}{url_path}",
+            headers={
+                "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+            },
+            json={
+                "download_dir": download_dir,
+                "upstream_instrument": upstream_file_request.upstream_instrument,
+                "upstream_visit_path": str(upstream_file_request.upstream_visit_path),
+            },
+        ) as resp:
+            data = await resp.json()
+    return data
+
+
 class RsyncerSource(BaseModel):
     source: str
 

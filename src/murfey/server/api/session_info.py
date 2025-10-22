@@ -18,6 +18,7 @@ from murfey.server.api.auth import (
 )
 from murfey.server.api.shared import (
     find_upstream_visits as _find_upstream_visits,
+    gather_upstream_files as _gather_upstream_files,
     gather_upstream_tiffs as _gather_upstream_tiffs,
     get_foil_hole as _get_foil_hole,
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
@@ -25,6 +26,7 @@ from murfey.server.api.shared import (
     get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
     get_machine_config_for_instrument,
     get_tiff_file as _get_tiff_file,
+    get_upstream_file as _get_upstream_file,
     remove_session_by_id,
 )
 from murfey.server.ispyb import DB as ispyb_db, get_all_ongoing_visits
@@ -414,6 +416,43 @@ correlative_router = APIRouter(
 @correlative_router.get("/sessions/{session_id}/upstream_visits")
 async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     return _find_upstream_visits(session_id=session_id, db=db)
+
+
+class UpstreamFileGatheringInfo(BaseModel):
+    upstream_instrument: str
+    upstream_visit_path: Path
+
+
+@correlative_router.get(
+    "/visits/{visit_name}/sessions/{session_id}/upstream_file_paths"
+)
+async def gather_upstream_files(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_file_gathering: UpstreamFileGatheringInfo,
+    db=murfey_db,
+):
+    return _gather_upstream_files(
+        session_id=session_id,
+        upstream_instrument=upstream_file_gathering.upstream_instrument,
+        upstream_visit_path=upstream_file_gathering.upstream_visit_path,
+        db=db,
+    )
+
+
+@correlative_router.get(
+    "/visits/{visit_name}/sessions/{session_id}/upstream_file/{upstream_file_path:path}"
+)
+async def get_upstream_file(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_file_path: Path,
+    db=murfey_db,
+):
+    upstream_file = _get_upstream_file(upstream_file_path)
+    return (
+        FileResponse(path=upstream_file) if upstream_file is not None else upstream_file
+    )
 
 
 @correlative_router.get(
