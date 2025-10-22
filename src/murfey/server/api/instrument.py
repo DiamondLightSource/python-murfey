@@ -242,14 +242,26 @@ async def pass_proc_params_to_instrument_server(
 ):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
 
-    session_processing_parameters = SessionProcessingParameters(
-        session_id=session_id,
-        dose_per_frame=proc_params.dose_per_frame,
-        gain_ref=session.current_gain_ref,
-        symmetry=proc_params.symmetry,
-        eer_fractionation=proc_params.eer_fractionation,
-        run_class3d=proc_params.run_class3d,
-    )
+    existing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if not existing_parameters:
+        session_processing_parameters = SessionProcessingParameters(
+            session_id=session_id,
+            dose_per_frame=proc_params.dose_per_frame,
+            gain_ref=session.current_gain_ref,
+            symmetry=proc_params.symmetry,
+            eer_fractionation=proc_params.eer_fractionation,
+            run_class3d=proc_params.run_class3d,
+        )
+    else:
+        session_processing_parameters = existing_parameters[0]
+        session_processing_parameters.dose_per_frame = proc_params.dose_per_frame
+        session_processing_parameters.eer_fractionation = proc_params.eer_fractionation
+        session_processing_parameters.symmetry = proc_params.symmetry
+        session_processing_parameters.run_class3d = proc_params.run_class3d
     db.add(session_processing_parameters)
     db.commit()
 
