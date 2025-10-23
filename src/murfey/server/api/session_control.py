@@ -52,6 +52,7 @@ from murfey.util.models import (
     GridSquareParameters,
     RsyncerInfo,
     SearchMapParameters,
+    UpstreamFileRequestInfo,
     Visit,
 )
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
@@ -424,24 +425,19 @@ async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
     return _find_upstream_visits(session_id=session_id, db=db)
 
 
-class UpstreamFileGatheringInfo(BaseModel):
-    upstream_instrument: str
-    upstream_visit_path: Path
-
-
 @correlative_router.get(
     "/visits/{visit_name}/sessions/{session_id}/upstream_file_paths"
 )
 async def gather_upstream_files(
     visit_name: str,
     session_id: MurfeySessionID,
-    upstream_file_gathering: UpstreamFileGatheringInfo,
+    upstream_file_request: UpstreamFileRequestInfo,
     db=murfey_db,
 ):
     return _gather_upstream_files(
         session_id=session_id,
-        upstream_instrument=upstream_file_gathering.upstream_instrument,
-        upstream_visit_path=upstream_file_gathering.upstream_visit_path,
+        upstream_instrument=upstream_file_request.upstream_instrument,
+        upstream_visit_path=upstream_file_request.upstream_visit_path,
         db=db,
     )
 

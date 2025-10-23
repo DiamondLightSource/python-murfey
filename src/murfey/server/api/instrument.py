@@ -27,7 +27,7 @@ from murfey.util import sanitise, secure_path
 from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
-from murfey.util.models import File, MultigridWatcherSetup
+from murfey.util.models import File, MultigridWatcherSetup, UpstreamFileRequestInfo
 
 # Create APIRouter class object
 router = APIRouter(
@@ -394,11 +394,6 @@ async def request_upstream_tiff_data_download(
                 ) as resp:
                     data = await resp.json()
     return data
-
-
-class UpstreamFileRequestInfo(BaseModel):
-    upstream_instrument: str
-    upstream_visit_path: Path
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
