@@ -181,7 +181,7 @@ def gather_upstream_files(
 ):
     """
     Searches the specified upstream instrument for files based on the search strings
-    set in the MachineConfig and retursn them as a list of file paths.
+    set in the MachineConfig and returns them as a list of file paths.
     """
     # Load the current instrument's machine config
     murfey_session = db.exec(
