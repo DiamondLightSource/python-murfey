@@ -487,11 +487,19 @@ def gather_upstream_files(
     """
     # Check for forbidden characters
     if any(c in visit_name for c in ("/", "\\", ":", ";")):
-        logger.error(f"Forbidden characters are present in the visit name {visit_name}")
+        logger.error(
+            f"Forbidden characters are present in visit name {sanitise(visit_name)}"
+        )
         return {
             "succss": False,
             "detail": "Forbidden characters present in visit name",
         }
+
+    # Sanitise inputs
+    download_dir = secure_path(upstream_file_download.download_dir)
+    upstream_instrument = sanitise(upstream_file_download.upstream_instrument)
+    upstream_visit_path = secure_path(upstream_file_download.upstream_visit_path)
+
     # Get the list of files to download
     murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
     sanitised_visit_name = sanitise_nonpath(visit_name)
@@ -505,13 +513,13 @@ def gather_upstream_files(
         f"{murfey_url.geturl()}{url_path}",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
         json={
-            "upstream_instrument": upstream_file_download.upstream_instrument,
-            "upstream_visit_path": str(upstream_file_download.upstream_visit_path),
+            "upstream_instrument": upstream_instrument,
+            "upstream_visit_path": str(upstream_visit_path),
         },
     ).json()
 
     # Make the download directory and download gathered files
-    upstream_file_download.download_dir.mkdir(exist_ok=True)
+    download_dir.mkdir(exist_ok=True)
     for upstream_file in upstream_files:
         url_path = url_path_for(
             "session_control.correlative_router",
@@ -525,10 +533,10 @@ def gather_upstream_files(
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
             stream=True,
         )
-        upstream_file_relative_path = Path(upstream_file).relative_to(
-            upstream_file_download.upstream_visit_path
+        upstream_file_relative_path = secure_path(
+            Path(upstream_file).relative_to(upstream_visit_path)
         )
-        save_file = upstream_file_download.download_dir / upstream_file_relative_path
+        save_file = download_dir / upstream_file_relative_path
         save_file.parent.mkdir(parents=True, exist_ok=True)
         with open(save_file, "wb") as f:
             for chunk in file_data.iter_content(chunk_size=32 * 1024**2):
