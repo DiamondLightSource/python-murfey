@@ -13,6 +13,7 @@ from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
@@ -21,7 +22,6 @@ from murfey.util.db import (
     PreprocessStash,
     ProcessingJob,
     Session as MurfeySession,
-    SPAFeedbackParameters,
     SPARelionParameters,
 )
 from murfey.util.models import FoilHoleParameters, GridSquareParameters
@@ -338,9 +338,9 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         .where(ProcessingJob.recipe == recipe_name)
     ).one()
     params = murfey_db.exec(
-        select(SPARelionParameters, SPAFeedbackParameters)
+        select(SPARelionParameters, ClassificationFeedbackParameters)
         .where(SPARelionParameters.pj_id == collected_ids[2].id)
-        .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+        .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
     ).one()
     proc_params = params[0]
     feedback_params = params[1]

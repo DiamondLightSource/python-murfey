@@ -49,6 +49,7 @@ from murfey.util.config import (
 )
 from murfey.util.db import (
     AutoProcProgram,
+    ClassificationFeedbackParameters,
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
@@ -60,7 +61,6 @@ from murfey.util.db import (
     ProcessingJob,
     RsyncInstance,
     Session,
-    SPAFeedbackParameters,
     SPARelionParameters,
     Tilt,
     TiltSeries,
@@ -244,7 +244,7 @@ class ProcessingDetails(BaseModel):
     data_collections: List[DataCollection]
     processing_jobs: List[ProcessingJob]
     relion_params: SPARelionParameters
-    feedback_params: SPAFeedbackParameters
+    feedback_params: ClassificationFeedbackParameters
 
 
 @router.get("/sessions/{session_id}/spa_processing_parameters")
@@ -257,13 +257,13 @@ def get_spa_proc_param_details(
             DataCollection,
             ProcessingJob,
             SPARelionParameters,
-            SPAFeedbackParameters,
+            ClassificationFeedbackParameters,
         )
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.id == DataCollection.dcg_id)
         .where(DataCollection.id == ProcessingJob.dc_id)
         .where(SPARelionParameters.pj_id == ProcessingJob.id)
-        .where(SPAFeedbackParameters.pj_id == ProcessingJob.id)
+        .where(ClassificationFeedbackParameters.pj_id == ProcessingJob.id)
     ).all()
     if not params:
         return None
@@ -560,9 +560,9 @@ def flush_spa_processing(
         .where(ProcessingJob.recipe == "em-spa-preprocess")
     ).one()
     params = db.exec(
-        select(SPARelionParameters, SPAFeedbackParameters)
+        select(SPARelionParameters, ClassificationFeedbackParameters)
         .where(SPARelionParameters.pj_id == collected_ids[2].id)
-        .where(SPAFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+        .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
     ).one()
     proc_params = dict(params[0])
     feedback_params = params[1]
