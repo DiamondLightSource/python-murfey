@@ -194,7 +194,7 @@ def gather_upstream_files(
 
     # Search for files using the configured strings for that upstream instrument
     file_list: list[Path] = []
-    logger.info(f"Searching for files in {upstream_visit_path}")
+    logger.info(f"Searching for files in {sanitise(str(upstream_visit_path))!r}")
     if (
         machine_config.upstream_data_search_strings.get(upstream_instrument, None)
         is not None
