@@ -8,7 +8,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
-from murfey.util import safe_run, sanitise
+from murfey.util import safe_run, sanitise, secure_path
 from murfey.util.config import MachineConfig, from_file, get_machine_config, settings
 from murfey.util.db import (
     DataCollection,
@@ -207,20 +207,23 @@ def gather_upstream_files(
                 if file.is_file():
                     file_list.append(file)
         logger.info(
-            f"Found {len(file_list)} files for download from {upstream_instrument}"
+            f"Found {len(file_list)} files for download "
+            f"from {sanitise(upstream_instrument)}"
         )
     else:
         logger.warning(
-            f"Upstream file searching has not been configured for {upstream_instrument} on {instrument_name}"
+            "Upstream file searching has not been configured for "
+            f"{sanitise(upstream_instrument)} on {sanitise(instrument_name)}"
         )
     return file_list
 
 
 def get_upstream_file(file_path: str | Path):
     file_path = Path(file_path) if isinstance(file_path, str) else file_path
+    file_path = secure_path(file_path)
     if file_path.exists() and file_path.is_file():
         return file_path
-    logger.warning(f"Requested file {str(file_path)!r} was not found")
+    logger.warning(f"Requested file {sanitise(str(file_path))!r} was not found")
     return None
 
 
