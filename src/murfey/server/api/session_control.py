@@ -16,7 +16,7 @@ from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
 )
-from murfey.server.api.shared import (
+from murfey.server.api.session_shared import (
     find_upstream_visits as _find_upstream_visits,
     gather_upstream_files as _gather_upstream_files,
     gather_upstream_tiffs as _gather_upstream_tiffs,
