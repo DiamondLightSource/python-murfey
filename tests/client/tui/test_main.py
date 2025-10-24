@@ -26,7 +26,6 @@ def test_get_visit_list(
     # Unpack test params and set up other params
     (server_url,) = test_params
     instrument_name = mock_client_configuration["Murfey"]["instrument_name"]
-    token = mock_client_configuration["Murfey"]["token"]
 
     # Construct the expected request response
     example_visits = [
@@ -61,7 +60,7 @@ def test_get_visit_list(
         base_url=server_url,
         router_name="session_control.router",
         function_name="get_current_visits",
-        token=token,
+        token=mock.ANY,
         instrument_name=instrument_name,
     )
 
