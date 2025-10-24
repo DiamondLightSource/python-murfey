@@ -469,13 +469,91 @@ def upload_gain_reference(
     return {"success": True}
 
 
-class UpstreamTiffInfo(BaseModel):
+class UpstreamFileDownloadInfo(BaseModel):
+    download_dir: Path
+    upstream_instrument: str
+    upstream_visit_path: Path
+
+
+@router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
+def gather_upstream_files(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_file_download: UpstreamFileDownloadInfo,
+):
+    """
+    Instrument server endpoint that will query the backend for files in the chosen
+    visit directory
+    """
+    # Check for forbidden characters
+    if any(c in visit_name for c in ("/", "\\", ":", ";")):
+        logger.error(
+            f"Forbidden characters are present in visit name {sanitise(visit_name)}"
+        )
+        return {
+            "succss": False,
+            "detail": "Forbidden characters present in visit name",
+        }
+
+    # Sanitise inputs
+    download_dir = secure_path(upstream_file_download.download_dir)
+    upstream_instrument = sanitise(upstream_file_download.upstream_instrument)
+    upstream_visit_path = secure_path(upstream_file_download.upstream_visit_path)
+
+    # Get the list of files to download
+    murfey_url = urlparse(_get_murfey_url(), allow_fragments=False)
+    sanitised_visit_name = sanitise_nonpath(visit_name)
+    url_path = url_path_for(
+        "session_control.correlative_router",
+        "gather_upstream_files",
+        session_id=session_id,
+        visit_name=sanitised_visit_name,
+    )
+    upstream_files: list[str] = requests.get(
+        f"{murfey_url.geturl()}{url_path}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+        json={
+            "upstream_instrument": upstream_instrument,
+            "upstream_visit_path": str(upstream_visit_path),
+        },
+    ).json()
+
+    # Make the download directory and download gathered files
+    download_dir.mkdir(exist_ok=True)
+    for upstream_file in upstream_files:
+        url_path = url_path_for(
+            "session_control.correlative_router",
+            "get_upstream_file",
+            session_id=session_id,
+            visit_name=sanitised_visit_name,
+            upstream_file_path=upstream_file,
+        )
+        file_data = requests.get(
+            f"{murfey_url.geturl()}{url_path}",
+            headers={"Authorization": f"Bearer {tokens[session_id]}"},
+            stream=True,
+        )
+        upstream_file_relative_path = secure_path(
+            Path(upstream_file).relative_to(upstream_visit_path)
+        )
+        save_file = download_dir / upstream_file_relative_path
+        save_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(save_file, "wb") as f:
+            for chunk in file_data.iter_content(chunk_size=32 * 1024**2):
+                f.write(chunk)
+        logger.info(f"Saved file to {str(save_file)!r}")
+    return {"success": True}
+
+
+class UpstreamTiffDownloadInfo(BaseModel):
     download_dir: Path
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request")
 def gather_upstream_tiffs(
-    visit_name: str, session_id: MurfeySessionID, upstream_tiff_info: UpstreamTiffInfo
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_tiff_info: UpstreamTiffDownloadInfo,
 ):
     sanitised_visit_name = sanitise_nonpath(visit_name)
     assert not any(c in visit_name for c in ("/", "\\", ":", ";"))
@@ -490,7 +568,7 @@ def gather_upstream_tiffs(
     )
     for tiff_path in upstream_tiff_paths:
         tiff_data = requests.get(
-            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff', session_id=session_id, visit_name=sanitised_visit_name, tiff_path=tiff_path)}",
+            f"{murfey_url.geturl()}{url_path_for('session_control.correlative_router', 'get_tiff_file', session_id=session_id, visit_name=sanitised_visit_name, tiff_path=tiff_path)}",
             stream=True,
             headers={"Authorization": f"Bearer {tokens[session_id]}"},
         )

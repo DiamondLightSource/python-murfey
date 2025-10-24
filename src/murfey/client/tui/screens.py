@@ -685,15 +685,23 @@ class VisitSelection(SwitchSelection):
                 self.app.push_screen("launcher")
 
         if machine_data.get("upstream_data_directories"):
-            upstream_downloads = capture_get(
+            upstream_downloads: dict[str, dict[str, Path]] = capture_get(
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.correlative_router",
                 function_name="find_upstream_visits",
                 token=token,
                 session_id=self.app._environment.murfey_session,
             ).json()
+            # Pass flattened dict for backwards compatibility
             self.app.install_screen(
-                UpstreamDownloads(upstream_downloads), "upstream-downloads"
+                UpstreamDownloads(
+                    {
+                        visit_name: visit_dir
+                        for _, upstream_visits in upstream_downloads.items()
+                        for visit_name, visit_dir in upstream_visits.items()
+                    }
+                ),
+                "upstream-downloads",
             )
             self.app.push_screen("upstream-downloads")
 
@@ -759,15 +767,23 @@ class VisitCreation(Screen):
             self.app.push_screen("directory-select")
 
         if machine_data.get("upstream_data_directories"):
-            upstream_downloads = capture_get(
+            upstream_downloads: dict[str, dict[str, Path]] = capture_get(
                 base_url=str(self.app._environment.url.geturl()),
                 router_name="session_control.correlative_router",
                 function_name="find_upstream_visits",
                 token=token,
                 session_id=self.app._environment.murfey_session,
             ).json()
+            # Pass a flattened dict for backwards compatibility
             self.app.install_screen(
-                UpstreamDownloads(upstream_downloads), "upstream-downloads"
+                UpstreamDownloads(
+                    {
+                        visit_name: visit_dir
+                        for _, upstream_visits in upstream_downloads.items()
+                        for visit_name, visit_dir in upstream_visits.items()
+                    }
+                ),
+                "upstream-downloads",
             )
             self.app.push_screen("upstream-downloads")
 
@@ -817,7 +833,7 @@ class UpstreamDownloads(Screen):
                 stream_response = capture_get(
                     base_url=str(self.app._environment.url.geturl()),
                     router_name="session_control.correlative_router",
-                    function_name="get_tiff",
+                    function_name="get_tiff_file",
                     token=token,
                     visit_name=event.button.label,
                     session_id=self.app._environment.murfey_session,

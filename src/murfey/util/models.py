@@ -84,6 +84,12 @@ class RsyncerSkippedFiles(BaseModel):
     increment_count: int = 1
 
 
+class UpstreamFileRequestInfo(BaseModel):
+    # Used in backend server for cross-instrument file download requests
+    upstream_instrument: str
+    upstream_visit_path: Path
+
+
 """
 Single Particle Analysis
 ========================
