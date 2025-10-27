@@ -306,7 +306,9 @@ def _flush_position_analysis(
     return register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
 
 
-def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) -> bool:
+def flush_spa_preprocess(
+    message: dict, murfey_db: Session, demo: bool = False
+) -> dict[str, bool]:
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
         select(PreprocessStash)
@@ -314,7 +316,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         .where(PreprocessStash.tag == message["tag"])
     ).all()
     if not stashed_files:
-        return True
+        return {"success": True}
 
     murfey_session = murfey_db.exec(
         select(MurfeySession).where(MurfeySession.id == message["session_id"])
@@ -348,7 +350,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         logger.warning(
             f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
         )
-        return False
+        return {"success": False, "requeue": False}
 
     murfey_ids = _murfey_id(
         collected_ids[3].id,
@@ -444,4 +446,4 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
             )
     murfey_db.commit()
     murfey_db.close()
-    return True
+    return {"success": True}

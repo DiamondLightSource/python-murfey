@@ -2462,17 +2462,17 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 return None
             # Run the workflow if a match is found
             workflow: EntryPoint = workflows[0]
-            result = workflow.load()(
+            result: dict[str, bool] = workflow.load()(
                 message=message,
                 murfey_db=_db,
             )
             if murfey.server._transport_object:
-                if result:
+                if result.get("success", False):
                     murfey.server._transport_object.transport.ack(header)
                 else:
                     # Send it directly to DLQ without trying to rerun it
                     murfey.server._transport_object.transport.nack(
-                        header, requeue=False
+                        header, requeue=result.get("requeue", False)
                     )
             if not result:
                 logger.error(

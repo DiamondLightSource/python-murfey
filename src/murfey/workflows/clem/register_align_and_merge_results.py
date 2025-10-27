@@ -41,7 +41,7 @@ class AlignAndMergeResult(BaseModel):
 
 def register_align_and_merge_result(
     message: dict, murfey_db: Session, demo: bool = False
-) -> bool:
+) -> dict[str, bool]:
     """
     session_id (recipe)
     register (wrapper)
@@ -69,13 +69,13 @@ def register_align_and_merge_result(
                 "Invalid type for align-and-merge processing result: "
                 f"{type(message['result'])}"
             )
-            return False
+            return {"success": False, "requeue": False}
     except Exception:
         logger.error(
             "Exception encountered when parsing align-and-merge processing result: \n"
             f"{traceback.format_exc()}"
         )
-        return False
+        return {"success": False, "requeue": False}
 
     # Outer try-finally block for tidying up database-related section of function
     try:
@@ -103,8 +103,8 @@ def register_align_and_merge_result(
                 f"{result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
-            return False
+            return {"success": False, "requeue": False}
 
-        return True
+        return {"success": True}
     finally:
         murfey_db.close()

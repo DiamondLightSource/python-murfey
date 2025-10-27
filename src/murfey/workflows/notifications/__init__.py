@@ -8,7 +8,7 @@ from murfey.util.db import NotificationParameter
 
 def notification_setup(
     message: dict, murfey_db: Session, num_instances_between_triggers: int = 500
-) -> bool:
+) -> dict[str, bool]:
     parameters: Dict[str, Tuple[float, float]] = {}
     for k in message.keys():
         parameter_name = ""
@@ -48,4 +48,4 @@ def notification_setup(
     murfey_db.add_all(existing_notification_parameters + new_notification_parameters)
     murfey_db.commit()
     murfey_db.close()
-    return True
+    return {"success": True}
