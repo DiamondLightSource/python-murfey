@@ -21,7 +21,6 @@ import mrcfile
 import numpy as np
 from backports.entry_points_selectable import entry_points
 from ispyb.sqlalchemy._auto_db_schema import (
-    Atlas,
     AutoProcProgram,
     Base,
     DataCollection,
@@ -2011,75 +2010,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             _db.close()
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "data_collection_group":
-            ispyb_session_id = get_session_id(
-                microscope=message["microscope"],
-                proposal_code=message["proposal_code"],
-                proposal_number=message["proposal_number"],
-                visit_number=message["visit_number"],
-                db=ISPyBSession(),
-            )
-            if dcg_murfey := _db.exec(
-                select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == message["session_id"])
-                .where(db.DataCollectionGroup.tag == message.get("tag"))
-            ).all():
-                dcgid = dcg_murfey[0].id
-            else:
-                if ispyb_session_id is None:
-                    murfey_dcg = db.DataCollectionGroup(
-                        session_id=message["session_id"],
-                        tag=message.get("tag"),
-                    )
-                    dcgid = murfey_dcg.id
-                else:
-                    record = DataCollectionGroup(
-                        sessionId=ispyb_session_id,
-                        experimentType=message["experiment_type"],
-                        experimentTypeId=message["experiment_type_id"],
-                    )
-                    dcgid = _register(record, header)
-                    atlas_record = Atlas(
-                        dataCollectionGroupId=dcgid,
-                        atlasImage=message.get("atlas", ""),
-                        pixelSize=message.get("atlas_pixel_size", 0),
-                        cassetteSlot=message.get("sample"),
-                    )
-                    if murfey.server._transport_object:
-                        atlas_id = murfey.server._transport_object.do_insert_atlas(
-                            atlas_record
-                        )["return_value"]
-                    else:
-                        atlas_id = None
-                    murfey_dcg = db.DataCollectionGroup(
-                        id=dcgid,
-                        atlas_id=atlas_id,
-                        atlas=message.get("atlas", ""),
-                        atlas_pixel_size=message.get("atlas_pixel_size"),
-                        sample=message.get("sample"),
-                        session_id=message["session_id"],
-                        tag=message.get("tag"),
-                    )
-                _db.add(murfey_dcg)
-                _db.commit()
-                _db.close()
-            if murfey.server._transport_object:
-                if dcgid is None:
-                    time.sleep(2)
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                    return None
-                murfey.server._transport_object.transport.ack(header)
-            if dcg_hooks := entry_points().select(
-                group="murfey.hooks", name="data_collection_group"
-            ):
-                try:
-                    for hook in dcg_hooks:
-                        hook.load()(dcgid, session_id=message["session_id"])
-                except Exception:
-                    logger.error(
-                        "Call to data collection group hook failed", exc_info=True
-                    )
             return None
         elif message["register"] == "atlas_update":
             if murfey.server._transport_object:
