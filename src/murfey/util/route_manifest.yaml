@@ -148,6 +148,15 @@ murfey.instrument_server.api.router:
         type: int
     methods:
       - POST
+  - path: /visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
     function: gather_upstream_tiffs
     path_params:
@@ -477,6 +486,13 @@ murfey.server.api.file_io_frontend.router:
         type: int
     methods:
       - POST
+  - path: /file_io/frontend/sessions/{session_id}/symlink
+    function: create_symlink
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.file_io_instrument.router:
   - path: /file_io/instrument/visits/{visit_name}/sessions/{session_id}/suggested_path
     function: suggest_path
@@ -602,6 +618,15 @@ murfey.server.api.instrument.router:
       - POST
   - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_tiff_data_request
     function: request_upstream_tiff_data_download
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
+    function: request_upstream_file_data_download
     path_params:
       - name: visit_name
         type: str
@@ -753,6 +778,26 @@ murfey.server.api.session_control.correlative_router:
         type: int
     methods:
       - GET
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file_paths
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file/{upstream_file_path:path}
+    function: get_upstream_file
+    path_params:
+      - name: visit_name
+        type: str
+      - name: upstream_file_path
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
   - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths
     function: gather_upstream_tiffs
     path_params:
@@ -763,7 +808,7 @@ murfey.server.api.session_control.correlative_router:
     methods:
       - GET
   - path: /session_control/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}
-    function: get_tiff
+    function: get_tiff_file
     path_params:
       - name: visit_name
         type: str
@@ -976,6 +1021,26 @@ murfey.server.api.session_info.correlative_router:
         type: int
     methods:
       - GET
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file_paths
+    function: gather_upstream_files
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_file/{upstream_file_path:path}
+    function: get_upstream_file
+    path_params:
+      - name: visit_name
+        type: str
+      - name: upstream_file_path
+        type: Path
+      - name: session_id
+        type: int
+    methods:
+      - GET
   - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths
     function: gather_upstream_tiffs
     path_params:
@@ -986,7 +1051,7 @@ murfey.server.api.session_info.correlative_router:
     methods:
       - GET
   - path: /session_info/correlative/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}
-    function: get_tiff
+    function: get_tiff_file
     path_params:
       - name: visit_name
         type: str

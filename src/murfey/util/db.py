@@ -341,6 +341,7 @@ class SessionProcessingParameters(SQLModel, table=True):  # type: ignore
     eer_fractionation: int = 20
     eer_fractionation_file: str = ""
     symmetry: str = "C1"
+    run_class3d: bool = True
     session: Optional[Session] = Relationship(
         back_populates="session_processing_parameters"
     )

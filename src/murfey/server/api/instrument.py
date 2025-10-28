@@ -27,7 +27,7 @@ from murfey.util import sanitise, secure_path
 from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
-from murfey.util.models import File, MultigridWatcherSetup
+from murfey.util.models import File, MultigridWatcherSetup, UpstreamFileRequestInfo
 
 # Create APIRouter class object
 router = APIRouter(
@@ -233,6 +233,7 @@ class ProvidedProcessingParameters(BaseModel):
     particle_diameter: Optional[float] = None
     symmetry: str = "C1"
     eer_fractionation: int = 20
+    run_class3d: bool = True
 
 
 @router.post("/sessions/{session_id}/provided_processing_parameters")
@@ -241,13 +242,26 @@ async def pass_proc_params_to_instrument_server(
 ):
     session = db.exec(select(Session).where(Session.id == session_id)).one()
 
-    session_processing_parameters = SessionProcessingParameters(
-        session_id=session_id,
-        dose_per_frame=proc_params.dose_per_frame,
-        gain_ref=session.current_gain_ref,
-        symmetry=proc_params.symmetry,
-        eer_fractionation=proc_params.eer_fractionation,
-    )
+    existing_parameters = db.exec(
+        select(SessionProcessingParameters).where(
+            SessionProcessingParameters.session_id == session_id
+        )
+    ).all()
+    if not existing_parameters:
+        session_processing_parameters = SessionProcessingParameters(
+            session_id=session_id,
+            dose_per_frame=proc_params.dose_per_frame,
+            gain_ref=session.current_gain_ref,
+            symmetry=proc_params.symmetry,
+            eer_fractionation=proc_params.eer_fractionation,
+            run_class3d=proc_params.run_class3d,
+        )
+    else:
+        session_processing_parameters = existing_parameters[0]
+        session_processing_parameters.dose_per_frame = proc_params.dose_per_frame
+        session_processing_parameters.eer_fractionation = proc_params.eer_fractionation
+        session_processing_parameters.symmetry = proc_params.symmetry
+        session_processing_parameters.run_class3d = proc_params.run_class3d
     db.add(session_processing_parameters)
     db.commit()
 
@@ -379,6 +393,64 @@ async def request_upstream_tiff_data_download(
                     },
                 ) as resp:
                     data = await resp.json()
+    return data
+
+
+@router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
+async def request_upstream_file_data_download(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    upstream_file_request: UpstreamFileRequestInfo,
+    db=murfey_db,
+):
+    """
+    Forwards a request to the instrument server to trigger a file download request.
+    """
+    # Load the current instrument's machine config
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    # Log and return errors if download directory or URL weren't specified
+    if not machine_config.upstream_data_download_directory:
+        log.error("No download directory was configured for this instrument")
+        return {
+            "success": False,
+            "detail": "No download directory configured",
+        }
+    if not machine_config.instrument_server_url:
+        log.error("Couldn't find instrument server URL to post request to")
+        return {
+            "success": False,
+            "detail": "No instrument server URL",
+        }
+
+    # Forward the download request
+    download_dir = str(
+        machine_config.upstream_data_download_directory / secure_filename(visit_name)
+    )
+    async with aiohttp.ClientSession() as clientsession:
+        url_path = url_path_for(
+            "api.router",
+            "gather_upstream_files",
+            visit_name=secure_filename(visit_name),
+            session_id=session_id,
+        )
+        async with clientsession.post(
+            f"{machine_config.instrument_server_url}{url_path}",
+            headers={
+                "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+            },
+            json={
+                "download_dir": download_dir,
+                "upstream_instrument": upstream_file_request.upstream_instrument,
+                "upstream_visit_path": str(upstream_file_request.upstream_visit_path),
+            },
+        ) as resp:
+            data = await resp.json()
     return data
 
 

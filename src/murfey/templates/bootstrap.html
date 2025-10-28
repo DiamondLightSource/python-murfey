@@ -2,7 +2,7 @@
 %} {% block content %}
 <h1>Bootstrapping Instructions</h1>
 <h2>1. Setting Up a POSIX Environment</h2>
-<h3>A. Installing MSYS2 (Recommended)</h3>
+<h3>Installing MSYS2</h3>
 <p>
   MSYS2 is a POSIX environment which provides extensive compiler support for the
   more modern programming languages used by Murfey's package dependencies.
@@ -47,7 +47,7 @@
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
     $ pacman -Syu
-    $ pacman -S msys2-runtime-3.6
+    $ pacman -S msys2-runtime
     $ pacman -S rsync
     $ pacman -S mingw-w64-ucrt-x86_64-python-pip
     $ pacman -S mingw-w64-ucrt-x86_64-rust
@@ -156,37 +156,6 @@
   shortcut icon to taste.
 </p>
 
-<h3>B. Installing Cygwin (Legacy)</h3>
-<p>
-  Cygwin is a lightweight POSIX environment that provides the minimum
-  requirements needed for a Windows client PC to run Murfey . However, it does
-  not support building and installing packages which have been written in Rust,
-  which many modern Python packages, including Murfey's dependencies, now make
-  use of. It is still possible to install and run Murfey via Cygwin, but older
-  versions of its dependencies will have to be installed.
-</p>
-<p>
-  To install, download the Cygwin setup executable using this
-  <a href="{{ proxy_path }}/cygwin/setup-x86_64.exe">mirror</a>, and then run
-  the following from a terminal (both Command Prompt and Windows Powershell
-  work):
-</p>
-<pre
-  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
->
-    $ setup-x86_64.exe -O -R C:\cygwin64 -s {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/cygwin -P curl,python3,rsync -q
-</pre>
-<p>
-  This will install Cygwin with the minimum packages needed to run Murfey. The
-  Cygwin install command will occasionally hang after completion. In such an
-  event, just hit Enter to return to a normal command prompt window.
-</p>
-<p>
-  If you already have a Cygwin install that you would like to preserve, rename
-  it so that it doesn't get overwritten (something like "cygwin64-old") before
-  running the command line above.
-</p>
-
 <h2>2. Setting Up Python</h2>
 <p>
   Once Python and
@@ -217,7 +186,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
+    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
 </pre>
 <p>
   If you wish to install the client-side dependencies needed to run Murfey via

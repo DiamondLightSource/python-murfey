@@ -27,6 +27,7 @@ class EditableSessionProcessingParameters(BaseModel):
     dose_per_frame: Optional[float] = None
     eer_fractionation_file: str = ""
     symmetry: str = ""
+    run_class3d: Optional[bool] = None
 
 
 @router.get("/sessions/{session_id}/session_processing_parameters")
@@ -46,6 +47,7 @@ def get_session_processing_parameters(
         dose_per_frame=proc_params.dose_per_frame,
         eer_fractionation_file=proc_params.eer_fractionation_file,
         symmetry=proc_params.symmetry,
+        run_class3d=proc_params.run_class3d,
     )
 
 
@@ -68,6 +70,8 @@ def set_session_processing_parameters(
         edited_parameters.eer_fractionation_file or proc_params.eer_fractionation_file
     )
     proc_params.symmetry = edited_parameters.symmetry or proc_params.symmetry
+    if edited_parameters.run_class3d is not None:
+        proc_params.run_class3d = edited_parameters.run_class3d
     db.add(proc_params)
     db.commit()
     db.close()

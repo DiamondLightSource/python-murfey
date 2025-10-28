@@ -241,6 +241,8 @@ def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
             db.Class2D.particles_file == particles_file and db.Class2D.pj_id == pj_id
         )
     ).all()
+    if not classes:
+        raise ValueError(f"No 2D classification IDs found for {particles_file}")
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
@@ -256,6 +258,8 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
             and db.Class3D.pj_id == pj_id
         )
     ).all()
+    if not classes:
+        raise ValueError(f"No 3D classification IDs found for {particles_file}")
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
@@ -2409,7 +2413,16 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "run_class3d":
-            _register_3d_batch(message, _db)
+            session_processing_parameters = _db.exec(
+                select(db.SessionProcessingParameters).where(
+                    db.SessionProcessingParameters.session_id == message["session_id"]
+                )
+            ).all()
+            if (
+                not session_processing_parameters
+                or session_processing_parameters[0].run_class3d
+            ):
+                _register_3d_batch(message, _db)
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
