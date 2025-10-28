@@ -23,9 +23,11 @@ from murfey.util.processing_params import default_tomo_parameters
 logger = getLogger("murfey.workflows.tomo.feedback")
 
 
-def _ids_tomo_classification(app_id: int, recipe: str, _db) -> Tuple[int, int]:
+def _ids_tomo_classification(
+    app_id: int, recipe: str, murfey_db: Session
+) -> Tuple[int, int]:
     dcg_id = (
-        _db.exec(
+        murfey_db.exec(
             select(AutoProcProgram, ProcessingJob, DataCollection)
             .where(AutoProcProgram.id == app_id)
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
@@ -35,7 +37,7 @@ def _ids_tomo_classification(app_id: int, recipe: str, _db) -> Tuple[int, int]:
         .dcg_id
     )
     pj_id = (
-        _db.exec(
+        murfey_db.exec(
             select(ProcessingJob, DataCollection)
             .where(DataCollection.dcg_id == dcg_id)
             .where(ProcessingJob.dc_id == DataCollection.id)
@@ -47,11 +49,11 @@ def _ids_tomo_classification(app_id: int, recipe: str, _db) -> Tuple[int, int]:
     return dcg_id, pj_id
 
 
-def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
+def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
     """Received picked particles from the tomogram autopick service"""
     # Add this message to the table of seen messages
     dcg_id, pj_id = _ids_tomo_classification(
-        message["program_id"], "em-tomo-class2d", _db
+        message["program_id"], "em-tomo-class2d", murfey_db
     )
 
     pick_params = TomogramPicks(
@@ -61,16 +63,16 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
         particle_count=message["particle_count"],
         tomogram_pixel_size=message["pixel_size"],
     )
-    _db.add(pick_params)
-    _db.commit()
+    murfey_db.add(pick_params)
+    murfey_db.commit()
 
-    picking_db_len = _db.exec(
+    picking_db_len = murfey_db.exec(
         select(func.count(ParticleSizes.id)).where(ParticleSizes.pj_id == pj_id)
     ).one()
     if picking_db_len > default_tomo_parameters.batch_size_2d:
         # If there are enough particles to get a diameter
         instrument_name = (
-            _db.exec(
+            murfey_db.exec(
                 select(MurfeySession).where(MurfeySession.id == message["session_id"])
             )
             .one()
@@ -79,7 +81,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
-        tomo_params = _db.exec(
+        tomo_params = murfey_db.exec(
             select(TomographyProcessingParameters).where(
                 TomographyProcessingParameters.dcg_id == dcg_id
             )
@@ -87,7 +89,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
 
         particle_diameter = tomo_params.particle_diameter
 
-        feedback_params = _db.exec(
+        feedback_params = murfey_db.exec(
             select(ClassificationFeedbackParameters).where(
                 ClassificationFeedbackParameters.pj_id == pj_id
             )
@@ -97,15 +99,15 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
 
         if not particle_diameter:
             # If the diameter has not been calculated then find it
-            picking_db = _db.exec(
+            picking_db = murfey_db.exec(
                 select(ParticleSizes.particle_size).where(ParticleSizes.pj_id == pj_id)
             ).all()
             particle_diameter = np.quantile(list(picking_db), 0.75)
             tomo_params.particle_diameter = particle_diameter
-            _db.add(tomo_params)
-            _db.commit()
+            murfey_db.add(tomo_params)
+            murfey_db.commit()
 
-            tomo_pick_db = _db.exec(
+            tomo_pick_db = murfey_db.exec(
                 select(TomogramPicks).where(TomogramPicks.pj_id == pj_id)
             ).all()
             for saved_message in tomo_pick_db:
@@ -114,13 +116,13 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     str(i + 1): m
                     for i, m in enumerate(
                         _murfey_id(
-                            _app_id(pj_id, _db),
-                            _db,
+                            _app_id(pj_id, murfey_db),
+                            murfey_db,
                             number=default_tomo_parameters.nr_classes_2d,
                         )
                     )
                 }
-                class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
+                class2d_grp_uuid = _murfey_id(_app_id(pj_id, murfey_db), murfey_db)[0]
                 zocalo_message: dict = {
                     "parameters": {
                         "tomogram": saved_message.tomogram,
@@ -130,7 +132,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                         "kv": tomo_params.voltage,
                         "node_creator_queue": machine_config.node_creator_queue,
                         "session_id": message["session_id"],
-                        "autoproc_program_id": _app_id(pj_id, _db),
+                        "autoproc_program_id": _app_id(pj_id, murfey_db),
                         "batch_size": default_tomo_parameters.batch_size_2d,
                         "nr_classes": default_tomo_parameters.nr_classes_2d,
                         "picker_id": None,
@@ -148,7 +150,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                         "processing_recipe", zocalo_message, new_connection=True
                     )
                 feedback_params.next_job += 2
-                _db.delete(saved_message)
+                murfey_db.delete(saved_message)
         else:
             # If the diameter is known then just send the new message
             particle_diameter = tomo_params.particle_diameter
@@ -156,13 +158,13 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                 str(i + 1): m
                 for i, m in enumerate(
                     _murfey_id(
-                        _app_id(pj_id, _db),
-                        _db,
+                        _app_id(pj_id, murfey_db),
+                        murfey_db,
                         number=default_tomo_parameters.nr_classes_2d,
                     )
                 )
             }
-            class2d_grp_uuid = _murfey_id(_app_id(pj_id, _db), _db)[0]
+            class2d_grp_uuid = _murfey_id(_app_id(pj_id, murfey_db), murfey_db)[0]
             zocalo_message = {
                 "parameters": {
                     "tomogram": message["tomogram"],
@@ -172,7 +174,7 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     "kv": tomo_params.voltage,
                     "node_creator_queue": machine_config.node_creator_queue,
                     "session_id": message["session_id"],
-                    "autoproc_program_id": _app_id(pj_id, _db),
+                    "autoproc_program_id": _app_id(pj_id, murfey_db),
                     "batch_size": default_tomo_parameters.batch_size_2d,
                     "nr_classes": default_tomo_parameters.nr_classes_2d,
                     "picker_id": None,
@@ -190,17 +192,17 @@ def _register_picked_tomogram_use_diameter(message: dict, _db: Session):
                     "processing_recipe", zocalo_message, new_connection=True
                 )
             feedback_params.next_job += 2
-        _db.add(feedback_params)
-        _db.commit()
+        murfey_db.add(feedback_params)
+        murfey_db.commit()
     else:
         # If not enough particles then save the new sizes
         particle_list = message.get("particle_diameters")
         assert isinstance(particle_list, list)
         for particle in particle_list:
             new_particle = ParticleSizes(pj_id=pj_id, particle_size=particle)
-            _db.add(new_particle)
-            _db.commit()
-    _db.close()
+            murfey_db.add(new_particle)
+            murfey_db.commit()
+    murfey_db.close()
 
 
 def picked_tomogram(message: dict, murfey_db: Session) -> bool:
