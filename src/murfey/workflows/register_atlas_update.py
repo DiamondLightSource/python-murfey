@@ -16,6 +16,9 @@ def run(
     if _transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
+
+    logger.info(f"Registering updated atlas: \n{message}")
+
     _transport_object.do_update_atlas(
         message["atlas_id"],
         message["atlas"],
