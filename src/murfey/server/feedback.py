@@ -41,7 +41,7 @@ from sqlmodel import Session, create_engine, select
 import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as db
-from murfey.server.ispyb import ISPyBSession, get_session_id
+from murfey.server.ispyb import ISPyBSession
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
 from murfey.util.config import (
@@ -2030,90 +2030,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     logger.error(
                         "Call to data collection group hook failed", exc_info=True
                     )
-            return None
-        elif message["register"] == "data_collection":
-            logger.debug(
-                "Received message named 'data_collection' containing the following items:\n"
-                f"{', '.join([f'{sanitise(key)}: {sanitise(str(value))}' for key, value in message.items()])}"
-            )
-            murfey_session_id = message["session_id"]
-            ispyb_session_id = get_session_id(
-                microscope=message["microscope"],
-                proposal_code=message["proposal_code"],
-                proposal_number=message["proposal_number"],
-                visit_number=message["visit_number"],
-                db=ISPyBSession(),
-            )
-            dcg = _db.exec(
-                select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == murfey_session_id)
-                .where(db.DataCollectionGroup.tag == message["source"])
-            ).all()
-            if dcg:
-                dcgid = dcg[0].id
-                # flush_data_collections(message["source"], _db)
-            else:
-                logger.warning(
-                    "No data collection group ID was found for image directory "
-                    f"{sanitise(message['image_directory'])} and source "
-                    f"{sanitise(message['source'])}"
-                )
-                if murfey.server._transport_object:
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if dc_murfey := _db.exec(
-                select(db.DataCollection)
-                .where(db.DataCollection.tag == message.get("tag"))
-                .where(db.DataCollection.dcg_id == dcgid)
-            ).all():
-                dcid = dc_murfey[0].id
-            else:
-                if ispyb_session_id is None:
-                    murfey_dc = db.DataCollection(
-                        tag=message.get("tag"),
-                        dcg_id=dcgid,
-                    )
-                else:
-                    record = DataCollection(
-                        SESSIONID=ispyb_session_id,
-                        experimenttype=message["experiment_type"],
-                        imageDirectory=message["image_directory"],
-                        imageSuffix=message["image_suffix"],
-                        voltage=message["voltage"],
-                        dataCollectionGroupId=dcgid,
-                        pixelSizeOnImage=message["pixel_size"],
-                        imageSizeX=message["image_size_x"],
-                        imageSizeY=message["image_size_y"],
-                        slitGapHorizontal=message.get("slit_width"),
-                        magnification=message.get("magnification"),
-                        exposureTime=message.get("exposure_time"),
-                        totalExposedDose=message.get("total_exposed_dose"),
-                        c2aperture=message.get("c2aperture"),
-                        phasePlate=int(message.get("phase_plate", 0)),
-                    )
-                    dcid = _register(
-                        record,
-                        header,
-                        tag=(
-                            message.get("tag")
-                            if message["experiment_type"] == "tomography"
-                            else ""
-                        ),
-                    )
-                    murfey_dc = db.DataCollection(
-                        id=dcid,
-                        tag=message.get("tag"),
-                        dcg_id=dcgid,
-                    )
-                _db.add(murfey_dc)
-                _db.commit()
-                dcid = murfey_dc.id
-                _db.close()
-            if dcid is None and murfey.server._transport_object:
-                murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
             return None
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
