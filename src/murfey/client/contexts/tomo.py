@@ -161,7 +161,13 @@ class TomographyContext(Context):
                             data=dc_data,
                         )
 
-                        for recipe in ("em-tomo-preprocess", "em-tomo-align"):
+                        recipes_to_assign_pjids = [
+                            "em-tomo-preprocess",
+                            "em-tomo-align",
+                        ]
+                        if not self._tilt_series_with_pjids:
+                            recipes_to_assign_pjids.append("em-tomo-class2d")
+                        for recipe in recipes_to_assign_pjids:
                             capture_post(
                                 base_url=str(environment.url.geturl()),
                                 router_name="workflow.router",

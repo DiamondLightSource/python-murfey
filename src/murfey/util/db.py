@@ -460,10 +460,16 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     spa_parameters: List["SPARelionParameters"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    spa_feedback_parameters: List["SPAFeedbackParameters"] = Relationship(
-        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    classification_feedback_parameters: List["ClassificationFeedbackParameters"] = (
+        Relationship(
+            back_populates="processing_job",
+            sa_relationship_kwargs={"cascade": "delete"},
+        )
     )
     ctf_parameters: List["CtfParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    tomogram_picks: List["TomogramPicks"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
     class2d_parameters: List["Class2DParameters"] = Relationship(
@@ -515,6 +521,7 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
     frame_count: int
     tilt_axis: float
     voltage: int
+    particle_diameter: Optional[float] = None
     eer_fractionation_file: Optional[str] = None
     motion_corr_binning: int = 1
     gain_ref: Optional[str] = None
@@ -558,8 +565,10 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     refine_parameters: Optional["RefineParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
-    spa_feedback_parameters: Optional["SPAFeedbackParameters"] = Relationship(
-        back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+    classification_feedback_parameters: Optional["ClassificationFeedbackParameters"] = (
+        Relationship(
+            back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
+        )
     )
     movies: Optional["Movie"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
@@ -672,6 +681,17 @@ class CtfParameters(SQLModel, table=True):  # type: ignore
     )
 
 
+class TomogramPicks(SQLModel, table=True):  # type: ignore
+    tomogram: str = Field(primary_key=True)
+    pj_id: int = Field(foreign_key="processingjob.id")
+    cbox_3d: str
+    particle_count: int
+    tomogram_pixel_size: float
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="tomogram_picks"
+    )
+
+
 class ParticleSizes(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
     pj_id: int = Field(foreign_key="processingjob.id")
@@ -701,7 +721,7 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
     )
 
 
-class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
+class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
@@ -715,10 +735,10 @@ class SPAFeedbackParameters(SQLModel, table=True):  # type: ignore
     picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
     picker_ispyb_id: Optional[int] = None
     processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="spa_feedback_parameters"
+        back_populates="classification_feedback_parameters"
     )
     murfey_ledger: Optional[MurfeyLedger] = Relationship(
-        back_populates="spa_feedback_parameters"
+        back_populates="classification_feedback_parameters"
     )
 
 

@@ -34,6 +34,7 @@ from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import MachineConfig
 from murfey.util.db import (
+    ClassificationFeedbackParameters,
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
@@ -44,7 +45,6 @@ from murfey.util.db import (
     RsyncInstance,
     Session,
     SessionProcessingParameters,
-    SPAFeedbackParameters,
     SPARelionParameters,
     Tilt,
     TiltSeries,
@@ -283,7 +283,7 @@ class ProcessingDetails(BaseModel):
     data_collections: List[DataCollection]
     processing_jobs: List[ProcessingJob]
     relion_params: SPARelionParameters
-    feedback_params: SPAFeedbackParameters
+    feedback_params: ClassificationFeedbackParameters
 
 
 @spa_router.get("/sessions/{session_id}/spa_processing_parameters")
@@ -296,13 +296,13 @@ def get_spa_proc_param_details(
             DataCollection,
             ProcessingJob,
             SPARelionParameters,
-            SPAFeedbackParameters,
+            ClassificationFeedbackParameters,
         )
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.id == DataCollection.dcg_id)
         .where(DataCollection.id == ProcessingJob.dc_id)
         .where(SPARelionParameters.pj_id == ProcessingJob.id)
-        .where(SPAFeedbackParameters.pj_id == ProcessingJob.id)
+        .where(ClassificationFeedbackParameters.pj_id == ProcessingJob.id)
     ).all()
     if not params:
         return None

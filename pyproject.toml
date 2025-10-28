@@ -110,6 +110,7 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
+"picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 
 [tool.setuptools]
