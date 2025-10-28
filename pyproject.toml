@@ -55,13 +55,13 @@ developer = [
 ]
 instrument-server = [
     "aiohttp",
-    "fastapi[standard]<0.116.0",
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "python-jose",
 ]
 server = [
     "aiohttp",
     "cryptography",
-    "fastapi[standard]<0.116.0",
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "graypy",
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
@@ -74,7 +74,7 @@ server = [
     "python-jose[cryptography]",
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
-    "stomp-py>8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
 ]
 [project.urls]
