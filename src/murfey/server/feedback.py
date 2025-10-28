@@ -2013,26 +2013,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
-        elif message["register"] == "atlas_update":
-            if murfey.server._transport_object:
-                murfey.server._transport_object.do_update_atlas(
-                    message["atlas_id"],
-                    message["atlas"],
-                    message["atlas_pixel_size"],
-                    message["sample"],
-                )
-                murfey.server._transport_object.transport.ack(header)
-            if dcg_hooks := entry_points().select(
-                group="murfey.hooks", name="data_collection_group"
-            ):
-                try:
-                    for hook in dcg_hooks:
-                        hook.load()(message["dcgid"], session_id=message["session_id"])
-                except Exception:
-                    logger.error(
-                        "Call to data collection group hook failed", exc_info=True
-                    )
-            return None
         elif message["register"] == "processing_job":
             murfey_session_id = message["session_id"]
             logger.info("registering processing job")

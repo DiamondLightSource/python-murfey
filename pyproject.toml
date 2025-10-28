@@ -101,6 +101,7 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
+"atlas_update" = "murfey.workflows.register_atlas_update:run"
 "clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:submit_cluster_request"
 "clem.process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
 "clem.process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
