@@ -614,7 +614,7 @@ class TransportManager:
         dcid = record.dataCollectionId
         if not dcid:
             log.error("Can not create job: DCID not specified")
-            return False
+            return {"success": False, "return_value": None}
 
         jp = self.ispyb.mx_processing.get_job_params()
         jp["automatic"] = record.automatic
