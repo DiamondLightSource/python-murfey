@@ -20,10 +20,7 @@ def run(
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
-    logger.info(
-        "Registering the following data collection:\n"
-        f"{', '.join([f'{sanitise(key)}: {sanitise(str(value))}' for key, value in message.items()])}"
-    )
+    logger.info(f"Registering the following data collection: \n{message}")
 
     murfey_session_id = message["session_id"]
     ispyb_session_id = get_session_id(
@@ -86,7 +83,7 @@ def run(
                     if message["experiment_type"] == "tomography"
                     else ""
                 ),
-            )
+            ).get("return_value", None)
             murfey_dc = MurfeyDB.DataCollection(
                 id=dcid,
                 tag=message.get("tag"),
@@ -98,5 +95,10 @@ def run(
         murfey_db.close()
 
     if dcid is None:
+        logger.error(
+            "Failed to register the following data collection: \n"
+            f"{message} \n"
+            "Requeueing message"
+        )
         return {"success": False, "requeue": True}
     return {"success": True}
