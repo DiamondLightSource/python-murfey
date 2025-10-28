@@ -12,7 +12,7 @@ import math
 import subprocess
 import time
 from datetime import datetime
-from functools import partial, singledispatch
+from functools import partial
 from importlib.metadata import EntryPoint  # For type hinting only
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Tuple
@@ -20,13 +20,6 @@ from typing import Dict, List, NamedTuple, Tuple
 import mrcfile
 import numpy as np
 from backports.entry_points_selectable import entry_points
-from ispyb.sqlalchemy._auto_db_schema import (
-    AutoProcProgram,
-    Base,
-    DataCollection,
-    DataCollectionGroup,
-    ProcessingJob,
-)
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
@@ -60,11 +53,6 @@ try:
     murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
     murfey_db = None
-
-
-class ExtendedRecord(NamedTuple):
-    record: Base  # type: ignore
-    record_params: List[Base]  # type: ignore
 
 
 class JobIDs(NamedTuple):
@@ -2262,65 +2250,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
         if murfey.server._transport_object:
             murfey.server._transport_object.transport.nack(header, requeue=False)
     return None
-
-
-@singledispatch
-def _register(record, header: dict, **kwargs):
-    raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
-
-
-@_register.register
-def _(record: Base, header: dict, **kwargs):  # type: ignore
-    if not murfey.server._transport_object:
-        logger.error(
-            f"No transport object found when processing record {record}. Message header: {header}"
-        )
-        return None
-    try:
-        if isinstance(record, DataCollection):
-            return murfey.server._transport_object.do_insert_data_collection(
-                record, **kwargs
-            )["return_value"]
-        if isinstance(record, DataCollectionGroup):
-            return murfey.server._transport_object.do_insert_data_collection_group(
-                record
-            )["return_value"]
-        if isinstance(record, ProcessingJob):
-            return murfey.server._transport_object.do_create_ispyb_job(record)[
-                "return_value"
-            ]
-        if isinstance(record, AutoProcProgram):
-            return murfey.server._transport_object.do_update_processing_status(record)[
-                "return_value"
-            ]
-        # session = Session()
-        # session.add(record)
-        # session.commit()
-        # murfey.server._transport_object.transport.ack(header, requeue=False)
-        return getattr(record, record.__table__.primary_key.columns[0].name)
-
-    except SQLAlchemyError as e:
-        logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
-        # murfey.server._transport_object.transport.nack(header)
-        return None
-    except AttributeError as e:
-        logger.error(
-            f"Murfey could not find primary key when inserting record {record}",
-            e,
-            exc_info=True,
-        )
-        return None
-
-
-@_register.register
-def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    if not murfey.server._transport_object:
-        raise ValueError(
-            "Transport object should not be None if a database record is being updated"
-        )
-    return murfey.server._transport_object.do_create_ispyb_job(
-        extended_record.record, params=extended_record.record_params
-    )["return_value"]
 
 
 def feedback_listen():
