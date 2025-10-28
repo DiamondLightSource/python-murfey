@@ -7,7 +7,6 @@ from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
@@ -39,7 +38,7 @@ logger = logging.getLogger("murfey.workflows.spa.flush_spa_preprocess")
 
 
 def register_grid_square(
-    session_id: MurfeySessionID,
+    session_id: int,
     gsid: int,
     grid_square_params: GridSquareParameters,
     murfey_db: Session,
@@ -119,7 +118,7 @@ def register_grid_square(
 
 
 def register_foil_hole(
-    session_id: MurfeySessionID,
+    session_id: int,
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
     murfey_db: Session,
