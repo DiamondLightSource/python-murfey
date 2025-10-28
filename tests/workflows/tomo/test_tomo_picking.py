@@ -173,7 +173,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
             "particle_diameter": 200,
         },
     )
-    for particle in range(10001):
+    for particle in range(5001):
         get_or_create_db_entry(
             murfey_db_session,
             ParticleSizes,
@@ -220,7 +220,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
                 "node_creator_queue": "node_creator",
                 "session_id": message["session_id"],
                 "autoproc_program_id": 0,
-                "batch_size": 10000,
+                "batch_size": 5000,
                 "nr_classes": 5,
                 "picker_id": None,
                 "class2d_grp_uuid": 6,
@@ -257,7 +257,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
             "particle_diameter": None,
         },
     )
-    for particle in range(10001):
+    for particle in range(5001):
         get_or_create_db_entry(
             murfey_db_session,
             ParticleSizes,
@@ -310,7 +310,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
                 "node_creator_queue": "node_creator",
                 "session_id": message["session_id"],
                 "autoproc_program_id": 0,
-                "batch_size": 10000,
+                "batch_size": 5000,
                 "nr_classes": 5,
                 "picker_id": None,
                 "class2d_grp_uuid": 12,
@@ -334,7 +334,7 @@ def test_picked_tomogram_run_class2d_estimate_diameter(
                 "node_creator_queue": "node_creator",
                 "session_id": message["session_id"],
                 "autoproc_program_id": 0,
-                "batch_size": 10000,
+                "batch_size": 5000,
                 "nr_classes": 5,
                 "picker_id": None,
                 "class2d_grp_uuid": 18,
