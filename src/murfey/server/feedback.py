@@ -26,7 +26,6 @@ from ispyb.sqlalchemy._auto_db_schema import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
-    ProcessingJobParameter,
 )
 from sqlalchemy import func
 from sqlalchemy.exc import (
@@ -41,7 +40,6 @@ from sqlmodel import Session, create_engine, select
 import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as db
-from murfey.server.ispyb import ISPyBSession
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
 from murfey.util.config import (
@@ -1901,7 +1899,6 @@ def _save_bfactor(message: dict, _db, demo: bool = False):
 
 def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
     try:
-        record = None
         if "environment" in message:
             params = message["recipe"][str(message["recipe-pointer"])].get(
                 "parameters", {}
@@ -2010,81 +2007,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             _db.commit()
             _db.close()
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "processing_job":
-            murfey_session_id = message["session_id"]
-            logger.info("registering processing job")
-            dc = _db.exec(
-                select(db.DataCollection, db.DataCollectionGroup)
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.DataCollectionGroup.session_id == murfey_session_id)
-                .where(db.DataCollectionGroup.tag == message["source"])
-                .where(db.DataCollection.tag == message["tag"])
-            ).all()
-            if dc:
-                _dcid = dc[0][0].id
-            else:
-                logger.warning(
-                    f"No data collection ID found for {sanitise(message['tag'])}"
-                )
-                if murfey.server._transport_object:
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if pj_murfey := _db.exec(
-                select(db.ProcessingJob)
-                .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.ProcessingJob.dc_id == _dcid)
-            ).all():
-                pid = pj_murfey[0].id
-            else:
-                if ISPyBSession() is None:
-                    murfey_pj = db.ProcessingJob(recipe=message["recipe"], dc_id=_dcid)
-                else:
-                    record = ProcessingJob(
-                        dataCollectionId=_dcid, recipe=message["recipe"]
-                    )
-                    run_parameters = message.get("parameters", {})
-                    assert isinstance(run_parameters, dict)
-                    if message.get("job_parameters"):
-                        job_parameters = [
-                            ProcessingJobParameter(parameterKey=k, parameterValue=v)
-                            for k, v in message["job_parameters"].items()
-                        ]
-                        pid = _register(ExtendedRecord(record, job_parameters), header)
-                    else:
-                        pid = _register(record, header)
-                    murfey_pj = db.ProcessingJob(
-                        id=pid, recipe=message["recipe"], dc_id=_dcid
-                    )
-                _db.add(murfey_pj)
-                _db.commit()
-                pid = murfey_pj.id
-                _db.close()
-            if pid is None and murfey.server._transport_object:
-                murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            prom.preprocessed_movies.labels(processing_job=pid)
-            if not _db.exec(
-                select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
-            ).all():
-                if ISPyBSession() is None:
-                    murfey_app = db.AutoProcProgram(pj_id=pid)
-                else:
-                    record = AutoProcProgram(
-                        processingJobId=pid, processingStartTime=datetime.now()
-                    )
-                    appid = _register(record, header)
-                    if appid is None and murfey.server._transport_object:
-                        murfey.server._transport_object.transport.nack(
-                            header, requeue=True
-                        )
-                        return None
-                    murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
-                _db.add(murfey_app)
-                _db.commit()
-                _db.close()
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
