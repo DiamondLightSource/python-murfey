@@ -21,6 +21,8 @@ def run(
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
+    logger.info(f"Registering the following data collection group: \n{message}")
+
     ispyb_session_id = get_session_id(
         microscope=message["microscope"],
         proposal_code=message["proposal_code"],
@@ -58,9 +60,9 @@ def run(
                 cassetteSlot=message.get("sample"),
             )
             if _transport_object:
-                atlas_id = _transport_object.do_insert_atlas(atlas_record)[
-                    "return_value"
-                ]
+                atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
+                    "return_value", None
+                )
             else:
                 atlas_id = None
             murfey_dcg = MurfeyDB.DataCollectionGroup(
@@ -77,6 +79,11 @@ def run(
         murfey_db.close()
     if dcgid is None:
         time.sleep(2)
+        logger.error(
+            "Failed to register the following data collection group: \n"
+            f"{message} \n"
+            "Requeuing message"
+        )
         return {"success": False, "requeue": True}
     if dcg_hooks := entry_points().select(
         group="murfey.hooks", name="data_collection_group"
