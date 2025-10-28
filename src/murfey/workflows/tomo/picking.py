@@ -205,6 +205,6 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
     murfey_db.close()
 
 
-def picked_tomogram(message: dict, murfey_db: Session) -> bool:
+def picked_tomogram(message: dict, murfey_db: Session) -> dict[str, bool]:
     _register_picked_tomogram_use_diameter(message, murfey_db)
-    return True
+    return {"success": True}
