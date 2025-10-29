@@ -444,7 +444,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
     return None
 
 
-def particles_picked(message: dict, murfey_db: Session) -> bool:
+def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
     ).one()
@@ -465,4 +465,4 @@ def particles_picked(message: dict, murfey_db: Session) -> bool:
         processing_job=_pj_id(message["program_id"], murfey_db)
     ).inc()
     _check_notifications(message, murfey_db)
-    return True
+    return {"success": True}

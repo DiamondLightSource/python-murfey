@@ -56,7 +56,7 @@ class CLEMPreprocessingResult(BaseModel):
     extent: list[float]
 
 
-def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
+def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool]:
     session_id: int = (
         int(message["session_id"])
         if not isinstance(message["session_id"], int)
@@ -72,13 +72,13 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
             logger.error(
                 f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
             )
-            return False
+            return {"success": False, "requeue": False}
     except Exception:
         logger.error(
             "Exception encountered when parsing TIFF preprocessing result: \n"
             f"{traceback.format_exc()}"
         )
-        return False
+        return {"success": False, "requeue": False}
 
     # Outer try-finally block for tidying up database-related section of function
     try:
@@ -181,7 +181,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
                 f"{result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
-            return False
+            return {"success": False, "requeue": False}
 
         # Load instrument name
         try:
@@ -197,7 +197,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
                 f"Error requesting data from database for {result.series_name!r} series: \n"
                 f"{traceback.format_exc()}"
             )
-            return False
+            return {"success": False, "requeue": False}
 
         # Construct list of files to use for image alignment and merging steps
         image_combos_to_process = [
@@ -234,12 +234,12 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> bool:
                     f"{result.series_name!r} series",
                     exc_info=True,
                 )
-                return False
+                return {"success": False, "requeue": False}
         logger.info(
             "Successfully requested image alignment and merging job for "
             f"{result.series_name!r} series"
         )
-        return True
+        return {"success": True}
 
     finally:
         murfey_db.close()

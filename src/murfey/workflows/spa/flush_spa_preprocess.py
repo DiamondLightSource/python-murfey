@@ -7,7 +7,6 @@ from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
 from murfey.server import _transport_object
-from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
@@ -39,7 +38,7 @@ logger = logging.getLogger("murfey.workflows.spa.flush_spa_preprocess")
 
 
 def register_grid_square(
-    session_id: MurfeySessionID,
+    session_id: int,
     gsid: int,
     grid_square_params: GridSquareParameters,
     murfey_db: Session,
@@ -119,7 +118,7 @@ def register_grid_square(
 
 
 def register_foil_hole(
-    session_id: MurfeySessionID,
+    session_id: int,
     gs_name: int,
     foil_hole_params: FoilHoleParameters,
     murfey_db: Session,
@@ -306,7 +305,9 @@ def _flush_position_analysis(
     return register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
 
 
-def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) -> bool:
+def flush_spa_preprocess(
+    message: dict, murfey_db: Session, demo: bool = False
+) -> dict[str, bool]:
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
         select(PreprocessStash)
@@ -314,7 +315,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         .where(PreprocessStash.tag == message["tag"])
     ).all()
     if not stashed_files:
-        return True
+        return {"success": True}
 
     murfey_session = murfey_db.exec(
         select(MurfeySession).where(MurfeySession.id == message["session_id"])
@@ -348,7 +349,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
         logger.warning(
             f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
         )
-        return False
+        return {"success": False, "requeue": False}
 
     murfey_ids = _murfey_id(
         collected_ids[3].id,
@@ -444,4 +445,4 @@ def flush_spa_preprocess(message: dict, murfey_db: Session, demo: bool = False) 
             )
     murfey_db.commit()
     murfey_db.close()
-    return True
+    return {"success": True}

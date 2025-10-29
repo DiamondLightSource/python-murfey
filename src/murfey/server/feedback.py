@@ -12,23 +12,16 @@ import math
 import subprocess
 import time
 from datetime import datetime
-from functools import partial, singledispatch
-from importlib.metadata import EntryPoint  # For type hinting only
+from functools import partial
+from importlib.metadata import (
+    EntryPoint,  # For type hinting only
+    entry_points,
+)
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Tuple
 
 import mrcfile
 import numpy as np
-from backports.entry_points_selectable import entry_points
-from ispyb.sqlalchemy._auto_db_schema import (
-    Atlas,
-    AutoProcProgram,
-    Base,
-    DataCollection,
-    DataCollectionGroup,
-    ProcessingJob,
-    ProcessingJobParameter,
-)
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
@@ -42,7 +35,6 @@ from sqlmodel import Session, create_engine, select
 import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as db
-from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
 from murfey.util.config import (
@@ -63,11 +55,6 @@ try:
     murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
     murfey_db = None
-
-
-class ExtendedRecord(NamedTuple):
-    record: Base  # type: ignore
-    record_params: List[Base]  # type: ignore
 
 
 class JobIDs(NamedTuple):
@@ -1902,7 +1889,6 @@ def _save_bfactor(message: dict, _db, demo: bool = False):
 
 def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
     try:
-        record = None
         if "environment" in message:
             params = message["recipe"][str(message["recipe-pointer"])].get(
                 "parameters", {}
@@ -2011,254 +1997,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
             _db.commit()
             _db.close()
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "data_collection_group":
-            ispyb_session_id = get_session_id(
-                microscope=message["microscope"],
-                proposal_code=message["proposal_code"],
-                proposal_number=message["proposal_number"],
-                visit_number=message["visit_number"],
-                db=ISPyBSession(),
-            )
-            if dcg_murfey := _db.exec(
-                select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == message["session_id"])
-                .where(db.DataCollectionGroup.tag == message.get("tag"))
-            ).all():
-                dcgid = dcg_murfey[0].id
-            else:
-                if ispyb_session_id is None:
-                    murfey_dcg = db.DataCollectionGroup(
-                        session_id=message["session_id"],
-                        tag=message.get("tag"),
-                    )
-                    dcgid = murfey_dcg.id
-                else:
-                    record = DataCollectionGroup(
-                        sessionId=ispyb_session_id,
-                        experimentType=message["experiment_type"],
-                        experimentTypeId=message["experiment_type_id"],
-                    )
-                    dcgid = _register(record, header)
-                    atlas_record = Atlas(
-                        dataCollectionGroupId=dcgid,
-                        atlasImage=message.get("atlas", ""),
-                        pixelSize=message.get("atlas_pixel_size", 0),
-                        cassetteSlot=message.get("sample"),
-                    )
-                    if murfey.server._transport_object:
-                        atlas_id = murfey.server._transport_object.do_insert_atlas(
-                            atlas_record
-                        )["return_value"]
-                    else:
-                        atlas_id = None
-                    murfey_dcg = db.DataCollectionGroup(
-                        id=dcgid,
-                        atlas_id=atlas_id,
-                        atlas=message.get("atlas", ""),
-                        atlas_pixel_size=message.get("atlas_pixel_size"),
-                        sample=message.get("sample"),
-                        session_id=message["session_id"],
-                        tag=message.get("tag"),
-                    )
-                _db.add(murfey_dcg)
-                _db.commit()
-                _db.close()
-            if murfey.server._transport_object:
-                if dcgid is None:
-                    time.sleep(2)
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                    return None
-                murfey.server._transport_object.transport.ack(header)
-            if dcg_hooks := entry_points().select(
-                group="murfey.hooks", name="data_collection_group"
-            ):
-                try:
-                    for hook in dcg_hooks:
-                        hook.load()(dcgid, session_id=message["session_id"])
-                except Exception:
-                    logger.error(
-                        "Call to data collection group hook failed", exc_info=True
-                    )
-            return None
-        elif message["register"] == "atlas_update":
-            if murfey.server._transport_object:
-                murfey.server._transport_object.do_update_atlas(
-                    message["atlas_id"],
-                    message["atlas"],
-                    message["atlas_pixel_size"],
-                    message["sample"],
-                )
-                murfey.server._transport_object.transport.ack(header)
-            if dcg_hooks := entry_points().select(
-                group="murfey.hooks", name="data_collection_group"
-            ):
-                try:
-                    for hook in dcg_hooks:
-                        hook.load()(message["dcgid"], session_id=message["session_id"])
-                except Exception:
-                    logger.error(
-                        "Call to data collection group hook failed", exc_info=True
-                    )
-            return None
-        elif message["register"] == "data_collection":
-            logger.debug(
-                "Received message named 'data_collection' containing the following items:\n"
-                f"{', '.join([f'{sanitise(key)}: {sanitise(str(value))}' for key, value in message.items()])}"
-            )
-            murfey_session_id = message["session_id"]
-            ispyb_session_id = get_session_id(
-                microscope=message["microscope"],
-                proposal_code=message["proposal_code"],
-                proposal_number=message["proposal_number"],
-                visit_number=message["visit_number"],
-                db=ISPyBSession(),
-            )
-            dcg = _db.exec(
-                select(db.DataCollectionGroup)
-                .where(db.DataCollectionGroup.session_id == murfey_session_id)
-                .where(db.DataCollectionGroup.tag == message["source"])
-            ).all()
-            if dcg:
-                dcgid = dcg[0].id
-                # flush_data_collections(message["source"], _db)
-            else:
-                logger.warning(
-                    "No data collection group ID was found for image directory "
-                    f"{sanitise(message['image_directory'])} and source "
-                    f"{sanitise(message['source'])}"
-                )
-                if murfey.server._transport_object:
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if dc_murfey := _db.exec(
-                select(db.DataCollection)
-                .where(db.DataCollection.tag == message.get("tag"))
-                .where(db.DataCollection.dcg_id == dcgid)
-            ).all():
-                dcid = dc_murfey[0].id
-            else:
-                if ispyb_session_id is None:
-                    murfey_dc = db.DataCollection(
-                        tag=message.get("tag"),
-                        dcg_id=dcgid,
-                    )
-                else:
-                    record = DataCollection(
-                        SESSIONID=ispyb_session_id,
-                        experimenttype=message["experiment_type"],
-                        imageDirectory=message["image_directory"],
-                        imageSuffix=message["image_suffix"],
-                        voltage=message["voltage"],
-                        dataCollectionGroupId=dcgid,
-                        pixelSizeOnImage=message["pixel_size"],
-                        imageSizeX=message["image_size_x"],
-                        imageSizeY=message["image_size_y"],
-                        slitGapHorizontal=message.get("slit_width"),
-                        magnification=message.get("magnification"),
-                        exposureTime=message.get("exposure_time"),
-                        totalExposedDose=message.get("total_exposed_dose"),
-                        c2aperture=message.get("c2aperture"),
-                        phasePlate=int(message.get("phase_plate", 0)),
-                    )
-                    dcid = _register(
-                        record,
-                        header,
-                        tag=(
-                            message.get("tag")
-                            if message["experiment_type"] == "tomography"
-                            else ""
-                        ),
-                    )
-                    murfey_dc = db.DataCollection(
-                        id=dcid,
-                        tag=message.get("tag"),
-                        dcg_id=dcgid,
-                    )
-                _db.add(murfey_dc)
-                _db.commit()
-                dcid = murfey_dc.id
-                _db.close()
-            if dcid is None and murfey.server._transport_object:
-                murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "processing_job":
-            murfey_session_id = message["session_id"]
-            logger.info("registering processing job")
-            dc = _db.exec(
-                select(db.DataCollection, db.DataCollectionGroup)
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.DataCollectionGroup.session_id == murfey_session_id)
-                .where(db.DataCollectionGroup.tag == message["source"])
-                .where(db.DataCollection.tag == message["tag"])
-            ).all()
-            if dc:
-                _dcid = dc[0][0].id
-            else:
-                logger.warning(
-                    f"No data collection ID found for {sanitise(message['tag'])}"
-                )
-                if murfey.server._transport_object:
-                    murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            if pj_murfey := _db.exec(
-                select(db.ProcessingJob)
-                .where(db.ProcessingJob.recipe == message["recipe"])
-                .where(db.ProcessingJob.dc_id == _dcid)
-            ).all():
-                pid = pj_murfey[0].id
-            else:
-                if ISPyBSession() is None:
-                    murfey_pj = db.ProcessingJob(recipe=message["recipe"], dc_id=_dcid)
-                else:
-                    record = ProcessingJob(
-                        dataCollectionId=_dcid, recipe=message["recipe"]
-                    )
-                    run_parameters = message.get("parameters", {})
-                    assert isinstance(run_parameters, dict)
-                    if message.get("job_parameters"):
-                        job_parameters = [
-                            ProcessingJobParameter(parameterKey=k, parameterValue=v)
-                            for k, v in message["job_parameters"].items()
-                        ]
-                        pid = _register(ExtendedRecord(record, job_parameters), header)
-                    else:
-                        pid = _register(record, header)
-                    murfey_pj = db.ProcessingJob(
-                        id=pid, recipe=message["recipe"], dc_id=_dcid
-                    )
-                _db.add(murfey_pj)
-                _db.commit()
-                pid = murfey_pj.id
-                _db.close()
-            if pid is None and murfey.server._transport_object:
-                murfey.server._transport_object.transport.nack(header, requeue=True)
-                return None
-            prom.preprocessed_movies.labels(processing_job=pid)
-            if not _db.exec(
-                select(db.AutoProcProgram).where(db.AutoProcProgram.pj_id == pid)
-            ).all():
-                if ISPyBSession() is None:
-                    murfey_app = db.AutoProcProgram(pj_id=pid)
-                else:
-                    record = AutoProcProgram(
-                        processingJobId=pid, processingStartTime=datetime.now()
-                    )
-                    appid = _register(record, header)
-                    if appid is None and murfey.server._transport_object:
-                        murfey.server._transport_object.transport.nack(
-                            header, requeue=True
-                        )
-                        return None
-                    murfey_app = db.AutoProcProgram(id=appid, pj_id=pid)
-                _db.add(murfey_app)
-                _db.commit()
-                _db.close()
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
@@ -2457,14 +2195,10 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
-        elif (
-            message["register"] in entry_points().select(group="murfey.workflows").names
-        ):
+        elif message["register"] in entry_points(group="murfey.workflows").names:
             # Search for corresponding workflow
             workflows: list[EntryPoint] = list(
-                entry_points().select(
-                    group="murfey.workflows", name=message["register"]
-                )
+                entry_points(group="murfey.workflows", name=message["register"])
             )  # Returns either 1 item or empty list
             if not workflows:
                 logger.error(f"No workflow found for {sanitise(message['register'])}")
@@ -2475,17 +2209,17 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 return None
             # Run the workflow if a match is found
             workflow: EntryPoint = workflows[0]
-            result = workflow.load()(
+            result: dict[str, bool] = workflow.load()(
                 message=message,
                 murfey_db=_db,
             )
             if murfey.server._transport_object:
-                if result:
+                if result.get("success", False):
                     murfey.server._transport_object.transport.ack(header)
                 else:
                     # Send it directly to DLQ without trying to rerun it
                     murfey.server._transport_object.transport.nack(
-                        header, requeue=False
+                        header, requeue=result.get("requeue", False)
                     )
             if not result:
                 logger.error(
@@ -2514,65 +2248,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
         if murfey.server._transport_object:
             murfey.server._transport_object.transport.nack(header, requeue=False)
     return None
-
-
-@singledispatch
-def _register(record, header: dict, **kwargs):
-    raise NotImplementedError(f"Not method to register {record} or type {type(record)}")
-
-
-@_register.register
-def _(record: Base, header: dict, **kwargs):  # type: ignore
-    if not murfey.server._transport_object:
-        logger.error(
-            f"No transport object found when processing record {record}. Message header: {header}"
-        )
-        return None
-    try:
-        if isinstance(record, DataCollection):
-            return murfey.server._transport_object.do_insert_data_collection(
-                record, **kwargs
-            )["return_value"]
-        if isinstance(record, DataCollectionGroup):
-            return murfey.server._transport_object.do_insert_data_collection_group(
-                record
-            )["return_value"]
-        if isinstance(record, ProcessingJob):
-            return murfey.server._transport_object.do_create_ispyb_job(record)[
-                "return_value"
-            ]
-        if isinstance(record, AutoProcProgram):
-            return murfey.server._transport_object.do_update_processing_status(record)[
-                "return_value"
-            ]
-        # session = Session()
-        # session.add(record)
-        # session.commit()
-        # murfey.server._transport_object.transport.ack(header, requeue=False)
-        return getattr(record, record.__table__.primary_key.columns[0].name)
-
-    except SQLAlchemyError as e:
-        logger.error(f"Murfey failed to insert ISPyB record {record}", e, exc_info=True)
-        # murfey.server._transport_object.transport.nack(header)
-        return None
-    except AttributeError as e:
-        logger.error(
-            f"Murfey could not find primary key when inserting record {record}",
-            e,
-            exc_info=True,
-        )
-        return None
-
-
-@_register.register
-def _(extended_record: ExtendedRecord, header: dict, **kwargs):
-    if not murfey.server._transport_object:
-        raise ValueError(
-            "Transport object should not be None if a database record is being updated"
-        )
-    return murfey.server._transport_object.do_create_ispyb_job(
-        extended_record.record, params=extended_record.record_params
-    )["return_value"]
 
 
 def feedback_listen():

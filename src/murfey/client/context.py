@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple
-
-from backports.entry_points_selectable import entry_points
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 

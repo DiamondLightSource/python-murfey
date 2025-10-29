@@ -78,4 +78,4 @@ def submit_cluster_request(
         },
         new_connection=True,
     )
-    return True
+    return {"success": True}

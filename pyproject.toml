@@ -29,7 +29,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "backports.entry_points_selectable",
     "defusedxml", # For safely parsing XML files
     "pydantic>=2",
     "pydantic-settings",
@@ -55,13 +54,14 @@ developer = [
 ]
 instrument-server = [
     "aiohttp",
-    "fastapi[standard]<0.116.0",
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "python-jose",
 ]
 server = [
     "aiohttp",
     "cryptography",
-    "fastapi[standard]<0.116.0",
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
+    "graypy",
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
@@ -73,7 +73,7 @@ server = [
     "python-jose[cryptography]",
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
-    "stomp-py<=8.1.0", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
 ]
 [project.urls]
@@ -100,14 +100,18 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.workflows"]
+"atlas_update" = "murfey.workflows.register_atlas_update:run"
 "clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:submit_cluster_request"
 "clem.process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
 "clem.process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
 "clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
 "clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
+"data_collection" = "murfey.workflows.register_data_collection:run"
+"data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
+"processing_job" = "murfey.workflows.register_processing_job:run"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 
 [tool.setuptools]
