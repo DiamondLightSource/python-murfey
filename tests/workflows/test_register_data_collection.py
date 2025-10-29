@@ -36,16 +36,21 @@ def test_run(
     ispyb_session_id, dcg_result, dc_result, insert_data_collection = test_params
 
     # Set up mock objects
+    # 'get_session_id'
     mock_get_session_id = mocker.patch(
         "murfey.workflows.register_data_collection.get_session_id"
     )
     mock_get_session_id.return_value = ispyb_session_id
+
+    # Transport object inserts
     mock_transport_object = mocker.patch(
         "murfey.workflows.register_data_collection._transport_object"
     )
     mock_transport_object.do_insert_data_collection.return_value = {
         "return_value": insert_data_collection
     }
+
+    # Murfey database
     mock_murfey_db = MagicMock()
     mock_dcg = MagicMock()
     mock_dcg.id = dcg_result
@@ -88,13 +93,12 @@ def test_run(
         if dc_result is None:
             if ispyb_session_id is not None:
                 mock_transport_object.do_insert_data_collection.assert_called_once()
-                if insert_data_collection is None:
-                    assert result == {"success": False, "requeue": True}
-                else:
+                if insert_data_collection is not None:
                     assert result == {"success": True}
+                else:
+                    assert result == {"success": False, "requeue": True}
             else:
                 mock_transport_object.do_insert_data_collection.assert_not_called()
-
                 assert result == {"success": False, "requeue": True}
         else:
             assert result == {"success": True}
