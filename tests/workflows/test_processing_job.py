@@ -94,19 +94,13 @@ def test_run(
             if ispyb_session is not None:
                 mock_transport_object.do_create_ispyb_job.assert_called_once()
                 if insert_job is not None:
-                    if pj_result is not None:
-                        mock_prom.preporcessed_movies.labels.assert_called_once()
                     if app_result is not None:
-                        if ispyb_session is not None:
+                        assert result == {"success": True}
+                    else:
+                        if update_status is not None:
                             assert result == {"success": True}
                         else:
-                            mock_transport_object.do_update_processing_status.assert_called_once()
-                            if update_status is not None:
-                                assert result == {"success": True}
-                            else:
-                                assert result == {"success": False, "requeue": True}
-                    else:
-                        assert {"success": True}
+                            assert result == {"success": False, "requeue": True}
                 else:
                     assert result == {"success": False, "requeue": True}
             else:
