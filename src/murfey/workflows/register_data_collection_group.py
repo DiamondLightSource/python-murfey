@@ -30,6 +30,7 @@ def run(
         visit_number=message["visit_number"],
         db=ISPyBSession(),
     )
+
     if dcg_murfey := murfey_db.exec(
         select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == message["session_id"])
@@ -53,18 +54,17 @@ def run(
             dcgid = _transport_object.do_insert_data_collection_group(record).get(
                 "return_value", None
             )
+
             atlas_record = ISPyBDB.Atlas(
                 dataCollectionGroupId=dcgid,
                 atlasImage=message.get("atlas", ""),
                 pixelSize=message.get("atlas_pixel_size", 0),
                 cassetteSlot=message.get("sample"),
             )
-            if _transport_object:
-                atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
-                    "return_value", None
-                )
-            else:
-                atlas_id = None
+            atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
+                "return_value", None
+            )
+
             murfey_dcg = MurfeyDB.DataCollectionGroup(
                 id=dcgid,
                 atlas_id=atlas_id,
@@ -77,6 +77,7 @@ def run(
         murfey_db.add(murfey_dcg)
         murfey_db.commit()
         murfey_db.close()
+
     if dcgid is None:
         time.sleep(2)
         logger.error(
@@ -85,6 +86,7 @@ def run(
             "Requeuing message"
         )
         return {"success": False, "requeue": True}
+
     if dcg_hooks := entry_points().select(
         group="murfey.hooks", name="data_collection_group"
     ):
@@ -93,4 +95,5 @@ def run(
                 hook.load()(dcgid, session_id=message["session_id"])
         except Exception:
             logger.error("Call to data collection group hook failed", exc_info=True)
+
     return {"success": True}
