@@ -18,8 +18,8 @@ register_data_collection_params_matrix = (
     (0, None, None, None),
     (None, 0, 0, 0),
     (None, 0, 0, None),
-    # (None, 0, None, 0),
-    # (None, 0, None, None),
+    (None, 0, None, 0),
+    (None, 0, None, None),
     (None, None, 0, 0),
     (None, None, 0, None),
     (None, None, None, 0),
@@ -95,6 +95,6 @@ def test_run(
             else:
                 mock_transport_object.do_insert_data_collection.assert_not_called()
 
-                assert result == {"success": True}
+                assert result == {"success": False, "requeue": True}
         else:
             assert result == {"success": True}
