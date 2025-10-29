@@ -3,11 +3,11 @@ from __future__ import annotations
 import os
 import socket
 from functools import lru_cache
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 import yaml
-from backports.entry_points_selectable import entry_points
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
 
@@ -270,6 +270,6 @@ def get_extended_machine_config(
     )
     if not machine_config:
         return None
-    model = entry_points().select(group="murfey.config", name=extension_name)[0].load()
+    model = entry_points(group="murfey.config", name=extension_name)[0].load()
     data = getattr(machine_config, extension_name, {})
     return model(**data)

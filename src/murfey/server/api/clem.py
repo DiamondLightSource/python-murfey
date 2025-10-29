@@ -3,12 +3,14 @@ from __future__ import annotations
 import re
 import traceback
 from ast import literal_eval
-from importlib.metadata import EntryPoint  # type hinting only
+from importlib.metadata import (
+    EntryPoint,  # type hinting only
+    entry_points,
+)
 from logging import getLogger
 from pathlib import Path
 from typing import Literal, Optional, Type, Union
 
-from backports.entry_points_selectable import entry_points
 from fastapi import APIRouter
 from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import NoResultFound
@@ -752,9 +754,7 @@ def process_raw_lifs(
     try:
         # Try and load relevant Murfey workflow
         workflow: EntryPoint = list(
-            entry_points().select(
-                group="murfey.workflows", name="clem.process_raw_lifs"
-            )
+            entry_points(group="murfey.workflows", name="clem.process_raw_lifs")
         )[0]
     except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
@@ -792,9 +792,7 @@ def process_raw_tiffs(
     try:
         # Try and load relevant Murfey workflow
         workflow: EntryPoint = list(
-            entry_points().select(
-                group="murfey.workflows", name="clem.process_raw_tiffs"
-            )
+            entry_points(group="murfey.workflows", name="clem.process_raw_tiffs")
         )[0]
     except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")
@@ -853,7 +851,7 @@ def align_and_merge_stacks(
     try:
         # Try and load relevant Murfey workflow
         workflow: EntryPoint = list(
-            entry_points().select(group="murfey.workflows", name="clem.align_and_merge")
+            entry_points(group="murfey.workflows", name="clem.align_and_merge")
         )[0]
     except IndexError:
         raise RuntimeError("The relevant Murfey workflow was not found")

@@ -1,7 +1,7 @@
+from importlib.metadata import entry_points
 from unittest.mock import MagicMock
 
 import pytest
-from backports.entry_points_selectable import entry_points
 from pytest_mock import MockerFixture
 
 feedback_callback_params_matrix = (
@@ -46,7 +46,7 @@ def test_feedback_callback(
     mock_sql_session.return_value = mock_murfey_db
 
     # Load the entry point and patch the executable it calls
-    eps = list(entry_points().select(group="murfey.workflows", name=entry_point_name))
+    eps = list(entry_points(group="murfey.workflows", name=entry_point_name))
     assert len(eps) == 1  # Entry point should be present and unique
     mock_function = mocker.patch(eps[0].value.replace(":", "."))
 

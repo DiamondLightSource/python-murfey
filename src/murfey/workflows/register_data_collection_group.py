@@ -1,8 +1,8 @@
 import logging
 import time
+from importlib.metadata import entry_points
 
 import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
-from backports.entry_points_selectable import entry_points
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
@@ -87,9 +87,7 @@ def run(
         )
         return {"success": False, "requeue": True}
 
-    if dcg_hooks := entry_points().select(
-        group="murfey.hooks", name="data_collection_group"
-    ):
+    if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
             for hook in dcg_hooks:
                 hook.load()(dcgid, session_id=message["session_id"])

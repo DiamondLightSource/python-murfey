@@ -13,13 +13,15 @@ import subprocess
 import time
 from datetime import datetime
 from functools import partial
-from importlib.metadata import EntryPoint  # For type hinting only
+from importlib.metadata import (
+    EntryPoint,  # For type hinting only
+    entry_points,
+)
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Tuple
 
 import mrcfile
 import numpy as np
-from backports.entry_points_selectable import entry_points
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
@@ -2193,14 +2195,10 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
-        elif (
-            message["register"] in entry_points().select(group="murfey.workflows").names
-        ):
+        elif message["register"] in entry_points(group="murfey.workflows").names:
             # Search for corresponding workflow
             workflows: list[EntryPoint] = list(
-                entry_points().select(
-                    group="murfey.workflows", name=message["register"]
-                )
+                entry_points(group="murfey.workflows", name=message["register"])
             )  # Returns either 1 item or empty list
             if not workflows:
                 logger.error(f"No workflow found for {sanitise(message['register'])}")

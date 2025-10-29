@@ -1,6 +1,6 @@
 import logging
+from importlib.metadata import entry_points
 
-from backports.entry_points_selectable import entry_points
 from sqlmodel.orm.session import Session as SQLModelSession
 
 from murfey.server import _transport_object
@@ -25,9 +25,7 @@ def run(
         message["atlas_pixel_size"],
         message["sample"],
     )
-    if dcg_hooks := entry_points().select(
-        group="murfey.hooks", name="data_collection_group"
-    ):
+    if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
             for hook in dcg_hooks:
                 hook.load()(message["dcgid"], session_id=message["session_id"])

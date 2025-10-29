@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import entry_points
 
-from backports.entry_points_selectable import entry_points
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
