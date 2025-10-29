@@ -203,13 +203,20 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
         image_combos_to_process = [
             list(result.output_files.values())  # Composite image of all channels
         ]
-        # Create additional job for fluorescent-only composite image if fluorescent channels are present
+        # Create additional fluorescent-only and bright field-only jobs
         if ("gray" in result.output_files.keys()) and len(result.output_files) > 1:
             image_combos_to_process.append(
                 [
                     file
                     for channel, file in result.output_files.items()
                     if channel != "gray"
+                ]
+            )
+            image_combos_to_process.append(
+                [
+                    file
+                    for channel, file in result.output_files.items()
+                    if channel == "gray"
                 ]
             )
 
