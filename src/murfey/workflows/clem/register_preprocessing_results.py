@@ -17,15 +17,8 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
-from murfey.util.db import (
-    CLEMImageMetadata,
-    CLEMImageSeries,
-    CLEMImageStack,
-    CLEMLIFFile,
-    CLEMTIFFFile,
-    Session as MurfeySession,
-)
 from murfey.util.processing_params import (
     default_clem_align_and_merge_parameters as processing_params,
 )
@@ -84,23 +77,23 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
     try:
         # Register items in database if not already present
         try:
-            clem_img_series: CLEMImageSeries = get_db_entry(
+            clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
                 db=murfey_db,
-                table=CLEMImageSeries,
+                table=MurfeyDB.CLEMImageSeries,
                 session_id=session_id,
                 series_name=result.series_name,
             )
-            clem_metadata: CLEMImageMetadata = get_db_entry(
+            clem_metadata: MurfeyDB.CLEMImageMetadata = get_db_entry(
                 db=murfey_db,
-                table=CLEMImageMetadata,
+                table=MurfeyDB.CLEMImageMetadata,
                 session_id=session_id,
                 file_path=result.metadata,
             )
             # Register and link parent LIF file if present
             if result.parent_lif is not None:
-                clem_lif_file: CLEMLIFFile = get_db_entry(
+                clem_lif_file: MurfeyDB.CLEMLIFFile = get_db_entry(
                     db=murfey_db,
-                    table=CLEMLIFFile,
+                    table=MurfeyDB.CLEMLIFFile,
                     session_id=session_id,
                     file_path=result.parent_lif,
                 )
@@ -115,9 +108,9 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
 
             # Iteratively register the output image stacks
             for c, (channel, output_file) in enumerate(result.output_files.items()):
-                clem_img_stk: CLEMImageStack = get_db_entry(
+                clem_img_stk: MurfeyDB.CLEMImageStack = get_db_entry(
                     db=murfey_db,
-                    table=CLEMImageStack,
+                    table=MurfeyDB.CLEMImageStack,
                     session_id=session_id,
                     file_path=output_file,
                 )
@@ -154,9 +147,9 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                     # Register TIFF file subset
                     clem_tiff_files = []
                     for file in tiff_file_subset:
-                        clem_tiff_file: CLEMTIFFFile = get_db_entry(
+                        clem_tiff_file: MurfeyDB.CLEMTIFFFile = get_db_entry(
                             db=murfey_db,
-                            table=CLEMTIFFFile,
+                            table=MurfeyDB.CLEMTIFFFile,
                             session_id=session_id,
                             file_path=file,
                         )
@@ -187,7 +180,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
         try:
             instrument_name = (
                 murfey_db.exec(
-                    select(MurfeySession).where(MurfeySession.id == session_id)
+                    select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
                 )
                 .one()
                 .instrument_name
