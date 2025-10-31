@@ -153,7 +153,11 @@ class TransportManager:
         return {"success": False, "return_value": None}
 
     def do_update_atlas(
-        self, atlas_id: int, atlas_image: str, pixel_size: float, slot: int
+        self,
+        atlas_id: int,
+        atlas_image: str,
+        pixel_size: float,
+        slot: int | None,
     ):
         try:
             with ISPyBSession() as db:
