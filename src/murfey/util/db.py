@@ -3,8 +3,6 @@ Contains classes that are used to store information on the metadata and status o
 of the sessions that Murfey is overseeing, along with the relationships between them.
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import List, Optional
 
@@ -237,54 +235,60 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     have been compiled together from individual TIFF files.
     """
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     series_name: str = Field(
         index=True
     )  # Name of the series, as determined from the metadata
-    search_string: str | None = Field(default=None)  # Path for globbing with
+    search_string: Optional[str] = Field(default=None)  # Path for globbing with
 
-    session: Session | None = Relationship(back_populates="image_series")  # Many to one
-    session_id: int | None = Field(foreign_key="session.id", default=None, unique=False)
+    session: Optional["Session"] = Relationship(
+        back_populates="image_series"
+    )  # Many to one
+    session_id: Optional[int] = Field(
+        foreign_key="session.id", default=None, unique=False
+    )
 
     # Type of data (atlas/overview or grid square)
-    data_type: str = Field(default="")  # "atlas" or "grid_square"
+    data_type: Optional[str] = Field(default=None)  # "atlas" or "grid_square"
 
     # Link to data collection group
-    data_collection_group: DataCollectionGroup | None = Relationship(
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="clem_image_series"
     )
-    dcg_id: int | None = Field(foreign_key="datacollectiongroup.id", default=None)
-    dcg_name: str = Field(default="")
+    dcg_id: Optional[int] = Field(foreign_key="datacollectiongroup.id", default=None)
+    dcg_name: Optional[str] = Field(default=None)
 
     # Link to grid squares
-    grid_square: GridSquare | None = Relationship(back_populates="clem_image_series")
-    grid_square_id: int | None = Field(foreign_key="gridsquare.id", default=None)
+    grid_square: Optional["GridSquare"] = Relationship(
+        back_populates="clem_image_series"
+    )
+    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
 
     # The parent LIF file this series originates from, if any
-    parent_lif: CLEMLIFFile | None = Relationship(
+    parent_lif: Optional["CLEMLIFFile"] = Relationship(
         back_populates="child_series",
     )  # Many to one
-    parent_lif_id: int | None = Field(
+    parent_lif_id: Optional[int] = Field(
         foreign_key="clemliffile.id",
         default=None,
     )
 
     # The parent TIFF files used to build up the image stacks in the series, if any
-    parent_tiffs: list[CLEMTIFFFile] = Relationship(
+    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
         back_populates="child_series", sa_relationship_kwargs={"cascade": "delete"}
     )  # One to many
 
     # Metadata file for this series
-    associated_metadata: CLEMImageMetadata | None = Relationship(
+    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
         back_populates="associated_series",
     )  # One to one
-    metadata_id: int | None = Field(
+    metadata_id: Optional[int] = Field(
         foreign_key="clemimagemetadata.id",
         default=None,
     )
 
     # Image stack entries that are part of this series
-    child_stacks: list[CLEMImageStack] = Relationship(
+    child_stacks: List["CLEMImageStack"] = Relationship(
         back_populates="parent_series",
         sa_relationship_kwargs={"cascade": "delete"},
     )  # One to many
@@ -401,7 +405,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    clem_image_series: list["CLEMImageSeries"] = Relationship(
+    clem_image_series: List["CLEMImageSeries"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -607,7 +611,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     pixel_size: Optional[float] = None
     image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
-    clem_image_series: list["CLEMImageSeries"] = Relationship(
+    clem_image_series: List["CLEMImageSeries"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
     foil_holes: List["FoilHole"] = Relationship(
