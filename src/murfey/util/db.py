@@ -254,6 +254,7 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
         back_populates="clem_image_series"
     )
     dcg_id: int | None = Field(foreign_key="datacollectiongroup.id", default=None)
+    dcg_name: str = Field(default="")
 
     # Link to grid squares
     grid_square: GridSquare | None = Relationship(back_populates="clem_image_series")
