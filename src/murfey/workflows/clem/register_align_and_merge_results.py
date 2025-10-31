@@ -87,7 +87,6 @@ def register_align_and_merge_result(
                 session_id=session_id,
                 series_name=result.series_name,
             )
-            clem_img_series.composite_image = str(result.composite_image)
             clem_img_series.composite_created = True
             murfey_db.add(clem_img_series)
             murfey_db.commit()
