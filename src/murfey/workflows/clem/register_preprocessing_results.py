@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import traceback
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -164,10 +165,17 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                     murfey_db.add_all(clem_tiff_files)
                     murfey_db.commit()
 
+            # Add data type and image search string
+            clem_img_series.search_string = str(output_file.parent / "*tiff")
+            clem_img_series.data_type = (
+                "atlas" if "Overview_" in result.series_name else "grid_square"
+            )
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
+
             logger.info(
                 f"CLEM preprocessing results registered for {result.series_name!r} "
             )
-
         except Exception:
             logger.error(
                 "Exception encountered when registering CLEM preprocessing result for "
@@ -176,21 +184,120 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
             )
             return {"success": False, "requeue": False}
 
-        # Load instrument name
         try:
-            instrument_name = (
-                murfey_db.exec(
-                    select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-                )
-                .one()
-                .instrument_name
+            # Load current session from database
+            murfey_session = murfey_db.exec(
+                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+            ).one()
+
+            # Determine variables to register data collection group and atlas with
+            visit_name = murfey_session.visit
+            proposal_code = "".join(
+                char for char in visit_name.split("-")[0] if char.isalpha()
             )
+            proposal_number = "".join(
+                char for char in visit_name.split("-")[0] if char.isdigit()
+            )
+            visit_number = visit_name.split("-")[-1]
+
+            # Generate name/tag for data colleciton group based on series name
+            dcg_name = result.series_name.split("--")[0]
+            if result.series_name.split("--")[1].isdigit():
+                dcg_name += f"--{result.series_name.split('--')[1]}"
+
+            # Determine values for atlas
+            if "Overview_" in result.series_name:  # These are atlas datasets
+                atlas_name = str(output_file.parent / "*.tiff")
+                atlas_pixel_size = result.pixel_size
+            else:
+                atlas_name = ""
+                atlas_pixel_size = 0.0
+
+            registration_result: dict[str, bool]
+            if dcg_search := murfey_db.exec(
+                select(MurfeyDB.DataCollectionGroup)
+                .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+                .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+            ).all():
+                # Update atlas if registering atlas dataset
+                # and data collection group already exists
+                dcg_entry = dcg_search[0]
+                if "Overview_" in result.series_name:
+                    atlas_message = {
+                        "session_id": session_id,
+                        "dcgid": dcg_entry.id,
+                        "atlas_id": dcg_entry.atlas_id,
+                        "atlas": atlas_name,
+                        "atlas_pixel_size": atlas_pixel_size,
+                        "sample": dcg_entry.sample,
+                    }
+                    if entry_point_result := entry_points(
+                        group="murfey.workflows", name="atlas_update"
+                    ):
+                        (workflow,) = entry_point_result
+                        registration_result = workflow.load()(
+                            message=atlas_message,
+                            murfey_db=murfey_db,
+                        )
+                    else:
+                        logger.warning("No workflow found for 'atlas_update'")
+                        registration_result = {"success": False, "requeue": False}
+                else:
+                    registration_result = {"success": True}
+            else:
+                # Register data collection group
+                dcg_message = {
+                    "microscope": murfey_session.instrument_name,
+                    "proposal_code": proposal_code,
+                    "proposal_number": proposal_number,
+                    "visit_number": visit_number,
+                    "session_id": session_id,
+                    "tag": dcg_name,
+                    "experiment_type": "experiment",
+                    "experiment_type_id": None,
+                    "atlas": atlas_name,
+                    "atlas_pixel_size": atlas_pixel_size,
+                    "sample": None,
+                }
+                if entry_point_result := entry_points(
+                    group="murfey.workflows", name="data_collection_group"
+                ):
+                    (workflow,) = entry_point_result
+                    # Register grid square
+                    registration_result = workflow.load()(
+                        message=dcg_message,
+                        murfey_db=murfey_db,
+                    )
+                else:
+                    logger.warning("No workflow found for 'data_collection_group'")
+                    registration_result = {"success": False, "requeue": False}
+            if registration_result.get("success", False):
+                logger.info(
+                    "Successfully registered data collection group for CLEM workflow "
+                    f"using{result.series_name!r}"
+                )
+            else:
+                logger.warning(
+                    "Failed to register data collection group for CLEM workflow "
+                    f"using {result.series_name!r}"
+                )
+
+            # Store data collection group id in CLEM image series table
+            dcg_entry = murfey_db.exec(
+                select(MurfeyDB.DataCollectionGroup)
+                .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+                .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+            ).one()
+            clem_img_series.dcg_id = dcg_entry.id
+            clem_img_series.dcg_name = dcg_entry.tag
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
         except Exception:
             logger.error(
-                f"Error requesting data from database for {result.series_name!r} series: \n"
+                "Exception encountered when registering data collection group for CLEM workflow "
+                f"using {result.series_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
-            return {"success": False, "requeue": False}
 
         # Construct list of files to use for image alignment and merging steps
         image_combos_to_process = [
@@ -218,7 +325,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
             try:
                 submit_cluster_request(
                     session_id=session_id,
-                    instrument_name=instrument_name,
+                    instrument_name=murfey_session.instrument_name,
                     series_name=result.series_name,
                     images=image_combo,
                     metadata=result.metadata,
