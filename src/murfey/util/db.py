@@ -292,9 +292,19 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
         back_populates="parent_series",
         sa_relationship_kwargs={"cascade": "delete"},
     )  # One to many
-    number_of_members: int = (
-        0  # Expected number of image stacks belonging to this series
-    )
+    number_of_members: Optional[int] = Field(default=None)
+
+    # Shape and resolution information
+    pixels_x: Optional[int] = Field(default=None)
+    pixels_y: Optional[int] = Field(default=None)
+    pixel_size: Optional[float] = Field(default=None)
+    units: Optional[str] = Field(default=None)
+
+    # Extent of the imaged area in real space
+    x0: Optional[float] = Field(default=None)
+    x1: Optional[float] = Field(default=None)
+    y0: Optional[float] = Field(default=None)
+    y1: Optional[float] = Field(default=None)
 
     # Composite images
     composite_created: bool = False  # Has a composite image been created?
