@@ -50,6 +50,221 @@ class CLEMPreprocessingResult(BaseModel):
     extent: list[float]
 
 
+def _register_results_in_murfey(
+    session_id: int, result: CLEMPreprocessingResult, murfey_db: Session
+):
+    clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
+        db=murfey_db,
+        table=MurfeyDB.CLEMImageSeries,
+        session_id=session_id,
+        series_name=result.series_name,
+    )
+    clem_metadata: MurfeyDB.CLEMImageMetadata = get_db_entry(
+        db=murfey_db,
+        table=MurfeyDB.CLEMImageMetadata,
+        session_id=session_id,
+        file_path=result.metadata,
+    )
+    # Register and link parent LIF file if present
+    if result.parent_lif is not None:
+        clem_lif_file: MurfeyDB.CLEMLIFFile = get_db_entry(
+            db=murfey_db,
+            table=MurfeyDB.CLEMLIFFile,
+            session_id=session_id,
+            file_path=result.parent_lif,
+        )
+        clem_img_series.parent_lif = clem_lif_file
+        clem_metadata.parent_lif = clem_lif_file
+
+    # Link and commit series and metadata tables first
+    clem_img_series.associated_metadata = clem_metadata
+    clem_img_series.number_of_members = result.number_of_members
+    murfey_db.add_all([clem_img_series, clem_metadata])
+    murfey_db.commit()
+
+    # Iteratively register the output image stacks
+    for c, (channel, output_file) in enumerate(result.output_files.items()):
+        clem_img_stk: MurfeyDB.CLEMImageStack = get_db_entry(
+            db=murfey_db,
+            table=MurfeyDB.CLEMImageStack,
+            session_id=session_id,
+            file_path=output_file,
+        )
+
+        # Link associated metadata
+        clem_img_stk.associated_metadata = clem_metadata
+        clem_img_stk.parent_series = clem_img_series
+        clem_img_stk.channel_name = channel
+        if result.parent_lif is not None:
+            clem_img_stk.parent_lif = clem_lif_file
+        murfey_db.add(clem_img_stk)
+        murfey_db.commit()
+
+        # Register and link parent TIFF files if present
+        if result.parent_tiffs:
+            seed_file = result.parent_tiffs[channel][0]
+            if c == 0:
+                # Load list of files to register from seed file
+                series_identifier = seed_file.stem.split("--")[0] + "--"
+                tiff_list = list(seed_file.parent.glob(f"{series_identifier}--"))
+
+            # Load TIFF files by colour channel if "--C" in file stem
+            match = re.search(r"--C[\d]{2,3}", seed_file.stem)
+            tiff_file_subset = [
+                file
+                for file in tiff_list
+                if file.stem.startswith(series_identifier)
+                and (match.group(0) in file.stem if match else True)
+            ]
+            tiff_file_subset.sort()
+
+            # Register TIFF file subset
+            clem_tiff_files = []
+            for file in tiff_file_subset:
+                clem_tiff_file: MurfeyDB.CLEMTIFFFile = get_db_entry(
+                    db=murfey_db,
+                    table=MurfeyDB.CLEMTIFFFile,
+                    session_id=session_id,
+                    file_path=file,
+                )
+
+                # Link associated metadata
+                clem_tiff_file.associated_metadata = clem_metadata
+                clem_tiff_file.child_series = clem_img_series
+                clem_tiff_file.child_stack = clem_img_stk
+
+                clem_tiff_files.append(clem_tiff_file)
+
+            murfey_db.add_all(clem_tiff_files)
+            murfey_db.commit()
+
+    # Add data type and image search string
+    clem_img_series.search_string = str(output_file.parent / "*tiff")
+    clem_img_series.data_type = (
+        "atlas" if "Overview_" in result.series_name else "grid_square"
+    )
+    murfey_db.add(clem_img_series)
+    murfey_db.commit()
+
+    logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
+
+
+def _register_results_in_ispyb(
+    session_id: int,
+    instrument_name: str,
+    visit_name: str,
+    result: CLEMPreprocessingResult,
+    murfey_db: Session,
+):
+    # Determine variables to register data collection group and atlas with
+    proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
+    proposal_number = "".join(
+        char for char in visit_name.split("-")[0] if char.isdigit()
+    )
+    visit_number = visit_name.split("-")[-1]
+
+    # Generate name/tag for data colleciton group based on series name
+    dcg_name = result.series_name.split("--")[0]
+    if result.series_name.split("--")[1].isdigit():
+        dcg_name += f"--{result.series_name.split('--')[1]}"
+
+    # Determine values for atlas
+    if "Overview_" in result.series_name:  # These are atlas datasets
+        output_file = list(result.output_files.values())[0]
+        atlas_name = str(output_file.parent / "*.tiff")
+        atlas_pixel_size = result.pixel_size
+    else:
+        atlas_name = ""
+        atlas_pixel_size = 0.0
+
+    registration_result: dict[str, bool]
+    if dcg_search := murfey_db.exec(
+        select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+    ).all():
+        # Update atlas if registering atlas dataset
+        # and data collection group already exists
+        dcg_entry = dcg_search[0]
+        if "Overview_" in result.series_name:
+            atlas_message = {
+                "session_id": session_id,
+                "dcgid": dcg_entry.id,
+                "atlas_id": dcg_entry.atlas_id,
+                "atlas": atlas_name,
+                "atlas_pixel_size": atlas_pixel_size,
+                "sample": dcg_entry.sample,
+            }
+            if entry_point_result := entry_points(
+                group="murfey.workflows", name="atlas_update"
+            ):
+                (workflow,) = entry_point_result
+                registration_result = workflow.load()(
+                    message=atlas_message,
+                    murfey_db=murfey_db,
+                )
+            else:
+                logger.warning("No workflow found for 'atlas_update'")
+                registration_result = {"success": False, "requeue": False}
+        else:
+            registration_result = {"success": True}
+    else:
+        # Register data collection group and placeholder for the atlas
+        dcg_message = {
+            "microscope": instrument_name,
+            "proposal_code": proposal_code,
+            "proposal_number": proposal_number,
+            "visit_number": visit_number,
+            "session_id": session_id,
+            "tag": dcg_name,
+            "experiment_type": "experiment",
+            "experiment_type_id": None,
+            "atlas": atlas_name,
+            "atlas_pixel_size": atlas_pixel_size,
+            "sample": None,
+        }
+        if entry_point_result := entry_points(
+            group="murfey.workflows", name="data_collection_group"
+        ):
+            (workflow,) = entry_point_result
+            # Register grid square
+            registration_result = workflow.load()(
+                message=dcg_message,
+                murfey_db=murfey_db,
+            )
+        else:
+            logger.warning("No workflow found for 'data_collection_group'")
+            registration_result = {"success": False, "requeue": False}
+    if registration_result.get("success", False):
+        logger.info(
+            "Successfully registered data collection group for CLEM workflow "
+            f"using{result.series_name!r}"
+        )
+    else:
+        logger.warning(
+            "Failed to register data collection group for CLEM workflow "
+            f"using {result.series_name!r}"
+        )
+
+    # Store data collection group id in CLEM image series table
+    dcg_entry = murfey_db.exec(
+        select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+    ).one()
+
+    clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
+        db=murfey_db,
+        table=MurfeyDB.CLEMImageSeries,
+        session_id=session_id,
+        series_name=result.series_name,
+    )
+    clem_img_series.dcg_id = dcg_entry.id
+    clem_img_series.dcg_name = dcg_entry.tag
+    murfey_db.add(clem_img_series)
+    murfey_db.commit()
+
+
 def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool]:
     session_id: int = (
         int(message["session_id"])
@@ -76,105 +291,22 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
 
     # Outer try-finally block for tidying up database-related section of function
     try:
-        # Register items in database if not already present
         try:
-            clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
-                db=murfey_db,
-                table=MurfeyDB.CLEMImageSeries,
+            # Load current session from database
+            murfey_session = murfey_db.exec(
+                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+            ).one()
+        except Exception:
+            logger.error(
+                "Exception encountered when loading Murfey session information: \n",
+                f"{traceback.format_exc()}",
+            )
+        try:
+            # Register items in Murfey database
+            _register_results_in_murfey(
                 session_id=session_id,
-                series_name=result.series_name,
-            )
-            clem_metadata: MurfeyDB.CLEMImageMetadata = get_db_entry(
-                db=murfey_db,
-                table=MurfeyDB.CLEMImageMetadata,
-                session_id=session_id,
-                file_path=result.metadata,
-            )
-            # Register and link parent LIF file if present
-            if result.parent_lif is not None:
-                clem_lif_file: MurfeyDB.CLEMLIFFile = get_db_entry(
-                    db=murfey_db,
-                    table=MurfeyDB.CLEMLIFFile,
-                    session_id=session_id,
-                    file_path=result.parent_lif,
-                )
-                clem_img_series.parent_lif = clem_lif_file
-                clem_metadata.parent_lif = clem_lif_file
-
-            # Link and commit series and metadata tables first
-            clem_img_series.associated_metadata = clem_metadata
-            clem_img_series.number_of_members = result.number_of_members
-            murfey_db.add_all([clem_img_series, clem_metadata])
-            murfey_db.commit()
-
-            # Iteratively register the output image stacks
-            for c, (channel, output_file) in enumerate(result.output_files.items()):
-                clem_img_stk: MurfeyDB.CLEMImageStack = get_db_entry(
-                    db=murfey_db,
-                    table=MurfeyDB.CLEMImageStack,
-                    session_id=session_id,
-                    file_path=output_file,
-                )
-
-                # Link associated metadata
-                clem_img_stk.associated_metadata = clem_metadata
-                clem_img_stk.parent_series = clem_img_series
-                clem_img_stk.channel_name = channel
-                if result.parent_lif is not None:
-                    clem_img_stk.parent_lif = clem_lif_file
-                murfey_db.add(clem_img_stk)
-                murfey_db.commit()
-
-                # Register and link parent TIFF files if present
-                if result.parent_tiffs:
-                    seed_file = result.parent_tiffs[channel][0]
-                    if c == 0:
-                        # Load list of files to register from seed file
-                        series_identifier = seed_file.stem.split("--")[0] + "--"
-                        tiff_list = list(
-                            seed_file.parent.glob(f"{series_identifier}--")
-                        )
-
-                    # Load TIFF files by colour channel if "--C" in file stem
-                    match = re.search(r"--C[\d]{2,3}", seed_file.stem)
-                    tiff_file_subset = [
-                        file
-                        for file in tiff_list
-                        if file.stem.startswith(series_identifier)
-                        and (match.group(0) in file.stem if match else True)
-                    ]
-                    tiff_file_subset.sort()
-
-                    # Register TIFF file subset
-                    clem_tiff_files = []
-                    for file in tiff_file_subset:
-                        clem_tiff_file: MurfeyDB.CLEMTIFFFile = get_db_entry(
-                            db=murfey_db,
-                            table=MurfeyDB.CLEMTIFFFile,
-                            session_id=session_id,
-                            file_path=file,
-                        )
-
-                        # Link associated metadata
-                        clem_tiff_file.associated_metadata = clem_metadata
-                        clem_tiff_file.child_series = clem_img_series
-                        clem_tiff_file.child_stack = clem_img_stk
-
-                        clem_tiff_files.append(clem_tiff_file)
-
-                    murfey_db.add_all(clem_tiff_files)
-                    murfey_db.commit()
-
-            # Add data type and image search string
-            clem_img_series.search_string = str(output_file.parent / "*tiff")
-            clem_img_series.data_type = (
-                "atlas" if "Overview_" in result.series_name else "grid_square"
-            )
-            murfey_db.add(clem_img_series)
-            murfey_db.commit()
-
-            logger.info(
-                f"CLEM preprocessing results registered for {result.series_name!r} "
+                result=result,
+                murfey_db=murfey_db,
             )
         except Exception:
             logger.error(
@@ -183,115 +315,15 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                 f"{traceback.format_exc()}"
             )
             return {"success": False, "requeue": False}
-
         try:
-            # Load current session from database
-            murfey_session = murfey_db.exec(
-                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-            ).one()
-
-            # Determine variables to register data collection group and atlas with
-            visit_name = murfey_session.visit
-            proposal_code = "".join(
-                char for char in visit_name.split("-")[0] if char.isalpha()
+            # Register items in ISPyB
+            _register_results_in_ispyb(
+                session_id=session_id,
+                instrument_name=murfey_session.instrument_name,
+                visit_name=murfey_session.visit,
+                result=result,
+                murfey_db=murfey_db,
             )
-            proposal_number = "".join(
-                char for char in visit_name.split("-")[0] if char.isdigit()
-            )
-            visit_number = visit_name.split("-")[-1]
-
-            # Generate name/tag for data colleciton group based on series name
-            dcg_name = result.series_name.split("--")[0]
-            if result.series_name.split("--")[1].isdigit():
-                dcg_name += f"--{result.series_name.split('--')[1]}"
-
-            # Determine values for atlas
-            if "Overview_" in result.series_name:  # These are atlas datasets
-                atlas_name = str(output_file.parent / "*.tiff")
-                atlas_pixel_size = result.pixel_size
-            else:
-                atlas_name = ""
-                atlas_pixel_size = 0.0
-
-            registration_result: dict[str, bool]
-            if dcg_search := murfey_db.exec(
-                select(MurfeyDB.DataCollectionGroup)
-                .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-                .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
-            ).all():
-                # Update atlas if registering atlas dataset
-                # and data collection group already exists
-                dcg_entry = dcg_search[0]
-                if "Overview_" in result.series_name:
-                    atlas_message = {
-                        "session_id": session_id,
-                        "dcgid": dcg_entry.id,
-                        "atlas_id": dcg_entry.atlas_id,
-                        "atlas": atlas_name,
-                        "atlas_pixel_size": atlas_pixel_size,
-                        "sample": dcg_entry.sample,
-                    }
-                    if entry_point_result := entry_points(
-                        group="murfey.workflows", name="atlas_update"
-                    ):
-                        (workflow,) = entry_point_result
-                        registration_result = workflow.load()(
-                            message=atlas_message,
-                            murfey_db=murfey_db,
-                        )
-                    else:
-                        logger.warning("No workflow found for 'atlas_update'")
-                        registration_result = {"success": False, "requeue": False}
-                else:
-                    registration_result = {"success": True}
-            else:
-                # Register data collection group
-                dcg_message = {
-                    "microscope": murfey_session.instrument_name,
-                    "proposal_code": proposal_code,
-                    "proposal_number": proposal_number,
-                    "visit_number": visit_number,
-                    "session_id": session_id,
-                    "tag": dcg_name,
-                    "experiment_type": "experiment",
-                    "experiment_type_id": None,
-                    "atlas": atlas_name,
-                    "atlas_pixel_size": atlas_pixel_size,
-                    "sample": None,
-                }
-                if entry_point_result := entry_points(
-                    group="murfey.workflows", name="data_collection_group"
-                ):
-                    (workflow,) = entry_point_result
-                    # Register grid square
-                    registration_result = workflow.load()(
-                        message=dcg_message,
-                        murfey_db=murfey_db,
-                    )
-                else:
-                    logger.warning("No workflow found for 'data_collection_group'")
-                    registration_result = {"success": False, "requeue": False}
-            if registration_result.get("success", False):
-                logger.info(
-                    "Successfully registered data collection group for CLEM workflow "
-                    f"using{result.series_name!r}"
-                )
-            else:
-                logger.warning(
-                    "Failed to register data collection group for CLEM workflow "
-                    f"using {result.series_name!r}"
-                )
-
-            # Store data collection group id in CLEM image series table
-            dcg_entry = murfey_db.exec(
-                select(MurfeyDB.DataCollectionGroup)
-                .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-                .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
-            ).one()
-            clem_img_series.dcg_id = dcg_entry.id
-            clem_img_series.dcg_name = dcg_entry.tag
-            murfey_db.add(clem_img_series)
-            murfey_db.commit()
         except Exception:
             logger.error(
                 "Exception encountered when registering data collection group for CLEM workflow "
@@ -303,8 +335,8 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
         image_combos_to_process = [
             list(result.output_files.values())  # Composite image of all channels
         ]
-        # Create additional fluorescent-only and bright field-only jobs
         if ("gray" in result.output_files.keys()) and len(result.output_files) > 1:
+            # Create additional fluorescent-only composite image
             image_combos_to_process.append(
                 [
                     file
@@ -312,6 +344,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                     if channel != "gray"
                 ]
             )
+            # Create additional bright field-only image
             image_combos_to_process.append(
                 [
                     file
