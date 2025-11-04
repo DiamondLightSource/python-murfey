@@ -43,6 +43,16 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     murfey_db: Session,
 ):
+    # Calculate scaled down version of the image for registration to ISPyB first
+    if grid_square_params.x_location is not None:
+        grid_square_params.x_location_scaled = int(grid_square_params.x_location / 7.8)
+    if grid_square_params.y_location is not None:
+        grid_square_params.y_location_scaled = int(grid_square_params.y_location / 7.8)
+    if grid_square_params.height is not None:
+        grid_square_params.height_scaled = int(grid_square_params.height / 7.8)
+    if grid_square_params.width is not None:
+        grid_square_params.width_scaled = int(grid_square_params.width / 7.8)
+
     try:
         grid_square = murfey_db.exec(
             select(GridSquare)
