@@ -301,6 +301,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                 "Exception encountered when loading Murfey session information: \n",
                 f"{traceback.format_exc()}",
             )
+            return {"success": False, "requeue": False}
         try:
             # Register items in Murfey database
             _register_results_in_murfey(
