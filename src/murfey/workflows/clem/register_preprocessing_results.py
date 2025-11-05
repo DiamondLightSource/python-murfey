@@ -20,6 +20,7 @@ from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
+from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     default_clem_align_and_merge_parameters as processing_params,
 )
@@ -47,11 +48,13 @@ class CLEMPreprocessingResult(BaseModel):
     units: str
     pixel_size: float
     resolution: float
-    extent: list[float]
+    extent: list[float]  # [x0, x1, y0, y1]
 
 
-def _register_results_in_murfey(
-    session_id: int, result: CLEMPreprocessingResult, murfey_db: Session
+def _register_clem_image_series(
+    session_id: int,
+    result: CLEMPreprocessingResult,
+    murfey_db: Session,
 ):
     clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
         db=murfey_db,
@@ -76,9 +79,8 @@ def _register_results_in_murfey(
         clem_img_series.parent_lif = clem_lif_file
         clem_metadata.parent_lif = clem_lif_file
 
-    # Link and commit series and metadata tables first
+    # Link and commit series and metadata tables
     clem_img_series.associated_metadata = clem_metadata
-    clem_img_series.number_of_members = result.number_of_members
     murfey_db.add_all([clem_img_series, clem_metadata])
     murfey_db.commit()
 
@@ -138,18 +140,28 @@ def _register_results_in_murfey(
             murfey_db.add_all(clem_tiff_files)
             murfey_db.commit()
 
-    # Add data type and image search string
+    # Add metadata for this series
     clem_img_series.search_string = str(output_file.parent / "*tiff")
     clem_img_series.data_type = (
         "atlas" if "Overview_" in result.series_name else "grid_square"
     )
+    clem_img_series.number_of_members = result.number_of_members
+    clem_img_series.pixels_x = result.pixels_x
+    clem_img_series.pixels_y = result.pixels_y
+    clem_img_series.pixel_size = result.pixel_size
+    clem_img_series.units = result.units
+    clem_img_series.x0 = result.extent[0]
+    clem_img_series.x1 = result.extent[1]
+    clem_img_series.y0 = result.extent[2]
+    clem_img_series.y1 = result.extent[3]
     murfey_db.add(clem_img_series)
     murfey_db.commit()
+    murfey_db.close()
 
     logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
 
 
-def _register_results_in_ispyb(
+def _register_dcg_and_atlas(
     session_id: int,
     instrument_name: str,
     visit_name: str,
@@ -177,15 +189,14 @@ def _register_results_in_ispyb(
         atlas_name = ""
         atlas_pixel_size = 0.0
 
-    registration_result: dict[str, bool]
     if dcg_search := murfey_db.exec(
         select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
         .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
     ).all():
+        dcg_entry = dcg_search[0]
         # Update atlas if registering atlas dataset
         # and data collection group already exists
-        dcg_entry = dcg_search[0]
         if "Overview_" in result.series_name:
             atlas_message = {
                 "session_id": session_id,
@@ -199,15 +210,12 @@ def _register_results_in_ispyb(
                 group="murfey.workflows", name="atlas_update"
             ):
                 (workflow,) = entry_point_result
-                registration_result = workflow.load()(
+                _ = workflow.load()(
                     message=atlas_message,
                     murfey_db=murfey_db,
                 )
             else:
                 logger.warning("No workflow found for 'atlas_update'")
-                registration_result = {"success": False, "requeue": False}
-        else:
-            registration_result = {"success": True}
     else:
         # Register data collection group and placeholder for the atlas
         dcg_message = {
@@ -228,23 +236,12 @@ def _register_results_in_ispyb(
         ):
             (workflow,) = entry_point_result
             # Register grid square
-            registration_result = workflow.load()(
+            _ = workflow.load()(
                 message=dcg_message,
                 murfey_db=murfey_db,
             )
         else:
             logger.warning("No workflow found for 'data_collection_group'")
-            registration_result = {"success": False, "requeue": False}
-    if registration_result.get("success", False):
-        logger.info(
-            "Successfully registered data collection group for CLEM workflow "
-            f"using{result.series_name!r}"
-        )
-    else:
-        logger.warning(
-            "Failed to register data collection group for CLEM workflow "
-            f"using {result.series_name!r}"
-        )
 
     # Store data collection group id in CLEM image series table
     dcg_entry = murfey_db.exec(
@@ -263,6 +260,162 @@ def _register_results_in_ispyb(
     clem_img_series.dcg_name = dcg_entry.tag
     murfey_db.add(clem_img_series)
     murfey_db.commit()
+    murfey_db.close()
+
+
+def _register_grid_square(
+    session_id: int,
+    result: CLEMPreprocessingResult,
+    murfey_db: Session,
+):
+    # Skip this step if no transport manager object is configured
+    if _transport_object is None:
+        logger.error("Unable to find transport manager")
+        return
+    # Load all entries for the current data collection group
+    dcg_name = result.series_name.split("--")[0]
+    if result.series_name.split("--")[1].isdigit():
+        dcg_name += f"--{result.series_name.split('--')[1]}"
+
+    # Check if an atlas has been registered
+    if atlas_search := murfey_db.exec(
+        select(MurfeyDB.CLEMImageSeries)
+        .where(MurfeyDB.CLEMImageSeries.session_id == session_id)
+        .where(MurfeyDB.CLEMImageSeries.dcg_name == dcg_name)
+        .where(MurfeyDB.CLEMImageSeries.data_type == "atlas")
+    ).all():
+        atlas_entry = atlas_search[0]
+    else:
+        logger.info(
+            f"No atlas has been registered for data collection group {dcg_name!r} yet"
+        )
+        return
+
+    # Check if there are CLEM entries to register
+    if clem_img_series_to_register := murfey_db.exec(
+        select(MurfeyDB.CLEMImageSeries)
+        .where(MurfeyDB.CLEMImageSeries.session_id == session_id)
+        .where(MurfeyDB.CLEMImageSeries.dcg_name == dcg_name)
+        .where(MurfeyDB.CLEMImageSeries.data_type == "grid_square")
+    ):
+        if (
+            atlas_entry.x0 is not None
+            and atlas_entry.x1 is not None
+            and atlas_entry.y0 is not None
+            and atlas_entry.y1 is not None
+            and atlas_entry.pixels_x is not None
+            and atlas_entry.pixels_y is not None
+        ):
+            atlas_width_real = atlas_entry.x1 - atlas_entry.x0
+            atlas_height_real = atlas_entry.y1 - atlas_entry.y0
+        else:
+            logger.warning("Atlas entry not populated with required values")
+            return
+
+        for clem_img_series in clem_img_series_to_register:
+            if (
+                clem_img_series.x0 is not None
+                and clem_img_series.x1 is not None
+                and clem_img_series.y0 is not None
+                and clem_img_series.y1 is not None
+            ):
+                # Find pixel corresponding to image midpoint on atlas
+                x_mid_real = (
+                    0.5 * (clem_img_series.x0 + clem_img_series.x1) - atlas_entry.x0
+                )
+                x_mid_px = int(x_mid_real / atlas_width_real * atlas_entry.pixels_x)
+                y_mid_real = (
+                    0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
+                )
+                y_mid_px = int(y_mid_real / atlas_height_real * atlas_entry.pixels_y)
+            else:
+                logger.warning(
+                    f"Image series {clem_img_series.series_name!r} not populated with required values"
+                )
+                continue
+
+            # Populate grid square Pydantic model
+            grid_square_params = GridSquareParameters(
+                tag=dcg_name,
+                x_location=clem_img_series.x0,
+                x_location_scaled=x_mid_px,
+                y_location=clem_img_series.y0,
+                y_location_scaled=y_mid_px,
+                height=clem_img_series.pixels_x,
+                width=clem_img_series.pixels_y,
+                x_stage_position=clem_img_series.x0,
+                y_stage_position=clem_img_series.y0,
+                pixel_size=clem_img_series.pixel_size,
+                image=clem_img_series.search_string,
+            )
+            # Register or update the grid square entry as required
+            if grid_square_result := murfey_db.exec(
+                select(MurfeyDB.GridSquare)
+                .where(MurfeyDB.GridSquare.name == clem_img_series.id)
+                .where(MurfeyDB.GridSquare.tag == grid_square_params.tag)
+                .where(MurfeyDB.GridSquare.session_id == session_id)
+            ).all():
+                # Update existing grid square entry on Murfey
+                grid_square_entry = grid_square_result[0]
+                grid_square_entry.x_location = grid_square_params.x_location
+                grid_square_entry.y_location = grid_square_params.y_location
+                grid_square_entry.x_stage_position = grid_square_params.x_stage_position
+                grid_square_entry.y_stage_position = grid_square_params.y_stage_position
+                grid_square_entry.readout_area_x = grid_square_params.readout_area_x
+                grid_square_entry.readout_area_y = grid_square_params.readout_area_y
+                grid_square_entry.thumbnail_size_x = grid_square_params.thumbnail_size_x
+                grid_square_entry.thumbnail_size_y = grid_square_params.thumbnail_size_y
+                grid_square_entry.pixel_size = grid_square_params.pixel_size
+                grid_square_entry.image = grid_square_params.image
+
+                # Update existing entry on ISPyB
+                _transport_object.do_update_grid_square(
+                    grid_square_id=grid_square_entry.id,
+                    grid_square_parameters=grid_square_params,
+                )
+            else:
+                # Look up data collection group for current series
+                dcg_entry = murfey_db.exec(
+                    select(MurfeyDB.DataCollectionGroup)
+                    .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+                    .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
+                ).one()
+                # Register to ISPyB
+                grid_square_ispyb_result = _transport_object.do_insert_grid_square(
+                    atlas_id=dcg_entry.atlas_id,
+                    grid_square_id=clem_img_series.id,
+                    grid_square_parameters=grid_square_params,
+                )
+                # Register to Murfey
+                grid_square_entry = MurfeyDB.GridSquare(
+                    id=grid_square_ispyb_result.get("return_value", None),
+                    name=clem_img_series.id,
+                    session_id=session_id,
+                    tag=grid_square_params.tag,
+                    x_location=grid_square_params.x_location,
+                    y_location=grid_square_params.y_location,
+                    x_stage_position=grid_square_params.x_stage_position,
+                    y_stage_position=grid_square_params.y_stage_position,
+                    readout_area_x=grid_square_params.readout_area_x,
+                    readout_area_y=grid_square_params.readout_area_y,
+                    thumbnail_size_x=grid_square_params.thumbnail_size_x,
+                    thumbnail_size_y=grid_square_params.thumbnail_size_y,
+                    pixel_size=grid_square_params.pixel_size,
+                    image=grid_square_params.image,
+                )
+            murfey_db.add(grid_square_entry)
+            murfey_db.commit()
+
+            # Add grid square ID to existing CLEM image series entry
+            clem_img_series.grid_square_id = grid_square_entry.id
+            murfey_db.add(clem_img_series)
+            murfey_db.commit()
+    else:
+        logger.info(
+            f"No grid squares to register for data collection group {dcg_name!r} yet"
+        )
+    murfey_db.close()
+    return
 
 
 def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool]:
@@ -304,7 +457,7 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
             return {"success": False, "requeue": False}
         try:
             # Register items in Murfey database
-            _register_results_in_murfey(
+            _register_clem_image_series(
                 session_id=session_id,
                 result=result,
                 murfey_db=murfey_db,
@@ -317,8 +470,8 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
             )
             return {"success": False, "requeue": False}
         try:
-            # Register items in ISPyB
-            _register_results_in_ispyb(
+            # Register data collection group and atlas in ISPyB
+            _register_dcg_and_atlas(
                 session_id=session_id,
                 instrument_name=murfey_session.instrument_name,
                 visit_name=murfey_session.visit,
@@ -326,9 +479,25 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
                 murfey_db=murfey_db,
             )
         except Exception:
+            # Log error but allow workflow to proceed
             logger.error(
                 "Exception encountered when registering data collection group for CLEM workflow "
                 f"using {result.series_name!r}: \n"
+                f"{traceback.format_exc()}"
+            )
+
+        try:
+            # Register dataset as grid square
+            if "Overview_" not in result.series_name:
+                _register_grid_square(
+                    session_id=session_id,
+                    result=result,
+                    murfey_db=murfey_db,
+                )
+        except Exception:
+            # Log error but allow workflow to proceed
+            logger.error(
+                f"Exception encountered when registering grid square for {result.series_name}: \n"
                 f"{traceback.format_exc()}"
             )
 
