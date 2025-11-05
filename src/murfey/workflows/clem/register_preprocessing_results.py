@@ -328,6 +328,18 @@ def _register_grid_square(
                     0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
                 )
                 y_mid_px = int(y_mid_real / atlas_height_real * atlas_entry.pixels_y)
+
+                # Find the number of pixels in width and height the image corresponds to on the atlas
+                width_scaled = int(
+                    (clem_img_series.x1 - clem_img_series.x0)
+                    / atlas_width_real
+                    * atlas_entry.pixels_x
+                )
+                height_scaled = int(
+                    (clem_img_series.y1 - clem_img_series.y0)
+                    / atlas_height_real
+                    * atlas_entry.pixels_y
+                )
             else:
                 logger.warning(
                     f"Image series {clem_img_series.series_name!r} not populated with required values"
@@ -342,7 +354,9 @@ def _register_grid_square(
                 y_location=clem_img_series.y0,
                 y_location_scaled=y_mid_px,
                 height=clem_img_series.pixels_x,
+                height_scaled=height_scaled,
                 width=clem_img_series.pixels_y,
+                width_scaled=width_scaled,
                 x_stage_position=clem_img_series.x0,
                 y_stage_position=clem_img_series.y0,
                 pixel_size=clem_img_series.pixel_size,
