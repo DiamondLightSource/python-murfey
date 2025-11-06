@@ -2,9 +2,12 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import ispyb.sqlalchemy as ISPyBDB
 import pytest
 from pytest_mock import MockerFixture
+from sqlalchemy import select as sa_select
 from sqlalchemy.orm.session import Session as SQLAlchemySession
+from sqlmodel import select as sm_select
 from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
@@ -179,6 +182,7 @@ def test_run_with_db(
     ispyb_db_session: SQLAlchemySession,
     test_params: tuple[bool],
 ):
+    # Unpack test params
     (shuffle_message,) = test_params
 
     # Create a session to insert for this test
@@ -253,9 +257,63 @@ def test_run_with_db(
             murfey_db=murfey_db_session,
         )
         assert result == {"success": True}
+
     # Each message should call the align-and-merge workflow thrice
     # if gray and colour channels are both present
     assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
         colors
     )
+
+    # Both databases should have entries for data collection group, and grid squares
+    # ISPyB database should additionally have an atlas entry
+    murfey_dcg_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == murfey_session.id
+        )
+    ).all()
+    assert len(murfey_dcg_search) == 1
+    murfey_gs_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.GridSquare).where(
+            MurfeyDB.GridSquare.session_id == murfey_session.id
+        )
+    ).all()
+    assert len(murfey_gs_search) == len(preprocessing_messages) - 1
+
+    murfey_dcg = murfey_dcg_search[0]
+    ispyb_dcg_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.DataCollectionGroup).where(
+                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_dcg_search) == 1
+
+    ispyb_dcg = ispyb_dcg_search[0]
+    ispyb_atlas_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.Atlas).where(
+                ISPyBDB.Atlas.dataCollectionGroupId == ispyb_dcg.dataCollectionGroupId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_atlas_search) == 1
+
+    ispyb_atlas = ispyb_atlas_search[0]
+    ispyb_gs_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.GridSquare).where(
+                ISPyBDB.GridSquare.atlasId == ispyb_atlas.atlasId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_gs_search) == len(preprocessing_messages) - 1
+
     murfey_db_session.close()
+    ispyb_db_session.close()
