@@ -128,7 +128,9 @@ class ProcessingParametersSPA(BaseModel):
 class GridSquareParameters(BaseModel):
     tag: str
     x_location: Optional[float] = None
+    x_location_scaled: Optional[int] = None
     y_location: Optional[float] = None
+    y_location_scaled: Optional[int] = None
     x_stage_position: Optional[float] = None
     y_stage_position: Optional[float] = None
     readout_area_x: Optional[int] = None
@@ -136,7 +138,9 @@ class GridSquareParameters(BaseModel):
     thumbnail_size_x: Optional[int] = None
     thumbnail_size_y: Optional[int] = None
     height: Optional[int] = None
+    height_scaled: Optional[int] = None
     width: Optional[int] = None
+    width_scaled: Optional[int] = None
     pixel_size: Optional[float] = None
     image: str = ""
     angle: Optional[float] = None
