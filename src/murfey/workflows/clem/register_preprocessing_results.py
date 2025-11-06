@@ -501,13 +501,12 @@ def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool
             )
 
         try:
-            # Register dataset as grid square
-            if "Overview_" not in result.series_name:
-                _register_grid_square(
-                    session_id=session_id,
-                    result=result,
-                    murfey_db=murfey_db,
-                )
+            # Register CLEM image series as grid squares
+            _register_grid_square(
+                session_id=session_id,
+                result=result,
+                murfey_db=murfey_db,
+            )
         except Exception:
             # Log error but allow workflow to proceed
             logger.error(

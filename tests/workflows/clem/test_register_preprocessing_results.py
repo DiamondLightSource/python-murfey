@@ -160,7 +160,7 @@ def test_run(
         assert result == {"success": True}
     assert mock_register_clem_series.call_count == len(preprocessing_messages)
     assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
-    assert mock_register_grid_square.call_count == len(preprocessing_messages) - 1
+    assert mock_register_grid_square.call_count == len(preprocessing_messages)
     assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
         colors
     )
