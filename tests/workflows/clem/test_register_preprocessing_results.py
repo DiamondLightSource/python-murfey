@@ -163,13 +163,24 @@ def test_run(
     )
 
 
+test_matrix = (
+    # Reverse order of list
+    (False,),
+    (True,),
+)
+
+
+@pytest.mark.parametrize("test_params", test_matrix)
 def test_run_with_db(
     mocker: MockerFixture,
     rsync_basepath: Path,
     mock_ispyb_credentials,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
+    test_params: tuple[bool],
 ):
+    (shuffle_message,) = test_params
+
     # Create a session to insert for this test
     murfey_session: MurfeyDB.Session = get_or_create_db_entry(
         murfey_db_session,
@@ -234,12 +245,16 @@ def test_run_with_db(
         rsync_basepath=rsync_basepath,
         session_id=murfey_session.id,
     )
+    if shuffle_message:
+        preprocessing_messages.reverse()
     for message in preprocessing_messages:
         result = run(
             message=message,
             murfey_db=murfey_db_session,
         )
         assert result == {"success": True}
+    # Each message should call the align-and-merge workflow thrice
+    # if gray and colour channels are both present
     assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
         colors
     )
