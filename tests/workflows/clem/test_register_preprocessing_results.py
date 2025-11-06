@@ -4,14 +4,17 @@ from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
+from sqlalchemy.orm.session import Session as SQLAlchemySession
+from sqlmodel.orm.session import Session as SQLModelSession
 
+import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
     _register_clem_image_series,
     _register_dcg_and_atlas,
     _register_grid_square,
     run,
 )
-from tests.conftest import ExampleVisit
+from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
 processed_dir_name = "processed"
@@ -20,9 +23,16 @@ colors = ("gray", "green", "red")
 
 
 @pytest.fixture
-def preprocessing_messages(tmp_path: Path):
+def rsync_basepath(tmp_path: Path):
+    return tmp_path / "data"
+
+
+def generate_preprocessing_messages(
+    rsync_basepath: Path,
+    session_id: int,
+):
     # Make directory to where data for current grid is stored
-    visit_dir = tmp_path / "data" / "2020" / visit_name
+    visit_dir = rsync_basepath / "2020" / visit_name
     processed_dir = visit_dir / processed_dir_name
     grid_dir = processed_dir / grid_name
     grid_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +81,7 @@ def preprocessing_messages(tmp_path: Path):
         extent = dataset[5]
 
         message = {
-            "session_id": ExampleVisit.murfey_session_id,
+            "session_id": session_id,
             "result": {
                 "series_name": series_name,
                 "number_of_members": 3,
@@ -110,7 +120,7 @@ def test_register_grid_square():
 
 def test_run(
     mocker: MockerFixture,
-    preprocessing_messages: list[dict[str, Any]],
+    rsync_basepath: Path,
 ):
     # Mock the MurfeyDB connection
     mock_murfey_session_entry = MagicMock()
@@ -135,6 +145,10 @@ def test_run(
         "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
     )
 
+    preprocessing_messages = generate_preprocessing_messages(
+        rsync_basepath=rsync_basepath,
+        session_id=ExampleVisit.murfey_session_id,
+    )
     for message in preprocessing_messages:
         result = run(
             message=message,
@@ -147,4 +161,86 @@ def test_run(
     assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
         colors
     )
-    assert run
+
+
+def test_run_with_db(
+    mocker: MockerFixture,
+    rsync_basepath: Path,
+    mock_ispyb_credentials,
+    murfey_db_session: SQLModelSession,
+    ispyb_db_session: SQLAlchemySession,
+):
+    # Create a session to insert for this test
+    murfey_session: MurfeyDB.Session = get_or_create_db_entry(
+        murfey_db_session,
+        MurfeyDB.Session,
+        lookup_kwargs={
+            "id": ExampleVisit.murfey_session_id + 1,
+            "name": visit_name,
+            "visit": visit_name,
+            "instrument_name": ExampleVisit.instrument_name,
+        },
+    )
+
+    # Mock the ISPyB connection where the TransportManager class is located
+    mock_security_config = MagicMock()
+    mock_security_config.ispyb_credentials = mock_ispyb_credentials
+    mocker.patch(
+        "murfey.server.ispyb.get_security_config",
+        return_value=mock_security_config,
+    )
+    mocker.patch(
+        "murfey.server.ispyb.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock out the machine config used in the helper sanitisation function
+    mock_get_machine_config = mocker.patch("murfey.workflows.clem.get_machine_config")
+    mock_machine_config = MagicMock()
+    mock_machine_config.rsync_basepath = rsync_basepath
+    mock_get_machine_config.return_value = {
+        ExampleVisit.instrument_name: mock_machine_config,
+    }
+
+    # Mock the align and merge workflow call
+    mock_align_and_merge_call = mocker.patch(
+        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+    )
+
+    # Patch the TransportManager object in the workflows called
+    from murfey.server.ispyb import TransportManager
+
+    mocker.patch(
+        "murfey.workflows.clem.register_preprocessing_results._transport_object",
+        new=TransportManager("PikaTransport"),
+    )
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group._transport_object",
+        new=TransportManager("PikaTransport"),
+    )
+    mocker.patch(
+        "murfey.workflows.register_atlas_update._transport_object",
+        new=TransportManager("PikaTransport"),
+    )
+
+    # Run the function
+    preprocessing_messages = generate_preprocessing_messages(
+        rsync_basepath=rsync_basepath,
+        session_id=murfey_session.id,
+    )
+    for message in preprocessing_messages:
+        result = run(
+            message=message,
+            murfey_db=murfey_db_session,
+        )
+        assert result == {"success": True}
+    assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
+        colors
+    )
+    murfey_db_session.close()
