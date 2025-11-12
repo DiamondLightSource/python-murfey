@@ -46,7 +46,9 @@ def run():
         default="",
         help=(
             "Alternative file path and file name to save the schema as. "
-            "Can be a relative or absolute path"
+            "Can be a relative or absolute path. \n"
+            "By default, the schema will be saved to 'murfey/utils/', "
+            "and it will have the name 'openapi.json' or 'openapi.yaml'."
         ),
     )
     parser.add_argument(
