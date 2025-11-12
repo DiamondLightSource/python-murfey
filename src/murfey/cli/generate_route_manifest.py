@@ -17,54 +17,7 @@ import yaml
 from fastapi import APIRouter
 
 import murfey
-
-
-class PrettierDumper(yaml.Dumper):
-    """
-    Custom YAML Dumper class that sets `indentless` to False. This generates a YAML
-    file that is then compliant with Prettier's formatting style
-    """
-
-    def increase_indent(self, flow=False, indentless=False):
-        # Force 'indentless=False' so list items align with Prettier
-        return super(PrettierDumper, self).increase_indent(flow, indentless=False)
-
-
-def prettier_str_representer(dumper, data):
-    """
-    Helper function to format strings according to Prettier's standards:
-    - No quoting unless it can be misinterpreted as another data type
-    - When quoting, use double quotes unless string already contains double quotes
-    """
-
-    def is_implicitly_resolved(value: str) -> bool:
-        for (
-            first_char,
-            resolvers,
-        ) in yaml.resolver.Resolver.yaml_implicit_resolvers.items():
-            if first_char is None or (value and value[0] in first_char):
-                for resolver in resolvers:
-                    if len(resolver) == 3:
-                        _, regexp, _ = resolver
-                    else:
-                        _, regexp = resolver
-                    if regexp.match(value):
-                        return True
-        return False
-
-    # If no quoting is needed, use default plain style
-    if not is_implicitly_resolved(data):
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data)
-
-    # If the string already contains double quotes, fall back to single quotes
-    if '"' in data and "'" not in data:
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="'")
-
-    # Otherwise, prefer double quotes
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style='"')
-
-
-PrettierDumper.add_representer(str, prettier_str_representer)
+from murfey.cli import PrettierDumper
 
 
 def find_routers(name: str) -> dict[str, APIRouter]:
