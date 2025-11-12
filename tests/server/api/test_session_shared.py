@@ -30,14 +30,20 @@ def test_find_upstream_visits(
     # Create mock upstream visit directories and necessary data structures
     upstream_visits = {}
     upstream_data_dirs = {}
-    for n in range(5):
+    for n in range(10):
         upstream_instrument = f"{instrument_name}{str(n).zfill(2)}"
         upstream_visit = (
             tmp_path / f"{upstream_instrument}/data/2020/{visit_name_root}-{n}"
         )
-        upstream_visit.mkdir(parents=True, exist_ok=True)
-        upstream_visits[upstream_instrument] = {upstream_visit.stem: upstream_visit}
-        upstream_data_dirs[upstream_instrument] = upstream_visit.parent
+        # Create some as directories, and some as files
+        if n % 2:
+            # Only directories should be picked up
+            upstream_visit.mkdir(parents=True, exist_ok=True)
+            upstream_visits[upstream_instrument] = {upstream_visit.stem: upstream_visit}
+            upstream_data_dirs[upstream_instrument] = upstream_visit.parent
+        else:
+            upstream_visit.parent.mkdir(parents=True, exist_ok=True)
+            upstream_visit.touch(exist_ok=True)
 
     # Mock the MachineConfig for this instrument
     mock_machine_config = MagicMock(spec=MachineConfig)

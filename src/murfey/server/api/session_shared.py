@@ -168,7 +168,8 @@ def find_upstream_visits(session_id: int, db: SQLModelSession):
         # Looks for visit name in file path
         current_upstream_visits = {}
         for visit_path in Path(upstream_data_dir).glob(f"{visit_name.split('-')[0]}-*"):
-            current_upstream_visits[visit_path.name] = visit_path
+            if visit_path.is_dir():
+                current_upstream_visits[visit_path.name] = visit_path
         upstream_visits[upstream_instrument] = current_upstream_visits
     return upstream_visits
 
