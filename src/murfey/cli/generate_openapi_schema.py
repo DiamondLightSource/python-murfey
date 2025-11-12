@@ -61,8 +61,6 @@ def run():
 
     # Load the relevant FastAPI app
     target = str(args.target).lower()
-    if args.debug:
-        print(f"Constructing OpenAPI schema for {target}")
 
     # Silence output during import; only return genuine errors
     buffer = io.StringIO()
@@ -76,8 +74,9 @@ def run():
                 "Unexpected value for target server. It must be one of "
                 "'instrument-server' or 'server'"
             )
+    if args.debug:
+        print(f"Imported FastAPI app for {target}")
 
-    output = str(args.output).lower()
     if not app.openapi_schema:
         schema = get_openapi(
             title=app.title,
@@ -86,19 +85,28 @@ def run():
             description=app.description,
             routes=app.routes,
         )
+        if args.debug:
+            print(f"Constructed OpenAPI schema for {target}")
     else:
         schema = app.openapi_schema
+        if args.debug:
+            print(f"Loaded OpenAPI schema for {target}")
 
+    output = str(args.output).lower()
+    if output not in ("json", "yaml"):
+        raise ValueError(
+            "Invalid file format selected. Output must be either 'json' or 'yaml'"
+        )
     murfey_dir = Path(murfey.__path__[0])
     save_path = (
-        murfey_dir / "util" / f"openapi.{output}"
+        murfey_dir / "util" / f"openapi-{target}.{output}"
         if not args.to_file
         else Path(args.to_file)
     )
     with open(save_path, "w") as f:
         if output == "json":
             json.dump(schema, f, indent=2)
-        elif output == "yaml":
+        else:
             yaml.dump(
                 schema,
                 f,
@@ -107,11 +115,8 @@ def run():
                 sort_keys=False,
                 indent=2,
             )
-        else:
-            raise ValueError(
-                "Invalid file format select. Output must be either 'json' or 'yaml'"
-            )
-    print(f"OpenAPI schema save to {save_path}")
+    print(f"OpenAPI schema saved to {save_path}")
+    exit()
 
 
 if __name__ == "__main__":
