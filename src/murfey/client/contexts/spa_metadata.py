@@ -177,8 +177,7 @@ class SPAMetadataContext(Context):
                     return
                 dcg_tag = str(dcg_images_dirs[-1])
                 dcg_data = {
-                    "experiment_type": "single particle",
-                    "experiment_type_id": 37,
+                    "experiment_type_id": 37,  # Single particle
                     "tag": dcg_tag,
                     "atlas": str(
                         _atlas_destination(
@@ -248,8 +247,7 @@ class SPAMetadataContext(Context):
                 return
             dcg_tag = str(dcg_images_dirs[-1])
             dcg_data = {
-                "experiment_type": "single particle",
-                "experiment_type_id": 37,
+                "experiment_type_id": 37,  # Single particle
                 "tag": dcg_tag,
             }
             capture_post(

@@ -83,7 +83,6 @@ router = APIRouter(
 
 class DCGroupParameters(BaseModel):
     # DC = Data collection
-    experiment_type: str
     experiment_type_id: int
     tag: str
     atlas: str = ""
@@ -159,7 +158,6 @@ def register_dc_group(
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),
-            "experiment_type": dcg_params.experiment_type,
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
             "session_id": session_id,

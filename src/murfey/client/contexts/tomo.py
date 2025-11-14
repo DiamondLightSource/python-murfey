@@ -102,8 +102,7 @@ class TomographyContext(Context):
             return
         try:
             dcg_data = {
-                "experiment_type": "tomo",
-                "experiment_type_id": 36,
+                "experiment_type_id": 36,  # Tomo
                 "tag": str(self._basepath),
                 "atlas": "",
                 "sample": None,
