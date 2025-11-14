@@ -66,7 +66,6 @@ def test_run(
         "visit_number": ExampleVisit.visit_number,
         "session_id": ExampleVisit.murfey_session_id,
         "tag": "some_text",
-        "experiment_type": "single particle",
         "experiment_type_id": 0,
         "atlas": "some_file",
         "atlas_pixel_size": 1e-9,

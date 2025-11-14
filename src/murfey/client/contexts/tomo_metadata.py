@@ -22,8 +22,7 @@ def ensure_dcg_exists(
         return None
     dcg_tag = str(source).replace(f"/{environment.visit}", "")
     dcg_data = {
-        "experiment_type": "tomo",
-        "experiment_type_id": 36,
+        "experiment_type_id": 36,  # Tomo
         "tag": dcg_tag,
     }
     capture_post(
@@ -107,8 +106,7 @@ class TomographyMetadataContext(Context):
                 p for p in transferred_file.parent.parts if p != environment.visit
             ).replace("//", "/")
             dcg_data = {
-                "experiment_type": "tomo",
-                "experiment_type_id": 36,
+                "experiment_type_id": 36,  # Tomo
                 "tag": dcg_tag,
                 "atlas": str(
                     _atlas_destination(
