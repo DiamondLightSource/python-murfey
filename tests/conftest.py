@@ -116,6 +116,8 @@ class ISPyBTableValues:
         "Tomography": 36,
         "Single Particle": 37,
         "Atlas": 44,
+        "CLEM": 45,
+        "FIB": 46,
     }
 
 
