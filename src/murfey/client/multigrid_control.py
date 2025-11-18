@@ -611,8 +611,7 @@ class MultigridController:
 
         elif isinstance(context, SPAModularContext):
             dcg_data = {
-                "experiment_type": "single particle",
-                "experiment_type_id": 37,
+                "experiment_type_id": 37,  # Single particle
                 "tag": str(source),
                 "atlas": (
                     str(self._environment.samples[source].atlas)

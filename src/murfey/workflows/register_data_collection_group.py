@@ -47,7 +47,6 @@ def run(
         else:
             record = ISPyBDB.DataCollectionGroup(
                 sessionId=ispyb_session_id,
-                experimentType=message["experiment_type"],
                 experimentTypeId=message["experiment_type_id"],
             )
 
