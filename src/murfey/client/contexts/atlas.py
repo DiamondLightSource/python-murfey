@@ -2,9 +2,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from murfey.client.context import Context
+from murfey.client.context import Context, _atlas_destination
 from murfey.client.contexts.spa import _get_source
-from murfey.client.contexts.spa_metadata import _atlas_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 
@@ -36,7 +35,7 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 transferred_atlas_name = _atlas_destination(
-                    environment, source, transferred_file, self._token
+                    environment, source, self._token
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     base_url=str(environment.url.geturl()),
