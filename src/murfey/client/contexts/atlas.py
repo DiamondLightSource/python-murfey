@@ -46,7 +46,7 @@ class AtlasContext(Context):
                     function_name="make_atlas_jpg",
                     token=self._token,
                     session_id=environment.murfey_session,
-                    data={"path": str(transferred_atlas_name)},
+                    data={"path": str(transferred_atlas_name).replace("//", "/")},
                 )
                 logger.info(
                     f"Submitted request to create JPG image of atlas {str(transferred_atlas_name)!r}"
@@ -87,7 +87,7 @@ class AtlasContext(Context):
                 dcg_data = {
                     "experiment_type_id": 44,  # Atlas
                     "tag": str(transferred_file.parent),
-                    "atlas": str(transferred_atlas_name),
+                    "atlas": str(transferred_atlas_name).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
                 }
