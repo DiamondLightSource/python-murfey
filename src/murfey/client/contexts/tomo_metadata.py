@@ -20,10 +20,58 @@ def ensure_dcg_exists(
     source = _get_source(transferred_file, environment=environment)
     if not source:
         return None
+    source_visit_dir = source.parent
+
+    session_file = source / "Session.dm"
+    if not session_file.is_file():
+        logger.warning(f"Cannot find session file {str(session_file)}")
+        return
+    with open(session_file, "r") as session_xml:
+        session_data = xmltodict.parse(session_xml.read())
+
+    windows_path = session_data["TomographySession"]["AtlasId"]
+    logger.info(f"Windows path to atlas metadata found: {windows_path}")
+    if not windows_path:
+        logger.warning("No atlas metadata path found")
+        return
+    visit_index = windows_path.split("\\").index(environment.visit)
+    partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+    logger.info("Partial Linux path successfully constructed from Windows path")
+
+    logger.info(
+        f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
+    )
+    atlas_xml_path = list((source_visit_dir / partial_path).parent.glob("Atlas_*.xml"))[
+        0
+    ]
+    logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
+    with open(atlas_xml_path, "rb") as atlas_xml:
+        atlas_xml_data = xmltodict.parse(atlas_xml)
+        atlas_pixel_size = float(
+            atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                "numericValue"
+            ]
+        )
+
+    for p in partial_path.split("/"):
+        if p.startswith("Sample"):
+            sample = int(p.replace("Sample", ""))
+            break
+    else:
+        logger.warning(f"Sample could not be identified for {transferred_file}")
+        return
+    environment.samples[source] = SampleInfo(atlas=Path(partial_path), sample=sample)
     dcg_tag = str(source).replace(f"/{environment.visit}", "")
     dcg_data = {
         "experiment_type_id": 36,  # Tomo
         "tag": dcg_tag,
+        "atlas": str(
+            _atlas_destination(environment, source, session_file, token)
+            / environment.samples[source].atlas.parent
+            / atlas_xml_path.with_suffix(".jpg").name
+        ),
+        "sample": environment.samples[source].sample,
+        "atlas_pixel_size": atlas_pixel_size,
     }
     capture_post(
         base_url=str(environment.url.geturl()),
@@ -56,77 +104,7 @@ class TomographyMetadataContext(Context):
 
         if transferred_file.name == "Session.dm" and environment:
             logger.info("Tomography session metadata found")
-            with open(transferred_file, "r") as session_xml:
-                session_data = xmltodict.parse(session_xml.read())
-
-            windows_path = session_data["TomographySession"]["AtlasId"]
-            logger.info(f"Windows path to atlas metadata found: {windows_path}")
-            if not windows_path:
-                logger.warning("No atlas metadata path found")
-                return
-            visit_index = windows_path.split("\\").index(environment.visit)
-            partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
-            logger.info("Partial Linux path successfully constructed from Windows path")
-
-            source = _get_source(transferred_file, environment)
-            if not source:
-                logger.warning(
-                    f"Source could not be identified for {str(transferred_file)}"
-                )
-                return
-
-            source_visit_dir = source.parent
-
-            logger.info(
-                f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
-            )
-            atlas_xml_path = list(
-                (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
-            )[0]
-            logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
-            with open(atlas_xml_path, "rb") as atlas_xml:
-                atlas_xml_data = xmltodict.parse(atlas_xml)
-                atlas_pixel_size = float(
-                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-                        "numericValue"
-                    ]
-                )
-
-            for p in partial_path.split("/"):
-                if p.startswith("Sample"):
-                    sample = int(p.replace("Sample", ""))
-                    break
-            else:
-                logger.warning(f"Sample could not be identified for {transferred_file}")
-                return
-            environment.samples[source] = SampleInfo(
-                atlas=Path(partial_path), sample=sample
-            )
-            dcg_tag = "/".join(
-                p for p in transferred_file.parent.parts if p != environment.visit
-            ).replace("//", "/")
-            dcg_data = {
-                "experiment_type_id": 36,  # Tomo
-                "tag": dcg_tag,
-                "atlas": str(
-                    _atlas_destination(
-                        environment, source, transferred_file, self._token
-                    )
-                    / environment.samples[source].atlas.parent
-                    / atlas_xml_path.with_suffix(".jpg").name
-                ),
-                "sample": environment.samples[source].sample,
-                "atlas_pixel_size": atlas_pixel_size,
-            }
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
-                token=self._token,
-                visit_name=environment.visit,
-                session_id=environment.murfey_session,
-                data=dcg_data,
-            )
+            ensure_dcg_exists(transferred_file, environment, self._token)
 
         elif transferred_file.name == "SearchMap.xml" and environment:
             logger.info("Tomography session search map xml found")
