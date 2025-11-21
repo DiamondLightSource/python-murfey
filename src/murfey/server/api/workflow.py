@@ -155,6 +155,24 @@ def register_dc_group(
                 session_id, sm.name, search_map_params, db, close_db=False
             )
         db.close()
+    elif dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.atlas == dcg_params.atlas)
+    ).all():
+        # Case where we switch from atlas to processing
+        dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
+        if _transport_object:
+            _transport_object.send(
+                _transport_object.feedback_queue,
+                {
+                    "register": "experiment_type_update",
+                    "experiment_type_id": dcg_params.experiment_type_id,
+                    "dcgid": dcg_murfey[0].id,
+                },
+            )
+        db.add(dcg_murfey[0])
+        db.commit()
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),
