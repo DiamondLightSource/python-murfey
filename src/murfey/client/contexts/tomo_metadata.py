@@ -13,16 +13,11 @@ from murfey.util.client import capture_post
 logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 
 
-def ensure_dcg_exists(
-    transferred_file: Path, environment: MurfeyInstanceEnvironment, token: str
+def ensure_tomo_dcg_exists(
+    metadata_source: Path, environment: MurfeyInstanceEnvironment, token: str
 ):
-    # Make sure we have a data collection group
-    source = _get_source(transferred_file, environment=environment)
-    if not source:
-        return None
-    source_visit_dir = source.parent
-
-    session_file = source / "Session.dm"
+    """Create  a tomography data collection group"""
+    session_file = metadata_source / "Session.dm"
     if not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
         return
@@ -38,6 +33,7 @@ def ensure_dcg_exists(
     partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
     logger.info("Partial Linux path successfully constructed from Windows path")
 
+    source_visit_dir = metadata_source.parent
     logger.info(
         f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
     )
@@ -58,19 +54,21 @@ def ensure_dcg_exists(
             sample = int(p.replace("Sample", ""))
             break
     else:
-        logger.warning(f"Sample could not be identified for {transferred_file}")
+        logger.warning(f"Sample could not be identified for {metadata_source}")
         return
-    environment.samples[source] = SampleInfo(atlas=Path(partial_path), sample=sample)
-    dcg_tag = str(source).replace(f"/{environment.visit}", "")
+    environment.samples[metadata_source] = SampleInfo(
+        atlas=Path(partial_path), sample=sample
+    )
+    dcg_tag = str(metadata_source).replace(f"/{environment.visit}", "")
     dcg_data = {
         "experiment_type_id": 36,  # Tomo
         "tag": dcg_tag,
         "atlas": str(
-            _atlas_destination(environment, source, session_file, token)
-            / environment.samples[source].atlas.parent
+            _atlas_destination(environment, metadata_source, session_file, token)
+            / environment.samples[metadata_source].atlas.parent
             / atlas_xml_path.with_suffix(".jpg").name
         ),
-        "sample": environment.samples[source].sample,
+        "sample": environment.samples[metadata_source].sample,
         "atlas_pixel_size": atlas_pixel_size,
     }
     capture_post(
@@ -102,13 +100,23 @@ class TomographyMetadataContext(Context):
             **kwargs,
         )
 
-        if transferred_file.name == "Session.dm" and environment:
-            logger.info("Tomography session metadata found")
-            ensure_dcg_exists(transferred_file, environment, self._token)
+        if environment is None:
+            logger.warning("No environment set")
+            return
 
-        elif transferred_file.name == "SearchMap.xml" and environment:
+        metadata_source = _get_source(transferred_file, environment=environment)
+        if not metadata_source:
+            logger.warning(f"No source found for {str(transferred_file)}")
+            return
+
+        if transferred_file.name == "Session.dm":
+            logger.info("Tomography session metadata found")
+            ensure_tomo_dcg_exists(metadata_source, environment, self._token)
+
+        elif transferred_file.name == "SearchMap.xml":
             logger.info("Tomography session search map xml found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
+
+            dcg_tag = ensure_tomo_dcg_exists(metadata_source, environment, self._token)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
@@ -208,9 +216,9 @@ class TomographyMetadataContext(Context):
                 },
             )
 
-        elif transferred_file.name == "SearchMap.dm" and environment:
+        elif transferred_file.name == "SearchMap.dm":
             logger.info("Tomography session search map dm found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
+            dcg_tag = ensure_tomo_dcg_exists(metadata_source, environment, self._token)
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
 
@@ -254,9 +262,9 @@ class TomographyMetadataContext(Context):
                 },
             )
 
-        elif transferred_file.name == "BatchPositionsList.xml" and environment:
+        elif transferred_file.name == "BatchPositionsList.xml":
             logger.info("Tomography session batch positions list found")
-            dcg_tag = ensure_dcg_exists(transferred_file, environment, self._token)
+            dcg_tag = ensure_tomo_dcg_exists(metadata_source, environment, self._token)
             with open(transferred_file) as xml:
                 for_parsing = xml.read()
             batch_xml = xmltodict.parse(for_parsing)

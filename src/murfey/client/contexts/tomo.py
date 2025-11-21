@@ -9,6 +9,7 @@ import xmltodict
 
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter
+from murfey.client.contexts.tomo_metadata import ensure_tomo_dcg_exists
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -101,21 +102,10 @@ class TomographyContext(Context):
             )
             return
         try:
-            dcg_data = {
-                "experiment_type_id": 36,  # Tomo
-                "tag": str(self._basepath),
-                "atlas": "",
-                "sample": None,
-            }
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
-                token=self._token,
-                visit_name=environment.visit,
-                session_id=environment.murfey_session,
-                data=dcg_data,
+            metadata_source = (
+                self._basepath.parent / environment.visit / self._basepath.name
             )
+            ensure_tomo_dcg_exists(metadata_source, environment, self._token)
 
             for tilt_series in self._tilt_series.keys():
                 if tilt_series not in self._tilt_series_with_pjids:
