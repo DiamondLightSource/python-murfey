@@ -49,6 +49,9 @@ def ensure_dcg_exists(
     elif collection_type == "spa":
         experiment_type_id = 37
         session_file = metadata_source / "EpuSession.dm"
+        for h in entry_points(group="murfey.hooks"):
+            if h.name == "get_epu_session":
+                h.load()(session_file, environment=environment)
     else:
         logger.error(f"Unknown collection type {collection_type}")
         return
