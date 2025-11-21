@@ -106,7 +106,12 @@ class SPAMetadataContext(Context):
                 return
 
             if source:
-                dcg_tag = ensure_dcg_exists("spa", source, environment, self._token)
+                dcg_tag = ensure_dcg_exists(
+                    collection_type="spa",
+                    metadata_source=source,
+                    environment=environment,
+                    token=self._token,
+                )
                 gs_pix_positions = get_grid_square_atlas_positions(
                     source.parent / partial_path
                 )
@@ -140,7 +145,12 @@ class SPAMetadataContext(Context):
             source = _get_source(transferred_file, environment=environment)
             if source is None:
                 return None
-            ensure_dcg_exists("spa", source, environment, self._token)
+            ensure_dcg_exists(
+                collection_type="spa",
+                metadata_source=source,
+                environment=environment,
+                token=self._token,
+            )
 
             gs_name = int(transferred_file.stem.split("_")[1])
             logger.info(

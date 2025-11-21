@@ -40,13 +40,21 @@ class TomographyMetadataContext(Context):
 
         if transferred_file.name == "Session.dm":
             logger.info("Tomography session metadata found")
-            ensure_dcg_exists("tomo", metadata_source, environment, self._token)
+            ensure_dcg_exists(
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
+                token=self._token,
+            )
 
         elif transferred_file.name == "SearchMap.xml":
             logger.info("Tomography session search map xml found")
 
             dcg_tag = ensure_dcg_exists(
-                "tomo", metadata_source, environment, self._token
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
+                token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
@@ -150,7 +158,10 @@ class TomographyMetadataContext(Context):
         elif transferred_file.name == "SearchMap.dm":
             logger.info("Tomography session search map dm found")
             dcg_tag = ensure_dcg_exists(
-                "tomo", metadata_source, environment, self._token
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
+                token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
                 sm_data = xmltodict.parse(sm_xml.read())
@@ -198,7 +209,10 @@ class TomographyMetadataContext(Context):
         elif transferred_file.name == "BatchPositionsList.xml":
             logger.info("Tomography session batch positions list found")
             dcg_tag = ensure_dcg_exists(
-                "tomo", metadata_source, environment, self._token
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
+                token=self._token,
             )
             with open(transferred_file) as xml:
                 for_parsing = xml.read()

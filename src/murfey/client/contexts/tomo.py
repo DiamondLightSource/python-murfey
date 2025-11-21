@@ -8,8 +8,7 @@ from typing import Callable, Dict, List, OrderedDict
 import xmltodict
 
 import murfey.util.eer
-from murfey.client.context import Context, ProcessingParameter
-from murfey.client.contexts.tomo_metadata import ensure_tomo_dcg_exists
+from murfey.client.context import Context, ProcessingParameter, ensure_dcg_exists
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -105,7 +104,12 @@ class TomographyContext(Context):
             metadata_source = (
                 self._basepath.parent / environment.visit / self._basepath.name
             )
-            ensure_tomo_dcg_exists(metadata_source, environment, self._token)
+            ensure_dcg_exists(
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
+                token=self._token,
+            )
 
             for tilt_series in self._tilt_series.keys():
                 if tilt_series not in self._tilt_series_with_pjids:
