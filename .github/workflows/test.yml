@@ -59,7 +59,7 @@ jobs:
           mkdir database
           wget -t 3 --waitretry=20 https://github.com/DiamondLightSource/ispyb-database/releases/download/v${{ env.ISPYB_DATABASE_SCHEMA }}/ispyb-database-${{ env.ISPYB_DATABASE_SCHEMA }}.tar.gz -O database/ispyb-database.tar.gz
       - name: Store database artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: database
           path: database/
