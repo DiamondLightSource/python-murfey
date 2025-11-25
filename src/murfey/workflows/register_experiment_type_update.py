@@ -23,7 +23,7 @@ def run(
         dataCollectionGroupId=message["dcgid"],
         experimentTypeId=message["experiment_type_id"],
     )
-    dcgid = _transport_object.do_insert_data_collection_group(record).get(
+    dcgid = _transport_object.do_update_data_collection_group(record).get(
         "return_value", None
     )
 
