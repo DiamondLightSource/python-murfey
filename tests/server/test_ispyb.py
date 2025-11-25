@@ -74,6 +74,7 @@ def test_get_all_ongoing_visits():
 @mock.patch("workflows.transport.pika_transport.PikaTransport")
 def test_transport_manager_init(mock_transport):
     TransportManager("PikaTransport")
+    print(mock_transport.mock_calls)
     mock_transport().connect.assert_called_once()
 
 

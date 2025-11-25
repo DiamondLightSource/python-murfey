@@ -137,15 +137,14 @@ def test_register_search_map_update_with_all_parameters(
     # Check this would have updated ispyb
     update_args = mock_transport.do_update_search_map.call_args_list
     assert len(update_args) == 2
-    print(update_args)
     assert update_args[0][0][0] == 1
     assert update_args[1][0][0] == 1
     assert update_args[0][0][1].x_stage_position == 0.3
     assert update_args[0][0][1].y_stage_position == 0.4
     assert update_args[1][0][1].x_location == sm_final_parameters.x_location
-    assert update_args[1][0][1].x_location == sm_final_parameters.y_location
-    assert update_args[1][0][1].height_on_atlas == int(40 * 7.8)
-    assert update_args[1][0][1].width_on_atlas == int(20 * 7.8)
+    assert update_args[1][0][1].y_location == sm_final_parameters.y_location
+    assert update_args[1][0][1].height_on_atlas == int(4000 * 1e-5 / 1e-7 * 7.8)
+    assert update_args[1][0][1].width_on_atlas == int(2000 * 1e-5 / 1e-7 * 7.8)
 
 
 @mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
