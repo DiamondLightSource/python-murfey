@@ -78,6 +78,7 @@ def test_update_data_collection_group(mock_transport, ispyb_db_session: Session)
         table=DataCollectionGroup,
         insert_kwargs={
             "dataCollectionGroupId": 1,
+            "sessionId": 0,
             "experimentTypeId": 1,
         },
     )
