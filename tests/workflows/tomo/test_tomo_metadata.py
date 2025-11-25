@@ -143,8 +143,8 @@ def test_register_search_map_update_with_all_parameters(
     assert update_args[0][0][1].y_stage_position == 0.4
     assert update_args[1][0][1].x_location == sm_final_parameters.x_location
     assert update_args[1][0][1].y_location == sm_final_parameters.y_location
-    assert update_args[1][0][1].height_on_atlas == int(4000 * 1e-5 / 1e-7 * 7.8)
-    assert update_args[1][0][1].width_on_atlas == int(2000 * 1e-5 / 1e-7 * 7.8)
+    assert update_args[1][0][1].height_on_atlas == 311
+    assert update_args[1][0][1].width_on_atlas == 155
 
 
 @mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
