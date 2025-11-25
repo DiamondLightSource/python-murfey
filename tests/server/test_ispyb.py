@@ -73,12 +73,27 @@ def test_get_all_ongoing_visits():
 
 @mock.patch("workflows.transport.pika_transport.PikaTransport")
 def test_update_data_collection_group(mock_transport, ispyb_db_session: Session):
+    # Manually get the BLSession ID for comparison
+    bl_session_id = (
+        ispyb_db_session.execute(
+            select(BLSession)
+            .join(Proposal)
+            .where(BLSession.proposalId == Proposal.proposalId)
+            .where(BLSession.beamLineName == ExampleVisit.instrument_name)
+            .where(Proposal.proposalCode == ExampleVisit.proposal_code)
+            .where(Proposal.proposalNumber == str(ExampleVisit.proposal_number))
+            .where(BLSession.visit_number == ExampleVisit.visit_number)
+        )
+        .scalar_one()
+        .sessionId
+    )
+    # Insert data collection group
     get_or_create_db_entry(
         session=ispyb_db_session,
         table=DataCollectionGroup,
         insert_kwargs={
             "dataCollectionGroupId": 1,
-            "sessionId": 0,
+            "sessionId": bl_session_id,
             "experimentTypeId": 1,
         },
     )
