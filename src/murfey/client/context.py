@@ -41,7 +41,7 @@ def ensure_dcg_exists(
     metadata_source: Path,
     environment: MurfeyInstanceEnvironment,
     token: str,
-):
+) -> str | None:
     """Create  a data collection group"""
     if collection_type == "tomo":
         experiment_type_id = 36
@@ -50,11 +50,14 @@ def ensure_dcg_exists(
         experiment_type_id = 37
         session_file = metadata_source / "EpuSession.dm"
         for h in entry_points(group="murfey.hooks"):
-            if h.name == "get_epu_session":
-                h.load()(session_file, environment=environment)
+            try:
+                if h.name == "get_epu_session":
+                    h.load()(session_file, environment=environment)
+            except Exception as e:
+                logger.warning(f"Get EPU session hook failed: {e}")
     else:
         logger.error(f"Unknown collection type {collection_type}")
-        return
+        return None
 
     if not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
@@ -79,7 +82,7 @@ def ensure_dcg_exists(
         logger.info(f"Windows path to atlas metadata found: {windows_path}")
         if not windows_path:
             logger.warning("No atlas metadata path found")
-            return
+            return None
         visit_index = windows_path.split("\\").index(environment.visit)
         partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
         logger.info("Partial Linux path successfully constructed from Windows path")
@@ -109,7 +112,7 @@ def ensure_dcg_exists(
                 break
         else:
             logger.warning(f"Sample could not be identified for {metadata_source}")
-            return
+            return None
         environment.samples[metadata_source] = SampleInfo(
             atlas=Path(partial_path), sample=sample
         )
@@ -126,7 +129,7 @@ def ensure_dcg_exists(
             )
             if not dcg_images_dirs:
                 logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
-                return
+                return None
             dcg_tag = str(dcg_images_dirs[-1])
 
         dcg_data = {
@@ -136,7 +139,7 @@ def ensure_dcg_exists(
                 _atlas_destination(environment, metadata_source, token)
                 / environment.samples[metadata_source].atlas.parent
                 / atlas_xml_path.with_suffix(".jpg").name
-            ),
+            ).replace("//", "/"),
             "sample": environment.samples[metadata_source].sample,
             "atlas_pixel_size": atlas_pixel_size,
         }
