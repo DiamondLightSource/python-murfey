@@ -238,7 +238,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
     context = TomographyContext("tomo", tmp_path, "")
     assert len(context._tilt_series_sizes) == 0
     context.post_transfer(
-        Path(__file__).parent.parent / "util" / "test_1.mdoc",
+        Path(__file__).parent.parent.parent / "util" / "test_1.mdoc",
         environment=env,
         required_strings=["fractions"],
     )
