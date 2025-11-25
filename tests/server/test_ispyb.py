@@ -77,8 +77,8 @@ def test_update_data_collection_group(mock_transport, ispyb_db_session: Session)
         session=ispyb_db_session,
         table=DataCollectionGroup,
         insert_kwargs={
-            "dataCollectionGroup": 1,
-            "experimentType": 1,
+            "dataCollectionGroupId": 1,
+            "experimentTypeId": 1,
         },
     )
 
@@ -93,8 +93,6 @@ def test_update_data_collection_group(mock_transport, ispyb_db_session: Session)
     final_dcg_entry = get_or_create_db_entry(
         session=ispyb_db_session,
         table=DataCollectionGroup,
-        lookup_kwargs={
-            "dataCollectionGroup": 1,
-        },
+        lookup_kwargs={"dataCollectionGroupId": 1},
     )
     assert final_dcg_entry.experimentTypeId == 2
