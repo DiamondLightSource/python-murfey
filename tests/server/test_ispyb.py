@@ -1,10 +1,12 @@
-from ispyb.sqlalchemy import BLSession, Proposal
+from unittest import mock
+
+from ispyb.sqlalchemy import BLSession, DataCollectionGroup, Proposal
 from pytest import mark
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from murfey.server.ispyb import get_proposal_id, get_session_id
-from tests.conftest import ExampleVisit
+from murfey.server.ispyb import TransportManager, get_proposal_id, get_session_id
+from tests.conftest import ExampleVisit, get_or_create_db_entry
 
 
 def test_get_session_id(
@@ -67,3 +69,32 @@ def test_get_sub_samples_from_visit():
 @mark.skip
 def test_get_all_ongoing_visits():
     pass
+
+
+@mock.patch("workflows.transport.pika_transport.PikaTransport")
+def test_update_data_collection_group(mock_transport, ispyb_db_session: Session):
+    get_or_create_db_entry(
+        session=ispyb_db_session,
+        table=DataCollectionGroup,
+        insert_kwargs={
+            "dataCollectionGroup": 1,
+            "experimentType": 1,
+        },
+    )
+
+    transport_manager = TransportManager("PikaTransport")
+    mock_transport().connect.assert_called_once()
+
+    with mock.patch("murfey.server.ispyb.ISPyBSession", ispyb_db_session):
+        transport_manager.do_update_data_collection_group(
+            record=DataCollectionGroup(dataCollectionGroupId=1, experimentTypeId=2)
+        )
+
+    final_dcg_entry = get_or_create_db_entry(
+        session=ispyb_db_session,
+        table=DataCollectionGroup,
+        lookup_kwargs={
+            "dataCollectionGroup": 1,
+        },
+    )
+    assert final_dcg_entry.experimentTypeId == 2
