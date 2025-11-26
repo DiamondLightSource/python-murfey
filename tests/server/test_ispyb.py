@@ -72,12 +72,7 @@ def test_get_all_ongoing_visits():
 
 
 @mock.patch("workflows.transport.pika_transport.PikaTransport")
-@mock.patch("murfey.server.ispyb.ISPyBSession.__call__")
-def test_update_data_collection_group(
-    mock_ispyb_session_call, mock_transport, ispyb_db_session: Session
-):
-    mock_ispyb_session_call.return_value = ispyb_db_session
-
+def test_update_data_collection_group(mock_transport, ispyb_db_session: Session):
     # Manually get the BLSession ID for comparison
     bl_session_id = (
         ispyb_db_session.execute(
@@ -104,9 +99,10 @@ def test_update_data_collection_group(
     )
 
     transport_manager = TransportManager("PikaTransport")
-    transport_manager.do_update_data_collection_group(
-        record=DataCollectionGroup(dataCollectionGroupId=1, experimentTypeId=2)
-    )
+    with mock.patch("murfey.server.ispyb.ISPyBSession", ispyb_db_session):
+        transport_manager.do_update_data_collection_group(
+            record=DataCollectionGroup(dataCollectionGroupId=1, experimentTypeId=2)
+        )
 
     final_dcg_entry = get_or_create_db_entry(
         session=ispyb_db_session,
