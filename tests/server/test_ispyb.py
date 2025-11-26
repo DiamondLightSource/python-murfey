@@ -99,9 +99,7 @@ def test_update_data_collection_group(mock_transport, ispyb_db_session: Session)
     )
 
     transport_manager = TransportManager("PikaTransport")
-    with mock.patch(
-        "murfey.server.ispyb.ISPyBSession.__call__.__enter__", ispyb_db_session
-    ):
+    with mock.patch("murfey.server.ispyb.ISPyBSession.__call__", ispyb_db_session):
         transport_manager.do_update_data_collection_group(
             record=DataCollectionGroup(dataCollectionGroupId=1, experimentTypeId=2)
         )

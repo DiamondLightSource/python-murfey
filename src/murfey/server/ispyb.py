@@ -124,6 +124,7 @@ class TransportManager:
         **kwargs,
     ):
         try:
+            print(ISPyBSession())
             with ISPyBSession() as db:
                 db.add(record)
                 db.commit()
