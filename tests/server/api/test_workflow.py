@@ -2,7 +2,7 @@ from unittest import mock
 
 from sqlmodel import Session, select
 
-from murfey.server.api.workflow import register_dc_group
+from murfey.server.api.workflow import DCGroupParameters, register_dc_group
 from murfey.util.db import DataCollectionGroup, SearchMap
 from tests.conftest import ExampleVisit
 
@@ -13,13 +13,13 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     mock_transport.feedback_queue = "mock_feedback_queue"
 
     # Request new dcg registration
-    dcg_params = {
-        "experiment_type_id": 44,
-        "tag": "atlas_tag",
-        "atlas": "/path/to/Atlas_1.jpg",
-        "sample": 1,
-        "atlas_pixel_size": 1e-5,
-    }
+    dcg_params = DCGroupParameters(
+        experiment_type_id=44,
+        tag="atlas_tag",
+        atlas="/path/to/Atlas_1.jpg",
+        sample=10,
+        atlas_pixel_size=1e-5,
+    )
     register_dc_group(
         visit_name="cm12345-6",
         session_id=ExampleVisit.murfey_session_id,
@@ -33,12 +33,12 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
         {
             "register": "data_collection_group",
             "start_time": mock.ANY,
-            "experiment_type_id": dcg_params["experiment_type_id"],
-            "tag": dcg_params["tag"],
+            "experiment_type_id": 44,
+            "tag": "atlas_tag",
             "session_id": ExampleVisit.murfey_session_id,
-            "atlas": dcg_params["atlas"],
-            "sample": dcg_params["sample"],
-            "atlas_pixel_size": dcg_params["atlas_pixel_size"],
+            "atlas": "/path/to/Atlas_1.jpg",
+            "sample": 10,
+            "atlas_pixel_size": 1e-5,
             "microscope": ExampleVisit.instrument_name,
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": ExampleVisit.proposal_number,
@@ -64,20 +64,20 @@ def test_register_dc_group_atlas_to_processing(
         tag="atlas_tag",
         atlas_id=90,
         atlas_pixel_size=1e-5,
-        sample=1,
+        sample=10,
         atlas="/path/to/Atlas_1.jpg",
     )
     murfey_db_session.add(dcg)
     murfey_db_session.commit()
 
     # Request new dcg registration with processing experiment type and tag
-    dcg_params = {
-        "experiment_type_id": 36,
-        "tag": "processing_tag",
-        "atlas": "/path/to/Atlas_1.jpg",
-        "sample": 1,
-        "atlas_pixel_size": 1e-5,
-    }
+    dcg_params = DCGroupParameters(
+        experiment_type_id=36,
+        tag="processing_tag",
+        atlas="/path/to/Atlas_1.jpg",
+        sample=10,
+        atlas_pixel_size=1e-5,
+    )
     register_dc_group(
         visit_name="cm12345-6",
         session_id=ExampleVisit.murfey_session_id,
@@ -90,16 +90,16 @@ def test_register_dc_group_atlas_to_processing(
         "mock_feedback_queue",
         {
             "register": "experiment_type_update",
-            "experiment_type_id": dcg_params["experiment_type_id"],
-            "dcgid": dcg.id,
+            "experiment_type_id": 36,
+            "dcgid": 1,
         },
     )
 
     # Check that the tag of the data collection group was updated
     new_dcg = murfey_db_session.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.id == dcg.id)
+        select(DataCollectionGroup).where(DataCollectionGroup.id == 1)
     ).one()
-    assert new_dcg.tag == dcg_params["tag"]
+    assert new_dcg.tag == "preprocessing_tag"
 
 
 @mock.patch("murfey.server.api.workflow._transport_object")
@@ -126,13 +126,13 @@ def test_register_dc_group_processing_to_atlas(
     murfey_db_session.commit()
 
     # Request new dcg registration with atlas experiment type and tag
-    dcg_params = {
-        "experiment_type_id": 44,
-        "tag": "atlas_tag",
-        "atlas": "/path/to/Atlas_2.jpg",
-        "sample": 1,
-        "atlas_pixel_size": 1e-4,
-    }
+    dcg_params = DCGroupParameters(
+        experiment_type_id=44,
+        tag="atlas_tag",
+        atlas="/path/to/Atlas_2.jpg",
+        sample=10,
+        atlas_pixel_size=1e-4,
+    )
     register_dc_group(
         visit_name="cm12345-6",
         session_id=ExampleVisit.murfey_session_id,
@@ -145,23 +145,23 @@ def test_register_dc_group_processing_to_atlas(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": dcg.atlas_id,
-            "atlas": dcg_params["atlas"],
-            "sample": dcg_params["sample"],
-            "atlas_pixel_size": dcg_params["atlas_pixel_size"],
-            "dcgid": dcg.id,
+            "atlas_id": 90,
+            "atlas": "/path/to/Atlas_2.jpg",
+            "sample": 10,
+            "atlas_pixel_size": 1e-4,
+            "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
         },
     )
 
     # Check the data collection group atlas was updated
     new_dcg = murfey_db_session.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.id == dcg.id)
+        select(DataCollectionGroup).where(DataCollectionGroup.id == 1)
     ).one()
-    assert new_dcg.atlas == dcg_params["atlas"]
-    assert new_dcg.atlas_pixel_size == dcg_params["atlas_pixel_size"]
+    assert new_dcg.atlas == "/path/to/Atlas_2.jpg"
+    assert new_dcg.atlas_pixel_size == 1e-4
     # Check the tag of the data collection group was not updated
-    assert new_dcg.tag != dcg_params["tag"]
+    assert new_dcg.tag != "atlas_tag"
 
 
 @mock.patch("murfey.server.api.workflow._transport_object")
@@ -183,13 +183,13 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     murfey_db_session.commit()
 
     # Request new dcg registration with atlas and exisiting tag
-    dcg_params = {
-        "experiment_type_id": 36,
-        "tag": "processing_tag",
-        "atlas": "/path/to/Atlas_2.jpg",
-        "sample": 1,
-        "atlas_pixel_size": 1e-4,
-    }
+    dcg_params = DCGroupParameters(
+        experiment_type_id=36,
+        tag="processing_tag",
+        atlas="/path/to/Atlas_2.jpg",
+        sample=10,
+        atlas_pixel_size=1e-4,
+    )
     register_dc_group(
         visit_name="cm12345-6",
         session_id=ExampleVisit.murfey_session_id,
@@ -203,19 +203,19 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     # Check the call to insert the atlas into ispyb
     atlas_args = mock_transport.do_insert_atlas.call_args_list
     assert len(atlas_args) == 1
-    assert atlas_args[0].dataCollectionGroupId == dcg.id
-    assert atlas_args[0].atlasImage == dcg_params["atlas"]
-    assert atlas_args[0].pixelSize == dcg_params["atlas_pixel_size"]
-    assert atlas_args[0].cassetteSlot == dcg_params["sample"]
+    assert atlas_args[0].dataCollectionGroupId == 1
+    assert atlas_args[0].atlasImage == "/path/to/Atlas_2.jpg"
+    assert atlas_args[0].pixelSize == 1e-4
+    assert atlas_args[0].cassetteSlot == 10
 
     # Check the data collection group atlas was updated
     new_dcg = murfey_db_session.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.id == dcg.id)
+        select(DataCollectionGroup).where(DataCollectionGroup.id == 1)
     ).one()
-    assert new_dcg.atlas == dcg_params["atlas"]
-    assert new_dcg.sample == dcg_params["sample"]
-    assert new_dcg.atlas_pixel_size == dcg_params["atlas_pixel_size"]
-    assert new_dcg.tag == dcg_params["tag"]
+    assert new_dcg.atlas == "/path/to/Atlas_2.jpg"
+    assert new_dcg.sample == 10
+    assert new_dcg.atlas_pixel_size == 1e-4
+    assert new_dcg.tag == "atlas_tag"
     assert new_dcg.atlas_id == 5
 
 
@@ -237,7 +237,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
         tag="processing_tag",
         atlas_id=90,
         atlas_pixel_size=1e-5,
-        sample=1,
+        sample=10,
         atlas="/path/to/Atlas_1.jpg",
     )
     murfey_db_session.add(dcg)
@@ -268,13 +268,13 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     murfey_db_session.commit()
 
     # Request new dcg registration with new atlas tag and sample
-    dcg_params = {
-        "experiment_type_id": 37,
-        "tag": "processing_tag",
-        "atlas": "/path/to/Atlas_2.jpg",
-        "sample": 2,
-        "atlas_pixel_size": 1e-4,
-    }
+    dcg_params = DCGroupParameters(
+        experiment_type_id=37,
+        tag="processing_tag",
+        atlas="/path/to/Atlas_2.jpg",
+        sample=12,
+        atlas_pixel_size=1e-4,
+    )
     register_dc_group(
         visit_name="cm12345-6",
         session_id=ExampleVisit.murfey_session_id,
@@ -287,11 +287,11 @@ def test_register_dc_group_new_atlas_with_searchmaps(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": dcg.atlas_id,
-            "atlas": dcg_params["atlas"],
-            "sample": dcg_params["sample"],
-            "atlas_pixel_size": dcg_params["atlas_pixel_size"],
-            "dcgid": dcg.id,
+            "atlas_id": 90,
+            "atlas": "/path/to/Atlas_2.jpg",
+            "sample": 12,
+            "atlas_pixel_size": 1e-4,
+            "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
         },
     )
@@ -300,11 +300,11 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     new_dcg = murfey_db_session.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.id == dcg.id)
     ).one()
-    assert new_dcg.atlas == dcg_params["atlas"]
-    assert new_dcg.sample == dcg_params["sample"]
-    assert new_dcg.atlas_pixel_size == dcg_params["atlas_pixel_size"]
-    assert new_dcg.tag == dcg_params["tag"]
-    assert new_dcg.atlas_id == dcg.atlas_id
+    assert new_dcg.atlas == "/path/to/Atlas_2.jpg"
+    assert new_dcg.sample == 12
+    assert new_dcg.atlas_pixel_size == 1e-4
+    assert new_dcg.tag == "processing_tag"
+    assert new_dcg.atlas_id == 90
 
     # Check the search map update calls
     assert mock_register_search_map.call_count == 2
