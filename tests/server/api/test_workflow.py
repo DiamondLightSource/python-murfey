@@ -203,10 +203,10 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     # Check the call to insert the atlas into ispyb
     atlas_args = mock_transport.do_insert_atlas.call_args_list
     assert len(atlas_args) == 1
-    assert atlas_args[0][0].dataCollectionGroupId == 1
-    assert atlas_args[0][0].atlasImage == "/path/to/Atlas_2.jpg"
-    assert atlas_args[0][0].pixelSize == 1e-4
-    assert atlas_args[0][0].cassetteSlot == 10
+    assert atlas_args[0][0][0].dataCollectionGroupId == 1
+    assert atlas_args[0][0][0].atlasImage == "/path/to/Atlas_2.jpg"
+    assert atlas_args[0][0][0].pixelSize == 1e-4
+    assert atlas_args[0][0][0].cassetteSlot == 10
 
     # Check the data collection group atlas was updated
     new_dcg = murfey_db_session.exec(
