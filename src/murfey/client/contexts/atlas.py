@@ -59,9 +59,9 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 atlas_mrc = transferred_file.with_suffix(".mrc")
-                transferred_atlas_name = _atlas_destination(
+                transferred_atlas_jpg = _atlas_destination(
                     environment, source, atlas_mrc, self._token
-                ) / atlas_mrc.relative_to(source.parent)
+                ) / atlas_mrc.relative_to(source.parent).with_suffix(".jpg")
 
                 with open(transferred_file, "rb") as atlas_xml:
                     atlas_xml_data = xmltodict.parse(atlas_xml)
@@ -87,7 +87,7 @@ class AtlasContext(Context):
                 dcg_data = {
                     "experiment_type_id": 44,  # Atlas
                     "tag": str(transferred_file.parent),
-                    "atlas": str(transferred_atlas_name).replace("//", "/"),
+                    "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
                 }
@@ -101,5 +101,5 @@ class AtlasContext(Context):
                     data=dcg_data,
                 )
                 logger.info(
-                    f"Registered data collection group for atlas {str(transferred_atlas_name)!r}"
+                    f"Registered data collection group for atlas {str(transferred_atlas_jpg)!r}"
                 )

@@ -77,7 +77,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
     dcg_data = {
         "experiment_type_id": 44,  # Atlas
         "tag": str(atlas_xml.parent),
-        "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.mrc')}",
+        "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 2,
         "atlas_pixel_size": atlas_pixel_size * 7.8,
     }
