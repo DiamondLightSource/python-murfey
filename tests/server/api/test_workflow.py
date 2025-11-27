@@ -215,7 +215,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     assert new_dcg.atlas == "/path/to/Atlas_2.jpg"
     assert new_dcg.sample == 10
     assert new_dcg.atlas_pixel_size == 1e-4
-    assert new_dcg.tag == "atlas_tag"
+    assert new_dcg.tag == "processing_tag"
     assert new_dcg.atlas_id == 5
 
 
