@@ -39,7 +39,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "atlas": "/path/to/Atlas_1.jpg",
             "sample": 10,
             "atlas_pixel_size": 1e-5,
-            "microscope": ExampleVisit.instrument_name,
+            "microscope": "",
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": ExampleVisit.proposal_number,
             "visit_number": ExampleVisit.visit_number,
@@ -99,7 +99,7 @@ def test_register_dc_group_atlas_to_processing(
     new_dcg = murfey_db_session.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.id == 1)
     ).one()
-    assert new_dcg.tag == "preprocessing_tag"
+    assert new_dcg.tag == "processing_tag"
 
 
 @mock.patch("murfey.server.api.workflow._transport_object")
@@ -119,7 +119,7 @@ def test_register_dc_group_processing_to_atlas(
         tag="processing_tag",
         atlas_id=90,
         atlas_pixel_size=1e-5,
-        sample=1,
+        sample=10,
         atlas="/path/to/Atlas_1.jpg",
     )
     murfey_db_session.add(dcg)
@@ -171,7 +171,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     by adding an atlas, using the same tag
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
-    mock_transport.do_insert_atlas.return_value = 5
+    mock_transport.do_insert_atlas.return_value = {"return_value": 5}
 
     # Make sure dcg is present without an atlas id
     dcg = DataCollectionGroup(
