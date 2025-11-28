@@ -132,5 +132,5 @@ async def prepare_eer_gain(
         )
         return None, None
     # Also copy the gain as a .gain file
-    shutil.copy(gain_path, gain_out.with_suffix(".gain"))
+    shutil.copy(secure_path(gain_path), secure_path(gain_out.with_suffix(".gain")))
     return gain_out, None
