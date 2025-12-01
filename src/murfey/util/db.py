@@ -9,6 +9,17 @@ from typing import List, Optional
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
+from murfey.util.processing_db import (
+    CTF,
+    Atlas,
+    MotionCorrection,
+    Movie as ProcessingMovie,
+    ParticleClassificationGroup,
+    ParticlePicker,
+    RelativeIceThickness,
+    Tomogram,
+)
+
 """
 GENERAL
 """
@@ -429,6 +440,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
             sa_relationship_kwargs={"cascade": "delete"},
         )
     )
+    Atlas: List["Atlas"] = Relationship(back_populates="DataCollectionGroup")
 
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
@@ -468,6 +480,11 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     processing_jobs: List["ProcessingJob"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
     )
+    Movie: List["ProcessingMovie"] = Relationship(back_populates="DataCollection")
+    MotionCorrection: List["MotionCorrection"] = Relationship(
+        back_populates="DataCollection"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="DataCollection")
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
@@ -568,6 +585,20 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     )
     murfey_ids: List["MurfeyLedger"] = Relationship(
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    MotionCorrection: List["MotionCorrection"] = Relationship(
+        back_populates="DataCollection"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="AutoProcProgram")
+    CTF: List["CTF"] = Relationship(back_populates="AutoProcProgram")
+    ParticlePicker: List["ParticlePicker"] = Relationship(
+        back_populates="AutoProcProgram"
+    )
+    RelativeIceThickness: List["RelativeIceThickness"] = Relationship(
+        back_populates="AutoProcProgram"
+    )
+    ParticleClassificationGroup: List["ParticleClassificationGroup"] = Relationship(
+        back_populates="AutoProcProgram"
     )
 
 
