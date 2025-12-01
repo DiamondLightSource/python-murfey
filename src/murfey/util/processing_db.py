@@ -3,76 +3,7 @@ from typing import List, Optional
 
 from sqlmodel import Enum, Field, Relationship, SQLModel
 
-from murfey.util.db import AutoProcProgram, DataCollection, DataCollectionGroup
-
-
-class Atlas(SQLModel, table=True):  # type: ignore
-    atlasId: int = Field(primary_key=True, unique=True)
-    dataCollectionGroupId: int = Field(foreign_key="DataCollectionGroup.id")
-    atlasImage: str
-    pixelSize: float
-    cassetteSlot: Optional[int] = None
-    DataCollectionGroup: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="Atlas"
-    )
-    GridSquare: List["GridSquare"] = Relationship(back_populates="Atlas")
-
-
-class GridSquare(SQLModel, table=True):  # type: ignore
-    gridSquareId: int = Field(primary_key=True, unique=True)
-    atlasId: int = Field(foreign_key="Atlas.atlasId")
-    gridSquareLabel: Optional[int] = None
-    gridSquareImage: Optional[str] = None
-    pixelLocationX: Optional[int] = None
-    pixelLocationY: Optional[int] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-    angle: Optional[float] = None
-    stageLocationX: Optional[float] = None
-    stageLocationY: Optional[float] = None
-    qualityIndicator: Optional[float] = None
-    pixelSize: Optional[float] = None
-    Atlas: Optional["Atlas"] = Relationship(back_populates="Atlas")
-    FoilHole: List["FoilHole"] = Relationship(back_populates="GridSquare")
-    Tomogram: List["Tomogram"] = Relationship(back_populates="GridSquare")
-
-
-class FoilHole(SQLModel, table=True):  # type: ignore
-    foilHoleId: int = Field(primary_key=True, unique=True)
-    gridSquareId: int = Field(foreign_key="GridSquare.gridSquareId")
-    foilHoleLabel: str
-    foilHoleImage: Optional[str] = None
-    pixelLocationX: Optional[int] = None
-    pixelLocationY: Optional[int] = None
-    diameter: Optional[int] = None
-    stageLocationX: Optional[float] = None
-    stageLocationY: Optional[float] = None
-    qualityIndicator: Optional[float] = None
-    pixelSize: Optional[float] = None
-    GridSquare: Optional["GridSquare"] = Relationship(back_populates="FoilHole")
-    Movie: List["Movie"] = Relationship(back_populates="FoilHole")
-
-
-class Movie(SQLModel, table=True):  # type: ignore
-    movieId: int = Field(primary_key=True, unique=True)
-    createdTimeStamp: datetime.datetime
-    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
-    movieNumber: Optional[int] = None
-    movieFullPath: Optional[str] = None
-    positionX: Optional[float] = None
-    positionY: Optional[float] = None
-    nominalDefocus: Optional[float] = None
-    angle: Optional[float] = None
-    fluence: Optional[float] = None
-    numberOfFrames: Optional[int] = None
-    foilHoleId: Optional[int] = Field(foreign_key="FoilHole.foilHoleId")
-    templateLabel: Optional[int] = None
-    DataCollection: Optional["DataCollection"] = Relationship(back_populates="Movie")
-    FoilHole: Optional["FoilHole"] = Relationship(back_populates="Movie")
-    MotionCorrection: List["MotionCorrection"] = Relationship(back_populates="Movie")
-    TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
-        back_populates="Movie"
-    )
+from murfey.util.db import AutoProcProgram, DataCollection, Movie, SearchMap
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore
@@ -134,14 +65,14 @@ class Tomogram(SQLModel, table=True):  # type: ignore
     projXZ: Optional[str] = None
     recordTimeStamp: Optional[datetime.datetime] = None
     globalAlignmentQuality: Optional[float] = None
-    gridSquareId: Optional[int] = Field(foreign_key="GridSquare.gridSquareId")
+    gridSquareId: Optional[int] = Field(foreign_key="SearchMap.id")
     pixelLocationX: Optional[int] = None
     pixelLocationY: Optional[int] = None
     AutoProcProgram: Optional["AutoProcProgram"] = Relationship(
         back_populates="Tomogram"
     )
     DataCollection: Optional["DataCollection"] = Relationship(back_populates="Tomogram")
-    GridSquare: Optional["GridSquare"] = Relationship(back_populates="Tomogram")
+    SearchMap: Optional["SearchMap"] = Relationship(back_populates="Tomogram")
     ProcessedTomogram: List["ProcessedTomogram"] = Relationship(
         back_populates="Tomogram"
     )
@@ -309,6 +240,9 @@ class BFactorFit(SQLModel, table=True):  # type: ignore
 
 class CryoemInitialModel(SQLModel, table=True):  # type: ignore
     cryoemInitialModelId: int = Field(primary_key=True, unique=True)
+    particleClassificationId: int = Field(
+        foreign_key="ParticleClassification.particleClassificationId"
+    )
     resolution: Optional[float] = None
     numberOfParticles: Optional[int] = None
     ParticleClassification: List["ParticleClassification"] = Relationship(

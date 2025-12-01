@@ -11,12 +11,11 @@ from sqlmodel import Field, Relationship, SQLModel, create_engine
 
 from murfey.util.processing_db import (
     CTF,
-    Atlas,
     MotionCorrection,
-    Movie as ProcessingMovie,
     ParticleClassificationGroup,
     ParticlePicker,
     RelativeIceThickness,
+    TiltImageAlignment,
     Tomogram,
 )
 
@@ -440,7 +439,14 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
             sa_relationship_kwargs={"cascade": "delete"},
         )
     )
-    Atlas: List["Atlas"] = Relationship(back_populates="DataCollectionGroup")
+    grid_squares: List["GridSquare"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    search_maps: List["SearchMap"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
 
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
@@ -480,7 +486,9 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     processing_jobs: List["ProcessingJob"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
     )
-    Movie: List["ProcessingMovie"] = Relationship(back_populates="DataCollection")
+    movies: List["Movie"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
     MotionCorrection: List["MotionCorrection"] = Relationship(
         back_populates="DataCollection"
     )
@@ -639,6 +647,7 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 class GridSquare(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     session_id: int = Field(foreign_key="session.id")
+    atlas_id: Optional[int] = Field(foreign_key="data_collection_group.id")
     name: int
     tag: str
     x_location: Optional[float]
@@ -650,6 +659,13 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     thumbnail_size_x: Optional[int]
     thumbnail_size_y: Optional[int]
     pixel_size: Optional[float] = None
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
     image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
     clem_image_series: List["CLEMImageSeries"] = Relationship(
@@ -657,6 +673,9 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     )
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="grid_squares"
     )
 
 
@@ -674,6 +693,11 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     thumbnail_size_x: Optional[int]
     thumbnail_size_y: Optional[int]
     pixel_size: Optional[float] = None
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    diameter: Optional[int] = None
+    quality_indicator: Optional[float] = None
     image: str = ""
     grid_square: Optional[GridSquare] = Relationship(back_populates="foil_holes")
     session: Optional[Session] = Relationship(back_populates="foil_holes")
@@ -688,6 +712,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
 class SearchMap(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     session_id: int = Field(foreign_key="session.id")
+    atlasId: Optional[int] = Field(foreign_key="data_collection_group.id")
     name: str
     tag: str
     x_location: Optional[float] = None
@@ -695,6 +720,13 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     x_stage_position: Optional[float] = None
     y_stage_position: Optional[float] = None
     pixel_size: Optional[float] = None
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    scaled_height: Optional[int] = None
+    scaled_width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
     image: str = ""
     binning: Optional[float] = None
     reference_matrix_m11: Optional[float] = None
@@ -715,17 +747,29 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="search_maps"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="SearchMap")
 
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
+    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
+    createdTimeStamp: Optional[datetime] = None
+    movie_full_path: Optional[str] = None
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
+    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
+    MotionCorrection: List["MotionCorrection"] = Relationship(back_populates="Movie")
+    TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
+        back_populates="Movie"
+    )
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
