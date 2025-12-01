@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 from enum import Enum
 from pathlib import Path
 from typing import Dict, Tuple
@@ -130,4 +131,6 @@ async def prepare_eer_gain(
             f"{stderr.decode('utf-8').strip()}"
         )
         return None, None
+    # Also copy the gain as a .gain file
+    shutil.copy(secure_path(gain_path), secure_path(gain_out.with_suffix(".gain")))
     return gain_out, None
