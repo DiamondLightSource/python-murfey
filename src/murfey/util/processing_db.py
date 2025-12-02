@@ -158,7 +158,7 @@ class RelativeIceThickness(SQLModel, table=True):  # type: ignore
 
 
 class TiltImageAlignment(SQLModel, table=True):  # type: ignore
-    movieId: int = Field(foreign_key="Movie.movieId", primary_key=True)
+    movieId: int = Field(foreign_key="Movie.murfey_id", primary_key=True)
     tomogramId: int = Field(foreign_key="Tomogram.tomogramId", primary_key=True)
     defocusU: Optional[float] = None
     defocusV: Optional[float] = None
