@@ -1,9 +1,10 @@
 import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlmodel import Enum, Field, Relationship, SQLModel
 
-from murfey.util.db import AutoProcProgram, DataCollection, Movie, SearchMap
+if TYPE_CHECKING:
+    from murfey.util.db import AutoProcProgram, DataCollection, Movie, SearchMap
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore
@@ -25,7 +26,7 @@ class MotionCorrection(SQLModel, table=True):  # type: ignore
     fftFullPath: Optional[str] = None
     fftCorrectedFullPath: Optional[str] = None
     comments: Optional[str] = None
-    movieId: Optional[int] = Field(foreign_key="Movie.movieId")
+    movieId: Optional[int] = Field(foreign_key="Movie.murfey_id")
     AutoProcProgram: Optional["AutoProcProgram"] = Relationship(
         back_populates="MotionCorrection"
     )

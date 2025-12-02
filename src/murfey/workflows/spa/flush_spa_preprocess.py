@@ -402,6 +402,7 @@ def flush_spa_preprocess(
             mrcp.parent.mkdir(parents=True)
         movie = Movie(
             murfey_id=murfey_ids[2 * i],
+            data_collection_id=collected_ids[1].id,
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,

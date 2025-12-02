@@ -4,20 +4,21 @@ of the sessions that Murfey is overseeing, along with the relationships between 
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import sqlalchemy
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 
-from murfey.util.processing_db import (
-    CTF,
-    MotionCorrection,
-    ParticleClassificationGroup,
-    ParticlePicker,
-    RelativeIceThickness,
-    TiltImageAlignment,
-    Tomogram,
-)
+if TYPE_CHECKING:
+    from murfey.util.processing_db import (
+        CTF,
+        MotionCorrection,
+        ParticleClassificationGroup,
+        ParticlePicker,
+        RelativeIceThickness,
+        TiltImageAlignment,
+        Tomogram,
+    )
 
 """
 GENERAL
@@ -712,7 +713,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
 class SearchMap(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     session_id: int = Field(foreign_key="session.id")
-    atlasId: Optional[int] = Field(foreign_key="data_collection_group.id")
+    atlas_id: Optional[int] = Field(foreign_key="data_collection_group.id")
     name: str
     tag: str
     x_location: Optional[float] = None
@@ -761,8 +762,6 @@ class Movie(SQLModel, table=True):  # type: ignore
     image_number: int
     tag: str
     preprocessed: bool = False
-    createdTimeStamp: Optional[datetime] = None
-    movie_full_path: Optional[str] = None
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
     data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
