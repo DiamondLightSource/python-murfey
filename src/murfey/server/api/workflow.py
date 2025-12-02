@@ -443,6 +443,7 @@ async def request_spa_preprocessing(
             db.add(feedback_params)
         movie = Movie(
             murfey_id=murfey_ids[0],
+            data_collection_id=detached_ids[1],
             path=proc_file.path,
             image_number=proc_file.image_number,
             tag=proc_file.tag,
@@ -694,6 +695,17 @@ async def request_tomography_preprocessing(
             proc_file.eer_fractionation_file = session_processing_parameters[
                 0
             ].eer_fractionation_file
+
+        movie = Movie(
+            murfey_id=murfey_ids[0],
+            data_collection_id=dcid,
+            path=proc_file.path,
+            image_number=proc_file.image_number,
+            tag=proc_file.tag,
+        )
+        db.add(movie)
+        db.commit()
+        db.close()
 
         zocalo_message: dict = {
             "recipes": [recipe_name],
