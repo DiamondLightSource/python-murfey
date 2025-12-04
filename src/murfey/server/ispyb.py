@@ -137,6 +137,34 @@ class TransportManager:
             )
         return {"success": False, "return_value": None}
 
+    def do_update_data_collection_group(
+        self,
+        record: DataCollectionGroup,
+        message=None,
+        **kwargs,
+    ):
+        try:
+            with ISPyBSession() as db:
+                dcg = (
+                    db.query(DataCollectionGroup)
+                    .filter(
+                        DataCollectionGroup.dataCollectionGroupId
+                        == record.dataCollectionGroupId
+                    )
+                    .one()
+                )
+                dcg.experimentTypeId = record.experimentTypeId
+                db.add(dcg)
+                db.commit()
+                return {"success": True, "return_value": record.dataCollectionGroupId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating Data Collection Group entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
     def do_insert_atlas(self, record: Atlas):
         try:
             with ISPyBSession() as db:
