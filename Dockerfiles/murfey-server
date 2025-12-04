@@ -2,7 +2,7 @@
 # podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-server -t murfey-server:<version> path/to/python-murfey
 
 # Set up the base image to build with
-FROM docker.io/library/python:3.12.10-slim-bookworm AS base
+FROM docker.io/library/python:3.12-slim-bookworm AS base
 
 # Install Vim and PostgreSQL dependencies in base image
 RUN apt-get update && \
@@ -35,10 +35,10 @@ RUN apt-get update && \
         psycopg2-binary \
         && \
     /venv/bin/python -m pip install /python-murfey[server] && \
-    curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.0_RHEL8-64_CUDA12.0.sh > imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
-    chmod +x imod_5.1.0_RHEL8-64_CUDA12.0.sh && \
+    curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.9_RHEL8-64_CUDA12.0.sh > imod_5.1.9_RHEL8-64_CUDA12.0.sh && \
+    chmod +x imod_5.1.9_RHEL8-64_CUDA12.0.sh && \
     mkdir imod && \
-    ./imod_5.1.0_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
+    ./imod_5.1.9_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
 
 
 # Transfer completed builds to base image
