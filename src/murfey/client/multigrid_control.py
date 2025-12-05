@@ -468,7 +468,13 @@ class MultigridController:
                     session_id=self._environment.murfey_session,
                     data=rsyncer_data,
                 )
-        self._environment.watchers[source] = DirWatcher(source, settling_time=30)
+        self._environment.watchers[source] = DirWatcher(
+            source,
+            settling_time=30,
+            substrings_blacklist=self._machine_config.get(
+                "substrings_blacklist", {"directories": [], "files": []}
+            ),
+        )
 
         if not self.analysers.get(source) and analyse:
             log.info(f"Starting analyser for {source}")

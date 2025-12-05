@@ -32,6 +32,7 @@ class DirWatcher(Observer):
         path: str | os.PathLike,
         settling_time: float = 60,
         appearance_time: float | None = None,
+        substrings_blacklist: dict[str, dict] = {},
         transfer_all: bool = True,
         status_bar: StatusBar | None = None,
     ):
@@ -42,6 +43,7 @@ class DirWatcher(Observer):
         self._statusbar = status_bar
         self.settling_time = settling_time
         self._appearance_time = appearance_time
+        self._substrings_blacklist = substrings_blacklist
         self._transfer_all = transfer_all
         self._modification_overwrite: float | None = None
         self._init_time: float = time.time()
@@ -252,7 +254,13 @@ class DirWatcher(Observer):
             raise
         for entry in directory_contents:
             entry_name = os.path.join(path, entry.name)
-            if entry.is_dir() and (
+            # Skip any directories with matching blacklisted substrings
+            if entry.is_dir() and any(
+                char in entry.name
+                for char in self._substrings_blacklist.get("directories", [])
+            ):
+                continue
+            elif entry.is_dir() and (
                 modification_time is None or entry.stat().st_ctime >= modification_time
             ):
                 result.update(self._scan_directory(entry_name))
@@ -260,7 +268,12 @@ class DirWatcher(Observer):
                 # Exclude textual log
                 if "textual" in str(entry):
                     continue
-
+                # Exclude files with blacklisted substrings
+                if any(
+                    char in entry.name
+                    for char in self._substrings_blacklist.get("files", [])
+                ):
+                    continue
                 # Get file statistics and append file to dictionary
                 try:
                     file_stat = entry.stat()
