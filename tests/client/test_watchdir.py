@@ -175,5 +175,6 @@ def test_scan_directory(
             substrings_blacklist=substrings_blacklist,
         )
         result = watcher._scan_directory()
-    # Check that the result does not contain the junk files
-    assert [str(file) for file in clem_test_files] == sorted(result.keys())
+
+        # Check that the result does not contain the junk files
+        assert [str(file) for file in clem_test_files] == sorted(result.keys())
