@@ -130,7 +130,7 @@ class DirWatcher(Observer):
                         settling_time=scan_completion
                     )
 
-            # Create a list of files stored based on their timestamps
+            # Create a list of files sorted based on their timestamps
             files_for_transfer = []
             time_ordered_file_candidates = sorted(
                 self._file_candidates,
@@ -260,6 +260,7 @@ class DirWatcher(Observer):
                 char in entry.name
                 for char in self._substrings_blacklist.get("directories", [])
             ):
+                log.debug(f"Skipping blacklisted directory {str(entry.name)!r}")
                 continue
             elif entry.is_dir() and (
                 modification_time is None or entry.stat().st_ctime >= modification_time
@@ -274,6 +275,7 @@ class DirWatcher(Observer):
                     char in entry.name
                     for char in self._substrings_blacklist.get("files", [])
                 ):
+                    log.debug(f"Skipping blacklisted file {str(entry.name)!r}")
                     continue
                 # Get file statistics and append file to dictionary
                 try:
