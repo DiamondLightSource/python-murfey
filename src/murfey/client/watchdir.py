@@ -130,7 +130,7 @@ class DirWatcher(Observer):
                         settling_time=scan_completion
                     )
 
-            # Create a list of files sroted based on their timestamps
+            # Create a list of files stored based on their timestamps
             files_for_transfer = []
             time_ordered_file_candidates = sorted(
                 self._file_candidates,
@@ -152,8 +152,9 @@ class DirWatcher(Observer):
                     continue
 
                 if (
-                    self._file_candidates[x].settling_time + self.settling_time  # type: ignore
-                    < time.time()
+                    current_file_settling_time := self._file_candidates[x].settling_time
+                ) is not None and (
+                    current_file_settling_time + self.settling_time < time.time()
                 ):
                     try:
                         file_stat = os.stat(x)
