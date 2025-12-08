@@ -32,6 +32,7 @@ class DirWatcher(Observer):
         path: str | os.PathLike,
         settling_time: float = 60,
         appearance_time: float | None = None,
+        substrings_blacklist: dict[str, dict] = {},
         transfer_all: bool = True,
         status_bar: StatusBar | None = None,
     ):
@@ -42,6 +43,7 @@ class DirWatcher(Observer):
         self._statusbar = status_bar
         self.settling_time = settling_time
         self._appearance_time = appearance_time
+        self._substrings_blacklist = substrings_blacklist
         self._transfer_all = transfer_all
         self._modification_overwrite: float | None = None
         self._init_time: float = time.time()
@@ -128,7 +130,7 @@ class DirWatcher(Observer):
                         settling_time=scan_completion
                     )
 
-            # Create a list of files sroted based on their timestamps
+            # Create a list of files sorted based on their timestamps
             files_for_transfer = []
             time_ordered_file_candidates = sorted(
                 self._file_candidates,
@@ -150,8 +152,9 @@ class DirWatcher(Observer):
                     continue
 
                 if (
-                    self._file_candidates[x].settling_time + self.settling_time  # type: ignore
-                    < time.time()
+                    current_file_settling_time := self._file_candidates[x].settling_time
+                ) is not None and (
+                    current_file_settling_time + self.settling_time < time.time()
                 ):
                     try:
                         file_stat = os.stat(x)
@@ -252,7 +255,14 @@ class DirWatcher(Observer):
             raise
         for entry in directory_contents:
             entry_name = os.path.join(path, entry.name)
-            if entry.is_dir() and (
+            # Skip any directories with matching blacklisted substrings
+            if entry.is_dir() and any(
+                char in entry.name
+                for char in self._substrings_blacklist.get("directories", [])
+            ):
+                log.debug(f"Skipping blacklisted directory {str(entry.name)!r}")
+                continue
+            elif entry.is_dir() and (
                 modification_time is None or entry.stat().st_ctime >= modification_time
             ):
                 result.update(self._scan_directory(entry_name))
@@ -260,7 +270,13 @@ class DirWatcher(Observer):
                 # Exclude textual log
                 if "textual" in str(entry):
                     continue
-
+                # Exclude files with blacklisted substrings
+                if any(
+                    char in entry.name
+                    for char in self._substrings_blacklist.get("files", [])
+                ):
+                    log.debug(f"Skipping blacklisted file {str(entry.name)!r}")
+                    continue
                 # Get file statistics and append file to dictionary
                 try:
                     file_stat = entry.stat()

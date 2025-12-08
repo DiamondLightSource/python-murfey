@@ -48,6 +48,10 @@ class MachineConfig(BaseModel):  # type: ignore
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
+    substrings_blacklist: dict[str, list] = {
+        "directories": [],
+        "files": [],
+    }
 
     # Data transfer setup -------------------------------------------------------------
     # Rsync setup
