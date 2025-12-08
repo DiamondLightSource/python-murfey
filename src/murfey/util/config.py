@@ -147,7 +147,9 @@ class MachineConfig(BaseModel):  # type: ignore
         return v
 
 
-def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
+def machine_config_from_file(
+    config_file_path: Path, instrument: str = ""
+) -> dict[str, MachineConfig]:
     with open(config_file_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
     return {
@@ -260,7 +262,7 @@ def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
     }
     if settings.murfey_machine_configuration:
         microscope = instrument_name
-        machine_config = from_file(
+        machine_config = machine_config_from_file(
             Path(settings.murfey_machine_configuration), microscope
         )
     return machine_config

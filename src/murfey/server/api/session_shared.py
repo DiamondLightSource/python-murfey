@@ -9,7 +9,12 @@ from werkzeug.utils import secure_filename
 
 import murfey.server.prometheus as prom
 from murfey.util import safe_run, sanitise, secure_path
-from murfey.util.config import MachineConfig, from_file, get_machine_config, settings
+from murfey.util.config import (
+    MachineConfig,
+    get_machine_config,
+    machine_config_from_file,
+    settings,
+)
 from murfey.util.db import (
     DataCollection,
     DataCollectionGroup,
@@ -26,9 +31,9 @@ logger = logging.getLogger("murfey.server.api.shared")
 @lru_cache(maxsize=5)
 def get_machine_config_for_instrument(instrument_name: str) -> Optional[MachineConfig]:
     if settings.murfey_machine_configuration:
-        return from_file(Path(settings.murfey_machine_configuration), instrument_name)[
-            instrument_name
-        ]
+        return machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )[instrument_name]
     return None
 
 
