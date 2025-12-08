@@ -22,7 +22,7 @@ import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
-    default_clem_align_and_merge_parameters as processing_params,
+    default_clem_processing_parameters as processing_params,
 )
 from murfey.workflows.clem import get_db_entry
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
@@ -55,7 +55,7 @@ def _is_clem_atlas(result: CLEMPreprocessingResult):
     # If an image has a width/height of at least 1.5 mm, it should qualify as an atlas
     return (
         max(result.pixels_x * result.pixel_size, result.pixels_y * result.pixel_size)
-        >= 0.0015  # In metres
+        >= processing_params.atlas_threshold
     )
 
 
