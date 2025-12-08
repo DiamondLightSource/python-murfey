@@ -1100,7 +1100,9 @@ def _register_class_selection(message: dict, _db, demo: bool = False):
 def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
     if machine_config.initial_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath / str(datetime.now().year) / visit
+            (machine_config.rsync_basepath or Path("")).resolve()
+            / str(datetime.now().year)
+            / visit
         )
         possible_models = [
             p
@@ -1512,7 +1514,10 @@ def _flush_tomography_preprocessing(message: dict, _db):
                 "fm_dose": proc_params.dose_per_frame,
                 "frame_count": proc_params.frame_count,
                 "gain_ref": (
-                    str(machine_config.rsync_basepath / proc_params.gain_ref)
+                    str(
+                        (machine_config.rsync_basepath or Path("")).resolve()
+                        / proc_params.gain_ref
+                    )
                     if proc_params.gain_ref
                     else proc_params.gain_ref
                 ),
@@ -2042,7 +2047,10 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     angpix=float(message["pixel_size_on_image"]) * 1e10,
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=(
-                        str(machine_config.rsync_basepath / message["gain_ref"])
+                        str(
+                            (machine_config.rsync_basepath or Path("")).resolve()
+                            / message["gain_ref"]
+                        )
                         if message["gain_ref"] and machine_config.data_transfer_enabled
                         else message["gain_ref"]
                     ),

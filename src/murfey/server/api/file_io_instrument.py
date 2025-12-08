@@ -57,7 +57,8 @@ def suggest_path(
         )
 
     # Construct the full path to where the dataset is to be saved
-    check_path = machine_config.rsync_basepath / base_path
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
+    check_path = rsync_basepath / base_path
 
     # Check previous year to account for the year rolling over during data collection
     if not check_path.parent.exists():
@@ -69,7 +70,7 @@ def suggest_path(
                 base_path_parts[year_idx] = str(int(part) - 1)
         base_path = "/".join(base_path_parts)
         check_path_prev = check_path
-        check_path = machine_config.rsync_basepath / base_path
+        check_path = rsync_basepath / base_path
 
         # If it's not in the previous year either, it's a genuine error
         if not check_path.parent.exists():
@@ -88,7 +89,7 @@ def suggest_path(
         check_path.mkdir(mode=0o750)
         if params.extra_directory:
             (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
-    return {"suggested_path": check_path.relative_to(machine_config.rsync_basepath)}
+    return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
 
 class Dest(BaseModel):
@@ -107,7 +108,9 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     ]
     if not machine_config:
         raise ValueError("No machine configuration set when making rsyncer destination")
-    full_destination_path = machine_config.rsync_basepath / destination_path
+    full_destination_path = (
+        machine_config.rsync_basepath or Path("")
+    ).resolve() / destination_path
     for parent_path in full_destination_path.parents:
         parent_path.mkdir(mode=0o750, exist_ok=True)
     return destination
@@ -151,7 +154,7 @@ async def write_eer_fractionation_file(
         ) / secure_filename(fractionation_params.fractionation_file_name)
     else:
         file_path = (
-            Path(machine_config.rsync_basepath)
+            (machine_config.rsync_basepath or Path("")).resolve()
             / str(datetime.now().year)
             / secure_filename(visit_name)
             / machine_config.gain_directory_name

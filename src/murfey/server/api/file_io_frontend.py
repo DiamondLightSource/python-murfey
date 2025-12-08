@@ -50,10 +50,11 @@ async def create_symlink(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    symlink_full_path = machine_config.rsync_basepath / symlink_params.symlink
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
+    symlink_full_path = rsync_basepath / symlink_params.symlink
     if symlink_full_path.is_symlink() and symlink_params.override:
         symlink_full_path.unlink()
     if symlink_full_path.exists():
         return ""
-    symlink_full_path.symlink_to(machine_config.rsync_basepath / symlink_params.target)
+    symlink_full_path.symlink_to(rsync_basepath / symlink_params.target)
     return str(symlink_params.symlink)
