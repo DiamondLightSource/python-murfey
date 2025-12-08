@@ -1161,9 +1161,9 @@ def _resize_intial_model(
     env: Dict[str, str],
 ) -> None:
     with mrcfile.open(input_path) as input_mrc:
-        input_size_x = input_mrc.nx
-        input_size_y = input_mrc.ny
-        input_size_z = input_mrc.nz
+        input_size_x = input_mrc.header.nx
+        input_size_y = input_mrc.header.ny
+        input_size_z = input_mrc.header.nz
     if executables.get("clip") and not input_size_x == input_size_y == input_size_z:
         # If the initial model is not a cube, do some padding
         clip_proc = subprocess.run(
