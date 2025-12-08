@@ -1115,12 +1115,12 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
 
 
 def _downscaled_box_size(
-    particle_diameter: int, pixel_size: float
+    particle_diameter_ang: float, pixel_size: float
 ) -> Tuple[int, float]:
+    particle_diameter = particle_diameter_ang / pixel_size
     box_size = int(math.ceil(1.2 * particle_diameter))
     box_size = box_size + box_size % 2
     for small_box_pix in (
-        48,
         64,
         96,
         128,
@@ -1145,9 +1145,9 @@ def _downscaled_box_size(
         # Don't go larger than the original box
         if small_box_pix > box_size:
             return box_size, pixel_size
-        # If Nyquist freq. is better than 8.5 A, use this downscaled box, else step size
+        # If Nyquist freq. is better than 7.5 A, use this downscaled box, else step size
         small_box_angpix = pixel_size * box_size / small_box_pix
-        if small_box_angpix < 4.25:
+        if small_box_angpix < 3.75:
             return small_box_pix, small_box_angpix
     raise ValueError(f"Box size is too large: {box_size}")
 
@@ -1197,6 +1197,8 @@ def _resize_intial_model(
                 "--new_box",
                 str(downscaled_box_size),
                 "--rescale_angpix",
+                str(downscaled_pixel_size),
+                "--force_header_angpix",
                 str(downscaled_pixel_size),
                 "--o",
                 str(output_path),
