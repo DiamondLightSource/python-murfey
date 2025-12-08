@@ -36,14 +36,14 @@ class MachineConfig(BaseModel):  # type: ignore
     # Hardware and software -----------------------------------------------------------
     camera: str = "FALCON"
     superres: bool = False
-    calibrations: dict[str, Any]
-    acquisition_software: list[str]
+    calibrations: dict[str, Any] = {}
+    acquisition_software: list[str] = []
     software_versions: dict[str, str] = {}
     software_settings_output_directories: dict[str, list[str]] = {}
     data_required_substrings: dict[str, dict[str, list[str]]] = {}
 
     # Client side directory setup -----------------------------------------------------
-    data_directories: list[Path]
+    data_directories: list[Path] = []
     create_directories: list[str] = ["atlas"]
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
@@ -58,7 +58,7 @@ class MachineConfig(BaseModel):  # type: ignore
     data_transfer_enabled: bool = True
     rsync_url: str = ""
     rsync_module: str = ""
-    rsync_basepath: Path
+    rsync_basepath: Optional[Path] = None
     allow_removal: bool = False
 
     # Upstream data download setup
@@ -86,7 +86,7 @@ class MachineConfig(BaseModel):  # type: ignore
     }
 
     # Particle picking setup
-    default_model: Path
+    default_model: Optional[Path] = None
     picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
