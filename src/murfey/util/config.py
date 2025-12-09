@@ -48,14 +48,16 @@ class MachineConfig(BaseModel):  # type: ignore
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
-    substrings_blacklist: dict[str, list] = {
+
+    # Data transfer setup -------------------------------------------------------------
+    # General setup
+    data_transfer_enabled: bool = True
+    substrings_blacklist: dict[str, list[str]] = {
         "directories": [],
         "files": [],
     }
 
-    # Data transfer setup -------------------------------------------------------------
     # Rsync setup
-    data_transfer_enabled: bool = True
     rsync_url: str = ""
     rsync_module: str = ""
     rsync_basepath: Optional[Path] = None
@@ -192,6 +194,7 @@ def machine_config_from_file(
         # If instrument name is set, skip irrelevant configs
         if instrument_name and i != instrument_name:
             continue
+
         # Construct instrument config hierarchically
         config: dict[str, Any] = {}
 
@@ -209,6 +212,7 @@ def machine_config_from_file(
         # Insert instrument-specific values
         config = _update_nested_values(config, instrument_config)
 
+        # Add to master dictionary
         all_machine_configs[i] = MachineConfig(**config)
 
     return all_machine_configs
