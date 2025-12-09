@@ -14,6 +14,7 @@ from textual.reactive import reactive
 from textual.widgets import Button, Input
 
 from murfey.client.analyser import Analyser
+from murfey.client.context import ensure_dcg_exists
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.destinations import determine_default_destination
@@ -561,28 +562,20 @@ class MurfeyTUI(App):
             )
             log.info("Tomography processing flushed")
         elif isinstance(context, SPAModularContext):
-            dcg_data = {
-                "experiment_type_id": 37,  # Single particle
-                "tag": str(source),
-                "atlas": (
-                    str(self._environment.samples[source].atlas)
-                    if self._environment.samples.get(source)
-                    else ""
-                ),
-                "sample": (
-                    self._environment.samples[source].sample
-                    if self._environment.samples.get(source)
-                    else None
-                ),
-            }
-            capture_post(
-                base_url=str(self._url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
-                token=token,
-                visit_name=self._visit,
-                session_id=self._environment.murfey_session,
-                data=dcg_data,
+            if self._environment.visit in source.parts:
+                metadata_source = source
+            else:
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{self._environment.visit}/"
+                    + source.parts[-2]
+                )
+                metadata_source = Path(metadata_source_as_str.replace("//", "/"))
+            ensure_dcg_exists(
+                collection_type="spa",
+                metadata_source=metadata_source,
+                environment=self._environment,
+                token=self.token,
             )
             if from_form:
                 data = {

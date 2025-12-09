@@ -215,16 +215,16 @@ def register_search_map_in_database(
 
         # Convert from metres to pixels
         search_map_params.height_on_atlas = int(
-            search_map.height * search_map.pixel_size / dcg.atlas_pixel_size
+            search_map.height * search_map.pixel_size / dcg.atlas_pixel_size * 7.8
         )
         search_map_params.width_on_atlas = int(
-            search_map.width * search_map.pixel_size / dcg.atlas_pixel_size
+            search_map.width * search_map.pixel_size / dcg.atlas_pixel_size * 7.8
         )
         search_map_params.x_location = float(
-            corrected_vector[0] / dcg.atlas_pixel_size + 2003
+            corrected_vector[0] / dcg.atlas_pixel_size * 7.8 + 2003
         )
         search_map_params.y_location = float(
-            corrected_vector[1] / dcg.atlas_pixel_size + 2003
+            corrected_vector[1] / dcg.atlas_pixel_size * 7.8 + 2003
         )
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location

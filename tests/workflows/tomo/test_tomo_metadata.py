@@ -135,12 +135,16 @@ def test_register_search_map_update_with_all_parameters(
     assert sm_final_parameters.y_location is not None
 
     # Check this would have updated ispyb
-    mock_transport.do_update_search_map.assert_called_with(1, new_parameters)
-    new_parameters.x_location = sm_final_parameters.x_location
-    new_parameters.y_location = sm_final_parameters.y_location
-    new_parameters.height_on_atlas = 40
-    new_parameters.width_on_atlas = 20
-    mock_transport.do_update_search_map.assert_called_with(1, new_parameters)
+    update_args = mock_transport.do_update_search_map.call_args_list
+    assert len(update_args) == 2
+    assert update_args[0][0][0] == 1
+    assert update_args[1][0][0] == 1
+    assert update_args[0][0][1].x_stage_position == 0.3
+    assert update_args[0][0][1].y_stage_position == 0.4
+    assert update_args[1][0][1].x_location == sm_final_parameters.x_location
+    assert update_args[1][0][1].y_location == sm_final_parameters.y_location
+    assert update_args[1][0][1].height_on_atlas == 311
+    assert update_args[1][0][1].width_on_atlas == 155
 
 
 @mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
