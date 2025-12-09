@@ -54,14 +54,18 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
     return machine_config.default_model
 
 
-class CLEMAlignAndMergeParameters(BaseModel):
+class CLEMProcessingParameters(BaseModel):
+    # Atlas vs GridSquare registration threshold
+    atlas_threshold: float = 0.0015  # in m
+
+    # Image alignment and merging-specific parameters
     crop_to_n_frames: Optional[int] = 50
     align_self: Literal["enabled", ""] = "enabled"
     flatten: Literal["mean", "min", "max", ""] = "mean"
     align_across: Literal["enabled", ""] = "enabled"
 
 
-default_clem_align_and_merge_parameters = CLEMAlignAndMergeParameters()
+default_clem_processing_parameters = CLEMProcessingParameters()
 
 
 class SPAParameters(BaseModel):

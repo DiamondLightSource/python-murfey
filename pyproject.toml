@@ -96,7 +96,6 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.sessions" = "murfey.cli.db_sessions:run"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
-"murfey.spa_ispyb_entries" = "murfey.cli.spa_ispyb_messages:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"

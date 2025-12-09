@@ -22,7 +22,7 @@ import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
-    default_clem_align_and_merge_parameters as processing_params,
+    default_clem_processing_parameters as processing_params,
 )
 from murfey.workflows.clem import get_db_entry
 from murfey.workflows.clem.align_and_merge import submit_cluster_request
@@ -49,6 +49,14 @@ class CLEMPreprocessingResult(BaseModel):
     pixel_size: float
     resolution: float
     extent: list[float]  # [x0, x1, y0, y1]
+
+
+def _is_clem_atlas(result: CLEMPreprocessingResult):
+    # If an image has a width/height of at least 1.5 mm, it should qualify as an atlas
+    return (
+        max(result.pixels_x * result.pixel_size, result.pixels_y * result.pixel_size)
+        >= processing_params.atlas_threshold
+    )
 
 
 def _register_clem_image_series(
@@ -142,9 +150,7 @@ def _register_clem_image_series(
 
     # Add metadata for this series
     clem_img_series.search_string = str(output_file.parent / "*tiff")
-    clem_img_series.data_type = (
-        "atlas" if "Overview_" in result.series_name else "grid_square"
-    )
+    clem_img_series.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
     clem_img_series.number_of_members = result.number_of_members
     clem_img_series.pixels_x = result.pixels_x
     clem_img_series.pixels_y = result.pixels_y
@@ -181,7 +187,7 @@ def _register_dcg_and_atlas(
         dcg_name += f"--{result.series_name.split('--')[1]}"
 
     # Determine values for atlas
-    if "Overview_" in result.series_name:  # These are atlas datasets
+    if _is_clem_atlas(result):
         output_file = list(result.output_files.values())[0]
         atlas_name = str(output_file.parent / "*.tiff")
         atlas_pixel_size = result.pixel_size
@@ -197,7 +203,7 @@ def _register_dcg_and_atlas(
         dcg_entry = dcg_search[0]
         # Update atlas if registering atlas dataset
         # and data collection group already exists
-        if "Overview_" in result.series_name:
+        if _is_clem_atlas(result):
             atlas_message = {
                 "session_id": session_id,
                 "dcgid": dcg_entry.id,
