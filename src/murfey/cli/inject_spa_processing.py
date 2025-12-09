@@ -87,7 +87,7 @@ def run():
         help="Path to EER fractionation file if relevant",
     )
 
-    zc = zocalo.configuration.machine_config_from_file()
+    zc = zocalo.configuration.from_file()
     zc.activate()
     zc.add_command_line_options(parser)
     workflows.transport.add_command_line_options(parser, transport_argument=True)
