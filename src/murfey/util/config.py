@@ -161,7 +161,7 @@ def machine_config_from_file(
 
     def _update_nested_values(base: dict[str, Any], new: dict[str, Any]):
         """
-        Helper function to recursively update nested dictioanry values.
+        Helper function to recursively update nested dictionary values.
         If the old and new values are both dicts, it will add the new keys and values
         to the existing dictionary recursively without overwriting entries.
         If the old and new values are both lists, it will extend the existing list.
@@ -192,7 +192,6 @@ def machine_config_from_file(
         # If instrument name is set, skip irrelevant configs
         if instrument_name and i != instrument_name:
             continue
-        print(f"Parsing key {i}")
         # Construct instrument config hierarchically
         config: dict[str, Any] = {}
 
