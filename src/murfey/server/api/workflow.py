@@ -106,11 +106,24 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
-    if dcg_murfey := db.exec(
-        select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == dcg_params.tag)
-    ).all():
+    if (
+        dcg_murfey := db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == dcg_params.tag)
+        ).all()
+    ) or (
+        (
+            dcg_murfey := db.exec(
+                select(DataCollectionGroup)
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.sample == dcg_params.sample)
+            ).all()
+        )
+        and dcg_params.experiment_type_id == 44
+    ):
+        # Either switching atlas for a common (atlas or processing) tag
+        # Or registering a new atlas-type dcg for a sample that is already present
         dcg_murfey[0].atlas = dcg_params.atlas or dcg_murfey[0].atlas
         dcg_murfey[0].sample = dcg_params.sample or dcg_murfey[0].sample
         dcg_murfey[0].atlas_pixel_size = (
@@ -155,6 +168,24 @@ def register_dc_group(
                 session_id, sm.name, search_map_params, db, close_db=False
             )
         db.close()
+    elif dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.sample == dcg_params.sample)
+    ).all():
+        # Case where we switch from atlas to processing
+        dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
+        if _transport_object:
+            _transport_object.send(
+                _transport_object.feedback_queue,
+                {
+                    "register": "experiment_type_update",
+                    "experiment_type_id": dcg_params.experiment_type_id,
+                    "dcgid": dcg_murfey[0].id,
+                },
+            )
+        db.add(dcg_murfey[0])
+        db.commit()
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),

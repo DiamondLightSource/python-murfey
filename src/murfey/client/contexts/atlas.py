@@ -4,9 +4,8 @@ from typing import Optional
 
 import xmltodict
 
-from murfey.client.context import Context
+from murfey.client.context import Context, _atlas_destination
 from murfey.client.contexts.spa import _get_source
-from murfey.client.contexts.spa_metadata import _atlas_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 
@@ -38,7 +37,7 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 transferred_atlas_name = _atlas_destination(
-                    environment, source, transferred_file, self._token
+                    environment, source, self._token
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     base_url=str(environment.url.geturl()),
@@ -60,7 +59,7 @@ class AtlasContext(Context):
             if source:
                 atlas_mrc = transferred_file.with_suffix(".mrc")
                 transferred_atlas_jpg = _atlas_destination(
-                    environment, source, atlas_mrc, self._token
+                    environment, source, self._token
                 ) / atlas_mrc.relative_to(source.parent).with_suffix(".jpg")
 
                 with open(transferred_file, "rb") as atlas_xml:
