@@ -147,16 +147,72 @@ class MachineConfig(BaseModel):  # type: ignore
         return v
 
 
+@lru_cache(maxsize=1)
 def machine_config_from_file(
-    config_file_path: Path, instrument: str = ""
+    config_file_path: Path,
+    instrument_name: str,
 ) -> dict[str, MachineConfig]:
+    """
+    Loads the machine config YAML file and constructs instrument-specific configs from
+    a hierarchical set of dictionary key-value pairs. It will populate the keys listed
+    in the general dictionary, then update the keys specified in the shared instrument
+    dictionary, before finally updating the keys for that specific instrument.
+    """
+
+    def _update_nested_values(base: dict[str, Any], new: dict[str, Any]):
+        """
+        Helper function to recursively update nested dictioanry values.
+        If the old and new values are both dicts, it will add the new keys and values
+        to the existing dictionary recursively without overwriting entries.
+        If the old and new values are both lists, it will extend the existing list.
+        For all other values, it will overwrite the existing value with the new one.
+        """
+        for key, value in new.items():
+            # If new values are dicts and dict values already exist, do recursive update
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                base[key] = _update_nested_values(base[key], value)
+            # If new values are lists and a list already exists, extend the list
+            if key in base and isinstance(base[key], list) and isinstance(value, list):
+                base[key].extend(value)
+            # Otherwise, overwrite values as normal
+            else:
+                base[key] = value
+        return base
+
+    # Load the dict from the file
     with open(config_file_path, "r") as config_stream:
-        config = yaml.safe_load(config_stream)
-    return {
-        i: MachineConfig(**config[i])
-        for i in config.keys()
-        if not instrument or i == instrument
-    }
+        master_config: dict[str, Any] = yaml.safe_load(config_stream)
+
+    # Construct requested machine configs from the YAML file
+    all_machine_configs: dict[str, MachineConfig] = {}
+    for i in sorted(master_config.keys()):
+        # Skip reserved top-level keys
+        if i in ("general", "clem", "fib", "tem"):
+            continue
+        # If instrument name is set, skip irrelevant configs
+        if instrument_name and i != instrument_name:
+            continue
+        print(f"Parsing key {i}")
+        # Construct instrument config hierarchically
+        config: dict[str, Any] = {}
+
+        # Populate with general values
+        general_config: dict[str, Any] = master_config.get("general", {})
+        config = _update_nested_values(config, general_config)
+
+        # Populate with shared instrument values
+        instrument_config: dict[str, Any] = master_config.get(i, {})
+        instrument_shared_config: dict[str, Any] = master_config.get(
+            str(instrument_config.get("instrument_type", "")).lower(), {}
+        )
+        config = _update_nested_values(config, instrument_shared_config)
+
+        # Insert instrument-specific values
+        config = _update_nested_values(config, instrument_config)
+
+        all_machine_configs[i] = MachineConfig(**config)
+
+    return all_machine_configs
 
 
 class Security(BaseModel):
@@ -250,22 +306,13 @@ def get_security_config() -> Security:
 
 @lru_cache(maxsize=1)
 def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
-    machine_config = {
-        "": MachineConfig(
-            acquisition_software=[],
-            calibrations={},
-            data_directories=[],
-            rsync_basepath=Path("dls/tmp"),
-            murfey_db_credentials="",
-            default_model="/tmp/weights.h5",
-        )
-    }
+    # Create an empty machine config as a placeholder
+    machine_configs = {instrument_name: MachineConfig()}
     if settings.murfey_machine_configuration:
-        microscope = instrument_name
-        machine_config = machine_config_from_file(
-            Path(settings.murfey_machine_configuration), microscope
+        machine_configs = machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
         )
-    return machine_config
+    return machine_configs
 
 
 def get_extended_machine_config(
