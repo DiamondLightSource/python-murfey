@@ -161,24 +161,26 @@ def machine_config_from_file(
     dictionary, before finally updating the keys for that specific instrument.
     """
 
-    def _update_nested_values(base: dict[str, Any], new: dict[str, Any]):
+    def _recursive_update(base: dict[str, Any], new: dict[str, Any]):
         """
-        Helper function to recursively update nested dictionary values.
+        Helper function to recursively update nested dictionaries.
+
         If the old and new values are both dicts, it will add the new keys and values
         to the existing dictionary recursively without overwriting entries.
+
         If the old and new values are both lists, it will extend the existing list.
         For all other values, it will overwrite the existing value with the new one.
         """
         for key, value in new.items():
             # If new values are dicts and dict values already exist, do recursive update
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                base[key] = _update_nested_values(base[key], value)
+                base[key] = _recursive_update(base[key], value)
             # If new values are lists and a list already exists, extend the list
             elif (
                 key in base and isinstance(base[key], list) and isinstance(value, list)
             ):
                 base[key].extend(value)
-            # Otherwise, overwrite values as normal
+            # Otherwise, overwrite/add values as normal
             else:
                 base[key] = value
         return base
@@ -202,17 +204,17 @@ def machine_config_from_file(
 
         # Populate with general values
         general_config: dict[str, Any] = master_config.get("general", {})
-        config = _update_nested_values(config, general_config)
+        config = _recursive_update(config, general_config)
 
         # Populate with shared instrument values
         instrument_config: dict[str, Any] = master_config.get(i, {})
         instrument_shared_config: dict[str, Any] = master_config.get(
             str(instrument_config.get("instrument_type", "")).lower(), {}
         )
-        config = _update_nested_values(config, instrument_shared_config)
+        config = _recursive_update(config, instrument_shared_config)
 
         # Insert instrument-specific values
-        config = _update_nested_values(config, instrument_config)
+        config = _recursive_update(config, instrument_config)
 
         # Add to master dictionary
         all_machine_configs[i] = MachineConfig(**config)
