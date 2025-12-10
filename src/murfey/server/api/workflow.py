@@ -245,15 +245,14 @@ def start_dc(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
     logger.info(
         f"Starting data collection on microscope {instrument_name!r} "
-        f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
+        f"with basepath {sanitise(str(rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
     )
     dc_parameters = {
         "visit": visit_name,
-        "image_directory": str(
-            machine_config.rsync_basepath / dc_params.image_directory
-        ),
+        "image_directory": str(rsync_basepath / dc_params.image_directory),
         "start_time": str(datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
@@ -744,7 +743,10 @@ async def request_tomography_preprocessing(
                 "fm_dose": proc_file.dose_per_frame,
                 "frame_count": proc_file.frame_count,
                 "gain_ref": (
-                    str(machine_config.rsync_basepath / proc_file.gain_ref)
+                    str(
+                        (machine_config.rsync_basepath or Path("")).resolve()
+                        / proc_file.gain_ref
+                    )
                     if proc_file.gain_ref and machine_config.data_transfer_enabled
                     else proc_file.gain_ref
                 ),
@@ -1060,7 +1062,7 @@ async def make_gif(
         instrument_name
     ]
     output_dir = (
-        Path(machine_config.rsync_basepath)
+        (machine_config.rsync_basepath or Path("")).resolve()
         / secure_filename(year)
         / secure_filename(visit_name)
         / "processed"
