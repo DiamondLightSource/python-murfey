@@ -171,19 +171,17 @@ def mock_standard_machine_config_yaml(
         for key, value in config.items()
     }
 
-    # Correct for nested dicts that would have been partially overwritten
-    machine_config["pkg_1"] = (
-        {
-            "file_path": "/path/to/pkg_1/file.txt",
-            "command": [
-                "/path/to/executable",
-                "--some_arg",
-                "-a",
-                "./path/to/file",
-            ],
-            "step_size": 100,
-        },
-    )
+    # Correct nested dicts that would have been partially overwritten
+    machine_config["pkg_1"] = {
+        "file_path": "/path/to/pkg_1/file.txt",
+        "command": [
+            "/path/to/executable",
+            "--some_arg",
+            "-a",
+            "./path/to/file",
+        ],
+        "step_size": 100,
+    }
 
     master_config = {
         "m01": machine_config,
@@ -346,3 +344,15 @@ def test_get_machine_config(
                 config[i].node_creator_queue
                 == mock_instrument_config["node_creator_queue"]
             )
+            # Extra keys
+            assert config[i].pkg_1 == {
+                "file_path": "/path/to/pkg_1/file.txt",
+                "command": [
+                    "/path/to/executable",
+                    "--some_arg",
+                    "-a",
+                    "./path/to/file",
+                ],
+                "step_size": 100,
+            }
+            assert config[i].pkg_2 == mock_general_config["pkg_2"]

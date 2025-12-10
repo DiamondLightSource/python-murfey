@@ -174,7 +174,9 @@ def machine_config_from_file(
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                 base[key] = _update_nested_values(base[key], value)
             # If new values are lists and a list already exists, extend the list
-            if key in base and isinstance(base[key], list) and isinstance(value, list):
+            elif (
+                key in base and isinstance(base[key], list) and isinstance(value, list)
+            ):
                 base[key].extend(value)
             # Otherwise, overwrite values as normal
             else:
