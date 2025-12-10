@@ -30,6 +30,7 @@ class MachineConfig(BaseModel):  # type: ignore
     # General info --------------------------------------------------------------------
     display_name: str = ""
     instrument_name: str = ""
+    instrument_type: str = ""  # For use with hierarchical config files
     image_path: Optional[Path] = None
     machine_override: str = ""
 

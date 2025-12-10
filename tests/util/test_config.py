@@ -183,6 +183,9 @@ def mock_standard_machine_config_yaml(
         "step_size": 100,
     }
 
+    # Remove 'instrument_type' value (not needed in standard config)
+    machine_config["instrument_type"] = ""
+
     master_config = {
         "m01": machine_config,
         "m02": machine_config,
@@ -239,6 +242,11 @@ def test_get_machine_config(
             # General info
             assert config[i].display_name == mock_instrument_config["display_name"]
             assert config[i].image_path == Path(mock_instrument_config["image_path"])
+            assert (
+                config[i].instrument_type == mock_instrument_config["instrument_type"]
+                if config_to_test == "hierarchical"
+                else not config[i].instrument_type
+            )
             # Hardware & software
             assert config[i].camera == mock_instrument_config["camera"]
             assert config[i].superres == mock_instrument_config["superres"]
