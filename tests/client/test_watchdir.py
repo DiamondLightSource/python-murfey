@@ -15,7 +15,6 @@ def test_dirwatcher_initialises(tmp_path: Path):
     assert watcher._basepath == os.fspath(str(tmp_path))
     assert watcher._lastscan == {}
     assert watcher._file_candidates == {}
-    assert watcher._statusbar is None
     assert watcher.settling_time == 60
     assert watcher._appearance_time is None
     assert watcher._substrings_blacklist == {}

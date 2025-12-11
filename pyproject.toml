@@ -82,7 +82,6 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 "murfey.add_user" = "murfey.cli.add_user:run"
-"murfey.client" = "murfey.client.tui.main:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
@@ -121,7 +120,6 @@ include-package-data = true
 zip-safe = false
 
 [tool.setuptools.package-data]
-"murfey.client.tui" = ["*.css"]
 "murfey.util" = ["route_manifest.yaml"]
 
 [tool.setuptools.packages.find]
