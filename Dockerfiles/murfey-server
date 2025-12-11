@@ -17,6 +17,10 @@ RUN apt-get update && \
 
 # Build Murfey and IMOD in a branch image
 FROM base as build
+
+# Set up build argumentss for this stage
+ARG IMOD_INSTALLER=imod_5.1.9_RHEL8-64_CUDA12.0.sh
+
 COPY ./ /python-murfey/
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -35,10 +39,13 @@ RUN apt-get update && \
         psycopg2-binary \
         && \
     /venv/bin/python -m pip install /python-murfey[server] && \
-    curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.9_RHEL8-64_CUDA12.0.sh > imod_5.1.9_RHEL8-64_CUDA12.0.sh && \
-    chmod +x imod_5.1.9_RHEL8-64_CUDA12.0.sh && \
+    if [ ! -f /python-murfey/installers/${IMOD_INSTALLER} ]; then \
+        echo "IMOD installer not found; downloading..."; \
+        curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/${IMOD_INSTALLER} > /python-murfey/installers/${IMOD_INSTALLER}; \
+    fi && \
+    chmod +x /python-murfey/installers/${IMOD_INSTALLER} && \
     mkdir imod && \
-    ./imod_5.1.9_RHEL8-64_CUDA12.0.sh -dir imod -skip -y
+    /python-murfey/installers/${IMOD_INSTALLER} -dir imod -skip -y
 
 
 # Transfer completed builds to base image
