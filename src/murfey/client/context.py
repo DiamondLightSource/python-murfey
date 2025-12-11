@@ -52,7 +52,11 @@ def ensure_dcg_exists(
         for h in entry_points(group="murfey.hooks"):
             try:
                 if h.name == "get_epu_session_metadata":
-                    h.load()(session_file, environment=environment, token=token)
+                    h.load()(
+                        destination_dir=session_file.parent,
+                        environment=environment,
+                        token=token,
+                    )
             except Exception as e:
                 logger.warning(f"Get EPU session hook failed: {e}")
     else:
