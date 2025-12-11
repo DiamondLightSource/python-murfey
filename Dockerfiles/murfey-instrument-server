@@ -32,7 +32,7 @@ RUN apt-get update && \
         pip \
         build \
         importlib-metadata && \
-    /venv/bin/python -m pip install /python-murfey[client,instrument-server]
+    /venv/bin/python -m pip install /python-murfey[client]
 
 
 # Transfer completed Murfey build to base image

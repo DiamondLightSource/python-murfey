@@ -29,9 +29,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "aiohttp",
     "defusedxml", # For safely parsing XML files
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "pydantic>=2",
     "pydantic-settings",
+    "python-jose",
     "requests",
     "rich",
     "werkzeug",
@@ -42,7 +45,6 @@ cicd = [
     "pytest-cov", # Used for generating PyTest coverage reports
 ]
 client = [
-    "textual==0.42.0",
     "websocket-client",
 ]
 developer = [
@@ -52,15 +54,8 @@ developer = [
     "pytest", # Test code functionality
     "pytest-mock", # Additional mocking tools for unit tests
 ]
-instrument-server = [
-    "aiohttp",
-    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
-    "python-jose",
-]
 server = [
-    "aiohttp",
     "cryptography",
-    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "graypy",
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
@@ -70,7 +65,6 @@ server = [
     "passlib",
     "pillow",
     "prometheus_client",
-    "python-jose[cryptography]",
     "sqlalchemy[postgresql]", # Add as explicit dependency
     "sqlmodel",
     "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
