@@ -142,10 +142,6 @@ def test_start_instrument_server(
     # Disable 'run'; we just want to confirm it's called correctly
     mock_server.run.return_value = lambda: None
 
-    # Patch the websocket instance
-    mock_wsapp = mocker.patch("murfey.client.websocket.WSApp")
-    mock_wsapp.return_value = mocker.Mock()  # Disable functionality
-
     # Construct the expected Uvicorn Config object and save it as a dict
     expected_config = vars(
         uvicorn.Config(
