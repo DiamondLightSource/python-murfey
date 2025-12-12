@@ -331,6 +331,6 @@ def get_extended_machine_config(
     )
     if not machine_config:
         return None
-    model = entry_points(group="murfey.config", name=extension_name)[0].load()
+    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
     data = getattr(machine_config, extension_name, {})
     return model(**data)
