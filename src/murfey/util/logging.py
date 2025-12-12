@@ -90,7 +90,6 @@ class HTTPSHandler(logging.Handler):
             self.log_times.append(time.time())
         except Exception:
             self.handleError(record)
-        pass
 
     def format_record(self, record: logging.LogRecord):
         """
@@ -113,8 +112,10 @@ class HTTPSHandler(logging.Handler):
             try:
                 log_entry = self.queue.get(timeout=0.05)
                 batch.append(log_entry)
+            # If the queue is empty, check back again
             except Empty:
-                pass
+                time.sleep(1)
+                continue
 
             # Calculate logging rate based on past second
             now = time.time()
@@ -146,8 +147,7 @@ class HTTPSHandler(logging.Handler):
                 if response.status_code == 200:
                     return
             except requests.RequestException:
-                pass
-            time.sleep(2 ** (attempt + 1) * 0.1)  # Exponential backoff
+                time.sleep(2 ** (attempt + 1) * 0.1)  # Exponential backoff
 
     def close(self):
         self._stop_event.set()
