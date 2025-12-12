@@ -174,7 +174,9 @@ def register_dc_group(
         select(DataCollectionGroup)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.sample == dcg_params.sample)
-        .where(f"/Sample{dcg_params.sample}/Atlas" in DataCollectionGroup.tag)
+        .where(
+            col(DataCollectionGroup.tag).contains(f"/Sample{dcg_params.sample}/Atlas")
+        )
     ).all():
         # Case where we switch from atlas to processing
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag

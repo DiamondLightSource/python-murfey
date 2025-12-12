@@ -233,7 +233,7 @@ def test_register_dc_group_new_dcg_old_atlas(
 
     # Request new dcg registration with atlas experiment type and new processing tag
     dcg_params = DCGroupParameters(
-        experiment_type_id=44,
+        experiment_type_id=37,
         tag="second_processing_tag",
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
