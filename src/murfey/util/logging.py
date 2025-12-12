@@ -116,11 +116,9 @@ class HTTPSHandler(logging.Handler):
             except Empty:
                 pass
 
-            # Calculate logging rate
+            # Calculate logging rate based on past second
             now = time.time()
-            self.log_times = [
-                t for t in self.log_times if now - t <= 1.0
-            ]  # Number of logs in last second
+            self.log_times = [t for t in self.log_times if now - t <= 1.0]
             log_rate = len(self.log_times)
 
             # Adjust batch size and flush interval
@@ -142,14 +140,14 @@ class HTTPSHandler(logging.Handler):
             self._send_batch(batch)
 
     def _send_batch(self, batch: list[str]):
-        for attempt in range(1, self.max_retry + 1):
+        for attempt in range(0, self.max_retry):
             try:
                 response = requests.post(self.endpoint_url, json=batch, timeout=5)
                 if response.status_code == 200:
                     return
             except requests.RequestException:
                 pass
-            time.sleep(2**attempt * 0.1)  # Exponential backoff
+            time.sleep(2 ** (attempt + 1) * 0.1)  # Exponential backoff
 
     def close(self):
         self._stop_event.set()
