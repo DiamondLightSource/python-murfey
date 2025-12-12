@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 from typing import List, NamedTuple, Optional
 
-from murfey.client.tui.status_bar import StatusBar
 from murfey.util.client import Observer
 
 log = logging.getLogger("murfey.client.watchdir")
@@ -32,15 +31,13 @@ class DirWatcher(Observer):
         path: str | os.PathLike,
         settling_time: float = 60,
         appearance_time: float | None = None,
-        substrings_blacklist: dict[str, dict] = {},
+        substrings_blacklist: dict[str, list[str]] = {},
         transfer_all: bool = True,
-        status_bar: StatusBar | None = None,
     ):
         super().__init__()
         self._basepath = os.fspath(path)
         self._lastscan: dict[str, _FileInfo] | None = {}
         self._file_candidates: dict[str, _FileInfo] = {}
-        self._statusbar = status_bar
         self.settling_time = settling_time
         self._appearance_time = appearance_time
         self._substrings_blacklist = substrings_blacklist
@@ -216,13 +213,6 @@ class DirWatcher(Observer):
         removes it from the file candidates list.
         """
         log.debug(f"File {Path(file_candidate).name!r} is ready to be transferred")
-        if self._statusbar:
-            # log.info("Increasing number to be transferred")
-            with self._statusbar.lock:
-                self._statusbar.transferred = [
-                    self._statusbar.transferred[0],
-                    self._statusbar.transferred[1] + 1,
-                ]
 
         # Check that it's not a hidden file, ".", "..", or still downloading
         transfer_check = not Path(file_candidate).name.startswith(".") and not Path(

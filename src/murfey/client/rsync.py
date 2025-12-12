@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Awaitable, Callable, List, NamedTuple
 from urllib.parse import ParseResult
 
-from murfey.client.tui.status_bar import StatusBar
 from murfey.util.client import Observer
 
 logger = logging.getLogger("murfey.client.rsync")
@@ -59,7 +58,6 @@ class RSyncer(Observer):
         server_url: ParseResult,
         stop_callback: Callable = lambda *args, **kwargs: None,
         local: bool = False,
-        status_bar: StatusBar | None = None,
         do_transfer: bool = True,
         remove_files: bool = False,
         required_substrings_for_removal: List[str] = [],
@@ -107,7 +105,6 @@ class RSyncer(Observer):
         )
         self._stopping = False
         self._halt_thread = False
-        self._statusbar = status_bar
 
     def __repr__(self) -> str:
         return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
@@ -116,15 +113,12 @@ class RSyncer(Observer):
     def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
         kwarguments_from_rsyncer = {
             "local": rsyncer._local,
-            "status_bar": rsyncer._statusbar,
             "do_transfer": rsyncer._do_transfer,
             "remove_files": rsyncer._remove_files,
             "notify": rsyncer._notify,
         }
         kwarguments_from_rsyncer.update(kwargs)
         assert isinstance(kwarguments_from_rsyncer["local"], bool)
-        if kwarguments_from_rsyncer["status_bar"] is not None:
-            assert isinstance(kwarguments_from_rsyncer["status_bar"], StatusBar)
         assert isinstance(kwarguments_from_rsyncer["do_transfer"], bool)
         assert isinstance(kwarguments_from_rsyncer["remove_files"], bool)
         assert isinstance(kwarguments_from_rsyncer["notify"], bool)
@@ -134,7 +128,6 @@ class RSyncer(Observer):
             rsyncer._rsync_module,
             rsyncer._server_url,
             local=kwarguments_from_rsyncer["local"],
-            status_bar=kwarguments_from_rsyncer["status_bar"],
             do_transfer=kwarguments_from_rsyncer["do_transfer"],
             remove_files=kwarguments_from_rsyncer["remove_files"],
             notify=kwarguments_from_rsyncer["notify"],
@@ -398,12 +391,6 @@ class RSyncer(Observer):
                     return
 
                 self._files_transferred += 1
-                if self._statusbar:
-                    with self._statusbar.lock:
-                        self._statusbar.transferred = [
-                            self._statusbar.transferred[0] + 1,
-                            self._statusbar.transferred[1],
-                        ]
                 current_outstanding = self.queue.unfinished_tasks - (
                     self._files_transferred - previously_transferred
                 )
