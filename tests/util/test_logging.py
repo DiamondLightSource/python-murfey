@@ -67,4 +67,5 @@ def test_https_handler(
         timeout=5,
     )
 
-    assert https_handler.close() is None
+    # Close the handler thread
+    https_handler.close()
