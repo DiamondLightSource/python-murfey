@@ -58,7 +58,9 @@ def start_instrument_server():
     # Construct URL for the HTTPS log handler
     client_config = dict(read_config()["Murfey"])
     murfey_server_url = client_config["server"].rstrip("/")
-    logger_url = f"{murfey_server_url}{url_path_for('api.hub.router', 'forward_logs')}"
+    logger_url = (
+        f"{murfey_server_url}{url_path_for('api.logging.router', 'forward_logs')}"
+    )
 
     # Forward DEBUG levels logs and above from Murfey to the backend
     murfey_https_handler = HTTPSHandler(endpoint_url=logger_url)
