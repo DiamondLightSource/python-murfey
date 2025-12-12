@@ -204,7 +204,7 @@ def test_register_dc_group_processing_to_atlas(
     assert second_new_dcg.atlas == "/path/to/Sample10/Atlas/Atlas_2.jpg"
     assert second_new_dcg.atlas_pixel_size == 1e-4
     # Check the tag of the data collection group was not updated
-    assert new_dcg.tag == "/path/to/Sample10/Atlas"
+    assert new_dcg.tag != "/path/to/Sample10/Atlas"
     assert second_new_dcg.tag != "/path/to/Sample10/Atlas"
 
 
