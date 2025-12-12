@@ -692,6 +692,12 @@ murfey.server.api.instrument.router:
         type: int
     methods:
       - GET
+murfey.server.api.logging.router:
+  - path: /logging/logs
+    function: forward_logs
+    path_params: []
+    methods:
+      - POST
 murfey.server.api.mag_table.router:
   - path: /mag_table/mag_table/
     function: get_mag_table
