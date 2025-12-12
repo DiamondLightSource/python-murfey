@@ -1,5 +1,7 @@
+import logging
 import sys
 from typing import Optional
+from unittest.mock import MagicMock
 from urllib.parse import urlparse
 
 import pytest
@@ -14,6 +16,7 @@ from murfey.client.update import UPDATE_SUCCESS
 from murfey.instrument_server import check_for_updates, start_instrument_server
 from murfey.server.api.bootstrap import pypi as pypi_router, version as version_router
 from murfey.util.api import url_path_for
+from murfey.util.logging import HTTPSHandler
 
 # Set up a test router with only the essential endpoints
 app = FastAPI()
@@ -132,10 +135,27 @@ start_instrument_server_test_matrix = (
 
 @pytest.mark.parametrize("test_params", start_instrument_server_test_matrix)
 def test_start_instrument_server(
-    mocker: MockerFixture, test_params: tuple[Optional[str], Optional[int]]
+    mocker: MockerFixture,
+    mock_client_configuration,
+    test_params: tuple[Optional[str], Optional[int]],
 ):
     # Unpack test params
     host, port = test_params
+
+    # Patch the 'read_config' function
+    _ = mocker.patch(
+        "murfey.util.client.read_config", return_value=mock_client_configuration
+    )
+
+    # Mock the HTTPSHandler (test it separately in a unit test)
+    mock_https_handler_instance = MagicMock()
+    mock_https_handler_instance.level = logging.INFO
+    mock_https_handler_instance.setLevel.return_value = None
+    mock_https_handler = mocker.patch(
+        "murfey.util.logging.HTTPSHandler",
+        spec=HTTPSHandler,
+    )
+    mock_https_handler.return_value = mock_https_handler_instance
 
     # Patch the Uvicorn Server instance
     mock_server = mocker.patch("uvicorn.Server")
