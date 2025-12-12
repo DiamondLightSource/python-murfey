@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime
@@ -9,7 +8,6 @@ from typing import Any, TypeVar
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlmodel import Session, select
 
-import murfey.server.prometheus as prom
 from murfey.server.murfey_db import get_murfey_db_session
 from murfey.util import sanitise
 from murfey.util.db import ClientEnvironment
@@ -69,31 +67,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@ws.websocket("/test/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int):
-    await manager.connect(websocket, client_id)
-    await manager.broadcast(f"Client {client_id} joined")
-    try:
-        while True:
-            data = await websocket.receive_text()
-            try:
-                json_data: dict = json.loads(data)
-                if json_data["type"] == "log":  # and isinstance(json_data, dict)
-                    json_data.pop("type")
-                    await forward_log(json_data, websocket)
-            except Exception:
-                await manager.broadcast(f"Client #{client_id} sent message {data}")
-    except WebSocketDisconnect:
-        log.info(f"Disconnecting Client {int(sanitise(str(client_id)))}")
-        murfey_db = next(get_murfey_db_session())
-        client_env = murfey_db.exec(
-            select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-        ).one()
-        prom.monitoring_switch.labels(visit=client_env.visit).set(0)
-        manager.disconnect(client_id)
-        await manager.broadcast(f"Client #{client_id} disconnected")
-
-
 @ws.websocket("/connect/{client_id}")
 async def websocket_connection_endpoint(
     websocket: WebSocket,
@@ -120,17 +93,6 @@ async def websocket_connection_endpoint(
         await manager.broadcast(f"Client #{client_id} disconnected")
 
 
-async def check_connections(active_connections: list[WebSocket]):
-    log.info("Checking connections")
-    for connection in active_connections:
-        log.info("Checking response")
-        try:
-            await asyncio.wait_for(connection.receive(), timeout=10)
-        except asyncio.TimeoutError:
-            log.info(f"Disconnecting Client {connection[0]}")
-            manager.disconnect(connection[0], connection[1])
-
-
 async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
     record_name = logrecord["name"]
     logrecord.pop("msecs", None)
@@ -142,26 +104,8 @@ async def forward_log(logrecord: dict[str, Any], websocket: WebSocket):
     logging.getLogger(record_name).handle(logging.makeLogRecord(logrecord))
 
 
-@ws.delete("/test/{client_id}")
-async def close_ws_connection(client_id: int):
-    murfey_db: Session = next(get_murfey_db_session())
-    client_env = murfey_db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.client_id == client_id)
-    ).one()
-    client_env.connected = False
-    visit_name = client_env.visit
-    murfey_db.add(client_env)
-    murfey_db.commit()
-    murfey_db.close()
-    client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
-    log.info(f"Disconnecting {client_id_str}")
-    manager.disconnect(client_id)
-    prom.monitoring_switch.labels(visit=visit_name).set(0)
-    await manager.broadcast(f"Client #{client_id} disconnected")
-
-
 @ws.delete("/connect/{client_id}")
-async def close_unrecorded_ws_connection(client_id: int | str):
+async def close_websocket_connection(client_id: int | str):
     client_id_str = str(client_id).replace("\r\n", "").replace("\n", "")
     log.info(f"Disconnecting {client_id_str}")
     manager.disconnect(client_id)

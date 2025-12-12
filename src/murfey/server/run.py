@@ -16,8 +16,8 @@ import murfey
 import murfey.server
 from murfey.server.feedback import feedback_listen
 from murfey.server.ispyb import TransportManager
-from murfey.util import LogFilter
 from murfey.util.config import get_microscope, get_security_config
+from murfey.util.logging import LogFilter
 
 logger = logging.getLogger("murfey.server.run")
 

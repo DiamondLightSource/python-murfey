@@ -25,9 +25,9 @@ def start_instrument_server():
     from rich.logging import RichHandler
 
     import murfey
-    import murfey.client.websocket
-    from murfey.client.customlogging import CustomHandler
-    from murfey.util import LogFilter
+    from murfey.util.api import url_path_for
+    from murfey.util.client import read_config
+    from murfey.util.logging import HTTPSHandler, LogFilter
 
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
@@ -55,22 +55,23 @@ def start_instrument_server():
     logging.getLogger("fastapi").addHandler(rich_handler)
     logging.getLogger("uvicorn").addHandler(rich_handler)
 
-    # Create a websocket app to connect to the backend
-    ws = murfey.client.websocket.WSApp(
-        server=read_config().get("Murfey", "server", fallback=""),
-        register_client=False,
+    # Construct URL for the HTTPS log handler
+    client_config = dict(read_config()["Murfey"])
+    murfey_server_url = client_config["server"].rstrip("/")
+    logger_url = (
+        f"{murfey_server_url}{url_path_for('api.logging.router', 'forward_logs')}"
     )
 
     # Forward DEBUG levels logs and above from Murfey to the backend
-    murfey_ws_handler = CustomHandler(ws.send)
-    murfey_ws_handler.setLevel(logging.DEBUG)
-    logging.getLogger("murfey").addHandler(murfey_ws_handler)
+    murfey_https_handler = HTTPSHandler(endpoint_url=logger_url)
+    murfey_https_handler.setLevel(logging.DEBUG)
+    logging.getLogger("murfey").addHandler(murfey_https_handler)
 
     # Forward only INFO level logs and above for other packages
-    other_ws_handler = CustomHandler(ws.send)
-    other_ws_handler.setLevel(logging.INFO)
-    logging.getLogger("fastapi").addHandler(other_ws_handler)
-    logging.getLogger("uvicorn").addHandler(other_ws_handler)
+    other_https_handler = HTTPSHandler(endpoint_url=logger_url)
+    other_https_handler.setLevel(logging.INFO)
+    logging.getLogger("fastapi").addHandler(other_https_handler)
+    logging.getLogger("uvicorn").addHandler(other_https_handler)
 
     logger.info(
         f"Starting Murfey server version {murfey.__version__}, listening on {args.host}:{args.port}"

@@ -18,6 +18,7 @@ import murfey.server.api.file_io_frontend
 import murfey.server.api.file_io_instrument
 import murfey.server.api.hub
 import murfey.server.api.instrument
+import murfey.server.api.logging
 import murfey.server.api.mag_table
 import murfey.server.api.processing_parameters
 import murfey.server.api.prometheus
@@ -76,6 +77,8 @@ app.include_router(murfey.server.api.file_io_frontend.router)
 app.include_router(murfey.server.api.file_io_instrument.router)
 
 app.include_router(murfey.server.api.instrument.router)
+
+app.include_router(murfey.server.api.logging.router)
 
 app.include_router(murfey.server.api.mag_table.router)
 
