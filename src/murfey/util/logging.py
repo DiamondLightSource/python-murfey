@@ -9,26 +9,40 @@ from queue import Empty, Queue
 import requests
 
 
-class CustomHandler(logging.Handler):
-    def __init__(self, callback):
-        """Set up a handler instance, record the callback function."""
+class LogFilter(logging.Filter):
+    """A filter to limit messages going to Graylog"""
+
+    def __repr__(self):
+        return "<murfey.server.LogFilter>"
+
+    def __init__(self):
         super().__init__()
-        self._callback = callback
+        self._filter_levels = {
+            "murfey": logging.DEBUG,
+            "ispyb": logging.DEBUG,
+            "zocalo": logging.DEBUG,
+            "uvicorn": logging.INFO,
+            "fastapi": logging.INFO,
+            "starlette": logging.INFO,
+            "sqlalchemy": logging.INFO,
+        }
 
-    def prepare(self, record):
-        self.format(record)
-        record_dict = record.__dict__
-        record_dict["type"] = "log"
-        try:
-            return json.dumps(record_dict)
-        except TypeError:
-            return json.dumps({str(k): str(v) for k, v in record_dict.items()})
+    @staticmethod
+    def install() -> LogFilter:
+        logfilter = LogFilter()
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            handler.addFilter(logfilter)
+        return logfilter
 
-    def emit(self, record):
-        try:
-            self._callback(self.prepare(record))
-        except Exception:
-            self.handleError(record)
+    def filter(self, record: logging.LogRecord) -> bool:
+        logger_name = record.name
+        while True:
+            if logger_name in self._filter_levels:
+                return record.levelno >= self._filter_levels[logger_name]
+            if "." not in logger_name:
+                return False
+            logger_name = logger_name.rsplit(".", maxsplit=1)[0]
 
 
 class HTTPSHandler(logging.Handler):
@@ -89,9 +103,7 @@ class HTTPSHandler(logging.Handler):
 
     def _worker(self):
         """
-        Worker function that sends batches of logs to the URL endpoint specified,
-        with logic to adjust how frequently it should batch and send logs depending
-        on rate of incoming traffic
+        The worker function when the handler is run as a thread.
         """
 
         batch: list[str] = []
@@ -130,9 +142,6 @@ class HTTPSHandler(logging.Handler):
             self._send_batch(batch)
 
     def _send_batch(self, batch: list[str]):
-        """
-        Submits the list of stringified log records to the URL endpoint specified.
-        """
         for attempt in range(1, self.max_retry + 1):
             try:
                 response = requests.post(self.endpoint_url, json=batch, timeout=5)

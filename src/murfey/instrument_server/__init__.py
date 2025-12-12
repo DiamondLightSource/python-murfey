@@ -25,10 +25,9 @@ def start_instrument_server():
     from rich.logging import RichHandler
 
     import murfey
-    from murfey.client.customlogging import HTTPSHandler
-    from murfey.util import LogFilter
     from murfey.util.api import url_path_for
     from murfey.util.client import read_config
+    from murfey.util.logging import HTTPSHandler, LogFilter
 
     parser = argparse.ArgumentParser(description="Start the Murfey server")
     parser.add_argument(
