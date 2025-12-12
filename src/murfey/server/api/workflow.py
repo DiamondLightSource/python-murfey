@@ -124,37 +124,39 @@ def register_dc_group(
     ):
         # Either switching atlas for a common (atlas or processing) tag
         # Or registering a new atlas-type dcg for a sample that is already present
-        dcg_murfey[0].atlas = dcg_params.atlas or dcg_murfey[0].atlas
-        dcg_murfey[0].sample = dcg_params.sample or dcg_murfey[0].sample
-        dcg_murfey[0].atlas_pixel_size = (
-            dcg_params.atlas_pixel_size or dcg_murfey[0].atlas_pixel_size
-        )
+        for dcg_instance in dcg_murfey:
+            # Update all instances in case there are multiple processing runs
+            dcg_instance.atlas = dcg_params.atlas or dcg_instance.atlas
+            dcg_instance.sample = dcg_params.sample or dcg_instance.sample
+            dcg_instance.atlas_pixel_size = (
+                dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
+            )
 
-        if _transport_object:
-            if dcg_murfey[0].atlas_id is not None:
-                _transport_object.send(
-                    _transport_object.feedback_queue,
-                    {
-                        "register": "atlas_update",
-                        "atlas_id": dcg_murfey[0].atlas_id,
-                        "atlas": dcg_params.atlas,
-                        "sample": dcg_params.sample,
-                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                        "dcgid": dcg_murfey[0].id,
-                        "session_id": session_id,
-                    },
-                )
-            else:
-                atlas_id_response = _transport_object.do_insert_atlas(
-                    Atlas(
-                        dataCollectionGroupId=dcg_murfey[0].id,
-                        atlasImage=dcg_params.atlas,
-                        pixelSize=dcg_params.atlas_pixel_size,
-                        cassetteSlot=dcg_params.sample,
+            if _transport_object:
+                if dcg_instance.atlas_id is not None:
+                    _transport_object.send(
+                        _transport_object.feedback_queue,
+                        {
+                            "register": "atlas_update",
+                            "atlas_id": dcg_instance.atlas_id,
+                            "atlas": dcg_params.atlas,
+                            "sample": dcg_params.sample,
+                            "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                            "dcgid": dcg_instance.id,
+                            "session_id": session_id,
+                        },
                     )
-                )
-                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
-        db.add(dcg_murfey[0])
+                else:
+                    atlas_id_response = _transport_object.do_insert_atlas(
+                        Atlas(
+                            dataCollectionGroupId=dcg_instance.id,
+                            atlasImage=dcg_params.atlas,
+                            pixelSize=dcg_params.atlas_pixel_size,
+                            cassetteSlot=dcg_params.sample,
+                        )
+                    )
+                    dcg_instance.atlas_id = atlas_id_response["return_value"]
+            db.add(dcg_instance)
         db.commit()
 
         search_maps = db.exec(
@@ -172,6 +174,7 @@ def register_dc_group(
         select(DataCollectionGroup)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.sample == dcg_params.sample)
+        .where(f"/Sample{dcg_params.sample}/Atlas" in DataCollectionGroup.tag)
     ).all():
         # Case where we switch from atlas to processing
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
