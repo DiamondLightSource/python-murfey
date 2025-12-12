@@ -15,7 +15,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     # Request new dcg registration
     dcg_params = DCGroupParameters(
         experiment_type_id=44,
-        tag="atlas_tag",
+        tag="/path/to/Sample10/Atlas",
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
         atlas_pixel_size=1e-5,
@@ -34,7 +34,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "register": "data_collection_group",
             "start_time": mock.ANY,
             "experiment_type_id": 44,
-            "tag": "atlas_tag",
+            "tag": "/path/to/Sample10/Atlas",
             "session_id": ExampleVisit.murfey_session_id,
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
             "sample": 10,
@@ -72,7 +72,7 @@ def test_register_dc_group_atlas_to_processing(
     dcg = DataCollectionGroup(
         id=2,
         session_id=ExampleVisit.murfey_session_id,
-        tag="atlas_tag",
+        tag="/path/to/Sample10/Atlas",
         atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
@@ -153,7 +153,7 @@ def test_register_dc_group_processing_to_atlas(
     # Request new dcg registration with atlas experiment type and tag
     dcg_params = DCGroupParameters(
         experiment_type_id=44,
-        tag="atlas_tag",
+        tag="/path/to/Sample10/Atlas",
         atlas="/path/to/Sample10/Atlas/Atlas_2.jpg",
         sample=10,
         atlas_pixel_size=1e-4,
@@ -204,8 +204,8 @@ def test_register_dc_group_processing_to_atlas(
     assert second_new_dcg.atlas == "/path/to/Sample10/Atlas/Atlas_2.jpg"
     assert second_new_dcg.atlas_pixel_size == 1e-4
     # Check the tag of the data collection group was not updated
-    assert new_dcg.tag != "atlas_tag"
-    assert second_new_dcg.tag != "atlas_tag"
+    assert new_dcg.tag == "/path/to/Sample10/Atlas"
+    assert second_new_dcg.tag != "/path/to/Sample10/Atlas"
 
 
 @mock.patch("murfey.server.api.workflow._transport_object")
@@ -252,7 +252,7 @@ def test_register_dc_group_new_dcg_old_atlas(
         {
             "register": "data_collection_group",
             "start_time": mock.ANY,
-            "experiment_type_id": 44,
+            "experiment_type_id": 37,
             "tag": "second_processing_tag",
             "session_id": ExampleVisit.murfey_session_id,
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
