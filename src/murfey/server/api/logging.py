@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
-logger = logging.getLogger("murfey.server.api.hub")
+logger = logging.getLogger("murfey.server.api.logging")
 
 router = APIRouter(
     prefix="/logging",

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from murfey.util.config import get_machine_config
 
-logger = getLogger("murfey.api.hub")
+logger = getLogger("murfey.server.api.hub")
 
 config = get_machine_config()
 

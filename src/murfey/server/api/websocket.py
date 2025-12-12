@@ -15,7 +15,7 @@ from murfey.util.db import ClientEnvironment
 T = TypeVar("T")
 
 ws = APIRouter(prefix="/ws", tags=["Websocket"])
-log = logging.getLogger("murfey.server.websocket")
+log = logging.getLogger("murfey.server.api.websocket")
 
 
 class ConnectionManager:

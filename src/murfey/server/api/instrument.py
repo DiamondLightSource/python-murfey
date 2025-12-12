@@ -36,7 +36,7 @@ router = APIRouter(
     tags=["Instrument Server"],
 )
 
-log = logging.getLogger("murfey.server.instrument")
+log = logging.getLogger("murfey.server.api.instrument")
 
 lock = asyncio.Lock()
 
