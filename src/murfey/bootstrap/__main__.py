@@ -144,7 +144,7 @@ if __name__ == "__main__":
             murfey_hostname,
             "-i",
             f"{murfey_base}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
-            "murfey[client]",
+            "murfey",
         ]
     )
     if result.returncode:

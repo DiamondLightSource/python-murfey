@@ -44,9 +44,6 @@ dependencies = [
 cicd = [
     "pytest-cov", # Used for generating PyTest coverage reports
 ]
-client = [
-    "websocket-client",
-]
 developer = [
     "bump-my-version", # Version control
     "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook

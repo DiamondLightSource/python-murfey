@@ -78,7 +78,7 @@ def install_murfey(api_base: ParseResult, version: str) -> bool:
                 path=f"{proxy_path}{url_path_for('bootstrap.pypi', 'get_pypi_index')}",
                 query="",
             ).geturl(),
-            f"murfey[client]=={version}",
+            f"murfey=={version}",
         ]
     )
     return result.returncode == 0
