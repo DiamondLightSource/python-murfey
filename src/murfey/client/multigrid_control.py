@@ -235,7 +235,6 @@ class MultigridController:
         self,
         source: Path,
         extra_directory: str = "",
-        include_mid_path: bool = True,
         use_suggested_path: bool = True,
         destination_overrides: Optional[Dict[Path, str]] = None,
         remove_files: bool = False,
@@ -276,7 +275,6 @@ class MultigridController:
                     self.token,
                     touch=True,
                     extra_directory=extra_directory,
-                    include_mid_path=include_mid_path,
                     use_suggested_path=use_suggested_path,
                 )
         self._environment.sources.append(source)
