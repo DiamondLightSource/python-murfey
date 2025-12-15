@@ -121,6 +121,9 @@ def test_determine_default_destinations_failures(mock_get, destination_params):
     Test failure of the following cases:
     No visit, no destination, source = default, source not in default
     """
+    mock_get().json.return_value = {
+        "data_directories": ["X:/DoseFractions", "X:/DoseFractions/DATA"]
+    }
     source, visit, destination, default_dests = destination_params
     mock_environment = mock.Mock()
     with pytest.raises(ValueError):

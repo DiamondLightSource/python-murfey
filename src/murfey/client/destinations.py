@@ -20,8 +20,8 @@ def find_longest_data_directory(
     Determine the longest path in the data_directories list
     which the match path is relative to
     """
-    base_dir = Path("")
-    mid_dir = Path("")
+    base_dir: Path | None = None
+    mid_dir: Path | None = None
     for dd in data_directories:
         dd_base = str(Path(dd).absolute())
         if str(match_path).startswith(str(dd)) and len(dd_base) > len(str(base_dir)):
@@ -54,7 +54,7 @@ def determine_default_destination(
     )
     if not base_path:
         raise ValueError(f"No data directory found for {source}")
-    if source.absolute() == Path(base_path).absolute():
+    if source.absolute() == base_path.absolute():
         raise ValueError(
             f"Source is the same as the base path {secure_path(source.absolute())}"
         )
