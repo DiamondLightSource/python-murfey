@@ -20,12 +20,12 @@ def find_longest_data_directory(
     Determine the longest path in the data_directories list
     which the match path is relative to
     """
-    base_dir = ""
+    base_dir = Path("")
     mid_dir = Path("")
     for dd in data_directories:
         dd_base = str(Path(dd).absolute())
-        if str(match_path).startswith(str(dd)) and len(dd_base) > len(base_dir):
-            base_dir = dd_base
+        if str(match_path).startswith(str(dd)) and len(dd_base) > len(str(base_dir)):
+            base_dir = Path(dd_base)
             mid_dir = match_path.absolute().relative_to(Path(base_dir)).parent
     return base_dir, mid_dir
 
