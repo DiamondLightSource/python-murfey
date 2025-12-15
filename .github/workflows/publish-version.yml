@@ -24,7 +24,7 @@ jobs:
       - name: Check current tag
         id: checkTag
         run: |
-          pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
+          pip install --disable-pip-version-check -e "."[cicd,server,developer]
           VERSION=$(python -c "import murfey; print(murfey.__version__)")
           echo "newVersion=v$VERSION" >> $GITHUB_OUTPUT
 
