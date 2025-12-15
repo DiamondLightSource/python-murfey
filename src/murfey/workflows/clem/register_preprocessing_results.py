@@ -38,6 +38,9 @@ class CLEMPreprocessingResult(BaseModel):
     output_files: dict[
         Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
     ]
+    thumbnails: dict[
+        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
+    ]
     metadata: Path
     parent_lif: Optional[Path] = None
     parent_tiffs: dict[

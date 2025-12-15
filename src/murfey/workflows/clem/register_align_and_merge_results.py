@@ -22,7 +22,8 @@ class AlignAndMergeResult(BaseModel):
     align_self: Optional[str] = None
     flatten: Optional[str] = "mean"
     align_across: Optional[str] = None
-    composite_image: Path
+    output_file: Path
+    thumbnail: Path
 
     @field_validator("image_stacks", mode="before")
     @classmethod
