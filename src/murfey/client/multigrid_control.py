@@ -1,4 +1,3 @@
-import json
 import logging
 import subprocess
 import threading
@@ -10,7 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-import murfey.client.websocket
 from murfey.client.analyser import Analyser
 from murfey.client.context import ensure_dcg_exists
 from murfey.client.contexts.spa import SPAModularContext
@@ -96,11 +94,6 @@ class MultigridController:
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
 
-        self.ws = murfey.client.websocket.WSApp(
-            server=self.murfey_url,
-            register_client=False,
-        )
-
         # Calculate the time offset between the client and the server
         current_time = datetime.now()
         server_timestamp = capture_get(
@@ -180,17 +173,6 @@ class MultigridController:
         success = response.status_code == 200 if response else False
         if not success:
             log.warning(f"Could not delete database data for {self.session_id}")
-
-        # Send message to frontend to trigger a refresh
-        self.ws.send(
-            json.dumps(
-                {
-                    "message": "refresh",
-                    "target": "sessions",
-                    "instrument_name": self.instrument_name,
-                }
-            )
-        )
 
         # Mark as dormant
         self.dormant = True
@@ -288,15 +270,6 @@ class MultigridController:
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
             restarted=str(source) in self.rsync_restarts,
-        )
-        self.ws.send(
-            json.dumps(
-                {
-                    "message": "refresh",
-                    "target": "rsyncer",
-                    "session_id": self.session_id,
-                }
-            )
         )
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):

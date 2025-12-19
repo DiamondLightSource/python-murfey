@@ -44,14 +44,12 @@ dependencies = [
 cicd = [
     "pytest-cov", # Used for generating PyTest coverage reports
 ]
-client = [
-    "websocket-client",
-]
 developer = [
     "bump-my-version", # Version control
     "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
     "pre-commit", # Formatting, linting, type checking, etc.
     "pytest", # Test code functionality
+    "pytest-asyncio", # For testing async functions
     "pytest-mock", # Additional mocking tools for unit tests
 ]
 server = [

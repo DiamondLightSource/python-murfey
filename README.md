@@ -19,7 +19,7 @@ then install using the following command.
 ```text
 $ git clone git@github.com:DiamondLightSource/python-murfey.git
 $ cd python-murfey
-$ pip install -e .[client,server,developer]
+$ pip install -e .[server,developer]
 ```
 
 The packages included under the `[developer]` installation key contain some helpful tools to aid you with developing Murfey further:
@@ -43,7 +43,7 @@ $ murfey.server
 and connect the client with
 
 ```text
-$ murfey --server http://127.0.0.1:8000
+$ murfey.instrument_server --port 8000
 ```
 
 You can also install a client on a remote machine. This machine only needs to have

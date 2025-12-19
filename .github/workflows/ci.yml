@@ -77,7 +77,7 @@ jobs:
       - name: Install Murfey
         run: |
           set -eux
-          pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
+          pip install --disable-pip-version-check -e "."[cicd,server,developer]
 
       - uses: shogo82148/actions-setup-mysql@v1
         with:
