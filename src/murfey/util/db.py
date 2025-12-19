@@ -239,7 +239,8 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     series_name: str = Field(
         index=True
     )  # Name of the series, as determined from the metadata
-    search_string: Optional[str] = Field(default=None)  # Path for globbing with
+    image_search_string: Optional[str] = Field(default=None)
+    thumbnail_search_string: Optional[str] = Field(default=None)
 
     session: Optional["Session"] = Relationship(
         back_populates="image_series"
@@ -295,9 +296,12 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     number_of_members: Optional[int] = Field(default=None)
 
     # Shape and resolution information
-    pixels_x: Optional[int] = Field(default=None)
-    pixels_y: Optional[int] = Field(default=None)
-    pixel_size: Optional[float] = Field(default=None)
+    image_pixels_x: Optional[int] = Field(default=None)
+    image_pixels_y: Optional[int] = Field(default=None)
+    image_pixel_size: Optional[float] = Field(default=None)
+    thumbnail_pixels_x: Optional[int] = Field(default=None)
+    thumbnail_pixels_y: Optional[int] = Field(default=None)
+    thumbnail_pixel_size: Optional[float] = Field(default=None)
     units: Optional[str] = Field(default=None)
 
     # Extent of the imaged area in real space
