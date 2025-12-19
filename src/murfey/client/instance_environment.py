@@ -46,7 +46,6 @@ class MurfeyInstanceEnvironment(BaseModel):
     tilt_angles: Dict[str, List[List[str]]] = {}
     movie_counters: Dict[str, itertools.count] = {}
     visit: str = ""
-    processing_only_mode: bool = False
     dose_per_frame: Optional[float] = None
     gain_ref: Optional[str] = None
     symmetry: Optional[str] = None
