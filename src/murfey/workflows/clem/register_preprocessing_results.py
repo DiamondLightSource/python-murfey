@@ -40,7 +40,8 @@ class CLEMPreprocessingResult(BaseModel):
     ]
     thumbnails: dict[
         Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
-    ]
+    ] = {}
+    thumbnail_size: Optional[tuple[int, int]] = None  # height, width
     metadata: Path
     parent_lif: Optional[Path] = None
     parent_tiffs: dict[
@@ -57,7 +58,10 @@ class CLEMPreprocessingResult(BaseModel):
 def _is_clem_atlas(result: CLEMPreprocessingResult):
     # If an image has a width/height of at least 1.5 mm, it should qualify as an atlas
     return (
-        max(result.pixels_x * result.pixel_size, result.pixels_y * result.pixel_size)
+        max(
+            result.pixels_x * result.pixel_size,
+            result.pixels_y * result.pixel_size,
+        )
         >= processing_params.atlas_threshold
     )
 
@@ -152,17 +156,29 @@ def _register_clem_image_series(
             murfey_db.commit()
 
     # Add metadata for this series
-    clem_img_series.search_string = str(output_file.parent / "*tiff")
+    clem_img_series.image_search_string = str(output_file.parent / "*tiff")
     clem_img_series.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
     clem_img_series.number_of_members = result.number_of_members
-    clem_img_series.pixels_x = result.pixels_x
-    clem_img_series.pixels_y = result.pixels_y
-    clem_img_series.pixel_size = result.pixel_size
+    clem_img_series.image_pixels_x = result.pixels_x
+    clem_img_series.image_pixels_y = result.pixels_y
+    clem_img_series.image_pixel_size = result.pixel_size
     clem_img_series.units = result.units
     clem_img_series.x0 = result.extent[0]
     clem_img_series.x1 = result.extent[1]
     clem_img_series.y0 = result.extent[2]
     clem_img_series.y1 = result.extent[3]
+    # Register thumbnails if they are present
+    if result.thumbnails and result.thumbnail_size:
+        thumbnail = list(result.thumbnails.values())[0]
+        clem_img_series.thumbnail_search_string = str(thumbnail.parent / "*.png")
+
+        thumbnail_height, thumbnail_width = result.thumbnail_size
+        scaling_factor = min(
+            thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
+        )
+        clem_img_series.thumbnail_pixel_size = result.pixel_size / scaling_factor
+        clem_img_series.thumbnail_pixels_x = int(result.pixels_x * scaling_factor)
+        clem_img_series.thumbnail_pixels_y = int(result.pixels_y * scaling_factor)
     murfey_db.add(clem_img_series)
     murfey_db.commit()
     murfey_db.close()
@@ -192,8 +208,23 @@ def _register_dcg_and_atlas(
     # Determine values for atlas
     if _is_clem_atlas(result):
         output_file = list(result.output_files.values())[0]
-        atlas_name = str(output_file.parent / "*.tiff")
-        atlas_pixel_size = result.pixel_size
+        # Register the thumbnail entries if they are provided
+        if result.thumbnails and result.thumbnail_size is not None:
+            # Glob path to the thumbnail files
+            thumbnail = list(result.thumbnails.values())[0]
+            atlas_name = str(thumbnail.parent / "*.png")
+
+            # Work out the scaling factor used
+            thumbnail_height, thumbnail_width = result.thumbnail_size
+            scaling_factor = min(
+                thumbnail_width / result.pixels_x,
+                thumbnail_height / result.pixels_y,
+            )
+            atlas_pixel_size = result.pixel_size / scaling_factor
+        # Otherwise, register the TIFF files themselves
+        else:
+            atlas_name = str(output_file.parent / "*.tiff")
+            atlas_pixel_size = result.pixel_size
     else:
         atlas_name = ""
         atlas_pixel_size = 0.0
@@ -311,8 +342,6 @@ def _register_grid_square(
             and atlas_entry.x1 is not None
             and atlas_entry.y0 is not None
             and atlas_entry.y1 is not None
-            and atlas_entry.pixels_x is not None
-            and atlas_entry.pixels_y is not None
         ):
             atlas_width_real = atlas_entry.x1 - atlas_entry.x0
             atlas_height_real = atlas_entry.y1 - atlas_entry.y0
@@ -321,32 +350,40 @@ def _register_grid_square(
             return
 
         for clem_img_series in clem_img_series_to_register:
+            # Register datasets using thumbnail sizes and scales
             if (
                 clem_img_series.x0 is not None
                 and clem_img_series.x1 is not None
                 and clem_img_series.y0 is not None
                 and clem_img_series.y1 is not None
+                and clem_img_series.thumbnail_pixels_x is not None
+                and clem_img_series.thumbnail_pixels_y is not None
+                and clem_img_series.thumbnail_pixel_size is not None
             ):
                 # Find pixel corresponding to image midpoint on atlas
                 x_mid_real = (
                     0.5 * (clem_img_series.x0 + clem_img_series.x1) - atlas_entry.x0
                 )
-                x_mid_px = int(x_mid_real / atlas_width_real * atlas_entry.pixels_x)
+                x_mid_px = int(
+                    x_mid_real / atlas_width_real * clem_img_series.thumbnail_pixels_x
+                )
                 y_mid_real = (
                     0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
                 )
-                y_mid_px = int(y_mid_real / atlas_height_real * atlas_entry.pixels_y)
+                y_mid_px = int(
+                    y_mid_real / atlas_height_real * clem_img_series.thumbnail_pixels_y
+                )
 
-                # Find the number of pixels in width and height the image corresponds to on the atlas
+                # Find the size of the image, in pixels, when overlaid the atlas
                 width_scaled = int(
                     (clem_img_series.x1 - clem_img_series.x0)
                     / atlas_width_real
-                    * atlas_entry.pixels_x
+                    * clem_img_series.thumbnail_pixels_x
                 )
                 height_scaled = int(
                     (clem_img_series.y1 - clem_img_series.y0)
                     / atlas_height_real
-                    * atlas_entry.pixels_y
+                    * clem_img_series.thumbnail_pixels_y
                 )
             else:
                 logger.warning(
@@ -361,14 +398,18 @@ def _register_grid_square(
                 x_location_scaled=x_mid_px,
                 y_location=clem_img_series.y0,
                 y_location_scaled=y_mid_px,
-                height=clem_img_series.pixels_x,
-                height_scaled=height_scaled,
-                width=clem_img_series.pixels_y,
+                readout_area_x=clem_img_series.image_pixels_x,
+                readout_area_y=clem_img_series.image_pixels_y,
+                thumbnail_size_x=clem_img_series.thumbnail_pixels_x,
+                thumbnail_size_y=clem_img_series.thumbnail_pixels_y,
+                width=clem_img_series.image_pixels_x,
                 width_scaled=width_scaled,
-                x_stage_position=clem_img_series.x0,
-                y_stage_position=clem_img_series.y0,
-                pixel_size=clem_img_series.pixel_size,
-                image=clem_img_series.search_string,
+                height=clem_img_series.image_pixels_y,
+                height_scaled=height_scaled,
+                x_stage_position=0.5 * (clem_img_series.x0 + clem_img_series.x1),
+                y_stage_position=0.5 * (clem_img_series.y0 + clem_img_series.y1),
+                pixel_size=clem_img_series.image_pixel_size,
+                image=clem_img_series.thumbnail_search_string,
             )
             # Register or update the grid square entry as required
             if grid_square_result := murfey_db.exec(
