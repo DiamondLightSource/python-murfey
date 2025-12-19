@@ -77,6 +77,14 @@ def generate_preprocessing_messages(
         output_files = {color: str(series_path / f"{color}.tiff") for color in colors}
         for output_file in output_files.values():
             Path(output_file).touch(exist_ok=True)
+        thumbnails = {
+            color: str(series_path / ".thumbnails" / f"{color}.png") for color in colors
+        }
+        for v in thumbnails.values():
+            if not (thumbnail := Path(v)).parent.exists():
+                thumbnail.parent.mkdir(parents=True)
+            thumbnail.touch(exist_ok=True)
+        thumbnail_size = (512, 512)
         is_stack = dataset[1]
         is_montage = dataset[2]
         shape = dataset[3]
@@ -91,6 +99,8 @@ def generate_preprocessing_messages(
                 "is_stack": is_stack,
                 "is_montage": is_montage,
                 "output_files": output_files,
+                "thumbnails": thumbnails,
+                "thumbnail_size": thumbnail_size,
                 "metadata": str(metadata),
                 "parent_lif": None,
                 "parent_tiffs": {},

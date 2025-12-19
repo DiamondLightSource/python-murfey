@@ -127,22 +127,34 @@ class ProcessingParametersSPA(BaseModel):
 
 class GridSquareParameters(BaseModel):
     tag: str
+    image: str = ""
+
     x_location: Optional[float] = None
-    x_location_scaled: Optional[int] = None
     y_location: Optional[float] = None
+
+    # Image coordinates when overlaid on atlas (in pixels0)
+    x_location_scaled: Optional[int] = None
     y_location_scaled: Optional[int] = None
+
     x_stage_position: Optional[float] = None
     y_stage_position: Optional[float] = None
+
+    # Size of original image (in pixels)
     readout_area_x: Optional[int] = None
     readout_area_y: Optional[int] = None
+
+    # Size of thumbnail used (in pixels)
     thumbnail_size_x: Optional[int] = None
     thumbnail_size_y: Optional[int] = None
+
     height: Optional[int] = None
-    height_scaled: Optional[int] = None
     width: Optional[int] = None
+
+    # Size of image when overlaid on atlas (in pixels)
+    height_scaled: Optional[int] = None
     width_scaled: Optional[int] = None
+
     pixel_size: Optional[float] = None
-    image: str = ""
     angle: Optional[float] = None
 
 
