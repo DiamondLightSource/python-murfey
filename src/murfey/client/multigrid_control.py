@@ -75,7 +75,6 @@ class MultigridController:
             symmetry=self.data_collection_parameters.get("symmetry"),
             eer_fractionation=self.data_collection_parameters.get("eer_fractionation"),
             instrument_name=self.instrument_name,
-            # processing_only_mode=server_routing_prefix_found,
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
@@ -218,7 +217,6 @@ class MultigridController:
         self,
         source: Path,
         extra_directory: str = "",
-        include_mid_path: bool = True,
         use_suggested_path: bool = True,
         destination_overrides: Optional[Dict[Path, str]] = None,
         remove_files: bool = False,
@@ -256,11 +254,9 @@ class MultigridController:
                     source,
                     self._environment.default_destinations[source],
                     self._environment,
-                    self.analysers or {},
                     self.token,
                     touch=True,
                     extra_directory=extra_directory,
-                    include_mid_path=include_mid_path,
                     use_suggested_path=use_suggested_path,
                 )
         self._environment.sources.append(source)

@@ -21,6 +21,7 @@ from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
+from murfey.client.destinations import find_longest_data_directory
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.util.client import Observer, get_machine_config_client
@@ -394,12 +395,8 @@ class Analyser(Observer):
             return data_file.with_suffix(".xml")
         file_name = f"{'_'.join(p for p in data_file.stem.split('_')[:-1])}.xml"
         data_directories = self._murfey_config.get("data_directories", [])
-        for dd in data_directories:
-            if str(data_file).startswith(dd):
-                base_dir = Path(dd).absolute()
-                mid_dir = data_file.relative_to(base_dir).parent
-                break
-        else:
+        base_dir, mid_dir = find_longest_data_directory(data_file, data_directories)
+        if not base_dir:
             return data_file.with_suffix(".xml")
         return base_dir / self._environment.visit / mid_dir / file_name
 
