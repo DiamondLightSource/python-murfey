@@ -23,7 +23,8 @@ class AlignAndMergeResult(BaseModel):
     flatten: Optional[str] = "mean"
     align_across: Optional[str] = None
     output_file: Path
-    thumbnail: Path
+    thumbnail: Optional[Path] = None
+    thumbnail_size: Optional[tuple[int, int]] = None
 
     @field_validator("image_stacks", mode="before")
     @classmethod
