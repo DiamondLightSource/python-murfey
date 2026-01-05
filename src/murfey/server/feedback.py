@@ -511,7 +511,7 @@ def _release_refine_hold(message: dict, _db):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": refine_params.class3d_dir,
                 "class_number": refine_params.class_number,
-                "pixel_size": relion_params.angpix,
+                "pixel_size": relion_params.angpix * relion_params.motion_corr_binning,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "symmetry": relion_params.symmetry,
@@ -1682,7 +1682,9 @@ def _register_refinement(message: dict, _db, demo: bool = False):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": message["class3d_dir"],
                 "class_number": message["best_class"],
-                "pixel_size": relion_options["angpix"],
+                "pixel_size": (
+                    relion_options["angpix"] * relion_options["motion_corr_binning"]
+                ),
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "symmetry": relion_options["symmetry"],
