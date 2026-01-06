@@ -108,6 +108,19 @@ class RSyncer(Observer):
         self._finalising = False
         self._finalised = False
 
+    @property
+    def status(self) -> str:
+        if self._stopping:
+            if self.thread.is_alive():
+                return "stopping"
+            else:
+                return "finished"
+        else:
+            if self.thread.is_alive():
+                return "running"
+            else:
+                return "ready"
+
     def __repr__(self) -> str:
         return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
 
@@ -134,19 +147,6 @@ class RSyncer(Observer):
             remove_files=kwarguments_from_rsyncer["remove_files"],
             notify=kwarguments_from_rsyncer["notify"],
         )
-
-    @property
-    def status(self) -> str:
-        if self._stopping:
-            if self.thread.is_alive():
-                return "stopping"
-            else:
-                return "finished"
-        else:
-            if self.thread.is_alive():
-                return "running"
-            else:
-                return "ready"
 
     def notify(self, *args, secondary: bool = False, **kwargs) -> None:
         if self._notify:
