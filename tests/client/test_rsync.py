@@ -89,12 +89,43 @@ def test_rsyncer_initialises(
     assert not rsyncer._finalising
     assert not rsyncer._finalised
 
-    assert rsyncer.status == "ready"
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Is stopping? | Is thread alive? | Expected status
+        (False, False, "ready"),
+        (False, True, "running"),
+        (True, True, "stopping"),
+        (True, False, "finished"),
+    ),
+)
+def test_rsyncer_status(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+    test_params: tuple[bool, bool, str],
+):
+    # Unpack test params
+    is_stopping, is_thread_alive, expected_status = test_params
+
+    # Mock the thread
+    mock_thread = MagicMock()
+    mock_thread.is_alive.return_value = is_thread_alive
+
+    # Initialise the RSyncer and patch the attributes to be tested
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer.thread = mock_thread
+    rsyncer._stopping = is_stopping
 
     # Check that it's represented correctly
     assert (
         str(rsyncer)
-        == f"<RSyncer ({rsyncer._basepath} → {rsyncer._remote}) [{rsyncer.status}]"
+        == f"<RSyncer ({rsyncer._basepath} → {rsyncer._remote}) [{expected_status}]"
     )
 
 
