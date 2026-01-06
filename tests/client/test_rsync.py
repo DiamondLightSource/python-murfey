@@ -2,6 +2,7 @@ import queue
 import threading
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -38,8 +39,6 @@ def test_rsyncer_initialises(
     # Assign values to parameters
     basepath_local = tmp_path / "local"
     basepath_remote = tmp_path / "remote"
-    do_transfer = True
-    remove_files = True
 
     # Create a test substrings blacklist dict
     substrings_blacklist = {
@@ -58,8 +57,6 @@ def test_rsyncer_initialises(
         server_url=mock_server_url,
         stop_callback=dummy_callback,
         local=is_local,
-        do_transfer=do_transfer,
-        remove_files=remove_files,
         substrings_blacklist=substrings_blacklist,
         end_time=timestamp,
     )
@@ -71,14 +68,12 @@ def test_rsyncer_initialises(
     assert rsyncer._server_url == mock_server_url
     assert rsyncer._stop_callback == dummy_callback
     assert rsyncer._local == is_local
-    assert rsyncer._do_transfer == do_transfer
-    assert rsyncer._remove_files == remove_files
+    assert rsyncer._do_transfer
+    assert not rsyncer._remove_files
     assert rsyncer._required_substrings_for_removal == []
     assert rsyncer._substrings_blacklist == substrings_blacklist
     assert rsyncer._notify
     assert rsyncer._end_time == timestamp
-    assert not rsyncer._finalising
-    assert not rsyncer._finalised
     assert rsyncer._skipped_files == []
     assert (
         rsyncer._remote == str(basepath_remote)
@@ -91,6 +86,145 @@ def test_rsyncer_initialises(
     assert isinstance(rsyncer.thread, threading.Thread)
     assert not rsyncer._stopping
     assert not rsyncer._halt_thread
+    assert not rsyncer._finalising
+    assert not rsyncer._finalised
+
+    assert rsyncer.status == "ready"
+
+    # Check that it's represented correctly
+    assert (
+        str(rsyncer)
+        == f"<RSyncer ({rsyncer._basepath} → {rsyncer._remote}) [{rsyncer.status}]"
+    )
+
+
+@pytest.mark.parametrize("rsyncer_status", ("default", "is_alive", "stopping"))
+def test_rsyncer_start(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+    rsyncer_status: str,
+):
+    # Mock the thread attribute so that it doesn't start an actual Thread
+    mock_thread = MagicMock()
+    mock_thread.start.return_value = None
+    mock_thread.is_alive.return_value = rsyncer_status == "is_alive"
+
+    # Initialise the RSyncer and patch the attributes to be tested
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer.thread = mock_thread
+    rsyncer._stopping = rsyncer_status == "stopping"
+
+    # Start the RSyncer
+    if rsyncer_status == "default":
+        rsyncer.start()
+        mock_thread.start.assert_called_once()
+    else:
+        with pytest.raises(RuntimeError):
+            rsyncer.start()
+
+
+def test_rsyncer_restart(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+):
+    # Patch the 'start' class method, which is called by 'restart'
+    mock_start = mocker.patch.object(RSyncer, "start")
+    mock_start.return_value = None
+
+    # Mock the thread and the attributes used
+    mock_thread = MagicMock()
+    mock_thread.join.return_value = None
+
+    # Initialise the RSyncer and patch the attributes to be tested
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer.thread = mock_thread
+
+    # Run 'restart'
+    rsyncer.restart()
+
+    # Check that the correct calls and attributes are present
+    mock_thread.join.assert_called_once()
+    assert not rsyncer._halt_thread
+    assert isinstance(rsyncer.thread, threading.Thread)
+    mock_start.assert_called_once()
+
+
+@pytest.mark.parametrize("thread_is_alive", (True, False))
+def test_rsyncer_stop(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+    thread_is_alive: bool,
+):
+    # Mock the thread
+    mock_thread = MagicMock()
+    mock_thread.is_alive.return_value = thread_is_alive
+    mock_thread.join.return_value = None
+
+    # Mock the queue
+    mock_queue = MagicMock()
+    mock_queue.join.return_value = None
+    mock_queue.put.return_value = None
+
+    # Initialise the RSyncer and patch the attributes to be tested
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer.thread = mock_thread
+    rsyncer.queue = mock_queue
+
+    # Check that initial attributes are as expected
+    assert not rsyncer._stopping
+    assert not rsyncer._halt_thread
+
+    # Run 'stop' and check that the calls are as expected
+    rsyncer.stop()
+
+    assert rsyncer._stopping
+    assert rsyncer._halt_thread
+    if thread_is_alive:
+        mock_queue.join.assert_called_once()
+        mock_queue.put.assert_called_with(None)
+        mock_thread.join.assert_called_once()
+    else:
+        mock_queue.join.assert_not_called()
+        mock_queue.put.assert_not_called()
+        mock_thread.join.assert_not_called()
+
+
+def test_rsyncer_request_stop(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+):
+    # Initialise the RSyncer
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+
+    # Check that initial attributes are as expected
+    assert not rsyncer._stopping
+    assert not rsyncer._halt_thread
+
+    # Run 'request_stop' and check that attributes have changed
+    rsyncer.request_stop()
+    assert rsyncer._stopping
+    assert rsyncer._halt_thread
 
 
 @pytest.fixture
@@ -310,3 +444,63 @@ def test_rsyncer_finalise(
         # Check that the callback was set at the end
         if use_callback:
             mock_callback.assert_called_once()
+
+
+@pytest.mark.parametrize("is_stopping", (True, False))
+def test_rsyncer_enqueue(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+    is_stopping: bool,
+):
+    # Mock the queue
+    mock_queue = MagicMock()
+    mock_queue.put.return_value = None
+
+    # Initialise the RSyncer and patch the attributes used by the test
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer._stopping = is_stopping
+    rsyncer.queue = mock_queue
+
+    # Run enqueue with a test file and check that the expected calls were made
+    rsyncer.enqueue(Path("test_file"))
+    if is_stopping:
+        mock_queue.put.assert_not_called()
+    else:
+        mock_queue.put.assert_called_once_with(
+            (tmp_path / "local" / "test_file").absolute()
+        )
+
+
+def test_rsyncer_flush_skipped(
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+):
+    # Mock the queue
+    mock_queue = MagicMock()
+    mock_queue.put.return_value = None
+
+    # Create a list of test files
+    skipped_files = [
+        tmp_path / "local" / f"file_{str(n).zfill(2)}.txt" for n in range(20)
+    ]
+
+    # Initialise the RSyncer and patch the attributes used by the test
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+    )
+    rsyncer.queue = mock_queue
+    rsyncer._skipped_files = skipped_files
+
+    # Run 'flush_skipped' and check that it works as intended
+    rsyncer.flush_skipped()
+    for f in skipped_files:
+        mock_queue.put.assert_any_call(f)
+    assert rsyncer._skipped_files == []
