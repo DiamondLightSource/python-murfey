@@ -129,6 +129,42 @@ def test_rsyncer_status(
     )
 
 
+@pytest.mark.parametrize("notify", (True, False))
+def test_rsyncer_notify(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    mock_server_url: MagicMock,
+    notify: bool,
+):
+    # Patch the superclass that RSyncer stems from
+    mock_notify = mocker.patch("murfey.client.rsync.Observer.notify")
+    mock_notify.return_value = None
+
+    # Initialise the RSyncer
+    rsyncer = RSyncer(
+        basepath_local=tmp_path / "local",
+        basepath_remote=tmp_path / "remote",
+        rsync_module=mock.ANY,
+        server_url=mock_server_url,
+        notify=notify,
+    )
+    # Check that the 'notify' attribute is set correctly
+    assert rsyncer._notify == notify
+
+    # Run 'notify' and check that the expected calls were made
+    rsyncer.notify("arg1", "arg2", kwarg1="kwarg1", kwarg2="kwarg2")
+    if notify:
+        mock_notify.assert_called_once_with(
+            "arg1",
+            "arg2",
+            secondary=False,
+            kwarg1="kwarg1",
+            kwarg2="kwarg2",
+        )
+    else:
+        mock_notify.assert_not_called()
+
+
 @pytest.mark.parametrize("rsyncer_status", ("default", "is_alive", "stopping"))
 def test_rsyncer_start(
     tmp_path: Path,
