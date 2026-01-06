@@ -79,18 +79,15 @@ class RSyncer(Observer):
         self._substrings_blacklist = substrings_blacklist
         self._notify = notify
         self._end_time = end_time
-        self._finalising = False
-        self._finalised = False
 
         self._skipped_files: List[Path] = []
 
         # Set rsync destination
-        if local:
-            self._remote = str(basepath_remote)
-        else:
-            self._remote = (
-                f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
-            )
+        self._remote = (
+            str(basepath_remote)
+            if local
+            else f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
+        )
         logger.debug(f"rsync destination path set to {self._remote}")
 
         # For local tests you can use something along the lines of
@@ -108,6 +105,8 @@ class RSyncer(Observer):
         )
         self._stopping = False
         self._halt_thread = False
+        self._finalising = False
+        self._finalised = False
 
     def __repr__(self) -> str:
         return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
