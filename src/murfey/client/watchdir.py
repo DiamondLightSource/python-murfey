@@ -247,8 +247,8 @@ class DirWatcher(Observer):
             entry_name = os.path.join(path, entry.name)
             # Skip any directories with matching blacklisted substrings
             if entry.is_dir() and any(
-                char in entry.name
-                for char in self._substrings_blacklist.get("directories", [])
+                pattern in entry.name
+                for pattern in self._substrings_blacklist.get("directories", [])
             ):
                 log.debug(f"Skipping blacklisted directory {str(entry.name)!r}")
                 continue
@@ -262,8 +262,8 @@ class DirWatcher(Observer):
                     continue
                 # Exclude files with blacklisted substrings
                 if any(
-                    char in entry.name
-                    for char in self._substrings_blacklist.get("files", [])
+                    pattern in entry.name
+                    for pattern in self._substrings_blacklist.get("files", [])
                 ):
                     log.debug(f"Skipping blacklisted file {str(entry.name)!r}")
                     continue

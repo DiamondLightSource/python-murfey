@@ -207,8 +207,8 @@ class RSyncer(Observer):
                 if entry.is_dir():
                     # Recursively delete directories with blacklisted substrings
                     if any(
-                        char in entry.name
-                        for char in self._substrings_blacklist.get("directories", [])
+                        pattern in entry.name
+                        for pattern in self._substrings_blacklist.get("directories", [])
                     ):
                         logger.debug(f"Deleting blacklisted directory {entry.path}")
                         shutil.rmtree(entry.path)
@@ -218,8 +218,8 @@ class RSyncer(Observer):
                 elif entry.is_file():
                     # Delete blacklisted files
                     if any(
-                        char in entry.name
-                        for char in self._substrings_blacklist.get("files", [])
+                        pattern in entry.name
+                        for pattern in self._substrings_blacklist.get("files", [])
                     ):
                         logger.debug(f"Deleting blacklisted file {entry.path}")
                         Path(entry.path).unlink()
