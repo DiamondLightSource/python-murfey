@@ -122,11 +122,11 @@ def test_rsyncer_status(
     rsyncer.thread = mock_thread
     rsyncer._stopping = is_stopping
 
-    # Check that it's represented correctly
-    assert (
-        str(rsyncer)
-        == f"<RSyncer ({rsyncer._basepath} → {rsyncer._remote}) [{expected_status}]"
-    )
+    # Check that its status is correct
+    assert rsyncer.status == expected_status
+
+    # Check that its canonical representation is correct
+    assert str(rsyncer) == f"<RSyncer ({rsyncer._basepath} → {rsyncer._remote})>"
 
 
 @pytest.mark.parametrize("notify", (True, False))

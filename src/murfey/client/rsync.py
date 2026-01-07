@@ -122,7 +122,7 @@ class RSyncer(Observer):
                 return "ready"
 
     def __repr__(self) -> str:
-        return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
+        return f"<RSyncer ({self._basepath} → {self._remote})>"
 
     @classmethod
     def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
