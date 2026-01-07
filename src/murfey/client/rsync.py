@@ -171,7 +171,7 @@ class RSyncer(Observer):
         self.start()
 
     def stop(self):
-        logger.info("RSync thread stop requested")
+        logger.info(f"Stopping RSync thread {self}")
         self._stopping = True
         if self.thread.is_alive():
             logger.info("Waiting for ongoing transfers to complete...")
@@ -181,7 +181,7 @@ class RSyncer(Observer):
         if self.thread.is_alive():
             self.queue.put(None)
             self.thread.join()
-        logger.info("RSync thread successfully stopped")
+        logger.info(f"RSync thread {self} successfully stopped")
 
     def request_stop(self):
         self._stopping = True
@@ -199,7 +199,7 @@ class RSyncer(Observer):
         self._finalising = True
 
         # Perform recursive cleanup on current directory
-        logger.info("File cleanup started for RSync thread")
+        logger.info(f"Starting file cleanup for RSync thread {self}")
         files_to_transfer: list[Path] = []
 
         def recursive_cleanup(dirpath: str | Path):
@@ -242,7 +242,7 @@ class RSyncer(Observer):
         else:
             self._transfer(files_to_transfer)
         self._finalised = True
-        logger.info("File cleanup for RSync thread successfully completed")
+        logger.info(f"File cleanup for RSync thread {self} successfully completed")
         if callback:
             callback()
 
@@ -257,7 +257,7 @@ class RSyncer(Observer):
         self._skipped_files = []
 
     def _process(self):
-        logger.info("Starting RSync thread main process loop")
+        logger.info(f"Starting main process loop for RSync thread {self}")
         files_to_transfer: list[Path]
         backoff = 0
         while not self._halt_thread:
