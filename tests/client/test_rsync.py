@@ -414,16 +414,21 @@ clem_substrings_blacklist = {
     ],
 }
 
-rsyncer_finalise_params_matrix: tuple[tuple[str, bool, bool], ...] = (
-    # Workflow type | Use thread? | Use callback function?
-    ("clem", False, False),
-    ("clem", False, True),
-    ("clem", True, False),
-    ("clem", True, True),
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Workflow type | Use thread? | Use callback function? | Use blacklist?
+        ("clem", False, False, False),
+        ("clem", False, False, True),
+        ("clem", False, True, False),
+        ("clem", False, True, True),
+        ("clem", True, False, False),
+        ("clem", True, False, True),
+        ("clem", True, True, False),
+        ("clem", True, True, True),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", rsyncer_finalise_params_matrix)
 def test_rsyncer_finalise(
     mocker: MockerFixture,
     rsync_module: str,
@@ -431,10 +436,10 @@ def test_rsyncer_finalise(
     clem_visit_dir: Path,
     clem_test_files: list[Path],
     clem_junk_files: list[Path],
-    test_params: tuple[str, bool, bool],
+    test_params: tuple[str, bool, bool, bool],
 ):
     # Unpack test params
-    workflow_type, use_thread, use_callback = test_params
+    workflow_type, use_thread, use_callback, use_blacklist = test_params
 
     # Create a test end time
     timestamp = datetime.now()
@@ -462,7 +467,7 @@ def test_rsyncer_finalise(
             rsync_module=rsync_module,
             server_url=mock_server_url,
             stop_callback=dummy_callback,
-            substrings_blacklist=clem_substrings_blacklist,
+            substrings_blacklist=clem_substrings_blacklist if use_blacklist else {},
             end_time=timestamp,
         )
         # Patch the 'queue' attribute with the mocked one
@@ -487,20 +492,26 @@ def test_rsyncer_finalise(
         assert rsyncer._end_time is None
         assert rsyncer._finalising
 
-        # Check that list of files to transfer doesn't include blacklisted files
+        # Check that list of files with and without using a blacklist are correct
         if use_thread:
             for file in clem_test_files:
                 mock_queue.put.assert_any_call(file)
+            if not use_blacklist:
+                for file in clem_junk_files:
+                    mock_queue.put.assert_any_call(file)
         else:
             transfer_args = mock_transfer.call_args.args
-            assert sorted(transfer_args[0]) == sorted(clem_test_files)
+            assert sorted(transfer_args[0]) == (
+                sorted(clem_test_files)
+                if use_blacklist
+                else sorted([*clem_test_files, *clem_junk_files])
+            )
 
-        # Check that the blacklisted files no longer exist
-        for file in clem_junk_files:
-            assert not file.exists()
         # Transfer is being mocked, so check that files to transfer are all present
         for file in clem_test_files:
             assert file.exists()
+        for file in clem_junk_files:
+            assert not file.exists() if use_blacklist else file.exists()
 
         # Check that stop was called the correct number of times depending on the setup
         assert mock_stop.call_count == 2 if use_thread else 1
