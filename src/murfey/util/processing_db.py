@@ -1,10 +1,102 @@
 import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import List, Optional
 
-from sqlmodel import Enum, Field, Relationship, SQLModel
+import sqlalchemy
+from sqlmodel import Enum, Field, Relationship, create_engine
 
-if TYPE_CHECKING:
-    from murfey.util.db import AutoProcProgram, DataCollection, Movie, SearchMap
+from murfey.util.db import (
+    AutoProcProgram as AutoProcProgramOrig,
+    DataCollection as DataCollectionOrig,
+    DataCollectionGroup as DataCollectionGroupOrig,
+    FoilHole as FoilHoleOrig,
+    GridSquare as GridSquareOrig,
+    Movie as MovieOrig,
+    SearchMap as SearchMapOrig,
+    SQLModel,
+)
+
+
+class DataCollectionGroup(DataCollectionGroupOrig):
+    grid_squares: List["GridSquare"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    search_maps: List["SearchMap"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class DataCollection(DataCollectionOrig):
+    movies: List["Movie"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    MotionCorrection: List["MotionCorrection"] = Relationship(
+        back_populates="DataCollection"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="DataCollection")
+
+
+class AutoProcProgram(AutoProcProgramOrig):
+    MotionCorrection: List["MotionCorrection"] = Relationship(
+        back_populates="DataCollection"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="AutoProcProgram")
+    CTF: List["CTF"] = Relationship(back_populates="AutoProcProgram")
+    ParticlePicker: List["ParticlePicker"] = Relationship(
+        back_populates="AutoProcProgram"
+    )
+    RelativeIceThickness: List["RelativeIceThickness"] = Relationship(
+        back_populates="AutoProcProgram"
+    )
+    ParticleClassificationGroup: List["ParticleClassificationGroup"] = Relationship(
+        back_populates="AutoProcProgram"
+    )
+
+
+class GridSquare(GridSquareOrig):
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="grid_squares"
+    )
+
+
+class FoilHole(FoilHoleOrig):
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    diameter: Optional[int] = None
+    quality_indicator: Optional[float] = None
+
+
+class SearchMap(SearchMapOrig):
+    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    scaled_height: Optional[int] = None
+    scaled_width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="search_maps"
+    )
+    Tomogram: List["Tomogram"] = Relationship(back_populates="SearchMap")
+
+
+class Movie(MovieOrig):
+    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
+    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
+    MotionCorrection: List["MotionCorrection"] = Relationship(back_populates="Movie")
+    TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
+        back_populates="Movie"
+    )
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore
@@ -249,3 +341,21 @@ class CryoemInitialModel(SQLModel, table=True):  # type: ignore
     ParticleClassification: List["ParticleClassification"] = Relationship(
         back_populates="CryoemInitialModel"
     )
+
+
+"""
+FUNCTIONS
+"""
+
+
+def setup(url: str):
+    engine = create_engine(url)
+    SQLModel.metadata.create_all(engine)
+
+
+def clear(url: str):
+    engine = create_engine(url)
+    metadata = sqlalchemy.MetaData()
+    metadata.create_all(engine)
+    metadata.reflect(engine)
+    metadata.drop_all(engine)
