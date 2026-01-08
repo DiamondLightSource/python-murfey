@@ -28,9 +28,6 @@ class DataCollectionGroup(DataCollectionGroupOrig):
 
 
 class DataCollection(DataCollectionOrig):
-    movies: List["Movie"] = Relationship(
-        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
-    )
     MotionCorrection: List["MotionCorrection"] = Relationship(
         back_populates="DataCollection"
     )

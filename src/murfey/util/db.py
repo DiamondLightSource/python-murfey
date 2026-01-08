@@ -468,6 +468,9 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     processing_jobs: List["ProcessingJob"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
     )
+    movies: List["Movie"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
