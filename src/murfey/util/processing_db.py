@@ -55,6 +55,7 @@ class AutoProcProgram(AutoProcProgramOrig):
 
 
 class GridSquare(GridSquareOrig):
+    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
     scaled_pixel_size: Optional[float] = None
     pixel_location_x: Optional[int] = None
     pixel_location_y: Optional[int] = None
@@ -91,8 +92,6 @@ class SearchMap(SearchMapOrig):
 
 
 class Movie(MovieOrig):
-    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
-    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     MotionCorrection: List["MotionCorrection"] = Relationship(back_populates="Movie")
     TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
         back_populates="Movie"

@@ -608,7 +608,6 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
 class GridSquare(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     session_id: int = Field(foreign_key="session.id")
-    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
     name: int
     tag: str
     x_location: Optional[float]
@@ -689,12 +688,14 @@ class SearchMap(SQLModel, table=True):  # type: ignore
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
+    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
 
 
