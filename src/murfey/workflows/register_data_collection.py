@@ -12,9 +12,7 @@ from murfey.util import sanitise
 logger = logging.getLogger("murfey.workflows.register_data_collection")
 
 
-def run(
-    message: dict, murfey_db: SQLModelSession, demo: bool = False
-) -> dict[str, bool]:
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if transport manager was not provided
     if _transport_object is None:
         logger.error("Unable to find transport manager")

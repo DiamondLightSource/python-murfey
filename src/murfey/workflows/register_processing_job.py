@@ -14,7 +14,7 @@ from murfey.util import sanitise
 logger = logging.getLogger("murfey.workflows.register_processing_job")
 
 
-def run(message: dict, murfey_db: SQLModelSession, demo: bool = False):
+def run(message: dict, murfey_db: SQLModelSession):
     # Faill immediately if not transport manager is set
     if _transport_object is None:
         logger.error("Unable to find transport manager")

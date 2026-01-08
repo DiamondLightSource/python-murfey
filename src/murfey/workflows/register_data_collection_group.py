@@ -13,9 +13,7 @@ from murfey.server.ispyb import ISPyBSession, get_session_id
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 
-def run(
-    message: dict, murfey_db: SQLModelSession, demo: bool = False
-) -> dict[str, bool]:
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if no transport wrapper is found
     if _transport_object is None:
         logger.error("Unable to find transport manager")
