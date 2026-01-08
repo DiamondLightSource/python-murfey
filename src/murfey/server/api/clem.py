@@ -83,7 +83,7 @@ def validate_and_sanitise(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    rsync_basepath = machine_config.rsync_basepath.resolve()
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
 
     # Check that full file path doesn't contain unallowed characters
     #   Currently allows only:

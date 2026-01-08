@@ -24,7 +24,6 @@ from murfey.server.api.session_shared import (
     get_foil_holes_from_grid_square as _get_foil_holes_from_grid_square,
     get_grid_squares as _get_grid_squares,
     get_grid_squares_from_dcg as _get_grid_squares_from_dcg,
-    get_machine_config_for_instrument,
     get_tiff_file as _get_tiff_file,
     get_upstream_file as _get_upstream_file,
     remove_session_by_id,
@@ -32,7 +31,7 @@ from murfey.server.api.session_shared import (
 from murfey.server.ispyb import DB as ispyb_db, get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
-from murfey.util.config import MachineConfig
+from murfey.util.config import get_machine_config
 from murfey.util.db import (
     ClassificationFeedbackParameters,
     ClientEnvironment,
@@ -78,8 +77,8 @@ def connections_check():
 @router.get("/instruments/{instrument_name}/machine")
 def machine_info_by_instrument(
     instrument_name: MurfeyInstrumentName,
-) -> Optional[MachineConfig]:
-    return get_machine_config_for_instrument(instrument_name)
+):
+    return get_machine_config(instrument_name)[instrument_name]
 
 
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])

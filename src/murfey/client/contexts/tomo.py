@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, OrderedDict
 import xmltodict
 
 import murfey.util.eer
-from murfey.client.context import Context, ProcessingParameter
+from murfey.client.context import Context, ProcessingParameter, ensure_dcg_exists
 from murfey.client.instance_environment import (
     MovieID,
     MovieTracker,
@@ -101,20 +101,14 @@ class TomographyContext(Context):
             )
             return
         try:
-            dcg_data = {
-                "experiment_type_id": 36,  # Tomo
-                "tag": str(self._basepath),
-                "atlas": "",
-                "sample": None,
-            }
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
+            metadata_source = (
+                self._basepath.parent / environment.visit / self._basepath.name
+            )
+            ensure_dcg_exists(
+                collection_type="tomo",
+                metadata_source=metadata_source,
+                environment=environment,
                 token=self._token,
-                visit_name=environment.visit,
-                session_id=environment.murfey_session,
-                data=dcg_data,
             )
 
             for tilt_series in self._tilt_series.keys():

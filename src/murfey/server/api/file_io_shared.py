@@ -37,8 +37,9 @@ async def process_gain(
         executables = machine_config.external_executables
     env = machine_config.external_environment
     safe_path_name = secure_filename(gain_reference_params.gain_ref.name)
+    rsync_basepath = machine_config.rsync_basepath or Path("")
     filepath = (
-        Path(machine_config.rsync_basepath)
+        rsync_basepath
         / str(datetime.now().year)
         / secure_filename(visit_name)
         / machine_config.gain_directory_name
@@ -48,7 +49,7 @@ async def process_gain(
     if not filepath.exists():
         filepath_prev = filepath
         filepath = (
-            Path(machine_config.rsync_basepath)
+            rsync_basepath
             / str(datetime.now().year - 1)
             / secure_filename(visit_name)
             / machine_config.gain_directory_name
@@ -80,14 +81,12 @@ async def process_gain(
         )
     if new_gain_ref and new_gain_ref_superres:
         return {
-            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
-            "gain_ref_superres": new_gain_ref_superres.relative_to(
-                Path(machine_config.rsync_basepath)
-            ),
+            "gain_ref": new_gain_ref.relative_to(rsync_basepath),
+            "gain_ref_superres": new_gain_ref_superres.relative_to(rsync_basepath),
         }
     elif new_gain_ref:
         return {
-            "gain_ref": new_gain_ref.relative_to(Path(machine_config.rsync_basepath)),
+            "gain_ref": new_gain_ref.relative_to(rsync_basepath),
             "gain_ref_superres": None,
         }
     else:

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 import xmltodict
 
 from murfey.client.context import Context, ProcessingParameter
+from murfey.client.destinations import find_longest_data_directory
 from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
@@ -51,12 +52,8 @@ def _file_transferred_to(
 def _grid_square_metadata_file(
     f: Path, data_directories: List[Path], visit: str, grid_square: int
 ) -> Path:
-    for dd in data_directories:
-        if str(f).startswith(str(dd)):
-            base_dir = dd.absolute()
-            mid_dir = f.relative_to(base_dir).parent
-            break
-    else:
+    base_dir, mid_dir = find_longest_data_directory(f, data_directories)
+    if not base_dir:
         raise ValueError(f"Could not determine grid square metadata path for {f}")
     metadata_file = (
         base_dir

@@ -106,42 +106,57 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
-    if dcg_murfey := db.exec(
-        select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.tag == dcg_params.tag)
-    ).all():
-        dcg_murfey[0].atlas = dcg_params.atlas or dcg_murfey[0].atlas
-        dcg_murfey[0].sample = dcg_params.sample or dcg_murfey[0].sample
-        dcg_murfey[0].atlas_pixel_size = (
-            dcg_params.atlas_pixel_size or dcg_murfey[0].atlas_pixel_size
+    if (
+        dcg_murfey := db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == dcg_params.tag)
+        ).all()
+    ) or (
+        (
+            dcg_murfey := db.exec(
+                select(DataCollectionGroup)
+                .where(DataCollectionGroup.session_id == session_id)
+                .where(DataCollectionGroup.sample == dcg_params.sample)
+            ).all()
         )
+        and dcg_params.experiment_type_id == 44
+    ):
+        # Either switching atlas for a common (atlas or processing) tag
+        # Or registering a new atlas-type dcg for a sample that is already present
+        for dcg_instance in dcg_murfey:
+            # Update all instances in case there are multiple processing runs
+            dcg_instance.atlas = dcg_params.atlas or dcg_instance.atlas
+            dcg_instance.sample = dcg_params.sample or dcg_instance.sample
+            dcg_instance.atlas_pixel_size = (
+                dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
+            )
 
-        if _transport_object:
-            if dcg_murfey[0].atlas_id is not None:
-                _transport_object.send(
-                    _transport_object.feedback_queue,
-                    {
-                        "register": "atlas_update",
-                        "atlas_id": dcg_murfey[0].atlas_id,
-                        "atlas": dcg_params.atlas,
-                        "sample": dcg_params.sample,
-                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                        "dcgid": dcg_murfey[0].id,
-                        "session_id": session_id,
-                    },
-                )
-            else:
-                atlas_id_response = _transport_object.do_insert_atlas(
-                    Atlas(
-                        dataCollectionGroupId=dcg_murfey[0].id,
-                        atlasImage=dcg_params.atlas,
-                        pixelSize=dcg_params.atlas_pixel_size,
-                        cassetteSlot=dcg_params.sample,
+            if _transport_object:
+                if dcg_instance.atlas_id is not None:
+                    _transport_object.send(
+                        _transport_object.feedback_queue,
+                        {
+                            "register": "atlas_update",
+                            "atlas_id": dcg_instance.atlas_id,
+                            "atlas": dcg_params.atlas,
+                            "sample": dcg_params.sample,
+                            "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                            "dcgid": dcg_instance.id,
+                            "session_id": session_id,
+                        },
                     )
-                )
-                dcg_murfey[0].atlas_id = atlas_id_response["return_value"]
-        db.add(dcg_murfey[0])
+                else:
+                    atlas_id_response = _transport_object.do_insert_atlas(
+                        Atlas(
+                            dataCollectionGroupId=dcg_instance.id,
+                            atlasImage=dcg_params.atlas,
+                            pixelSize=dcg_params.atlas_pixel_size,
+                            cassetteSlot=dcg_params.sample,
+                        )
+                    )
+                    dcg_instance.atlas_id = atlas_id_response["return_value"]
+            db.add(dcg_instance)
         db.commit()
 
         search_maps = db.exec(
@@ -155,6 +170,27 @@ def register_dc_group(
                 session_id, sm.name, search_map_params, db, close_db=False
             )
         db.close()
+    elif dcg_murfey := db.exec(
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.sample == dcg_params.sample)
+        .where(
+            col(DataCollectionGroup.tag).contains(f"/Sample{dcg_params.sample}/Atlas")
+        )
+    ).all():
+        # Case where we switch from atlas to processing
+        dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
+        if _transport_object:
+            _transport_object.send(
+                _transport_object.feedback_queue,
+                {
+                    "register": "experiment_type_update",
+                    "experiment_type_id": dcg_params.experiment_type_id,
+                    "dcgid": dcg_murfey[0].id,
+                },
+            )
+        db.add(dcg_murfey[0])
+        db.commit()
     else:
         dcg_parameters = {
             "start_time": str(datetime.now()),
@@ -214,15 +250,14 @@ def start_dc(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
     logger.info(
         f"Starting data collection on microscope {instrument_name!r} "
-        f"with basepath {sanitise(str(machine_config.rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
+        f"with basepath {sanitise(str(rsync_basepath))} and directory {sanitise(dc_params.image_directory)}"
     )
     dc_parameters = {
         "visit": visit_name,
-        "image_directory": str(
-            machine_config.rsync_basepath / dc_params.image_directory
-        ),
+        "image_directory": str(rsync_basepath / dc_params.image_directory),
         "start_time": str(datetime.now()),
         "voltage": dc_params.voltage,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
@@ -725,7 +760,10 @@ async def request_tomography_preprocessing(
                 "fm_dose": proc_file.dose_per_frame,
                 "frame_count": proc_file.frame_count,
                 "gain_ref": (
-                    str(machine_config.rsync_basepath / proc_file.gain_ref)
+                    str(
+                        (machine_config.rsync_basepath or Path("")).resolve()
+                        / proc_file.gain_ref
+                    )
                     if proc_file.gain_ref and machine_config.data_transfer_enabled
                     else proc_file.gain_ref
                 ),
@@ -1041,7 +1079,7 @@ async def make_gif(
         instrument_name
     ]
     output_dir = (
-        Path(machine_config.rsync_basepath)
+        (machine_config.rsync_basepath or Path("")).resolve()
         / secure_filename(year)
         / secure_filename(visit_name)
         / "processed"

@@ -2,7 +2,7 @@
 %} {% block content %}
 <h1>Bootstrapping Instructions</h1>
 <h2>1. Setting Up a POSIX Environment</h2>
-<h3>Installing MSYS2</h3>
+<h3>A. Installing MSYS2</h3>
 <p>
   MSYS2 is a POSIX environment which provides extensive compiler support for the
   more modern programming languages used by Murfey's package dependencies.
@@ -14,9 +14,14 @@
   <a href="{{ proxy_path }}/msys2/repo/distrib/msys2-x86_64-latest.exe"
     >mirror</a
   >, then run it using the default settings. This will install MSYS2 to
-  C:\msys64.
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+  >
+    C:\msys64 </span
+  >.
 </p>
-<h4>Setting Up the MSYS2 Package Manager (If Network-Restricted)</h4>
+<h3>B. Setting Up MSYS2</h3>
+<h4>i. Setting Up the MSYS2 Package Manager (If Network-Restricted)</h4>
 <p>
   By default, MSYS2 comes with preset lists of mirrors and servers that it
   installs its packages from. On a network-restricted PC, these will need to be
@@ -36,7 +41,7 @@
 >
     C:\msys64\etc\pacman.d
 </pre>
-<h4>Installing Dependencies</h4>
+<h4>ii. Installing Dependencies</h4>
 <p>
   MSYS2 comes with multiple environments, but UCRT64 is the most modern one. In
   order for the Murfey client to be able to install and run its dependencies
@@ -69,7 +74,7 @@
     >pacman -Ss &lt;package-name&gt;</span
   >
 </p>
-<h4>Configuring the Rust Package Manager (If Network-Restricted)</h4>
+<h4>iii. Configuring the Rust Package Manager (If Network-Restricted)</h4>
 <p>
   Many newer Python packages now have dependencies written in Rust that allow
   them to operate more efficiently. MSYS2 supports the compilation and
@@ -132,30 +137,6 @@
   instead.
 </p>
 
-<h4>Running MSYS2 Through Command Prompt</h4>
-<p>
-  In order to run Murfey via the terminal, MSYS2 will have to be run through
-  Window's Command Prompt terminal, as there is an ongoing bug with MSYS2's
-  pre-packaged terminal that prevents mouse interaction with interactive apps in
-  the terminal.
-</p>
-<p>
-  To do so, simply right-click on your desktop and navigate to
-  <span>New > Shortcut</span>. When prompted for the location of the item, enter
-  the following into the text box:
-</p>
-<pre
-  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
->
-    cmd.exe /k "C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -shell bash"
-</pre>
-<p>
-  After naming the shortcut, click Finish to create the shortcut. This will run
-  a UCRT64 instance of MSYS2 through the Command Prompt terminal that starts you
-  off in MSYS2's default home directory. You can proceed to customise the
-  shortcut icon to taste.
-</p>
-
 <h2>2. Setting Up Python</h2>
 <p>
   Once Python and
@@ -180,25 +161,11 @@
 <h3>B. Installing Murfey</h3>
 <p>
   You can install Murfey in the Python environment (the base one or a virtual
-  environment) in either the Cygwin or UCRT64 terminal using the following
-  commands:
+  environment) in the UCRT64 terminal using the following commands:
 </p>
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install murfey[client] --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
+    $ pip install murfey --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
 </pre>
-<p>
-  If you wish to install the client-side dependencies needed to run Murfey via
-  the web UI, replace
-  <span
-    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
-    >murfey[client]</span
-  >
-  with
-  <span
-    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
-    >murfey[client,instrument-server]</span
-  >.
-</p>
 {% endblock %}

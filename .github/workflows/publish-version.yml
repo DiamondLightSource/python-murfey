@@ -16,15 +16,15 @@ jobs:
       doTag: ${{ steps.checkTag.outputs.doTag }}
       newVersion: ${{ steps.checkTag.outputs.newVersion }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.10"
       - name: Check current tag
         id: checkTag
         run: |
-          pip install --disable-pip-version-check -e "."[cicd,client,server,developer]
+          pip install --disable-pip-version-check -e "."[cicd,server,developer]
           VERSION=$(python -c "import murfey; print(murfey.__version__)")
           echo "newVersion=v$VERSION" >> $GITHUB_OUTPUT
 
@@ -46,7 +46,7 @@ jobs:
       - get-current-version
     if: ${{ needs.get-current-version.outputs.doTag == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Push the new tag
         run: |
           git config --global user.name "DiamondLightSource-build-server"
@@ -64,9 +64,9 @@ jobs:
       - get-current-version
     if: ${{ needs.get-current-version.outputs.doTag == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.10"
       - name: Install pypa/build
@@ -78,7 +78,7 @@ jobs:
       - name: Build python package
         run: python3 -m build
       - name: Store built package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: package-distributions
           path: dist/
@@ -100,7 +100,7 @@ jobs:
 
     steps:
       - name: Download all the dists
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: package-distributions
           path: dist/
@@ -123,12 +123,12 @@ jobs:
 
     steps:
       - name: Download all the dists
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: package-distributions
           path: dist/
       - name: Sign the dists with Sigstore
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        uses: sigstore/gh-action-sigstore-python@v3.2.0
         with:
           inputs: >-
             ./dist/*.tar.gz

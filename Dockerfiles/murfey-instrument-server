@@ -2,7 +2,7 @@
 # podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-instrument-server -t murfey-instrument-server:<version> path/to/python-murfey
 
 # Set up the base image to build with
-FROM docker.io/library/python:3.12.10-slim-bookworm AS base
+FROM docker.io/library/python:3.12-slim-bookworm AS base
 
 # Install Vim in base image
 RUN apt-get update && \
@@ -32,7 +32,7 @@ RUN apt-get update && \
         pip \
         build \
         importlib-metadata && \
-    /venv/bin/python -m pip install /python-murfey[client,instrument-server]
+    /venv/bin/python -m pip install /python-murfey
 
 
 # Transfer completed Murfey build to base image

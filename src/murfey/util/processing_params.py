@@ -42,7 +42,9 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
     ]
     if machine_config.picking_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath / str(datetime.now().year) / visit
+            (machine_config.rsync_basepath or Path("")).resolve()
+            / str(datetime.now().year)
+            / visit
         )
         possible_models = list(
             (visit_directory / machine_config.picking_model_search_directory).glob(
@@ -51,17 +53,21 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
         )
         if possible_models:
             return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
-    return machine_config.default_model
+    return (machine_config.default_model or Path("")).resolve()
 
 
-class CLEMAlignAndMergeParameters(BaseModel):
+class CLEMProcessingParameters(BaseModel):
+    # Atlas vs GridSquare registration threshold
+    atlas_threshold: float = 0.0015  # in m
+
+    # Image alignment and merging-specific parameters
     crop_to_n_frames: Optional[int] = 50
     align_self: Literal["enabled", ""] = "enabled"
     flatten: Literal["mean", "min", "max", ""] = "mean"
     align_across: Literal["enabled", ""] = "enabled"
 
 
-default_clem_align_and_merge_parameters = CLEMAlignAndMergeParameters()
+default_clem_processing_parameters = CLEMProcessingParameters()
 
 
 class SPAParameters(BaseModel):

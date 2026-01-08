@@ -1,4 +1,3 @@
-import json
 import logging
 import subprocess
 import threading
@@ -10,8 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-import murfey.client.websocket
 from murfey.client.analyser import Analyser
+from murfey.client.context import ensure_dcg_exists
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.destinations import determine_default_destination
@@ -76,7 +75,6 @@ class MultigridController:
             symmetry=self.data_collection_parameters.get("symmetry"),
             eer_fractionation=self.data_collection_parameters.get("eer_fractionation"),
             instrument_name=self.instrument_name,
-            # processing_only_mode=server_routing_prefix_found,
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
@@ -95,11 +93,6 @@ class MultigridController:
         self._register_dc: bool | None = None
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
-
-        self.ws = murfey.client.websocket.WSApp(
-            server=self.murfey_url,
-            register_client=False,
-        )
 
         # Calculate the time offset between the client and the server
         current_time = datetime.now()
@@ -181,17 +174,6 @@ class MultigridController:
         if not success:
             log.warning(f"Could not delete database data for {self.session_id}")
 
-        # Send message to frontend to trigger a refresh
-        self.ws.send(
-            json.dumps(
-                {
-                    "message": "refresh",
-                    "target": "sessions",
-                    "instrument_name": self.instrument_name,
-                }
-            )
-        )
-
         # Mark as dormant
         self.dormant = True
 
@@ -235,7 +217,6 @@ class MultigridController:
         self,
         source: Path,
         extra_directory: str = "",
-        include_mid_path: bool = True,
         use_suggested_path: bool = True,
         destination_overrides: Optional[Dict[Path, str]] = None,
         remove_files: bool = False,
@@ -273,11 +254,9 @@ class MultigridController:
                     source,
                     self._environment.default_destinations[source],
                     self._environment,
-                    self.analysers or {},
                     self.token,
                     touch=True,
                     extra_directory=extra_directory,
-                    include_mid_path=include_mid_path,
                     use_suggested_path=use_suggested_path,
                 )
         self._environment.sources.append(source)
@@ -291,15 +270,6 @@ class MultigridController:
             limited=limited,
             transfer=machine_data.get("data_transfer_enabled", True),
             restarted=str(source) in self.rsync_restarts,
-        )
-        self.ws.send(
-            json.dumps(
-                {
-                    "message": "refresh",
-                    "target": "rsyncer",
-                    "session_id": self.session_id,
-                }
-            )
         )
 
     def _rsyncer_stopped(self, source: Path, explicit_stop: bool = False):
@@ -410,6 +380,9 @@ class MultigridController:
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
+                substrings_blacklist=self._machine_config.get(
+                    "substrings_blacklist", {"directories": [], "files": []}
+                ),
                 end_time=self.visit_end_time,
             )
 
@@ -468,7 +441,13 @@ class MultigridController:
                     session_id=self._environment.murfey_session,
                     data=rsyncer_data,
                 )
-        self._environment.watchers[source] = DirWatcher(source, settling_time=30)
+        self._environment.watchers[source] = DirWatcher(
+            source,
+            settling_time=30,
+            substrings_blacklist=self._machine_config.get(
+                "substrings_blacklist", {"directories": [], "files": []}
+            ),
+        )
 
         if not self.analysers.get(source) and analyse:
             log.info(f"Starting analyser for {source}")
@@ -610,28 +589,20 @@ class MultigridController:
             log.info("Tomography processing flushed")
 
         elif isinstance(context, SPAModularContext):
-            dcg_data = {
-                "experiment_type_id": 37,  # Single particle
-                "tag": str(source),
-                "atlas": (
-                    str(self._environment.samples[source].atlas)
-                    if self._environment.samples.get(source)
-                    else ""
-                ),
-                "sample": (
-                    self._environment.samples[source].sample
-                    if self._environment.samples.get(source)
-                    else None
-                ),
-            }
-            capture_post(
-                base_url=str(self._environment.url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
+            if self._environment.visit in source.parts:
+                metadata_source = source
+            else:
+                metadata_source_as_str = (
+                    "/".join(source.parts[:-2])
+                    + f"/{self._environment.visit}/"
+                    + source.parts[-2]
+                )
+                metadata_source = Path(metadata_source_as_str.replace("//", "/"))
+            ensure_dcg_exists(
+                collection_type="spa",
+                metadata_source=metadata_source,
+                environment=self._environment,
                 token=self.token,
-                visit_name=self._environment.visit,
-                session_id=self.session_id,
-                data=dcg_data,
             )
             if from_form:
                 data = {

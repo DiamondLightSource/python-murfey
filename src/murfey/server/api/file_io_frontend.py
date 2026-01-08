@@ -14,6 +14,7 @@ from murfey.server.api.file_io_shared import (
     process_gain as _process_gain,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util import secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import Session
 
@@ -50,10 +51,23 @@ async def create_symlink(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    symlink_full_path = machine_config.rsync_basepath / symlink_params.symlink
+    rsync_basepath = (machine_config.rsync_basepath or Path("")).resolve()
+    symlink_full_path = secure_path(
+        rsync_basepath / symlink_params.symlink, keep_spaces=True
+    )
+    # Verify that the symlink provided does not lead elsewhere
+    if not symlink_full_path.resolve().is_relative_to(rsync_basepath):
+        logger.warning(
+            "Symlink rejected because it will be created in a forbidden location"
+        )
+        return ""
+    # Remove and replace symlink if it exists are 'override' is set
     if symlink_full_path.is_symlink() and symlink_params.override:
         symlink_full_path.unlink()
+    # If a file/folder already exists using the desired symlink name, return empty string
     if symlink_full_path.exists():
         return ""
-    symlink_full_path.symlink_to(machine_config.rsync_basepath / symlink_params.target)
+    symlink_full_path.symlink_to(
+        secure_path(rsync_basepath / symlink_params.target, keep_spaces=True)
+    )
     return str(symlink_params.symlink)

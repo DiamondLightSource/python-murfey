@@ -511,7 +511,7 @@ def _release_refine_hold(message: dict, _db):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": refine_params.class3d_dir,
                 "class_number": refine_params.class_number,
-                "pixel_size": relion_params.angpix,
+                "pixel_size": relion_params.angpix * relion_params.motion_corr_binning,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "symmetry": relion_params.symmetry,
@@ -1100,7 +1100,9 @@ def _register_class_selection(message: dict, _db, demo: bool = False):
 def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | None:
     if machine_config.initial_model_search_directory:
         visit_directory = (
-            machine_config.rsync_basepath / str(datetime.now().year) / visit
+            (machine_config.rsync_basepath or Path("")).resolve()
+            / str(datetime.now().year)
+            / visit
         )
         possible_models = [
             p
@@ -1115,12 +1117,12 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
 
 
 def _downscaled_box_size(
-    particle_diameter: int, pixel_size: float
+    particle_diameter_ang: float, pixel_size: float
 ) -> Tuple[int, float]:
+    particle_diameter = particle_diameter_ang / pixel_size
     box_size = int(math.ceil(1.2 * particle_diameter))
     box_size = box_size + box_size % 2
     for small_box_pix in (
-        48,
         64,
         96,
         128,
@@ -1145,9 +1147,9 @@ def _downscaled_box_size(
         # Don't go larger than the original box
         if small_box_pix > box_size:
             return box_size, pixel_size
-        # If Nyquist freq. is better than 8.5 A, use this downscaled box, else step size
+        # If Nyquist freq. is better than 7.5 A, use this downscaled box, else step size
         small_box_angpix = pixel_size * box_size / small_box_pix
-        if small_box_angpix < 4.25:
+        if small_box_angpix < 3.75:
             return small_box_pix, small_box_angpix
     raise ValueError(f"Box size is too large: {box_size}")
 
@@ -1161,9 +1163,9 @@ def _resize_intial_model(
     env: Dict[str, str],
 ) -> None:
     with mrcfile.open(input_path) as input_mrc:
-        input_size_x = input_mrc.nx
-        input_size_y = input_mrc.ny
-        input_size_z = input_mrc.nz
+        input_size_x = input_mrc.header.nx
+        input_size_y = input_mrc.header.ny
+        input_size_z = input_mrc.header.nz
     if executables.get("clip") and not input_size_x == input_size_y == input_size_z:
         # If the initial model is not a cube, do some padding
         clip_proc = subprocess.run(
@@ -1197,6 +1199,8 @@ def _resize_intial_model(
                 "--new_box",
                 str(downscaled_box_size),
                 "--rescale_angpix",
+                str(downscaled_pixel_size),
+                "--force_header_angpix",
                 str(downscaled_pixel_size),
                 "--o",
                 str(output_path),
@@ -1511,7 +1515,10 @@ def _flush_tomography_preprocessing(message: dict, _db):
                 "fm_dose": proc_params.dose_per_frame,
                 "frame_count": proc_params.frame_count,
                 "gain_ref": (
-                    str(machine_config.rsync_basepath / proc_params.gain_ref)
+                    str(
+                        (machine_config.rsync_basepath or Path("")).resolve()
+                        / proc_params.gain_ref
+                    )
                     if proc_params.gain_ref
                     else proc_params.gain_ref
                 ),
@@ -1676,7 +1683,9 @@ def _register_refinement(message: dict, _db, demo: bool = False):
                 "refine_job_dir": refine_params.refine_dir,
                 "class3d_dir": message["class3d_dir"],
                 "class_number": message["best_class"],
-                "pixel_size": relion_options["angpix"],
+                "pixel_size": (
+                    relion_options["angpix"] * relion_options["motion_corr_binning"]
+                ),
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "symmetry": relion_options["symmetry"],
@@ -2041,7 +2050,10 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     angpix=float(message["pixel_size_on_image"]) * 1e10,
                     dose_per_frame=message["dose_per_frame"],
                     gain_ref=(
-                        str(machine_config.rsync_basepath / message["gain_ref"])
+                        str(
+                            (machine_config.rsync_basepath or Path("")).resolve()
+                            / message["gain_ref"]
+                        )
                         if message["gain_ref"] and machine_config.data_transfer_enabled
                         else message["gain_ref"]
                     ),

@@ -55,7 +55,6 @@ class MultigridDirWatcher(Observer):
         self.notify(
             directory,
             extra_directory=extra_directory,
-            include_mid_path=False,
             analyse=self._analyse,
             limited=True,
             tag="metadata",
@@ -71,7 +70,6 @@ class MultigridDirWatcher(Observer):
                 # This allows you to avoid triggering processing again if Murfey is restarted
                 self.notify(
                     d02,
-                    include_mid_path=False,
                     remove_files=True,
                     analyse=(
                         not (first_loop and self._skip_existing_processing)
@@ -90,7 +88,6 @@ class MultigridDirWatcher(Observer):
             ):
                 self.notify(
                     directory,
-                    include_mid_path=False,
                     analyse=(
                         not (first_loop and self._skip_existing_processing)
                         if self._analyse
@@ -108,7 +105,6 @@ class MultigridDirWatcher(Observer):
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(
                             d,
-                            include_mid_path=False,
                             use_suggested_path=False,
                             analyse=(
                                 (

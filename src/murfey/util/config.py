@@ -30,31 +30,38 @@ class MachineConfig(BaseModel):  # type: ignore
     # General info --------------------------------------------------------------------
     display_name: str = ""
     instrument_name: str = ""
+    instrument_type: str = ""  # For use with hierarchical config files
     image_path: Optional[Path] = None
     machine_override: str = ""
 
     # Hardware and software -----------------------------------------------------------
     camera: str = "FALCON"
     superres: bool = False
-    calibrations: dict[str, Any]
-    acquisition_software: list[str]
+    calibrations: dict[str, Any] = {}
+    acquisition_software: list[str] = []
     software_versions: dict[str, str] = {}
     software_settings_output_directories: dict[str, list[str]] = {}
     data_required_substrings: dict[str, dict[str, list[str]]] = {}
 
     # Client side directory setup -----------------------------------------------------
-    data_directories: list[Path]
+    data_directories: list[Path] = []
     create_directories: list[str] = ["atlas"]
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
 
     # Data transfer setup -------------------------------------------------------------
-    # Rsync setup
+    # General setup
     data_transfer_enabled: bool = True
+    substrings_blacklist: dict[str, list[str]] = {
+        "directories": [],
+        "files": [],
+    }
+
+    # Rsync setup
     rsync_url: str = ""
     rsync_module: str = ""
-    rsync_basepath: Path
+    rsync_basepath: Optional[Path] = None
     allow_removal: bool = False
 
     # Upstream data download setup
@@ -82,7 +89,7 @@ class MachineConfig(BaseModel):  # type: ignore
     }
 
     # Particle picking setup
-    default_model: Path
+    default_model: Optional[Path] = None
     picking_model_search_directory: str = "processing"
     initial_model_search_directory: str = "processing/initial_model"
 
@@ -143,14 +150,77 @@ class MachineConfig(BaseModel):  # type: ignore
         return v
 
 
-def from_file(config_file_path: Path, instrument: str = "") -> dict[str, MachineConfig]:
+@lru_cache(maxsize=1)
+def machine_config_from_file(
+    config_file_path: Path,
+    instrument_name: str,
+) -> dict[str, MachineConfig]:
+    """
+    Loads the machine config YAML file and constructs instrument-specific configs from
+    a hierarchical set of dictionary key-value pairs. It will populate the keys listed
+    in the general dictionary, then update the keys specified in the shared instrument
+    dictionary, before finally updating the keys for that specific instrument.
+    """
+
+    def _recursive_update(base: dict[str, Any], new: dict[str, Any]):
+        """
+        Helper function to recursively update nested dictionaries.
+
+        If the old and new values are both dicts, it will add the new keys and values
+        to the existing dictionary recursively without overwriting entries.
+
+        If the old and new values are both lists, it will extend the existing list.
+        For all other values, it will overwrite the existing value with the new one.
+        """
+        for key, value in new.items():
+            # If new values are dicts and dict values already exist, do recursive update
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                base[key] = _recursive_update(base[key], value)
+            # If new values are lists and a list already exists, extend the list
+            elif (
+                key in base and isinstance(base[key], list) and isinstance(value, list)
+            ):
+                base[key].extend(value)
+            # Otherwise, overwrite/add values as normal
+            else:
+                base[key] = value
+        return base
+
+    # Load the dict from the file
     with open(config_file_path, "r") as config_stream:
-        config = yaml.safe_load(config_stream)
-    return {
-        i: MachineConfig(**config[i])
-        for i in config.keys()
-        if not instrument or i == instrument
-    }
+        master_config: dict[str, Any] = yaml.safe_load(config_stream)
+
+    # Construct requested machine configs from the YAML file
+    all_machine_configs: dict[str, MachineConfig] = {}
+    for i in sorted(master_config.keys()):
+        # Skip reserved top-level keys
+        if i in ("general", "clem", "fib", "tem"):
+            continue
+        # If instrument name is set, skip irrelevant configs
+        if instrument_name and i != instrument_name:
+            continue
+
+        # Construct instrument config hierarchically
+        config: dict[str, Any] = {}
+
+        # Populate with general values
+        general_config: dict[str, Any] = master_config.get("general", {})
+        config = _recursive_update(config, general_config)
+
+        # Populate with shared instrument values
+        instrument_config: dict[str, Any] = master_config.get(i, {})
+        instrument_shared_config: dict[str, Any] = master_config.get(
+            str(instrument_config.get("instrument_type", "")).lower(), {}
+        )
+        config = _recursive_update(config, instrument_shared_config)
+
+        # Insert instrument-specific values
+        config = _recursive_update(config, instrument_config)
+
+        # Add to master dictionary
+        all_machine_configs[i] = MachineConfig(**config)
+
+    return all_machine_configs
 
 
 class Security(BaseModel):
@@ -244,22 +314,13 @@ def get_security_config() -> Security:
 
 @lru_cache(maxsize=1)
 def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
-    machine_config = {
-        "": MachineConfig(
-            acquisition_software=[],
-            calibrations={},
-            data_directories=[],
-            rsync_basepath=Path("dls/tmp"),
-            murfey_db_credentials="",
-            default_model="/tmp/weights.h5",
-        )
-    }
+    # Create an empty machine config as a placeholder
+    machine_configs = {instrument_name: MachineConfig()}
     if settings.murfey_machine_configuration:
-        microscope = instrument_name
-        machine_config = from_file(
-            Path(settings.murfey_machine_configuration), microscope
+        machine_configs = machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
         )
-    return machine_config
+    return machine_configs
 
 
 def get_extended_machine_config(
@@ -270,6 +331,6 @@ def get_extended_machine_config(
     )
     if not machine_config:
         return None
-    model = entry_points(group="murfey.config", name=extension_name)[0].load()
+    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
     data = getattr(machine_config, extension_name, {})
     return model(**data)
