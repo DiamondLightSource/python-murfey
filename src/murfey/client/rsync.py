@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import shutil
 import subprocess
 import threading
 import time
@@ -61,6 +62,7 @@ class RSyncer(Observer):
         do_transfer: bool = True,
         remove_files: bool = False,
         required_substrings_for_removal: List[str] = [],
+        substrings_blacklist: dict[str, list[str]] = {},
         notify: bool = True,
         end_time: datetime | None = None,
     ):
@@ -68,26 +70,24 @@ class RSyncer(Observer):
         self._basepath = basepath_local.absolute()
         self._basepath_remote = basepath_remote
         self._rsync_module = rsync_module
+        self._server_url = server_url
+        self._stop_callback = stop_callback
+        self._local = local
         self._do_transfer = do_transfer
         self._remove_files = remove_files
         self._required_substrings_for_removal = required_substrings_for_removal
-        self._stop_callback = stop_callback
-        self._local = local
-        self._server_url = server_url
+        self._substrings_blacklist = substrings_blacklist
         self._notify = notify
-        self._finalised = False
         self._end_time = end_time
-        self._finalising = False
 
         self._skipped_files: List[Path] = []
 
         # Set rsync destination
-        if local:
-            self._remote = str(basepath_remote)
-        else:
-            self._remote = (
-                f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
-            )
+        self._remote = (
+            str(basepath_remote)
+            if local
+            else f"{server_url.hostname}::{self._rsync_module}/{basepath_remote}/"
+        )
         logger.debug(f"rsync destination path set to {self._remote}")
 
         # For local tests you can use something along the lines of
@@ -105,9 +105,24 @@ class RSyncer(Observer):
         )
         self._stopping = False
         self._halt_thread = False
+        self._finalising = False
+        self._finalised = False
+
+    @property
+    def status(self) -> str:
+        if self._stopping:
+            if self.thread.is_alive():
+                return "stopping"
+            else:
+                return "finished"
+        else:
+            if self.thread.is_alive():
+                return "running"
+            else:
+                return "ready"
 
     def __repr__(self) -> str:
-        return f"<RSyncer ({self._basepath} → {self._remote}) [{self.status}]"
+        return f"<RSyncer ({self._basepath} → {self._remote})>"
 
     @classmethod
     def from_rsyncer(cls, rsyncer: RSyncer, **kwargs):
@@ -133,19 +148,6 @@ class RSyncer(Observer):
             notify=kwarguments_from_rsyncer["notify"],
         )
 
-    @property
-    def status(self) -> str:
-        if self._stopping:
-            if self.thread.is_alive():
-                return "stopping"
-            else:
-                return "finished"
-        else:
-            if self.thread.is_alive():
-                return "running"
-            else:
-                return "ready"
-
     def notify(self, *args, secondary: bool = False, **kwargs) -> None:
         if self._notify:
             super().notify(*args, secondary=secondary, **kwargs)
@@ -169,7 +171,7 @@ class RSyncer(Observer):
         self.start()
 
     def stop(self):
-        logger.debug("RSync thread stop requested")
+        logger.info(f"Stopping RSync thread {self}")
         self._stopping = True
         if self.thread.is_alive():
             logger.info("Waiting for ongoing transfers to complete...")
@@ -179,7 +181,7 @@ class RSyncer(Observer):
         if self.thread.is_alive():
             self.queue.put(None)
             self.thread.join()
-        logger.debug("RSync thread successfully stopped")
+        logger.info(f"RSync thread {self} successfully stopped")
 
     def request_stop(self):
         self._stopping = True
@@ -195,18 +197,52 @@ class RSyncer(Observer):
         self._notify = False
         self._end_time = None
         self._finalising = True
+
+        # Perform recursive cleanup on current directory
+        logger.info(f"Starting file cleanup for RSync thread {self}")
+        files_to_transfer: list[Path] = []
+
+        def recursive_cleanup(dirpath: str | Path):
+            for entry in os.scandir(dirpath):
+                if entry.is_dir():
+                    # Recursively delete directories with blacklisted substrings
+                    if any(
+                        pattern in entry.name
+                        for pattern in self._substrings_blacklist.get("directories", [])
+                    ):
+                        logger.debug(f"Deleting blacklisted directory {entry.path}")
+                        shutil.rmtree(entry.path)
+                        continue
+                    # Recursively search in whitelisted ones
+                    recursive_cleanup(entry.path)
+                elif entry.is_file():
+                    # Delete blacklisted files
+                    if any(
+                        pattern in entry.name
+                        for pattern in self._substrings_blacklist.get("files", [])
+                    ):
+                        logger.debug(f"Deleting blacklisted file {entry.path}")
+                        Path(entry.path).unlink()
+                        continue
+                    # Append others for transfer
+                    files_to_transfer.append(Path(entry.path))
+
+        recursive_cleanup(self._basepath)
+        logger.debug(f"Number of files to transfer: {len(files_to_transfer)}")
+
         if thread:
             self.thread = threading.Thread(
                 name=f"RSync finalisation {self._basepath}:{self._remote}",
                 target=self._process,
                 daemon=True,
             )
-            for f in self._basepath.glob("**/*"):
+            for f in files_to_transfer:
                 self.queue.put(f)
             self.stop()
         else:
-            self._transfer(list(self._basepath.glob("**/*")))
+            self._transfer(files_to_transfer)
         self._finalised = True
+        logger.info(f"File cleanup for RSync thread {self} successfully completed")
         if callback:
             callback()
 
@@ -221,7 +257,7 @@ class RSyncer(Observer):
         self._skipped_files = []
 
     def _process(self):
-        logger.info("RSync thread starting")
+        logger.info(f"Starting main process loop for RSync thread {self}")
         files_to_transfer: list[Path]
         backoff = 0
         while not self._halt_thread:

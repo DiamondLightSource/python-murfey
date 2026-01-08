@@ -380,6 +380,9 @@ class MultigridController:
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
+                substrings_blacklist=self._machine_config.get(
+                    "substrings_blacklist", {"directories": [], "files": []}
+                ),
                 end_time=self.visit_end_time,
             )
 
