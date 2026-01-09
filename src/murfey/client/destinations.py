@@ -14,7 +14,7 @@ logger = logging.getLogger("murfey.client.destinations")
 
 
 def find_longest_data_directory(
-    match_path: Path, data_directories: list[str | Path]
+    match_path: Path, data_directories: list[str] | list[Path]
 ) -> tuple[Path | None, Path | None]:
     """
     Determine the longest path in the data_directories list

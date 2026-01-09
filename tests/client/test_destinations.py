@@ -41,15 +41,16 @@ def test_find_longest_data_directory(
 ):
     # Unpack test params
     match_path, use_path, (expected_base_dir, expected_mid_dir) = test_params
-    data_directories: list[str | Path] = [
-        Path(dd) if use_path else dd
-        for dd in (
-            "X:",
-            "X:/DATA",
-            "X:/DoseFractions",
-            "X:/DoseFractions/DATA",
-        )
+
+    # Construct data directories using strings or Paths as needed
+    data_directories: list[str] | list[Path] = [
+        "X:",
+        "X:/DATA",
+        "X:/DoseFractions",
+        "X:/DoseFractions/DATA",
     ]
+    if use_path:
+        data_directories = [Path(dd) for dd in data_directories]
     # Patch Pathlib's 'absolute()' function, since we are simulating Windows on Linux
     mocker.patch("murfey.client.destinations.Path.absolute", lambda self: self)
 
