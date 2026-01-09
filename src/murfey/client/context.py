@@ -20,7 +20,6 @@ def _atlas_destination(
         str(environment.url.geturl()),
         token,
         instrument_name=environment.instrument_name,
-        demo=environment.demo,
     )
     for i, destination_part in enumerate(
         Path(environment.default_destinations[source]).parts
