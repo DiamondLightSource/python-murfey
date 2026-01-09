@@ -60,7 +60,6 @@ def test_find_longest_data_directory(
     )
     assert base_dir == Path(expected_base_dir)
     assert mid_dir == Path(expected_mid_dir)
-    pass
 
 
 source_list = [
