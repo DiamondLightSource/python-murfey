@@ -52,9 +52,7 @@ def read_config() -> configparser.ConfigParser:
 
 
 @lru_cache(maxsize=1)
-def get_machine_config_client(
-    url: str, token: str, instrument_name: str = "", demo: bool = False
-) -> dict:
+def get_machine_config_client(url: str, token: str, instrument_name: str = "") -> dict:
     _instrument_name: Optional[str] = instrument_name or os.getenv("BEAMLINE")
     if not _instrument_name:
         return {}

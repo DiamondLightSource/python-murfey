@@ -37,7 +37,6 @@ class MultigridController:
     murfey_url: str = "http://localhost:8000"
     rsync_url: str = ""
     rsync_module: str = "data"
-    demo: bool = False
     finalising: bool = False
     dormant: bool = False
     multigrid_watcher_active: bool = True
@@ -68,7 +67,6 @@ class MultigridController:
             client_id=0,
             murfey_session=self.session_id,
             software_versions=machine_data.get("software_versions", {}),
-            demo=self.demo,
             visit=self.visit,
             dose_per_frame=self.data_collection_parameters.get("dose_per_frame"),
             gain_ref=self.data_collection_parameters.get("gain_ref"),
@@ -80,7 +78,6 @@ class MultigridController:
             str(self._environment.url.geturl()),
             self.token,
             instrument_name=self._environment.instrument_name,
-            demo=self._environment.demo,
         )
         self._data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         self._data_substrings = [
@@ -430,7 +427,7 @@ class MultigridController:
                     "source": str(source),
                     "destination": destination,
                     "session_id": self.session_id,
-                    "transferring": self.do_transfer or self._environment.demo,
+                    "transferring": self.do_transfer,
                     "tag": tag,
                 }
                 capture_post(

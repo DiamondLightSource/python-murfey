@@ -40,7 +40,6 @@ class MurfeyInstanceEnvironment(BaseModel):
     default_destinations: Dict[Path, str] = {}
     destination_registry: Dict[str, str] = {}
     watchers: Dict[Path, DirWatcher] = {}
-    demo: bool = False
     movies: Dict[Path, MovieTracker] = {}
     movie_tilt_pair: Dict[Path, str] = {}
     tilt_angles: Dict[str, List[List[str]]] = {}

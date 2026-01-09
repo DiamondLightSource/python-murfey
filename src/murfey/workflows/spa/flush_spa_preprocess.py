@@ -315,9 +315,7 @@ def _flush_position_analysis(
     return register_foil_hole(session_id, gs.id, foil_hole_parameters, murfey_db)
 
 
-def flush_spa_preprocess(
-    message: dict, murfey_db: Session, demo: bool = False
-) -> dict[str, bool]:
+def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
     session_id = message["session_id"]
     stashed_files = murfey_db.exec(
         select(PreprocessStash)

@@ -12,7 +12,6 @@ from murfey.server.feedback import (
     _flush_class2d,
     _pj_id,
     _register_class_selection,
-    _register_incomplete_2d_batch,
 )
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
@@ -34,9 +33,7 @@ from murfey.util.processing_params import default_spa_parameters
 logger = getLogger("murfey.workflows.spa.picking")
 
 
-def _register_picked_particles_use_diameter(
-    message: dict, _db: Session, demo: bool = False
-):
+def _register_picked_particles_use_diameter(message: dict, _db: Session):
     """Received picked particles from the autopick service"""
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
@@ -86,7 +83,7 @@ def _register_picked_particles_use_diameter(
         particle_diameter = relion_params.particle_diameter
 
         if feedback_params.picker_ispyb_id is None:
-            if demo or not _transport_object:
+            if not _transport_object:
                 feedback_params.picker_ispyb_id = 1000
             else:
                 assert feedback_params.picker_murfey_id is not None
@@ -107,7 +104,6 @@ def _register_picked_particles_use_diameter(
                         "class_selection_score": s.class_selection_score or 0,
                     },
                     _db=_db,
-                    demo=demo,
                 )
                 _db.delete(s)
                 _db.commit()
@@ -202,20 +198,6 @@ def _register_picked_particles_use_diameter(
                 )
                 _transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
-                )
-            if demo:
-                _register_incomplete_2d_batch(
-                    {
-                        "session_id": message["session_id"],
-                        "program_id": message["program_id"],
-                        "class2d_message": {
-                            "particles_file": "Select/job009/particles_split_1.star",
-                            "class2d_dir": "Class2D",
-                            "batch_size": 50000,
-                        },
-                    },
-                    _db=_db,
-                    demo=demo,
                 )
 
     else:

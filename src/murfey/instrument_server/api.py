@@ -173,7 +173,6 @@ def setup_multigrid_watcher(
         watcher_spec.instrument_name,
         session_id,
         murfey_url=_get_murfey_url(),
-        demo=True,
         do_transfer=True,
         processing_enabled=not watcher_spec.skip_existing_processing,
         _machine_config=machine_config,
