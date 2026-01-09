@@ -17,22 +17,22 @@ from murfey.client.destinations import (
         (
             "X:/cm12345-6/Supervisor/Images-Disc1/file",
             True,
-            ("X:/", "Supervisor/Images-Disc1"),
+            ("X:/", "cm12345-6/Supervisor/Images-Disc1"),
         ),
         (
             "X:/DATA/cm12345-6/Supervisor/Images-Disc1/file",
             False,
-            ("X:/DATA", "Supervisor/Images-Disc1"),
+            ("X:/DATA", "cm12345-6/Supervisor/Images-Disc1"),
         ),
         (
             "X:/DoseFractions/cm12345-6/Supervisor/Images-Disc1/file",
             True,
-            ("X:/DoseFractions", "Supervisor/Images-Disc1"),
+            ("X:/DoseFractions", "cm12345-6/Supervisor/Images-Disc1"),
         ),
         (
             "X:/DoseFractions/DATA/cm12345-6/Supervisor/Images-Disc1/file",
             False,
-            ("X:/DoseFractions/DATA", "Supervisor/Images-Disc1"),
+            ("X:/DoseFractions/DATA", "cm12345-6/Supervisor/Images-Disc1"),
         ),
     ),
 )

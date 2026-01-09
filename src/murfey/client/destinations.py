@@ -28,14 +28,7 @@ def find_longest_data_directory(
             len(base_dir.parts) if base_dir else 0
         ):
             base_dir = dd_base
-            # Extract the path parts from immediately after the visit directory
-            mid_dir = Path(
-                "/".join(
-                    list(
-                        match_path.absolute().relative_to(Path(base_dir)).parent.parts
-                    )[1:]
-                )
-            )
+            mid_dir = match_path.absolute().relative_to(Path(base_dir)).parent
     return base_dir, mid_dir
 
 
