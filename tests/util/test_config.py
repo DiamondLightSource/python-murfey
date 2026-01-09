@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -133,10 +134,22 @@ def mock_instrument_config():
 
 
 @pytest.fixture
+def mock_second_instrument_config(mock_instrument_config: dict[str, Any]):
+    """Test the case of recursive dictionaries which are present
+    in both the general and instrument configs"""
+    second_instrument_config = copy.deepcopy(mock_instrument_config)
+    second_instrument_config.update(
+        {"pkg_1": {"file_path": "/path/to/pkg_1/file_2.txt"}}
+    )
+    return second_instrument_config
+
+
+@pytest.fixture
 def mock_hierarchical_machine_config_yaml(
     mock_general_config: dict[str, Any],
     mock_tem_shared_config: dict[str, Any],
     mock_instrument_config: dict[str, Any],
+    mock_second_instrument_config: dict[str, Any],
     tmp_path: Path,
 ):
     # Create machine config (with all currently supported keys) for the instrument
@@ -144,7 +157,7 @@ def mock_hierarchical_machine_config_yaml(
         "general": mock_general_config,
         "tem": mock_tem_shared_config,
         "m01": mock_instrument_config,
-        "m02": mock_instrument_config,
+        "m02": mock_second_instrument_config,
     }
     config_file = tmp_path / "config" / "murfey-machine-config-hierarchical.yaml"
     config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -210,6 +223,7 @@ def test_get_machine_config(
     mock_general_config: dict[str, Any],
     mock_tem_shared_config: dict[str, Any],
     mock_instrument_config: dict[str, Any],
+    mock_second_instrument_config: dict[str, Any],
     mock_hierarchical_machine_config_yaml: Path,
     mock_standard_machine_config_yaml: Path,
     test_params: tuple[str, list[str]],
@@ -353,14 +367,26 @@ def test_get_machine_config(
                 == mock_instrument_config["node_creator_queue"]
             )
             # Extra keys
-            assert config[i].pkg_1 == {
-                "file_path": "/path/to/pkg_1/file.txt",
-                "command": [
-                    "/path/to/executable",
-                    "--some_arg",
-                    "-a",
-                    "./path/to/file",
-                ],
-                "step_size": 100,
-            }
+            if config_to_test == "standard" or i == "m01":
+                assert config[i].pkg_1 == {
+                    "file_path": "/path/to/pkg_1/file.txt",
+                    "command": [
+                        "/path/to/executable",
+                        "--some_arg",
+                        "-a",
+                        "./path/to/file",
+                    ],
+                    "step_size": 100,
+                }
+            elif i == "m02":
+                assert config[i].pkg_1 == {
+                    "file_path": "/path/to/pkg_1/file_2.txt",
+                    "command": [
+                        "/path/to/executable",
+                        "--some_arg",
+                        "-a",
+                        "./path/to/file",
+                    ],
+                    "step_size": 100,
+                }
             assert config[i].pkg_2 == mock_general_config["pkg_2"]
