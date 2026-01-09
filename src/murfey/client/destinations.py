@@ -14,20 +14,29 @@ logger = logging.getLogger("murfey.client.destinations")
 
 
 def find_longest_data_directory(
-    match_path: Path, data_directories: list[str] | list[Path]
+    match_path: Path, data_directories: list[str | Path]
 ) -> tuple[Path | None, Path | None]:
     """
     Determine the longest path in the data_directories list
     which the match path is relative to
     """
-    base_dir: Path | str = ""
+    base_dir: Path | None = None
     mid_dir: Path | None = None
     for dd in data_directories:
-        dd_base = str(Path(dd).absolute())
-        if str(match_path).startswith(str(dd)) and len(dd_base) > len(str(base_dir)):
-            base_dir = Path(dd_base)
-            mid_dir = match_path.absolute().relative_to(Path(base_dir)).parent
-    return Path(base_dir) if base_dir else None, mid_dir
+        dd_base = Path(dd).absolute()
+        if match_path.absolute().is_relative_to(dd_base) and len(dd_base.parts) > (
+            len(base_dir.parts) if base_dir else 0
+        ):
+            base_dir = dd_base
+            # Extract the path parts from immediately after the visit directory
+            mid_dir = Path(
+                "/".join(
+                    list(
+                        match_path.absolute().relative_to(Path(base_dir)).parent.parts
+                    )[1:]
+                )
+            )
+    return base_dir, mid_dir
 
 
 def determine_default_destination(
