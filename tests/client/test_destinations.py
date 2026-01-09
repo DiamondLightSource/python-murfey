@@ -2,8 +2,65 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from pytest_mock import MockerFixture
 
-from murfey.client.destinations import determine_default_destination
+from murfey.client.destinations import (
+    determine_default_destination,
+    find_longest_data_directory,
+)
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # File to match | Use Path? | Expected result
+        (
+            "X:/cm12345-6/Supervisor/Images-Disc1/file",
+            True,
+            ("X:/", "Supervisor/Images-Disc1"),
+        ),
+        (
+            "X:/DATA/cm12345-6/Supervisor/Images-Disc1/file",
+            False,
+            ("X:/DATA", "Supervisor/Images-Disc1"),
+        ),
+        (
+            "X:/DoseFractions/cm12345-6/Supervisor/Images-Disc1/file",
+            True,
+            ("X:/DoseFractions", "Supervisor/Images-Disc1"),
+        ),
+        (
+            "X:/DoseFractions/DATA/cm12345-6/Supervisor/Images-Disc1/file",
+            False,
+            ("X:/DoseFractions/DATA", "Supervisor/Images-Disc1"),
+        ),
+    ),
+)
+def test_find_longest_data_directory(
+    mocker: MockerFixture, test_params: tuple[str, bool, tuple[str, str]]
+):
+    # Unpack test params
+    match_path, use_path, (expected_base_dir, expected_mid_dir) = test_params
+    data_directories: list[str | Path] = [
+        Path(dd) if use_path else dd
+        for dd in (
+            "X:",
+            "X:/DATA",
+            "X:/DoseFractions",
+            "X:/DoseFractions/DATA",
+        )
+    ]
+    # Patch Pathlib's 'absolute()' function, since we are simulating Windows on Linux
+    mocker.patch("murfey.client.destinations.Path.absolute", lambda self: self)
+
+    base_dir, mid_dir = find_longest_data_directory(
+        Path(match_path),
+        data_directories,
+    )
+    assert base_dir == Path(expected_base_dir)
+    assert mid_dir == Path(expected_mid_dir)
+    pass
+
 
 source_list = [
     ["X:/DoseFractions/cm12345-6/Supervisor", "Supervisor", True, "extra_name"],
