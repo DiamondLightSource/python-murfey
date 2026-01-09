@@ -72,6 +72,56 @@ def test_determine_default_destinations_suggested_path(mock_post, mock_get, sour
 
 
 @mock.patch("murfey.client.destinations.capture_get")
+@mock.patch("murfey.client.destinations.capture_post")
+def test_determine_default_destinations_short_path(mock_post, mock_get):
+    """Test for the case where the data directory is a drive"""
+    mock_environment = mock.Mock()
+    mock_environment.murfey_session = 2
+    mock_environment.instrument_name = "m01"
+    mock_environment.destination_registry = {}
+
+    mock_get().json.return_value = {"data_directories": ["X:/"]}
+    mock_post().json.return_value = {"suggested_path": "/base_path/2025/cm12345-6/raw"}
+
+    destination = determine_default_destination(
+        visit="cm12345-6",
+        source=Path("X:/cm12345-6/Supervisor"),
+        destination="2025",
+        environment=mock_environment,
+        token="token",
+        touch=True,
+        extra_directory="",
+        use_suggested_path=True,
+    )
+    mock_get.assert_any_call(
+        base_url=str(mock_environment.url.geturl()),
+        router_name="session_control.router",
+        function_name="machine_info_by_instrument",
+        token="token",
+        instrument_name="m01",
+    )
+    mock_post.assert_any_call(
+        base_url=str(mock_environment.url.geturl()),
+        router_name="file_io_instrument.router",
+        function_name="suggest_path",
+        token="token",
+        visit_name="cm12345-6",
+        session_id=2,
+        data={
+            "base_path": "2025/cm12345-6/raw",
+            "touch": True,
+            "extra_directory": "",
+        },
+    )
+
+    assert destination == "/base_path/2025/cm12345-6/raw/"
+    assert (
+        mock_environment.destination_registry.get("Supervisor")
+        == "/base_path/2025/cm12345-6/raw"
+    )
+
+
+@mock.patch("murfey.client.destinations.capture_get")
 @pytest.mark.parametrize("sources", source_list)
 def test_determine_default_destinations_skip_suggested(mock_get, sources):
     mock_environment = mock.Mock()
