@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 from threading import Thread
 from typing import Literal
 
@@ -106,10 +105,6 @@ def run():
         "--workers", help="Number of workers for Uvicorn server", type=int, default=2
     )
     parser.add_argument(
-        "--demo",
-        action="store_true",
-    )
-    parser.add_argument(
         "--feedback",
         action="store_true",
     )
@@ -154,22 +149,16 @@ def run():
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
-    if args.demo:
-        # Run in demo mode with no connections set up
-        os.environ["MURFEY_DEMO"] = "1"
-    else:
-        # Load RabbitMQ configuration and set up the connection
-        try:
-            PikaTransport().load_configuration_file(
-                security_config.rabbitmq_credentials
-            )
-            _set_up_transport("PikaTransport")
-            logger.info("Set up message transport manager")
-        except WorkflowsError:
-            logger.error(
-                "Error encountered setting up RabbitMQ connection",
-                exc_info=True,
-            )
+    # Load RabbitMQ configuration and set up the connection
+    try:
+        PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+        _set_up_transport("PikaTransport")
+        logger.info("Set up message transport manager")
+    except WorkflowsError:
+        logger.error(
+            "Error encountered setting up RabbitMQ connection",
+            exc_info=True,
+        )
 
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)

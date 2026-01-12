@@ -28,7 +28,6 @@ def _file_transferred_to(
         str(environment.url.geturl()),
         token,
         instrument_name=environment.instrument_name,
-        demo=environment.demo,
     )
 
     # Construct destination path

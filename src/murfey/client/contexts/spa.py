@@ -33,7 +33,6 @@ def _file_transferred_to(
         str(environment.url.geturl()),
         token,
         instrument_name=environment.instrument_name,
-        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (
@@ -453,7 +452,6 @@ class SPAModularContext(Context):
                             str(environment.url.geturl()),
                             self._token,
                             instrument_name=environment.instrument_name,
-                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}

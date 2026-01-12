@@ -65,7 +65,6 @@ class Analyser(Observer):
                 str(environment.url.geturl()),
                 self._token,
                 instrument_name=environment.instrument_name,
-                demo=environment.demo,
             )
             if environment
             else {}
