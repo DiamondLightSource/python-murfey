@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -136,11 +137,40 @@ def get_foil_hole(session_id: int, fh_name: int, db) -> Dict[str, int]:
     return {f[1].tag: f[0].id for f in foil_holes}
 
 
-def find_upstream_visits(session_id: int, db: SQLModelSession):
+def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 2):
     """
     Returns a nested dictionary, in which visits and the full paths to their directories
     are further grouped by instrument name.
     """
+
+    def _recursive_search(
+        dirpath: str | Path,
+        search_string: str,
+        partial_match=True,
+        max_depth: int = 1,
+    ):
+        # Stop recursing for this route once max depth hits 0
+        if max_depth == 0:
+            return
+        for entry in os.scandir(dirpath):
+            if entry.is_dir():
+                # Update dictionary with match and stop recursing for this route
+                if (
+                    search_string in entry.name
+                    if partial_match
+                    else search_string == entry.name
+                ):
+                    current_upstream_visits[entry.name] = Path(entry.path)
+                else:
+                    # Continue searching down this route until max depth is reached
+                    _recursive_search(
+                        dirpath=entry.path,
+                        search_string=search_string,
+                        partial_match=partial_match,
+                        max_depth=max_depth - 1,
+                    )
+            continue
+
     murfey_session = db.exec(
         select(MurfeySession).where(MurfeySession.id == session_id)
     ).one()
@@ -155,11 +185,14 @@ def find_upstream_visits(session_id: int, db: SQLModelSession):
         upstream_instrument,
         upstream_data_dir,
     ) in machine_config.upstream_data_directories.items():
-        # Looks for visit name in file path
-        current_upstream_visits = {}
-        for visit_path in Path(upstream_data_dir).glob(f"{visit_name.split('-')[0]}-*"):
-            if visit_path.is_dir():
-                current_upstream_visits[visit_path.name] = visit_path
+        # Recursively look for matching visit names under current directory
+        current_upstream_visits: dict[str, Path] = {}
+        _recursive_search(
+            dirpath=upstream_data_dir,
+            search_string=f"{visit_name.split('-')[0]}-",
+            partial_match=True,
+            max_depth=max_depth,
+        )
         upstream_visits[upstream_instrument] = current_upstream_visits
     return upstream_visits
 
