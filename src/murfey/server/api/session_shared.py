@@ -146,12 +146,19 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
     def _recursive_search(
         dirpath: str | Path,
         search_string: str,
-        partial_match=True,
+        partial_match: bool = True,
         max_depth: int = 1,
+        result: dict[str, Path] = {},
     ):
+        # Start a new dictionary object if none were provided
+        # This if-block prevents in-place memory modification on subsequent loops
+        if not result:
+            result = {}
         # Stop recursing for this route once max depth hits 0
         if max_depth == 0:
-            return
+            return result
+
+        # Walk through the directories
         for entry in os.scandir(dirpath):
             if entry.is_dir():
                 # Update dictionary with match and stop recursing for this route
@@ -160,16 +167,17 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
                     if partial_match
                     else search_string == entry.name
                 ):
-                    current_upstream_visits[entry.name] = Path(entry.path)
+                    result[entry.name] = Path(entry.path)
                 else:
                     # Continue searching down this route until max depth is reached
-                    _recursive_search(
+                    result = _recursive_search(
                         dirpath=entry.path,
                         search_string=search_string,
                         partial_match=partial_match,
                         max_depth=max_depth - 1,
+                        result=result,
                     )
-            continue
+        return result
 
     murfey_session = db.exec(
         select(MurfeySession).where(MurfeySession.id == session_id)
@@ -186,14 +194,12 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
         upstream_data_dir,
     ) in machine_config.upstream_data_directories.items():
         # Recursively look for matching visit names under current directory
-        current_upstream_visits: dict[str, Path] = {}
-        _recursive_search(
+        upstream_visits[upstream_instrument] = _recursive_search(
             dirpath=upstream_data_dir,
             search_string=f"{visit_name.split('-')[0]}-",
             partial_match=True,
             max_depth=max_depth,
         )
-        upstream_visits[upstream_instrument] = current_upstream_visits
     return upstream_visits
 
 
