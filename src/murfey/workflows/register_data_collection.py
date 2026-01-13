@@ -1,4 +1,5 @@
 import logging
+import time
 
 import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
@@ -39,6 +40,7 @@ def run(
         dcgid = dcg[0].id
         # flush_data_collections(message["source"], murfey_db)
     else:
+        time.sleep(2)
         logger.warning(
             "No data collection group ID was found for image directory "
             f"{sanitise(message['image_directory'])} and source "
@@ -84,6 +86,14 @@ def run(
                     else ""
                 ),
             ).get("return_value", None)
+            if dcid is None:
+                time.sleep(2)
+                logger.error(
+                    "Failed to register the following data collection: \n"
+                    f"{message} \n"
+                    "Requeueing message"
+                )
+                return {"success": False, "requeue": True}
             murfey_dc = MurfeyDB.DataCollection(
                 id=dcid,
                 tag=message.get("tag"),
@@ -91,14 +101,5 @@ def run(
             )
         murfey_db.add(murfey_dc)
         murfey_db.commit()
-        dcid = murfey_dc.id
         murfey_db.close()
-
-    if dcid is None:
-        logger.error(
-            "Failed to register the following data collection: \n"
-            f"{message} \n"
-            "Requeueing message"
-        )
-        return {"success": False, "requeue": True}
     return {"success": True}
