@@ -77,10 +77,10 @@ def test_run(
     else:
         if ispyb_session_id is not None:
             mock_transport_object.do_insert_data_collection_group.assert_called_once()
-            mock_transport_object.do_insert_atlas.assert_called_once()
             if insert_dcg is not None:
+                mock_transport_object.do_insert_atlas.assert_called_once()
                 assert result == {"success": True}
             else:
                 assert result == {"success": False, "requeue": True}
         else:
-            assert result == {"success": False, "requeue": True}
+            assert result == {"success": True}

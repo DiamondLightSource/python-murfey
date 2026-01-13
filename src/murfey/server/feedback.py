@@ -2160,7 +2160,7 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 murfey_db=_db,
             )
             if murfey.server._transport_object:
-                if result.get("success", False):
+                if result.get("success"):
                     murfey.server._transport_object.transport.ack(header)
                 else:
                     # Send it directly to DLQ without trying to rerun it

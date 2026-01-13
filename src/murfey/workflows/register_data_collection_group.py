@@ -52,6 +52,15 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 "return_value", None
             )
 
+            if dcgid is None:
+                time.sleep(2)
+                logger.error(
+                    "Failed to register the following data collection group: \n"
+                    f"{message} \n"
+                    "Requeuing message"
+                )
+                return {"success": False, "requeue": True}
+
             atlas_record = ISPyBDB.Atlas(
                 dataCollectionGroupId=dcgid,
                 atlasImage=message.get("atlas", ""),
@@ -74,15 +83,6 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
         murfey_db.add(murfey_dcg)
         murfey_db.commit()
         murfey_db.close()
-
-    if dcgid is None:
-        time.sleep(2)
-        logger.error(
-            "Failed to register the following data collection group: \n"
-            f"{message} \n"
-            "Requeuing message"
-        )
-        return {"success": False, "requeue": True}
 
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
