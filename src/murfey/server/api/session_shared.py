@@ -148,11 +148,10 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
         search_string: str,
         partial_match: bool = True,
         max_depth: int = 1,
-        result: dict[str, Path] = {},
+        result: dict[str, Path] | None = None,
     ):
-        # Start a new dictionary object if none were provided
-        # This if-block prevents in-place memory modification on subsequent loops
-        if not result:
+        # If no dictionary was passed in, create a new dictionary
+        if result is None:
             result = {}
         # Stop recursing for this route once max depth hits 0
         if max_depth == 0:
@@ -167,7 +166,8 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
                     if partial_match
                     else search_string == entry.name
                 ):
-                    result[entry.name] = Path(entry.path)
+                    if result is not None:  # MyPy needs this 'is not None' check
+                        result[entry.name] = Path(entry.path)
                 else:
                     # Continue searching down this route until max depth is reached
                     result = _recursive_search(
