@@ -1428,6 +1428,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
             p.parent.mkdir(parents=True)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
+            data_collection_id=detached_ids[1],
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
