@@ -9,10 +9,11 @@ from murfey.util.config import MachineConfig
 from tests.conftest import ExampleVisit
 
 
+@pytest.mark.parametrize("recurse", (True, False))
 def test_find_upstream_visits(
     mocker: MockerFixture,
     tmp_path: Path,
-    # murfey_db_session,
+    recurse: bool,
 ):
     # Get the visit, instrument name, and session ID
     visit_name_root = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}"
@@ -40,7 +41,10 @@ def test_find_upstream_visits(
             # Only directories should be picked up
             upstream_visit.mkdir(parents=True, exist_ok=True)
             upstream_visits[upstream_instrument] = {upstream_visit.stem: upstream_visit}
-            upstream_data_dirs[upstream_instrument] = upstream_visit.parent
+            # Check that the function can cope with recursive searching
+            upstream_data_dirs[upstream_instrument] = (
+                upstream_visit.parent.parent if recurse else upstream_visit.parent
+            )
         else:
             upstream_visit.parent.mkdir(parents=True, exist_ok=True)
             upstream_visit.touch(exist_ok=True)

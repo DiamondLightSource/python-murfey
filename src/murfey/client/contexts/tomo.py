@@ -191,7 +191,6 @@ class TomographyContext(Context):
             str(environment.url.geturl()),
             self._token,
             instrument_name=environment.instrument_name,
-            demo=environment.demo,
         )
         if environment.visit in environment.default_destinations[source]:
             return (
@@ -465,7 +464,6 @@ class TomographyContext(Context):
                             str(environment.url.geturl()),
                             self._token,
                             instrument_name=environment.instrument_name,
-                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}

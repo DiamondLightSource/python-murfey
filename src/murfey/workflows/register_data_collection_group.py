@@ -13,9 +13,7 @@ from murfey.server.ispyb import ISPyBSession, get_session_id
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 
-def run(
-    message: dict, murfey_db: SQLModelSession, demo: bool = False
-) -> dict[str, bool]:
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if no transport wrapper is found
     if _transport_object is None:
         logger.error("Unable to find transport manager")
@@ -54,6 +52,15 @@ def run(
                 "return_value", None
             )
 
+            if dcgid is None:
+                time.sleep(2)
+                logger.error(
+                    "Failed to register the following data collection group: \n"
+                    f"{message} \n"
+                    "Requeuing message"
+                )
+                return {"success": False, "requeue": True}
+
             atlas_record = ISPyBDB.Atlas(
                 dataCollectionGroupId=dcgid,
                 atlasImage=message.get("atlas", ""),
@@ -76,15 +83,6 @@ def run(
         murfey_db.add(murfey_dcg)
         murfey_db.commit()
         murfey_db.close()
-
-    if dcgid is None:
-        time.sleep(2)
-        logger.error(
-            "Failed to register the following data collection group: \n"
-            f"{message} \n"
-            "Requeuing message"
-        )
-        return {"success": False, "requeue": True}
 
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:

@@ -104,6 +104,6 @@ def test_run(
                 else:
                     assert result == {"success": False, "requeue": True}
             else:
-                assert result == {"success": False, "requeue": True}
+                assert result == {"success": True}
     else:
         assert result == {"success": False, "requeue": True}

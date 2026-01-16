@@ -99,6 +99,6 @@ def test_run(
                     assert result == {"success": False, "requeue": True}
             else:
                 mock_transport_object.do_insert_data_collection.assert_not_called()
-                assert result == {"success": False, "requeue": True}
+                assert result == {"success": True}
         else:
             assert result == {"success": True}

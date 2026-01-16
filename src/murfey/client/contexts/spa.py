@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, Optional, OrderedDict, Tuple
+from typing import Any, Optional, OrderedDict
 
 import xmltodict
 
@@ -33,7 +33,6 @@ def _file_transferred_to(
         str(environment.url.geturl()),
         token,
         instrument_name=environment.instrument_name,
-        demo=environment.demo,
     )
     if environment.visit in environment.default_destinations[source]:
         return (
@@ -50,10 +49,10 @@ def _file_transferred_to(
 
 
 def _grid_square_metadata_file(
-    f: Path, data_directories: List[Path], visit: str, grid_square: int
+    f: Path, data_directories: list[Path], visit: str, grid_square: int
 ) -> Path:
     base_dir, mid_dir = find_longest_data_directory(f, data_directories)
-    if not base_dir:
+    if not base_dir or not mid_dir:
         raise ValueError(f"Could not determine grid square metadata path for {f}")
     metadata_file = (
         base_dir
@@ -113,7 +112,7 @@ class SPAModularContext(Context):
         super().__init__("SPA", acquisition_software, token)
         self._basepath = basepath
         self._processing_job_stash: dict = {}
-        self._foil_holes: Dict[int, List[int]] = {}
+        self._foil_holes: dict[int, list[int]] = {}
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
@@ -287,7 +286,7 @@ class SPAModularContext(Context):
             and self._foil_holes.get(grid_square) is None
         ):
             self._foil_holes[grid_square] = []
-            gs_pix_position: Tuple[
+            gs_pix_position: tuple[
                 Optional[int],
                 Optional[int],
                 Optional[float],
@@ -453,7 +452,6 @@ class SPAModularContext(Context):
                             str(environment.url.geturl()),
                             self._token,
                             instrument_name=environment.instrument_name,
-                            demo=environment.demo,
                         )
                     else:
                         machine_config = {}
@@ -586,7 +584,7 @@ class SPAModularContext(Context):
         self,
         tag: str,
         environment: MurfeyInstanceEnvironment,
-        parameters: Dict[str, Any] | None = None,
+        parameters: dict[str, Any] | None = None,
     ):
         return
 
