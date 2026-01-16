@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import aiohttp
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import (
     APIKeyCookie,
     OAuth2PasswordBearer,
@@ -84,18 +84,16 @@ def check_user(username: str) -> bool:
     return username in [u.username for u in users]
 
 
-async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
+async def validate_token(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    request: Request,
+):
     """
     Used by the backend routers to validate requests coming in from frontend.
     """
     try:
         # Validate using auth URL if provided; will error if invalid
         if auth_url:
-            headers = (
-                {}
-                if security_config.auth_type == "cookie"
-                else {"Authorization": f"Bearer {token}"}
-            )
             cookies = (
                 {security_config.cookie_key: token}
                 if security_config.auth_type == "cookie"
@@ -104,7 +102,7 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
                     f"{auth_url}/validate_token",
-                    headers=headers,
+                    headers=request.headers,
                 ) as response:
                     success = response.status == 200
                     validation_outcome = await response.json()
