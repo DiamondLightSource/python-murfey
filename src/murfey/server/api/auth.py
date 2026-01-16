@@ -94,6 +94,12 @@ async def validate_token(
     try:
         # Validate using auth URL if provided; will error if invalid
         if auth_url:
+            # Extract and forward headers as-is
+            headers = dict(request.headers)
+            # Update/add authorization header if authenticating using password
+            if security_config.auth_type == "password":
+                headers["authorization"] = f"Bearer {token}"
+            # Forward the cookie along if authenticating using cookie
             cookies = (
                 {security_config.cookie_key: token}
                 if security_config.auth_type == "cookie"
@@ -102,7 +108,7 @@ async def validate_token(
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.get(
                     f"{auth_url}/validate_token",
-                    headers=request.headers,
+                    headers=headers,
                 ) as response:
                     success = response.status == 200
                     validation_outcome = await response.json()
