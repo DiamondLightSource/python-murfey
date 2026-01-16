@@ -592,7 +592,7 @@ class MultigridController:
                 metadata_source_as_str = (
                     "/".join(source.parts[:-2])
                     + f"/{self._environment.visit}/"
-                    + source.parts[-2]
+                    + "/".join(source.parts[-2:])
                 )
                 metadata_source = Path(metadata_source_as_str.replace("//", "/"))
             ensure_dcg_exists(
