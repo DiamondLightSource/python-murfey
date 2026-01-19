@@ -158,25 +158,29 @@ def find_upstream_visits(session_id: int, db: SQLModelSession, max_depth: int = 
             return result
 
         # Walk through the directories
-        for entry in os.scandir(dirpath):
-            if entry.is_dir():
-                # Update dictionary with match and stop recursing for this route
-                if (
-                    search_string in entry.name
-                    if partial_match
-                    else search_string == entry.name
-                ):
-                    if result is not None:  # MyPy needs this 'is not None' check
-                        result[entry.name] = Path(entry.path)
-                else:
-                    # Continue searching down this route until max depth is reached
-                    result = _recursive_search(
-                        dirpath=entry.path,
-                        search_string=search_string,
-                        partial_match=partial_match,
-                        max_depth=max_depth - 1,
-                        result=result,
-                    )
+        try:
+            for entry in os.scandir(dirpath):
+                if entry.is_dir():
+                    # Update dictionary with match and stop recursing for this route
+                    if (
+                        search_string in entry.name
+                        if partial_match
+                        else search_string == entry.name
+                    ):
+                        if result is not None:  # MyPy needs this 'is not None' check
+                            result[entry.name] = Path(entry.path)
+                    else:
+                        # Continue searching down this route until max depth is reached
+                        result = _recursive_search(
+                            dirpath=entry.path,
+                            search_string=search_string,
+                            partial_match=partial_match,
+                            max_depth=max_depth - 1,
+                            result=result,
+                        )
+        # Safely skip the directory if it can't access it
+        except PermissionError:
+            logger.warning(f"Unable to access {dirpath}; skipping", exc_info=True)
         return result
 
     murfey_session = db.exec(
