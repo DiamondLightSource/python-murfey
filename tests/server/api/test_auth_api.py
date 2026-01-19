@@ -1,10 +1,15 @@
 import copy
+import secrets
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import HTTPException
 from pytest_mock import MockerFixture
 
-from murfey.server.api.auth import submit_to_auth_endpoint
+from murfey.server.api.auth import (
+    submit_to_auth_endpoint,
+    validate_token,
+)
 
 
 def test_check_user():
@@ -131,9 +136,95 @@ async def test_submit_to_auth_endpoint(
     assert result == {"valid": (validation_outcome if status_code == 200 else False)}
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Exception raised? | Auth URL | Auth type | Validation outcome | User decoded | User exists
+        (False, "some_url", "cookie", True, True, True),
+        (False, "", "password", True, True, True),
+        # Auth endpoint returns False
+        (True, "some_url", "cookie", False, True, True),
+        # Authenticating with cookie, but no auth URL
+        (True, "", "cookie", True, True, True),
+        # Decoding fails
+        (True, "", "password", True, False, True),
+        # User check fails
+        (True, "", "password", True, True, False),
+    ),
+)
 @pytest.mark.asyncio
-async def test_validate_token():
-    pass
+async def test_validate_token(
+    mocker: MockerFixture,
+    test_params: tuple[bool, str, str, bool, bool, bool],
+):
+    # Unpack test params
+    (
+        raises_exception,
+        auth_url,
+        auth_type,
+        validation_outcome,
+        user_decoded,
+        user_exists,
+    ) = test_params
+
+    # Patch the auth URL to use
+    mocker.patch("murfey.server.api.auth.auth_url", auth_url)
+
+    # Create a mock token
+    mock_token = "some_token"
+
+    # Mock the request
+    mock_request = MagicMock()
+
+    # Mock the secret key and algorithms module-level variables
+    mock_secret_key = mocker.patch(
+        "murfey.server.api.auth.SECRET_KEY", secrets.token_hex(32)
+    )
+    mock_algorithms = mocker.patch("murfey.server.api.auth.ALGORITHM", "HS256")
+
+    # Mock the 'jwt.decode' function
+    mock_decoded_data = {"user": "some_user"} if user_decoded else {}
+    mock_decode = mocker.patch(
+        "murfey.server.api.auth.jwt.decode", return_value=mock_decoded_data
+    )
+
+    # Mock the 'check_user' function
+    mock_check_user = mocker.patch(
+        "murfey.server.api.auth.check_user", return_value=user_exists
+    )
+
+    # Patch the security config
+    mock_security_config = MagicMock()
+    mock_security_config.auth_type = auth_type
+    mocker.patch("murfey.server.api.auth.security_config", mock_security_config)
+
+    # Patch the 'submit_to_auth_endpoint' function
+    mock_submit = mocker.patch(
+        "murfey.server.api.auth.submit_to_auth_endpoint", new_callable=AsyncMock
+    )
+    mock_submit.return_value = {"valid": validation_outcome}
+
+    # Run the function and check that the values passed and returned are as expected
+    if not raises_exception:
+        result = await validate_token(
+            token=mock_token,
+            request=mock_request,
+        )
+        if auth_url:
+            mock_submit.assert_called_once_with(
+                "validate_token", mock_request, mock_token
+            )
+        if auth_type == "password":
+            mock_decode.assert_called_once_with(
+                mock_token, mock_secret_key, algorithms=[mock_algorithms]
+            )
+            mock_check_user.assert_called_once_with(mock_decoded_data["user"])
+        assert result is None
+    else:
+        with pytest.raises(HTTPException):
+            await validate_token(
+                token=mock_token,
+                request=mock_request,
+            )
 
 
 def test_validate_session_against_visit():
