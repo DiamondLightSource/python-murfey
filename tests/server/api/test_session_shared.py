@@ -33,13 +33,14 @@ def test_find_upstream_visits(
     upstream_data_dirs = {}
     for n in range(10):
         upstream_instrument = f"{instrument_name}{str(n).zfill(2)}"
+        # Create path to visit
         upstream_visit = (
             tmp_path / f"{upstream_instrument}/data/2020/{visit_name_root}-{n}"
         )
         # Create some as directories, and some as files
         if n % 2:
             # Only directories should be picked up
-            (upstream_visit / "images" / "grid_1").mkdir(parents=True, exist_ok=True)
+            upstream_visit.mkdir(parents=True, exist_ok=True)
             upstream_visits[upstream_instrument] = {upstream_visit.stem: upstream_visit}
             # Check that the function can cope with recursive searching
             upstream_data_dirs[upstream_instrument] = (
@@ -48,6 +49,14 @@ def test_find_upstream_visits(
         else:
             upstream_visit.parent.mkdir(parents=True, exist_ok=True)
             upstream_visit.touch(exist_ok=True)
+
+        # Create junk directories with multiple levels to test recursion logic with
+        junk_directories = [
+            tmp_path / f"{upstream_instrument}/data/junk/directory/number/{n}"
+            for n in range(5)
+        ]
+        for dirpath in junk_directories:
+            dirpath.mkdir(parents=True, exist_ok=True)
 
     # Mock the MachineConfig for this instrument
     mock_machine_config = MagicMock(spec=MachineConfig)
