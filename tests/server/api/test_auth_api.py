@@ -5,17 +5,50 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 from pytest_mock import MockerFixture
+from sqlmodel import Session as SQLModelSession
 
 from murfey.server.api.auth import (
+    check_user,
     submit_to_auth_endpoint,
     validate_frontend_session_access,
     validate_token,
     validate_user_instrument_access,
 )
+from murfey.util.db import MurfeyUser
 
 
-def test_check_user():
-    pass
+@pytest.mark.parametrize(
+    "test_params",
+    (  # User to check | Expected result
+        ("murfey_user", True),
+        ("some_dud", False),
+    ),
+)
+def test_check_user(
+    mocker: MockerFixture,
+    murfey_db_session: SQLModelSession,
+    test_params: tuple[str, bool],
+):
+    # Unpack test params
+    user_to_check, expected_result = test_params
+
+    # Add the test user to the database
+    murfey_user = MurfeyUser(
+        username="murfey_user",
+        hashed_password="asdfghjkl",
+    )
+    murfey_db_session.add(murfey_user)
+    murfey_db_session.commit()
+
+    # Patch the Session context
+    mock_session_context = MagicMock()
+    mock_session_context.__enter__.return_value = murfey_db_session
+    mock_session_context.__exit__.return_value = None
+    mocker.patch("murfey.server.api.auth.Session", return_value=mock_session_context)
+
+    # Run the function and check that the result is as expected
+    result = check_user(user_to_check)
+    assert result == expected_result
 
 
 @pytest.mark.parametrize(
