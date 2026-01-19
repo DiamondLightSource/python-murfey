@@ -8,7 +8,9 @@ from pytest_mock import MockerFixture
 
 from murfey.server.api.auth import (
     submit_to_auth_endpoint,
+    validate_frontend_session_access,
     validate_token,
+    validate_user_instrument_access,
 )
 
 
@@ -139,8 +141,10 @@ async def test_submit_to_auth_endpoint(
 @pytest.mark.parametrize(
     "test_params",
     (  # Exception raised? | Auth URL | Auth type | Validation outcome | User decoded | User exists
+        # These cases will pass
         (False, "some_url", "cookie", True, True, True),
         (False, "", "password", True, True, True),
+        # These cases will fail
         # Auth endpoint returns False
         (True, "some_url", "cookie", False, True, True),
         # Authenticating with cookie, but no auth URL
@@ -245,14 +249,125 @@ async def test_validate_instrument_server_session_access():
     pass
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Raises exception | Auth URL | Validation outcome
+        # These cases will pass
+        (False, "some_url", True),
+        (False, "", True),
+        # These cases will fail
+        (True, "some_url", False),
+    ),
+)
 @pytest.mark.asyncio
-async def test_validate_frontend_session_access():
-    pass
+async def test_validate_frontend_session_access(
+    mocker: MockerFixture,
+    test_params: tuple[bool, str, bool],
+):
+    # Unpack the test parameters
+    raises_exception, auth_url, validation_outcome = test_params
+    session_id = 1
+
+    # Mock the request and token
+    mock_request = MagicMock()
+    mock_token = "123456"
+
+    # Mock the results of 'get_visit_name'
+    visit_name = "test_visit"
+    mock_get_visit_name = mocker.patch(
+        "murfey.server.api.auth.get_visit_name", return_value=visit_name
+    )
+
+    # Patch the auth URL
+    mocker.patch("murfey.server.api.auth.auth_url", auth_url)
+
+    # Patch the 'submit_to_auth_endpoint' function
+    mock_submit = mocker.patch(
+        "murfey.server.api.auth.submit_to_auth_endpoint", new_callable=AsyncMock
+    )
+    mock_submit.return_value = {"valid": validation_outcome}
+
+    # Run the function and check that the results and passed parameters are as expected
+    if not raises_exception:
+        result = await validate_frontend_session_access(
+            session_id=session_id,
+            request=mock_request,
+            token=mock_token,
+        )
+        mock_get_visit_name.assert_called_once_with(session_id)
+        if auth_url:
+            mock_submit.assert_awaited_once_with(
+                f"validate_visit_access/{visit_name}",
+                mock_request,
+                mock_token,
+            )
+        else:
+            mock_submit.assert_not_called()
+        assert result == session_id
+    else:
+        with pytest.raises(HTTPException):
+            await validate_frontend_session_access(
+                session_id=session_id,
+                request=mock_request,
+                token=mock_token,
+            )
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Raises exception | Auth URL | Validation outcome
+        # These cases will pass
+        (False, "some_url", True),
+        (False, "", True),
+        # These cases will fail
+        (True, "some_url", False),
+    ),
+)
 @pytest.mark.asyncio
-async def test_validate_user_instrument_access():
-    pass
+async def test_validate_user_instrument_access(
+    mocker: MockerFixture,
+    test_params: tuple[bool, str, bool],
+):
+    # Unpack the test parameters
+    raises_exception, auth_url, validation_outcome = test_params
+    instrument_name = "some_instrument"
+
+    # Mock the request and token
+    mock_request = MagicMock()
+    mock_token = "123456"
+
+    # Patch the auth URL
+    mocker.patch("murfey.server.api.auth.auth_url", auth_url)
+
+    # Patch the 'submit_to_auth_endpoint' function
+    mock_submit = mocker.patch(
+        "murfey.server.api.auth.submit_to_auth_endpoint", new_callable=AsyncMock
+    )
+    mock_submit.return_value = {"valid": validation_outcome}
+
+    # Run the function and check that the results and passed parameters are as expected
+    if not raises_exception:
+        result = await validate_user_instrument_access(
+            instrument_name=instrument_name,
+            request=mock_request,
+            token=mock_token,
+        )
+        if auth_url:
+            mock_submit.assert_awaited_once_with(
+                f"validate_instrument_access/{instrument_name}",
+                mock_request,
+                mock_token,
+            )
+        else:
+            mock_submit.assert_not_called()
+        assert result == instrument_name
+    else:
+        with pytest.raises(HTTPException):
+            await validate_user_instrument_access(
+                instrument_name=instrument_name,
+                request=mock_request,
+                token=mock_token,
+            )
 
 
 def test_verify_password():
