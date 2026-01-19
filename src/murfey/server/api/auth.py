@@ -39,14 +39,16 @@ security_config = get_security_config()
 auth_url = security_config.auth_url
 ALGORITHM = security_config.auth_algorithm or "HS256"
 SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
-if security_config.auth_type == "password":
-    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-else:
-    oauth2_scheme = APIKeyCookie(name=security_config.cookie_key)
-if security_config.instrument_auth_type == "token":
-    instrument_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-else:
-    instrument_oauth2_scheme = lambda *args, **kwargs: None
+oauth2_scheme = (
+    OAuth2PasswordBearer(tokenUrl="auth/token")
+    if security_config.auth_type == "password"
+    else APIKeyCookie(name=security_config.cookie_key)
+)
+instrument_oauth2_scheme = (
+    OAuth2PasswordBearer(tokenUrl="auth/token")
+    if security_config.instrument_auth_type == "token"
+    else lambda *args, **kwargs: None
+)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 instrument_server_tokens: dict[float, dict] = {}
