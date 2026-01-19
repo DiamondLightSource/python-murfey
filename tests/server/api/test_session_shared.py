@@ -33,6 +33,7 @@ def test_find_upstream_visits(
     upstream_data_dirs = {}
     for n in range(10):
         upstream_instrument = f"{instrument_name}{str(n).zfill(2)}"
+        # Create path to visit
         upstream_visit = (
             tmp_path / f"{upstream_instrument}/data/2020/{visit_name_root}-{n}"
         )
@@ -49,6 +50,14 @@ def test_find_upstream_visits(
             upstream_visit.parent.mkdir(parents=True, exist_ok=True)
             upstream_visit.touch(exist_ok=True)
 
+        # Create junk directories with multiple levels to test recursion logic with
+        junk_directories = [
+            tmp_path / f"{upstream_instrument}/data/junk/directory/number/{n}"
+            for n in range(5)
+        ]
+        for dirpath in junk_directories:
+            dirpath.mkdir(parents=True, exist_ok=True)
+
     # Mock the MachineConfig for this instrument
     mock_machine_config = MagicMock(spec=MachineConfig)
     mock_machine_config.upstream_data_directories = upstream_data_dirs
@@ -57,10 +66,66 @@ def test_find_upstream_visits(
     )
     mock_get_machine_config.return_value = {instrument_name: mock_machine_config}
 
+    # Run the function
+    result = find_upstream_visits(session_id=session_id, db=mock_murfey_db)
+
+    # Check that the expected directories are returned
+    assert result == upstream_visits
+
+
+def test_find_upstream_visits_permission_error(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Get the visit, instrument name, and session ID
+    visit_name_root = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}"
+    visit_name = f"{visit_name_root}-{ExampleVisit.visit_number}"
+    instrument_name = ExampleVisit.instrument_name
+    session_id = ExampleVisit.murfey_session_id
+
+    # Mock the database call
+    mock_murfey_session_row = MagicMock()
+    mock_murfey_session_row.visit = visit_name
+    mock_murfey_session_row.instrument_name = instrument_name
+    mock_murfey_db = MagicMock()
+    mock_murfey_db.exec.return_value.one.return_value = mock_murfey_session_row
+
+    # Create mock upstream visit directories and necessary data structures
+    upstream_visits: dict[str, dict] = {}
+    upstream_data_dirs = {}
+    for n in range(10):
+        upstream_instrument = f"{instrument_name}{str(n).zfill(2)}"
+        upstream_visit = (
+            tmp_path / f"{upstream_instrument}/data/2020/{visit_name_root}-{n}"
+        )
+        # Create some as directories, and some as files
+        if n % 2:
+            upstream_visit.mkdir(parents=True, exist_ok=True)
+            upstream_data_dirs[upstream_instrument] = upstream_visit.parent.parent
+            # With os.scandir set to raise PermissionError, dictionaries should be empty
+            upstream_visits[upstream_instrument] = {}
+        else:
+            upstream_visit.parent.mkdir(parents=True, exist_ok=True)
+            upstream_visit.touch(exist_ok=True)
+
+    # Mock the MachineConfig for this instrument
+    mock_machine_config = MagicMock(spec=MachineConfig)
+    mock_machine_config.upstream_data_directories = upstream_data_dirs
+    mock_get_machine_config = mocker.patch(
+        "murfey.server.api.session_shared.get_machine_config",
+    )
+    mock_get_machine_config.return_value = {instrument_name: mock_machine_config}
+
+    # Mock the 'os.scandir' function used
+    mocker.patch(
+        "murfey.server.api.session_shared.os.scandir",
+        side_effect=PermissionError(),
+    )
+
     # Run the function:
     result = find_upstream_visits(session_id=session_id, db=mock_murfey_db)
 
-    # Mock the database call
+    # With 'os.scandir' mocked to raise PermissionError, no entries should be returned
     assert result == upstream_visits
 
 
