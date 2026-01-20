@@ -11,10 +11,11 @@ from murfey.server.api.auth import (
     check_user,
     submit_to_auth_endpoint,
     validate_frontend_session_access,
+    validate_session_against_visit,
     validate_token,
     validate_user_instrument_access,
 )
-from murfey.util.db import MurfeyUser
+from murfey.util.db import MurfeyUser, Session as MurfeySession
 
 
 @pytest.mark.parametrize(
@@ -264,8 +265,50 @@ async def test_validate_token(
             )
 
 
-def test_validate_session_against_visit():
-    pass
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Session ID | Visit | Expected result
+        (1, "test_visit", True),
+        (1, "some_visit", False),
+        (2, "test_visit", False),
+    ),
+)
+def test_validate_session_against_visit(
+    mocker: MockerFixture,
+    murfey_db_session: SQLModelSession,
+    test_params: tuple[int, str, bool],
+):
+    # Unpack test params
+    session_id, visit_name, expected_result = test_params
+
+    # Add a test session to the database
+    session_entry = MurfeySession(
+        id=1,
+        name="test_visit",
+        visit="test_visit",
+        started=False,
+        current_gain_ref="/path/to/gain_ref",
+        instrument_name="test_instrument",
+        process=True,
+        visit_end_time=None,
+    )
+    murfey_db_session.add(session_entry)
+    murfey_db_session.commit()
+
+    # Patch the Session call with the test database
+    mock_session_context = MagicMock()
+    mock_session_context.__enter__.return_value = murfey_db_session
+    mock_session_context.__exit__.return_value = None
+    mocker.patch("murfey.server.api.auth.Session", return_value=mock_session_context)
+
+    # Run the function
+    assert (
+        validate_session_against_visit(
+            session_id=session_id,
+            visit=visit_name,
+        )
+        == expected_result
+    )
 
 
 @pytest.mark.asyncio
