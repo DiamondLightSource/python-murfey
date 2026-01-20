@@ -14,6 +14,7 @@ from murfey.server.api.auth import (
     validate_frontend_session_access,
     validate_session_against_visit,
     validate_token,
+    validate_user,
     validate_user_instrument_access,
 )
 from murfey.util.db import MurfeyUser, Session as MurfeySession
@@ -475,8 +476,40 @@ def test_verify_password():
     pass
 
 
-def test_validate_user():
-    pass
+@pytest.mark.parametrize(
+    "test_params",
+    (  # User to query | Expected outcome
+        ("test_user", True),
+        ("some_user", False),
+    ),
+)
+def test_validate_user(
+    mocker: MockerFixture,
+    murfey_db_session: SQLModelSession,
+    test_params: tuple[str, bool],
+):
+    # Unpack test params
+    user_to_query, expected_result = test_params
+
+    # Add a user to the test database
+    user_entry = MurfeyUser(
+        username="test_user",
+        hashed_password="asdfghjkl",
+    )
+    murfey_db_session.add(user_entry)
+    murfey_db_session.commit()
+
+    # Mock the 'verify_password' function
+    mocker.patch("murfey.server.api.auth.verify_password", return_value=True)
+
+    # Patch the Session call with the test database
+    mock_session_context = MagicMock()
+    mock_session_context.__enter__.return_value = murfey_db_session
+    mock_session_context.__exit__.return_value = None
+    mocker.patch("murfey.server.api.auth.Session", return_value=mock_session_context)
+
+    # Run the function and check that the outocome is as expected
+    assert validate_user(user_to_query, "dummypassword") == expected_result
 
 
 def test_create_access_token():
