@@ -268,9 +268,9 @@ async def test_validate_token(
 @pytest.mark.parametrize(
     "test_params",
     (  # Session ID | Visit | Expected result
-        (1, "test_visit", True),
-        (1, "some_visit", False),
-        (2, "test_visit", False),
+        (11, "test_visit", True),
+        (11, "some_visit", False),
+        (12, "test_visit", False),
     ),
 )
 def test_validate_session_against_visit(
@@ -283,7 +283,7 @@ def test_validate_session_against_visit(
 
     # Add a test session to the database
     session_entry = MurfeySession(
-        id=1,
+        id=11,
         name="test_visit",
         visit="test_visit",
         started=False,
