@@ -9,6 +9,7 @@ from sqlmodel import Session as SQLModelSession
 
 from murfey.server.api.auth import (
     check_user,
+    get_visit_name,
     submit_to_auth_endpoint,
     validate_frontend_session_access,
     validate_session_against_visit,
@@ -16,6 +17,7 @@ from murfey.server.api.auth import (
     validate_user_instrument_access,
 )
 from murfey.util.db import MurfeyUser, Session as MurfeySession
+from tests.conftest import ExampleVisit
 
 
 @pytest.mark.parametrize(
@@ -316,8 +318,19 @@ async def test_validate_instrument_token():
     pass
 
 
-def test_get_visit_name():
-    pass
+def test_get_visit_name(
+    mocker: MockerFixture,
+    murfey_db_session: SQLModelSession,
+):
+    # Patch the Session call with the test database
+    mock_session_context = MagicMock()
+    mock_session_context.__enter__.return_value = murfey_db_session
+    mock_session_context.__exit__.return_value = None
+    mocker.patch("murfey.server.api.auth.Session", return_value=mock_session_context)
+
+    # Check that the built-in default visit gets returned
+    visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
+    assert get_visit_name(ExampleVisit.murfey_session_id) == visit_name
 
 
 @pytest.mark.asyncio
