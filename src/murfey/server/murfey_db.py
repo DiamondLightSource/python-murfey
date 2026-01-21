@@ -15,10 +15,10 @@ def url(security_config: Security | None = None) -> str:
     security_config = security_config or get_security_config()
     with open(security_config.murfey_db_credentials, "r") as stream:
         creds = yaml.safe_load(stream)
-    f = Fernet(security_config.crypto_key.encode("ascii"))
-    p = f.decrypt(creds["password"].encode("ascii"))
     if security_config.db == "sqlite":
         return f"sqlite:///{creds['database']}"
+    f = Fernet(security_config.crypto_key.encode("ascii"))
+    p = f.decrypt(creds["password"].encode("ascii"))
     return f"postgresql+psycopg2://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
