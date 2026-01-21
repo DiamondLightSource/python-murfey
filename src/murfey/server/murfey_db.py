@@ -17,6 +17,8 @@ def url(security_config: Security | None = None) -> str:
         creds = yaml.safe_load(stream)
     f = Fernet(security_config.crypto_key.encode("ascii"))
     p = f.decrypt(creds["password"].encode("ascii"))
+    if security_config.db == "sqlite":
+        return f"sqlite:///{creds['database']}"
     return f"postgresql+psycopg2://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
