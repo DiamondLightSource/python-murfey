@@ -2,6 +2,7 @@ import datetime
 from typing import List, Optional
 
 import sqlalchemy
+from pydantic import ConfigDict
 from sqlmodel import Enum, Field, Relationship, create_engine
 
 from murfey.util.db import (
@@ -25,6 +26,8 @@ class DataCollectionGroup(DataCollectionGroupOrig):
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class DataCollection(DataCollectionOrig):
