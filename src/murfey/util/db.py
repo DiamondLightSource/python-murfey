@@ -414,7 +414,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
-    session: Optional[Session] = Relationship(back_populates="data_collection_groups")
+    session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
