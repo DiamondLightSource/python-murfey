@@ -414,7 +414,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
-    session: Optional[Session] = Relationship(back_populates="data_collection_groups")
+    session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -470,6 +470,9 @@ class DataCollection(SQLModel, table=True):  # type: ignore
         back_populates="data_collections"
     )
     processing_jobs: List["ProcessingJob"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    movies: List["Movie"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
     )
 
@@ -692,12 +695,14 @@ class SearchMap(SQLModel, table=True):  # type: ignore
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
+    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
 
 
