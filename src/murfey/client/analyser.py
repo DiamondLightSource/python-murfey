@@ -65,7 +65,6 @@ class Analyser(Observer):
                 str(environment.url.geturl()),
                 self._token,
                 instrument_name=environment.instrument_name,
-                demo=environment.demo,
             )
             if environment
             else {}
@@ -398,7 +397,9 @@ class Analyser(Observer):
         base_dir, mid_dir = find_longest_data_directory(data_file, data_directories)
         if not base_dir:
             return data_file.with_suffix(".xml")
-        return base_dir / self._environment.visit / mid_dir / file_name
+        # Add the visit directory to the file path and return it
+        # The file is moved from a location where the visit name is not part of its path
+        return base_dir / self._environment.visit / (mid_dir or "") / file_name
 
     def enqueue(self, rsyncer: RSyncerUpdate):
         if not self._stopping and rsyncer.outcome == TransferResult.SUCCESS:

@@ -20,7 +20,6 @@ def _atlas_destination(
         str(environment.url.geturl()),
         token,
         instrument_name=environment.instrument_name,
-        demo=environment.demo,
     )
     for i, destination_part in enumerate(
         Path(environment.default_destinations[source]).parts
@@ -132,8 +131,10 @@ def ensure_dcg_exists(
                 key=lambda x: x.stat().st_ctime,
             )
             if not dcg_images_dirs:
-                logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
-                return None
+                logger.warning(
+                    f"Cannot find Images-Disc* in {dcg_search_dir}, falling back to Images-Disc1"
+                )
+                dcg_images_dirs = [Path(dcg_search_dir) / "Images-Disc1"]
             dcg_tag = str(dcg_images_dirs[-1])
 
         dcg_data = {

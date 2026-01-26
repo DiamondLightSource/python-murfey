@@ -14,7 +14,7 @@ from murfey.util import sanitise
 logger = logging.getLogger("murfey.workflows.register_processing_job")
 
 
-def run(message: dict, murfey_db: SQLModelSession, demo: bool = False):
+def run(message: dict, murfey_db: SQLModelSession):
     # Faill immediately if not transport manager is set
     if _transport_object is None:
         logger.error("Unable to find transport manager")
@@ -63,6 +63,8 @@ def run(message: dict, murfey_db: SQLModelSession, demo: bool = False):
                 pid = _transport_object.do_create_ispyb_job(record).get(
                     "return_value", None
                 )
+            if pid is None:
+                return {"success": False, "requeue": True}
             murfey_pj = MurfeyDB.ProcessingJob(
                 id=pid, recipe=message["recipe"], dc_id=_dcid
             )
@@ -70,9 +72,6 @@ def run(message: dict, murfey_db: SQLModelSession, demo: bool = False):
         murfey_db.commit()
         pid = murfey_pj.id
         murfey_db.close()
-
-    if pid is None:
-        return {"success": False, "requeue": True}
 
     # Update Prometheus counter for preprocessed movies
     prom.preprocessed_movies.labels(processing_job=pid)

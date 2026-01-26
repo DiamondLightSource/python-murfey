@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import os
 import socket
 from functools import lru_cache
@@ -183,7 +184,7 @@ def machine_config_from_file(
                 base[key].extend(value)
             # Otherwise, overwrite/add values as normal
             else:
-                base[key] = value
+                base[key] = copy.deepcopy(value)
         return base
 
     # Load the dict from the file
@@ -227,6 +228,7 @@ class Security(BaseModel):
     # Murfey database settings
     murfey_db_credentials: Path
     crypto_key: str
+    db: str = "postgres"
     sqlalchemy_pooling: bool = True
 
     # ISPyB settings

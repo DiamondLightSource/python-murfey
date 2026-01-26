@@ -555,7 +555,7 @@ def _release_refine_hold(message: dict, _db):
     _db.close()
 
 
-def _register_incomplete_2d_batch(message: dict, _db, demo: bool = False):
+def _register_incomplete_2d_batch(message: dict, _db):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
     logger.info("Registering incomplete particle batch for 2D classification")
@@ -664,24 +664,10 @@ def _register_incomplete_2d_batch(message: dict, _db, demo: bool = False):
             "processing_recipe", zocalo_message, new_connection=True
         )
         logger.info("2D classification requested")
-    if demo:
-        logger.info("Incomplete 2D batch registered in demo mode")
-        if not _db.exec(
-            select(func.count(db.Class2DParameters.particles_file)).where(
-                db.Class2DParameters.particles_file == class2d_message["particles_file"]
-                and db.Class2DParameters.pj_id == pj_id
-                and db.Class2DParameters.complete
-            )
-        ).one():
-            _register_complete_2d_batch(message, _db=_db, demo=demo)
-            message["class2d_message"]["particles_file"] = (
-                message["class2d_message"]["particles_file"] + "_new"
-            )
-            _register_complete_2d_batch(message, _db=_db, demo=demo)
     _db.close()
 
 
-def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
+def _register_complete_2d_batch(message: dict, _db):
     """Received full batch from particle selection service"""
     instrument_name = (
         _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
@@ -747,12 +733,6 @@ def _register_complete_2d_batch(message: dict, _db, demo: bool = False):
             )
             _murfey_class2ds(
                 murfey_ids, class2d_message["particles_file"], _app_id(pj_id, _db), _db
-            )
-        if demo:
-            _register_class_selection(
-                {"session_id": message["session_id"], "class_selection_score": 0.5},
-                _db=_db,
-                demo=demo,
             )
     elif not feedback_params.class_selection_score:
         # For the first batch, start a container and set the database to wait
@@ -1007,7 +987,7 @@ def _flush_class2d(
     _db.commit()
 
 
-def _register_class_selection(message: dict, _db, demo: bool = False):
+def _register_class_selection(message: dict, _db):
     """Received selection score from class selection service"""
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
@@ -1039,57 +1019,13 @@ def _register_class_selection(message: dict, _db, demo: bool = False):
 
     feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False
-    next_job = feedback_params.next_job
-    if demo:
-        for saved_message in class2d_db:
-            # Send all held Class2D messages on with the selection score added
-            _db.expunge(saved_message)
-            particles_file = saved_message.particles_file
-            logger.info("Complete 2D classification registered in demo mode")
-            _register_3d_batch(
-                {
-                    "session_id": message["session_id"],
-                    "class3d_message": {
-                        "particles_file": particles_file,
-                        "class3d_dir": "Class3D",
-                        "batch_size": 50000,
-                    },
-                },
-                _db=_db,
-                demo=demo,
-            )
-            logger.info("3D classification registered in demo mode")
-            _register_3d_batch(
-                {
-                    "session_id": message["session_id"],
-                    "class3d_message": {
-                        "particles_file": particles_file + "_new",
-                        "class3d_dir": "Class3D",
-                        "batch_size": 50000,
-                    },
-                },
-                _db=_db,
-                demo=demo,
-            )
-            _register_initial_model(
-                {
-                    "session_id": message["session_id"],
-                    "initial_model": "InitialModel/job015/model.mrc",
-                },
-                _db=_db,
-                demo=demo,
-            )
-            next_job += 3 if default_spa_parameters.do_icebreaker_jobs else 2
-        feedback_params.next_job = next_job
-        _db.close()
-    else:
-        _flush_class2d(
-            message["session_id"],
-            message["program_id"],
-            _db,
-            relion_params=relion_params,
-            feedback_params=feedback_params,
-        )
+    _flush_class2d(
+        message["session_id"],
+        message["program_id"],
+        _db,
+        relion_params=relion_params,
+        feedback_params=feedback_params,
+    )
     _db.add(feedback_params)
     for sm in class2d_db:
         _db.delete(sm)
@@ -1225,7 +1161,7 @@ def _resize_intial_model(
     return None
 
 
-def _register_3d_batch(message: dict, _db, demo: bool = False):
+def _register_3d_batch(message: dict, _db):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
     assert isinstance(class3d_message, dict)
@@ -1419,7 +1355,7 @@ def _register_3d_batch(message: dict, _db, demo: bool = False):
         _db.close()
 
 
-def _register_initial_model(message: dict, _db, demo: bool = False):
+def _register_initial_model(message: dict, _db):
     """Received initial model from 3d classification service"""
     pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
     # Add the initial model file to the database
@@ -1552,7 +1488,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
         _db.close()
 
 
-def _flush_grid_square_records(message: dict, _db, demo: bool = False):
+def _flush_grid_square_records(message: dict, _db):
     tag = message["tag"]
     session_id = message["session_id"]
     gs_ids = []
@@ -1562,21 +1498,19 @@ def _flush_grid_square_records(message: dict, _db, demo: bool = False):
         .where(db.GridSquare.tag == tag)
     ).all():
         gs_ids.append(gs.id)
-        if demo:
-            logger.info(f"Flushing grid square {gs.name}")
+        logger.info(f"Flushing grid square {gs.name}")
     for i in gs_ids:
-        _flush_foil_hole_records(i, _db=_db, demo=demo)
+        _flush_foil_hole_records(i, _db=_db)
 
 
-def _flush_foil_hole_records(grid_square_id: int, _db, demo: bool = False):
+def _flush_foil_hole_records(grid_square_id: int, _db):
     for fh in _db.exec(
         select(db.FoilHole).where(db.FoilHole.grid_square_id == grid_square_id)
     ).all():
-        if demo:
-            logger.info(f"Flushing foil hole: {fh.name}")
+        logger.info(f"Flushing foil hole: {fh.name}")
 
 
-def _register_refinement(message: dict, _db, demo: bool = False):
+def _register_refinement(message: dict, _db):
     """Received class to refine from 3D classification"""
     instrument_name = (
         _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
@@ -1726,7 +1660,7 @@ def _register_refinement(message: dict, _db, demo: bool = False):
         _db.close()
 
 
-def _register_bfactors(message: dict, _db, demo: bool = False):
+def _register_bfactors(message: dict, _db):
     """Received refined class to calculate b-factor"""
     instrument_name = (
         _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
@@ -1847,7 +1781,7 @@ def _register_bfactors(message: dict, _db, demo: bool = False):
     return True
 
 
-def _save_bfactor(message: dict, _db, demo: bool = False):
+def _save_bfactor(message: dict, _db):
     """Received b-factor from refinement run"""
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
     bfactor_run = _db.exec(
@@ -2227,7 +2161,7 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                 murfey_db=_db,
             )
             if murfey.server._transport_object:
-                if result.get("success", False):
+                if result.get("success"):
                     murfey.server._transport_object.transport.ack(header)
                 else:
                     # Send it directly to DLQ without trying to rerun it

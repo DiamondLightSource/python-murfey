@@ -481,7 +481,7 @@ def _register_grid_square(
     return
 
 
-def run(message: dict, murfey_db: Session, demo: bool = False) -> dict[str, bool]:
+def run(message: dict, murfey_db: Session) -> dict[str, bool]:
     session_id: int = (
         int(message["session_id"])
         if not isinstance(message["session_id"], int)

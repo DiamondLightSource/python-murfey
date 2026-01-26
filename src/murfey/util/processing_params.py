@@ -53,7 +53,7 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
         )
         if possible_models:
             return sorted(possible_models, key=lambda x: x.stat().st_ctime)[-1]
-    return (machine_config.default_model or Path("")).resolve()
+    return machine_config.default_model or Path("")
 
 
 class CLEMProcessingParameters(BaseModel):

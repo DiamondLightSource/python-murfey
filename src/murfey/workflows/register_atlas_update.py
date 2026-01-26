@@ -11,7 +11,6 @@ logger = logging.getLogger("murfey.workflows.register_atlas_update")
 def run(
     message: dict,
     murfey_db: SQLModelSession,  # Defined for compatibility but unused
-    demo: bool = False,
 ):
     if _transport_object is None:
         logger.error("Unable to find transport manager")
