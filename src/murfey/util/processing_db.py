@@ -131,45 +131,6 @@ class MotionCorrection(SQLModel, table=True):  # type: ignore
     )
 
 
-class Tomogram(SQLModel, table=True):  # type: ignore
-    tomogramId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProcProgram.id")
-    volumeFile: Optional[str] = None
-    stackFile: Optional[str] = None
-    sizeX: Optional[int] = None
-    sizeY: Optional[int] = None
-    sizeZ: Optional[int] = None
-    pixelSpacing: Optional[float] = None
-    residualErrorMean: Optional[float] = None
-    residualErrorSD: Optional[float] = None
-    xAxisCorrection: Optional[float] = None
-    tiltAngleOffset: Optional[float] = None
-    zShift: Optional[float] = None
-    fileDirectory: Optional[str] = None
-    centralSliceImage: Optional[str] = None
-    tomogramMovie: Optional[str] = None
-    xyShiftPlot: Optional[str] = None
-    projXY: Optional[str] = None
-    projXZ: Optional[str] = None
-    recordTimeStamp: Optional[datetime.datetime] = None
-    globalAlignmentQuality: Optional[float] = None
-    gridSquareId: Optional[int] = Field(foreign_key="SearchMap.id")
-    pixelLocationX: Optional[int] = None
-    pixelLocationY: Optional[int] = None
-    AutoProcProgram: Optional["AutoProcProgram"] = Relationship(
-        back_populates="Tomogram"
-    )
-    DataCollection: Optional["DataCollection"] = Relationship(back_populates="Tomogram")
-    SearchMap: Optional["SearchMap"] = Relationship(back_populates="Tomogram")
-    ProcessedTomogram: List["ProcessedTomogram"] = Relationship(
-        back_populates="Tomogram"
-    )
-    TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
-        back_populates="Tomogram"
-    )
-
-
 class CTF(SQLModel, table=True):  # type: ignore
     ctfId: int = Field(primary_key=True, unique=True)
     motionCorrectionId: Optional[int] = Field(
@@ -213,6 +174,45 @@ class ParticlePicker(SQLModel, table=True):  # type: ignore
     )
     ParticleClassificationGroup: List["ParticleClassificationGroup"] = Relationship(
         back_populates="ParticlePicker"
+    )
+
+
+class Tomogram(SQLModel, table=True):  # type: ignore
+    tomogramId: int = Field(primary_key=True, unique=True)
+    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProcProgram.id")
+    volumeFile: Optional[str] = None
+    stackFile: Optional[str] = None
+    sizeX: Optional[int] = None
+    sizeY: Optional[int] = None
+    sizeZ: Optional[int] = None
+    pixelSpacing: Optional[float] = None
+    residualErrorMean: Optional[float] = None
+    residualErrorSD: Optional[float] = None
+    xAxisCorrection: Optional[float] = None
+    tiltAngleOffset: Optional[float] = None
+    zShift: Optional[float] = None
+    fileDirectory: Optional[str] = None
+    centralSliceImage: Optional[str] = None
+    tomogramMovie: Optional[str] = None
+    xyShiftPlot: Optional[str] = None
+    projXY: Optional[str] = None
+    projXZ: Optional[str] = None
+    recordTimeStamp: Optional[datetime.datetime] = None
+    globalAlignmentQuality: Optional[float] = None
+    gridSquareId: Optional[int] = Field(foreign_key="SearchMap.id")
+    pixelLocationX: Optional[int] = None
+    pixelLocationY: Optional[int] = None
+    AutoProcProgram: Optional["AutoProcProgram"] = Relationship(
+        back_populates="Tomogram"
+    )
+    DataCollection: Optional["DataCollection"] = Relationship(back_populates="Tomogram")
+    SearchMap: Optional["SearchMap"] = Relationship(back_populates="Tomogram")
+    ProcessedTomogram: List["ProcessedTomogram"] = Relationship(
+        back_populates="Tomogram"
+    )
+    TiltImageAlignment: List["TiltImageAlignment"] = Relationship(
+        back_populates="Tomogram"
     )
 
 
