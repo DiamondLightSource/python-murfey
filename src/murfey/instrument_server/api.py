@@ -189,7 +189,6 @@ def setup_multigrid_watcher(
     watchers[session_id] = MultigridDirWatcher(
         watcher_spec.source,
         machine_config,
-        skip_existing_processing=watcher_spec.skip_existing_processing,
     )
     watchers[session_id].subscribe(
         partial(

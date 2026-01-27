@@ -17,7 +17,6 @@ class MultigridDirWatcher(Observer):
         self,
         path: str | os.PathLike,
         machine_config: dict,
-        skip_existing_processing: bool = False,
     ):
         super().__init__()
         self._basepath = Path(path)
@@ -30,7 +29,6 @@ class MultigridDirWatcher(Observer):
         )
         # Toggleable settings
         self._analyse = True
-        self._skip_existing_processing = skip_existing_processing
         self._stopping = False
 
     def start(self):
@@ -61,21 +59,14 @@ class MultigridDirWatcher(Observer):
         )
         self._seen_dirs.append(directory)
 
-    def _handle_fractions(self, directory: Path, first_loop: bool):
+    def _handle_fractions(self, directory: Path):
         processing_started = False
         for d02 in directory.glob("Images-Disc*"):
             if d02 not in self._seen_dirs:
-                # If 'skip_existing_processing' is set, do not process for
-                # any data directories found on the first loop.
-                # This allows you to avoid triggering processing again if Murfey is restarted
                 self.notify(
                     d02,
                     remove_files=True,
-                    analyse=(
-                        not (first_loop and self._skip_existing_processing)
-                        if self._analyse
-                        else False
-                    ),
+                    analyse=self._analyse,
                     tag="fractions",
                 )
                 self._seen_dirs.append(d02)
@@ -88,17 +79,12 @@ class MultigridDirWatcher(Observer):
             ):
                 self.notify(
                     directory,
-                    analyse=(
-                        not (first_loop and self._skip_existing_processing)
-                        if self._analyse
-                        else False
-                    ),
+                    analyse=self._analyse,
                     tag="fractions",
                 )
                 self._seen_dirs.append(directory)
 
     def _process(self):
-        first_loop = True
         while not self._stopping:
             for d in self._basepath.glob("*"):
                 if d.name in self._machine_config["create_directories"]:
@@ -133,7 +119,6 @@ class MultigridDirWatcher(Observer):
                                 self._handle_fractions(
                                     sample.parent.parent.parent
                                     / f"{sample.parent.name}_{sample.name}",
-                                    first_loop,
                                 )
 
                     else:
@@ -141,10 +126,7 @@ class MultigridDirWatcher(Observer):
                             self._handle_metadata(
                                 d, extra_directory=f"metadata_{d.name}"
                             )
-                        self._handle_fractions(d.parent.parent / d.name, first_loop)
-
-            if first_loop:
-                first_loop = False
+                        self._handle_fractions(d.parent.parent / d.name)
             time.sleep(15)
 
         self.notify(final=True)
