@@ -99,7 +99,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
 
     ensure_dcg_exists(
         collection_type="spa",
-        metadata_source=metadata_source,
+        metadata_source=metadata_source / "Images-Disc1",
         environment=env,
         token="token",
     )
