@@ -174,7 +174,6 @@ def setup_multigrid_watcher(
         session_id,
         murfey_url=_get_murfey_url(),
         do_transfer=True,
-        processing_enabled=not watcher_spec.skip_existing_processing,
         _machine_config=machine_config,
         token=tokens.get(session_id, "token"),
         data_collection_parameters=data_collection_parameters.get(label, {}),
