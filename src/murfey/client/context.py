@@ -47,7 +47,8 @@ def ensure_dcg_exists(
         session_file = metadata_source / "Session.dm"
     elif collection_type == "spa":
         experiment_type_id = 37
-        session_file = metadata_source / "EpuSession.dm"
+        # For SPA the metadata source sent should include the Images-Disc
+        session_file = metadata_source.parent / "EpuSession.dm"
         for h in entry_points(group="murfey.hooks"):
             try:
                 if h.name == "get_epu_session_metadata":
