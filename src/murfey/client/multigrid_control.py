@@ -40,7 +40,6 @@ class MultigridController:
     finalising: bool = False
     dormant: bool = False
     multigrid_watcher_active: bool = True
-    processing_enabled: bool = True
     do_transfer: bool = True
     dummy_dc: bool = False
     force_mdoc_metadata: bool = True
@@ -86,8 +85,6 @@ class MultigridController:
             for ds in val.values()
             for s in ds
         ]
-        self._data_collection_form_complete = False
-        self._register_dc: bool | None = None
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
 
@@ -260,7 +257,6 @@ class MultigridController:
         self._start_rsyncer(
             source,
             destination,
-            force_metadata=self.processing_enabled,
             analyse=analyse,
             remove_files=remove_files,
             tag=tag,
@@ -324,7 +320,6 @@ class MultigridController:
         source: Path,
         destination: str,
         visit_path: str = "",
-        force_metadata: bool = False,
         analyse: bool = True,
         remove_files: bool = False,
         tag: str = "",
@@ -455,12 +450,7 @@ class MultigridController:
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
             )
-            if force_metadata:
-                self.analysers[source].subscribe(
-                    partial(self._start_dc, from_form=True)
-                )
-            else:
-                self.analysers[source].subscribe(self._data_collection_form)
+            self.analysers[source].subscribe(partial(self._start_dc, from_form=True))
             self.analysers[source].start()
             if transfer:
                 self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
@@ -501,21 +491,6 @@ class MultigridController:
                     secondary=True,
                 )
                 self._environment.watchers[source].start()
-
-    def _data_collection_form(self, response: dict):
-        log.info("data collection form ready")
-        if self._data_collection_form_complete:
-            return
-        if self._register_dc and response.get("form"):
-            self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
-            log.info(
-                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.gain_ref}"
-            )
-            if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values["gain_ref"] = self._environment.gain_ref
-            self._data_collection_form_complete = True
-        elif self._register_dc is None:
-            self._data_collection_form_complete = True
 
     def _start_dc(self, metadata_json, from_form: bool = False):
         if self.dummy_dc:

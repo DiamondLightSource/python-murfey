@@ -154,7 +154,6 @@ async def setup_multigrid_watcher(
                     "visit": visit,
                     "label": visit,
                     "instrument_name": instrument_name,
-                    "skip_existing_processing": watcher_spec.skip_existing_processing,
                     "destination_overrides": {
                         str(k): v for k, v in watcher_spec.destination_overrides.items()
                     },
