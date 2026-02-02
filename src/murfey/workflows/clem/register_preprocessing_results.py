@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import traceback
+from collections.abc import Collection
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Literal, Optional
@@ -186,6 +187,41 @@ def _register_clem_image_series(
     logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
 
 
+color_columns = {
+    "gray": "hasGrey",
+    "red": "hasRed",
+    "green": "hasGreen",
+    "blue": "hasBlue",
+    "cyan": "hasCyan",
+    "magenta": "hasMagenta",
+    "yellow": "hasYellow",
+}
+
+
+def _get_color_flags(
+    colors: Collection[str] = [],
+):
+    return {
+        color_columns[color]: (1 if color in color_columns.keys() else 0)
+        for color in colors
+    }
+
+
+def _determine_collection_mode(
+    colors: Collection[str] = [],
+):
+    if not colors:
+        logger.warning("No colours were present in returned result")
+        return None
+    if "gray" in colors:
+        if len(colors) == 1:
+            return "Bright Field"
+        else:
+            return "Bright Field and Fluorescent"
+    else:
+        return "Fluorescent"
+
+
 def _register_dcg_and_atlas(
     session_id: int,
     instrument_name: str,
@@ -245,6 +281,10 @@ def _register_dcg_and_atlas(
                 "atlas": atlas_name,
                 "atlas_pixel_size": atlas_pixel_size,
                 "sample": dcg_entry.sample,
+                "color_flags": _get_color_flags(result.output_files.keys()),
+                "collection_mode": _determine_collection_mode(
+                    result.output_files.keys()
+                ),
             }
             if entry_point_result := entry_points(
                 group="murfey.workflows", name="atlas_update"
@@ -269,6 +309,8 @@ def _register_dcg_and_atlas(
             "atlas": atlas_name,
             "atlas_pixel_size": atlas_pixel_size,
             "sample": None,
+            "color_flags": _get_color_flags(result.output_files.keys()),
+            "collection_mode": _determine_collection_mode(result.output_files.keys()),
         }
         if entry_point_result := entry_points(
             group="murfey.workflows", name="data_collection_group"
@@ -410,6 +452,7 @@ def _register_grid_square(
                 y_stage_position=0.5 * (clem_img_series.y0 + clem_img_series.y1),
                 pixel_size=clem_img_series.image_pixel_size,
                 image=clem_img_series.thumbnail_search_string,
+                collection_mode=_determine_collection_mode(result.output_files.keys()),
             )
             # Register or update the grid square entry as required
             if grid_square_result := murfey_db.exec(

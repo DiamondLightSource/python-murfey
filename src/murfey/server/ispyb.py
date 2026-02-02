@@ -186,6 +186,8 @@ class TransportManager:
         atlas_image: str,
         pixel_size: float,
         slot: int | None,
+        collection_mode: str | None = None,
+        color_flags: dict[str, str | int] = {},
     ):
         try:
             with ISPyBSession() as db:
@@ -193,6 +195,14 @@ class TransportManager:
                 atlas.atlasImage = atlas_image or atlas.atlasImage
                 atlas.pixelSize = pixel_size or atlas.pixelSize
                 atlas.cassetteSlot = slot or atlas.cassetteSlot
+                atlas.mode = collection_mode or atlas.mode
+                # Optionally insert colour flags if present
+                if color_flags:
+                    for (
+                        col_name,
+                        value,
+                    ) in color_flags.items():
+                        setattr(atlas, col_name, value)
                 db.add(atlas)
                 db.commit()
                 return {"success": True, "return_value": atlas.atlasId}
@@ -209,6 +219,7 @@ class TransportManager:
         atlas_id: int,
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
+        color_flags: dict[str, int] = {},
     ):
         # most of this is for mypy
         if (
@@ -235,6 +246,10 @@ class TransportManager:
             stageLocationY=grid_square_parameters.y_stage_position,
             pixelSize=grid_square_parameters.pixel_size,
         )
+        # Optionally insert colour flags
+        if color_flags:
+            for col_name, value in color_flags.items():
+                setattr(record, col_name, value)
         try:
             with ISPyBSession() as db:
                 db.add(record)
@@ -250,7 +265,10 @@ class TransportManager:
         return {"success": False, "return_value": None}
 
     def do_update_grid_square(
-        self, grid_square_id: int, grid_square_parameters: GridSquareParameters
+        self,
+        grid_square_id: int,
+        grid_square_parameters: GridSquareParameters,
+        color_flags: dict[str, int] = {},
     ):
         try:
             with ISPyBSession() as db:
@@ -290,6 +308,12 @@ class TransportManager:
                     grid_square.stageLocationY = grid_square_parameters.y_stage_position
                 if grid_square_parameters.pixel_size:
                     grid_square.pixelSize = grid_square_parameters.pixel_size
+                if grid_square_parameters.collection_mode:
+                    grid_square.mode = grid_square_parameters.collection_mode
+                # Optionally insert colour flags
+                if color_flags:
+                    for col_name, value in color_flags.items():
+                        setattr(grid_square, col_name, value)
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
