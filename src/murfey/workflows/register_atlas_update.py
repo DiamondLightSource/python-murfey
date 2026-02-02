@@ -19,10 +19,13 @@ def run(
     logger.info(f"Registering updated atlas: \n{message}")
 
     _transport_object.do_update_atlas(
-        message["atlas_id"],
-        message["atlas"],
-        message["atlas_pixel_size"],
-        message["sample"],
+        atlas_id=message["atlas_id"],
+        atlas_image=message["atlas"],
+        pixel_size=message["atlas_pixel_size"],
+        slot=message["sample"],
+        # Extract optional parameters
+        collection_mode=message.get("collection_mode"),
+        color_flags=message.get("color_flags", {}),
     )
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
