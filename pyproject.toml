@@ -58,7 +58,7 @@ server = [
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
-    "numpy<2",
+    "numpy<3",
     "packaging",
     "passlib",
     "pillow",
