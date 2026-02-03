@@ -40,7 +40,6 @@ class MultigridController:
     finalising: bool = False
     dormant: bool = False
     multigrid_watcher_active: bool = True
-    processing_enabled: bool = True
     do_transfer: bool = True
     dummy_dc: bool = False
     force_mdoc_metadata: bool = True
@@ -86,8 +85,6 @@ class MultigridController:
             for ds in val.values()
             for s in ds
         ]
-        self._data_collection_form_complete = False
-        self._register_dc: bool | None = None
         self.rsync_processes = self.rsync_processes or {}
         self.analysers = self.analysers or {}
 
@@ -260,7 +257,6 @@ class MultigridController:
         self._start_rsyncer(
             source,
             destination,
-            force_metadata=self.processing_enabled,
             analyse=analyse,
             remove_files=remove_files,
             tag=tag,
@@ -324,7 +320,6 @@ class MultigridController:
         source: Path,
         destination: str,
         visit_path: str = "",
-        force_metadata: bool = False,
         analyse: bool = True,
         remove_files: bool = False,
         tag: str = "",
@@ -455,12 +450,7 @@ class MultigridController:
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
             )
-            if force_metadata:
-                self.analysers[source].subscribe(
-                    partial(self._start_dc, from_form=True)
-                )
-            else:
-                self.analysers[source].subscribe(self._data_collection_form)
+            self.analysers[source].subscribe(self._start_dc)
             self.analysers[source].start()
             if transfer:
                 self.rsync_processes[source].subscribe(self.analysers[source].enqueue)
@@ -502,32 +492,13 @@ class MultigridController:
                 )
                 self._environment.watchers[source].start()
 
-    def _data_collection_form(self, response: dict):
-        log.info("data collection form ready")
-        if self._data_collection_form_complete:
-            return
-        if self._register_dc and response.get("form"):
-            self._form_values = {k: str(v) for k, v in response.get("form", {}).items()}
-            log.info(
-                f"gain reference is set to {self._form_values.get('gain_ref')}, {self._environment.gain_ref}"
-            )
-            if self._form_values.get("gain_ref") in (None, "None"):
-                self._form_values["gain_ref"] = self._environment.gain_ref
-            self._data_collection_form_complete = True
-        elif self._register_dc is None:
-            self._data_collection_form_complete = True
-
-    def _start_dc(self, metadata_json, from_form: bool = False):
+    def _start_dc(self, metadata_json):
         if self.dummy_dc:
             return
-        # for multigrid the analyser sends the message straight to _start_dc by-passing user input
-        # it is then necessary to extract the data from the message
-        if from_form:
-            metadata_json = metadata_json.get("form", {})
-            # Safely convert all entries into strings, but leave None as-is
-            metadata_json = {
-                k: str(v) if v is not None else None for k, v in metadata_json.items()
-            }
+        # Safely convert all entries into strings, but leave None as-is
+        metadata_json = {
+            k: str(v) if v is not None else None for k, v in metadata_json.items()
+        }
         self._environment.dose_per_frame = metadata_json.get("dose_per_frame")
         self._environment.gain_ref = metadata_json.get("gain_ref")
         self._environment.symmetry = metadata_json.get("symmetry")
@@ -601,82 +572,76 @@ class MultigridController:
                 environment=self._environment,
                 token=self.token,
             )
-            if from_form:
-                data = {
-                    "voltage": metadata_json["voltage"],
-                    "pixel_size_on_image": metadata_json["pixel_size_on_image"],
-                    "experiment_type": metadata_json["experiment_type"],
-                    "image_size_x": metadata_json["image_size_x"],
-                    "image_size_y": metadata_json["image_size_y"],
-                    "file_extension": metadata_json["file_extension"],
-                    "acquisition_software": metadata_json["acquisition_software"],
-                    "image_directory": str(
-                        self._environment.default_destinations[source]
-                    ),
-                    "tag": str(source),
-                    "source": str(source),
-                    "magnification": metadata_json["magnification"],
-                    "total_exposed_dose": metadata_json.get("total_exposed_dose"),
-                    "c2aperture": metadata_json.get("c2aperture"),
-                    "exposure_time": metadata_json.get("exposure_time"),
-                    "slit_width": metadata_json.get("slit_width"),
-                    "phase_plate": metadata_json.get("phase_plate", False),
-                }
+            data = {
+                "voltage": metadata_json["voltage"],
+                "pixel_size_on_image": metadata_json["pixel_size_on_image"],
+                "experiment_type": metadata_json["experiment_type"],
+                "image_size_x": metadata_json["image_size_x"],
+                "image_size_y": metadata_json["image_size_y"],
+                "file_extension": metadata_json["file_extension"],
+                "acquisition_software": metadata_json["acquisition_software"],
+                "image_directory": str(self._environment.default_destinations[source]),
+                "tag": str(source),
+                "source": str(source),
+                "magnification": metadata_json["magnification"],
+                "total_exposed_dose": metadata_json.get("total_exposed_dose"),
+                "c2aperture": metadata_json.get("c2aperture"),
+                "exposure_time": metadata_json.get("exposure_time"),
+                "slit_width": metadata_json.get("slit_width"),
+                "phase_plate": metadata_json.get("phase_plate", False),
+            }
+            capture_post(
+                base_url=str(self._environment.url.geturl()),
+                router_name="workflow.router",
+                function_name="start_dc",
+                token=self.token,
+                visit_name=self._environment.visit,
+                session_id=self.session_id,
+                data=data,
+            )
+            for recipe in (
+                "em-spa-preprocess",
+                "em-spa-extract",
+                "em-spa-class2d",
+                "em-spa-class3d",
+                "em-spa-refine",
+            ):
                 capture_post(
                     base_url=str(self._environment.url.geturl()),
                     router_name="workflow.router",
-                    function_name="start_dc",
+                    function_name="register_proc",
                     token=self.token,
                     visit_name=self._environment.visit,
-                    session_id=self.session_id,
-                    data=data,
-                )
-                for recipe in (
-                    "em-spa-preprocess",
-                    "em-spa-extract",
-                    "em-spa-class2d",
-                    "em-spa-class3d",
-                    "em-spa-refine",
-                ):
-                    capture_post(
-                        base_url=str(self._environment.url.geturl()),
-                        router_name="workflow.router",
-                        function_name="register_proc",
-                        token=self.token,
-                        visit_name=self._environment.visit,
-                        session_id=self.session_id,
-                        data={
-                            "tag": str(source),
-                            "source": str(source),
-                            "recipe": recipe,
-                        },
-                    )
-                log.info(f"Posting SPA processing parameters: {metadata_json}")
-                response = capture_post(
-                    base_url=str(self._environment.url.geturl()),
-                    router_name="workflow.spa_router",
-                    function_name="register_spa_proc_params",
-                    token=self.token,
                     session_id=self.session_id,
                     data={
-                        **{
-                            k: None if v == "None" else v
-                            for k, v in metadata_json.items()
-                        },
                         "tag": str(source),
+                        "source": str(source),
+                        "recipe": recipe,
                     },
                 )
-                if response and not str(response.status_code).startswith("2"):
-                    log.warning(f"{response.reason}")
-                capture_post(
-                    base_url=str(self._environment.url.geturl()),
-                    router_name="workflow.spa_router",
-                    function_name="flush_spa_processing",
-                    token=self.token,
-                    visit_name=self._environment.visit,
-                    session_id=self.session_id,
-                    data={"tag": str(source)},
-                )
+            log.info(f"Posting SPA processing parameters: {metadata_json}")
+            response = capture_post(
+                base_url=str(self._environment.url.geturl()),
+                router_name="workflow.spa_router",
+                function_name="register_spa_proc_params",
+                token=self.token,
+                session_id=self.session_id,
+                data={
+                    **{k: None if v == "None" else v for k, v in metadata_json.items()},
+                    "tag": str(source),
+                },
+            )
+            if response and not str(response.status_code).startswith("2"):
+                log.warning(f"{response.reason}")
+            capture_post(
+                base_url=str(self._environment.url.geturl()),
+                router_name="workflow.spa_router",
+                function_name="flush_spa_processing",
+                token=self.token,
+                visit_name=self._environment.visit,
+                session_id=self.session_id,
+                data={"tag": str(source)},
+            )
 
     def _increment_file_count(
         self, observed_files: List[Path], source: str, destination: str

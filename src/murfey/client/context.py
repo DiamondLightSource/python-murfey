@@ -45,9 +45,12 @@ def ensure_dcg_exists(
     if collection_type == "tomo":
         experiment_type_id = 36
         session_file = metadata_source / "Session.dm"
+        source_visit_dir = metadata_source.parent
     elif collection_type == "spa":
         experiment_type_id = 37
-        session_file = metadata_source / "EpuSession.dm"
+        # For SPA the metadata source sent should include the Images-Disc
+        session_file = metadata_source.parent / "EpuSession.dm"
+        source_visit_dir = metadata_source.parent.parent
         for h in entry_points(group="murfey.hooks"):
             try:
                 if h.name == "get_epu_session_metadata":
@@ -90,27 +93,13 @@ def ensure_dcg_exists(
         partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
         logger.info("Partial Linux path successfully constructed from Windows path")
 
-        source_visit_dir = metadata_source.parent
         logger.info(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
         )
 
-        dcg_search_dir = (
+        dcg_tag = (
             str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
         )
-        if collection_type == "tomo":
-            dcg_tag = dcg_search_dir
-        else:
-            dcg_images_dirs = sorted(
-                Path(dcg_search_dir).glob("Images-Disc*"),
-                key=lambda x: x.stat().st_ctime,
-            )
-            if not dcg_images_dirs:
-                logger.warning(
-                    f"Cannot find Images-Disc* in {dcg_search_dir}, falling back to Images-Disc1"
-                )
-                dcg_images_dirs = [Path(dcg_search_dir) / "Images-Disc1"]
-            dcg_tag = str(dcg_images_dirs[-1])
 
         for p in partial_path.split("/"):
             if p.startswith("Sample"):
@@ -143,7 +132,7 @@ def ensure_dcg_exists(
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
                 "atlas": str(
-                    _atlas_destination(environment, metadata_source, token)
+                    _atlas_destination(environment, session_file.parent, token)
                     / environment.samples[metadata_source].atlas.parent
                     / atlas_xml_path.with_suffix(".jpg").name
                 ).replace("//", "/"),

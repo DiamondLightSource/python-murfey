@@ -106,35 +106,39 @@ class SPAMetadataContext(Context):
                 return
 
             if source:
-                dcg_tag = ensure_dcg_exists(
-                    collection_type="spa",
-                    metadata_source=source,
-                    environment=environment,
-                    token=self._token,
-                )
                 gs_pix_positions = get_grid_square_atlas_positions(
                     source.parent / partial_path
                 )
-                for gs, pos_data in gs_pix_positions.items():
-                    if pos_data:
-                        capture_post(
-                            base_url=str(environment.url.geturl()),
-                            router_name="session_control.spa_router",
-                            function_name="register_grid_square",
-                            token=self._token,
-                            session_id=environment.murfey_session,
-                            gsid=int(gs),
-                            data={
-                                "tag": dcg_tag,
-                                "x_location": pos_data[0],
-                                "y_location": pos_data[1],
-                                "x_stage_position": pos_data[2],
-                                "y_stage_position": pos_data[3],
-                                "width": pos_data[4],
-                                "height": pos_data[5],
-                                "angle": pos_data[6],
-                            },
-                        )
+                for images_disc in list(source.glob("Images-Disc*")) or [
+                    source / "Images-Disc1"
+                ]:
+                    # Do the dcg registration for every Images-Disc with this session file
+                    dcg_tag = ensure_dcg_exists(
+                        collection_type="spa",
+                        metadata_source=images_disc,
+                        environment=environment,
+                        token=self._token,
+                    )
+                    for gs, pos_data in gs_pix_positions.items():
+                        if pos_data:
+                            capture_post(
+                                base_url=str(environment.url.geturl()),
+                                router_name="session_control.spa_router",
+                                function_name="register_grid_square",
+                                token=self._token,
+                                session_id=environment.murfey_session,
+                                gsid=int(gs),
+                                data={
+                                    "tag": dcg_tag,
+                                    "x_location": pos_data[0],
+                                    "y_location": pos_data[1],
+                                    "x_stage_position": pos_data[2],
+                                    "y_stage_position": pos_data[3],
+                                    "width": pos_data[4],
+                                    "height": pos_data[5],
+                                    "angle": pos_data[6],
+                                },
+                            )
 
         elif (
             transferred_file.suffix == ".dm"
@@ -145,12 +149,15 @@ class SPAMetadataContext(Context):
             source = _get_source(transferred_file, environment=environment)
             if source is None:
                 return None
-            ensure_dcg_exists(
-                collection_type="spa",
-                metadata_source=source,
-                environment=environment,
-                token=self._token,
-            )
+            for images_disc in list(source.glob("Images-Disc*")) or [
+                source / "Images-Disc1"
+            ]:
+                ensure_dcg_exists(
+                    collection_type="spa",
+                    metadata_source=images_disc,
+                    environment=environment,
+                    token=self._token,
+                )
 
             gs_name = int(transferred_file.stem.split("_")[1])
             logger.info(
@@ -168,7 +175,9 @@ class SPAMetadataContext(Context):
                 logger.warning(
                     f"Cannot find Images-Disc* in {visitless_source_search_dir}"
                 )
-                return
+                visitless_source_images_dirs = [
+                    Path(visitless_source_search_dir) / "Images-Disc1"
+                ]
             visitless_source = str(visitless_source_images_dirs[-1])
 
             if fh_positions:
