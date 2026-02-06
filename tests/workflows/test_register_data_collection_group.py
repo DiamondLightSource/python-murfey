@@ -1,33 +1,35 @@
 from unittest.mock import MagicMock
 
+import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 import pytest
 from pytest_mock import MockerFixture
 
 from murfey.workflows.register_data_collection_group import run
 from tests.conftest import ExampleVisit
 
-register_data_collection_group_params_matrix = (
-    # ISPyB session ID | # DCG search result | # DCG insert result | # Atlas insert result
-    (0, 0, 0, 0),
-    (0, 0, 0, None),
-    (0, 0, None, 0),
-    (0, 0, None, None),
-    (0, None, 0, 0),
-    (0, None, 0, None),
-    (0, None, None, 0),
-    (0, None, None, None),
-    (None, 0, 0, 0),
-    (None, 0, 0, None),
-    (None, 0, None, 0),
-    (None, 0, None, None),
-    (None, None, 0, 0),
-    (None, None, 0, None),
-    (None, None, None, 0),
-    (None, None, None, None),
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # ISPyB session ID | # DCG search result | # DCG insert result | # Atlas insert result
+        (0, 0, 0, 0),
+        (0, 0, 0, None),
+        (0, 0, None, 0),
+        (0, 0, None, None),
+        (0, None, 0, 0),
+        (0, None, 0, None),
+        (0, None, None, 0),
+        (0, None, None, None),
+        (None, 0, 0, 0),
+        (None, 0, 0, None),
+        (None, 0, None, 0),
+        (None, 0, None, None),
+        (None, None, 0, 0),
+        (None, None, 0, None),
+        (None, None, None, 0),
+        (None, None, None, None),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", register_data_collection_group_params_matrix)
 def test_run(
     mocker: MockerFixture,
     test_params: tuple[int | None, int | None, int | None, int | None],
@@ -76,9 +78,21 @@ def test_run(
         assert result == {"success": True}
     else:
         if ispyb_session_id is not None:
-            mock_transport_object.do_insert_data_collection_group.assert_called_once()
+            mock_transport_object.do_insert_data_collection_group.assert_called_once_with(
+                ISPyBDB.DataCollectionGroup(
+                    sessionId=ispyb_session_id,
+                    experimentTypeId=message["experiment_type_id"],
+                )
+            )
             if insert_dcg is not None:
-                mock_transport_object.do_insert_atlas.assert_called_once()
+                mock_transport_object.do_insert_atlas.assert_called_once_with(
+                    ISPyBDB.Atlas(
+                        dataCollectionGroupId=dcg_result,
+                        atlasImage=message.get("atlas", ""),
+                        pixelSize=message.get("atlas_pixel_size", 0),
+                        cassetteSlot=message.get("sample"),
+                    )
+                )
                 assert result == {"success": True}
             else:
                 assert result == {"success": False, "requeue": True}
