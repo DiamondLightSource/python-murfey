@@ -122,6 +122,46 @@ def test_register_clem_image_series():
     assert _register_clem_image_series
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        (
+            ["gray"],
+            {
+                "hasGrey": 1,
+            },
+        ),
+        (
+            ["gray", "red"],
+            {
+                "hasGrey": 1,
+                "hasRed": 1,
+            },
+        ),
+        (
+            ["red", "green", "blue"],
+            {
+                "hasRed": 1,
+                "hasGreen": 1,
+                "hasBlue": 1,
+            },
+        ),
+        (
+            ["cyan", "magenta", "yellow"],
+            {
+                "hasCyan": 1,
+                "hasMagenta": 1,
+                "hasYellow": 1,
+            },
+        ),
+    ),
+)
+def test_get_color_flags(test_params: tuple[list[str], dict[str, int]]):
+    # Unpack test params
+    colors, expected_result = test_params
+    assert _get_color_flags(colors) == expected_result
+
+
 def test_register_dcg_and_atlas():
     assert _register_dcg_and_atlas
 
