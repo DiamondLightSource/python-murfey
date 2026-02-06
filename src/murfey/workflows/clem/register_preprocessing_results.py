@@ -202,10 +202,10 @@ def _get_color_flags(
     colors: Collection[str] | None = None,
 ):
     colors = colors or []
-    return {
-        color_columns[color]: (1 if color in color_columns.keys() else 0)
-        for color in colors
-    }
+    color_flags = dict.fromkeys(color_columns.values(), 0)
+    for color in colors:
+        color_flags[color_columns[color]] = 1
+    return color_flags
 
 
 def _determine_collection_mode(
@@ -262,12 +262,13 @@ def _register_dcg_and_atlas(
         else:
             atlas_name = str(output_file.parent / "*.tiff")
             atlas_pixel_size = result.pixel_size
+        color_flags = _get_color_flags(result.output_files.keys())
+        collection_mode = _determine_collection_mode(result.output_files.keys())
     else:
         atlas_name = ""
         atlas_pixel_size = 0.0
-
-    color_flags = _get_color_flags(result.output_files.keys())
-    collection_mode = _determine_collection_mode(result.output_files.keys())
+        color_flags = None
+        collection_mode = None
 
     if dcg_search := murfey_db.exec(
         select(MurfeyDB.DataCollectionGroup)

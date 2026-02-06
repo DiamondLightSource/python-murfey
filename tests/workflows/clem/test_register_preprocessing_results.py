@@ -119,7 +119,7 @@ def generate_preprocessing_messages(
 
 
 def test_register_clem_image_series():
-    assert _register_clem_image_series
+    _register_clem_image_series
 
 
 @pytest.mark.parametrize(
@@ -158,16 +158,49 @@ def test_register_clem_image_series():
 )
 def test_get_color_flags(test_params: tuple[list[str], dict[str, int]]):
     # Unpack test params
-    colors, expected_result = test_params
+    colors, positive_flags = test_params
+    expected_result = dict.fromkeys(
+        (
+            "hasGrey",
+            "hasRed",
+            "hasGreen",
+            "hasBlue",
+            "hasCyan",
+            "hasMagenta",
+            "hasYellow",
+        ),
+        0,
+    )
+    for flag, value in positive_flags.items():
+        expected_result[flag] = value
     assert _get_color_flags(colors) == expected_result
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        (
+            ["gray"],
+            "Bright Field",
+        ),
+        (
+            ["gray", "blue"],
+            "Bright Field and Fluorescent",
+        ),
+        (["red", "green", "blue"], "Fluorescent"),
+    ),
+)
+def test_determine_collection_mode(test_params: tuple[list[str], str]):
+    colors, expected_result = test_params
+    assert _determine_collection_mode(colors) == expected_result
+
+
 def test_register_dcg_and_atlas():
-    assert _register_dcg_and_atlas
+    _register_dcg_and_atlas
 
 
 def test_register_grid_square():
-    assert _register_grid_square
+    _register_grid_square
 
 
 @pytest.mark.parametrize(
