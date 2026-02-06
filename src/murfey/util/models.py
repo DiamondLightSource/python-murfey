@@ -157,6 +157,9 @@ class GridSquareParameters(BaseModel):
     pixel_size: Optional[float] = None
     angle: Optional[float] = None
 
+    # Collection mode
+    collection_mode: Optional[str] = None
+
 
 class FoilHoleParameters(BaseModel):
     tag: str

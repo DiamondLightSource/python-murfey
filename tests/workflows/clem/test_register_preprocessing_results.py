@@ -12,9 +12,13 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
+    COLOR_FLAGS_MURFEY_TO_ISPYB,
+    _determine_collection_mode,
+    _get_color_flags,
     _register_clem_image_series,
     _register_dcg_and_atlas,
     _register_grid_square,
+    _snake_to_camel_case,
     run,
 )
 from tests.conftest import ExampleVisit, get_or_create_db_entry
@@ -22,7 +26,6 @@ from tests.conftest import ExampleVisit, get_or_create_db_entry
 visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
 processed_dir_name = "processed"
 grid_name = "Grid_1"
-colors = ("gray", "green", "red")
 
 
 @pytest.fixture
@@ -33,6 +36,7 @@ def rsync_basepath(tmp_path: Path):
 def generate_preprocessing_messages(
     rsync_basepath: Path,
     session_id: int,
+    colors: list[str],
 ):
     # Make directory to where data for current grid is stored
     visit_dir = rsync_basepath / "2020" / visit_name
@@ -116,25 +120,120 @@ def generate_preprocessing_messages(
     return messages
 
 
-@pytest.mark.skip
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        (
+            ["gray"],
+            {
+                "has_grey": True,
+            },
+        ),
+        (
+            ["gray", "red"],
+            {
+                "has_grey": True,
+                "has_red": True,
+            },
+        ),
+        (
+            ["red", "green", "blue"],
+            {
+                "has_red": True,
+                "has_green": True,
+                "has_blue": True,
+            },
+        ),
+        (
+            ["cyan", "magenta", "yellow"],
+            {
+                "has_cyan": True,
+                "has_magenta": True,
+                "has_yellow": True,
+            },
+        ),
+    ),
+)
+def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
+    colors, positive_flags = test_params
+    expected_result = dict.fromkeys(
+        (
+            "has_grey",
+            "has_red",
+            "has_green",
+            "has_blue",
+            "has_cyan",
+            "has_magenta",
+            "has_yellow",
+        ),
+        False,
+    )
+    for flag, value in positive_flags.items():
+        expected_result[flag] = value
+    assert _get_color_flags(colors) == expected_result
+
+
 def test_register_clem_image_series():
-    assert _register_clem_image_series
+    _register_clem_image_series
 
 
-@pytest.mark.skip
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        (["gray"], "Bright Field"),
+        (["gray", "blue"], "Bright Field and Fluorescent"),
+        (["red", "green", "blue"], "Fluorescent"),
+    ),
+)
+def test_determine_collection_mode(test_params: tuple[list[str], str]):
+    colors, expected_result = test_params
+    assert _determine_collection_mode(colors) == expected_result
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        ("has_grey", "hasGrey"),
+        ("has_red", "hasRed"),
+        ("has_green", "hasGreen"),
+        ("has_blue", "hasBlue"),
+        ("has_cyan", "hasCyan"),
+        ("has_magenta", "hasMagenta"),
+        ("has_yellow", "hasYellow"),
+    ),
+)
+def test_snake_to_camel_case(
+    test_params: tuple[str, str],
+):
+    string, expected_result = test_params
+    assert _snake_to_camel_case(string) == expected_result
+
+
 def test_register_dcg_and_atlas():
-    assert _register_dcg_and_atlas
+    _register_dcg_and_atlas
 
 
-@pytest.mark.skip
 def test_register_grid_square():
-    assert _register_grid_square
+    _register_grid_square
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Colors
+        (["gray"],),
+        (["gray", "green"],),
+        (["red", "green", "blue"],),
+        (["cyan", "magenta", "blue"],),
+    ),
+)
 def test_run(
     mocker: MockerFixture,
     rsync_basepath: Path,
+    test_params: tuple[list[str]],
 ):
+    # Unpack test params
+    (colors,) = test_params
+
     # Mock the MurfeyDB connection
     mock_murfey_session_entry = MagicMock()
     mock_murfey_session_entry.instrument_name = ExampleVisit.instrument_name
@@ -161,6 +260,7 @@ def test_run(
     preprocessing_messages = generate_preprocessing_messages(
         rsync_basepath=rsync_basepath,
         session_id=ExampleVisit.murfey_session_id,
+        colors=colors,
     )
     for message in preprocessing_messages:
         result = run(
@@ -171,29 +271,34 @@ def test_run(
     assert mock_register_clem_series.call_count == len(preprocessing_messages)
     assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
     assert mock_register_grid_square.call_count == len(preprocessing_messages)
-    assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
-        colors
-    )
+    if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
+        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+    else:
+        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
 
 
-test_matrix = (
-    # Reverse order of list
-    (False,),
-    (True,),
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Reverse list order? | Colors
+        (False, ["gray"]),
+        (True, ["gray"]),
+        (False, ["red", "green", "blue"]),
+        (True, ["cyan", "magenta", "yellow"]),
+        (False, ["gray", "red", "green", "blue"]),
+        (True, ["gray", "cyan", "magenta", "yellow"]),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", test_matrix)
 def test_run_with_db(
     mocker: MockerFixture,
     rsync_basepath: Path,
     mock_ispyb_credentials,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
-    test_params: tuple[bool],
+    test_params: tuple[bool, list[str]],
 ):
     # Unpack test params
-    (shuffle_message,) = test_params
+    (shuffle_message, colors) = test_params
 
     # Create a session to insert for this test
     murfey_session: MurfeyDB.Session = get_or_create_db_entry(
@@ -258,6 +363,7 @@ def test_run_with_db(
     preprocessing_messages = generate_preprocessing_messages(
         rsync_basepath=rsync_basepath,
         session_id=murfey_session.id,
+        colors=colors,
     )
     if shuffle_message:
         preprocessing_messages.reverse()
@@ -270,9 +376,10 @@ def test_run_with_db(
 
     # Each message should call the align-and-merge workflow thrice
     # if gray and colour channels are both present
-    assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * len(
-        colors
-    )
+    if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
+        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+    else:
+        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
 
     # Both databases should have entries for data collection group, and grid squares
     # ISPyB database should additionally have an atlas entry
@@ -313,7 +420,19 @@ def test_run_with_db(
     )
     assert len(ispyb_atlas_search) == 1
 
+    # Determine the color flags and collection mode
+    color_flags = {
+        COLOR_FLAGS_MURFEY_TO_ISPYB[flag]: int(value)
+        for flag, value in _get_color_flags(colors).items()
+    }
+    collection_mode = _determine_collection_mode(colors)
+
     ispyb_atlas = ispyb_atlas_search[0]
+    # Check that the Atlas color flags and collection mode are set correctly
+    for flag, value in color_flags.items():
+        assert getattr(ispyb_atlas, flag) == value
+    assert ispyb_atlas.mode == collection_mode
+
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(
@@ -324,6 +443,11 @@ def test_run_with_db(
         .all()
     )
     assert len(ispyb_gs_search) == len(preprocessing_messages) - 1
+    for gs in ispyb_gs_search:
+        # Check that the Atlas color flags and collection mode are set correctly
+        for flag, value in color_flags.items():
+            assert getattr(gs, flag) == value
+        assert gs.mode == collection_mode
 
     murfey_db_session.close()
     ispyb_db_session.close()

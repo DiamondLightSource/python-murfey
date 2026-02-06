@@ -25,9 +25,11 @@ def test_run(
     # Run the function and check the results and calls made
     result = run(message, mock_murfey_db)
     mock_transport_object.do_update_atlas.assert_called_once_with(
-        message["atlas_id"],
-        message["atlas"],
-        message["atlas_pixel_size"],
-        message["sample"],
+        atlas_id=message["atlas_id"],
+        atlas_image=message["atlas"],
+        pixel_size=message["atlas_pixel_size"],
+        slot=message["sample"],
+        collection_mode=message.get("collection_mode"),
+        color_flags=message.get("color_flags", {}),
     )
     assert result == {"success": True}
