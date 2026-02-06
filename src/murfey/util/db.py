@@ -301,6 +301,7 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     has_cyan: Optional[bool] = Field(default=None)
     has_magenta: Optional[bool] = Field(default=None)
     has_yellow: Optional[bool] = Field(default=None)
+    collection_mode: Optional[str] = Field(default=None)
 
     # Shape and resolution information
     image_pixels_x: Optional[int] = Field(default=None)
