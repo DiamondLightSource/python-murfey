@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock
 
-import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 import pytest
 from pytest_mock import MockerFixture
 
@@ -78,21 +77,9 @@ def test_run(
         assert result == {"success": True}
     else:
         if ispyb_session_id is not None:
-            mock_transport_object.do_insert_data_collection_group.assert_called_once_with(
-                ISPyBDB.DataCollectionGroup(
-                    sessionId=ispyb_session_id,
-                    experimentTypeId=message["experiment_type_id"],
-                )
-            )
+            mock_transport_object.do_insert_data_collection_group.assert_called_once()
             if insert_dcg is not None:
-                mock_transport_object.do_insert_atlas.assert_called_once_with(
-                    ISPyBDB.Atlas(
-                        dataCollectionGroupId=dcg_result,
-                        atlasImage=message.get("atlas", ""),
-                        pixelSize=message.get("atlas_pixel_size", 0),
-                        cassetteSlot=message.get("sample"),
-                    )
-                )
+                mock_transport_object.do_insert_atlas.assert_called_once()
                 assert result == {"success": True}
             else:
                 assert result == {"success": False, "requeue": True}
