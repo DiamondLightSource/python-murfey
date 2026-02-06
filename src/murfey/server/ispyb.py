@@ -7,7 +7,7 @@ from typing import Callable, Generator, List, Literal, Optional
 import ispyb
 import workflows.transport
 from fastapi import Depends
-from ispyb.sqlalchemy import (
+from ispyb.sqlalchemy._auto_db_schema import (
     Atlas,
     AutoProcProgram,
     BLSample,
@@ -198,13 +198,8 @@ class TransportManager:
                 atlas.mode = collection_mode or atlas.mode
                 # Optionally insert colour flags if present
                 if color_flags:
-                    atlas.hasGrey = color_flags.get("hasGrey")
-                    atlas.hasRed = color_flags.get("hasRed")
-                    atlas.hasGreen = color_flags.get("hasGreen")
-                    atlas.hasBlue = color_flags.get("hasBlue")
-                    atlas.hasCyan = color_flags.get("hasCyan")
-                    atlas.hasYellow = color_flags.get("hasYellow")
-                    atlas.hasMagenta = color_flags.get("hasMagenta")
+                    for col_name, value in color_flags.items():
+                        setattr(atlas, col_name, value)
                 db.add(atlas)
                 db.commit()
                 return {"success": True, "return_value": atlas.atlasId}
@@ -247,16 +242,12 @@ class TransportManager:
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
             pixelSize=grid_square_parameters.pixel_size,
+            mode=grid_square_parameters.collection_mode,
         )
         # Optionally insert colour flags
         if color_flags:
-            record.hasGrey = color_flags.get("hasGrey")
-            record.hasRed = color_flags.get("hasRed")
-            record.hasGreen = color_flags.get("hasGreen")
-            record.hasBlue = color_flags.get("hasBlue")
-            record.hasCyan = color_flags.get("hasCyan")
-            record.hasYellow = color_flags.get("hasYellow")
-            record.hasMagenta = color_flags.get("hasMagenta")
+            for col_name, value in color_flags.items():
+                setattr(record, col_name, value)
         try:
             with ISPyBSession() as db:
                 db.add(record)
@@ -319,13 +310,8 @@ class TransportManager:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
                 if color_flags:
-                    grid_square.hasGrey = color_flags.get("hasGrey")
-                    grid_square.hasRed = color_flags.get("hasRed")
-                    grid_square.hasGreen = color_flags.get("hasGreen")
-                    grid_square.hasBlue = color_flags.get("hasBlue")
-                    grid_square.hasCyan = color_flags.get("hasCyan")
-                    grid_square.hasYellow = color_flags.get("hasYellow")
-                    grid_square.hasMagenta = color_flags.get("hasMagenta")
+                    for col_name, value in color_flags.items():
+                        setattr(grid_square, col_name, value)
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}

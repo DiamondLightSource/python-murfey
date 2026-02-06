@@ -71,13 +71,8 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
             if collection_mode := message.get("collection_mode"):
                 atlas_record.mode = collection_mode
             if color_flags := message.get("color_flags", {}):
-                atlas_record.hasGrey = color_flags.get("hasGrey")
-                atlas_record.hasRed = color_flags.get("hasRed")
-                atlas_record.hasGreen = color_flags.get("hasGreen")
-                atlas_record.hasBlue = color_flags.get("hasBlue")
-                atlas_record.hasCyan = color_flags.get("hasCyan")
-                atlas_record.hasYellow = color_flags.get("hasYellow")
-                atlas_record.hasMagenta = color_flags.get("hasMagenta")
+                for col_name, value in color_flags.items():
+                    setattr(atlas_record, col_name, value)
             atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
                 "return_value", None
             )
