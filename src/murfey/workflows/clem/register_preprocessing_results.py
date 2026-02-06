@@ -181,7 +181,7 @@ def _register_clem_image_series(
     clem_img_series.image_search_string = str(output_file.parent / "*tiff")
     clem_img_series.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
     clem_img_series.number_of_members = result.number_of_members
-    for col_name, value in _get_color_flags(result.output_files.keys()):
+    for col_name, value in _get_color_flags(result.output_files.keys()).items():
         setattr(clem_img_series, col_name, value)
     clem_img_series.collection_mode = _determine_collection_mode(
         result.output_files.keys()
