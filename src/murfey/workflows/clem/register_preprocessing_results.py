@@ -479,6 +479,7 @@ def _register_grid_square(
                 _transport_object.do_update_grid_square(
                     grid_square_id=grid_square_entry.id,
                     grid_square_parameters=grid_square_params,
+                    color_flags=_get_color_flags(result.output_files.keys()),
                 )
             else:
                 # Look up data collection group for current series
