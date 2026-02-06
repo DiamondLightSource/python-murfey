@@ -492,6 +492,7 @@ def _register_grid_square(
                     atlas_id=dcg_entry.atlas_id,
                     grid_square_id=clem_img_series.id,
                     grid_square_parameters=grid_square_params,
+                    color_flags=_get_color_flags(result.output_files.keys()),
                 )
                 # Register to Murfey
                 grid_square_entry = MurfeyDB.GridSquare(
