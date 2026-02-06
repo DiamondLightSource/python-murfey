@@ -187,8 +187,9 @@ class TransportManager:
         pixel_size: float,
         slot: int | None,
         collection_mode: str | None = None,
-        color_flags: dict[str, str | int] = {},
+        color_flags: dict[str, str | int] | None = None,
     ):
+        color_flags = color_flags or {}
         try:
             with ISPyBSession() as db:
                 atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
@@ -216,8 +217,9 @@ class TransportManager:
         atlas_id: int,
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
-        color_flags: dict[str, int] = {},
+        color_flags: dict[str, int] | None = None,
     ):
+        color_flags = color_flags or {}
         # most of this is for mypy
         if (
             grid_square_parameters.pixel_size is not None
@@ -266,8 +268,9 @@ class TransportManager:
         self,
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
-        color_flags: dict[str, int] = {},
+        color_flags: dict[str, int] | None = None,
     ):
+        color_flags = color_flags or {}
         try:
             with ISPyBSession() as db:
                 grid_square: GridSquare = (

@@ -199,8 +199,9 @@ color_columns = {
 
 
 def _get_color_flags(
-    colors: Collection[str] = [],
+    colors: Collection[str] | None = None,
 ):
+    colors = colors or []
     return {
         color_columns[color]: (1 if color in color_columns.keys() else 0)
         for color in colors
@@ -208,7 +209,7 @@ def _get_color_flags(
 
 
 def _determine_collection_mode(
-    colors: Collection[str] = [],
+    colors: Collection[str] | None = None,
 ):
     if not colors:
         logger.warning("No colours were present in returned result")
