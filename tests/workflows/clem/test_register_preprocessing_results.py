@@ -12,11 +12,13 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
+    COLOR_FLAGS_MURFEY_TO_ISPYB,
     _determine_collection_mode,
     _get_color_flags,
     _register_clem_image_series,
     _register_dcg_and_atlas,
     _register_grid_square,
+    _snake_to_camel_case,
     run,
 )
 from tests.conftest import ExampleVisit, get_or_create_db_entry
@@ -118,6 +120,59 @@ def generate_preprocessing_messages(
     return messages
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        (
+            ["gray"],
+            {
+                "has_grey": True,
+            },
+        ),
+        (
+            ["gray", "red"],
+            {
+                "has_grey": True,
+                "has_red": True,
+            },
+        ),
+        (
+            ["red", "green", "blue"],
+            {
+                "has_red": True,
+                "has_green": True,
+                "has_blue": True,
+            },
+        ),
+        (
+            ["cyan", "magenta", "yellow"],
+            {
+                "has_cyan": True,
+                "has_magenta": True,
+                "has_yellow": True,
+            },
+        ),
+    ),
+)
+def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
+    colors, positive_flags = test_params
+    expected_result = dict.fromkeys(
+        (
+            "has_grey",
+            "has_red",
+            "has_green",
+            "has_blue",
+            "has_cyan",
+            "has_magenta",
+            "has_yellow",
+        ),
+        False,
+    )
+    for flag, value in positive_flags.items():
+        expected_result[flag] = value
+    assert _get_color_flags(colors) == expected_result
+
+
 def test_register_clem_image_series():
     _register_clem_image_series
 
@@ -125,74 +180,33 @@ def test_register_clem_image_series():
 @pytest.mark.parametrize(
     "test_params",
     (
-        (
-            ["gray"],
-            {
-                "hasGrey": 1,
-            },
-        ),
-        (
-            ["gray", "red"],
-            {
-                "hasGrey": 1,
-                "hasRed": 1,
-            },
-        ),
-        (
-            ["red", "green", "blue"],
-            {
-                "hasRed": 1,
-                "hasGreen": 1,
-                "hasBlue": 1,
-            },
-        ),
-        (
-            ["cyan", "magenta", "yellow"],
-            {
-                "hasCyan": 1,
-                "hasMagenta": 1,
-                "hasYellow": 1,
-            },
-        ),
-    ),
-)
-def test_get_color_flags(test_params: tuple[list[str], dict[str, int]]):
-    # Unpack test params
-    colors, positive_flags = test_params
-    expected_result = dict.fromkeys(
-        (
-            "hasGrey",
-            "hasRed",
-            "hasGreen",
-            "hasBlue",
-            "hasCyan",
-            "hasMagenta",
-            "hasYellow",
-        ),
-        0,
-    )
-    for flag, value in positive_flags.items():
-        expected_result[flag] = value
-    assert _get_color_flags(colors) == expected_result
-
-
-@pytest.mark.parametrize(
-    "test_params",
-    (
-        (
-            ["gray"],
-            "Bright Field",
-        ),
-        (
-            ["gray", "blue"],
-            "Bright Field and Fluorescent",
-        ),
+        (["gray"], "Bright Field"),
+        (["gray", "blue"], "Bright Field and Fluorescent"),
         (["red", "green", "blue"], "Fluorescent"),
     ),
 )
 def test_determine_collection_mode(test_params: tuple[list[str], str]):
     colors, expected_result = test_params
     assert _determine_collection_mode(colors) == expected_result
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        ("has_grey", "hasGrey"),
+        ("has_red", "hasRed"),
+        ("has_green", "hasGreen"),
+        ("has_blue", "hasBlue"),
+        ("has_cyan", "hasCyan"),
+        ("has_magenta", "hasMagenta"),
+        ("has_yellow", "hasYellow"),
+    ),
+)
+def test_snake_to_camel_case(
+    test_params: tuple[str, str],
+):
+    string, expected_result = test_params
+    assert _snake_to_camel_case(string) == expected_result
 
 
 def test_register_dcg_and_atlas():
@@ -267,18 +281,8 @@ def test_run(
     "test_params",
     (
         # Reverse list order? | Colors
-        (
-            False,
-            [
-                "gray",
-            ],
-        ),
-        (
-            True,
-            [
-                "gray",
-            ],
-        ),
+        (False, ["gray"]),
+        (True, ["gray"]),
         (False, ["red", "green", "blue"]),
         (True, ["cyan", "magenta", "yellow"]),
         (False, ["gray", "red", "green", "blue"]),
@@ -417,7 +421,10 @@ def test_run_with_db(
     assert len(ispyb_atlas_search) == 1
 
     # Determine the color flags and collection mode
-    color_flags = _get_color_flags(colors)
+    color_flags = {
+        COLOR_FLAGS_MURFEY_TO_ISPYB[flag]: int(value)
+        for flag, value in _get_color_flags(colors).items()
+    }
     collection_mode = _determine_collection_mode(colors)
 
     ispyb_atlas = ispyb_atlas_search[0]
