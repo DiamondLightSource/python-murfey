@@ -7,7 +7,7 @@ from typing import Callable, Generator, List, Literal, Optional
 import ispyb
 import workflows.transport
 from fastapi import Depends
-from ispyb.sqlalchemy._auto_db_schema import (
+from ispyb.sqlalchemy import (
     Atlas,
     AutoProcProgram,
     BLSample,
