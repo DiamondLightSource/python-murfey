@@ -294,6 +294,13 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
         sa_relationship_kwargs={"cascade": "delete"},
     )  # One to many
     number_of_members: Optional[int] = Field(default=None)
+    has_grey: Optional[bool] = Field(default=None)
+    has_red: Optional[bool] = Field(default=None)
+    has_green: Optional[bool] = Field(default=None)
+    has_blue: Optional[bool] = Field(default=None)
+    has_cyan: Optional[bool] = Field(default=None)
+    has_magenta: Optional[bool] = Field(default=None)
+    has_yellow: Optional[bool] = Field(default=None)
 
     # Shape and resolution information
     image_pixels_x: Optional[int] = Field(default=None)
