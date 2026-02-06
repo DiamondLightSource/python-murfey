@@ -265,6 +265,9 @@ def _register_dcg_and_atlas(
         atlas_name = ""
         atlas_pixel_size = 0.0
 
+    color_flags = _get_color_flags(result.output_files.keys())
+    collection_mode = _determine_collection_mode(result.output_files.keys())
+
     if dcg_search := murfey_db.exec(
         select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
@@ -281,10 +284,8 @@ def _register_dcg_and_atlas(
                 "atlas": atlas_name,
                 "atlas_pixel_size": atlas_pixel_size,
                 "sample": dcg_entry.sample,
-                "color_flags": _get_color_flags(result.output_files.keys()),
-                "collection_mode": _determine_collection_mode(
-                    result.output_files.keys()
-                ),
+                "color_flags": color_flags,
+                "collection_mode": collection_mode,
             }
             if entry_point_result := entry_points(
                 group="murfey.workflows", name="atlas_update"
@@ -309,8 +310,8 @@ def _register_dcg_and_atlas(
             "atlas": atlas_name,
             "atlas_pixel_size": atlas_pixel_size,
             "sample": None,
-            "color_flags": _get_color_flags(result.output_files.keys()),
-            "collection_mode": _determine_collection_mode(result.output_files.keys()),
+            "color_flags": color_flags,
+            "collection_mode": collection_mode,
         }
         if entry_point_result := entry_points(
             group="murfey.workflows", name="data_collection_group"
