@@ -1148,15 +1148,17 @@ def _resize_intial_model(
         logger.info(
             f"Initial model rescaling finished with code {comp_proc.returncode}"
         )
+        if comp_proc.returncode:
+            logger.error(
+                f"Resizing initial model {input_path} failed"
+                f"\n {comp_proc.stdout} \n {comp_proc.stderr}"
+            )
+            raise RuntimeError(f"Resizing initial model {input_path} failed")
         with mrcfile.open(output_path) as rescaled_mrc:
             rescaled_mrc.header.cella = (
                 downscaled_pixel_size,
                 downscaled_pixel_size,
                 downscaled_pixel_size,
-            )
-        if comp_proc.returncode:
-            logger.error(
-                f"Resizing initial model {input_path} failed \n {comp_proc.stdout}"
             )
     return None
 
