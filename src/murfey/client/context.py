@@ -67,9 +67,9 @@ def ensure_dcg_exists(
 
     if not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
-        dcg_tag = (
-            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
-        )
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+        ).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
@@ -122,9 +122,9 @@ def ensure_dcg_exists(
             atlas=Path(partial_path), sample=sample
         )
 
-        dcg_tag = (
-            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
-        )
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+        ).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
