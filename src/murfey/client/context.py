@@ -96,20 +96,10 @@ def ensure_dcg_exists(
         logger.info(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
         )
-        atlas_xml_path = list(
-            (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
-        )[0]
-        logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
-        with open(atlas_xml_path, "rb") as atlas_xml:
-            atlas_xml_data = xmltodict.parse(atlas_xml)
-            atlas_original_pixel_size = float(
-                atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-                    "numericValue"
-                ]
-            )
-        # need to calculate the pixel size of the downscaled image
-        atlas_pixel_size = atlas_original_pixel_size * 7.8
-        logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
+
+        dcg_tag = (
+            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
+        )
 
         for p in partial_path.split("/"):
             if p.startswith("Sample"):
@@ -122,20 +112,39 @@ def ensure_dcg_exists(
             atlas=Path(partial_path), sample=sample
         )
 
-        dcg_tag = (
-            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
-        )
-        dcg_data = {
-            "experiment_type_id": experiment_type_id,
-            "tag": dcg_tag,
-            "atlas": str(
-                _atlas_destination(environment, session_file.parent, token)
-                / environment.samples[metadata_source].atlas.parent
-                / atlas_xml_path.with_suffix(".jpg").name
-            ).replace("//", "/"),
-            "sample": environment.samples[metadata_source].sample,
-            "atlas_pixel_size": atlas_pixel_size,
-        }
+        if atlas_xml_search := list(
+            (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
+        ):
+            atlas_xml_path = atlas_xml_search[0]
+            logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
+            with open(atlas_xml_path, "rb") as atlas_xml:
+                atlas_xml_data = xmltodict.parse(atlas_xml)
+                atlas_original_pixel_size = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
+            # need to calculate the pixel size of the downscaled image
+            atlas_pixel_size = atlas_original_pixel_size * 7.8
+            logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
+
+            dcg_data = {
+                "experiment_type_id": experiment_type_id,
+                "tag": dcg_tag,
+                "atlas": str(
+                    _atlas_destination(environment, session_file.parent, token)
+                    / environment.samples[metadata_source].atlas.parent
+                    / atlas_xml_path.with_suffix(".jpg").name
+                ).replace("//", "/"),
+                "sample": environment.samples[metadata_source].sample,
+                "atlas_pixel_size": atlas_pixel_size,
+            }
+        else:
+            dcg_data = {
+                "experiment_type_id": experiment_type_id,
+                "tag": dcg_tag,
+                "sample": environment.samples[metadata_source].sample,
+            }
     capture_post(
         base_url=str(environment.url.geturl()),
         router_name="workflow.router",
