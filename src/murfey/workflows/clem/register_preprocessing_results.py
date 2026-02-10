@@ -406,6 +406,8 @@ def _register_grid_square(
             and atlas_entry.x1 is not None
             and atlas_entry.y0 is not None
             and atlas_entry.y1 is not None
+            and atlas_entry.thumbnail_pixels_x is not None
+            and atlas_entry.thumbnail_pixels_y is not None
         ):
             atlas_width_real = atlas_entry.x1 - atlas_entry.x0
             atlas_height_real = atlas_entry.y1 - atlas_entry.y0
@@ -420,34 +422,31 @@ def _register_grid_square(
                 and clem_img_series.x1 is not None
                 and clem_img_series.y0 is not None
                 and clem_img_series.y1 is not None
-                and clem_img_series.thumbnail_pixels_x is not None
-                and clem_img_series.thumbnail_pixels_y is not None
-                and clem_img_series.thumbnail_pixel_size is not None
             ):
                 # Find pixel corresponding to image midpoint on atlas
                 x_mid_real = (
                     0.5 * (clem_img_series.x0 + clem_img_series.x1) - atlas_entry.x0
                 )
                 x_mid_px = int(
-                    x_mid_real / atlas_width_real * clem_img_series.thumbnail_pixels_x
+                    x_mid_real / atlas_width_real * atlas_entry.thumbnail_pixels_x
                 )
                 y_mid_real = (
                     0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
                 )
                 y_mid_px = int(
-                    y_mid_real / atlas_height_real * clem_img_series.thumbnail_pixels_y
+                    y_mid_real / atlas_height_real * atlas_entry.thumbnail_pixels_y
                 )
 
-                # Find the size of the image, in pixels, when overlaid the atlas
+                # Find the size of the image, in pixels, when overlaid on the atlas
                 width_scaled = int(
                     (clem_img_series.x1 - clem_img_series.x0)
                     / atlas_width_real
-                    * clem_img_series.thumbnail_pixels_x
+                    * atlas_entry.thumbnail_pixels_x
                 )
                 height_scaled = int(
                     (clem_img_series.y1 - clem_img_series.y0)
                     / atlas_height_real
-                    * clem_img_series.thumbnail_pixels_y
+                    * atlas_entry.thumbnail_pixels_y
                 )
             else:
                 logger.warning(
