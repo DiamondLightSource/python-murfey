@@ -39,17 +39,17 @@ def extract_base_type(annotation):
     The unwrapped base type, or the original annotation if no unambiguous base
     type can be determined.
     """
-    # Unwrap Annotated
+    # Unwrap Annotated type annotations
     if get_origin(annotation) is Annotated:
         annotation = get_args(annotation)[0]
 
-    # Unwrap Optional / Union:param
-    origin = get_origin(annotation)
-    if origin is Union:
+    # Unwrap and return single-type Optional type annotations
+    if get_origin(annotation) is Union:
         args = [a for a in get_args(annotation) if a is not type(None)]
         if len(args) == 1:
             return args[0]
 
+    # Return complex multi-type annotations or simple unpacked ones
     return annotation
 
 
