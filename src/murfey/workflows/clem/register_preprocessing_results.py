@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import traceback
+from collections.abc import Collection
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Literal, Optional
@@ -64,6 +65,27 @@ def _is_clem_atlas(result: CLEMPreprocessingResult):
         )
         >= processing_params.atlas_threshold
     )
+
+
+COLOR_FLAGS_MURFEY = {
+    "gray": "has_grey",
+    "red": "has_red",
+    "green": "has_green",
+    "blue": "has_blue",
+    "cyan": "has_cyan",
+    "magenta": "has_magenta",
+    "yellow": "has_yellow",
+}
+
+
+def _get_color_flags(
+    colors: Collection[str] | None = None,
+):
+    colors = colors or []
+    color_flags = dict.fromkeys(COLOR_FLAGS_MURFEY.values(), False)
+    for color in colors:
+        color_flags[COLOR_FLAGS_MURFEY[color]] = True
+    return color_flags
 
 
 def _register_clem_image_series(
@@ -159,6 +181,11 @@ def _register_clem_image_series(
     clem_img_series.image_search_string = str(output_file.parent / "*tiff")
     clem_img_series.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
     clem_img_series.number_of_members = result.number_of_members
+    for col_name, value in _get_color_flags(result.output_files.keys()).items():
+        setattr(clem_img_series, col_name, value)
+    clem_img_series.collection_mode = _determine_collection_mode(
+        result.output_files.keys()
+    )
     clem_img_series.image_pixels_x = result.pixels_x
     clem_img_series.image_pixels_y = result.pixels_y
     clem_img_series.image_pixel_size = result.pixel_size
@@ -184,6 +211,31 @@ def _register_clem_image_series(
     murfey_db.close()
 
     logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
+
+
+def _determine_collection_mode(
+    colors: Collection[str] | None = None,
+):
+    if not colors:
+        logger.warning("No colours were present in returned result")
+        return None
+    if "gray" in colors:
+        if len(colors) == 1:
+            return "Bright Field"
+        else:
+            return "Bright Field and Fluorescent"
+    else:
+        return "Fluorescent"
+
+
+def _snake_to_camel_case(string: str):
+    parts = string.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+COLOR_FLAGS_MURFEY_TO_ISPYB = {
+    value: _snake_to_camel_case(value) for value in COLOR_FLAGS_MURFEY.values()
+}
 
 
 def _register_dcg_and_atlas(
@@ -225,9 +277,17 @@ def _register_dcg_and_atlas(
         else:
             atlas_name = str(output_file.parent / "*.tiff")
             atlas_pixel_size = result.pixel_size
+        # Translate colour flags into ISPyB convention
+        color_flags = {
+            COLOR_FLAGS_MURFEY_TO_ISPYB[key]: int(value)
+            for key, value in _get_color_flags(result.output_files.keys()).items()
+        }
+        collection_mode = _determine_collection_mode(result.output_files.keys())
     else:
         atlas_name = ""
         atlas_pixel_size = 0.0
+        color_flags = None
+        collection_mode = None
 
     if dcg_search := murfey_db.exec(
         select(MurfeyDB.DataCollectionGroup)
@@ -245,6 +305,8 @@ def _register_dcg_and_atlas(
                 "atlas": atlas_name,
                 "atlas_pixel_size": atlas_pixel_size,
                 "sample": dcg_entry.sample,
+                "color_flags": color_flags,
+                "collection_mode": collection_mode,
             }
             if entry_point_result := entry_points(
                 group="murfey.workflows", name="atlas_update"
@@ -269,6 +331,8 @@ def _register_dcg_and_atlas(
             "atlas": atlas_name,
             "atlas_pixel_size": atlas_pixel_size,
             "sample": None,
+            "color_flags": color_flags,
+            "collection_mode": collection_mode,
         }
         if entry_point_result := entry_points(
             group="murfey.workflows", name="data_collection_group"
@@ -342,6 +406,8 @@ def _register_grid_square(
             and atlas_entry.x1 is not None
             and atlas_entry.y0 is not None
             and atlas_entry.y1 is not None
+            and atlas_entry.thumbnail_pixels_x is not None
+            and atlas_entry.thumbnail_pixels_y is not None
         ):
             atlas_width_real = atlas_entry.x1 - atlas_entry.x0
             atlas_height_real = atlas_entry.y1 - atlas_entry.y0
@@ -356,34 +422,31 @@ def _register_grid_square(
                 and clem_img_series.x1 is not None
                 and clem_img_series.y0 is not None
                 and clem_img_series.y1 is not None
-                and clem_img_series.thumbnail_pixels_x is not None
-                and clem_img_series.thumbnail_pixels_y is not None
-                and clem_img_series.thumbnail_pixel_size is not None
             ):
                 # Find pixel corresponding to image midpoint on atlas
                 x_mid_real = (
                     0.5 * (clem_img_series.x0 + clem_img_series.x1) - atlas_entry.x0
                 )
                 x_mid_px = int(
-                    x_mid_real / atlas_width_real * clem_img_series.thumbnail_pixels_x
+                    x_mid_real / atlas_width_real * atlas_entry.thumbnail_pixels_x
                 )
                 y_mid_real = (
                     0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
                 )
                 y_mid_px = int(
-                    y_mid_real / atlas_height_real * clem_img_series.thumbnail_pixels_y
+                    y_mid_real / atlas_height_real * atlas_entry.thumbnail_pixels_y
                 )
 
-                # Find the size of the image, in pixels, when overlaid the atlas
+                # Find the size of the image, in pixels, when overlaid on the atlas
                 width_scaled = int(
                     (clem_img_series.x1 - clem_img_series.x0)
                     / atlas_width_real
-                    * clem_img_series.thumbnail_pixels_x
+                    * atlas_entry.thumbnail_pixels_x
                 )
                 height_scaled = int(
                     (clem_img_series.y1 - clem_img_series.y0)
                     / atlas_height_real
-                    * clem_img_series.thumbnail_pixels_y
+                    * atlas_entry.thumbnail_pixels_y
                 )
             else:
                 logger.warning(
@@ -410,7 +473,13 @@ def _register_grid_square(
                 y_stage_position=0.5 * (clem_img_series.y0 + clem_img_series.y1),
                 pixel_size=clem_img_series.image_pixel_size,
                 image=clem_img_series.thumbnail_search_string,
+                collection_mode=clem_img_series.collection_mode,
             )
+            # Construct colour flags for ISPyB
+            color_flags = {
+                ispyb_color_flags: int(getattr(clem_img_series, murfey_color_flags, 0))
+                for murfey_color_flags, ispyb_color_flags in COLOR_FLAGS_MURFEY_TO_ISPYB.items()
+            }
             # Register or update the grid square entry as required
             if grid_square_result := murfey_db.exec(
                 select(MurfeyDB.GridSquare)
@@ -435,6 +504,7 @@ def _register_grid_square(
                 _transport_object.do_update_grid_square(
                     grid_square_id=grid_square_entry.id,
                     grid_square_parameters=grid_square_params,
+                    color_flags=color_flags,
                 )
             else:
                 # Look up data collection group for current series
@@ -448,6 +518,7 @@ def _register_grid_square(
                     atlas_id=dcg_entry.atlas_id,
                     grid_square_id=clem_img_series.id,
                     grid_square_parameters=grid_square_params,
+                    color_flags=color_flags,
                 )
                 # Register to Murfey
                 grid_square_entry = MurfeyDB.GridSquare(

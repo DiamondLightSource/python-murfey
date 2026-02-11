@@ -67,6 +67,12 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 pixelSize=message.get("atlas_pixel_size", 0),
                 cassetteSlot=message.get("sample"),
             )
+            # Optionally set the collection mode and color flags
+            if collection_mode := message.get("collection_mode"):
+                atlas_record.mode = collection_mode
+            if color_flags := message.get("color_flags", {}):
+                for col_name, value in color_flags.items():
+                    setattr(atlas_record, col_name, value)
             atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
                 "return_value", None
             )

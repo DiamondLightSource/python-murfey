@@ -6,28 +6,29 @@ from pytest_mock import MockerFixture
 from murfey.workflows.register_data_collection_group import run
 from tests.conftest import ExampleVisit
 
-register_data_collection_group_params_matrix = (
-    # ISPyB session ID | # DCG search result | # DCG insert result | # Atlas insert result
-    (0, 0, 0, 0),
-    (0, 0, 0, None),
-    (0, 0, None, 0),
-    (0, 0, None, None),
-    (0, None, 0, 0),
-    (0, None, 0, None),
-    (0, None, None, 0),
-    (0, None, None, None),
-    (None, 0, 0, 0),
-    (None, 0, 0, None),
-    (None, 0, None, 0),
-    (None, 0, None, None),
-    (None, None, 0, 0),
-    (None, None, 0, None),
-    (None, None, None, 0),
-    (None, None, None, None),
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # ISPyB session ID | # DCG search result | # DCG insert result | # Atlas insert result
+        (0, 0, 0, 0),
+        (0, 0, 0, None),
+        (0, 0, None, 0),
+        (0, 0, None, None),
+        (0, None, 0, 0),
+        (0, None, 0, None),
+        (0, None, None, 0),
+        (0, None, None, None),
+        (None, 0, 0, 0),
+        (None, 0, 0, None),
+        (None, 0, None, 0),
+        (None, 0, None, None),
+        (None, None, 0, 0),
+        (None, None, 0, None),
+        (None, None, None, 0),
+        (None, None, None, None),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", register_data_collection_group_params_matrix)
 def test_run(
     mocker: MockerFixture,
     test_params: tuple[int | None, int | None, int | None, int | None],
