@@ -566,12 +566,15 @@ class MultigridController:
                     + "/".join(source.parts[-2:])
                 )
                 metadata_source = Path(metadata_source_as_str.replace("//", "/"))
-            ensure_dcg_exists(
-                collection_type="spa",
-                metadata_source=metadata_source,
-                environment=self._environment,
-                token=self.token,
-            )
+            try:
+                ensure_dcg_exists(
+                    collection_type="spa",
+                    metadata_source=metadata_source,
+                    environment=self._environment,
+                    token=self.token,
+                )
+            except Exception as e:
+                log.error(f"Failed to register data collection group: {e}")
             data = {
                 "voltage": metadata_json["voltage"],
                 "pixel_size_on_image": metadata_json["pixel_size_on_image"],
