@@ -89,9 +89,18 @@ def ensure_dcg_exists(
         if not windows_path:
             logger.warning("No atlas metadata path found")
             return None
-        visit_index = windows_path.split("\\").index(environment.visit)
-        partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
-        logger.info("Partial Linux path successfully constructed from Windows path")
+        if environment.visit in windows_path.split("\\"):
+            # Case of atlas in the correct location
+            visit_index = windows_path.split("\\").index(environment.visit)
+            partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+            logger.info(
+                f"Partial Linux path successfully constructed from Windows path: {partial_path}"
+            )
+        else:
+            # Atlas not in visit, so come up with where it should have been
+            # Assumes /structure/to/Supervisor/Sample/Atlas/Atlas.dm
+            partial_path = "atlas/" + "/".join(windows_path.split("\\")[-4:])
+            logger.info(f"Partial Linux path estimated: {partial_path}")
 
         logger.info(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
