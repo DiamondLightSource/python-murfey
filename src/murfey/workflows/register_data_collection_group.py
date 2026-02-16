@@ -1,14 +1,15 @@
 import logging
 import time
 from importlib.metadata import entry_points
+from pathlib import Path
 
 import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
 from murfey.server.ispyb import ISPyBSession, get_session_id
+from murfey.util.db import DataCollectionGroup
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
@@ -30,14 +31,14 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     )
 
     if dcg_murfey := murfey_db.exec(
-        select(MurfeyDB.DataCollectionGroup)
-        .where(MurfeyDB.DataCollectionGroup.session_id == message["session_id"])
-        .where(MurfeyDB.DataCollectionGroup.tag == message.get("tag"))
+        select(DataCollectionGroup)
+        .where(DataCollectionGroup.session_id == message["session_id"])
+        .where(DataCollectionGroup.tag == message.get("tag"))
     ).all():
         dcgid = dcg_murfey[0].id
     else:
         if ispyb_session_id is None:
-            murfey_dcg = MurfeyDB.DataCollectionGroup(
+            murfey_dcg = DataCollectionGroup(
                 session_id=message["session_id"],
                 tag=message.get("tag"),
             )
@@ -77,7 +78,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 "return_value", None
             )
 
-            murfey_dcg = MurfeyDB.DataCollectionGroup(
+            murfey_dcg = DataCollectionGroup(
                 id=dcgid,
                 atlas_id=atlas_id,
                 atlas=message.get("atlas", ""),
@@ -89,6 +90,23 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
         murfey_db.add(murfey_dcg)
         murfey_db.commit()
         murfey_db.close()
+
+    # Find out how many dcgs we have with this atlas
+    if (
+        message.get("atlas")
+        and message.get("sample")
+        and "atlas" in Path(message.get("tag", "/")).parts
+    ):
+        dcgs_atlas = murfey_db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == message["session_id"])
+            .where(DataCollectionGroup.atlas == message["atlas"])
+            .where(DataCollectionGroup.sample == message["sample"])
+        ).all()
+        if len(dcgs_atlas) > 1:
+            # Skip hooks if this is an atlas and there is a processing dcg present
+            logger.info(f"Skipping data collection group hooks for {message['tag']}")
+            return {"success": True}
 
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:

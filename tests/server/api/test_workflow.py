@@ -177,6 +177,7 @@ def test_register_dc_group_processing_to_atlas(
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
+            "tag": "processing_tag",
         },
     )
     mock_transport.send.assert_any_call(
@@ -189,6 +190,7 @@ def test_register_dc_group_processing_to_atlas(
             "atlas_pixel_size": 1e-4,
             "dcgid": 2,
             "session_id": ExampleVisit.murfey_session_id,
+            "tag": "second_processing_tag",
         },
     )
 
@@ -395,6 +397,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
+            "tag": "processing_tag",
         },
     )
 
