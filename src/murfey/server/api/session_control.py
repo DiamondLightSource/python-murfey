@@ -10,6 +10,14 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import select
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import AtlasData
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api.auth import (
@@ -347,6 +355,47 @@ def get_foil_hole(
     session_id: MurfeySessionID, fh_name: int, db=murfey_db
 ) -> Dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
+
+
+class AtlasRegistration(BaseModel):
+    name: str
+    acqusition_uuid: str
+
+
+@spa_router.post("/sessions/{session_id}/register_atlas")
+def register_atlas(
+    session_id: MurfeySessionID,
+    atlas_registration_data: AtlasRegistration,
+    db=murfey_db,
+):
+    if SMARTEM_ACTIVE:
+        session = db.exec(select(Session).where(Session.id == session_id)).one()
+        machine_config = get_machine_config(session.instrument_name)[
+            session.instrument_name
+        ]
+        if machine_config.smartem_api_url:
+            smartem_client = SmartEMAPIClient(
+                base_url=machine_config.smartem_api_url, logger=logger
+            )
+            possible_grids = smartem_client.get_acquisition_grids(
+                atlas_registration_data.acqusition_uuid
+            )
+            grid_uuid = None
+            for grid in possible_grids:
+                if grid.name == atlas_registration_data.name.replace("_atlas", ""):
+                    grid_uuid = grid.uuid
+                    break
+            if grid_uuid is not None:
+                atlas_data = AtlasData(
+                    id=atlas_registration_data.name,
+                    acquisition_data=datetime.now(),
+                    storage_folder="",
+                    name=atlas_registration_data.name,
+                    tiles=[],
+                    gridsquare_positions=None,
+                    grid_uuid=grid_uuid,
+                )
+                smartem_client.create_grid_atlas(atlas_data)
 
 
 @spa_router.post("/sessions/{session_id}/make_atlas_jpg")
