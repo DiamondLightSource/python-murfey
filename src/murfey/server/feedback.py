@@ -1215,7 +1215,6 @@ def _register_3d_batch(message: dict, _db):
             )
         feedback_params.initial_model = str(rescaled_initial_model_path)
         other_options["initial_model"] = str(rescaled_initial_model_path)
-        next_job = feedback_params.next_job
         class3d_dir = (
             f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
