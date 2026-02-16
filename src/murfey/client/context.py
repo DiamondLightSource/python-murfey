@@ -99,7 +99,7 @@ def ensure_dcg_exists(
         else:
             # Atlas not in visit, so come up with where it should have been
             # Assumes /structure/to/Supervisor/Sample/Atlas/Atlas.dm
-            partial_path = "/".join(windows_path.split("\\")[-4:])
+            partial_path = "atlas/" + "/".join(windows_path.split("\\")[-4:])
             logger.info(f"Partial Linux path estimated: {partial_path}")
 
         logger.info(
