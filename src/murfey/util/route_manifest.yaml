@@ -1092,6 +1092,13 @@ murfey.server.api.session_info.router:
         type: str
     methods:
       - GET
+  - path: /session_info/instruments/{instrument_name}/smartem
+    function: check_smartem_availability
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
   - path: /session_info/instruments/{instrument_name}/visits_raw
     function: get_current_visits
     path_params:
