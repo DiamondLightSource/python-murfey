@@ -160,10 +160,10 @@ async def setup_multigrid_watcher(
                 acquisition_data = AcquisitionData(name=visit)
                 async with clientsession.post(
                     f"{machine_config.smartem_api_url}/acquisitions",
-                    AcquisitionData.model_json_schema(),
+                    acquisition_data.model_json_schema(),
                 ) as response:
-                    acquisition_data = await response.json()
-                acquisition_uuid = acquisition_data.uuid
+                    acquisition_response_data = await response.json()
+                acquisition_uuid = acquisition_response_data.uuid
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={
