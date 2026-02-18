@@ -164,9 +164,9 @@ class SPAMetadataContext(Context):
                 f"Collecting foil hole positions for {str(transferred_file)} and grid square {gs_name}"
             )
             fh_positions = _foil_hole_positions(transferred_file, gs_name)
-            visitless_source_search_dir = str(source).replace(
-                f"/{environment.visit}", ""
-            )
+            visitless_source_search_dir = "/".join(
+                [part for part in source.parts if part != environment.visit]
+            ).replace("//", "/")
             visitless_source_images_dirs = sorted(
                 Path(visitless_source_search_dir).glob("Images-Disc*"),
                 key=lambda x: x.stat().st_ctime,
