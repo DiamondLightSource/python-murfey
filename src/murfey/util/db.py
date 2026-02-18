@@ -42,15 +42,30 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
     session: Optional["Session"] = Relationship(back_populates="rsync_instances")
 
 
+class AtlasOptics(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True)
+    mag: int
+    tiles_x: int
+    tiles_y: int
+    spot_size: float
+    c2_percentage: float
+    name: str = ""
+    sessions: List["Session"] = Relationship(back_populates="atlas_optics")
+
+
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
+    atlas_optics_id: int = Field(foreign_key="atlasoptics.id", default=None)
     visit: str = Field(default="")
     started: bool = Field(default=False)
     current_gain_ref: str = Field(default="")
     instrument_name: str = Field(default="")
     process: bool = Field(default=True)
+    acquisition_uuid: str = Field(default="")
     visit_end_time: Optional[datetime] = Field(default=None)
+
+    atlas_optics: Optional[AtlasOptics] = Relationship(back_populates="sessions")
 
     # CLEM Workflow
 

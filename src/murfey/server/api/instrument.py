@@ -169,6 +169,9 @@ async def setup_multigrid_watcher(
                     ) as response:
                         acquisition_response_data = await response.json()
                     acquisition_uuid = acquisition_response_data["uuid"]
+                    session.acquisition_uuid = acquisition_response_data or ""
+                    db.add(session)
+                    db.commit()
                 except Exception:
                     log.warning(
                         "failed to register acquisition with smartem", exc_info=True
