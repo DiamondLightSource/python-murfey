@@ -14,6 +14,7 @@ from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 try:
+    from smartem_backend.api_client import EntityConverter
     from smartem_common.schemas import AcquisitionData
 
     SMARTEM_ACTIVE = True
@@ -157,13 +158,23 @@ async def setup_multigrid_watcher(
         async with aiohttp.ClientSession() as clientsession:
             acquisition_uuid = None
             if SMARTEM_ACTIVE and machine_config.smartem_api_url:
-                acquisition_data = AcquisitionData(name=visit)
-                async with clientsession.post(
-                    f"{machine_config.smartem_api_url}/acquisitions",
-                    acquisition_data.model_json_schema(),
-                ) as response:
-                    acquisition_response_data = await response.json()
-                acquisition_uuid = acquisition_response_data.uuid
+                log.info("registering an acquisition with smartem")
+                try:
+                    acquisition_data = EntityConverter.acquisition_to_request(
+                        AcquisitionData(name=visit)
+                    )
+                    async with clientsession.post(
+                        f"{machine_config.smartem_api_url}/acquisitions",
+                        json=acquisition_data.model_dump(),
+                    ) as response:
+                        acquisition_response_data = await response.json()
+                    acquisition_uuid = acquisition_response_data["uuid"]
+                except Exception:
+                    log.warning(
+                        "failed to register acquisition with smartem", exc_info=True
+                    )
+            else:
+                log.info("smartem not configured")
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={

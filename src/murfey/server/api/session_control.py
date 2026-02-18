@@ -396,6 +396,8 @@ def register_atlas(
                     grid_uuid=grid_uuid,
                 )
                 smartem_client.create_grid_atlas(atlas_data)
+    else:
+        logger.info("smartem deactivated so did not register atlas")
 
 
 @spa_router.post("/sessions/{session_id}/make_atlas_jpg")
