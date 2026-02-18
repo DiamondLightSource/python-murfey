@@ -731,6 +731,25 @@ murfey.server.api.processing_parameters.router:
         type: int
     methods:
       - POST
+  - path: /session_parameters/atlas_optics
+    function: get_all_registered_atlas_optic_settings
+    path_params: []
+    methods:
+      - GET
+  - path: /session_parameters/sessions/{session_id}/atlas_optics
+    function: get_atlas_optics_for_session
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_parameters/acquisitions/{acquisition_uuid}/atlas_optics
+    function: get_atlas_optics_for_session_from_acquisition_uuid
+    path_params:
+      - name: acquisition_uuid
+        type: str
+    methods:
+      - GET
 murfey.server.api.prometheus.router:
   - path: /prometheus/visits/{visit_name}/increment_rsync_file_count
     function: increment_rsync_file_count

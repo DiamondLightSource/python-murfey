@@ -13,7 +13,11 @@ from murfey.server.api.auth import (
 )
 from murfey.server.murfey_db import murfey_db
 from murfey.util.config import get_machine_config
-from murfey.util.db import Session as MurfeySession, SessionProcessingParameters
+from murfey.util.db import (
+    AtlasOptics,
+    Session as MurfeySession,
+    SessionProcessingParameters,
+)
 
 logger = getLogger("murfey.server.api.processing_parameters")
 
@@ -120,3 +124,32 @@ def set_session_processing_parameters(
     db.commit()
     db.close()
     return edited_parameters
+
+
+@router.get("/atlas_optics")
+def get_all_registered_atlas_optic_settings(
+    db: Session = murfey_db,
+) -> List[AtlasOptics]:
+    return list(db.exec(select(AtlasOptics)).all())
+
+
+@router.get("/sessions/{session_id}/atlas_optics")
+def get_atlas_optics_for_session(
+    session_id: int, db: Session = murfey_db
+) -> AtlasOptics:
+    return db.exec(
+        select(MurfeySession, AtlasOptics)
+        .where(MurfeySession.id == session_id)
+        .where(MurfeySession.atlas_optics_id == AtlasOptics.id)
+    ).one()[1]
+
+
+@router.get("/acquisitions/{acquisition_uuid}/atlas_optics")
+def get_atlas_optics_for_session_from_acquisition_uuid(
+    acquisition_uuid: str, db: Session = murfey_db
+) -> AtlasOptics:
+    return db.exec(
+        select(MurfeySession, AtlasOptics)
+        .where(MurfeySession.acquisition_uuid == acquisition_uuid)
+        .where(MurfeySession.atlas_optics_id == AtlasOptics.id)
+    ).one()[1]
