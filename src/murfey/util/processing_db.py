@@ -9,7 +9,19 @@ from murfey.util import db
 
 
 class CLEMImageSeries(db.CLEMImageSeries):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    pass
+
+
+class CLEMLIFFile(db.CLEMLIFFile):
+    pass
+
+
+class CLEMImageMetadata(db.CLEMImageMetadata):
+    pass
+
+
+class CLEMImageStack(db.CLEMImageStack):
+    pass
 
 
 class NotificationParameter(db.NotificationParameter):
