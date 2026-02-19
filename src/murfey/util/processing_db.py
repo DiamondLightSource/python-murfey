@@ -8,6 +8,22 @@ from sqlmodel import Enum, Field, Relationship, create_engine
 from murfey.util import db
 
 
+class CLEMImageSeries(db.CLEMImageSeries):
+    pass
+
+
+class NotificationParameter(db.NotificationParameter):
+    pass
+
+
+class Session(db.Session):
+    pass
+
+
+class TomographyProcessingParameters(db.TomographyProcessingParameters):
+    pass
+
+
 class DataCollectionGroup(db.DataCollectionGroup):
     grid_squares: List["GridSquare"] = Relationship(
         back_populates="data_collection_group",
