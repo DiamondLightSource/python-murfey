@@ -608,13 +608,13 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     ctf_id: Optional[int] = Field(foreign_key="ctf.ctfId")
     tomogram_id: Optional[int] = Field(foreign_key="tomogram.tomogramId")
     particle_picker_id: Optional[int] = Field(
-        foreign_key="ParticlePicker.particlePickerId"
+        foreign_key="particlepicker.particlePickerId"
     )
     relative_ice_thickness_id: Optional[int] = Field(
-        foreign_key="RelativeIceThickness.relativeIceThicknessId"
+        foreign_key="relativeicethickness.relativeIceThicknessId"
     )
     particle_classification_group_id: Optional[int] = Field(
-        foreign_key="ParticleClassificationGroup.particleClassificationGroupId"
+        foreign_key="particleclassificationgroup.particleClassificationGroupId"
     )
     motion_correction: Optional[List["MotionCorrection"]] = Relationship(
         back_populates="auto_proc_program"

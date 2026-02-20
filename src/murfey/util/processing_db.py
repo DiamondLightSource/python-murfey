@@ -9,8 +9,8 @@ from murfey.util import db
 
 class MotionCorrection(db.SQLModel, table=True):  # type: ignore
     motionCorrectionId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProgProgram.id")
+    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     imageNumber: Optional[int] = None
     firstFrame: Optional[int] = None
     lastFrame: Optional[int] = None
@@ -26,7 +26,7 @@ class MotionCorrection(db.SQLModel, table=True):  # type: ignore
     fftFullPath: Optional[str] = None
     fftCorrectedFullPath: Optional[str] = None
     comments: Optional[str] = None
-    movieId: Optional[int] = Field(foreign_key="Movie.murfey_id")
+    movieId: Optional[int] = Field(foreign_key="movie.murfey_id")
     auto_proc_program: Optional["db.AutoProcProgram"] = Relationship(
         back_populates="motion_correction"
     )
@@ -46,9 +46,9 @@ class MotionCorrection(db.SQLModel, table=True):  # type: ignore
 class CTF(db.SQLModel, table=True):  # type: ignore
     ctfId: int = Field(primary_key=True, unique=True)
     motionCorrectionId: Optional[int] = Field(
-        foreign_key="MotionCorrection.motionCorrectionId"
+        foreign_key="motioncorrection.motionCorrectionId"
     )
-    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProcProgram.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     boxSizeX: Optional[float] = None
     boxSizeY: Optional[float] = None
     minResolution: Optional[float] = None
@@ -72,9 +72,9 @@ class CTF(db.SQLModel, table=True):  # type: ignore
 
 class ParticlePicker(db.SQLModel, table=True):  # type: ignore
     particlePickerId: int = Field(primary_key=True, unique=True)
-    programId: Optional[int] = Field(foreign_key="db.AutoProcProgram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
     firstMotionCorrectionId: Optional[int] = Field(
-        foreign_key="MotionCorrection.motionCorrectionId"
+        foreign_key="motioncorrection.motionCorrectionId"
     )
     particlePickingTemplate: Optional[str] = None
     particleDiameter: Optional[float] = None
@@ -93,8 +93,8 @@ class ParticlePicker(db.SQLModel, table=True):  # type: ignore
 
 class Tomogram(db.SQLModel, table=True):  # type: ignore
     tomogramId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="db.DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProcProgram.id")
+    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     volumeFile: Optional[str] = None
     stackFile: Optional[str] = None
     sizeX: Optional[int] = None
@@ -114,10 +114,10 @@ class Tomogram(db.SQLModel, table=True):  # type: ignore
     projXZ: Optional[str] = None
     recordTimeStamp: Optional[datetime.datetime] = None
     globalAlignmentQuality: Optional[float] = None
-    gridSquareId: Optional[int] = Field(foreign_key="SearchMap.id")
+    gridSquareId: Optional[int] = Field(foreign_key="searchmap.id")
     pixelLocationX: Optional[int] = None
     pixelLocationY: Optional[int] = None
-    auto_program_program: Optional["db.AutoProcProgram"] = Relationship(
+    auto_proc_program: Optional["db.AutoProcProgram"] = Relationship(
         back_populates="tomogram"
     )
     data_collection: Optional["db.DataCollection"] = Relationship(
@@ -134,7 +134,7 @@ class Tomogram(db.SQLModel, table=True):  # type: ignore
 
 class ProcessedTomogram(db.SQLModel, table=True):  # type: ignore
     processedTomogramId: int = Field(primary_key=True, unique=True)
-    tomogramId: int = Field(foreign_key="Tomogram.tomogramId")
+    tomogramId: int = Field(foreign_key="tomogram.tomogramId")
     filePath: Optional[str] = None
     processingType: Optional[str] = None
     tomogram: Optional["Tomogram"] = Relationship(back_populates="processed_tomogram")
@@ -143,10 +143,10 @@ class ProcessedTomogram(db.SQLModel, table=True):  # type: ignore
 class RelativeIceThickness(db.SQLModel, table=True):  # type: ignore
     relativeIceThicknessId: int = Field(primary_key=True, unique=True)
     motionCorrectionId: Optional[int] = Field(
-        foreign_key="MotionCorrection.motionCorrectionId"
+        foreign_key="motioncorrection.motionCorrectionId"
     )
     autoProcProgramId: Optional[int] = Field(
-        foreign_key="db.AutoProcProgram.autoProcProgramId"
+        foreign_key="autoprocprogram.autoProcProgramId"
     )
     minimum: Optional[float] = None
     q1: Optional[float] = None
@@ -162,8 +162,8 @@ class RelativeIceThickness(db.SQLModel, table=True):  # type: ignore
 
 
 class TiltImageAlignment(db.SQLModel, table=True):  # type: ignore
-    movieId: int = Field(foreign_key="db.Movie.murfey_id", primary_key=True)
-    tomogramId: int = Field(foreign_key="Tomogram.tomogramId", primary_key=True)
+    movieId: int = Field(foreign_key="movie.murfey_id", primary_key=True)
+    tomogramId: int = Field(foreign_key="tomogram.tomogramId", primary_key=True)
     defocusU: Optional[float] = None
     defocusV: Optional[float] = None
     psdFile: Optional[str] = None
@@ -180,9 +180,9 @@ class TiltImageAlignment(db.SQLModel, table=True):  # type: ignore
 class ParticleClassificationGroup(db.SQLModel, table=True):  # type: ignore
     particleClassificationGroupId: int = Field(primary_key=True, unique=True)
     particlePickerId: Optional[int] = Field(
-        foreign_key="ParticlePicker.particlePickerId"
+        foreign_key="particlepicker.particlePickerId"
     )
-    programId: Optional[int] = Field(foreign_key="db.AutoProcProgram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
     type: Optional[str] = Enum("2D", "3D")
     batchNumber: Optional[int] = None
     numberOfParticlesPerBatch: Optional[int] = None
@@ -210,7 +210,7 @@ class ParticleClassification(db.SQLModel, table=True):  # type: ignore
     estimatedResolution: Optional[float] = None
     overallFourierCompleteness: Optional[float] = None
     particleClassificationGroupId: Optional[int] = Field(
-        foreign_key="ParticleClassificationGroup.particleClassificationGroupId"
+        foreign_key="particleclassificationgroup.particleClassificationGroupId"
     )
     classDistribution: Optional[float] = None
     selected: Optional[int] = None
@@ -233,7 +233,7 @@ class ParticleClassification(db.SQLModel, table=True):  # type: ignore
 class BFactorFit(db.SQLModel, table=True):  # type: ignore
     bFactorFitId: int = Field(primary_key=True, unique=True)
     particleClassificationId: int = Field(
-        foreign_key="ParticleClassification.particleClassificationId"
+        foreign_key="particleclassification.particleClassificationId"
     )
     resolution: Optional[float] = None
     numberOfParticles: Optional[int] = None
@@ -246,7 +246,7 @@ class BFactorFit(db.SQLModel, table=True):  # type: ignore
 class CryoemInitialModel(db.SQLModel, table=True):  # type: ignore
     cryoemInitialModelId: int = Field(primary_key=True, unique=True)
     particleClassificationId: int = Field(
-        foreign_key="ParticleClassification.particleClassificationId"
+        foreign_key="particleclassification.particleClassificationId"
     )
     resolution: Optional[float] = None
     numberOfParticles: Optional[int] = None
