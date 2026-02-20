@@ -153,3 +153,33 @@ def get_atlas_optics_for_session_from_acquisition_uuid(
         .where(MurfeySession.acquisition_uuid == acquisition_uuid)
         .where(MurfeySession.atlas_optics_id == AtlasOptics.id)
     ).one()[1]
+
+
+class AtlasOpticsData(BaseModel):
+    mag: int
+    tiles_x: int
+    tiles_y: int
+    spot_size: float
+    c2_percentage: float
+    name: str = ""
+
+
+@router.post("/atlas_optics")
+def add_atlas_optics_settings(
+    atlas_optics: AtlasOpticsData, db: Session = murfey_db
+) -> AtlasOptics:
+    atlas_optics_row = AtlasOptics(**atlas_optics.model_dump())
+    db.add(atlas_optics_row)
+    db.commit()
+    return atlas_optics_row
+
+
+@router.post("/session/{session_id}/atlas_optics/{atlas_optics_id}")
+def link_session_to_atlas_optics(
+    session_id: int, atlas_optics_id: int, db: Session = murfey_db
+) -> None:
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    session.atlas_optics_id = atlas_optics_id
+    db.add(session)
+    db.commit()
+    return None

@@ -750,6 +750,20 @@ murfey.server.api.processing_parameters.router:
         type: str
     methods:
       - GET
+  - path: /session_parameters/atlas_optics
+    function: add_atlas_optics_settings
+    path_params: []
+    methods:
+      - POST
+  - path: /session_parameters/session/{session_id}/atlas_optics/{atlas_optics_id}
+    function: link_session_to_atlas_optics
+    path_params:
+      - name: session_id
+        type: int
+      - name: atlas_optics_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.prometheus.router:
   - path: /prometheus/visits/{visit_name}/increment_rsync_file_count
     function: increment_rsync_file_count
