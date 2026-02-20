@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, select
 
@@ -64,7 +64,3 @@ def test_processing_tables_exist(murfey_db_url):
         assert murfey_db_session.exec(select(DataCollectionGroup)).all() == []
 
     connection.close()
-    metadata = MetaData()
-    metadata.create_all(engine)
-    metadata.reflect(engine)
-    metadata.drop_all(engine)
