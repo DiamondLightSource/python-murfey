@@ -9,7 +9,7 @@ from murfey.util import db
 
 
 class CLEMImageSeries(db.CLEMImageSeries):
-    pass
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class CLEMLIFFile(db.CLEMLIFFile):
