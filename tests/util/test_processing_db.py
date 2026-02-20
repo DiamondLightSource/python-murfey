@@ -9,7 +9,6 @@ from murfey.util.processing_db import (
     CTF,
     BFactorFit,
     CryoemInitialModel,
-    DataCollectionGroup,
     MotionCorrection,
     ParticleClassification,
     ParticleClassificationGroup,
@@ -47,7 +46,6 @@ def test_processing_tables_exist(murfey_db_url):
     with sessionmaker(
         bind=connection, expire_on_commit=False, class_=Session
     ) as murfey_db_session:
-        assert murfey_db_session.exec(select(DataCollectionGroup)).all() == []
         assert murfey_db_session.exec(select(MotionCorrection)).all() == []
         assert murfey_db_session.exec(select(CTF)).all() == []
         assert murfey_db_session.exec(select(ParticlePicker)).all() == []
@@ -60,9 +58,10 @@ def test_processing_tables_exist(murfey_db_url):
         assert murfey_db_session.exec(select(BFactorFit)).all() == []
         assert murfey_db_session.exec(select(CryoemInitialModel)).all() == []
 
-        from murfey.util.db import ClientEnvironment
+        from murfey.util.db import ClientEnvironment, DataCollectionGroup
 
         assert murfey_db_session.exec(select(ClientEnvironment)).all() == []
+        assert murfey_db_session.exec(select(DataCollectionGroup)).all() == []
 
     connection.close()
     metadata = MetaData()
