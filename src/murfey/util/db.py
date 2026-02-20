@@ -56,7 +56,7 @@ class AtlasOptics(SQLModel, table=True):  # type: ignore
 class Session(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True)
     name: str
-    atlas_optics_id: int = Field(foreign_key="atlasoptics.id", default=None)
+    atlas_optics_id: Optional[int] = Field(foreign_key="atlasoptics.id", default=None, nullable=True)
     visit: str = Field(default="")
     started: bool = Field(default=False)
     current_gain_ref: str = Field(default="")

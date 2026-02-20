@@ -133,6 +133,14 @@ def get_all_registered_atlas_optic_settings(
     return list(db.exec(select(AtlasOptics)).all())
 
 
+@router.delete("/atlas_optics/{atlas_optics_id}")
+def delete_registered_atlas_optic_settings(
+    atlas_optics_id: int, db: Session = murfey_db,
+) -> None:
+    atlas_optics_settings = db.exec(select(AtlasOptics).where(AtlasOptics.id == atlas_optics_id)).one()
+    db.delete(atlas_optics_settings)
+    db.commit()
+
 @router.get("/sessions/{session_id}/atlas_optics")
 def get_atlas_optics_for_session(
     session_id: int, db: Session = murfey_db
@@ -168,7 +176,9 @@ class AtlasOpticsData(BaseModel):
 def add_atlas_optics_settings(
     atlas_optics: AtlasOpticsData, db: Session = murfey_db
 ) -> AtlasOptics:
+    print(atlas_optics.model_dump())
     atlas_optics_row = AtlasOptics(**atlas_optics.model_dump())
+    print(atlas_optics_row)
     db.add(atlas_optics_row)
     db.commit()
     return atlas_optics_row
