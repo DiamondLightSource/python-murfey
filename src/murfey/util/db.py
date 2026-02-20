@@ -607,7 +607,7 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
     )
     motion_correction: Optional[List["MotionCorrection"]] = Relationship(
-        back_populates="motion_correction"
+        back_populates="auto_proc_program"
     )
     tomogram: Optional[List["Tomogram"]] = Relationship(
         back_populates="auto_proc_program"
