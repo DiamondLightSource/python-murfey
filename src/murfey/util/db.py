@@ -407,7 +407,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 
 
-class DataCollectionGroupModel(SQLModel):  # type: ignore
+class DataCollectionGroupModel(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
