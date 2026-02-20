@@ -12,6 +12,7 @@ from sqlmodel import Field, Relationship, SQLModel, create_engine
 """
 GENERAL
 """
+mapper_registry = sqlalchemy.orm.registry()
 
 
 class MurfeyUser(SQLModel, table=True):  # type: ignore
@@ -435,6 +436,7 @@ class DataCollectionGroupModel(SQLModel):  # type: ignore
     )
 
 
+@mapper_registry.mapped
 class DataCollectionGroup(DataCollectionGroupModel, table=True):  # type: ignore
     pass
 
