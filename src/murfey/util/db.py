@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 """
 GENERAL
 """
-mapper_registry = sqlalchemy.orm.registry()
 
 
 class MurfeyUser(SQLModel, table=True):  # type: ignore
