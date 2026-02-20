@@ -45,7 +45,7 @@ def test_processing_tables_exist(murfey_db_url):
 
     with sessionmaker(
         bind=connection, expire_on_commit=False, class_=Session
-    ) as murfey_db_session:
+    )() as murfey_db_session:
         assert murfey_db_session.exec(select(MotionCorrection)).all() == []
         assert murfey_db_session.exec(select(CTF)).all() == []
         assert murfey_db_session.exec(select(ParticlePicker)).all() == []
