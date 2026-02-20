@@ -598,13 +598,23 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     pj_id: int = Field(foreign_key="processingjob.id")
-    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
-    ctf_id: Optional[int] = Field(foreign_key="ctf.ctfId")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )
     murfey_ids: List["MurfeyLedger"] = Relationship(
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
+    ctf_id: Optional[int] = Field(foreign_key="ctf.ctfId")
+    tomogram_id: Optional[int] = Field(foreign_key="tomogram.tomogramId")
+    particle_picker_id: Optional[int] = Field(
+        foreign_key="ParticlePicker.particlePickerId"
+    )
+    relative_ice_thickness_id: Optional[int] = Field(
+        foreign_key="RelativeIceThickness.relativeIceThicknessId"
+    )
+    particle_classification_group_id: Optional[int] = Field(
+        foreign_key="ParticleClassificationGroup.particleClassificationGroupId"
     )
     motion_correction: Optional[List["MotionCorrection"]] = Relationship(
         back_populates="auto_proc_program"
