@@ -486,8 +486,6 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
-    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
-    tomogram_id: Optional[int] = Field(foreign_key="tomogram.tomogramId")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
@@ -603,18 +601,6 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     )
     murfey_ids: List["MurfeyLedger"] = Relationship(
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
-    ctf_id: Optional[int] = Field(foreign_key="ctf.ctfId")
-    tomogram_id: Optional[int] = Field(foreign_key="tomogram.tomogramId")
-    particle_picker_id: Optional[int] = Field(
-        foreign_key="particlepicker.particlePickerId"
-    )
-    relative_ice_thickness_id: Optional[int] = Field(
-        foreign_key="relativeicethickness.relativeIceThicknessId"
-    )
-    particle_classification_group_id: Optional[int] = Field(
-        foreign_key="particleclassificationgroup.particleClassificationGroupId"
     )
     motion_correction: Optional[List["MotionCorrection"]] = Relationship(
         back_populates="auto_proc_program"
