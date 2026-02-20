@@ -406,7 +406,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
 
 
-class DataCollectionGroup(SQLModel, table=True):  # type: ignore
+class DataCollectionGroupModel(SQLModel):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
@@ -434,6 +434,9 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         )
     )
 
+
+class DataCollectionGroup(DataCollectionGroupModel, table=True):
+    pass
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -2,41 +2,12 @@ import datetime
 from typing import List, Optional
 
 import sqlalchemy
-from pydantic import ConfigDict
 from sqlmodel import Enum, Field, Relationship, create_engine
 
 from murfey.util import db
 
 
-class CLEMImageSeries(db.CLEMImageSeries):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-class CLEMLIFFile(db.CLEMLIFFile):
-    pass
-
-
-class CLEMImageMetadata(db.CLEMImageMetadata):
-    pass
-
-
-class CLEMImageStack(db.CLEMImageStack):
-    pass
-
-
-class NotificationParameter(db.NotificationParameter):
-    pass
-
-
-class Session(db.Session):
-    pass
-
-
-class TomographyProcessingParameters(db.TomographyProcessingParameters):
-    pass
-
-
-class DataCollectionGroup(db.DataCollectionGroup):
+class DataCollectionGroup(db.DataCollectionGroupModel, table=True):
     grid_squares: List["GridSquare"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -45,8 +16,6 @@ class DataCollectionGroup(db.DataCollectionGroup):
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class DataCollection(db.DataCollection):
