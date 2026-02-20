@@ -486,6 +486,8 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     tag: str = Field(primary_key=True)
     dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
+    tomogram_id: Optional[int] = Field(foreign_key="tomogram.tomogramId")
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
