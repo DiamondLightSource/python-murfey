@@ -598,6 +598,8 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
     id: int = Field(primary_key=True, unique=True)
     pj_id: int = Field(foreign_key="processingjob.id")
+    mc_id: Optional[int] = Field(foreign_key="motioncorrection.motionCorrectionId")
+    ctf_id: Optional[int] = Field(foreign_key="ctf.ctfId")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )

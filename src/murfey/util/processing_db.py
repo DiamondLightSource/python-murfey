@@ -9,8 +9,8 @@ from murfey.util import db
 
 class MotionCorrection(db.SQLModel, table=True):  # type: ignore
     motionCorrectionId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProcProgram.id")
+    dataCollectionId: Optional[int] = Field(foreign_key="db.DataCollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProgProgram.id")
     imageNumber: Optional[int] = None
     firstFrame: Optional[int] = None
     lastFrame: Optional[int] = None
@@ -48,7 +48,7 @@ class CTF(db.SQLModel, table=True):  # type: ignore
     motionCorrectionId: Optional[int] = Field(
         foreign_key="MotionCorrection.motionCorrectionId"
     )
-    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProcProgram.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProcProgram.id")
     boxSizeX: Optional[float] = None
     boxSizeY: Optional[float] = None
     minResolution: Optional[float] = None
@@ -72,7 +72,7 @@ class CTF(db.SQLModel, table=True):  # type: ignore
 
 class ParticlePicker(db.SQLModel, table=True):  # type: ignore
     particlePickerId: int = Field(primary_key=True, unique=True)
-    programId: Optional[int] = Field(foreign_key="AutoProcProgram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="db.AutoProcProgram.autoProcProgramId")
     firstMotionCorrectionId: Optional[int] = Field(
         foreign_key="MotionCorrection.motionCorrectionId"
     )
@@ -93,8 +93,8 @@ class ParticlePicker(db.SQLModel, table=True):  # type: ignore
 
 class Tomogram(db.SQLModel, table=True):  # type: ignore
     tomogramId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProcProgram.id")
+    dataCollectionId: Optional[int] = Field(foreign_key="db.DataCollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProcProgram.id")
     volumeFile: Optional[str] = None
     stackFile: Optional[str] = None
     sizeX: Optional[int] = None
@@ -146,7 +146,7 @@ class RelativeIceThickness(db.SQLModel, table=True):  # type: ignore
         foreign_key="MotionCorrection.motionCorrectionId"
     )
     autoProcProgramId: Optional[int] = Field(
-        foreign_key="AutoProcProgram.autoProcProgramId"
+        foreign_key="db.AutoProcProgram.autoProcProgramId"
     )
     minimum: Optional[float] = None
     q1: Optional[float] = None
@@ -162,7 +162,7 @@ class RelativeIceThickness(db.SQLModel, table=True):  # type: ignore
 
 
 class TiltImageAlignment(db.SQLModel, table=True):  # type: ignore
-    movieId: int = Field(foreign_key="Movie.murfey_id", primary_key=True)
+    movieId: int = Field(foreign_key="db.Movie.murfey_id", primary_key=True)
     tomogramId: int = Field(foreign_key="Tomogram.tomogramId", primary_key=True)
     defocusU: Optional[float] = None
     defocusV: Optional[float] = None
@@ -182,7 +182,7 @@ class ParticleClassificationGroup(db.SQLModel, table=True):  # type: ignore
     particlePickerId: Optional[int] = Field(
         foreign_key="ParticlePicker.particlePickerId"
     )
-    programId: Optional[int] = Field(foreign_key="AutoProcProgram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="db.AutoProcProgram.autoProcProgramId")
     type: Optional[str] = Enum("2D", "3D")
     batchNumber: Optional[int] = None
     numberOfParticlesPerBatch: Optional[int] = None
