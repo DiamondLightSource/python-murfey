@@ -72,7 +72,7 @@ class CTF(db.SQLModel, table=True):  # type: ignore
 
 class ParticlePicker(db.SQLModel, table=True):  # type: ignore
     particlePickerId: int = Field(primary_key=True, unique=True)
-    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     firstMotionCorrectionId: Optional[int] = Field(
         foreign_key="motioncorrection.motionCorrectionId"
     )
@@ -145,9 +145,7 @@ class RelativeIceThickness(db.SQLModel, table=True):  # type: ignore
     motionCorrectionId: Optional[int] = Field(
         foreign_key="motioncorrection.motionCorrectionId"
     )
-    autoProcProgramId: Optional[int] = Field(
-        foreign_key="autoprocprogram.autoProcProgramId"
-    )
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     minimum: Optional[float] = None
     q1: Optional[float] = None
     median: Optional[float] = None
@@ -182,7 +180,7 @@ class ParticleClassificationGroup(db.SQLModel, table=True):  # type: ignore
     particlePickerId: Optional[int] = Field(
         foreign_key="particlepicker.particlePickerId"
     )
-    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
     type: Optional[str] = Enum("2D", "3D")
     batchNumber: Optional[int] = None
     numberOfParticlesPerBatch: Optional[int] = None
