@@ -9,8 +9,8 @@ from murfey.util import db
 
 class MotionCorrection(db.SQLModel, table=True):  # type: ignore
     motionCorrectionId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="db.DataCollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="db.AutoProgProgram.id")
+    dataCollectionId: Optional[int] = Field(foreign_key="DataCollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="AutoProgProgram.id")
     imageNumber: Optional[int] = None
     firstFrame: Optional[int] = None
     lastFrame: Optional[int] = None
