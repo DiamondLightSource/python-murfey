@@ -308,11 +308,7 @@ class Analyser(Observer):
                                 dc_metadata["acquisition_software"] = (
                                     self._context._acquisition_software
                                 )
-                                self.notify(
-                                    {
-                                        "form": dc_metadata,
-                                    }
-                                )
+                                self.notify(dc_metadata)
 
                 # If a file with a CLEM context is identified, immediately post it
                 elif isinstance(self._context, CLEMContext):
@@ -366,11 +362,7 @@ class Analyser(Observer):
                             dc_metadata["acquisition_software"] = (
                                 self._context._acquisition_software
                             )
-                            self.notify(
-                                {
-                                    "form": dc_metadata,
-                                }
-                            )
+                            self.notify(dc_metadata)
                 elif isinstance(
                     self._context,
                     (
