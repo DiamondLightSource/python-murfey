@@ -7,7 +7,7 @@ from sqlmodel import Enum, Field, Relationship, create_engine
 from murfey.util import db
 
 
-class DataCollectionGroup(db.DataCollectionGroupModel, table=True):
+class DataCollectionGroup(db.DataCollectionGroupModel, table=True):  # type: ignore
     grid_squares: List["GridSquare"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},

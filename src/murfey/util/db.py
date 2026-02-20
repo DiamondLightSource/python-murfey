@@ -435,8 +435,9 @@ class DataCollectionGroupModel(SQLModel):  # type: ignore
     )
 
 
-class DataCollectionGroup(DataCollectionGroupModel, table=True):
+class DataCollectionGroup(DataCollectionGroupModel, table=True):  # type: ignore
     pass
+
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
