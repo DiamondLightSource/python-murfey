@@ -102,7 +102,7 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
             picking_db = murfey_db.exec(
                 select(ParticleSizes.particle_size).where(ParticleSizes.pj_id == pj_id)
             ).all()
-            particle_diameter = np.quantile(list(picking_db), 0.75)
+            particle_diameter = float(np.quantile(list(picking_db), 0.75))
             tomo_params.particle_diameter = particle_diameter
             murfey_db.add(tomo_params)
             murfey_db.commit()
