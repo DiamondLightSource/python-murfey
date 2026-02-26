@@ -1013,6 +1013,7 @@ class CTF(SQLModel, table=True):  # type: ignore
     amplitudeContrast: Optional[float] = None
     ccValue: Optional[float] = None
     fftTheoreticalFullPath: Optional[str] = None
+    iceRingDensity: Optional[float] = None
     comments: Optional[str] = None
     auto_proc_program: Optional["AutoProcProgram"] = Relationship(back_populates="ctf")
     motion_correction: Optional["MotionCorrection"] = Relationship(back_populates="ctf")
