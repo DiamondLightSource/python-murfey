@@ -45,9 +45,12 @@ def ensure_dcg_exists(
     if collection_type == "tomo":
         experiment_type_id = 36
         session_file = metadata_source / "Session.dm"
+        source_visit_dir = metadata_source.parent
     elif collection_type == "spa":
         experiment_type_id = 37
-        session_file = metadata_source / "EpuSession.dm"
+        # For SPA the metadata source sent should include the Images-Disc
+        session_file = metadata_source.parent / "EpuSession.dm"
+        source_visit_dir = metadata_source.parent.parent
         for h in entry_points(group="murfey.hooks"):
             try:
                 if h.name == "get_epu_session_metadata":
@@ -64,9 +67,9 @@ def ensure_dcg_exists(
 
     if not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
-        dcg_tag = (
-            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
-        )
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+        ).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
@@ -86,28 +89,26 @@ def ensure_dcg_exists(
         if not windows_path:
             logger.warning("No atlas metadata path found")
             return None
-        visit_index = windows_path.split("\\").index(environment.visit)
-        partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
-        logger.info("Partial Linux path successfully constructed from Windows path")
+        if environment.visit in windows_path.split("\\"):
+            # Case of atlas in the correct location
+            visit_index = windows_path.split("\\").index(environment.visit)
+            partial_path = "/".join(windows_path.split("\\")[visit_index + 1 :])
+            logger.info(
+                f"Partial Linux path successfully constructed from Windows path: {partial_path}"
+            )
+        else:
+            # Atlas not in visit, so come up with where it should have been
+            # Assumes /structure/to/Supervisor/Sample/Atlas/Atlas.dm
+            partial_path = "atlas/" + "/".join(windows_path.split("\\")[-4:])
+            logger.info(f"Partial Linux path estimated: {partial_path}")
 
-        source_visit_dir = metadata_source.parent
         logger.info(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
         )
-        atlas_xml_path = list(
-            (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
-        )[0]
-        logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
-        with open(atlas_xml_path, "rb") as atlas_xml:
-            atlas_xml_data = xmltodict.parse(atlas_xml)
-            atlas_original_pixel_size = float(
-                atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
-                    "numericValue"
-                ]
-            )
-        # need to calculate the pixel size of the downscaled image
-        atlas_pixel_size = atlas_original_pixel_size * 7.8
-        logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
+
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+        ).replace("//", "/")
 
         for p in partial_path.split("/"):
             if p.startswith("Sample"):
@@ -120,32 +121,39 @@ def ensure_dcg_exists(
             atlas=Path(partial_path), sample=sample
         )
 
-        dcg_search_dir = (
-            str(metadata_source).replace(f"/{environment.visit}", "").replace("//", "/")
-        )
-        if collection_type == "tomo":
-            dcg_tag = dcg_search_dir
-        else:
-            dcg_images_dirs = sorted(
-                Path(dcg_search_dir).glob("Images-Disc*"),
-                key=lambda x: x.stat().st_ctime,
-            )
-            if not dcg_images_dirs:
-                logger.warning(f"Cannot find Images-Disc* in {dcg_search_dir}")
-                return None
-            dcg_tag = str(dcg_images_dirs[-1])
+        if atlas_xml_search := list(
+            (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
+        ):
+            atlas_xml_path = atlas_xml_search[0]
+            logger.info(f"Atlas XML path {str(atlas_xml_path)} found")
+            with open(atlas_xml_path, "rb") as atlas_xml:
+                atlas_xml_data = xmltodict.parse(atlas_xml)
+                atlas_original_pixel_size = float(
+                    atlas_xml_data["MicroscopeImage"]["SpatialScale"]["pixelSize"]["x"][
+                        "numericValue"
+                    ]
+                )
+            # need to calculate the pixel size of the downscaled image
+            atlas_pixel_size = atlas_original_pixel_size * 7.8
+            logger.info(f"Atlas image pixel size determined to be {atlas_pixel_size}")
 
-        dcg_data = {
-            "experiment_type_id": experiment_type_id,
-            "tag": dcg_tag,
-            "atlas": str(
-                _atlas_destination(environment, metadata_source, token)
-                / environment.samples[metadata_source].atlas.parent
-                / atlas_xml_path.with_suffix(".jpg").name
-            ).replace("//", "/"),
-            "sample": environment.samples[metadata_source].sample,
-            "atlas_pixel_size": atlas_pixel_size,
-        }
+            dcg_data = {
+                "experiment_type_id": experiment_type_id,
+                "tag": dcg_tag,
+                "atlas": str(
+                    _atlas_destination(environment, session_file.parent, token)
+                    / environment.samples[metadata_source].atlas.parent
+                    / atlas_xml_path.with_suffix(".jpg").name
+                ).replace("//", "/"),
+                "sample": environment.samples[metadata_source].sample,
+                "atlas_pixel_size": atlas_pixel_size,
+            }
+        else:
+            dcg_data = {
+                "experiment_type_id": experiment_type_id,
+                "tag": dcg_tag,
+                "sample": environment.samples[metadata_source].sample,
+            }
     capture_post(
         base_url=str(environment.url.geturl()),
         router_name="workflow.router",

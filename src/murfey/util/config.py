@@ -228,6 +228,7 @@ class Security(BaseModel):
     # Murfey database settings
     murfey_db_credentials: Path
     crypto_key: str
+    db: str = "postgres"
     sqlalchemy_pooling: bool = True
 
     # ISPyB settings

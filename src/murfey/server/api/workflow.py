@@ -138,6 +138,7 @@ def register_dc_group(
                         murfey.server._transport_object.feedback_queue,
                         {
                             "register": "atlas_update",
+                            "tag": dcg_instance.tag,
                             "atlas_id": dcg_instance.atlas_id,
                             "atlas": dcg_params.atlas,
                             "sample": dcg_params.sample,

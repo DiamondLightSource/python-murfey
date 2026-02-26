@@ -11,13 +11,46 @@ import pkgutil
 from argparse import ArgumentParser
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Annotated, Union, get_args, get_origin
 
 import yaml
 from fastapi import APIRouter
 
 import murfey
 from murfey.cli import PrettierDumper
+
+
+def extract_base_type(annotation):
+    """
+    Given a Python type annotation, return its underlying base type.
+
+    This function unwraps `typing.Annotated` to extract the annotated type
+    and simplifies `Optional[T]` / `Union[T, None]` to `T`. All other union
+    types and complex annotations are returned unchanged.
+
+    Parameters
+    ----------
+    annotation:
+        A Python type annotation (e.g. int, Annotated[int, ...], Optional[int],
+        Union[int, str])
+
+    Returns
+    -------
+    The unwrapped base type, or the original annotation if no unambiguous base
+    type can be determined.
+    """
+    # Unwrap Annotated type annotations
+    if get_origin(annotation) is Annotated:
+        annotation = get_args(annotation)[0]
+
+    # Unwrap and return single-type Optional type annotations
+    if get_origin(annotation) is Union:
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+
+    # Return complex multi-type annotations or simple unpacked ones
+    return annotation
 
 
 def find_routers(name: str) -> dict[str, APIRouter]:
@@ -74,7 +107,7 @@ def get_route_manifest(routers: dict[str, APIRouter]):
         for route in router.routes:
             path_params = []
             for param in route.dependant.path_params:
-                param_type = param.type_ if param.type_ is not None else Any
+                param_type = extract_base_type(param._type_adapter._type)
                 param_info = {
                     "name": param.name if hasattr(param, "name") else "",
                     "type": (
@@ -86,7 +119,7 @@ def get_route_manifest(routers: dict[str, APIRouter]):
                 path_params.append(param_info)
             for route_dependency in route.dependant.dependencies:
                 for param in route_dependency.path_params:
-                    param_type = param.type_ if param.type_ is not None else Any
+                    param_type = extract_base_type(param._type_adapter._type)
                     param_info = {
                         "name": param.name if hasattr(param, "name") else "",
                         "type": (
