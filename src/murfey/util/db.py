@@ -415,7 +415,7 @@ class Tilt(SQLModel, table=True):  # type: ignore
 
 
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(primary_key=True, unique=True, alias="dataCollectionGroupId")
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
     atlas_id: Optional[int] = None
@@ -479,9 +479,11 @@ class NotificationValue(SQLModel, table=True):  # type: ignore
 
 
 class DataCollection(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(primary_key=True, unique=True, alias="dataCollectionId")
     tag: str = Field(primary_key=True)
-    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    dcg_id: int = Field(
+        foreign_key="datacollectiongroup.id", alias="dataCollectionGroupId"
+    )
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
@@ -500,9 +502,9 @@ class DataCollection(SQLModel, table=True):  # type: ignore
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(primary_key=True, unique=True, alias="processingJobId")
     recipe: str = Field(primary_key=True)
-    dc_id: int = Field(foreign_key="datacollection.id")
+    dc_id: int = Field(foreign_key="datacollection.id", alias="dataCollectionId")
     data_collection: Optional[DataCollection] = Relationship(
         back_populates="processing_jobs"
     )
@@ -590,8 +592,8 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
-    pj_id: int = Field(foreign_key="processingjob.id")
+    id: int = Field(primary_key=True, unique=True, alias="autoProcProgramId")
+    pj_id: int = Field(foreign_key="processingjob.id", alias="processingJobId")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )
@@ -760,8 +762,12 @@ class SearchMap(SQLModel, table=True):  # type: ignore
 
 
 class Movie(SQLModel, table=True):  # type: ignore
-    murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
-    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
+    murfey_id: int = Field(
+        primary_key=True, foreign_key="murfeyledger.id", alias="movieId"
+    )
+    data_collection_id: Optional[int] = Field(
+        foreign_key="datacollection.id", alias="dataCollectionId"
+    )
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
     path: str
     image_number: int
