@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings
 import murfey.server
 import murfey.server.api.auth
 import murfey.server.api.bootstrap
-import murfey.server.api.clem
+#import murfey.server.api.clem
 import murfey.server.api.display
 import murfey.server.api.file_io_frontend
 import murfey.server.api.file_io_instrument
@@ -96,7 +96,7 @@ app.include_router(murfey.server.api.workflow.router)
 app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
-app.include_router(murfey.server.api.clem.router)
+#app.include_router(murfey.server.api.clem.router)
 
 app.include_router(murfey.server.api.prometheus.router)
 

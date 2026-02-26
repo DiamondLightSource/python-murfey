@@ -6,12 +6,38 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
+from gemmi import cif  
+from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
+
 from murfey.util.config import MachineConfig, get_machine_config
 
+import os
+
+def get_current_job_number(visit_name: str, machine_config: MachineConfig) -> int:
+    if os.path.exists(visit_name):
+        default_pipeline_path = os.path.join(visit_name, "default_pipeline.star")
+    """elif machine_config.processed_directory_name:
+        core = Path(visit_name).parts[0]
+        extra_path = machine_config.processed_extra_directory
+        sub
+        default_pipeline_path = (core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / extra_path)"""
+    if os.path.exists(default_pipeline_path):
+        dp = cif.read_file(default_pipeline_path)  
+        dp_job_counter = dp.find_block(GENERAL_BLOCK).find_value(JOB_COUNTER)  
+        current_counter = int(dp_job_counter)
+        return current_counter
+    
+    return 2  # Default to job002 if the file doesn't exist or the value is not found
 
 def motion_corrected_mrc(
     input_movie: Path, visit_name: str, machine_config: MachineConfig
 ):
+    movie = os.path.basename(input_movie)
+
+    """ if not os.path.exists(visit_name):
     parts = [secure_filename(p) for p in input_movie.parts]
     visit_idx = parts.index(visit_name)
     core = Path("/") / Path(*parts[: visit_idx + 1])
@@ -21,16 +47,16 @@ def motion_corrected_mrc(
     else:
         sub_dataset = ""
     extra_path = machine_config.processed_extra_directory
+    """
+
+    job_number = get_current_job_number(visit_name, machine_config)
+
     mrc_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
+        Path(visit_name)
         / "MotionCorr"
-        / "job002"
+        / f"Live_processing_mc"
         / "Movies"
-        / ppath.parent.relative_to(core / sub_dataset)
-        / str(ppath.stem + "_motion_corrected.mrc")
+        / str(movie + "_motion_corrected.mrc")
     )
     return Path("/".join(secure_filename(p) for p in mrc_out.parts))
 

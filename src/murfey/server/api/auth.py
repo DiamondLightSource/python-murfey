@@ -42,8 +42,10 @@ ALGORITHM = security_config.auth_algorithm or "HS256"
 SECRET_KEY = security_config.auth_key or secrets.token_hex(32)
 if security_config.auth_type == "password":
     oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-else:
+elif security_config.auth_type == "cookie":
     oauth2_scheme = APIKeyCookie(name=security_config.cookie_key)
+else:  # "none"
+    oauth2_scheme = lambda *args, **kwargs: None
 if security_config.instrument_auth_type == "token":
     instrument_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 else:
@@ -88,6 +90,11 @@ async def validate_token(token: Annotated[str, Depends(oauth2_scheme)]):
     """
     Used by the backend routers to validate requests coming in from frontend.
     """
+    return None
+    if security_config.auth_type == "none":
+        return None
+    
+    
     try:
         # Validate using auth URL if provided; will error if invalid
         if auth_url:
@@ -151,6 +158,10 @@ async def validate_instrument_token(
     """
     Used by the backend routers to check the incoming instrument server token.
     """
+    return None
+    if security_config.instrument_auth_type == "none":
+        return None
+    
     try:
         # Validate using auth URL if provided
         if security_config.instrument_auth_url:

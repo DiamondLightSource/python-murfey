@@ -7,7 +7,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.server.prometheus as prom
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.ispyb import ISPyBSession
 from murfey.util import sanitise
 
@@ -16,7 +16,7 @@ logger = logging.getLogger("murfey.workflows.register_processing_job")
 
 def run(message: dict, murfey_db: SQLModelSession):
     # Faill immediately if not transport manager is set
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
@@ -56,11 +56,11 @@ def run(message: dict, murfey_db: SQLModelSession):
                     ISPyBDB.ProcessingJobParameter(parameterKey=k, parameterValue=v)
                     for k, v in message["job_parameters"].items()
                 ]
-                pid = _transport_object.do_create_ispyb_job(
+                pid = murfey.server._transport_object.do_create_ispyb_job(
                     record, params=job_parameters
                 ).get("return_value", None)
             else:
-                pid = _transport_object.do_create_ispyb_job(record).get(
+                pid = murfey.server._transport_object.do_create_ispyb_job(record).get(
                     "return_value", None
                 )
             if pid is None:
@@ -86,7 +86,7 @@ def run(message: dict, murfey_db: SQLModelSession):
             record = ISPyBDB.AutoProcProgram(
                 processingJobId=pid, processingStartTime=datetime.now()
             )
-            appid = _transport_object.do_update_processing_status(record).get(
+            appid = murfey.server._transport_object.do_update_processing_status(record).get(
                 "return_value", None
             )
             if appid is None:

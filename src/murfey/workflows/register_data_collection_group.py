@@ -7,7 +7,7 @@ from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
@@ -15,7 +15,7 @@ logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if no transport wrapper is found
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
@@ -48,7 +48,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 experimentTypeId=message["experiment_type_id"],
             )
 
-            dcgid = _transport_object.do_insert_data_collection_group(record).get(
+            dcgid = murfey.server._transport_object.do_insert_data_collection_group(record).get(
                 "return_value", None
             )
 
@@ -67,7 +67,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 pixelSize=message.get("atlas_pixel_size", 0),
                 cassetteSlot=message.get("sample"),
             )
-            atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
+            atlas_id = murfey.server._transport_object.do_insert_atlas(atlas_record).get(
                 "return_value", None
             )
 

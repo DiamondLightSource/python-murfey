@@ -6,7 +6,7 @@ from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util import sanitise
 
@@ -15,7 +15,7 @@ logger = logging.getLogger("murfey.workflows.register_data_collection")
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if transport manager was not provided
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
@@ -76,7 +76,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 c2aperture=message.get("c2aperture"),
                 phasePlate=int(message.get("phase_plate", 0)),
             )
-            dcid = _transport_object.do_insert_data_collection(
+            dcid = murfey.server._transport_object.do_insert_data_collection(
                 record,
                 tag=(
                     message.get("tag")

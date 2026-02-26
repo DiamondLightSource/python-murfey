@@ -76,7 +76,7 @@ class MachineConfig(BaseModel):  # type: ignore
     processing_enabled: bool = True
     process_by_default: bool = True
     gain_directory_name: str = "processing"
-    process_multiple_datasets: bool = True
+    process_multiple_datasets: bool = False
     processed_directory_name: str = "processed"
     processed_extra_directory: str = ""
     recipes: dict[str, str] = {
@@ -235,7 +235,7 @@ class Security(BaseModel):
 
     # Murfey server connection settings
     auth_url: str = ""
-    auth_type: Literal["password", "cookie"] = "password"
+    auth_type: Literal["password", "cookie", "none"] = "password"
     auth_algorithm: str = ""
     auth_key: str = ""
     cookie_key: str = ""
