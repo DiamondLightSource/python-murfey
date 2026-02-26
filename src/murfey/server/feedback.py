@@ -1429,6 +1429,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
             p.parent.mkdir(parents=True)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
+            data_collection_id=detached_ids[1],
             path=f.file_path,
             image_number=f.image_number,
             tag=f.tag,
@@ -1818,8 +1819,8 @@ def _save_bfactor(message: dict, _db):
                         "ispyb_command": "insert_particle_classification"
                     },
                     "program_id": message["program_id"],
-                    "bfactor_fit_intercept": str(bfactor_fitting[1]),
-                    "bfactor_fit_linear": str(bfactor_fitting[0]),
+                    "bfactor_fit_intercept": str(float(bfactor_fitting[1])),
+                    "bfactor_fit_linear": str(float(bfactor_fitting[0])),
                 },
                 new_connection=True,
             )

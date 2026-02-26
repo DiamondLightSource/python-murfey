@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy
-from sqlmodel import Field, Relationship, SQLModel, create_engine
+from sqlmodel import Enum, Field, Relationship, SQLModel, create_engine
 
 """
 GENERAL
@@ -422,7 +422,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
-    session: Optional[Session] = Relationship(back_populates="data_collection_groups")
+    session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -440,6 +440,14 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
             back_populates="data_collection_group",
             sa_relationship_kwargs={"cascade": "delete"},
         )
+    )
+    grid_squares: Optional[List["GridSquare"]] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    search_maps: Optional[List["SearchMap"]] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
     )
 
 
@@ -479,6 +487,15 @@ class DataCollection(SQLModel, table=True):  # type: ignore
     )
     processing_jobs: List["ProcessingJob"] = Relationship(
         back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    movies: List["Movie"] = Relationship(
+        back_populates="data_collection", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    motion_correction: Optional[List["MotionCorrection"]] = Relationship(
+        back_populates="data_collection"
+    )
+    tomogram: Optional[List["Tomogram"]] = Relationship(
+        back_populates="data_collection"
     )
 
 
@@ -581,6 +598,22 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
     murfey_ids: List["MurfeyLedger"] = Relationship(
         back_populates="auto_proc_program", sa_relationship_kwargs={"cascade": "delete"}
     )
+    motion_correction: Optional[List["MotionCorrection"]] = Relationship(
+        back_populates="auto_proc_program"
+    )
+    tomogram: Optional[List["Tomogram"]] = Relationship(
+        back_populates="auto_proc_program"
+    )
+    ctf: Optional[List["CTF"]] = Relationship(back_populates="auto_proc_program")
+    particle_picker: Optional[List["ParticlePicker"]] = Relationship(
+        back_populates="auto_proc_program"
+    )
+    relative_ice_thickness: Optional[List["RelativeIceThickness"]] = Relationship(
+        back_populates="auto_proc_program"
+    )
+    particle_classification_group: Optional[List["ParticleClassificationGroup"]] = (
+        Relationship(back_populates="auto_proc_program")
+    )
 
 
 class MurfeyLedger(SQLModel, table=True):  # type: ignore
@@ -639,6 +672,17 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
+    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="grid_squares"
+    )
 
 
 class FoilHole(SQLModel, table=True):  # type: ignore
@@ -664,6 +708,11 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     preprocess_stashes: List[PreprocessStash] = Relationship(
         back_populates="foil_hole", sa_relationship_kwargs={"cascade": "delete"}
     )
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    diameter: Optional[int] = None
+    quality_indicator: Optional[float] = None
 
 
 class SearchMap(SQLModel, table=True):  # type: ignore
@@ -696,17 +745,37 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
+    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    scaled_height: Optional[int] = None
+    scaled_width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="search_maps"
+    )
+    tomogram: Optional[List["Tomogram"]] = Relationship(back_populates="search_map")
 
 
 class Movie(SQLModel, table=True):  # type: ignore
     murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
+    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
     path: str
     image_number: int
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
+    data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
+    motion_correction: Optional[List["MotionCorrection"]] = Relationship(
+        back_populates="movie"
+    )
+    tilt_image_alignment: Optional[List["TiltImageAlignment"]] = Relationship(
+        back_populates="movie"
+    )
 
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
@@ -886,6 +955,251 @@ class BFactors(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
     number_of_particles: int
     resolution: float
+
+
+class MotionCorrection(SQLModel, table=True):  # type: ignore
+    motionCorrectionId: int = Field(primary_key=True, unique=True)
+    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    imageNumber: Optional[int] = None
+    firstFrame: Optional[int] = None
+    lastFrame: Optional[int] = None
+    dosePerFrame: Optional[float] = None
+    doseWeight: Optional[float] = None
+    totalMotion: Optional[float] = None
+    averageMotionPerFrame: Optional[float] = None
+    driftPlotFullPath: Optional[str] = None
+    micrographFullPath: Optional[str] = None
+    micrographSnapshotFullPath: Optional[str] = None
+    patchesUsedX: Optional[int] = None
+    patchesUsedY: Optional[int] = None
+    fftFullPath: Optional[str] = None
+    fftCorrectedFullPath: Optional[str] = None
+    comments: Optional[str] = None
+    movieId: Optional[int] = Field(foreign_key="movie.murfey_id")
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(
+        back_populates="motion_correction"
+    )
+    data_collection: Optional["DataCollection"] = Relationship(
+        back_populates="motion_correction"
+    )
+    movie: Optional["Movie"] = Relationship(back_populates="motion_correction")
+    ctf: List["CTF"] = Relationship(back_populates="motion_correction")
+    particle_picker: List["ParticlePicker"] = Relationship(
+        back_populates="motion_correction"
+    )
+    relative_ice_thickness: List["RelativeIceThickness"] = Relationship(
+        back_populates="motion_correction"
+    )
+
+
+class CTF(SQLModel, table=True):  # type: ignore
+    ctfId: int = Field(primary_key=True, unique=True)
+    motionCorrectionId: Optional[int] = Field(
+        foreign_key="motioncorrection.motionCorrectionId"
+    )
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    boxSizeX: Optional[float] = None
+    boxSizeY: Optional[float] = None
+    minResolution: Optional[float] = None
+    maxResolution: Optional[float] = None
+    minDefocus: Optional[float] = None
+    maxDefocus: Optional[float] = None
+    defocusStepSize: Optional[float] = None
+    astigmatism: Optional[float] = None
+    astigmatismAngle: Optional[float] = None
+    estimatedResolution: Optional[float] = None
+    estimatedDefocus: Optional[float] = None
+    amplitudeContrast: Optional[float] = None
+    ccValue: Optional[float] = None
+    fftTheoreticalFullPath: Optional[str] = None
+    iceRingDensity: Optional[float] = None
+    comments: Optional[str] = None
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(back_populates="ctf")
+    motion_correction: Optional["MotionCorrection"] = Relationship(back_populates="ctf")
+
+
+class ParticlePicker(SQLModel, table=True):  # type: ignore
+    particlePickerId: int = Field(primary_key=True, unique=True)
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    firstMotionCorrectionId: Optional[int] = Field(
+        foreign_key="motioncorrection.motionCorrectionId"
+    )
+    particlePickingTemplate: Optional[str] = None
+    particleDiameter: Optional[float] = None
+    numberOfParticles: Optional[int] = None
+    summaryImageFullPath: Optional[str] = None
+    motion_correction: Optional["MotionCorrection"] = Relationship(
+        back_populates="particle_picker"
+    )
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(
+        back_populates="particle_picker"
+    )
+    particle_classification_group: List["ParticleClassificationGroup"] = Relationship(
+        back_populates="particle_picker"
+    )
+
+
+class Tomogram(SQLModel, table=True):  # type: ignore
+    tomogramId: int = Field(primary_key=True, unique=True)
+    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    volumeFile: Optional[str] = None
+    stackFile: Optional[str] = None
+    sizeX: Optional[int] = None
+    sizeY: Optional[int] = None
+    sizeZ: Optional[int] = None
+    pixelSpacing: Optional[float] = None
+    residualErrorMean: Optional[float] = None
+    residualErrorSD: Optional[float] = None
+    xAxisCorrection: Optional[float] = None
+    tiltAngleOffset: Optional[float] = None
+    zShift: Optional[float] = None
+    fileDirectory: Optional[str] = None
+    centralSliceImage: Optional[str] = None
+    tomogramMovie: Optional[str] = None
+    xyShiftPlot: Optional[str] = None
+    projXY: Optional[str] = None
+    projXZ: Optional[str] = None
+    recordTimeStamp: Optional[datetime] = None
+    globalAlignmentQuality: Optional[float] = None
+    gridSquareId: Optional[int] = Field(foreign_key="searchmap.id")
+    pixelLocationX: Optional[int] = None
+    pixelLocationY: Optional[int] = None
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(
+        back_populates="tomogram"
+    )
+    data_collection: Optional["DataCollection"] = Relationship(
+        back_populates="tomogram"
+    )
+    search_map: Optional["SearchMap"] = Relationship(back_populates="tomogram")
+    processed_tomogram: List["ProcessedTomogram"] = Relationship(
+        back_populates="tomogram"
+    )
+    tilt_image_alignment: List["TiltImageAlignment"] = Relationship(
+        back_populates="tomogram"
+    )
+
+
+class ProcessedTomogram(SQLModel, table=True):  # type: ignore
+    processedTomogramId: int = Field(primary_key=True, unique=True)
+    tomogramId: int = Field(foreign_key="tomogram.tomogramId")
+    filePath: Optional[str] = None
+    processingType: Optional[str] = None
+    tomogram: Optional["Tomogram"] = Relationship(back_populates="processed_tomogram")
+
+
+class RelativeIceThickness(SQLModel, table=True):  # type: ignore
+    relativeIceThicknessId: int = Field(primary_key=True, unique=True)
+    motionCorrectionId: Optional[int] = Field(
+        foreign_key="motioncorrection.motionCorrectionId"
+    )
+    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    minimum: Optional[float] = None
+    q1: Optional[float] = None
+    median: Optional[float] = None
+    q3: Optional[float] = None
+    maximum: Optional[float] = None
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(
+        back_populates="relative_ice_thickness"
+    )
+    motion_correction: Optional["MotionCorrection"] = Relationship(
+        back_populates="relative_ice_thickness"
+    )
+
+
+class TiltImageAlignment(SQLModel, table=True):  # type: ignore
+    movieId: int = Field(foreign_key="movie.murfey_id", primary_key=True)
+    tomogramId: int = Field(foreign_key="tomogram.tomogramId", primary_key=True)
+    defocusU: Optional[float] = None
+    defocusV: Optional[float] = None
+    psdFile: Optional[str] = None
+    resolution: Optional[float] = None
+    fitQuality: Optional[float] = None
+    refinedMagnification: Optional[float] = None
+    refinedTiltAngle: Optional[float] = None
+    refinedTiltAxis: Optional[float] = None
+    residualError: Optional[float] = None
+    movie: Optional["Movie"] = Relationship(back_populates="tilt_image_alignment")
+    tomogram: Optional["Tomogram"] = Relationship(back_populates="tilt_image_alignment")
+
+
+class ParticleClassificationGroup(SQLModel, table=True):  # type: ignore
+    particleClassificationGroupId: int = Field(primary_key=True, unique=True)
+    particlePickerId: Optional[int] = Field(
+        foreign_key="particlepicker.particlePickerId"
+    )
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    type: Optional[str] = Enum("2D", "3D")
+    batchNumber: Optional[int] = None
+    numberOfParticlesPerBatch: Optional[int] = None
+    numberOfClassesPerBatch: Optional[int] = None
+    symmetry: Optional[str] = None
+    binnedPixelSize: Optional[float] = None
+    particle_picker: Optional["ParticlePicker"] = Relationship(
+        back_populates="particle_classification_group"
+    )
+    auto_proc_program: Optional["AutoProcProgram"] = Relationship(
+        back_populates="particle_classification_group"
+    )
+    particle_classification: List["ParticleClassification"] = Relationship(
+        back_populates="particle_classification_group"
+    )
+
+
+class ParticleClassification(SQLModel, table=True):  # type: ignore
+    particleClassificationId: int = Field(primary_key=True, unique=True)
+    classNumber: Optional[int] = None
+    classImageFullPath: Optional[str] = None
+    particlesPerClass: Optional[int] = None
+    rotationAccuracy: Optional[float] = None
+    translationAccuracy: Optional[float] = None
+    estimatedResolution: Optional[float] = None
+    overallFourierCompleteness: Optional[float] = None
+    particleClassificationGroupId: Optional[int] = Field(
+        foreign_key="particleclassificationgroup.particleClassificationGroupId"
+    )
+    classDistribution: Optional[float] = None
+    selected: Optional[int] = None
+    bFactorFitIntercept: Optional[float] = None
+    bFactorFitLinear: Optional[float] = None
+    bFactorFitQuadratic: Optional[float] = None
+    angularEfficiency: Optional[float] = None
+    suggestedTilt: Optional[float] = None
+    cryoem_initial_model: List["CryoemInitialModel"] = Relationship(
+        back_populates="particle_classification"
+    )
+    particle_classification_group: Optional["ParticleClassificationGroup"] = (
+        Relationship(back_populates="particle_classification")
+    )
+    bfactor_fit: List["BFactorFit"] = Relationship(
+        back_populates="particle_classification"
+    )
+
+
+class BFactorFit(SQLModel, table=True):  # type: ignore
+    bFactorFitId: int = Field(primary_key=True, unique=True)
+    particleClassificationId: int = Field(
+        foreign_key="particleclassification.particleClassificationId"
+    )
+    resolution: Optional[float] = None
+    numberOfParticles: Optional[int] = None
+    particleBatchSize: Optional[int] = None
+    particle_classification: Optional["ParticleClassification"] = Relationship(
+        back_populates="bfactor_fit"
+    )
+
+
+class CryoemInitialModel(SQLModel, table=True):  # type: ignore
+    cryoemInitialModelId: int = Field(primary_key=True, unique=True)
+    particleClassificationId: int = Field(
+        foreign_key="particleclassification.particleClassificationId"
+    )
+    resolution: Optional[float] = None
+    numberOfParticles: Optional[int] = None
+    particle_classification: List["ParticleClassification"] = Relationship(
+        back_populates="cryoem_initial_model"
+    )
 
 
 """
