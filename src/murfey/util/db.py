@@ -812,8 +812,15 @@ class Movie(SQLModel, table=True):  # type: ignore
         sa_column_kwargs={"name": "dataCollectionId"},
     )
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
-    path: str
-    image_number: int
+    image_number: int = Field(
+        alias="movieNumber", sa_column_kwargs={"name": "movieNumber"}
+    )
+    path: str = Field(alias="imageFullPath", sa_column_kwargs={"name": "imageFullPath"})
+    creation_time: datetime = Field(
+        alias="createdTimeStamp",
+        sa_column_kwargs={"name": "createdTimeStamp"},
+        default_factory=datetime.now,
+    )
     tag: str
     preprocessed: bool = False
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
