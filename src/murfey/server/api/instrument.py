@@ -164,17 +164,21 @@ async def setup_multigrid_watcher(
                     acquisition_data = EntityConverter.acquisition_to_request(
                         AcquisitionData(
                             name=visit,
-                            microscope_data=microscope_data,
-                            working_dir=str(secure_path(watcher_spec.source / visit)),
+                            id=visit,
+                            instrument=microscope_data,
+                            storage_path=str(secure_path(watcher_spec.source / visit)),
+                            start_time=datetime.datetime.now(),
                         )
                     )
                     async with clientsession.post(
                         f"{machine_config.smartem_api_url}/acquisitions",
-                        json=acquisition_data.model_dump(),
+                        json=acquisition_data.model_dump(
+                            mode="json", exclude_none=True
+                        ),
                     ) as response:
                         acquisition_response_data = await response.json()
                     acquisition_uuid = acquisition_response_data["uuid"]
-                    session.acquisition_uuid = acquisition_response_data or ""
+                    session.acquisition_uuid = acquisition_uuid or ""
                     db.add(session)
                     db.commit()
                 except Exception:
