@@ -28,7 +28,40 @@ class AtlasContext(Context):
             environment=environment,
             **kwargs,
         )
+        if self._acquisition_software == "serialem":
+            self.post_transfer_serialem(
+                transferred_file, environment=environment, **kwargs
+            )
+        else:
+            self.post_transfer_epu(transferred_file, environment=environment, **kwargs)
 
+    def post_transfer_serialem(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
+        if environment and transferred_file.suffix == ".mrc":
+            source = _get_source(transferred_file, environment)
+            if source:
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_atlas",
+                    token=self._token,
+                    session_id=environment.murfey_session,
+                    data={
+                        "name": transferred_file.stem,
+                        "acquisition_uuid": environment.acquisition_uuid,
+                    },
+                )
+
+    def post_transfer_epu(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
         if (
             environment
             and "Atlas_" in transferred_file.stem

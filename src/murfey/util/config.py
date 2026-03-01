@@ -106,6 +106,7 @@ class MachineConfig(BaseModel):  # type: ignore
     murfey_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
     instrument_server_url: str = "http://localhost:8001"
+    smartem_api_url: str = ""
 
     # Messaging queues
     failure_queue: str = ""

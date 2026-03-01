@@ -53,6 +53,7 @@ class MurfeyInstanceEnvironment(BaseModel):
     murfey_session: Optional[int] = None
     samples: Dict[Path, SampleInfo] = {}
     rsync_url: str = ""
+    acquisition_uuid: Optional[str] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

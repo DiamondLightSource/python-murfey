@@ -975,6 +975,13 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - GET
+  - path: /session_control/spa/sessions/{session_id}/register_atlas
+    function: register_atlas
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /session_control/spa/sessions/{session_id}/make_atlas_jpg
     function: make_atlas_jpg
     path_params:
@@ -1080,6 +1087,13 @@ murfey.server.api.session_info.router:
       - GET
   - path: /session_info/instruments/{instrument_name}/machine
     function: machine_info_by_instrument
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/instruments/{instrument_name}/smartem
+    function: check_smartem_availability
     path_params:
       - name: instrument_name
         type: str
