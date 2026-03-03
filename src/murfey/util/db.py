@@ -832,7 +832,13 @@ class Movie(SQLModel, table=True):  # type: ignore
     tilt_image_alignment: Optional[List["TiltImageAlignment"]] = Relationship(
         back_populates="movie"
     )
-
+positionX: Optional[float] = None
+positionY: Optional[float] = None
+nominalDefocus: Optional[float] = None
+angle: Optional[float] = None
+fluence: Optional[float] = None
+numberOfFrames: Optional[int] = None
+templateLabel: Optional[str] = None
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
