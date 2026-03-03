@@ -133,10 +133,6 @@ class RSyncer(Observer):
             "notify": rsyncer._notify,
         }
         kwarguments_from_rsyncer.update(kwargs)
-        assert isinstance(kwarguments_from_rsyncer["local"], bool)
-        assert isinstance(kwarguments_from_rsyncer["do_transfer"], bool)
-        assert isinstance(kwarguments_from_rsyncer["remove_files"], bool)
-        assert isinstance(kwarguments_from_rsyncer["notify"], bool)
         return cls(
             rsyncer._basepath,
             rsyncer._basepath_remote,

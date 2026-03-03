@@ -1,4 +1,6 @@
 import logging
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -208,6 +210,11 @@ class TomographyMetadataContext(Context):
 
         elif transferred_file.name == "BatchPositionsList.xml":
             logger.info("Tomography session batch positions list found")
+            shutil.copy(
+                transferred_file,
+                transferred_file.parent
+                / f"{transferred_file.stem}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}{transferred_file.suffix}",
+            )
             dcg_tag = ensure_dcg_exists(
                 collection_type="tomo",
                 metadata_source=metadata_source,
