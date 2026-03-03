@@ -256,7 +256,9 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="clem_image_series"
     )
-    dcg_id: Optional[int] = Field(foreign_key="datacollectiongroup.id", default=None)
+    dcg_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
+    )
     dcg_name: Optional[str] = Field(default=None)
 
     # Link to grid squares
@@ -415,7 +417,12 @@ class Tilt(SQLModel, table=True):  # type: ignore
 
 
 class DataCollectionGroup(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="dataCollectionGroupId",
+        sa_column_kwargs={"name": "dataCollectionGroupId"},
+    )
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
     atlas_id: Optional[int] = None
@@ -453,7 +460,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
-    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    dcg_id: int = Field(foreign_key="datacollectiongroup.dataCollectionGroupId")
     name: str
     min_value: float
     max_value: float
@@ -479,9 +486,18 @@ class NotificationValue(SQLModel, table=True):  # type: ignore
 
 
 class DataCollection(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="dataCollectionId",
+        sa_column_kwargs={"name": "dataCollectionId"},
+    )
     tag: str = Field(primary_key=True)
-    dcg_id: int = Field(foreign_key="datacollectiongroup.id")
+    dcg_id: int = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId",
+        alias="dataCollectionGroupId",
+        sa_column_kwargs={"name": "dataCollectionGroupId"},
+    )
     data_collection_group: Optional[DataCollectionGroup] = Relationship(
         back_populates="data_collections"
     )
@@ -500,9 +516,18 @@ class DataCollection(SQLModel, table=True):  # type: ignore
 
 
 class ProcessingJob(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="processingJobId",
+        sa_column_kwargs={"name": "processingJobId"},
+    )
     recipe: str = Field(primary_key=True)
-    dc_id: int = Field(foreign_key="datacollection.id")
+    dc_id: int = Field(
+        foreign_key="datacollection.dataCollectionId",
+        alias="dataCollectionId",
+        sa_column_kwargs={"name": "dataCollectionId"},
+    )
     data_collection: Optional[DataCollection] = Relationship(
         back_populates="processing_jobs"
     )
@@ -567,14 +592,16 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
 class SelectionStash(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
     class_selection_score: float
-    pj_id: int = Field(foreign_key="processingjob.id")
+    pj_id: int = Field(foreign_key="processingjob.processingJobId")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="selection_stash"
     )
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
-    dcg_id: int = Field(primary_key=True, foreign_key="datacollectiongroup.id")
+    dcg_id: int = Field(
+        primary_key=True, foreign_key="datacollectiongroup.dataCollectionGroupId"
+    )
     pixel_size: float
     dose_per_frame: float
     frame_count: int
@@ -590,8 +617,17 @@ class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
 
 
 class AutoProcProgram(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True, unique=True)
-    pj_id: int = Field(foreign_key="processingjob.id")
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="autoProcProgramId",
+        sa_column_kwargs={"name": "autoProcProgramId"},
+    )
+    pj_id: int = Field(
+        foreign_key="processingjob.processingJobId",
+        alias="processingJobId",
+        sa_column_kwargs={"name": "processingJobId"},
+    )
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="auto_proc_programs"
     )
@@ -618,7 +654,7 @@ class AutoProcProgram(SQLModel, table=True):  # type: ignore
 
 class MurfeyLedger(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
-    app_id: int = Field(foreign_key="autoprocprogram.id")
+    app_id: int = Field(foreign_key="autoprocprogram.autoProcProgramId")
     auto_proc_program: Optional[AutoProcProgram] = Relationship(
         back_populates="murfey_ids"
     )
@@ -672,7 +708,9 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
-    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
+    atlas_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId"
+    )
     scaled_pixel_size: Optional[float] = None
     pixel_location_x: Optional[int] = None
     pixel_location_y: Optional[int] = None
@@ -745,7 +783,9 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
-    atlas_id: Optional[int] = Field(foreign_key="datacollectiongroup.id")
+    atlas_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId"
+    )
     scaled_pixel_size: Optional[float] = None
     pixel_location_x: Optional[int] = None
     pixel_location_y: Optional[int] = None
@@ -760,13 +800,36 @@ class SearchMap(SQLModel, table=True):  # type: ignore
 
 
 class Movie(SQLModel, table=True):  # type: ignore
-    murfey_id: int = Field(primary_key=True, foreign_key="murfeyledger.id")
-    data_collection_id: Optional[int] = Field(foreign_key="datacollection.id")
+    murfey_id: int = Field(
+        primary_key=True,
+        foreign_key="murfeyledger.id",
+        alias="movieId",
+        sa_column_kwargs={"name": "movieId"},
+    )
+    data_collection_id: Optional[int] = Field(
+        foreign_key="datacollection.dataCollectionId",
+        alias="dataCollectionId",
+        sa_column_kwargs={"name": "dataCollectionId"},
+    )
     foil_hole_id: int = Field(foreign_key="foilhole.id", nullable=True, default=None)
-    path: str
-    image_number: int
+    image_number: int = Field(
+        alias="movieNumber", sa_column_kwargs={"name": "movieNumber"}
+    )
+    path: str = Field(alias="imageFullPath", sa_column_kwargs={"name": "imageFullPath"})
+    creation_time: datetime = Field(
+        alias="createdTimeStamp",
+        sa_column_kwargs={"name": "createdTimeStamp"},
+        default_factory=datetime.now,
+    )
     tag: str
     preprocessed: bool = False
+    positionX: Optional[float] = None
+    positionY: Optional[float] = None
+    nominalDefocus: Optional[float] = None
+    angle: Optional[float] = None
+    fluence: Optional[float] = None
+    numberOfFrames: Optional[int] = None
+    templateLabel: Optional[str] = None
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
     data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
@@ -780,7 +843,7 @@ class Movie(SQLModel, table=True):  # type: ignore
 
 class CtfParameters(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
-    pj_id: int = Field(foreign_key="processingjob.id")
+    pj_id: int = Field(foreign_key="processingjob.processingJobId")
     micrographs_file: str
     coord_list_file: str
     extract_file: str
@@ -797,7 +860,7 @@ class CtfParameters(SQLModel, table=True):  # type: ignore
 
 class TomogramPicks(SQLModel, table=True):  # type: ignore
     tomogram: str = Field(primary_key=True)
-    pj_id: int = Field(foreign_key="processingjob.id")
+    pj_id: int = Field(foreign_key="processingjob.processingJobId")
     cbox_3d: str
     particle_count: int
     tomogram_pixel_size: float
@@ -808,7 +871,7 @@ class TomogramPicks(SQLModel, table=True):  # type: ignore
 
 class ParticleSizes(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(default=None, primary_key=True)
-    pj_id: int = Field(foreign_key="processingjob.id")
+    pj_id: int = Field(foreign_key="processingjob.processingJobId")
     particle_size: float
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="particle_sizes"
@@ -816,7 +879,7 @@ class ParticleSizes(SQLModel, table=True):  # type: ignore
 
 
 class SPARelionParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     angpix: float
     dose_per_frame: float
     gain_ref: Optional[str]
@@ -836,7 +899,7 @@ class SPARelionParameters(SQLModel, table=True):  # type: ignore
 
 
 class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     estimate_particle_diameter: bool = True
     hold_class2d: bool = False
     rerun_class2d: bool = False
@@ -858,7 +921,7 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
 
 class Class2DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class2d_dir: str
     batch_size: int
@@ -876,7 +939,7 @@ class Class2D(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(
         primary_key=True,
     )
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="class2ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="class2ds")
@@ -884,7 +947,7 @@ class Class2D(SQLModel, table=True):  # type: ignore
 
 class Class3DParameters(SQLModel, table=True):  # type: ignore
     particles_file: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     batch_size: int
@@ -904,7 +967,7 @@ class Class3DParameters(SQLModel, table=True):  # type: ignore
 class Class3D(SQLModel, table=True):  # type: ignore
     class_number: int = Field(primary_key=True)
     particles_file: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     # class3d_parameters: Optional[Class3DParameters] = Relationship(
     #    back_populates="class3ds"
@@ -916,7 +979,7 @@ class Class3D(SQLModel, table=True):  # type: ignore
 class RefineParameters(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     refine_dir: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     class3d_dir: str
     class_number: int
@@ -932,7 +995,7 @@ class RefineParameters(SQLModel, table=True):  # type: ignore
 class Refine3D(SQLModel, table=True):  # type: ignore
     tag: str = Field(primary_key=True)
     refine_dir: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     murfey_id: int = Field(foreign_key="murfeyledger.id")
     processing_job: Optional[ProcessingJob] = Relationship(back_populates="refine3ds")
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="refine3ds")
@@ -940,7 +1003,7 @@ class Refine3D(SQLModel, table=True):  # type: ignore
 
 class BFactorParameters(SQLModel, table=True):  # type: ignore
     project_dir: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     batch_size: int
     refined_grp_uuid: int
     refined_class_uuid: int
@@ -952,15 +1015,19 @@ class BFactorParameters(SQLModel, table=True):  # type: ignore
 
 class BFactors(SQLModel, table=True):  # type: ignore
     bfactor_directory: str = Field(primary_key=True)
-    pj_id: int = Field(primary_key=True, foreign_key="processingjob.id")
+    pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     number_of_particles: int
     resolution: float
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore
     motionCorrectionId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    dataCollectionId: Optional[int] = Field(
+        foreign_key="datacollection.dataCollectionId"
+    )
+    autoProcProgramId: Optional[int] = Field(
+        foreign_key="autoprocprogram.autoProcProgramId"
+    )
     imageNumber: Optional[int] = None
     firstFrame: Optional[int] = None
     lastFrame: Optional[int] = None
@@ -976,7 +1043,7 @@ class MotionCorrection(SQLModel, table=True):  # type: ignore
     fftFullPath: Optional[str] = None
     fftCorrectedFullPath: Optional[str] = None
     comments: Optional[str] = None
-    movieId: Optional[int] = Field(foreign_key="movie.murfey_id")
+    movieId: Optional[int] = Field(foreign_key="movie.movieId")
     auto_proc_program: Optional["AutoProcProgram"] = Relationship(
         back_populates="motion_correction"
     )
@@ -998,7 +1065,9 @@ class CTF(SQLModel, table=True):  # type: ignore
     motionCorrectionId: Optional[int] = Field(
         foreign_key="motioncorrection.motionCorrectionId"
     )
-    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    autoProcProgramId: Optional[int] = Field(
+        foreign_key="autoprocprogram.autoProcProgramId"
+    )
     boxSizeX: Optional[float] = None
     boxSizeY: Optional[float] = None
     minResolution: Optional[float] = None
@@ -1021,7 +1090,7 @@ class CTF(SQLModel, table=True):  # type: ignore
 
 class ParticlePicker(SQLModel, table=True):  # type: ignore
     particlePickerId: int = Field(primary_key=True, unique=True)
-    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
     firstMotionCorrectionId: Optional[int] = Field(
         foreign_key="motioncorrection.motionCorrectionId"
     )
@@ -1042,8 +1111,12 @@ class ParticlePicker(SQLModel, table=True):  # type: ignore
 
 class Tomogram(SQLModel, table=True):  # type: ignore
     tomogramId: int = Field(primary_key=True, unique=True)
-    dataCollectionId: Optional[int] = Field(foreign_key="datacollection.id")
-    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    dataCollectionId: Optional[int] = Field(
+        foreign_key="datacollection.dataCollectionId"
+    )
+    autoProcProgramId: Optional[int] = Field(
+        foreign_key="autoprocprogram.autoProcProgramId"
+    )
     volumeFile: Optional[str] = None
     stackFile: Optional[str] = None
     sizeX: Optional[int] = None
@@ -1094,7 +1167,9 @@ class RelativeIceThickness(SQLModel, table=True):  # type: ignore
     motionCorrectionId: Optional[int] = Field(
         foreign_key="motioncorrection.motionCorrectionId"
     )
-    autoProcProgramId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    autoProcProgramId: Optional[int] = Field(
+        foreign_key="autoprocprogram.autoProcProgramId"
+    )
     minimum: Optional[float] = None
     q1: Optional[float] = None
     median: Optional[float] = None
@@ -1109,7 +1184,7 @@ class RelativeIceThickness(SQLModel, table=True):  # type: ignore
 
 
 class TiltImageAlignment(SQLModel, table=True):  # type: ignore
-    movieId: int = Field(foreign_key="movie.murfey_id", primary_key=True)
+    movieId: int = Field(foreign_key="movie.movieId", primary_key=True)
     tomogramId: int = Field(foreign_key="tomogram.tomogramId", primary_key=True)
     defocusU: Optional[float] = None
     defocusV: Optional[float] = None
@@ -1129,7 +1204,7 @@ class ParticleClassificationGroup(SQLModel, table=True):  # type: ignore
     particlePickerId: Optional[int] = Field(
         foreign_key="particlepicker.particlePickerId"
     )
-    programId: Optional[int] = Field(foreign_key="autoprocprogram.id")
+    programId: Optional[int] = Field(foreign_key="autoprocprogram.autoProcProgramId")
     type: Optional[str] = Enum("2D", "3D")
     batchNumber: Optional[int] = None
     numberOfParticlesPerBatch: Optional[int] = None
