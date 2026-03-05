@@ -54,7 +54,7 @@ def motion_corrected_mrc(
     mrc_out = (
         Path(visit_name)
         / "MotionCorr"
-        / f"Live_processing_mc"
+        / f"job002"
         / "Movies"
         / str(movie + "_motion_corrected.mrc")
     )
