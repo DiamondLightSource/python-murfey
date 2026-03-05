@@ -159,7 +159,7 @@ def register_foil_hole(
         .where(FoilHole.name == foil_hole_params.name)
         .where(FoilHole.grid_square_id == gsid)
         .where(FoilHole.session_id == session_id)
-    ).one()
+    ).all()
     if foil_hole_query:
         # Foil hole already exists in the murfey database
         foil_hole = foil_hole_query[0]
