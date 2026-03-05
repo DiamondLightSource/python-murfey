@@ -53,13 +53,15 @@ def register_grid_square(
     if grid_square_params.width is not None:
         grid_square_params.width_scaled = int(grid_square_params.width / 7.8)
 
-    try:
-        grid_square = murfey_db.exec(
-            select(GridSquare)
-            .where(GridSquare.name == gsid)
-            .where(GridSquare.tag == grid_square_params.tag)
-            .where(GridSquare.session_id == session_id)
-        ).one()
+    grid_square_query = murfey_db.exec(
+        select(GridSquare)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.tag == grid_square_params.tag)
+        .where(GridSquare.session_id == session_id)
+    ).all()
+    if grid_square_query:
+        # Grid square already exists in the murfey database
+        grid_square = grid_square_query[0]
         grid_square.x_location = grid_square_params.x_location or grid_square.x_location
         grid_square.y_location = grid_square_params.y_location or grid_square.y_location
         grid_square.x_stage_position = (
@@ -84,7 +86,8 @@ def register_grid_square(
         grid_square.image = grid_square_params.image or grid_square.image
         if _transport_object:
             _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
-    except Exception:
+    else:
+        # No existing grid square in the murfey database
         if _transport_object:
             dcg = murfey_db.exec(
                 select(DataCollectionGroup)
@@ -151,13 +154,15 @@ def register_foil_hole(
         jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
-    try:
-        foil_hole = murfey_db.exec(
-            select(FoilHole)
-            .where(FoilHole.name == foil_hole_params.name)
-            .where(FoilHole.grid_square_id == gsid)
-            .where(FoilHole.session_id == session_id)
-        ).one()
+    foil_hole_query = murfey_db.exec(
+        select(FoilHole)
+        .where(FoilHole.name == foil_hole_params.name)
+        .where(FoilHole.grid_square_id == gsid)
+        .where(FoilHole.session_id == session_id)
+    ).one()
+    if foil_hole_query:
+        # Foil hole already exists in the murfey database
+        foil_hole = foil_hole_query[0]
         foil_hole.x_location = foil_hole_params.x_location or foil_hole.x_location
         foil_hole.y_location = foil_hole_params.y_location or foil_hole.y_location
         foil_hole.x_stage_position = (
@@ -183,7 +188,8 @@ def register_foil_hole(
             _transport_object.do_update_foil_hole(
                 foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
-    except Exception:
+    else:
+        # No existing foil hole in the murfey database
         if _transport_object:
             fh_ispyb_response = _transport_object.do_insert_foil_hole(
                 gs.id,
