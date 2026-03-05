@@ -7,7 +7,6 @@ def run():
     parser = argparse.ArgumentParser(
         description="Generate the necessary tables for the Murfey database"
     )
-
     parser.add_argument(
         "--no-clear",
         dest="clear",
@@ -22,4 +21,5 @@ def run():
 
     if args.clear:
         clear(url())
+
     setup(url())
