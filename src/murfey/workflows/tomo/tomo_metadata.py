@@ -31,14 +31,15 @@ def register_search_map_in_database(
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == search_map_params.tag)
     ).one()
-    try:
+    search_map_query = murfey_db.exec(
+        select(SearchMap)
+        .where(SearchMap.name == search_map_name)
+        .where(SearchMap.tag == search_map_params.tag)
+        .where(SearchMap.session_id == session_id)
+    ).all()
+    if search_map_query:
         # See if there is already a search map with this name and update if so
-        search_map = murfey_db.exec(
-            select(SearchMap)
-            .where(SearchMap.name == search_map_name)
-            .where(SearchMap.tag == search_map_params.tag)
-            .where(SearchMap.session_id == session_id)
-        ).one()
+        search_map = search_map_query[0]
         search_map.x_stage_position = (
             search_map_params.x_stage_position or search_map.x_stage_position
         )
@@ -100,8 +101,8 @@ def register_search_map_in_database(
         search_map.width = search_map_params.width or search_map.width
         if _transport_object:
             _transport_object.do_update_search_map(search_map.id, search_map_params)
-    except Exception as e:
-        logger.info(f"Registering new search map due to {e}", exc_info=True)
+    else:
+        logger.info(f"Registering new search map {sanitise(search_map_name)}")
         if _transport_object:
             sm_ispyb_response = _transport_object.do_insert_search_map(
                 dcg.atlas_id, search_map_params
