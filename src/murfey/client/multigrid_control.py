@@ -48,6 +48,8 @@ class MultigridController:
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
     data_collection_parameters: dict = field(default_factory=lambda: {})
     token: str = ""
+    serialem: bool = False
+    acquisition_uuid: Optional[str] = None
     _machine_config: dict = field(default_factory=lambda: {})
     visit_end_time: Optional[datetime] = None
 
@@ -72,6 +74,7 @@ class MultigridController:
             symmetry=self.data_collection_parameters.get("symmetry"),
             eer_fractionation=self.data_collection_parameters.get("eer_fractionation"),
             instrument_name=self.instrument_name,
+            acquisition_uuid=self.acquisition_uuid,
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
@@ -449,6 +452,7 @@ class MultigridController:
                 environment=self._environment if not self.dummy_dc else None,
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
+                serialem=self.serialem,
             )
             self.analysers[source].subscribe(self._start_dc)
             self.analysers[source].start()

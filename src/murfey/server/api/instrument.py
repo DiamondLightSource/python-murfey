@@ -13,6 +13,14 @@ from pydantic import BaseModel
 from sqlmodel import select
 from werkzeug.utils import secure_filename
 
+try:
+    from smartem_backend.api_client import EntityConverter
+    from smartem_common.schemas import AcquisitionData
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server.prometheus as prom
 from murfey.server.api.auth import (
     MurfeyInstrumentNameFrontend as MurfeyInstrumentName,
@@ -75,6 +83,7 @@ async def activate_instrument_server_for_session(
                 success = response.status == 200
                 instrument_server_token = await response.json()
                 instrument_server_tokens[session_id] = instrument_server_token
+
     if success:
         log.info("Handshake successful")
     else:
@@ -147,6 +156,25 @@ async def setup_multigrid_watcher(
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
         async with aiohttp.ClientSession() as clientsession:
+            acquisition_uuid = None
+            if SMARTEM_ACTIVE and machine_config.smartem_api_url:
+                log.info("registering an acquisition with smartem")
+                try:
+                    acquisition_data = EntityConverter.acquisition_to_request(
+                        AcquisitionData(name=visit)
+                    )
+                    async with clientsession.post(
+                        f"{machine_config.smartem_api_url}/acquisitions",
+                        json=acquisition_data.model_dump(),
+                    ) as response:
+                        acquisition_response_data = await response.json()
+                    acquisition_uuid = acquisition_response_data["uuid"]
+                except Exception:
+                    log.warning(
+                        "failed to register acquisition with smartem", exc_info=True
+                    )
+            else:
+                log.info("smartem not configured")
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={
@@ -161,6 +189,8 @@ async def setup_multigrid_watcher(
                     "visit_end_time": (
                         str(session.visit_end_time) if session.visit_end_time else None
                     ),
+                    "acquisition_uuid": acquisition_uuid,
+                    "serialem": watcher_spec.serialem,
                 },
                 headers={
                     "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"

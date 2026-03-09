@@ -179,6 +179,8 @@ def setup_multigrid_watcher(
         data_collection_parameters=data_collection_parameters.get(label, {}),
         rsync_restarts=watcher_spec.rsync_restarts,
         visit_end_time=watcher_spec.visit_end_time,
+        acquisition_uuid=watcher_spec.acquisition_uuid,
+        serialem=watcher_spec.serialem,
     )
     # Make child directories, if specified
     watcher_spec.source.mkdir(exist_ok=True)

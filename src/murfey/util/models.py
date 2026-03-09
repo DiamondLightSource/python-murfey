@@ -208,6 +208,7 @@ class MultigridWatcherSetup(BaseModel):
     source: Path
     destination_overrides: Dict[Path, str] = {}
     rsync_restarts: List[str] = []
+    serialem: bool = False
 
 
 class Token(BaseModel):

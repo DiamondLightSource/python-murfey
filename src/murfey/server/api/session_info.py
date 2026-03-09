@@ -81,6 +81,12 @@ def machine_info_by_instrument(
     return get_machine_config(instrument_name)[instrument_name]
 
 
+@router.get("/instruments/{instrument_name}/smartem")
+def check_smartem_availability(instrument_name: str):
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+    return {"available": bool(machine_config.smartem_api_url)}
+
+
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: MurfeyInstrumentName, db=ispyb_db):
     logger.debug(

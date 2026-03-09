@@ -39,6 +39,7 @@ class Analyser(Observer):
         environment: MurfeyInstanceEnvironment | None = None,
         force_mdoc_metadata: bool = False,
         limited: bool = False,
+        serialem: bool = False,
     ):
         super().__init__()
         self._basepath = basepath_local.absolute()
@@ -52,6 +53,7 @@ class Analyser(Observer):
         self._environment = environment
         self._force_mdoc_metadata = force_mdoc_metadata
         self._token = token
+        self._serialem = serialem
         self.parameters_model: (
             Type[ProcessingParametersSPA] | Type[ProcessingParametersTomo] | None
         ) = None
@@ -138,7 +140,9 @@ class Analyser(Observer):
 
         # Tomography and SPA workflow checks
         if "atlas" in file_path.parts:
-            self._context = AtlasContext("epu", self._basepath, self._token)
+            self._context = AtlasContext(
+                "serialem" if self._serialem else "epu", self._basepath, self._token
+            )
             return True
 
         if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
