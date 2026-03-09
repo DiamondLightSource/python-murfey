@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.23.4"
+version = "0.23.5"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
