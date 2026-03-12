@@ -5,6 +5,7 @@ import pytest
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
+from murfey.client.contexts.fib import FIBContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -75,6 +76,23 @@ example_files = [
     [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001_Lng_LVCC.xlif",
         CLEMContext,
+    ],
+    # FIB Autotem files
+    ["visit/autotem/visit/ProjectData.dat", FIBContext],
+    ["visit/autotem/visit/Sites/Lamella/SetupImages/Preparation.tif", FIBContext],
+    [
+        "visit/autotem/visit/Sites/Lamella (2)//DCImages/DCM_2026-03-09-23-45-40.926/2026-03-09-23-48-43-Finer-Milling-dc_rescan-image-.png",
+        FIBContext,
+    ],
+    # FIB Maps files
+    ["visit/maps/visit/EMproject.emxml", FIBContext],
+    [
+        "visit/maps/visit/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
+        FIBContext,
+    ],
+    [
+        "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
+        FIBContext,
     ],
 ]
 
