@@ -172,7 +172,7 @@ async def setup_multigrid_watcher(
                     )
                     async with clientsession.post(
                         f"{machine_config.smartem_api_url}/acquisitions",
-                        json=acquisition_data.model_dump(),
+                        json=acquisition_data.model_dump(mode="json"),
                     ) as response:
                         acquisition_response_data = await response.json()
                     acquisition_uuid = acquisition_response_data["uuid"]
