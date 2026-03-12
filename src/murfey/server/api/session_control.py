@@ -359,7 +359,7 @@ def get_foil_hole(
 
 class AtlasRegistration(BaseModel):
     name: str
-    acqusition_uuid: str
+    acquisition_uuid: str
 
 
 @spa_router.post("/sessions/{session_id}/register_atlas")
@@ -378,7 +378,7 @@ def register_atlas(
                 base_url=machine_config.smartem_api_url, logger=logger
             )
             possible_grids = smartem_client.get_acquisition_grids(
-                atlas_registration_data.acqusition_uuid
+                atlas_registration_data.acquisition_uuid
             )
             grid_uuid = None
             for grid in possible_grids:
@@ -388,7 +388,7 @@ def register_atlas(
             if grid_uuid is not None:
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
-                    acquisition_data=datetime.now(),
+                    acquisition_date=datetime.now(),
                     storage_folder="",
                     name=atlas_registration_data.name,
                     tiles=[],
