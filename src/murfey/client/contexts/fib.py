@@ -45,6 +45,9 @@ class FIBContext(Context):
         **kwargs,
     ):
         super().post_transfer(transferred_file, environment=environment, **kwargs)
+        # -----------------------------------------------------------------------------
+        # AutoTEM
+        # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":
@@ -123,3 +126,13 @@ class FIBContext(Context):
                         self._lamellae[number]._replace(
                             angle=float(milling_angle.split(" ")[0])
                         )
+        # -----------------------------------------------------------------------------
+        # Maps
+        # -----------------------------------------------------------------------------
+        elif self._acquisition_software == "maps":
+            pass
+        # -----------------------------------------------------------------------------
+        # Meteor
+        # -----------------------------------------------------------------------------
+        elif self._acquisition_software == "meteor":
+            pass
