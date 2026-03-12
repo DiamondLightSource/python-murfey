@@ -6,8 +6,12 @@ from typing import Optional
 
 import xmltodict
 
-from murfey.client.context import Context, ensure_dcg_exists
-from murfey.client.contexts.spa import _file_transferred_to, _get_source
+from murfey.client.context import (
+    Context,
+    _file_transferred_to,
+    _get_source,
+    ensure_dcg_exists,
+)
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 

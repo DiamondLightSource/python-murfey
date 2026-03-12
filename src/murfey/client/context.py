@@ -13,6 +13,44 @@ from murfey.util.client import capture_post, get_machine_config_client
 logger = logging.getLogger("murfey.client.context")
 
 
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+):
+    machine_config = get_machine_config_client(
+        str(environment.url.geturl()),
+        token,
+        instrument_name=environment.instrument_name,
+    )
+    if environment.visit in environment.default_destinations[source]:
+        return (
+            Path(machine_config.get("rsync_basepath", ""))
+            / Path(environment.default_destinations[source])
+            / file_path.relative_to(source)  # need to strip out the rsync_module name
+        )
+    return (
+        Path(machine_config.get("rsync_basepath", ""))
+        / Path(environment.default_destinations[source])
+        / environment.visit
+        / file_path.relative_to(source)
+    )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    possible_sources = []
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            possible_sources.append(s)
+    if not possible_sources:
+        return None
+    elif len(possible_sources) == 1:
+        return possible_sources[0]
+    source = possible_sources[0]
+    for extra_source in possible_sources[1:]:
+        if extra_source.is_relative_to(source):
+            source = extra_source
+    return source
+
+
 def _atlas_destination(
     environment: MurfeyInstanceEnvironment, source: Path, token: str
 ) -> Path:

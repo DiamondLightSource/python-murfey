@@ -19,6 +19,7 @@ from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
+from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.client.destinations import find_longest_data_directory
@@ -110,8 +111,8 @@ class Analyser(Observer):
             if subframe_path := mdoc_data_block.get("SubFramePath"):
                 self._extension = Path(subframe_path).suffix
                 return True
-        # Check for LIF files separately
-        elif file_path.suffix == ".lif":
+        # Check for LIF files and TXRM files separately
+        elif file_path.suffix == ".lif" or file_path.suffix == ".txrm":
             self._extension = file_path.suffix
             return True
         return False
@@ -136,6 +137,11 @@ class Analyser(Observer):
             pattern in file_path.stem for pattern in ("--Stage", "--Z", "--C")
         ) and file_path.suffix in (".tiff", ".tif"):
             self._context = CLEMContext("leica", self._basepath, self._token)
+            return True
+
+        # SXT workflow checks
+        if file_path.suffix == ".txrm":
+            self._context = SXTContext("zeiss", self._basepath, self._token)
             return True
 
         # Tomography and SPA workflow checks
@@ -319,6 +325,10 @@ class Analyser(Observer):
                     logger.debug(
                         f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
                     )
+                    self.post_transfer(transferred_file)
+
+                elif isinstance(self._context, SXTContext):
+                    logger.debug(f"File {transferred_file.name!r} is an SXT file")
                     self.post_transfer(transferred_file)
 
                 elif isinstance(self._context, AtlasContext):

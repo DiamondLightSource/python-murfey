@@ -961,6 +961,105 @@ async def register_tilt(
         _add_tilt()
 
 
+sxt_router = APIRouter(
+    prefix="/workflow/sxt",
+    dependencies=[Depends(validate_instrument_token)],
+    tags=["Workflows: Soft x-ray tomography"],
+)
+
+
+class SXTTiltSeriesInfo(BaseModel):
+    session_id: int
+    tag: str
+    source: str
+    txrm: str
+    tilt_series_length: int
+    pixel_size: float
+    tilt_offset: int
+
+
+@sxt_router.post("/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series")
+def process_sxt_tilt_series(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tilt_series_info: SXTTiltSeriesInfo,
+    db=murfey_db,
+):
+    tilt_series_query = db.exec(
+        select(TiltSeries)
+        .where(TiltSeries.session_id == tilt_series_info.session_id)
+        .where(TiltSeries.tag == tilt_series_info.tag)
+        .where(TiltSeries.rsync_source == tilt_series_info.source)
+    ).all()
+    if tilt_series_query:
+        tilt_series = tilt_series_query[0]
+    else:
+        tilt_series = TiltSeries(
+            session_id=session_id,
+            tag=tilt_series_info.tag,
+            rsync_source=tilt_series_info.source,
+            tilt_series_length=tilt_series_info.tilt_series_length,
+            processing_requested=True,
+        )
+        db.add(tilt_series)
+        db.commit()
+
+    collected_ids = db.exec(
+        select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
+        .where(DataCollectionGroup.session_id == session_id)
+        .where(DataCollectionGroup.tag == tilt_series.rsync_source)
+        .where(DataCollection.tag == tilt_series.tag)
+        .where(DataCollection.dcg_id == DataCollectionGroup.id)
+        .where(ProcessingJob.dc_id == DataCollection.id)
+        .where(AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(ProcessingJob.recipe == "sxt-tomo-align")
+    ).one()
+    instrument_name = (
+        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+    )
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    parts = [secure_filename(p) for p in Path(tilt_series_info.txrm).parts]
+    visit_idx = parts.index(visit_name)
+    core = Path(*Path(tilt_series_info.txrm).parts[: visit_idx + 1])
+    ppath = Path(
+        "/".join(secure_filename(p) for p in Path(tilt_series_info.txrm).parts)
+    )
+    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
+    extra_path = machine_config.processed_extra_directory
+    stack_file = (
+        core
+        / machine_config.processed_directory_name
+        / sub_dataset
+        / extra_path
+        / "Tomograms"
+        / f"{tilt_series.tag}_stack.mrc"
+    )
+    stack_file.parent.mkdir(parents=True, exist_ok=True)
+    zocalo_message = {
+        "recipes": ["sxt-tomo-align"],
+        "parameters": {
+            "txrm_file": tilt_series_info.txrm,
+            "dcid": collected_ids[1].id,
+            "appid": collected_ids[3].id,
+            "stack_file": str(stack_file),
+            "tilt_axis": 0,
+            "pixel_size": tilt_series_info.pixel_size,
+            "manual_tilt_offset": -tilt_series_info.tilt_offset,
+            "node_creator_queue": machine_config.node_creator_queue,
+        },
+    }
+    if _transport_object:
+        logger.info(f"Sending Zocalo message for processing: {zocalo_message}")
+        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+    else:
+        logger.info(
+            f"No transport object found. Zocalo message would be {zocalo_message}"
+        )
+
+
 correlative_router = APIRouter(
     prefix="/workflow/correlative",
     dependencies=[Depends(validate_instrument_token)],
