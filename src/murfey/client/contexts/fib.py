@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional
+from xml.etree import ElementTree as ET
 
 import xmltodict
 
@@ -12,6 +14,8 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.fib")
+
+lock = threading.Lock()
 
 
 class Lamella(NamedTuple):
@@ -25,10 +29,87 @@ class MillingProgress(NamedTuple):
     timestamp: float
 
 
+class ElectronSnapshotMetadata(NamedTuple):
+    image_dir: str  # Partial path from EMproject.emxml parent to the image
+    status: str
+    x_len: float | None
+    y_len: float | None
+    z_len: float | None
+    x_center: float | None
+    y_center: float | None
+    z_center: float | None
+    extent: tuple[float, float, float, float] | None
+    rotation_angle: float | None
+
+
 def _number_from_name(name: str) -> int:
     return int(
         name.strip().replace("Lamella", "").replace("(", "").replace(")", "") or 1
     )
+
+
+def _parse_electron_snapshot_metadata(xml_file: Path):
+    metadata_dict = {}
+    root = ET.parse(xml_file).getroot()
+    datasets = root.findall(".//Datasets/Dataset")
+    for dataset in datasets:
+        # Extract all string-based values
+        name, image_dir, status = [
+            node.text
+            if ((node := dataset.find(node_path)) is not None and node.text is not None)
+            else ""
+            for node_path in (
+                ".//Name",
+                ".//FinalImages",
+                ".//Status",
+            )
+        ]
+
+        # Extract all float values
+        cx, cy, cz, x_len, y_len, z_len, rotation_angle = [
+            float(node.text)
+            if ((node := dataset.find(node_path)) is not None and node.text is not None)
+            else None
+            for node_path in (
+                ".//BoxCenter/CenterX",
+                ".//BoxCenter/CenterY",
+                ".//BoxCenter/CenterZ",
+                ".//BoxSize/SizeX",
+                ".//BoxSize/SizeY",
+                ".//BoxSize/SizeZ",
+                ".//RotationAngle",
+            )
+        ]
+
+        # Calculate the extent of the image
+        extent = None
+        if (
+            cx is not None
+            and cy is not None
+            and x_len is not None
+            and y_len is not None
+        ):
+            extent = (
+                x_len - (cx / 2),
+                x_len + (cx / 2),
+                y_len - (cy / 2),
+                y_len - (cy / 2),
+            )
+
+        # Append metadata for current site to dict
+        metadata_dict[name] = ElectronSnapshotMetadata(
+            status=status,
+            image_dir=image_dir,
+            x_len=x_len,
+            y_len=y_len,
+            z_len=z_len,
+            x_center=cx,
+            y_center=cy,
+            z_center=cz,
+            extent=extent,
+            rotation_angle=rotation_angle,
+        )
+    return metadata_dict
 
 
 class FIBContext(Context):
@@ -37,6 +118,9 @@ class FIBContext(Context):
         self._basepath = basepath
         self._milling: Dict[int, List[MillingProgress]] = {}
         self._lamellae: Dict[int, Lamella] = {}
+        self._electron_snapshots: Dict[str, Path] = {}
+        self._electron_snapshot_metadata: Dict[str, ElectronSnapshotMetadata] = {}
+        self._electron_snapshots_submitted: set[str] = set()
 
     def post_transfer(
         self,
@@ -130,7 +214,50 @@ class FIBContext(Context):
         # Maps
         # -----------------------------------------------------------------------------
         elif self._acquisition_software == "maps":
-            pass
+            # Electron snapshot metadata file
+            if transferred_file.name == "EMproject.emxml":
+                # Extract all "Electron Snapshot" metadata and store it
+                self._electron_snapshot_metadata = _parse_electron_snapshot_metadata(
+                    transferred_file
+                )
+                # If dataset hasn't been transferred, register it
+                for dataset_name in list(self._electron_snapshot_metadata.keys()):
+                    if dataset_name not in self._electron_snapshots_submitted:
+                        if dataset_name in self._electron_snapshots:
+                            logger.info(f"Registering {dataset_name!r}")
+
+                            ## Workflow to trigger goes here
+
+                            # Clear old entry after triggering workflow
+                            self._electron_snapshots_submitted.add(dataset_name)
+                            with lock:
+                                self._electron_snapshots.pop(dataset_name, None)
+                                self._electron_snapshot_metadata.pop(dataset_name, None)
+                        else:
+                            logger.debug(f"Waiting for image for {dataset_name}")
+            # Electron snapshot image
+            elif (
+                "Electron Snapshot" in transferred_file.name
+                and transferred_file.suffix in (".tif", ".tiff")
+            ):
+                # Store file in Context memory
+                dataset_name = transferred_file.stem
+                self._electron_snapshots[dataset_name] = transferred_file
+
+                if dataset_name not in self._electron_snapshots_submitted:
+                    # If the metadata and image are both present, register dataset
+                    if dataset_name in list(self._electron_snapshot_metadata.keys()):
+                        logger.info(f"Registering {dataset_name!r}")
+
+                        ## Workflow to trigger goes here
+
+                        # Clear old entry after triggering workflow
+                        self._electron_snapshots_submitted.add(dataset_name)
+                        with lock:
+                            self._electron_snapshots.pop(dataset_name, None)
+                            self._electron_snapshot_metadata.pop(dataset_name, None)
+                    else:
+                        logger.debug(f"Waiting for metadata for {dataset_name}")
         # -----------------------------------------------------------------------------
         # Meteor
         # -----------------------------------------------------------------------------
