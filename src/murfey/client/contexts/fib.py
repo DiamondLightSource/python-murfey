@@ -12,7 +12,7 @@ import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.client import capture_post
+from murfey.util.client import capture_post, get_machine_config_client
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
@@ -59,6 +59,39 @@ def _number_from_name(name: str) -> int:
         if (match := re.search(r"\(([\d+])\)", name)) is not None
         else 1
     )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    """
+    Returns the Path of the file on the client PC.
+    """
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            return s
+    return None
+
+
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+) -> Path | None:
+    """
+    Returns the Path of the transferred file on the DLS file system.
+    """
+    machine_config = get_machine_config_client(
+        str(environment.url.geturl()),
+        token,
+        instrument_name=environment.instrument_name,
+    )
+
+    # Construct destination path
+    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
+        environment.default_destinations[source]
+    )
+    # Add visit number to the path if it's not present in default destination
+    if environment.visit not in environment.default_destinations[source]:
+        base_destination = base_destination / environment.visit
+    destination = base_destination / file_path.relative_to(source)
+    return destination
 
 
 def _parse_electron_snapshot_metadata(xml_file: Path):
@@ -144,6 +177,10 @@ class FIBContext(Context):
         **kwargs,
     ):
         super().post_transfer(transferred_file, environment=environment, **kwargs)
+        if environment is None:
+            logger.warning("No environment passed in")
+            return
+
         # -----------------------------------------------------------------------------
         # AutoTEM
         # -----------------------------------------------------------------------------
@@ -257,7 +294,22 @@ class FIBContext(Context):
             ):
                 # Store file in Context memory
                 dataset_name = transferred_file.stem
-                self._electron_snapshots[dataset_name] = transferred_file
+                if not (source := _get_source(transferred_file, environment)):
+                    logger.warning(f"No source found for file {transferred_file}")
+                    return
+                if not (
+                    destination_file := _file_transferred_to(
+                        environment=environment,
+                        source=source,
+                        file_path=transferred_file,
+                        token=self._token,
+                    )
+                ):
+                    logger.warning(
+                        f"File {transferred_file.name!r} not found on storage system"
+                    )
+                    return
+                self._electron_snapshots[dataset_name] = destination_file
 
                 if dataset_name not in self._electron_snapshots_submitted:
                     # If the metadata and image are both present, register dataset
