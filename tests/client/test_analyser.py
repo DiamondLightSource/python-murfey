@@ -7,6 +7,7 @@ from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
+from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
@@ -76,6 +77,9 @@ example_files = [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001_Lng_LVCC.xlif",
         CLEMContext,
     ],
+    # Soft x-ray tomography
+    ["visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm", SXTContext],
+    ["visit/X-ray_mosaic_ROI2.xrm", SXTContext],
 ]
 
 
