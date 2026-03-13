@@ -136,44 +136,63 @@ class SXTContext(Context):
                     XrmDataTypes.XRM_FLOAT,
                     strict=True,
                 )
-                metadata["minimum_angle"] = min(angles)
-                metadata["maximum_angle"] = max(angles)
-                metadata["pixel_size_microns"] = read_stream(
+                if angles:
+                    metadata["minimum_angle"] = min(angles)
+                    metadata["maximum_angle"] = max(angles)
+
+                pixel_size_txrm = read_stream(
                     inspector.txrm.ole,
                     "ImageInfo/PixelSize",
                     XrmDataTypes.XRM_FLOAT,
                     strict=True,
-                )[0]
-                metadata["image_size_x"] = read_stream(
+                )
+                if pixel_size_txrm:
+                    metadata["pixel_size_microns"] = pixel_size_txrm[0]
+
+                image_width_txrm = read_stream(
                     inspector.txrm.ole,
                     "ImageInfo/ImageWidth",
                     XrmDataTypes.XRM_INT,
                     strict=True,
-                )[0]
-                metadata["image_size_y"] = read_stream(
+                )
+                if image_width_txrm:
+                    metadata["image_size_x"] = image_width_txrm[0]
+
+                image_height_txrm = read_stream(
                     inspector.txrm.ole,
                     "ImageInfo/ImageHeight",
                     XrmDataTypes.XRM_INT,
                     strict=True,
-                )[0]
-                metadata["exposure_time"] = read_stream(
+                )
+                if image_height_txrm:
+                    metadata["image_size_y"] = image_height_txrm[0]
+
+                exposure_time_txrm = read_stream(
                     inspector.txrm.ole,
-                    "ImageInfo/ExpTime",
+                    "ImageInfo/ExpTimes",
                     XrmDataTypes.XRM_FLOAT,
                     strict=True,
                 )
-                metadata["magnification"] = read_stream(
+                if exposure_time_txrm:
+                    metadata["exposure_time"] = exposure_time_txrm[0]
+
+                magnification_txrm = read_stream(
                     inspector.txrm.ole,
                     "ImageInfo/XrayMagnification",
                     XrmDataTypes.XRM_FLOAT,
                     strict=True,
                 )
-                metadata["tilt_count"] = read_stream(
+                if magnification_txrm:
+                    metadata["magnification"] = magnification_txrm[0]
+
+                tilt_count_txrm = read_stream(
                     inspector.txrm.ole,
                     "ImageInfo/ImagesTaken",
                     XrmDataTypes.XRM_INT,
                     strict=True,
-                )[0]
+                )
+                if tilt_count_txrm:
+                    metadata["tilt_count"] = tilt_count_txrm[0]
 
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
@@ -208,11 +227,3 @@ class SXTContext(Context):
                 },
             )
         return True
-
-    def post_first_transfer(
-        self,
-        transferred_file: Path,
-        environment: MurfeyInstanceEnvironment | None = None,
-        **kwargs,
-    ):
-        self.post_transfer(transferred_file, environment=environment, **kwargs)
