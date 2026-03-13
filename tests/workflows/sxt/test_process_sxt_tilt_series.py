@@ -86,7 +86,7 @@ def test_process_new_sxt_tilt_series(
                 "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
                 "dcid": dc_id,
                 "appid": app_id,
-                "stack_file": f"{tmp_path}/cm12345-6/processed/raw/relion_murfey/Tomograms/tomogram_tag_stack.mrc",
+                "stack_file": f"{tmp_path}/cm12345-6/processed/raw/Tomograms/tomogram_tag_stack.mrc",
                 "tilt_axis": 0,
                 "pixel_size": 100,
                 "manual_tilt_offset": -1,
