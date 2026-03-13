@@ -1,8 +1,10 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.client.contexts.fib import FIBContext
 
@@ -197,11 +199,19 @@ def test_fib_autotem_context():
 
 @pytest.mark.parametrize("metadata_first", ((False, True)))
 def test_fib_maps_context(
+    mocker: MockerFixture,
     tmp_path: Path,
     fib_maps_metadata_file: Path,
     fib_maps_images: list[Path],
     metadata_first: bool,
 ):
+    # Mock out irrelevant functions
+    mocker.patch("murfey.client.contexts.fib._get_source", return_value=tmp_path)
+    mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to", side_effect=fib_maps_images
+    )
+    mock_environment = MagicMock()
+
     # Initialise the FIBContext
     basepath = tmp_path
     context = FIBContext(
@@ -216,7 +226,7 @@ def test_fib_maps_context(
 
     if metadata_first:
         # Read the metadata first
-        context.post_transfer(fib_maps_metadata_file)
+        context.post_transfer(fib_maps_metadata_file, mock_environment)
         # Metadata field should now be populated
         assert all(
             name in context._electron_snapshot_metadata.keys()
@@ -225,7 +235,7 @@ def test_fib_maps_context(
         # Parse the images one-by-one
         for image in fib_maps_images:
             name = image.stem
-            context.post_transfer(image)
+            context.post_transfer(image, mock_environment)
             # Entries should now start being removed from 'metadata' and 'images' fields
             assert (
                 name not in context._electron_snapshots.keys()
@@ -236,14 +246,14 @@ def test_fib_maps_context(
         # Read in images first
         for image in fib_maps_images:
             name = image.stem
-            context.post_transfer(image)
+            context.post_transfer(image, mock_environment)
             assert (
                 name in context._electron_snapshots.keys()
                 and name not in context._electron_snapshot_metadata.keys()
                 and name not in context._electron_snapshots_submitted
             )
         # Read in the metadata
-        context.post_transfer(fib_maps_metadata_file)
+        context.post_transfer(fib_maps_metadata_file, mock_environment)
         assert all(
             name in context._electron_snapshots_submitted
             and name not in context._electron_snapshots.keys()
