@@ -99,6 +99,10 @@ def ensure_dcg_exists(
                     )
             except Exception as e:
                 logger.warning(f"Get EPU session hook failed: {e}")
+    elif collection_type == "sxt":
+        experiment_type_id = 47
+        session_file = metadata_source / "Session.dm"
+        source_visit_dir = metadata_source.parent
     else:
         logger.error(f"Unknown collection type {collection_type}")
         return None

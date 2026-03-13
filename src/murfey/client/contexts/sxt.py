@@ -58,7 +58,7 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    data_collection_parameters.get("pixel_size_on_image", 100)
+                    data_collection_parameters.get("pixel_size", 100)
                 ),
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
@@ -142,7 +142,7 @@ class SXTContext(Context):
                     strict=True,
                 )
                 if pixel_size_txrm:
-                    metadata["pixel_size_microns"] = pixel_size_txrm[0]
+                    metadata["pixel_size"] = pixel_size_txrm[0] * 1e4
 
                 image_width_txrm = read_stream(
                     inspector.txrm.ole,
