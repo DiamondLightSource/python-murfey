@@ -64,7 +64,7 @@ def test_process_new_sxt_tilt_series(
         session_id=ExampleVisit.murfey_session_id,
         tag="tomogram_tag",
         source="/path/to/tomogram_source",
-        txrm="/path/to/final/cm12345-6/raw/tomogram_tag.txrm",
+        txrm=f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
         tilt_series_length=5,
         pixel_size=100,
         tilt_offset=1,
@@ -83,10 +83,10 @@ def test_process_new_sxt_tilt_series(
         "processing_recipe",
         {
             "parameters": {
-                "txrm_file": "/path/to/final/cm12345-6/raw/tomogram_tag.txrm",
+                "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
                 "dcid": dc_id,
                 "appid": app_id,
-                "stack_file": "/path/to/final/cm123456-7/processed/raw/relion_murfey/Tomograms/tomogram_tag_stack.mrc",
+                "stack_file": f"{tmp_path}/cm123456-7/processed/raw/relion_murfey/Tomograms/tomogram_tag_stack.mrc",
                 "tilt_axis": 0,
                 "pixel_size": 100,
                 "manual_tilt_offset": -1,

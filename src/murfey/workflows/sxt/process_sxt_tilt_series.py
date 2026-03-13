@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 
 from murfey.server import _transport_object
 from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
+from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
@@ -105,9 +106,11 @@ def process_sxt_tilt_series_workflow(
         },
     }
     if _transport_object:
-        logger.info(f"Sending Zocalo message for processing: {zocalo_message!r}")
+        logger.info(
+            f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
+        )
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     else:
         logger.info(
-            f"No transport object found. Zocalo message would be {zocalo_message!r}"
+            f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
         )
