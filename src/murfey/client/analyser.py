@@ -112,7 +112,11 @@ class Analyser(Observer):
                 self._extension = Path(subframe_path).suffix
                 return True
         # Check for LIF files and TXRM files separately
-        elif file_path.suffix == ".lif" or file_path.suffix == ".txrm":
+        elif (
+            file_path.suffix == ".lif"
+            or file_path.suffix == ".txrm"
+            or file_path.suffix == ".xrm"
+        ):
             self._extension = file_path.suffix
             return True
         return False
@@ -140,7 +144,7 @@ class Analyser(Observer):
             return True
 
         # SXT workflow checks
-        if file_path.suffix == ".txrm":
+        if file_path.suffix in (".txrm", ".xrm"):
             self._context = SXTContext("zeiss", self._basepath, self._token)
             return True
 

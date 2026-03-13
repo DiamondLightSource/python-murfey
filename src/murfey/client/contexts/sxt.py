@@ -57,19 +57,14 @@ class SXTContext(Context):
                 "data_collection_tag": tilt_series,
                 "source": str(self._basepath),
                 "tag": tilt_series,
+                "pixel_size_on_image": str(
+                    data_collection_parameters.get("pixel_size_on_image", 100)
+                ),
+                "image_size_x": data_collection_parameters.get("image_size_x", 0),
+                "image_size_y": data_collection_parameters.get("image_size_y", 0),
+                "magnification": data_collection_parameters.get("magnification", 0),
+                "voltage": 0,
             }
-
-            # Once mdoc parameters are known register processing jobs
-            dc_data.update(
-                {
-                    "pixel_size_on_image": data_collection_parameters.get(
-                        "pixel_size_on_image"
-                    ),
-                    "image_size_x": data_collection_parameters.get("image_size_x"),
-                    "image_size_y": data_collection_parameters.get("image_size_y"),
-                    "magnification": data_collection_parameters.get("magnification"),
-                }
-            )
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.router",
