@@ -22,6 +22,7 @@ def create_fib_maps_dataset_element(
     size_y: float,
     size_z: float,
     rotation_angle: float,
+    status: str,
 ):
     # Create dataset node
     dataset = ET.Element("Dataset")
@@ -69,6 +70,11 @@ def create_fib_maps_dataset_element(
     image_path_node.text = relative_path.replace("/", "\\")
     dataset.append(image_path_node)
 
+    # Status
+    status_node = ET.Element("Status")
+    status_node.text = status
+    dataset.append(status_node)
+
     return dataset
 
 
@@ -104,6 +110,7 @@ fib_maps_test_datasets = [
         "size_y": sy,
         "size_z": sz,
         "rotation_angle": ra,
+        "status": "Finished",
     }
     for (name, relative_path, cx, cy, cz, sx, sy, sz, ra) in (
         (
