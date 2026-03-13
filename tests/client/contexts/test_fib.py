@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.client.contexts.fib import FIBContext, _number_from_name
+from murfey.client.contexts.fib import FIBContext, _get_source, _number_from_name
 
 # -------------------------------------------------------------------------------------
 # FIBContext test utilty functions and fixtures
@@ -164,25 +164,32 @@ fib_maps_test_datasets = [
 
 
 @pytest.fixture
-def fib_maps_metadata_file(tmp_path: Path):
+def visit_dir(tmp_path: Path):
+    return tmp_path / "visit"
+
+
+@pytest.fixture
+def fib_maps_metadata_file(visit_dir: Path):
     metadata = create_fib_maps_xml_metadata(
         "test-project",
         fib_maps_test_datasets,
     )
     tree = ET.ElementTree(metadata)
     ET.indent(tree, space="  ")
-    save_path = tmp_path / "EMproject.emxml"
+    save_path = visit_dir / "maps/visit/EMproject.emxml"
+    if not save_path.parent.exists():
+        save_path.parent.mkdir(parents=True, exist_ok=True)
     tree.write(save_path, encoding="utf-8")
     return save_path
 
 
 @pytest.fixture
-def fib_maps_images(tmp_path: Path):
+def fib_maps_images(fib_maps_metadata_file: Path):
     image_list = []
     for dataset in fib_maps_test_datasets:
         name = str(dataset["name"])
         relative_path = str(dataset["relative_path"])
-        file = tmp_path / relative_path / f"{name}.tiff"
+        file = fib_maps_metadata_file.parent / relative_path / f"{name}.tiff"
         if not file.exists():
             file.parent.mkdir(parents=True, exist_ok=True)
             file.touch()
@@ -213,8 +220,21 @@ def test_number_from_name(test_params: tuple[str, int]):
     assert _number_from_name(name) == number
 
 
-def test_get_source():
-    pass
+def test_get_source(
+    tmp_path: Path,
+    visit_dir: Path,
+    fib_maps_images: list[Path],
+    fib_maps_metadata_file: Path,
+):
+    # Mock the MurfeyInstanceEnvironment
+    mock_environment = MagicMock()
+    mock_environment.sources = [
+        visit_dir,
+        tmp_path / "another_dir",
+    ]
+    # Check that the correct source directory is found
+    for file in [fib_maps_metadata_file, *fib_maps_images]:
+        assert _get_source(file, mock_environment) == visit_dir
 
 
 def test_file_transferred_to():
