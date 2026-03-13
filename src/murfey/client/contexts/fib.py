@@ -5,7 +5,7 @@ import re
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional
+from typing import NamedTuple
 from xml.etree import ElementTree as ET
 
 import xmltodict
@@ -22,7 +22,7 @@ lock = threading.Lock()
 class Lamella(NamedTuple):
     name: str
     number: int
-    angle: Optional[float] = None
+    angle: float | None = None
 
 
 class MillingProgress(NamedTuple):
@@ -131,10 +131,10 @@ class FIBContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path, token: str):
         super().__init__("FIB", acquisition_software, token)
         self._basepath = basepath
-        self._milling: Dict[int, List[MillingProgress]] = {}
-        self._lamellae: Dict[int, Lamella] = {}
-        self._electron_snapshots: Dict[str, Path] = {}
-        self._electron_snapshot_metadata: Dict[str, ElectronSnapshotMetadata] = {}
+        self._milling: dict[int, list[MillingProgress]] = {}
+        self._lamellae: dict[int, Lamella] = {}
+        self._electron_snapshots: dict[str, Path] = {}
+        self._electron_snapshot_metadata: dict[str, ElectronSnapshotMetadata] = {}
         self._electron_snapshots_submitted: set[str] = set()
 
     def post_transfer(
