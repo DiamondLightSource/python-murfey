@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,8 @@ class MillingProgress(NamedTuple):
 
 
 class ElectronSnapshotMetadata(NamedTuple):
+    slot_num: int | None  # Which slot in the FIB-SEM it is from
+    image_num: int
     image_dir: str  # Partial path from EMproject.emxml parent to the image
     status: str
     x_len: float | None
@@ -43,8 +46,18 @@ class ElectronSnapshotMetadata(NamedTuple):
 
 
 def _number_from_name(name: str) -> int:
-    return int(
-        name.strip().replace("Lamella", "").replace("(", "").replace(")", "") or 1
+    """
+    In the AutoTEM and Maps workflows for the FIB, the sites and images are
+    auto-incremented with parenthesised numbers (e.g. "Lamella (2)"), with
+    the first site/image typically not having a number.
+
+    This function extracts the number from the file name, and returns 1 if
+    no such number is found.
+    """
+    return (
+        int(match.group(1))
+        if (match := re.search(r"\(([\d+])\)", name)) is not None
+        else 1
     )
 
 
@@ -98,6 +111,8 @@ def _parse_electron_snapshot_metadata(xml_file: Path):
 
         # Append metadata for current site to dict
         metadata_dict[name] = ElectronSnapshotMetadata(
+            slot_num=None if cx is None else (1 if cx < 0 else 2),
+            image_num=_number_from_name(name),
             status=status,
             image_dir=image_dir,
             x_len=x_len,
