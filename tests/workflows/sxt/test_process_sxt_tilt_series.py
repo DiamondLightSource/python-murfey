@@ -21,7 +21,7 @@ def set_up_db(murfey_db_session: Session):
         lookup_kwargs={
             "id": 0,
             "session_id": ExampleVisit.murfey_session_id,
-            "tag": "test_dcg",
+            "tag": "/path/to/tomogram_source",
         },
     )
     dc_entry: DataCollection = get_or_create_db_entry(
@@ -29,7 +29,7 @@ def set_up_db(murfey_db_session: Session):
         DataCollection,
         lookup_kwargs={
             "id": 0,
-            "tag": "test_dc",
+            "tag": "tomogram_tag",
             "dcg_id": dcg_entry.id,
         },
     )
@@ -38,7 +38,7 @@ def set_up_db(murfey_db_session: Session):
         ProcessingJob,
         lookup_kwargs={
             "id": 1,
-            "recipe": "test_recipe",
+            "recipe": "sxt-tomo-align",
             "dc_id": dc_entry.id,
         },
     )

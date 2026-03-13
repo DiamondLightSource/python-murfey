@@ -105,9 +105,9 @@ def process_sxt_tilt_series_workflow(
         },
     }
     if _transport_object:
-        logger.info(f"Sending Zocalo message for processing: {zocalo_message}")
+        logger.info(f"Sending Zocalo message for processing: {zocalo_message!r}")
         _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     else:
         logger.info(
-            f"No transport object found. Zocalo message would be {zocalo_message}"
+            f"No transport object found. Zocalo message would be {zocalo_message!r}"
         )
