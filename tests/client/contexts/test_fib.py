@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.client.contexts.fib import FIBContext
+from murfey.client.contexts.fib import FIBContext, _number_from_name
 
 # -------------------------------------------------------------------------------------
 # FIBContext test utilty functions and fixtures
@@ -193,6 +193,34 @@ def fib_maps_images(tmp_path: Path):
 # -------------------------------------------------------------------------------------
 # Tests
 # -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (  # File name | Expected number
+        # AutoTEM examples
+        ("Lamella", 1),
+        ("Lamella (2)", 2),
+        ("Lamella (12)", 12),
+        # Maps examples
+        ("Electron Snapshot", 1),
+        ("Electron Snapshot (3)", 3),
+        ("Electron Snapshot (21)", 21),
+    ),
+)
+def test_number_from_name(test_params: tuple[str, int]):
+    name, number = test_params
+    assert _number_from_name(name) == number
+
+
+def test_get_source():
+    pass
+
+
+def test_file_transferred_to():
+    pass
+
+
 def test_fib_autotem_context():
     pass
 

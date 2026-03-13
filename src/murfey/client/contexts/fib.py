@@ -56,7 +56,7 @@ def _number_from_name(name: str) -> int:
     """
     return (
         int(match.group(1))
-        if (match := re.search(r"\(([\d+])\)", name)) is not None
+        if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
         else 1
     )
 
