@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.client.contexts.fib import FIBContext, _get_source, _number_from_name
+from murfey.client.contexts.fib import (
+    FIBContext,
+    _file_transferred_to,
+    _get_source,
+    _number_from_name,
+)
 
 # -------------------------------------------------------------------------------------
 # FIBContext test utilty functions and fixtures
@@ -237,7 +242,37 @@ def test_get_source(
         assert _get_source(file, mock_environment) == visit_dir
 
 
-def test_file_transferred_to():
+def test_file_transferred_to(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    visit_dir: Path,
+    fib_maps_images: list[Path],
+    fib_maps_metadata_file: Path,
+):
+    # Mock the machine config and environment
+    mock_get_machine_config = mocker.patch(
+        "murfey.client.contexts.fib.get_machine_config_client"
+    )
+    mock_get_machine_config.return_value = {
+        "rsync_basepath": tmp_path / "fib" / "data",
+    }
+    mock_environment = MagicMock()
+    mock_environment.default_destinations = {visit_dir: "current_year"}
+    mock_environment.visit = "visit"
+
+    # Iterate across the FIB files to compare against
+    destination_dir = tmp_path / "fib" / "data" / "current_year" / "visit"
+    for file in [fib_maps_metadata_file, *fib_maps_images]:
+        # Work out what the expected destination will be
+        assert _file_transferred_to(
+            environment=mock_environment,
+            source=visit_dir,
+            file_path=file,
+            token="",
+        ) == destination_dir / file.relative_to(visit_dir)
+
+
+def test_parse_electron_snapshot_metadata():
     pass
 
 
