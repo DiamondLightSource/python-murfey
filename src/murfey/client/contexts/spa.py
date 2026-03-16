@@ -7,7 +7,12 @@ from typing import Any, Optional, OrderedDict
 
 import xmltodict
 
-from murfey.client.context import Context, ProcessingParameter
+from murfey.client.context import (
+    Context,
+    ProcessingParameter,
+    _file_transferred_to,
+    _get_source,
+)
 from murfey.client.destinations import find_longest_data_directory
 from murfey.client.instance_environment import (
     MovieTracker,
@@ -26,28 +31,6 @@ from murfey.util.spa_metadata import (
 logger = logging.getLogger("murfey.client.contexts.spa")
 
 
-def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
-):
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
-    if environment.visit in environment.default_destinations[source]:
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source])
-            / file_path.relative_to(source)  # need to strip out the rsync_module name
-        )
-    return (
-        Path(machine_config.get("rsync_basepath", ""))
-        / Path(environment.default_destinations[source])
-        / environment.visit
-        / file_path.relative_to(source)
-    )
-
-
 def _grid_square_metadata_file(
     f: Path, data_directories: list[Path], visit: str, grid_square: int
 ) -> Path:
@@ -64,22 +47,6 @@ def _grid_square_metadata_file(
     if not metadata_file.is_file():
         logger.warning(f"Grid square metadata file {str(metadata_file)} does not exist")
     return metadata_file
-
-
-def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
-    possible_sources = []
-    for s in environment.sources:
-        if file_path.is_relative_to(s):
-            possible_sources.append(s)
-    if not possible_sources:
-        return None
-    elif len(possible_sources) == 1:
-        return possible_sources[0]
-    source = possible_sources[0]
-    for extra_source in possible_sources[1:]:
-        if extra_source.is_relative_to(source):
-            source = extra_source
-    return source
 
 
 def _get_xml_list_index(key: str, xml_list: list) -> int:

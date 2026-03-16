@@ -4,8 +4,7 @@ from typing import Optional
 
 import xmltodict
 
-from murfey.client.context import Context, _atlas_destination
-from murfey.client.contexts.spa import _get_source
+from murfey.client.context import Context, _atlas_destination, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 

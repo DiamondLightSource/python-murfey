@@ -16,7 +16,7 @@ from murfey.util.db import (
 )
 from murfey.util.models import BatchPositionParameters, SearchMapParameters
 
-logger = logging.getLogger("murfey.client.util.tomo_metadata")
+logger = logging.getLogger("murfey.workflows.tomo.tomo_metadata")
 
 
 def register_search_map_in_database(

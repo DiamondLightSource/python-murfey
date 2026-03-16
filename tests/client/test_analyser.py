@@ -8,6 +8,7 @@ from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.fib import FIBContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
+from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
@@ -94,6 +95,9 @@ example_files = [
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
         FIBContext,
     ],
+    # Soft x-ray tomography
+    ["visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm", SXTContext],
+    ["visit/X-ray_mosaic_ROI2.xrm", SXTContext],
 ]
 
 

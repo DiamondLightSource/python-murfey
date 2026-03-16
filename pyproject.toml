@@ -71,6 +71,9 @@ server = [
 smartem = [
     "smartem-decisions[backend]",
 ]
+sxt = [
+    "txrm2tiff",
+]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"

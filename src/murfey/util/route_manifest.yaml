@@ -1383,6 +1383,16 @@ murfey.server.api.workflow.spa_router:
         type: int
     methods:
       - POST
+murfey.server.api.workflow.sxt_router:
+  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
+    function: process_sxt_tilt_series
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.workflow.tomo_router:
   - path: /workflow/tomo/sessions/{session_id}/tomography_processing_parameters
     function: register_tomo_proc_params
