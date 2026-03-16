@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 try:
     from smartem_backend.api_client import EntityConverter
-    from smartem_common.schemas import AcquisitionData
+    from smartem_common.schemas import AcquisitionData, MicroscopeData
 
     SMARTEM_ACTIVE = True
 except ImportError:
@@ -160,12 +160,19 @@ async def setup_multigrid_watcher(
             if SMARTEM_ACTIVE and machine_config.smartem_api_url:
                 log.info("registering an acquisition with smartem")
                 try:
+                    microscope_data = MicroscopeData(instrument_id=instrument_name)
                     acquisition_data = EntityConverter.acquisition_to_request(
-                        AcquisitionData(name=visit)
+                        AcquisitionData(
+                            name=visit,
+                            id=visit,
+                            instrument=microscope_data,
+                            storage_path=str(secure_path(watcher_spec.source / visit)),
+                            start_time=datetime.datetime.now(),
+                        )
                     )
                     async with clientsession.post(
                         f"{machine_config.smartem_api_url}/acquisitions",
-                        json=acquisition_data.model_dump(),
+                        json=acquisition_data.model_dump(mode="json"),
                     ) as response:
                         acquisition_response_data = await response.json()
                     acquisition_uuid = acquisition_response_data["uuid"]

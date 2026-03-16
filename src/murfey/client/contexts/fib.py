@@ -1,23 +1,28 @@
 from __future__ import annotations
 
 import logging
+import re
+import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional
+from typing import NamedTuple
+from xml.etree import ElementTree as ET
 
 import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.client import capture_post
+from murfey.util.client import capture_post, get_machine_config_client
 
 logger = logging.getLogger("murfey.client.contexts.fib")
+
+lock = threading.Lock()
 
 
 class Lamella(NamedTuple):
     name: str
     number: int
-    angle: Optional[float] = None
+    angle: float | None = None
 
 
 class MillingProgress(NamedTuple):
@@ -25,18 +30,145 @@ class MillingProgress(NamedTuple):
     timestamp: float
 
 
+class ElectronSnapshotMetadata(NamedTuple):
+    slot_num: int | None  # Which slot in the FIB-SEM it is from
+    image_num: int
+    image_dir: str  # Partial path from EMproject.emxml parent to the image
+    status: str
+    x_len: float | None
+    y_len: float | None
+    z_len: float | None
+    x_center: float | None
+    y_center: float | None
+    z_center: float | None
+    extent: tuple[float, float, float, float] | None
+    rotation_angle: float | None
+
+
 def _number_from_name(name: str) -> int:
-    return int(
-        name.strip().replace("Lamella", "").replace("(", "").replace(")", "") or 1
+    """
+    In the AutoTEM and Maps workflows for the FIB, the sites and images are
+    auto-incremented with parenthesised numbers (e.g. "Lamella (2)"), with
+    the first site/image typically not having a number.
+
+    This function extracts the number from the file name, and returns 1 if
+    no such number is found.
+    """
+    return (
+        int(match.group(1))
+        if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
+        else 1
     )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    """
+    Returns the Path of the file on the client PC.
+    """
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            return s
+    return None
+
+
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+) -> Path | None:
+    """
+    Returns the Path of the transferred file on the DLS file system.
+    """
+    machine_config = get_machine_config_client(
+        str(environment.url.geturl()),
+        token,
+        instrument_name=environment.instrument_name,
+    )
+
+    # Construct destination path
+    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
+        environment.default_destinations[source]
+    )
+    # Add visit number to the path if it's not present in default destination
+    if environment.visit not in environment.default_destinations[source]:
+        base_destination = base_destination / environment.visit
+    destination = base_destination / file_path.relative_to(source)
+    return destination
+
+
+def _parse_electron_snapshot_metadata(xml_file: Path):
+    metadata_dict = {}
+    root = ET.parse(xml_file).getroot()
+    datasets = root.findall(".//Datasets/Dataset")
+    for dataset in datasets:
+        # Extract all string-based values
+        name, image_dir, status = [
+            node.text
+            if ((node := dataset.find(node_path)) is not None and node.text is not None)
+            else ""
+            for node_path in (
+                ".//Name",
+                ".//FinalImages",
+                ".//Status",
+            )
+        ]
+
+        # Extract all float values
+        cx, cy, cz, x_len, y_len, z_len, rotation_angle = [
+            float(node.text)
+            if ((node := dataset.find(node_path)) is not None and node.text is not None)
+            else None
+            for node_path in (
+                ".//BoxCenter/CenterX",
+                ".//BoxCenter/CenterY",
+                ".//BoxCenter/CenterZ",
+                ".//BoxSize/SizeX",
+                ".//BoxSize/SizeY",
+                ".//BoxSize/SizeZ",
+                ".//RotationAngle",
+            )
+        ]
+
+        # Calculate the extent of the image
+        extent = None
+        if (
+            cx is not None
+            and cy is not None
+            and x_len is not None
+            and y_len is not None
+        ):
+            extent = (
+                x_len - (cx / 2),
+                x_len + (cx / 2),
+                y_len - (cy / 2),
+                y_len - (cy / 2),
+            )
+
+        # Append metadata for current site to dict
+        metadata_dict[name] = ElectronSnapshotMetadata(
+            slot_num=None if cx is None else (1 if cx < 0 else 2),
+            image_num=_number_from_name(name),
+            status=status,
+            image_dir=image_dir,
+            x_len=x_len,
+            y_len=y_len,
+            z_len=z_len,
+            x_center=cx,
+            y_center=cy,
+            z_center=cz,
+            extent=extent,
+            rotation_angle=rotation_angle,
+        )
+    return metadata_dict
 
 
 class FIBContext(Context):
     def __init__(self, acquisition_software: str, basepath: Path, token: str):
         super().__init__("FIB", acquisition_software, token)
         self._basepath = basepath
-        self._milling: Dict[int, List[MillingProgress]] = {}
-        self._lamellae: Dict[int, Lamella] = {}
+        self._milling: dict[int, list[MillingProgress]] = {}
+        self._lamellae: dict[int, Lamella] = {}
+        self._electron_snapshots: dict[str, Path] = {}
+        self._electron_snapshot_metadata: dict[str, ElectronSnapshotMetadata] = {}
+        self._electron_snapshots_submitted: set[str] = set()
 
     def post_transfer(
         self,
@@ -45,6 +177,13 @@ class FIBContext(Context):
         **kwargs,
     ):
         super().post_transfer(transferred_file, environment=environment, **kwargs)
+        if environment is None:
+            logger.warning("No environment passed in")
+            return
+
+        # -----------------------------------------------------------------------------
+        # AutoTEM
+        # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":
@@ -123,3 +262,71 @@ class FIBContext(Context):
                         self._lamellae[number]._replace(
                             angle=float(milling_angle.split(" ")[0])
                         )
+        # -----------------------------------------------------------------------------
+        # Maps
+        # -----------------------------------------------------------------------------
+        elif self._acquisition_software == "maps":
+            # Electron snapshot metadata file
+            if transferred_file.name == "EMproject.emxml":
+                # Extract all "Electron Snapshot" metadata and store it
+                self._electron_snapshot_metadata = _parse_electron_snapshot_metadata(
+                    transferred_file
+                )
+                # If dataset hasn't been transferred, register it
+                for dataset_name in list(self._electron_snapshot_metadata.keys()):
+                    if dataset_name not in self._electron_snapshots_submitted:
+                        if dataset_name in self._electron_snapshots:
+                            logger.info(f"Registering {dataset_name!r}")
+
+                            ## Workflow to trigger goes here
+
+                            # Clear old entry after triggering workflow
+                            self._electron_snapshots_submitted.add(dataset_name)
+                            with lock:
+                                self._electron_snapshots.pop(dataset_name, None)
+                                self._electron_snapshot_metadata.pop(dataset_name, None)
+                        else:
+                            logger.debug(f"Waiting for image for {dataset_name}")
+            # Electron snapshot image
+            elif (
+                "Electron Snapshot" in transferred_file.name
+                and transferred_file.suffix in (".tif", ".tiff")
+            ):
+                # Store file in Context memory
+                dataset_name = transferred_file.stem
+                if not (source := _get_source(transferred_file, environment)):
+                    logger.warning(f"No source found for file {transferred_file}")
+                    return
+                if not (
+                    destination_file := _file_transferred_to(
+                        environment=environment,
+                        source=source,
+                        file_path=transferred_file,
+                        token=self._token,
+                    )
+                ):
+                    logger.warning(
+                        f"File {transferred_file.name!r} not found on storage system"
+                    )
+                    return
+                self._electron_snapshots[dataset_name] = destination_file
+
+                if dataset_name not in self._electron_snapshots_submitted:
+                    # If the metadata and image are both present, register dataset
+                    if dataset_name in list(self._electron_snapshot_metadata.keys()):
+                        logger.info(f"Registering {dataset_name!r}")
+
+                        ## Workflow to trigger goes here
+
+                        # Clear old entry after triggering workflow
+                        self._electron_snapshots_submitted.add(dataset_name)
+                        with lock:
+                            self._electron_snapshots.pop(dataset_name, None)
+                            self._electron_snapshot_metadata.pop(dataset_name, None)
+                    else:
+                        logger.debug(f"Waiting for metadata for {dataset_name}")
+        # -----------------------------------------------------------------------------
+        # Meteor
+        # -----------------------------------------------------------------------------
+        elif self._acquisition_software == "meteor":
+            pass

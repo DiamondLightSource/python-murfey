@@ -17,6 +17,7 @@ from typing import Type
 from murfey.client.context import Context
 from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
+from murfey.client.contexts.fib import FIBContext
 from murfey.client.contexts.spa import SPAModularContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.sxt import SXTContext
@@ -130,25 +131,69 @@ class Analyser(Observer):
         """
         logger.debug(f"Finding context using file {str(file_path)!r}")
 
+        # -----------------------------------------------------------------------------
         # CLEM workflow checks
-        # Look for LIF and XLIF files
-        if file_path.suffix in (".lif", ".xlif"):
-            self._context = CLEMContext("leica", self._basepath, self._token)
-            return True
-        # Look for TIFF files associated with CLEM workflow
-        # CLEM TIFF files will have "--Stage", "--Z", and/or "--C" in their file stem
-        if any(
-            pattern in file_path.stem for pattern in ("--Stage", "--Z", "--C")
-        ) and file_path.suffix in (".tiff", ".tif"):
+        # -----------------------------------------------------------------------------
+        if (
+            # Look for LIF and XLIF files
+            file_path.suffix in (".lif", ".xlif")
+            or (
+                # TIFF files have "--Stage", "--Z", and/or "--C" in their file stem
+                file_path.suffix in (".tiff", ".tif")
+                and any(
+                    pattern in file_path.stem for pattern in ("--Stage", "--Z", "--C")
+                )
+            )
+        ):
             self._context = CLEMContext("leica", self._basepath, self._token)
             return True
 
+        # -----------------------------------------------------------------------------
+        # FIB workflow checks
+        # -----------------------------------------------------------------------------
+        # Determine if it's from AutoTEM
+        if (
+            # AutoTEM generates a "ProjectData.dat" file
+            file_path.name == "ProjectData.dat"
+            or (
+                # Images are stored in ".../Sites/Lamella (N)/..."
+                any(path.startswith("Lamella") for path in file_path.parts)
+                and "Sites" in file_path.parts
+            )
+        ):
+            self._context = FIBContext("autotem", self._basepath, self._token)
+            return True
+
+        # Determine if it's from Maps
+        if (
+            # Electron snapshot metadata in "EMproject.emxml"
+            file_path.name == "EMproject.emxml"
+            or (
+                # Key images are stored in ".../LayersData/Layer/..."
+                all(path in file_path.parts for path in ("LayersData", "Layer"))
+            )
+        ):
+            self._context = FIBContext("maps", self._basepath, self._token)
+            return True
+
+        # Determine if it's from Meteor
+        if (
+            # Image metadata stored in "features.json" file
+            file_path.name == "features.json" or ()
+        ):
+            self._context = FIBContext("meteor", self._basepath, self._token)
+            return True
+
+        # -----------------------------------------------------------------------------
         # SXT workflow checks
+        # -----------------------------------------------------------------------------
         if file_path.suffix in (".txrm", ".xrm"):
             self._context = SXTContext("zeiss", self._basepath, self._token)
             return True
 
+        # -----------------------------------------------------------------------------
         # Tomography and SPA workflow checks
+        # -----------------------------------------------------------------------------
         if "atlas" in file_path.parts:
             self._context = AtlasContext(
                 "serialem" if self._serialem else "epu", self._basepath, self._token
@@ -328,6 +373,12 @@ class Analyser(Observer):
                 elif isinstance(self._context, CLEMContext):
                     logger.debug(
                         f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
+                    )
+                    self.post_transfer(transferred_file)
+
+                elif isinstance(self._context, FIBContext):
+                    logger.debug(
+                        f"File {transferred_file.name!r} will be processed as part of the FIB workflow"
                     )
                     self.post_transfer(transferred_file)
 
