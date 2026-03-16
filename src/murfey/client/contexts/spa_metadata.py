@@ -198,7 +198,10 @@ class SPAMetadataContext(Context):
                 )
                 image_path = (
                     _file_transferred_to(
-                        environment, source, Path(gs_info.image), self._token
+                        environment,
+                        source,
+                        Path(gs_info.image),
+                        self._machine_config,
                     )
                     if gs_info.image
                     else ""

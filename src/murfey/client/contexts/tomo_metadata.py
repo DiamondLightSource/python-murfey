@@ -142,7 +142,7 @@ class TomographyMetadataContext(Context):
                     environment,
                     source,
                     transferred_file.parent / "SearchMap.jpg",
-                    self._token,
+                    self._machine_config,
                 )
                 if source
                 else ""

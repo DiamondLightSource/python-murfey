@@ -12,7 +12,7 @@ import xmltodict
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.client import capture_post, get_machine_config_client
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
@@ -72,17 +72,14 @@ def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    file_path: Path,
+    machine_config: dict,
 ) -> Path | None:
     """
     Returns the Path of the transferred file on the DLS file system.
     """
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
-
     # Construct destination path
     base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
         environment.default_destinations[source]
@@ -309,7 +306,7 @@ class FIBContext(Context):
                         environment=environment,
                         source=source,
                         file_path=transferred_file,
-                        token=self._token,
+                        machine_config=self._machine_config,
                     )
                 ):
                     logger.warning(

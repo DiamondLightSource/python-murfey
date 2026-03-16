@@ -15,7 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.client import capture_get, capture_post, get_machine_config_client
+from murfey.util.client import capture_get, capture_post
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
@@ -192,13 +192,12 @@ class TomographyContext(Context):
             logger.error(f"ERROR {e}, {self.data_collection_parameters}", exc_info=True)
 
     def _file_transferred_to(
-        self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+        self,
+        environment: MurfeyInstanceEnvironment,
+        source: Path,
+        file_path: Path,
+        machine_config: dict,
     ):
-        machine_config = get_machine_config_client(
-            str(environment.url.geturl()),
-            self._token,
-            instrument_name=environment.instrument_name,
-        )
         if environment.visit in environment.default_destinations[source]:
             return (
                 Path(machine_config.get("rsync_basepath", ""))
@@ -256,7 +255,10 @@ class TomographyContext(Context):
 
         if environment:
             file_transferred_to = self._file_transferred_to(
-                environment, source, file_path
+                environment,
+                source,
+                file_path,
+                self._machine_config,
             )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
@@ -466,16 +468,8 @@ class TomographyContext(Context):
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            self._token,
-                            instrument_name=environment.instrument_name,
-                        )
-                    else:
-                        machine_config = {}
                     required_strings = (
-                        machine_config.get("data_required_substrings", {})
+                        self._machine_config.get("data_required_substrings", {})
                         .get("tomo", {})
                         .get(transferred_file.suffix, ["fractions"])
                     )

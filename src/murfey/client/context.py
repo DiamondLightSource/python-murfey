@@ -14,13 +14,11 @@ logger = logging.getLogger("murfey.client.context")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    file_path: Path,
+    machine_config: dict,
 ):
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
     if environment.visit in environment.default_destinations[source]:
         return (
             Path(machine_config.get("rsync_basepath", ""))
