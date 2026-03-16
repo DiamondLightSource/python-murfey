@@ -6,8 +6,9 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 
 def test_sxt_context_initialisation(tmp_path):
-    context = SXTContext("zeiss", tmp_path, "")
+    context = SXTContext("zeiss", tmp_path, {}, "")
     assert context._acquisition_software == "zeiss"
+    assert context._machine_config == {}
     assert context._basepath == tmp_path
 
 
@@ -23,7 +24,7 @@ def test_sxt_context_xrm(mock_post, tmp_path):
         visit="test",
         murfey_session=1,
     )
-    context = SXTContext("zeiss", tmp_path, "")
+    context = SXTContext("zeiss", tmp_path, {}, "")
     return_value = context.post_transfer(
         tmp_path / "example.xrm",
         required_position_files=[],
@@ -61,7 +62,7 @@ def test_sxt_context_txrm(
         visit="test",
         murfey_session=1,
     )
-    context = SXTContext("zeiss", tmp_path, "")
+    context = SXTContext("zeiss", tmp_path, {}, "")
     context.post_transfer(
         tmp_path / "example.txrm",
         required_position_files=[],

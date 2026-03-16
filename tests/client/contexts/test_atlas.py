@@ -6,10 +6,11 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 
 def test_atlas_context_initialisation(tmp_path):
-    context = AtlasContext("tomo", tmp_path, "token")
+    context = AtlasContext("tomo", tmp_path, {}, "token")
     assert context.name == "Atlas"
     assert context._acquisition_software == "tomo"
     assert context._basepath == tmp_path
+    assert context._machine_config == {}
     assert context._token == "token"
 
 
@@ -26,7 +27,7 @@ def test_atlas_context_mrc(mock_capture_post, tmp_path):
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = AtlasContext("tomo", tmp_path, "token")
+    context = AtlasContext("tomo", tmp_path, {}, "token")
 
     atlas_mrc = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_1.mrc"
     atlas_mrc.parent.mkdir(parents=True)
@@ -59,7 +60,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = AtlasContext("tomo", tmp_path, "token")
+    context = AtlasContext("tomo", tmp_path, {}, "token")
 
     atlas_pixel_size = 4.6
     atlas_xml = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_1.xml"

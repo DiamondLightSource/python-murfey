@@ -9,9 +9,10 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 
 def test_tomography_context_initialisation_for_tomo(tmp_path):
-    context = TomographyContext("tomo", tmp_path, "")
+    context = TomographyContext("tomo", tmp_path, {}, "")
     assert not context._completed_tilt_series
     assert context._acquisition_software == "tomo"
+    assert context._machine_config == {}
 
 
 @patch("requests.get")
@@ -28,7 +29,7 @@ def test_tomography_context_add_tomo_tilt(mock_post, mock_get, tmp_path):
         visit="test",
         murfey_session=1,
     )
-    context = TomographyContext("tomo", tmp_path, "")
+    context = TomographyContext("tomo", tmp_path, {}, "")
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
@@ -85,7 +86,7 @@ def test_tomography_context_add_tomo_tilt_out_of_order(mock_post, mock_get, tmp_
         visit="test",
         murfey_session=1,
     )
-    context = TomographyContext("tomo", tmp_path, "")
+    context = TomographyContext("tomo", tmp_path, {}, "")
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
@@ -170,7 +171,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
         visit="test",
         murfey_session=1,
     )
-    context = TomographyContext("tomo", tmp_path, "")
+    context = TomographyContext("tomo", tmp_path, {}, "")
     (tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff").touch()
     context.post_transfer(
         tmp_path / "Position_1_001_[30.0]_date_time_fractions.tiff",
@@ -214,7 +215,7 @@ def test_tomography_context_add_tomo_tilt_delayed_tilt(mock_post, mock_get, tmp_
 
 
 def test_tomography_context_initialisation_for_serialem(tmp_path):
-    context = TomographyContext("serialem", tmp_path, "")
+    context = TomographyContext("serialem", tmp_path, {}, "")
     assert not context._completed_tilt_series
     assert context._acquisition_software == "serialem"
 
@@ -235,7 +236,7 @@ def test_setting_tilt_series_size_and_completion_from_mdoc_parsing(
         visit="test",
         murfey_session=1,
     )
-    context = TomographyContext("tomo", tmp_path, "")
+    context = TomographyContext("tomo", tmp_path, {}, "")
     assert len(context._tilt_series_sizes) == 0
     context.post_transfer(
         Path(__file__).parent.parent.parent / "util" / "test_1.mdoc",
