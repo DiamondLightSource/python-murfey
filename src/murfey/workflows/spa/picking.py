@@ -113,7 +113,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
             picking_db = _db.exec(
                 select(ParticleSizes.particle_size).where(ParticleSizes.pj_id == pj_id)
             ).all()
-            particle_diameter = np.quantile(list(picking_db), 0.75)
+            particle_diameter = float(np.quantile(list(picking_db), 0.75))
             relion_params.particle_diameter = particle_diameter
             _db.add(relion_params)
             _db.commit()
