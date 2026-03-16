@@ -12,9 +12,16 @@ logger = logging.getLogger("murfey.client.contexts.atlas")
 
 
 class AtlasContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("Atlas", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def post_transfer(
         self,

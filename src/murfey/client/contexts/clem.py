@@ -87,9 +87,16 @@ def _get_image_elements(root: ET.Element) -> List[ET.Element]:
 
 
 class CLEMContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("CLEM", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         # CLEM contexts for "auto-save" acquisition mode
         self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
         self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}

@@ -161,9 +161,16 @@ def _parse_electron_snapshot_metadata(xml_file: Path):
 
 
 class FIBContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("FIB", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._milling: dict[int, list[MillingProgress]] = {}
         self._lamellae: dict[int, Lamella] = {}
         self._electron_snapshots: dict[str, Path] = {}

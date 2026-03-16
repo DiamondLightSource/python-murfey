@@ -75,9 +75,16 @@ class SPAModularContext(Context):
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("SPA", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._processing_job_stash: dict = {}
         self._foil_holes: dict[int, list[int]] = {}
 

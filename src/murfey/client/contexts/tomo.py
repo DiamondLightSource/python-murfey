@@ -77,9 +77,16 @@ class TomographyContext(Context):
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("Tomography", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_with_pjids: List[str] = []
         self._tilt_series_sizes: Dict[str, int] = {}
