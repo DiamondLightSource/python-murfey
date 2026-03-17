@@ -248,10 +248,7 @@ def test_file_transferred_to(
     fib_maps_images: list[Path],
     fib_maps_metadata_file: Path,
 ):
-    # Mock the machine config and environment
-    machine_config = {
-        "rsync_basepath": tmp_path / "fib" / "data",
-    }
+    # Mock the environment
     mock_environment = MagicMock()
     mock_environment.default_destinations = {visit_dir: "current_year"}
     mock_environment.visit = "visit"
@@ -264,7 +261,7 @@ def test_file_transferred_to(
             environment=mock_environment,
             source=visit_dir,
             file_path=file,
-            machine_config=machine_config,
+            rsync_basepath=tmp_path / "fib" / "data",
         ) == destination_dir / file.relative_to(visit_dir)
 
 
