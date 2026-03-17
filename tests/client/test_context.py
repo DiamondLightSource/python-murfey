@@ -41,6 +41,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
         collection_type="tomo",
         metadata_source=metadata_source,
         environment=env,
+        machine_config={},
         token="token",
     )
 
@@ -101,6 +102,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
         collection_type="spa",
         metadata_source=metadata_source / "Images-Disc1",
         environment=env,
+        machine_config={},
         token="token",
     )
 
@@ -139,6 +141,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
         collection_type="spa",
         metadata_source=metadata_source,
         environment=env,
+        machine_config={},
         token="token",
     )
 
