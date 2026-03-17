@@ -210,7 +210,10 @@ class SXTContext(Context):
                 f"The following tilt series will be processed: {transferred_file.stem}"
             )
             file_transferred_to = _file_transferred_to(
-                environment, source, transferred_file, self._machine_config
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
             )
             capture_post(
                 base_url=str(environment.url.geturl()),

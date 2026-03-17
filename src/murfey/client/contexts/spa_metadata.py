@@ -201,7 +201,7 @@ class SPAMetadataContext(Context):
                         environment,
                         source,
                         Path(gs_info.image),
-                        self._machine_config,
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if gs_info.image
                     else ""

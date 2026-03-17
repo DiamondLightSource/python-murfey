@@ -142,7 +142,7 @@ class TomographyMetadataContext(Context):
                     environment,
                     source,
                     transferred_file.parent / "SearchMap.jpg",
-                    self._machine_config,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if source
                 else ""

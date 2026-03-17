@@ -196,16 +196,16 @@ class TomographyContext(Context):
         environment: MurfeyInstanceEnvironment,
         source: Path,
         file_path: Path,
-        machine_config: dict,
+        rsync_basepath: Path,
     ):
         if environment.visit in environment.default_destinations[source]:
             return (
-                Path(machine_config.get("rsync_basepath", ""))
+                rsync_basepath
                 / Path(environment.default_destinations[source])
                 / file_path.name
             )
         return (
-            Path(machine_config.get("rsync_basepath", ""))
+            rsync_basepath
             / Path(environment.default_destinations[source])
             / environment.visit
             / file_path.name
@@ -258,7 +258,7 @@ class TomographyContext(Context):
                 environment,
                 source,
                 file_path,
-                self._machine_config,
+                Path(self._machine_config.get("rsync_basepath", "")),
             )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),

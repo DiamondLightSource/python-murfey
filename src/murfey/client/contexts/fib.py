@@ -75,15 +75,13 @@ def _file_transferred_to(
     environment: MurfeyInstanceEnvironment,
     source: Path,
     file_path: Path,
-    machine_config: dict,
+    rsync_basepath: Path,
 ) -> Path | None:
     """
     Returns the Path of the transferred file on the DLS file system.
     """
     # Construct destination path
-    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
-        environment.default_destinations[source]
-    )
+    base_destination = rsync_basepath / Path(environment.default_destinations[source])
     # Add visit number to the path if it's not present in default destination
     if environment.visit not in environment.default_destinations[source]:
         base_destination = base_destination / environment.visit
@@ -306,7 +304,9 @@ class FIBContext(Context):
                         environment=environment,
                         source=source,
                         file_path=transferred_file,
-                        machine_config=self._machine_config,
+                        rsync_basepath=Path(
+                            self._machine_config.get("rsync_basepath", "")
+                        ),
                     )
                 ):
                     logger.warning(

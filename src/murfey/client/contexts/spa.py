@@ -313,7 +313,10 @@ class SPAModularContext(Context):
             )
             image_path = (
                 _file_transferred_to(
-                    environment, metadata_source, Path(gs.image), self._machine_config
+                    environment,
+                    metadata_source,
+                    Path(gs.image),
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if gs.image
                 else ""
@@ -365,7 +368,7 @@ class SPAModularContext(Context):
                         environment,
                         metadata_source,
                         Path(fh.image),
-                        self._machine_config,
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if fh.image
                     else ""
@@ -445,7 +448,10 @@ class SPAModularContext(Context):
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
-                            environment, source, transferred_file, self._machine_config
+                            environment,
+                            source,
+                            transferred_file,
+                            Path(self._machine_config.get("rsync_basepath", "")),
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(

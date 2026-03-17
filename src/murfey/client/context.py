@@ -17,16 +17,16 @@ def _file_transferred_to(
     environment: MurfeyInstanceEnvironment,
     source: Path,
     file_path: Path,
-    machine_config: dict,
+    rsync_basepath: Path,
 ):
     if environment.visit in environment.default_destinations[source]:
         return (
-            Path(machine_config.get("rsync_basepath", ""))
+            rsync_basepath
             / Path(environment.default_destinations[source])
             / file_path.relative_to(source)  # need to strip out the rsync_module name
         )
     return (
-        Path(machine_config.get("rsync_basepath", ""))
+        rsync_basepath
         / Path(environment.default_destinations[source])
         / environment.visit
         / file_path.relative_to(source)
