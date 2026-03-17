@@ -76,7 +76,9 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 transferred_atlas_name = _atlas_destination(
-                    environment, source, self._token
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     base_url=str(environment.url.geturl()),
@@ -98,7 +100,9 @@ class AtlasContext(Context):
             if source:
                 atlas_mrc = transferred_file.with_suffix(".mrc")
                 transferred_atlas_jpg = _atlas_destination(
-                    environment, source, self._token
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 ) / atlas_mrc.relative_to(source.parent).with_suffix(".jpg")
 
                 with open(transferred_file, "rb") as atlas_xml:

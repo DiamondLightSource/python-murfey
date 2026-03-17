@@ -57,6 +57,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -67,6 +68,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -174,6 +176,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -230,6 +233,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file) as xml:

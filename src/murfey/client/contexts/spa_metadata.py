@@ -128,6 +128,7 @@ class SPAMetadataContext(Context):
                         collection_type="spa",
                         metadata_source=images_disc,
                         environment=environment,
+                        machine_config=self._machine_config,
                         token=self._token,
                     )
                     for gs, pos_data in gs_pix_positions.items():
@@ -167,6 +168,7 @@ class SPAMetadataContext(Context):
                     collection_type="spa",
                     metadata_source=images_disc,
                     environment=environment,
+                    machine_config=self._machine_config,
                     token=self._token,
                 )
 

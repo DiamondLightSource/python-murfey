@@ -575,6 +575,7 @@ class MultigridController:
                     collection_type="spa",
                     metadata_source=metadata_source,
                     environment=self._environment,
+                    machine_config=self._machine_config,
                     token=self.token,
                 )
             except Exception as e:

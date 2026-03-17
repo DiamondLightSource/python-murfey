@@ -53,6 +53,7 @@ class SXTContext(Context):
                 collection_type="sxt",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
