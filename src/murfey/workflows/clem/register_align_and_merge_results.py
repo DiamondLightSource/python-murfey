@@ -8,10 +8,9 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from murfey.util.db import CLEMImageSeries
-from murfey.workflows.clem import get_db_entry
 
 logger = logging.getLogger("murfey.workflows.clem.register_align_and_merge_results")
 
@@ -83,12 +82,16 @@ def register_align_and_merge_result(
     try:
         # Register items in database if not already present
         try:
-            clem_img_series: CLEMImageSeries = get_db_entry(
-                db=murfey_db,
-                table=CLEMImageSeries,
-                session_id=session_id,
-                series_name=result.series_name,
-            )
+            if not (
+                clem_img_series := murfey_db.exec(
+                    select(CLEMImageSeries)
+                    .where(CLEMImageSeries.session_id == session_id)
+                    .where(CLEMImageSeries.series_name == result.series_name)
+                ).one_or_none()
+            ):
+                clem_img_series = CLEMImageSeries(
+                    session_id=session_id, series_name=result.series_name
+                )
             clem_img_series.composite_created = True
             murfey_db.add(clem_img_series)
             murfey_db.commit()
