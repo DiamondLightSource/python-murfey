@@ -8,27 +8,25 @@ from typing import Any, List, NamedTuple
 import xmltodict
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util.client import capture_post, get_machine_config_client
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.context")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    file_path: Path,
+    rsync_basepath: Path,
 ):
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
     if environment.visit in environment.default_destinations[source]:
         return (
-            Path(machine_config.get("rsync_basepath", ""))
+            rsync_basepath
             / Path(environment.default_destinations[source])
             / file_path.relative_to(source)  # need to strip out the rsync_module name
         )
     return (
-        Path(machine_config.get("rsync_basepath", ""))
+        rsync_basepath
         / Path(environment.default_destinations[source])
         / environment.visit
         / file_path.relative_to(source)
@@ -52,22 +50,19 @@ def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path
 
 
 def _atlas_destination(
-    environment: MurfeyInstanceEnvironment, source: Path, token: str
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    rsync_basepath: Path,
 ) -> Path:
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
     for i, destination_part in enumerate(
         Path(environment.default_destinations[source]).parts
     ):
         if destination_part == environment.visit:
-            return Path(machine_config.get("rsync_basepath", "")) / "/".join(
+            return rsync_basepath / "/".join(
                 Path(environment.default_destinations[source]).parent.parts[: i + 1]
             )
     return (
-        Path(machine_config.get("rsync_basepath", ""))
+        rsync_basepath
         / Path(environment.default_destinations[source]).parent
         / environment.visit
     )
@@ -77,6 +72,7 @@ def ensure_dcg_exists(
     collection_type: str,
     metadata_source: Path,
     environment: MurfeyInstanceEnvironment,
+    machine_config: dict,
     token: str,
 ) -> str | None:
     """Create  a data collection group"""
@@ -183,7 +179,11 @@ def ensure_dcg_exists(
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
                 "atlas": str(
-                    _atlas_destination(environment, session_file.parent, token)
+                    _atlas_destination(
+                        environment,
+                        session_file.parent,
+                        Path(machine_config.get("rsync_basepath", "")),
+                    )
                     / environment.samples[metadata_source].atlas.parent
                     / atlas_xml_path.with_suffix(".jpg").name
                 ).replace("//", "/"),

@@ -19,7 +19,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.client import capture_get, capture_post, get_machine_config_client
+from murfey.util.client import capture_get, capture_post
 from murfey.util.spa_metadata import (
     foil_hole_data,
     foil_hole_from_file,
@@ -75,9 +75,16 @@ class SPAModularContext(Context):
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("SPA", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._processing_job_stash: dict = {}
         self._foil_holes: dict[int, list[int]] = {}
 
@@ -306,7 +313,10 @@ class SPAModularContext(Context):
             )
             image_path = (
                 _file_transferred_to(
-                    environment, metadata_source, Path(gs.image), self._token
+                    environment,
+                    metadata_source,
+                    Path(gs.image),
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if gs.image
                 else ""
@@ -355,7 +365,10 @@ class SPAModularContext(Context):
                 )
                 image_path = (
                     _file_transferred_to(
-                        environment, metadata_source, Path(fh.image), self._token
+                        environment,
+                        metadata_source,
+                        Path(fh.image),
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if fh.image
                     else ""
@@ -414,16 +427,8 @@ class SPAModularContext(Context):
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "epu":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            self._token,
-                            instrument_name=environment.instrument_name,
-                        )
-                    else:
-                        machine_config = {}
                     required_strings = (
-                        machine_config.get("data_required_substrings", {})
+                        self._machine_config.get("data_required_substrings", {})
                         .get("epu", {})
                         .get(transferred_file.suffix, ["fractions"])
                     )
@@ -443,7 +448,10 @@ class SPAModularContext(Context):
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
-                            environment, source, transferred_file, self._token
+                            environment,
+                            source,
+                            transferred_file,
+                            Path(self._machine_config.get("rsync_basepath", "")),
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
@@ -489,7 +497,10 @@ class SPAModularContext(Context):
 
                         try:
                             foil_hole: Optional[int] = self._position_analysis(
-                                transferred_file, environment, source, machine_config
+                                transferred_file,
+                                environment,
+                                source,
+                                self._machine_config,
                             )
                         except Exception as e:
                             # try to continue if position information gathering fails so that movie is processed anyway

@@ -12,28 +12,23 @@ from defusedxml.ElementTree import parse
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
-from murfey.util.client import capture_post, get_machine_config_client
+from murfey.util.client import capture_post
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
 
 
 def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    file_path: Path,
+    rsync_basepath: Path,
 ) -> Optional[Path]:
     """
     Returns the Path of the transferred file on the DLS file system.
     """
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
-
     # Construct destination path
-    base_destination = Path(machine_config.get("rsync_basepath", "")) / Path(
-        environment.default_destinations[source]
-    )
+    base_destination = rsync_basepath / Path(environment.default_destinations[source])
     # Add visit number to the path if it's not present in default destination
     if environment.visit not in environment.default_destinations[source]:
         base_destination = base_destination / environment.visit
@@ -87,9 +82,16 @@ def _get_image_elements(root: ET.Element) -> List[ET.Element]:
 
 
 class CLEMContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("CLEM", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         # CLEM contexts for "auto-save" acquisition mode
         self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
         self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}
@@ -125,7 +127,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
-                token=self._token,
+                rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
             )
             if not destination_file:
                 logger.warning(
@@ -301,7 +303,7 @@ class CLEMContext(Context):
                 environment=environment,
                 source=source,
                 file_path=transferred_file,
-                token=self._token,
+                rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
             )
             if not destination_file:
                 logger.warning(

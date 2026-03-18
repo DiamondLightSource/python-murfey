@@ -15,7 +15,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.client import capture_get, capture_post, get_machine_config_client
+from murfey.util.client import capture_get, capture_post
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
@@ -77,9 +77,16 @@ class TomographyContext(Context):
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("Tomography", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_with_pjids: List[str] = []
         self._tilt_series_sizes: Dict[str, int] = {}
@@ -108,6 +115,7 @@ class TomographyContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -185,21 +193,20 @@ class TomographyContext(Context):
             logger.error(f"ERROR {e}, {self.data_collection_parameters}", exc_info=True)
 
     def _file_transferred_to(
-        self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+        self,
+        environment: MurfeyInstanceEnvironment,
+        source: Path,
+        file_path: Path,
+        rsync_basepath: Path,
     ):
-        machine_config = get_machine_config_client(
-            str(environment.url.geturl()),
-            self._token,
-            instrument_name=environment.instrument_name,
-        )
         if environment.visit in environment.default_destinations[source]:
             return (
-                Path(machine_config.get("rsync_basepath", ""))
+                rsync_basepath
                 / Path(environment.default_destinations[source])
                 / file_path.name
             )
         return (
-            Path(machine_config.get("rsync_basepath", ""))
+            rsync_basepath
             / Path(environment.default_destinations[source])
             / environment.visit
             / file_path.name
@@ -249,7 +256,10 @@ class TomographyContext(Context):
 
         if environment:
             file_transferred_to = self._file_transferred_to(
-                environment, source, file_path
+                environment,
+                source,
+                file_path,
+                Path(self._machine_config.get("rsync_basepath", "")),
             )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
@@ -459,16 +469,8 @@ class TomographyContext(Context):
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            self._token,
-                            instrument_name=environment.instrument_name,
-                        )
-                    else:
-                        machine_config = {}
                     required_strings = (
-                        machine_config.get("data_required_substrings", {})
+                        self._machine_config.get("data_required_substrings", {})
                         .get("tomo", {})
                         .get(transferred_file.suffix, ["fractions"])
                     )

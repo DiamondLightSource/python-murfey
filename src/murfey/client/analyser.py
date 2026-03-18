@@ -145,7 +145,12 @@ class Analyser(Observer):
                 )
             )
         ):
-            self._context = CLEMContext("leica", self._basepath, self._token)
+            self._context = CLEMContext(
+                "leica",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
 
         # -----------------------------------------------------------------------------
@@ -161,7 +166,12 @@ class Analyser(Observer):
                 and "Sites" in file_path.parts
             )
         ):
-            self._context = FIBContext("autotem", self._basepath, self._token)
+            self._context = FIBContext(
+                "autotem",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
 
         # Determine if it's from Maps
@@ -173,7 +183,12 @@ class Analyser(Observer):
                 all(path in file_path.parts for path in ("LayersData", "Layer"))
             )
         ):
-            self._context = FIBContext("maps", self._basepath, self._token)
+            self._context = FIBContext(
+                "maps",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
 
         # Determine if it's from Meteor
@@ -181,14 +196,24 @@ class Analyser(Observer):
             # Image metadata stored in "features.json" file
             file_path.name == "features.json" or ()
         ):
-            self._context = FIBContext("meteor", self._basepath, self._token)
+            self._context = FIBContext(
+                "meteor",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
 
         # -----------------------------------------------------------------------------
         # SXT workflow checks
         # -----------------------------------------------------------------------------
         if file_path.suffix in (".txrm", ".xrm"):
-            self._context = SXTContext("zeiss", self._basepath, self._token)
+            self._context = SXTContext(
+                "zeiss",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
 
         # -----------------------------------------------------------------------------
@@ -196,12 +221,20 @@ class Analyser(Observer):
         # -----------------------------------------------------------------------------
         if "atlas" in file_path.parts:
             self._context = AtlasContext(
-                "serialem" if self._serialem else "epu", self._basepath, self._token
+                "serialem" if self._serialem else "epu",
+                self._basepath,
+                self._murfey_config,
+                self._token,
             )
             return True
 
         if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
-            self._context = SPAMetadataContext("epu", self._basepath, self._token)
+            self._context = SPAMetadataContext(
+                "epu",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
             return True
         elif (
             "Batch" in file_path.parts
@@ -210,7 +243,10 @@ class Analyser(Observer):
             or file_path.name == "Session.dm"
         ):
             self._context = TomographyMetadataContext(
-                "tomo", self._basepath, self._token
+                "tomo",
+                self._basepath,
+                self._murfey_config,
+                self._token,
             )
             return True
 
@@ -228,7 +264,10 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: EPU")
                     self._context = SPAModularContext(
-                        "epu", self._basepath, self._token
+                        "epu",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
                     )
                 self.parameters_model = ProcessingParametersSPA
                 return True
@@ -244,7 +283,10 @@ class Analyser(Observer):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
                     self._context = TomographyContext(
-                        "tomo", self._basepath, self._token
+                        "tomo",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
                     )
                     self.parameters_model = ProcessingParametersTomo
                 return True
@@ -281,7 +323,10 @@ class Analyser(Observer):
                     and not self._context
                 ):
                     self._context = SPAMetadataContext(
-                        "epu", self._basepath, self._token
+                        "epu",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
                     )
                 elif (
                     "Batch" in transferred_file.parts
@@ -290,7 +335,10 @@ class Analyser(Observer):
                     and not self._context
                 ):
                     self._context = TomographyMetadataContext(
-                        "tomo", self._basepath, self._token
+                        "tomo",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
                     )
                 self.post_transfer(transferred_file)
             else:

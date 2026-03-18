@@ -21,9 +21,16 @@ logger = logging.getLogger("murfey.client.contexts.sxt")
 
 
 class SXTContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("SXT", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def register_sxt_data_collection(
         self,
@@ -46,6 +53,7 @@ class SXTContext(Context):
                 collection_type="sxt",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -203,7 +211,10 @@ class SXTContext(Context):
                 f"The following tilt series will be processed: {transferred_file.stem}"
             )
             file_transferred_to = _file_transferred_to(
-                environment, source, transferred_file, self._token
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
             )
             capture_post(
                 base_url=str(environment.url.geturl()),

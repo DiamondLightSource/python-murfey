@@ -19,9 +19,16 @@ logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 
 
 class TomographyMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("Tomography_metadata", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def post_transfer(
         self,
@@ -50,6 +57,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -60,6 +68,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -135,7 +144,7 @@ class TomographyMetadataContext(Context):
                     environment,
                     source,
                     transferred_file.parent / "SearchMap.jpg",
-                    self._token,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if source
                 else ""
@@ -167,6 +176,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -223,6 +233,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file) as xml:

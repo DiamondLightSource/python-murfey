@@ -74,9 +74,16 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
 
 
 class SPAMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
         super().__init__("SPA_metadata", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def post_transfer(
         self,
@@ -121,6 +128,7 @@ class SPAMetadataContext(Context):
                         collection_type="spa",
                         metadata_source=images_disc,
                         environment=environment,
+                        machine_config=self._machine_config,
                         token=self._token,
                     )
                     for gs, pos_data in gs_pix_positions.items():
@@ -160,6 +168,7 @@ class SPAMetadataContext(Context):
                     collection_type="spa",
                     metadata_source=images_disc,
                     environment=environment,
+                    machine_config=self._machine_config,
                     token=self._token,
                 )
 
@@ -191,7 +200,10 @@ class SPAMetadataContext(Context):
                 )
                 image_path = (
                     _file_transferred_to(
-                        environment, source, Path(gs_info.image), self._token
+                        environment,
+                        source,
+                        Path(gs_info.image),
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if gs_info.image
                     else ""

@@ -243,19 +243,12 @@ def test_get_source(
 
 
 def test_file_transferred_to(
-    mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
     fib_maps_images: list[Path],
     fib_maps_metadata_file: Path,
 ):
-    # Mock the machine config and environment
-    mock_get_machine_config = mocker.patch(
-        "murfey.client.contexts.fib.get_machine_config_client"
-    )
-    mock_get_machine_config.return_value = {
-        "rsync_basepath": tmp_path / "fib" / "data",
-    }
+    # Mock the environment
     mock_environment = MagicMock()
     mock_environment.default_destinations = {visit_dir: "current_year"}
     mock_environment.visit = "visit"
@@ -268,7 +261,7 @@ def test_file_transferred_to(
             environment=mock_environment,
             source=visit_dir,
             file_path=file,
-            token="",
+            rsync_basepath=tmp_path / "fib" / "data",
         ) == destination_dir / file.relative_to(visit_dir)
 
 
@@ -300,6 +293,7 @@ def test_fib_maps_context(
     context = FIBContext(
         acquisition_software="maps",
         basepath=basepath,
+        machine_config={},
         token="",
     )
     # Assert that its initial state is correct
