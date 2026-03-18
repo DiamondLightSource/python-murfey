@@ -10,11 +10,7 @@ from sqlmodel import Session, select
 
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
-    CLEMImageMetadata,
-    CLEMImageSeries,
-    CLEMImageStack,
-    CLEMLIFFile,
-    CLEMTIFFFile,
+    ImageSite,
     Session as MurfeySession,
 )
 
@@ -92,25 +88,11 @@ def get_db_entry(
     # With the database search funcion having been moved out of the FastAPI
     # endpoint, the database now has to be explicitly passed within the FastAPI
     # endpoint function in order for it to be loaded in the correct state.
-    table: Type[
-        Union[
-            CLEMImageMetadata,
-            CLEMImageSeries,
-            CLEMImageStack,
-            CLEMLIFFile,
-            CLEMTIFFFile,
-        ]
-    ],
+    table: Type[Union[ImageSite,]],
     session_id: int,
     file_path: Optional[Path] = None,
     series_name: Optional[str] = None,
-) -> Union[
-    CLEMImageMetadata,
-    CLEMImageSeries,
-    CLEMImageStack,
-    CLEMLIFFile,
-    CLEMTIFFFile,
-]:
+) -> Union[ImageSite,]:
     """
     Searches the CLEM workflow-related tables in the Murfey database for an entry that
     matches the file path or series name within a given session. Returns the entry if

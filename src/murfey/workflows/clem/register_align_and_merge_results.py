@@ -10,7 +10,7 @@ from typing import Optional
 from pydantic import BaseModel, field_validator
 from sqlmodel import Session, select
 
-from murfey.util.db import CLEMImageSeries
+from murfey.util.db import ImageSite
 
 logger = logging.getLogger("murfey.workflows.clem.register_align_and_merge_results")
 
@@ -84,12 +84,12 @@ def register_align_and_merge_result(
         try:
             if not (
                 clem_img_series := murfey_db.exec(
-                    select(CLEMImageSeries)
-                    .where(CLEMImageSeries.session_id == session_id)
-                    .where(CLEMImageSeries.series_name == result.series_name)
+                    select(ImageSite)
+                    .where(ImageSite.session_id == session_id)
+                    .where(ImageSite.series_name == result.series_name)
                 ).one_or_none()
             ):
-                clem_img_series = CLEMImageSeries(
+                clem_img_series = ImageSite(
                     session_id=session_id, series_name=result.series_name
                 )
             clem_img_series.composite_created = True
