@@ -360,6 +360,7 @@ def get_foil_hole(
 class AtlasRegistration(BaseModel):
     name: str
     acquisition_uuid: str
+    destination_directory: str = ""
 
 
 @spa_router.post("/sessions/{session_id}/register_atlas")
@@ -389,7 +390,7 @@ def register_atlas(
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
                     acquisition_date=datetime.now(),
-                    storage_folder="",
+                    storage_folder=atlas_registration_data.destination_directory,
                     name=atlas_registration_data.name,
                     tiles=[],
                     gridsquare_positions=None,
