@@ -6,7 +6,7 @@ import pytest
 
 from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
-from murfey.workflows.clem.align_and_merge import submit_cluster_request
+from murfey.workflows.clem.align_and_merge import run
 
 # Folder and file settings
 session_id = 0
@@ -63,7 +63,7 @@ def metadata(processed_dir: Path):
 
 
 @patch("murfey.workflows.clem.align_and_merge.get_machine_config")
-def test_submit_cluster_request(
+def test_run(
     mock_get_machine_config,
     image_stacks: list[Path],
     metadata: Path,
@@ -86,7 +86,7 @@ def test_submit_cluster_request(
     }
 
     # Run the function
-    submit_cluster_request(
+    run(
         session_id=session_id,
         instrument_name=instrument_name,
         series_name=series_name_long,

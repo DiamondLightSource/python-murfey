@@ -254,7 +254,7 @@ def test_run(
 
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     preprocessing_messages = generate_preprocessing_messages(
@@ -340,7 +340,7 @@ def test_run_with_db(
 
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     # Patch the TransportManager object in the workflows called

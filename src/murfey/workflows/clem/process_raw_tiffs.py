@@ -15,7 +15,7 @@ except AttributeError:
     pass  # Ignore if ISPyB credentials environment variable not set
 
 
-def zocalo_cluster_request(
+def run(
     tiff_list: list[Path],
     root_folder: str,
     session_id: int,

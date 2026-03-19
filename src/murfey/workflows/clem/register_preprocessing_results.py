@@ -24,7 +24,7 @@ from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     default_clem_processing_parameters as processing_params,
 )
-from murfey.workflows.clem.align_and_merge import submit_cluster_request
+from murfey.workflows.clem.align_and_merge import run as run_align_and_merge
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
@@ -589,7 +589,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
         # Request for image alignment and processing for the requested combinations
         for image_combo in image_combos_to_process:
             try:
-                submit_cluster_request(
+                run_align_and_merge(
                     session_id=session_id,
                     instrument_name=murfey_session.instrument_name,
                     series_name=result.series_name,

@@ -40,9 +40,7 @@ class AlignAndMergeResult(BaseModel):
         return value
 
 
-def register_align_and_merge_result(
-    message: dict, murfey_db: Session
-) -> dict[str, bool]:
+def run(message: dict, murfey_db: Session) -> dict[str, bool]:
     """
     session_id (recipe)
     register (wrapper)

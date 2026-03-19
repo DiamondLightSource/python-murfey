@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from murfey.server.ispyb import TransportManager
-from murfey.workflows.clem.process_raw_lifs import zocalo_cluster_request
+from murfey.workflows.clem.process_raw_lifs import run
 
 # Set up variables
 visit_name = "cm12345-6"
@@ -29,7 +29,7 @@ def lif_file(raw_dir: Path):
     return file
 
 
-def test_zocalo_cluster_request(
+def test_run(
     lif_file: Path,
     raw_dir: Path,
 ):
@@ -38,7 +38,7 @@ def test_zocalo_cluster_request(
     mock_transport.feedback_queue = feedback_queue
 
     # Run the function with the listed parameters
-    zocalo_cluster_request(
+    run(
         file=lif_file,
         root_folder=root_folder,
         session_id=session_id,
