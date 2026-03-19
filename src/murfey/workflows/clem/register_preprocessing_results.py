@@ -99,7 +99,7 @@ def _register_clem_imaging_site(
         ).one_or_none()
     ):
         clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id, series_name=result.series_name
+            session_id=session_id, site_name=result.series_name
         )
 
     # Add metadata for this series
@@ -287,7 +287,7 @@ def _register_dcg_and_atlas(
         ).one_or_none()
     ):
         clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id, series_name=result.series_name
+            session_id=session_id, site_name=result.series_name
         )
 
     clem_img_site.dcg_id = dcg_entry.id
