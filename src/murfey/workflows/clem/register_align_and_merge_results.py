@@ -84,7 +84,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                 clem_img_series := murfey_db.exec(
                     select(ImagingSite)
                     .where(ImagingSite.session_id == session_id)
-                    .where(ImagingSite.series_name == result.series_name)
+                    .where(ImagingSite.site_name == result.series_name)
                 ).one_or_none()
             ):
                 clem_img_series = ImagingSite(
