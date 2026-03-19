@@ -330,14 +330,6 @@ def test_run_with_db(
         return_value=ispyb_db_session,
     )
 
-    # Mock out the machine config used in the helper sanitisation function
-    mock_get_machine_config = mocker.patch("murfey.workflows.clem.get_machine_config")
-    mock_machine_config = MagicMock()
-    mock_machine_config.rsync_basepath = rsync_basepath
-    mock_get_machine_config.return_value = {
-        ExampleVisit.instrument_name: mock_machine_config,
-    }
-
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
