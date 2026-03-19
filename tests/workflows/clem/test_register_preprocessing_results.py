@@ -15,7 +15,7 @@ from murfey.workflows.clem.register_preprocessing_results import (
     COLOR_FLAGS_MURFEY_TO_ISPYB,
     _determine_collection_mode,
     _get_color_flags,
-    _register_clem_image_site,
+    _register_clem_imaging_site,
     _register_dcg_and_atlas,
     _register_grid_square,
     _snake_to_camel_case,
@@ -173,8 +173,8 @@ def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
     assert _get_color_flags(colors) == expected_result
 
 
-def test_register_clem_image_site():
-    _register_clem_image_site
+def test_register_clem_imaging_site():
+    _register_clem_imaging_site
 
 
 @pytest.mark.parametrize(
@@ -243,7 +243,7 @@ def test_run(
 
     # Mock the registration helper functions
     mock_register_clem_series = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_image_site"
+        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site"
     )
     mock_register_dcg_and_atlas = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"

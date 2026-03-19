@@ -53,7 +53,7 @@ class Session(SQLModel, table=True):  # type: ignore
     visit_end_time: Optional[datetime] = Field(default=None)
 
     # Image sites associated with this session
-    image_sites: List["ImageSite"] = Relationship(
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -86,7 +86,7 @@ class Session(SQLModel, table=True):  # type: ignore
     )
 
 
-class ImageSite(SQLModel, table=True):  # type: ignore
+class ImagingSite(SQLModel, table=True):  # type: ignore
     """
     Table for recording unique imaging sites in the session. These can then be linked
     to DataCollectionGroup or GridSquare entries as needed.
@@ -101,7 +101,7 @@ class ImageSite(SQLModel, table=True):  # type: ignore
 
     # Link to Session table
     session: Optional["Session"] = Relationship(
-        back_populates="image_series"
+        back_populates="imaging_sites"
     )  # Many to one
     session_id: Optional[int] = Field(
         foreign_key="session.id", default=None, unique=False
@@ -112,7 +112,7 @@ class ImageSite(SQLModel, table=True):  # type: ignore
 
     # Link to data collection group
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="image_sites"
+        back_populates="imaging_sites"
     )
     dcg_id: Optional[int] = Field(
         foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
@@ -120,7 +120,7 @@ class ImageSite(SQLModel, table=True):  # type: ignore
     dcg_name: Optional[str] = Field(default=None)
 
     # Link to grid squares
-    grid_square: Optional["GridSquare"] = Relationship(back_populates="image_sites")
+    grid_square: Optional["GridSquare"] = Relationship(back_populates="imaging_sites")
     grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
 
     # Shape and resolution information
@@ -216,7 +216,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    image_sites: List["ImageSite"] = Relationship(
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -484,7 +484,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     pixel_size: Optional[float] = None
     image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
-    image_sites: List["ImageSite"] = Relationship(
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
     foil_holes: List["FoilHole"] = Relationship(

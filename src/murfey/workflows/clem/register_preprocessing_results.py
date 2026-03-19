@@ -86,19 +86,19 @@ def _get_color_flags(
     return color_flags
 
 
-def _register_clem_image_site(
+def _register_clem_imaging_site(
     session_id: int,
     result: CLEMPreprocessingResult,
     murfey_db: Session,
 ):
     if not (
         clem_img_site := murfey_db.exec(
-            select(MurfeyDB.ImageSite)
-            .where(MurfeyDB.ImageSite.session_id == session_id)
-            .where(MurfeyDB.ImageSite.site_name == result.series_name)
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
         ).one_or_none()
     ):
-        clem_img_site = MurfeyDB.ImageSite(
+        clem_img_site = MurfeyDB.ImagingSite(
             session_id=session_id, series_name=result.series_name
         )
 
@@ -281,12 +281,12 @@ def _register_dcg_and_atlas(
 
     if not (
         clem_img_site := murfey_db.exec(
-            select(MurfeyDB.ImageSite)
-            .where(MurfeyDB.ImageSite.session_id == session_id)
-            .where(MurfeyDB.ImageSite.site_name == result.series_name)
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
         ).one_or_none()
     ):
-        clem_img_site = MurfeyDB.ImageSite(
+        clem_img_site = MurfeyDB.ImagingSite(
             session_id=session_id, series_name=result.series_name
         )
 
@@ -314,10 +314,10 @@ def _register_grid_square(
     # Check if an atlas has been registered
     if not (
         atlas_entry := murfey_db.exec(
-            select(MurfeyDB.ImageSite)
-            .where(MurfeyDB.ImageSite.session_id == session_id)
-            .where(MurfeyDB.ImageSite.dcg_name == dcg_name)
-            .where(MurfeyDB.ImageSite.data_type == "atlas")
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+            .where(MurfeyDB.ImagingSite.data_type == "atlas")
         ).one_or_none()
     ):
         logger.info(
@@ -327,10 +327,10 @@ def _register_grid_square(
 
     # Check if there are CLEM entries to register
     if clem_img_site_to_register := murfey_db.exec(
-        select(MurfeyDB.ImageSite)
-        .where(MurfeyDB.ImageSite.session_id == session_id)
-        .where(MurfeyDB.ImageSite.dcg_name == dcg_name)
-        .where(MurfeyDB.ImageSite.data_type == "grid_square")
+        select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+        .where(MurfeyDB.ImagingSite.data_type == "grid_square")
     ).all():
         if (
             atlas_entry.x0 is not None
@@ -521,7 +521,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             return {"success": False, "requeue": False}
         try:
             # Register items in Murfey database
-            _register_clem_image_site(
+            _register_clem_imaging_site(
                 session_id=session_id,
                 result=result,
                 murfey_db=murfey_db,
