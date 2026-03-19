@@ -343,7 +343,7 @@ class Analyser(Observer):
                 self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}
-                if (
+                if not self._serialem and (
                     self._force_mdoc_metadata
                     and transferred_file.suffix == ".mdoc"
                     or mdoc_for_reading
