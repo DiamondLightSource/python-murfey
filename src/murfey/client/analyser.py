@@ -449,20 +449,20 @@ class Analyser(Observer):
                                 self.notify(dc_metadata)
 
                 # Contexts that can be immediately posted without additional work
-                elif "CLEMContext" not in str(self._context):
+                elif "CLEMContext" in str(self._context):
                     logger.debug(
                         f"File {transferred_file.name!r} is part of CLEM workflow"
                     )
                     self.post_transfer(transferred_file)
-                elif "FIBContext" not in str(self._context):
+                elif "FIBContext" in str(self._context):
                     logger.debug(
                         f"File {transferred_file.name!r} is part of the FIB workflow"
                     )
                     self.post_transfer(transferred_file)
-                elif "SXTContext" not in str(self._context):
+                elif "SXTContext" in str(self._context):
                     logger.debug(f"File {transferred_file.name!r} is an SXT file")
                     self.post_transfer(transferred_file)
-                elif "AtlasContext" not in str(self._context):
+                elif "AtlasContext" in str(self._context):
                     logger.debug(f"File {transferred_file.name!r} is part of the atlas")
                     self.post_transfer(transferred_file)
 
