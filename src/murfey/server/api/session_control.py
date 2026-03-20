@@ -12,7 +12,7 @@ from sqlmodel import select
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_common.schemas import AtlasData
+    from smartem_common.schemas import AtlasData, GridSquareData
 
     SMARTEM_ACTIVE = True
 except ImportError:
@@ -421,7 +421,34 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    return _register_grid_square(session_id, gsid, grid_square_params, db)
+    _register_grid_square(session_id, gsid, grid_square_params, db)
+    if SMARTEM_ACTIVE and grid_square_params.acquisition_uuid:
+        session = db.exec(select(Session).where(Session.id == session_id)).one()
+        machine_config = get_machine_config(session.instrument_name)[
+            session.instrument_name
+        ]
+        if machine_config.smartem_api_url:
+            smartem_client = SmartEMAPIClient(
+                base_url=machine_config.smartem_api_url, logger=logger
+            )
+            possible_grids = smartem_client.get_acquisition_grids(
+                grid_square_params.acquisition_uuid
+            )
+            grid_uuid = None
+            for grid in possible_grids:
+                if grid.name == Path(grid_square_params.tag).name:
+                    grid_uuid = grid.uuid
+                    break
+            if grid_uuid is not None:
+                gridsquare_data = GridSquareData(
+                    gridsquare_id=str(gsid),
+                    grid_uuid=grid_uuid,
+                    center_x=grid_square_params.x_location_scaled,
+                    center_y=grid_square_params.y_location_scaled,
+                    size_width=grid_square_params.width_scaled,
+                    size_height=grid_square_params.height_scaled,
+                )
+                smartem_client.create_grid_gridsquare(gridsquare_data)
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")

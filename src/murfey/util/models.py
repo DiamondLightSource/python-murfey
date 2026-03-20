@@ -160,6 +160,8 @@ class GridSquareParameters(BaseModel):
     # Collection mode
     collection_mode: Optional[str] = None
 
+    acquisition_uuid: Optional[str] = None
+
 
 class FoilHoleParameters(BaseModel):
     tag: str

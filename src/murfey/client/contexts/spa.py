@@ -343,6 +343,7 @@ class SPAModularContext(Context):
                     "width": gs_pix_position[4],
                     "height": gs_pix_position[5],
                     "angle": gs_pix_position[6],
+                    "acquisition_uuid": environment.acquisition_uuid,
                 },
             )
         foil_hole = foil_hole_from_file(transferred_file)

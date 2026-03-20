@@ -149,6 +149,7 @@ class SPAMetadataContext(Context):
                                     "width": pos_data[4],
                                     "height": pos_data[5],
                                     "angle": pos_data[6],
+                                    "acquisition_uuid": environment.acquisition_uuid,
                                 },
                             )
 
@@ -223,6 +224,7 @@ class SPAMetadataContext(Context):
                         "thumbnail_size_y": gs_info.thumbnail_size_y,
                         "pixel_size": gs_info.pixel_size,
                         "image": str(image_path),
+                        "acquisition_uuid": environment.acquisition_uuid,
                     },
                 )
 
