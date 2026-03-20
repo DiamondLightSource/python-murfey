@@ -448,7 +448,7 @@ class Analyser(Observer):
                                 )
                                 self.notify(dc_metadata)
 
-                # Ccontexts that can be immediately posted without additional work
+                # Contexts that can be immediately posted without additional work
                 elif "CLEMContext" not in str(self._context):
                     logger.debug(
                         f"File {transferred_file.name!r} is part of CLEM workflow"
