@@ -8,21 +8,15 @@ Individual contexts can be found in murfey.client.contexts.
 
 from __future__ import annotations
 
+import functools
 import logging
 import queue
 import threading
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Type
 
 from murfey.client.context import Context
-from murfey.client.contexts.atlas import AtlasContext
-from murfey.client.contexts.clem import CLEMContext
-from murfey.client.contexts.fib import FIBContext
-from murfey.client.contexts.spa import SPAContext
-from murfey.client.contexts.spa_metadata import SPAMetadataContext
-from murfey.client.contexts.sxt import SXTContext
-from murfey.client.contexts.tomo import TomographyContext
-from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.client.destinations import find_longest_data_directory
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.client.rsync import RSyncerUpdate, TransferResult
@@ -31,6 +25,23 @@ from murfey.util.mdoc import get_block
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 logger = logging.getLogger("murfey.client.analyser")
+
+
+# Load the Context entry points as a list upon initialisation
+context_eps = list(entry_points(group="murfey.contexts"))
+
+
+@functools.lru_cache(maxsize=1)
+def _get_context(name: str):
+    """
+    Load the desired context from the configured list of entry points.
+    Returns None if the entry point is not found
+    """
+    if context := [ep for ep in context_eps if ep.name == name]:
+        return context[0]
+    else:
+        logger.warning(f"Could not find entry point for {name!r}")
+        return None
 
 
 class Analyser(Observer):
@@ -145,7 +156,9 @@ class Analyser(Observer):
                 )
             )
         ):
-            self._context = CLEMContext(
+            if (context := _get_context("CLEMContext")) is None:
+                return False
+            self._context = context.load()(
                 "leica",
                 self._basepath,
                 self._murfey_config,
@@ -166,7 +179,9 @@ class Analyser(Observer):
                 and "Sites" in file_path.parts
             )
         ):
-            self._context = FIBContext(
+            if (context := _get_context("FIBContext")) is None:
+                return False
+            self._context = context.load()(
                 "autotem",
                 self._basepath,
                 self._murfey_config,
@@ -183,7 +198,9 @@ class Analyser(Observer):
                 all(path in file_path.parts for path in ("LayersData", "Layer"))
             )
         ):
-            self._context = FIBContext(
+            if (context := _get_context("FIBContext")) is None:
+                return False
+            self._context = context.load()(
                 "maps",
                 self._basepath,
                 self._murfey_config,
@@ -196,7 +213,9 @@ class Analyser(Observer):
             # Image metadata stored in "features.json" file
             file_path.name == "features.json" or ()
         ):
-            self._context = FIBContext(
+            if (context := _get_context("FIBContext")) is None:
+                return False
+            self._context = context.load()(
                 "meteor",
                 self._basepath,
                 self._murfey_config,
@@ -208,7 +227,9 @@ class Analyser(Observer):
         # SXT workflow checks
         # -----------------------------------------------------------------------------
         if file_path.suffix in (".txrm", ".xrm"):
-            self._context = SXTContext(
+            if (context := _get_context("SXTContext")) is None:
+                return False
+            self._context = context.load()(
                 "zeiss",
                 self._basepath,
                 self._murfey_config,
@@ -220,7 +241,9 @@ class Analyser(Observer):
         # Tomography and SPA workflow checks
         # -----------------------------------------------------------------------------
         if "atlas" in file_path.parts:
-            self._context = AtlasContext(
+            if (context := _get_context("AtlasContext")) is None:
+                return False
+            self._context = context.load()(
                 "serialem" if self._serialem else "epu",
                 self._basepath,
                 self._murfey_config,
@@ -229,7 +252,9 @@ class Analyser(Observer):
             return True
 
         if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
-            self._context = SPAMetadataContext(
+            if (context := _get_context("SPAMetadataContext")) is None:
+                return False
+            self._context = context.load()(
                 "epu",
                 self._basepath,
                 self._murfey_config,
@@ -242,7 +267,9 @@ class Analyser(Observer):
             or "Thumbnails" in file_path.parts
             or file_path.name == "Session.dm"
         ):
-            self._context = TomographyMetadataContext(
+            if (context := _get_context("TomographyMetadataContext")) is None:
+                return False
+            self._context = context.load()(
                 "tomo",
                 self._basepath,
                 self._murfey_config,
@@ -263,7 +290,9 @@ class Analyser(Observer):
             ]:
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    self._context = SPAContext(
+                    if (context := _get_context("SPAContext")) is None:
+                        return False
+                    self._context = context.load()(
                         "epu",
                         self._basepath,
                         self._murfey_config,
@@ -282,7 +311,9 @@ class Analyser(Observer):
             ):
                 if not self._context:
                     logger.info("Acquisition software: tomo")
-                    self._context = TomographyContext(
+                    if (context := _get_context("TomographyContext")) is None:
+                        return False
+                    self._context = context.load()(
                         "tomo",
                         self._basepath,
                         self._murfey_config,
@@ -322,24 +353,26 @@ class Analyser(Observer):
                     or transferred_file.name == "EpuSession.dm"
                     and not self._context
                 ):
-                    self._context = SPAMetadataContext(
-                        "epu",
-                        self._basepath,
-                        self._murfey_config,
-                        self._token,
-                    )
+                    if context := _get_context("SPAMetadataContext"):
+                        self._context = context.load()(
+                            "epu",
+                            self._basepath,
+                            self._murfey_config,
+                            self._token,
+                        )
                 elif (
                     "Batch" in transferred_file.parts
                     or "SearchMaps" in transferred_file.parts
                     or transferred_file.name == "Session.dm"
                     and not self._context
                 ):
-                    self._context = TomographyMetadataContext(
-                        "tomo",
-                        self._basepath,
-                        self._murfey_config,
-                        self._token,
-                    )
+                    if context := _get_context("TomographyMetadataContext"):
+                        self._context = context.load()(
+                            "tomo",
+                            self._basepath,
+                            self._murfey_config,
+                            self._token,
+                        )
                 self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}
@@ -386,7 +419,7 @@ class Analyser(Observer):
                             )
                         except Exception as e:
                             logger.error(f"Exception encountered: {e}")
-                        if not isinstance(self._context, AtlasContext):
+                        if "AtlasContext" not in str(self._context):
                             if not dc_metadata:
                                 try:
                                     dc_metadata = self._context.gather_metadata(
@@ -417,24 +450,21 @@ class Analyser(Observer):
                                 )
                                 self.notify(dc_metadata)
 
-                # If a file with a CLEM context is identified, immediately post it
-                elif isinstance(self._context, CLEMContext):
+                # Ccontexts that can be immediately posted without additional work
+                elif "CLEMContext" not in str(self._context):
                     logger.debug(
-                        f"File {transferred_file.name!r} will be processed as part of CLEM workflow"
+                        f"File {transferred_file.name!r} is part of CLEM workflow"
                     )
                     self.post_transfer(transferred_file)
-
-                elif isinstance(self._context, FIBContext):
+                elif "FIBContext" not in str(self._context):
                     logger.debug(
-                        f"File {transferred_file.name!r} will be processed as part of the FIB workflow"
+                        f"File {transferred_file.name!r} is part of the FIB workflow"
                     )
                     self.post_transfer(transferred_file)
-
-                elif isinstance(self._context, SXTContext):
+                elif "SXTContext" not in str(self._context):
                     logger.debug(f"File {transferred_file.name!r} is an SXT file")
                     self.post_transfer(transferred_file)
-
-                elif isinstance(self._context, AtlasContext):
+                elif "AtlasContext" not in str(self._context):
                     logger.debug(f"File {transferred_file.name!r} is part of the atlas")
                     self.post_transfer(transferred_file)
 
@@ -480,14 +510,14 @@ class Analyser(Observer):
                                 self._context._acquisition_software
                             )
                             self.notify(dc_metadata)
-                elif isinstance(
-                    self._context,
-                    (
-                        SPAContext,
-                        SPAMetadataContext,
-                        TomographyContext,
-                        TomographyMetadataContext,
-                    ),
+                elif any(
+                    context in str(self._context)
+                    for context in (
+                        "SPAContext",
+                        "SPAMetadataContext",
+                        "TomographyContext",
+                        "TomographyMetadataContext",
+                    )
                 ):
                     context = str(self._context).split(" ")[0].split(".")[-1]
                     logger.debug(
