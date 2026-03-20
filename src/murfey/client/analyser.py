@@ -397,12 +397,10 @@ class Analyser(Observer):
                     elif transferred_file.suffix == ".mdoc":
                         mdoc_for_reading = transferred_file
                 if not self._context:
-                    valid_extension = self._find_extension(transferred_file)
-                    if not valid_extension:
+                    if not self._find_extension(transferred_file):
                         logger.error(f"No extension found for {transferred_file}")
                         continue
-                    found = self._find_context(transferred_file)
-                    if not found:
+                    if not self._find_context(transferred_file):
                         logger.debug(
                             f"Couldn't find context for {str(transferred_file)!r}"
                         )
@@ -470,8 +468,7 @@ class Analyser(Observer):
 
                 # Handle files with tomography and SPA context differently
                 elif not self._extension or self._unseen_xml:
-                    valid_extension = self._find_extension(transferred_file)
-                    if not valid_extension:
+                    if not self._find_extension(transferred_file):
                         logger.error(f"No extension found for {transferred_file}")
                         continue
                     if self._extension:
