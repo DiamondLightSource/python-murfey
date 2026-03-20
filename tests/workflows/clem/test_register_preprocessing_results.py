@@ -15,7 +15,7 @@ from murfey.workflows.clem.register_preprocessing_results import (
     COLOR_FLAGS_MURFEY_TO_ISPYB,
     _determine_collection_mode,
     _get_color_flags,
-    _register_clem_image_series,
+    _register_clem_imaging_site,
     _register_dcg_and_atlas,
     _register_grid_square,
     _snake_to_camel_case,
@@ -173,8 +173,8 @@ def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
     assert _get_color_flags(colors) == expected_result
 
 
-def test_register_clem_image_series():
-    _register_clem_image_series
+def test_register_clem_imaging_site():
+    _register_clem_imaging_site
 
 
 @pytest.mark.parametrize(
@@ -243,7 +243,7 @@ def test_run(
 
     # Mock the registration helper functions
     mock_register_clem_series = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_image_series"
+        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site"
     )
     mock_register_dcg_and_atlas = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"
@@ -254,7 +254,7 @@ def test_run(
 
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     preprocessing_messages = generate_preprocessing_messages(
@@ -330,17 +330,9 @@ def test_run_with_db(
         return_value=ispyb_db_session,
     )
 
-    # Mock out the machine config used in the helper sanitisation function
-    mock_get_machine_config = mocker.patch("murfey.workflows.clem.get_machine_config")
-    mock_machine_config = MagicMock()
-    mock_machine_config.rsync_basepath = rsync_basepath
-    mock_get_machine_config.return_value = {
-        ExampleVisit.instrument_name: mock_machine_config,
-    }
-
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     # Patch the TransportManager object in the workflows called

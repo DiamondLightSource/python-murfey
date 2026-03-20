@@ -16,7 +16,7 @@ except AttributeError:
     pass  # Ignore if ISPyB credentials environment variable not set
 
 
-def submit_cluster_request(
+def run(
     # Session parameters
     session_id: int,
     instrument_name: str,

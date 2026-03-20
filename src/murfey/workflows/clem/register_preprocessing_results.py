@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import traceback
 from collections.abc import Collection
 from importlib.metadata import entry_points
@@ -25,8 +24,7 @@ from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     default_clem_processing_parameters as processing_params,
 )
-from murfey.workflows.clem import get_db_entry
-from murfey.workflows.clem.align_and_merge import submit_cluster_request
+from murfey.workflows.clem.align_and_merge import run as run_align_and_merge
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
@@ -88,125 +86,53 @@ def _get_color_flags(
     return color_flags
 
 
-def _register_clem_image_series(
+def _register_clem_imaging_site(
     session_id: int,
     result: CLEMPreprocessingResult,
     murfey_db: Session,
 ):
-    clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
-        db=murfey_db,
-        table=MurfeyDB.CLEMImageSeries,
-        session_id=session_id,
-        series_name=result.series_name,
-    )
-    clem_metadata: MurfeyDB.CLEMImageMetadata = get_db_entry(
-        db=murfey_db,
-        table=MurfeyDB.CLEMImageMetadata,
-        session_id=session_id,
-        file_path=result.metadata,
-    )
-    # Register and link parent LIF file if present
-    if result.parent_lif is not None:
-        clem_lif_file: MurfeyDB.CLEMLIFFile = get_db_entry(
-            db=murfey_db,
-            table=MurfeyDB.CLEMLIFFile,
-            session_id=session_id,
-            file_path=result.parent_lif,
+    if not (
+        clem_img_site := murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
+        ).one_or_none()
+    ):
+        clem_img_site = MurfeyDB.ImagingSite(
+            session_id=session_id, site_name=result.series_name
         )
-        clem_img_series.parent_lif = clem_lif_file
-        clem_metadata.parent_lif = clem_lif_file
-
-    # Link and commit series and metadata tables
-    clem_img_series.associated_metadata = clem_metadata
-    murfey_db.add_all([clem_img_series, clem_metadata])
-    murfey_db.commit()
-
-    # Iteratively register the output image stacks
-    for c, (channel, output_file) in enumerate(result.output_files.items()):
-        clem_img_stk: MurfeyDB.CLEMImageStack = get_db_entry(
-            db=murfey_db,
-            table=MurfeyDB.CLEMImageStack,
-            session_id=session_id,
-            file_path=output_file,
-        )
-
-        # Link associated metadata
-        clem_img_stk.associated_metadata = clem_metadata
-        clem_img_stk.parent_series = clem_img_series
-        clem_img_stk.channel_name = channel
-        if result.parent_lif is not None:
-            clem_img_stk.parent_lif = clem_lif_file
-        murfey_db.add(clem_img_stk)
-        murfey_db.commit()
-
-        # Register and link parent TIFF files if present
-        if result.parent_tiffs:
-            seed_file = result.parent_tiffs[channel][0]
-            if c == 0:
-                # Load list of files to register from seed file
-                series_identifier = seed_file.stem.split("--")[0] + "--"
-                tiff_list = list(seed_file.parent.glob(f"{series_identifier}--"))
-
-            # Load TIFF files by colour channel if "--C" in file stem
-            match = re.search(r"--C[\d]{2,3}", seed_file.stem)
-            tiff_file_subset = [
-                file
-                for file in tiff_list
-                if file.stem.startswith(series_identifier)
-                and (match.group(0) in file.stem if match else True)
-            ]
-            tiff_file_subset.sort()
-
-            # Register TIFF file subset
-            clem_tiff_files = []
-            for file in tiff_file_subset:
-                clem_tiff_file: MurfeyDB.CLEMTIFFFile = get_db_entry(
-                    db=murfey_db,
-                    table=MurfeyDB.CLEMTIFFFile,
-                    session_id=session_id,
-                    file_path=file,
-                )
-
-                # Link associated metadata
-                clem_tiff_file.associated_metadata = clem_metadata
-                clem_tiff_file.child_series = clem_img_series
-                clem_tiff_file.child_stack = clem_img_stk
-
-                clem_tiff_files.append(clem_tiff_file)
-
-            murfey_db.add_all(clem_tiff_files)
-            murfey_db.commit()
 
     # Add metadata for this series
-    clem_img_series.image_search_string = str(output_file.parent / "*tiff")
-    clem_img_series.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
-    clem_img_series.number_of_members = result.number_of_members
+    output_file = list(result.output_files.values())[0]
+    clem_img_site.image_path = str(output_file.parent / "*tiff")
+    clem_img_site.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
+    clem_img_site.number_of_members = result.number_of_members
     for col_name, value in _get_color_flags(result.output_files.keys()).items():
-        setattr(clem_img_series, col_name, value)
-    clem_img_series.collection_mode = _determine_collection_mode(
+        setattr(clem_img_site, col_name, value)
+    clem_img_site.collection_mode = _determine_collection_mode(
         result.output_files.keys()
     )
-    clem_img_series.image_pixels_x = result.pixels_x
-    clem_img_series.image_pixels_y = result.pixels_y
-    clem_img_series.image_pixel_size = result.pixel_size
-    clem_img_series.units = result.units
-    clem_img_series.x0 = result.extent[0]
-    clem_img_series.x1 = result.extent[1]
-    clem_img_series.y0 = result.extent[2]
-    clem_img_series.y1 = result.extent[3]
+    clem_img_site.image_pixels_x = result.pixels_x
+    clem_img_site.image_pixels_y = result.pixels_y
+    clem_img_site.image_pixel_size = result.pixel_size
+    clem_img_site.units = result.units
+    clem_img_site.x0 = result.extent[0]
+    clem_img_site.x1 = result.extent[1]
+    clem_img_site.y0 = result.extent[2]
+    clem_img_site.y1 = result.extent[3]
     # Register thumbnails if they are present
     if result.thumbnails and result.thumbnail_size:
         thumbnail = list(result.thumbnails.values())[0]
-        clem_img_series.thumbnail_search_string = str(thumbnail.parent / "*.png")
+        clem_img_site.thumbnail_path = str(thumbnail.parent / "*.png")
 
         thumbnail_height, thumbnail_width = result.thumbnail_size
         scaling_factor = min(
             thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
         )
-        clem_img_series.thumbnail_pixel_size = result.pixel_size / scaling_factor
-        clem_img_series.thumbnail_pixels_x = int(result.pixels_x * scaling_factor)
-        clem_img_series.thumbnail_pixels_y = int(result.pixels_y * scaling_factor)
-    murfey_db.add(clem_img_series)
+        clem_img_site.thumbnail_pixel_size = result.pixel_size / scaling_factor
+        clem_img_site.thumbnail_pixels_x = int(result.pixels_x * scaling_factor)
+        clem_img_site.thumbnail_pixels_y = int(result.pixels_y * scaling_factor)
+    murfey_db.add(clem_img_site)
     murfey_db.commit()
     murfey_db.close()
 
@@ -353,15 +279,20 @@ def _register_dcg_and_atlas(
         .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
     ).one()
 
-    clem_img_series: MurfeyDB.CLEMImageSeries = get_db_entry(
-        db=murfey_db,
-        table=MurfeyDB.CLEMImageSeries,
-        session_id=session_id,
-        series_name=result.series_name,
-    )
-    clem_img_series.dcg_id = dcg_entry.id
-    clem_img_series.dcg_name = dcg_entry.tag
-    murfey_db.add(clem_img_series)
+    if not (
+        clem_img_site := murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
+        ).one_or_none()
+    ):
+        clem_img_site = MurfeyDB.ImagingSite(
+            session_id=session_id, site_name=result.series_name
+        )
+
+    clem_img_site.dcg_id = dcg_entry.id
+    clem_img_site.dcg_name = dcg_entry.tag
+    murfey_db.add(clem_img_site)
     murfey_db.commit()
     murfey_db.close()
 
@@ -381,26 +312,26 @@ def _register_grid_square(
         dcg_name += f"--{result.series_name.split('--')[1]}"
 
     # Check if an atlas has been registered
-    if atlas_search := murfey_db.exec(
-        select(MurfeyDB.CLEMImageSeries)
-        .where(MurfeyDB.CLEMImageSeries.session_id == session_id)
-        .where(MurfeyDB.CLEMImageSeries.dcg_name == dcg_name)
-        .where(MurfeyDB.CLEMImageSeries.data_type == "atlas")
-    ).all():
-        atlas_entry = atlas_search[0]
-    else:
+    if not (
+        atlas_entry := murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+            .where(MurfeyDB.ImagingSite.data_type == "atlas")
+        ).one_or_none()
+    ):
         logger.info(
             f"No atlas has been registered for data collection group {dcg_name!r} yet"
         )
         return
 
     # Check if there are CLEM entries to register
-    if clem_img_series_to_register := murfey_db.exec(
-        select(MurfeyDB.CLEMImageSeries)
-        .where(MurfeyDB.CLEMImageSeries.session_id == session_id)
-        .where(MurfeyDB.CLEMImageSeries.dcg_name == dcg_name)
-        .where(MurfeyDB.CLEMImageSeries.data_type == "grid_square")
-    ):
+    if clem_img_site_to_register := murfey_db.exec(
+        select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+        .where(MurfeyDB.ImagingSite.data_type == "grid_square")
+    ).all():
         if (
             atlas_entry.x0 is not None
             and atlas_entry.x1 is not None
@@ -415,23 +346,23 @@ def _register_grid_square(
             logger.warning("Atlas entry not populated with required values")
             return
 
-        for clem_img_series in clem_img_series_to_register:
+        for clem_img_site in clem_img_site_to_register:
             # Register datasets using thumbnail sizes and scales
             if (
-                clem_img_series.x0 is not None
-                and clem_img_series.x1 is not None
-                and clem_img_series.y0 is not None
-                and clem_img_series.y1 is not None
+                clem_img_site.x0 is not None
+                and clem_img_site.x1 is not None
+                and clem_img_site.y0 is not None
+                and clem_img_site.y1 is not None
             ):
                 # Find pixel corresponding to image midpoint on atlas
                 x_mid_real = (
-                    0.5 * (clem_img_series.x0 + clem_img_series.x1) - atlas_entry.x0
+                    0.5 * (clem_img_site.x0 + clem_img_site.x1) - atlas_entry.x0
                 )
                 x_mid_px = int(
                     x_mid_real / atlas_width_real * atlas_entry.thumbnail_pixels_x
                 )
                 y_mid_real = (
-                    0.5 * (clem_img_series.y0 + clem_img_series.y1) - atlas_entry.y0
+                    0.5 * (clem_img_site.y0 + clem_img_site.y1) - atlas_entry.y0
                 )
                 y_mid_px = int(
                     y_mid_real / atlas_height_real * atlas_entry.thumbnail_pixels_y
@@ -439,56 +370,55 @@ def _register_grid_square(
 
                 # Find the size of the image, in pixels, when overlaid on the atlas
                 width_scaled = int(
-                    (clem_img_series.x1 - clem_img_series.x0)
+                    (clem_img_site.x1 - clem_img_site.x0)
                     / atlas_width_real
                     * atlas_entry.thumbnail_pixels_x
                 )
                 height_scaled = int(
-                    (clem_img_series.y1 - clem_img_series.y0)
+                    (clem_img_site.y1 - clem_img_site.y0)
                     / atlas_height_real
                     * atlas_entry.thumbnail_pixels_y
                 )
             else:
                 logger.warning(
-                    f"Image series {clem_img_series.series_name!r} not populated with required values"
+                    f"Image series {clem_img_site.site_name!r} not populated with required values"
                 )
                 continue
 
             # Populate grid square Pydantic model
             grid_square_params = GridSquareParameters(
                 tag=dcg_name,
-                x_location=clem_img_series.x0,
+                x_location=clem_img_site.x0,
                 x_location_scaled=x_mid_px,
-                y_location=clem_img_series.y0,
+                y_location=clem_img_site.y0,
                 y_location_scaled=y_mid_px,
-                readout_area_x=clem_img_series.image_pixels_x,
-                readout_area_y=clem_img_series.image_pixels_y,
-                thumbnail_size_x=clem_img_series.thumbnail_pixels_x,
-                thumbnail_size_y=clem_img_series.thumbnail_pixels_y,
-                width=clem_img_series.image_pixels_x,
+                readout_area_x=clem_img_site.image_pixels_x,
+                readout_area_y=clem_img_site.image_pixels_y,
+                thumbnail_size_x=clem_img_site.thumbnail_pixels_x,
+                thumbnail_size_y=clem_img_site.thumbnail_pixels_y,
+                width=clem_img_site.image_pixels_x,
                 width_scaled=width_scaled,
-                height=clem_img_series.image_pixels_y,
+                height=clem_img_site.image_pixels_y,
                 height_scaled=height_scaled,
-                x_stage_position=0.5 * (clem_img_series.x0 + clem_img_series.x1),
-                y_stage_position=0.5 * (clem_img_series.y0 + clem_img_series.y1),
-                pixel_size=clem_img_series.image_pixel_size,
-                image=clem_img_series.thumbnail_search_string,
-                collection_mode=clem_img_series.collection_mode,
+                x_stage_position=0.5 * (clem_img_site.x0 + clem_img_site.x1),
+                y_stage_position=0.5 * (clem_img_site.y0 + clem_img_site.y1),
+                pixel_size=clem_img_site.image_pixel_size,
+                image=clem_img_site.thumbnail_path,
+                collection_mode=clem_img_site.collection_mode,
             )
             # Construct colour flags for ISPyB
             color_flags = {
-                ispyb_color_flags: int(getattr(clem_img_series, murfey_color_flags, 0))
+                ispyb_color_flags: int(getattr(clem_img_site, murfey_color_flags, 0))
                 for murfey_color_flags, ispyb_color_flags in COLOR_FLAGS_MURFEY_TO_ISPYB.items()
             }
             # Register or update the grid square entry as required
-            if grid_square_result := murfey_db.exec(
+            if grid_square_entry := murfey_db.exec(
                 select(MurfeyDB.GridSquare)
-                .where(MurfeyDB.GridSquare.name == clem_img_series.id)
+                .where(MurfeyDB.GridSquare.name == clem_img_site.id)
                 .where(MurfeyDB.GridSquare.tag == grid_square_params.tag)
                 .where(MurfeyDB.GridSquare.session_id == session_id)
-            ).all():
+            ).one_or_none():
                 # Update existing grid square entry on Murfey
-                grid_square_entry = grid_square_result[0]
                 grid_square_entry.x_location = grid_square_params.x_location
                 grid_square_entry.y_location = grid_square_params.y_location
                 grid_square_entry.x_stage_position = grid_square_params.x_stage_position
@@ -516,14 +446,14 @@ def _register_grid_square(
                 # Register to ISPyB
                 grid_square_ispyb_result = _transport_object.do_insert_grid_square(
                     atlas_id=dcg_entry.atlas_id,
-                    grid_square_id=clem_img_series.id,
+                    grid_square_id=clem_img_site.id,
                     grid_square_parameters=grid_square_params,
                     color_flags=color_flags,
                 )
                 # Register to Murfey
                 grid_square_entry = MurfeyDB.GridSquare(
                     id=grid_square_ispyb_result.get("return_value", None),
-                    name=clem_img_series.id,
+                    name=clem_img_site.id,
                     session_id=session_id,
                     tag=grid_square_params.tag,
                     x_location=grid_square_params.x_location,
@@ -541,8 +471,8 @@ def _register_grid_square(
             murfey_db.commit()
 
             # Add grid square ID to existing CLEM image series entry
-            clem_img_series.grid_square_id = grid_square_entry.id
-            murfey_db.add(clem_img_series)
+            clem_img_site.grid_square_id = grid_square_entry.id
+            murfey_db.add(clem_img_site)
             murfey_db.commit()
     else:
         logger.info(
@@ -591,7 +521,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             return {"success": False, "requeue": False}
         try:
             # Register items in Murfey database
-            _register_clem_image_series(
+            _register_clem_imaging_site(
                 session_id=session_id,
                 result=result,
                 murfey_db=murfey_db,
@@ -659,7 +589,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
         # Request for image alignment and processing for the requested combinations
         for image_combo in image_combos_to_process:
             try:
-                submit_cluster_request(
+                run_align_and_merge(
                     session_id=session_id,
                     instrument_name=murfey_session.instrument_name,
                     series_name=result.series_name,

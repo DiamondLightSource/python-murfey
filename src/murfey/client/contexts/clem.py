@@ -5,7 +5,7 @@ the CLEM workflow should be processed.
 
 import logging
 from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Generator
 from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
@@ -23,7 +23,7 @@ def _file_transferred_to(
     source: Path,
     file_path: Path,
     rsync_basepath: Path,
-) -> Optional[Path]:
+):
     """
     Returns the Path of the transferred file on the DLS file system.
     """
@@ -36,9 +36,7 @@ def _file_transferred_to(
     return destination
 
 
-def _get_source(
-    file_path: Path, environment: MurfeyInstanceEnvironment
-) -> Optional[Path]:
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment):
     """
     Returns the Path of the file on the client PC.
     """
@@ -48,7 +46,7 @@ def _get_source(
     return None
 
 
-def _get_image_elements(root: ET.Element) -> List[ET.Element]:
+def _get_image_elements(root: ET.Element) -> list[ET.Element]:
     """
     Searches the XML metadata recursively to find the nodes tagged as "Element" that
     have image-related tags. Some LIF datasets have layers of nested elements, so a
@@ -93,14 +91,14 @@ class CLEMContext(Context):
         self._basepath = basepath
         self._machine_config = machine_config
         # CLEM contexts for "auto-save" acquisition mode
-        self._tiff_series: Dict[str, List[str]] = {}  # {Series name : TIFF path list}
-        self._series_metadata: Dict[str, str] = {}  # {Series name : Metadata file path}
-        self._files_in_series: Dict[str, int] = {}  # {Series name : Total TIFFs}
+        self._tiff_series: dict[str, list[str]] = {}  # {Series name : TIFF path list}
+        self._series_metadata: dict[str, str] = {}  # {Series name : Metadata file path}
+        self._files_in_series: dict[str, int] = {}  # {Series name : Total TIFFs}
 
     def post_transfer(
         self,
         transferred_file: Path,
-        environment: Optional[MurfeyInstanceEnvironment] = None,
+        environment: MurfeyInstanceEnvironment | None = None,
         **kwargs,
     ) -> bool:
         super().post_transfer(transferred_file, environment=environment, **kwargs)
@@ -179,11 +177,6 @@ class CLEMContext(Context):
                 logger.debug(
                     f"File {transferred_file.name!r} added to series {series_name!r}"
                 )
-
-                # Register the TIFF file in the database
-                post_result = self.register_tiff_file(destination_file, environment)
-                if post_result is False:
-                    return False
 
             # Process XLIF files
             if transferred_file.suffix == ".xlif":
@@ -311,12 +304,6 @@ class CLEMContext(Context):
                 )
                 return False
 
-            # Post URL to register LIF file in database
-            post_result = self.register_lif_file(destination_file, environment)
-            if post_result is False:
-                return False
-            logger.info(f"Registered {destination_file.name!r} in the database")
-
             # Post URL to trigger job and convert LIF file into image stacks
             post_result = self.process_lif_file(destination_file, environment)
             if post_result is False:
@@ -325,31 +312,6 @@ class CLEMContext(Context):
 
         # Function has completed as expected
         return True
-
-    def register_lif_file(
-        self,
-        lif_file: Path,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        """
-        Constructs the URL and dictionary to be posted to the server, which will then
-        register the LIF file in the database correctly as part of the CLEM workflow.
-        """
-        try:
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="clem.router",
-                function_name="register_lif_file",
-                token=self._token,
-                session_id=environment.murfey_session,
-                data={"lif_file": str(lif_file)},
-            )
-            return True
-        except Exception as e:
-            logger.error(
-                f"Error encountered when registering the LIF file in the database: {e}"
-            )
-            return False
 
     def process_lif_file(
         self,
@@ -373,32 +335,6 @@ class CLEMContext(Context):
             return True
         except Exception as e:
             logger.error(f"Error encountered processing LIF file: {e}")
-            return False
-
-    def register_tiff_file(
-        self,
-        tiff_file: Path,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        """
-        Constructs the URL and dictionary to be posted to the server, which will then
-        register the TIFF file in the database correctly as part of the CLEM workflow.
-        """
-
-        try:
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="clem.router",
-                function_name="register_tiff_file",
-                token=self._token,
-                session_id=environment.murfey_session,
-                data={"tiff_file": str(tiff_file)},
-            )
-            return True
-        except Exception as e:
-            logger.error(
-                f"Error encountered when registering the TIFF file in the database: {e}"
-            )
             return False
 
     def process_tiff_series(
