@@ -6,7 +6,7 @@ from murfey.client.analyser import Analyser
 from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.fib import FIBContext
-from murfey.client.contexts.spa import SPAModularContext
+from murfey.client.contexts.spa import SPAContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -28,8 +28,8 @@ example_files = [
     ["visit/Batch/BatchPositionsList.xml", TomographyMetadataContext],
     ["visit/Thumbnails/file.mrc", TomographyMetadataContext],
     # SPA
-    ["visit/FoilHole_01234_fractions.tiff", SPAModularContext],
-    ["visit/FoilHole_01234_EER.eer", SPAModularContext],
+    ["visit/FoilHole_01234_fractions.tiff", SPAContext],
+    ["visit/FoilHole_01234_EER.eer", SPAContext],
     # SPA metadata
     ["atlas/atlas.mrc", AtlasContext],
     ["visit/EpuSession.dm", SPAMetadataContext],
@@ -116,7 +116,7 @@ def test_find_context(file_and_context, tmp_path):
     # Checks for the specific workflow contexts
     if isinstance(analyser._context, TomographyContext):
         assert analyser.parameters_model == ProcessingParametersTomo
-    if isinstance(analyser._context, SPAModularContext):
+    if isinstance(analyser._context, SPAContext):
         assert analyser.parameters_model == ProcessingParametersSPA
 
 

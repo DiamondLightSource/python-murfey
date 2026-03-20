@@ -56,7 +56,7 @@ def _get_xml_list_index(key: str, xml_list: list) -> int:
     raise ValueError(f"Key not found in XML list: {key}")
 
 
-class SPAModularContext(Context):
+class SPAContext(Context):
     user_params = [
         ProcessingParameter(
             "dose_per_frame",

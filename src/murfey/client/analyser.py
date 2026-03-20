@@ -18,7 +18,7 @@ from murfey.client.context import Context
 from murfey.client.contexts.atlas import AtlasContext
 from murfey.client.contexts.clem import CLEMContext
 from murfey.client.contexts.fib import FIBContext
-from murfey.client.contexts.spa import SPAModularContext
+from murfey.client.contexts.spa import SPAContext
 from murfey.client.contexts.spa_metadata import SPAMetadataContext
 from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
@@ -263,7 +263,7 @@ class Analyser(Observer):
             ]:
                 if not self._context:
                     logger.info("Acquisition software: EPU")
-                    self._context = SPAModularContext(
+                    self._context = SPAContext(
                         "epu",
                         self._basepath,
                         self._murfey_config,
@@ -483,7 +483,7 @@ class Analyser(Observer):
                 elif isinstance(
                     self._context,
                     (
-                        SPAModularContext,
+                        SPAContext,
                         SPAMetadataContext,
                         TomographyContext,
                         TomographyMetadataContext,
