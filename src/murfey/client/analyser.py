@@ -353,26 +353,28 @@ class Analyser(Observer):
                     or transferred_file.name == "EpuSession.dm"
                     and not self._context
                 ):
-                    if context := _get_context("SPAMetadataContext"):
-                        self._context = context.load()(
-                            "epu",
-                            self._basepath,
-                            self._murfey_config,
-                            self._token,
-                        )
+                    if not (context := _get_context("SPAMetadataContext")):
+                        continue
+                    self._context = context.load()(
+                        "epu",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
+                    )
                 elif (
                     "Batch" in transferred_file.parts
                     or "SearchMaps" in transferred_file.parts
                     or transferred_file.name == "Session.dm"
                     and not self._context
                 ):
-                    if context := _get_context("TomographyMetadataContext"):
-                        self._context = context.load()(
-                            "tomo",
-                            self._basepath,
-                            self._murfey_config,
-                            self._token,
-                        )
+                    if not (context := _get_context("TomographyMetadataContext")):
+                        continue
+                    self._context = context.load()(
+                        "tomo",
+                        self._basepath,
+                        self._murfey_config,
+                        self._token,
+                    )
                 self.post_transfer(transferred_file)
             else:
                 dc_metadata = {}
