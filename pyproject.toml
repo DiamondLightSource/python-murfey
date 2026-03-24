@@ -96,6 +96,15 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
+[project.entry-points."murfey.contexts"]
+AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
+CLEMContext = "murfey.client.contexts.clem:CLEMContext"
+FIBContext = "murfey.client.contexts.fib:FIBContext"
+SPAContext = "murfey.client.contexts.spa:SPAContext"
+SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
+SXTContext = "murfey.client.contexts.sxt:SXTContext"
+TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
+TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
 [project.entry-points."murfey.workflows"]
 "atlas_update" = "murfey.workflows.register_atlas_update:run"
 "clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:run"

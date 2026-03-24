@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import ensure_dcg_exists
-from murfey.client.contexts.spa import SPAModularContext
+from murfey.client.contexts.spa import SPAContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.destinations import determine_default_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -560,7 +560,7 @@ class MultigridController:
             )
             log.info("Tomography processing flushed")
 
-        elif isinstance(context, SPAModularContext):
+        elif isinstance(context, SPAContext):
             if self._environment.visit in source.parts:
                 metadata_source = source
             else:
