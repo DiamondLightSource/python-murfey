@@ -54,7 +54,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    C:\msys64\etc\pacman.d
+  C:\msys64\etc\pacman.d
 </pre>
 <h4>ii. Installing Dependencies</h4>
 <p>
@@ -66,11 +66,11 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pacman -Syu
-    $ pacman -S msys2-runtime
-    $ pacman -S rsync
-    $ pacman -S mingw-w64-ucrt-x86_64-python-pip
-    $ pacman -S mingw-w64-ucrt-x86_64-rust
+  $ pacman -Syu
+  $ pacman -S msys2-runtime
+  $ pacman -S rsync
+  $ pacman -S mingw-w64-ucrt-x86_64-python-pip
+  $ pacman -S mingw-w64-ucrt-x86_64-rust
 </pre>
 <p>
   Other utility packages such as
@@ -140,7 +140,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pacman -U /c/Users/&lt;username&gt;/Downloads/&lt;package-name&gt;</pre
+  $ pacman -U /c/Users/&lt;username&gt;/Downloads/&lt;package-name&gt;</pre
 >
 
 <h4>iii. Configuring the Rust Package Manager (If Network-Restricted)</h4>
@@ -188,13 +188,13 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    %USERPROFILE%\.cargo
+  %USERPROFILE%\.cargo
 </pre>
 <p>For a user named Murfey, for example, this would take the form:</p>
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    C:\Users\Murfey\.cargo
+  C:\Users\Murfey\.cargo
 </pre>
 <p>
   With this file configured,
@@ -223,9 +223,9 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
-    $ virtualenv your-env-name  # Create the virtual environment
-    $ source your-env-name/bin/activate  # Activate the virtual environment
+  $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
+  $ virtualenv your-env-name  # Create the virtual environment
+  $ source your-env-name/bin/activate  # Activate the virtual environment
 </pre>
 <h3>B. Installing Murfey</h3>
 <p>
@@ -235,7 +235,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install murfey --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
+  $ pip install murfey --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
 </pre>
 
 <h4>Installing Pillow</h4>
@@ -268,7 +268,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ ZLIB_ROOT="/ucrt64" pip install pillow --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
+  $ ZLIB_ROOT="/ucrt64" pip install pillow --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
 </pre>
 
 {% endblock %}
