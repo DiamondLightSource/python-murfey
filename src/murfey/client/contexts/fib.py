@@ -207,7 +207,7 @@ class FIBContext(Context):
                     return
 
                 # Register image in database
-                self._register_fib_atlas(destination_file, environment)
+                self._register_atlas(destination_file, environment)
                 return
 
         # -----------------------------------------------------------------------------
@@ -216,7 +216,7 @@ class FIBContext(Context):
         elif self._acquisition_software == "meteor":
             pass
 
-    def _register_fib_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
+    def _register_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
         """
         Constructs the URL and dictionary to be posted to the server, which then triggers
         the processing of the electron snapshot image.
