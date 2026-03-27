@@ -122,18 +122,35 @@ class FIBContext(Context):
                         name=lamella_name,
                         number=lamella_number,
                     )
+                if not (source := _get_source(transferred_file, environment)):
+                    logger.warning(f"No source found for file {transferred_file}")
+                    return
+                if not (
+                    destination_file := _file_transferred_to(
+                        environment=environment,
+                        source=source,
+                        file_path=transferred_file,
+                        rsync_basepath=Path(
+                            self._machine_config.get("rsync_basepath", "")
+                        ),
+                    )
+                ):
+                    logger.warning(
+                        f"File {transferred_file.name!r} not found on storage system"
+                    )
+                    return
                 if not self._milling.get(lamella_number):
                     self._milling[lamella_number] = [
                         MillingProgress(
                             timestamp=timestamp,
-                            file=transferred_file,
+                            file=destination_file,
                         )
                     ]
                 else:
                     self._milling[lamella_number].append(
                         MillingProgress(
                             timestamp=timestamp,
-                            file=transferred_file,
+                            file=destination_file,
                         )
                     )
                 gif_list = [
@@ -142,25 +159,24 @@ class FIBContext(Context):
                         self._milling[lamella_number], key=lambda x: x.timestamp
                     )
                 ]
-                if environment:
-                    raw_directory = Path(
-                        environment.default_destinations[self._basepath]
-                    ).name
-                    # Submit job to backend to construct a GIF
-                    capture_post(
-                        base_url=str(environment.url.geturl()),
-                        router_name="workflow.correlative_router",
-                        function_name="make_gif",
-                        token=self._token,
-                        year=datetime.now().year,
-                        visit_name=environment.visit,
-                        session_id=environment.murfey_session,
-                        data={
-                            "lamella_number": lamella_number,
-                            "images": [str(file) for file in gif_list],
-                            "raw_directory": raw_directory,
-                        },
-                    )
+                raw_directory = Path(
+                    environment.default_destinations[self._basepath]
+                ).name
+                # Submit job to backend to construct a GIF
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow.correlative_router",
+                    function_name="make_gif",
+                    token=self._token,
+                    year=datetime.now().year,
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
+                    data={
+                        "lamella_number": lamella_number,
+                        "images": [str(file) for file in gif_list],
+                        "raw_directory": raw_directory,
+                    },
+                )
             elif transferred_file.name == "ProjectData.dat":
                 with open(transferred_file, "r") as dat:
                     try:
