@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 from murfey.client.multigrid_control import MultigridController
 from murfey.client.rsync import RSyncer
 from murfey.client.watchdir_multigrid import MultigridDirWatcher
+from murfey.instrument_server import murfey_server_url
 from murfey.util import posix_path, sanitise, sanitise_nonpath, secure_path
 from murfey.util.api import url_path_for
 from murfey.util.client import read_config
@@ -84,7 +85,10 @@ def health():
 
 
 def _get_murfey_url() -> str:
-    known_server = config["Murfey"].get("server")
+    if murfey_server_url.url:
+        known_server = murfey_server_url.url
+    else:
+        known_server = config["Murfey"].get("server")
     if not known_server:
         exit("Murfey server not set")
     if not known_server.startswith(("http://", "https://")):

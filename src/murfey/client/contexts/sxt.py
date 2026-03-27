@@ -78,6 +78,7 @@ class SXTContext(Context):
                 router_name="workflow.router",
                 function_name="start_dc",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=dc_data,
@@ -92,6 +93,7 @@ class SXTContext(Context):
                     router_name="workflow.router",
                     function_name="register_proc",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data={
@@ -221,6 +223,7 @@ class SXTContext(Context):
                 router_name="workflow.sxt_router",
                 function_name="process_sxt_tilt_series",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={

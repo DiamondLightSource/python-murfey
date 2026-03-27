@@ -13,7 +13,7 @@ from pytest_mock import MockerFixture
 
 import murfey
 from murfey.client.update import UPDATE_SUCCESS
-from murfey.instrument_server import check_for_updates, start_instrument_server
+from murfey.instrument_server import check_for_updates, run
 from murfey.server.api.bootstrap import pypi as pypi_router, version as version_router
 from murfey.util.api import url_path_for
 from murfey.util.logging import HTTPSHandler
@@ -186,7 +186,7 @@ def test_start_instrument_server(
         sys.argv.extend(["--port", str(port)])
 
     # Run the function
-    start_instrument_server()
+    run()
 
     # Check that the server was called with the correct arguments
     args, kwargs = mock_server.call_args

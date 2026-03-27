@@ -157,6 +157,7 @@ class TomographyContext(Context):
                             router_name="workflow.router",
                             function_name="start_dc",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data=dc_data,
@@ -174,6 +175,7 @@ class TomographyContext(Context):
                                 router_name="workflow.router",
                                 function_name="register_proc",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -290,6 +292,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series_for_rerun",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 data=rerun_data,
             )
@@ -310,6 +313,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 data=ts_data,
             )
@@ -345,6 +349,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=tilt_data,
@@ -357,6 +362,7 @@ class TomographyContext(Context):
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data={
@@ -393,6 +399,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="request_tomography_preprocessing",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=preproc_data,
@@ -498,6 +505,7 @@ class TomographyContext(Context):
                             router_name="workflow.tomo_router",
                             function_name="register_tilt_series_length",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             data={
                                 "tags": [tilt_series],
@@ -518,6 +526,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_completed_tilt_series",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
