@@ -130,7 +130,7 @@ class FIBContext(Context):
                     raw_directory = Path(
                         environment.default_destinations[self._basepath]
                     ).name
-                    # post gif list to gif making API call
+                    # Submit job to backend to construct a GIF
                     capture_post(
                         base_url=str(environment.url.geturl()),
                         router_name="workflow.correlative_router",
@@ -141,7 +141,7 @@ class FIBContext(Context):
                         session_id=environment.murfey_session,
                         data={
                             "lamella_number": lamella_number,
-                            "images": gif_list,
+                            "images": [str(file) for file in gif_list],
                             "raw_directory": raw_directory,
                         },
                     )
