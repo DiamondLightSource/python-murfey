@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +11,7 @@ import xmltodict
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.fib import number_from_name
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
@@ -27,22 +27,6 @@ class Lamella(NamedTuple):
 class MillingProgress(NamedTuple):
     file: Path
     timestamp: float
-
-
-def _number_from_name(name: str) -> int:
-    """
-    In the AutoTEM and Maps workflows for the FIB, the sites and images are
-    auto-incremented with parenthesised numbers (e.g. "Lamella (2)"), with
-    the first site/image typically not having a number.
-
-    This function extracts the number from the file name, and returns 1 if
-    no such number is found.
-    """
-    return (
-        int(match.group(1))
-        if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
-        else 1
-    )
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -105,7 +89,7 @@ class FIBContext(Context):
             parts = transferred_file.parts
             if "DCImages" in parts and transferred_file.suffix == ".png":
                 lamella_name = parts[parts.index("Sites") + 1]
-                lamella_number = _number_from_name(lamella_name)
+                lamella_number = number_from_name(lamella_name)
                 time_from_name = transferred_file.name.split("-")[:6]
                 timestamp = datetime.timestamp(
                     datetime(
@@ -171,7 +155,7 @@ class FIBContext(Context):
                     metadata = xmltodict.parse(for_parsing)
                 sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
                 for site in sites:
-                    number = _number_from_name(site["Name"])
+                    number = number_from_name(site["Name"])
                     milling_angle = site["Workflow"]["Recipe"][0]["Activites"][
                         "MillingAngleActivity"
                     ].get("MillingAngle")
