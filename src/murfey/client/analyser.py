@@ -400,7 +400,7 @@ class Analyser(Observer):
                         mdoc_for_reading = transferred_file
                 if not self._context:
                     if not self._find_extension(transferred_file):
-                        logger.error(f"No extension found for {transferred_file}")
+                        logger.debug(f"No extension found for {transferred_file}")
                         continue
                     if not self._find_context(transferred_file):
                         logger.debug(

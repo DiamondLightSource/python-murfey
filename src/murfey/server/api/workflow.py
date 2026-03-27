@@ -4,6 +4,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import (
@@ -1104,7 +1105,7 @@ async def make_gif(
     ]
     output_dir = (
         (machine_config.rsync_basepath or Path("")).resolve()
-        / secure_filename(year)
+        / secure_filename(str(year))
         / secure_filename(visit_name)
         / "processed"
     )
@@ -1112,21 +1113,35 @@ async def make_gif(
     output_dir = output_dir / secure_filename(gif_params.raw_directory)
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-    image_full_paths = [
-        output_dir.parent / gif_params.raw_directory / i for i in gif_params.images
-    ]
+
     if Image is not None:
-        images = [Image.open(f) for f in image_full_paths]
+        images = [Image.open(f) for f in gif_params.images]
     else:
         images = []
     for im in images:
         im.thumbnail((512, 512))
-    images[0].save(
+
+    # Normalize and convert individual frames to 8-bit
+    arr: list[np.ndarray] = []
+    for im in images:
+        frame = np.array(im).astype(np.float32)
+        vmin, vmax = np.percentile(frame, (0.5, 99.5))
+        scale = 255 / ((vmax - vmin) or 1)
+        np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
+        np.subtract(frame, vmin, out=frame)
+        np.multiply(frame, scale, out=frame)
+        arr.append(frame.astype(np.uint8))
+    arr = np.array(arr).astype(np.uint8)
+
+    # Convert back to Image objects and save as GIF
+    converted = [Image.fromarray(arr[f], mode="L") for f in range(len(images))]
+    converted[0].save(
         output_path,
         format="GIF",
-        append_images=images[1:],
+        append_images=converted[1:],
         save_all=True,
         duration=30,
         loop=0,
     )
+
     return {"output_gif": str(output_path)}

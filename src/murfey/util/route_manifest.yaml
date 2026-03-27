@@ -1423,3 +1423,11 @@ murfey.server.api.workflow.tomo_router:
         type: int
     methods:
       - POST
+murfey.server.api.workflow_fib.router:
+  - path: /workflow/fib/sessions/{session_id}/register_atlas
+    function: register_fib_atlas
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST

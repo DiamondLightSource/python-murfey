@@ -1,6 +1,5 @@
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,156 +15,7 @@ from murfey.client.contexts.fib import (
 # -------------------------------------------------------------------------------------
 # FIBContext test utilty functions and fixtures
 # -------------------------------------------------------------------------------------
-
-
-def create_fib_maps_dataset_element(
-    id: int,
-    name: str,
-    relative_path: str,
-    center_x: float,
-    center_y: float,
-    center_z: float,
-    size_x: float,
-    size_y: float,
-    size_z: float,
-    rotation_angle: float,
-    status: str,
-):
-    # Create dataset node
-    dataset = ET.Element("Dataset")
-    # ID node
-    id_node = ET.Element("Id")
-    id_node.text = str(id)
-    dataset.append(id_node)
-
-    # Name node
-    name_node = ET.Element("Name")
-    name_node.text = name
-    dataset.append(name_node)
-
-    # Stage position node
-    box_center = ET.Element("BoxCenter")
-    for tag, value in (
-        ("CenterX", center_x),
-        ("CenterY", center_y),
-        ("CenterZ", center_z),
-    ):
-        node = ET.Element(tag)
-        node.text = str(value)
-        box_center.append(node)
-    dataset.append(box_center)
-
-    # Image size node
-    box_size = ET.Element("BoxSize")
-    for tag, value in (
-        ("SizeX", size_x),
-        ("SizeY", size_y),
-        ("SizeZ", size_z),
-    ):
-        node = ET.Element(tag)
-        node.text = str(value)
-        box_size.append(node)
-    dataset.append(box_size)
-
-    # Rotation angle
-    angle_node = ET.Element("RotationAngle")
-    angle_node.text = str(rotation_angle)
-    dataset.append(angle_node)
-
-    # Relative path
-    image_path_node = ET.Element("FinalImages")
-    image_path_node.text = relative_path.replace("/", "\\")
-    dataset.append(image_path_node)
-
-    # Status
-    status_node = ET.Element("Status")
-    status_node.text = status
-    dataset.append(status_node)
-
-    return dataset
-
-
-def create_fib_maps_xml_metadata(
-    project_name: str,
-    datasets: list[dict[str, Any]],
-):
-    # Create root node
-    root = ET.Element("EMProject")
-
-    # Project name node
-    project_name_node = ET.Element("ProjectName")
-    project_name_node.text = project_name
-    root.append(project_name_node)
-
-    # Datasets node
-    datasets_node = ET.Element("Datasets")
-    for id, dataset in enumerate(datasets):
-        datasets_node.append(create_fib_maps_dataset_element(id, **dataset))
-    root.append(datasets_node)
-
-    return root
-
-
-fib_maps_test_datasets = [
-    {
-        "name": name,
-        "relative_path": relative_path,
-        "center_x": cx,
-        "center_y": cy,
-        "center_z": cz,
-        "size_x": sx,
-        "size_y": sy,
-        "size_z": sz,
-        "rotation_angle": ra,
-        "status": "Finished",
-    }
-    for (name, relative_path, cx, cy, cz, sx, sy, sz, ra) in (
-        (
-            "Electron Snapshot",
-            "LayersData/Layer/Electron Snapshot",
-            -0.002,
-            -0.004,
-            0.00000008,
-            0.0036,
-            0.0024,
-            0.0,
-            3.1415926535897931,
-        ),
-        (
-            "Electron Snapshot (2)",
-            "LayersData/Layer/Electron Snapshot (2)",
-            -0.002,
-            -0.004,
-            0.00000008,
-            0.0036,
-            0.0024,
-            0.0,
-            3.1415926535897931,
-        ),
-        (
-            "Electron Snapshot (3)",
-            "LayersData/Layer/Electron Snapshot (3)",
-            0.002,
-            0.004,
-            0.00000008,
-            0.0036,
-            0.0024,
-            0.0,
-            3.1415926535897931,
-        ),
-        (
-            "Electron Snapshot (4)",
-            "LayersData/Layer/Electron Snapshot (4)",
-            0.002,
-            0.004,
-            0.00000008,
-            0.0036,
-            0.0024,
-            0.0,
-            3.1415926535897931,
-        ),
-    )
-]
+num_lamellae = 5
 
 
 @pytest.fixture
@@ -174,27 +24,43 @@ def visit_dir(tmp_path: Path):
 
 
 @pytest.fixture
-def fib_maps_metadata_file(visit_dir: Path):
-    metadata = create_fib_maps_xml_metadata(
-        "test-project",
-        fib_maps_test_datasets,
-    )
-    tree = ET.ElementTree(metadata)
-    ET.indent(tree, space="  ")
-    save_path = visit_dir / "maps/visit/EMproject.emxml"
-    if not save_path.parent.exists():
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-    tree.write(save_path, encoding="utf-8")
-    return save_path
+def fib_autotem_dc_images(visit_dir: Path):
+    stages = ("Rough-Milling", "Polishing-1", "Polishing-2")
+    images_per_stage = 2
+
+    # Create images as Murfey would expect to find them in the DCImages folder
+    image_list = []
+    for l in range(num_lamellae):
+        for s, stage in enumerate(stages):
+            for i in range(images_per_stage):
+                lamella_folder = "Lamella"
+                if l > 0:
+                    lamella_folder += f" ({l + 1})"
+                # Continuously increment seconds count between files
+                timestamp = (
+                    f"2025-05-10-12-34-{str(0 + i + (s * images_per_stage)).zfill(2)}"
+                )
+                file = (
+                    visit_dir
+                    / f"autotem/visit/Sites/{lamella_folder}"
+                    / "DCImages/DCM_2025-05-10-12-34-00.125"
+                    / f"{timestamp}-{stage}-dc_rescan-image-.png"
+                )
+                if not file.exists():
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.touch()
+                image_list.append(file)
+    return image_list
 
 
 @pytest.fixture
-def fib_maps_images(fib_maps_metadata_file: Path):
+def fib_maps_images(visit_dir: Path):
     image_list = []
-    for dataset in fib_maps_test_datasets:
-        name = str(dataset["name"])
-        relative_path = str(dataset["relative_path"])
-        file = fib_maps_metadata_file.parent / relative_path / f"{name}.tiff"
+    for i in range(4):
+        name = "Electron Snapshot"
+        if i > 0:
+            name += f" ({i + 1})"
+        file = visit_dir / "maps/visit/LayersData/Layer" / f"{name}.tiff"
         if not file.exists():
             file.parent.mkdir(parents=True, exist_ok=True)
             file.touch()
@@ -229,7 +95,6 @@ def test_get_source(
     tmp_path: Path,
     visit_dir: Path,
     fib_maps_images: list[Path],
-    fib_maps_metadata_file: Path,
 ):
     # Mock the MurfeyInstanceEnvironment
     mock_environment = MagicMock()
@@ -238,7 +103,7 @@ def test_get_source(
         tmp_path / "another_dir",
     ]
     # Check that the correct source directory is found
-    for file in [fib_maps_metadata_file, *fib_maps_images]:
+    for file in fib_maps_images:
         assert _get_source(file, mock_environment) == visit_dir
 
 
@@ -246,7 +111,6 @@ def test_file_transferred_to(
     tmp_path: Path,
     visit_dir: Path,
     fib_maps_images: list[Path],
-    fib_maps_metadata_file: Path,
 ):
     # Mock the environment
     mock_environment = MagicMock()
@@ -255,7 +119,7 @@ def test_file_transferred_to(
 
     # Iterate across the FIB files to compare against
     destination_dir = tmp_path / "fib" / "data" / "current_year" / "visit"
-    for file in [fib_maps_metadata_file, *fib_maps_images]:
+    for file in fib_maps_images:
         # Work out what the expected destination will be
         assert _file_transferred_to(
             environment=mock_environment,
@@ -265,28 +129,77 @@ def test_file_transferred_to(
         ) == destination_dir / file.relative_to(visit_dir)
 
 
-def test_parse_electron_snapshot_metadata():
-    pass
+def test_fib_autotem_context(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    visit_dir: Path,
+    fib_autotem_dc_images: list[Path],
+):
+    # Mock the environment
+    mock_environment = MagicMock()
+
+    # Create a list of destinations
+    destination_dir = tmp_path / "fib" / "data" / "current_year" / "visit"
+    destination_files = [
+        destination_dir / file.relative_to(visit_dir) for file in fib_autotem_dc_images
+    ]
+
+    # Mock the functions used in 'post_transfer'
+    mock_get_source = mocker.patch(
+        "murfey.client.contexts.fib._get_source", return_value=tmp_path
+    )
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
+    )
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+
+    # Initialise the FIBContext
+    basepath = tmp_path
+    context = FIBContext(
+        acquisition_software="autotem",
+        basepath=basepath,
+        machine_config={},
+        token="",
+    )
+
+    # Parse images one-by-one and check that expected calls were made
+    for file in fib_autotem_dc_images:
+        context.post_transfer(file, environment=mock_environment)
+        mock_get_source.assert_called_with(file, mock_environment)
+        mock_file_transferred_to.assert_called_with(
+            environment=mock_environment,
+            source=basepath,
+            file_path=file,
+            rsync_basepath=Path(""),
+        )
+    assert mock_capture_post.call_count == len(fib_autotem_dc_images)
+    assert len(context._milling) == num_lamellae
+    assert len(context._lamellae) == num_lamellae
 
 
-def test_fib_autotem_context():
-    pass
-
-
-@pytest.mark.parametrize("metadata_first", ((False, True)))
 def test_fib_maps_context(
     mocker: MockerFixture,
     tmp_path: Path,
-    fib_maps_metadata_file: Path,
+    visit_dir: Path,
     fib_maps_images: list[Path],
-    metadata_first: bool,
 ):
-    # Mock out irrelevant functions
-    mocker.patch("murfey.client.contexts.fib._get_source", return_value=tmp_path)
-    mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to", side_effect=fib_maps_images
-    )
+    # Mock the environment
     mock_environment = MagicMock()
+
+    # Create a list of destinations
+    destination_dir = tmp_path / "fib" / "data" / "current_year" / "visit"
+    destination_files = [
+        destination_dir / file.relative_to(visit_dir) for file in fib_maps_images
+    ]
+
+    # Mock the functions used in 'post_transfer'
+    mock_get_source = mocker.patch(
+        "murfey.client.contexts.fib._get_source", return_value=tmp_path
+    )
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
+    )
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
     # Initialise the FIBContext
     basepath = tmp_path
@@ -296,46 +209,24 @@ def test_fib_maps_context(
         machine_config={},
         token="",
     )
-    # Assert that its initial state is correct
-    assert not context._electron_snapshots
-    assert not context._electron_snapshot_metadata
-    assert not context._electron_snapshots_submitted
 
-    if metadata_first:
-        # Read the metadata first
-        context.post_transfer(fib_maps_metadata_file, mock_environment)
-        # Metadata field should now be populated
-        assert all(
-            name in context._electron_snapshot_metadata.keys()
-            for name in [image.stem for image in fib_maps_images]
+    # Parse images one-by-one
+    for f, file in enumerate(fib_maps_images):
+        context.post_transfer(file, environment=mock_environment)
+        mock_get_source.assert_called_with(file, mock_environment)
+        mock_file_transferred_to.assert_called_with(
+            environment=mock_environment,
+            source=basepath,
+            file_path=file,
+            rsync_basepath=Path(""),
         )
-        # Parse the images one-by-one
-        for image in fib_maps_images:
-            name = image.stem
-            context.post_transfer(image, mock_environment)
-            # Entries should now start being removed from 'metadata' and 'images' fields
-            assert (
-                name not in context._electron_snapshots.keys()
-                and name not in context._electron_snapshot_metadata.keys()
-                and name in context._electron_snapshots_submitted
-            )
-    else:
-        # Read in images first
-        for image in fib_maps_images:
-            name = image.stem
-            context.post_transfer(image, mock_environment)
-            assert (
-                name in context._electron_snapshots.keys()
-                and name not in context._electron_snapshot_metadata.keys()
-                and name not in context._electron_snapshots_submitted
-            )
-        # Read in the metadata
-        context.post_transfer(fib_maps_metadata_file, mock_environment)
-        assert all(
-            name in context._electron_snapshots_submitted
-            and name not in context._electron_snapshots.keys()
-            and name not in context._electron_snapshot_metadata.keys()
-            for name in [file.stem for file in fib_maps_images]
+        mock_capture_post.assert_called_with(
+            base_url=mock.ANY,
+            router_name="workflow_fib.router",
+            function_name="register_fib_atlas",
+            token="",
+            data={"file": str(destination_files[f])},
+            session_id=mock.ANY,
         )
 
 
