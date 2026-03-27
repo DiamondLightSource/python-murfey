@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -198,9 +199,7 @@ def test_fib_maps_context(
     mock_file_transferred_to = mocker.patch(
         "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
     )
-    mock_register_fib_atlas = mocker.patch.object(
-        FIBContext, "_register_atlas", return_value=True
-    )
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
     # Initialise the FIBContext
     basepath = tmp_path
@@ -212,7 +211,7 @@ def test_fib_maps_context(
     )
 
     # Parse images one-by-one
-    for file in fib_maps_images:
+    for f, file in enumerate(fib_maps_images):
         context.post_transfer(file, environment=mock_environment)
         mock_get_source.assert_called_with(file, mock_environment)
         mock_file_transferred_to.assert_called_with(
@@ -221,11 +220,13 @@ def test_fib_maps_context(
             file_path=file,
             rsync_basepath=Path(""),
         )
-    assert mock_register_fib_atlas.call_count == len(fib_maps_images)
-    for dst in destination_files:
-        mock_register_fib_atlas.assert_any_call(
-            dst,
-            mock_environment,
+        mock_capture_post.assert_called_with(
+            base_url=mock.ANY,
+            router_name="workflow_fib.router",
+            function_name="register_fib_atlas",
+            token="",
+            data={"file": str(destination_files[f])},
+            session_id=mock.ANY,
         )
 
 
