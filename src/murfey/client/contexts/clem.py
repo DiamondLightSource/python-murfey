@@ -329,6 +329,7 @@ class CLEMContext(Context):
                 router_name="clem.router",
                 function_name="process_raw_lifs",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 data={"lif_file": str(lif_file)},
             )
@@ -353,6 +354,7 @@ class CLEMContext(Context):
                 router_name="clem.router",
                 function_name="process_raw_tiffs",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 data=tiff_dataset,
             )

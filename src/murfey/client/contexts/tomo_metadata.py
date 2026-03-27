@@ -155,6 +155,7 @@ class TomographyMetadataContext(Context):
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -213,6 +214,7 @@ class TomographyMetadataContext(Context):
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -266,6 +268,7 @@ class TomographyMetadataContext(Context):
                     router_name="session_control.tomo_router",
                     function_name="register_search_map",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     sm_name=search_map_name,
                     data={
@@ -279,6 +282,7 @@ class TomographyMetadataContext(Context):
                     router_name="session_control.tomo_router",
                     function_name="register_batch_position",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     batch_name=batch_name,
                     data={
@@ -309,6 +313,7 @@ class TomographyMetadataContext(Context):
                             router_name="session_control.tomo_router",
                             function_name="register_batch_position",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             batch_name=beamshift_name,
                             data={

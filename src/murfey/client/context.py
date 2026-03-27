@@ -201,6 +201,7 @@ def ensure_dcg_exists(
         router_name="workflow.router",
         function_name="register_dc_group",
         token=token,
+        instrument_name=environment.instrument_name,
         visit_name=environment.visit,
         session_id=environment.murfey_session,
         data=dcg_data,

@@ -55,6 +55,7 @@ class AtlasContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_atlas",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={
                         "name": transferred_file.stem,
@@ -85,6 +86,7 @@ class AtlasContext(Context):
                     router_name="session_control.spa_router",
                     function_name="make_atlas_jpg",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={"path": str(transferred_atlas_name).replace("//", "/")},
                 )
@@ -138,6 +140,7 @@ class AtlasContext(Context):
                     router_name="workflow.router",
                     function_name="register_dc_group",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data=dcg_data,

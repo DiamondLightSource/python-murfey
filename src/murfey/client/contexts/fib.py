@@ -237,6 +237,7 @@ class FIBContext(Context):
                         router_name="workflow.correlative_router",
                         function_name="make_gif",
                         token=self._token,
+                        instrument_name=environment.instrument_name,
                         year=datetime.now().year,
                         visit_name=environment.visit,
                         session_id=environment.murfey_session,
