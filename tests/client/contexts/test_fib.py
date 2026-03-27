@@ -8,8 +8,8 @@ from murfey.client.contexts.fib import (
     FIBContext,
     _file_transferred_to,
     _get_source,
+    _number_from_name,
 )
-from murfey.util.fib import number_from_name
 
 # -------------------------------------------------------------------------------------
 # FIBContext test utilty functions and fixtures
@@ -56,7 +56,7 @@ def fib_maps_images(visit_dir: Path):
 )
 def test_number_from_name(test_params: tuple[str, int]):
     name, number = test_params
-    assert number_from_name(name) == number
+    assert _number_from_name(name) == number
 
 
 def test_get_source(
