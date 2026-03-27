@@ -92,7 +92,7 @@ def run():
     )
     parser.add_argument(
         "--server",
-        help="URL path to backend murfey server",
+        help="URL path to backend murfey server e.g. http://murfey-server:8000",
         type=str,
         default="",
     )
