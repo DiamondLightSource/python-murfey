@@ -9,9 +9,7 @@ import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.feedback import (
     _app_id,
-    _flush_class2d,
     _pj_id,
-    _register_class_selection,
 )
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
@@ -24,7 +22,6 @@ from murfey.util.db import (
     NotificationValue,
     ParticleSizes,
     ProcessingJob,
-    SelectionStash,
     Session as MurfeySession,
     SPARelionParameters,
 )
@@ -74,39 +71,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
             select(SPARelionParameters).where(SPARelionParameters.pj_id == pj_id)
         ).one()
         relion_options = dict(relion_params)
-        feedback_params = _db.exec(
-            select(ClassificationFeedbackParameters).where(
-                ClassificationFeedbackParameters.pj_id == pj_id
-            )
-        ).one()
-
         particle_diameter = relion_params.particle_diameter
-
-        if feedback_params.picker_ispyb_id is None:
-            if not _transport_object:
-                feedback_params.picker_ispyb_id = 1000
-            else:
-                assert feedback_params.picker_murfey_id is not None
-                feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
-                    message["program_id"], feedback_params.picker_murfey_id
-                )
-                if feedback_params.picker_ispyb_id is not None:
-                    _flush_class2d(message["session_id"], message["program_id"], _db)
-            _db.add(feedback_params)
-            _db.commit()
-            selection_stash = _db.exec(
-                select(SelectionStash).where(SelectionStash.pj_id == pj_id)
-            ).all()
-            for s in selection_stash:
-                _register_class_selection(
-                    {
-                        "session_id": s.session_id,
-                        "class_selection_score": s.class_selection_score or 0,
-                    },
-                    _db=_db,
-                )
-                _db.delete(s)
-                _db.commit()
 
         if not particle_diameter:
             # If the diameter has not been calculated then find it
@@ -246,34 +211,6 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     relion_params = _db.exec(
         select(SPARelionParameters).where(SPARelionParameters.pj_id == pj_id)
     ).one()
-    feedback_params = _db.exec(
-        select(ClassificationFeedbackParameters).where(
-            ClassificationFeedbackParameters.pj_id == pj_id
-        )
-    ).one()
-
-    if feedback_params.picker_ispyb_id is None and _transport_object:
-        assert feedback_params.picker_murfey_id is not None
-        feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
-            message["program_id"], feedback_params.picker_murfey_id
-        )
-        if feedback_params.picker_ispyb_id is not None:
-            _flush_class2d(message["session_id"], message["program_id"], _db)
-        _db.add(feedback_params)
-        _db.commit()
-        selection_stash = _db.exec(
-            select(SelectionStash).where(SelectionStash.pj_id == pj_id)
-        ).all()
-        for s in selection_stash:
-            _register_class_selection(
-                {
-                    "session_id": s.session_id,
-                    "class_selection_score": s.class_selection_score or 0,
-                },
-                _db=_db,
-            )
-            _db.delete(s)
-            _db.commit()
 
     # Send the message to extraction with the box sizes
     zocalo_message: dict = {
