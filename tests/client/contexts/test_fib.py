@@ -225,6 +225,7 @@ def test_fib_maps_context(
             router_name="workflow_fib.router",
             function_name="register_fib_atlas",
             token="",
+            instrument_name=mock.ANY,
             data={"file": str(destination_files[f])},
             session_id=mock.ANY,
         )
