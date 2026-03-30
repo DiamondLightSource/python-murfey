@@ -70,6 +70,7 @@ def capture_post(
     router_name: str,
     function_name: str,
     token: str,
+    instrument_name: str,
     data: Optional[dict] = None,
     **kwargs,
 ) -> requests.Response:
@@ -86,11 +87,10 @@ def capture_post(
             f"Response to post to {url} with data {data} had status code "
             f"{response.status_code}. The reason given was {response.reason}"
         )
-        client_config = read_config()
         failure_address = url_path_for(
             "session_control.router",
             "failed_client_post",
-            instrument_name=client_config["Murfey"]["instrument_name"],
+            instrument_name=instrument_name,
         )
         failure_url = f"{base_url}{failure_address}"
         try:

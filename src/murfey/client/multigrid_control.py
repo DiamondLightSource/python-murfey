@@ -284,6 +284,7 @@ class MultigridController:
                 router_name="session_control.router",
                 function_name="register_stopped_rsyncer",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={"path": str(source)},
             )
@@ -310,6 +311,7 @@ class MultigridController:
             router_name="session_control.router",
             function_name="register_restarted_rsyncer",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             session_id=self.session_id,
             data={"path": str(source)},
         )
@@ -338,6 +340,7 @@ class MultigridController:
                 router_name="file_io_instrument.router",
                 function_name="make_rsyncer_destination",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={"destination": destination},
             )
@@ -417,6 +420,7 @@ class MultigridController:
                     router_name="session_control.router",
                     function_name="register_restarted_rsyncer",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     session_id=self.session_id,
                     data={"path": str(source)},
                 )
@@ -433,6 +437,7 @@ class MultigridController:
                     router_name="session_control.router",
                     function_name="register_rsyncer",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     session_id=self._environment.murfey_session,
                     data=rsyncer_data,
                 )
@@ -528,6 +533,7 @@ class MultigridController:
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     visit_name=self._environment.visit,
                     session_id=self._environment.murfey_session,
                     data={
@@ -546,6 +552,7 @@ class MultigridController:
                 router_name="workflow.tomo_router",
                 function_name="register_tomo_proc_params",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self._environment.murfey_session,
                 data=metadata_json,
             )
@@ -554,6 +561,7 @@ class MultigridController:
                 router_name="workflow.tomo_router",
                 function_name="flush_tomography_processing",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self._environment.murfey_session,
                 data={"rsync_source": str(source)},
@@ -603,6 +611,7 @@ class MultigridController:
                 router_name="workflow.router",
                 function_name="start_dc",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self.session_id,
                 data=data,
@@ -619,6 +628,7 @@ class MultigridController:
                     router_name="workflow.router",
                     function_name="register_proc",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     visit_name=self._environment.visit,
                     session_id=self.session_id,
                     data={
@@ -633,6 +643,7 @@ class MultigridController:
                 router_name="workflow.spa_router",
                 function_name="register_spa_proc_params",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={
                     **{k: None if v == "None" else v for k, v in metadata_json.items()},
@@ -646,6 +657,7 @@ class MultigridController:
                 router_name="workflow.spa_router",
                 function_name="flush_spa_processing",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self.session_id,
                 data={"tag": str(source)},
@@ -674,6 +686,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_file_count",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data=data,
         )
@@ -707,6 +720,7 @@ class MultigridController:
                 router_name="prometheus.router",
                 function_name="increment_rsync_transferred_files_prometheus",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 data=data,
             )
@@ -723,6 +737,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_skipped_files_prometheus",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data={
                 "source": source,
@@ -758,6 +773,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_transferred_files",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data=data,
         )

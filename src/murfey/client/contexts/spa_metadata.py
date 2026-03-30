@@ -138,6 +138,7 @@ class SPAMetadataContext(Context):
                                 router_name="session_control.spa_router",
                                 function_name="register_grid_square",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 session_id=environment.murfey_session,
                                 gsid=int(gs),
                                 data={
@@ -213,6 +214,7 @@ class SPAMetadataContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_grid_square",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gsid=gs_name,
                     data={
@@ -232,6 +234,7 @@ class SPAMetadataContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=gs_name,
                     data={

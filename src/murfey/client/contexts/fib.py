@@ -168,6 +168,7 @@ class FIBContext(Context):
                     router_name="workflow.correlative_router",
                     function_name="make_gif",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     year=datetime.now().year,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
@@ -244,6 +245,7 @@ class FIBContext(Context):
                 router_name="workflow_fib.router",
                 function_name="register_fib_atlas",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 data={"file": str(file)},
                 session_id=environment.murfey_session,
             )

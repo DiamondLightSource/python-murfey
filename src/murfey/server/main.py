@@ -30,7 +30,7 @@ import murfey.server.api.workflow_fib
 from murfey.server import template_files
 from murfey.util.config import get_security_config
 
-log = logging.getLogger("murfey.server.main")
+logger = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.api.bootstrap.tag]
 
@@ -106,4 +106,7 @@ app.include_router(murfey.server.api.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey
 for r in entry_points(group="murfey.routers"):
-    app.include_router(r.load())
+    try:
+        app.include_router(r.load())
+    except Exception:
+        logger.warning(f"Failed to load router {r.name!r}", exc_info=True)
