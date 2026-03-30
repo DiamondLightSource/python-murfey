@@ -41,6 +41,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
             murfey_dcg = DataCollectionGroup(
                 session_id=message["session_id"],
                 tag=message.get("tag"),
+                smartem_grid_uuid=message.get("smartem_grid_uuid"),
             )
             dcgid = murfey_dcg.id
         else:
@@ -86,6 +87,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 sample=message.get("sample"),
                 session_id=message["session_id"],
                 tag=message.get("tag"),
+                smartem_grid_uuid=message.get("smartem_grid_uuid"),
             )
         murfey_db.add(murfey_dcg)
         murfey_db.commit()
