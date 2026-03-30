@@ -151,6 +151,17 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
+                            capture_post(
+                                base_url=str(environment.url.geturl()),
+                                router_name="session_control.spa_router",
+                                function_name="register_atlas",
+                                token=self._token,
+                                session_id=environment.murfey_session,
+                                data={
+                                    "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
+                                    "acquisition_uuid": environment.acquisition_uuid,
+                                },
+                            )
 
         elif (
             transferred_file.suffix == ".dm"

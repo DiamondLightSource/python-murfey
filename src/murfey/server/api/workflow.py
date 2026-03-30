@@ -28,7 +28,6 @@ try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_common.schemas import (
         AcquisitionData as SmartEMAcquisitionData,
-        AtlasData as SmartEMAtlasData,
         GridData as SmartEMGridData,
         MicrographData as SmartEMMicrographData,
         MicrographManifest as SmartEMMicrographManifest,
@@ -146,27 +145,14 @@ def register_dc_group(
                     atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
                     acquisition_data=SmartEMAcquisitionData(
                         uuid=dcg_params.acquisition_uuid,
-                        name=Path(dcg_params.tag).name,
+                        name=f"{visit_name}-sample-{dcg_params.sample}"
+                        if dcg_params.sample
+                        else f"{visit_name}-sample-unknown",
                     ),
                 )
                 smartem_grid_uuid = smartem_client.create_acquisition_grid(
                     grid_data
                 ).uuid
-                atlas_name = (
-                    Path(dcg_params.atlas).stem
-                    if dcg_params.atlas
-                    else Path(dcg_params.tag).name
-                )
-                atlas_data = SmartEMAtlasData(
-                    id=atlas_name,
-                    acquisition_date=datetime.now(),
-                    storage_folder="",
-                    name=atlas_name,
-                    tiles=[],
-                    gridsquare_positions=None,
-                    grid_uuid=smartem_grid_uuid,
-                )
-                smartem_client.create_grid_atlas(atlas_data)
             except Exception:
                 logger.warning("Failed to register SmartEM grid", exc_info=True)
     if (
