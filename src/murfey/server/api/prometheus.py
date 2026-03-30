@@ -105,10 +105,6 @@ def change_monitoring_status(visit_name: str, on: int):
     prom.monitoring_switch.labels(visit=visit_name).set(on)
 
 
-def change_monitoring_end_time(timestamp):
-    prom.monitoring_end_time
-
-
 @router.get("/metrics/{metric_name}")
 def inspect_prometheus_metrics(
     metric_name: str,
