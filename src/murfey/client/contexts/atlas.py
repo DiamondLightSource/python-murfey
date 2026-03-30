@@ -91,17 +91,6 @@ class AtlasContext(Context):
                     session_id=environment.murfey_session,
                     data={"path": str(transferred_atlas_name).replace("//", "/")},
                 )
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_atlas",
-                    token=self._token,
-                    session_id=environment.murfey_session,
-                    data={
-                        "name": transferred_file.stem,
-                        "acquisition_uuid": environment.acquisition_uuid,
-                    },
-                )
                 logger.info(
                     f"Submitted request to create JPG image of atlas {str(transferred_atlas_name)!r}"
                 )
