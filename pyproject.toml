@@ -119,7 +119,9 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
 "processing_job" = "murfey.workflows.register_processing_job:run"
+"spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
+"spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
