@@ -326,6 +326,7 @@ class SPAContext(Context):
                 router_name="session_control.spa_router",
                 function_name="register_grid_square",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 gsid=grid_square,
                 data={
@@ -378,6 +379,7 @@ class SPAContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -402,6 +404,7 @@ class SPAContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -476,6 +479,7 @@ class SPAContext(Context):
                                 router_name="file_io_instrument.router",
                                 function_name="write_eer_fractionation_file",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -539,6 +543,7 @@ class SPAContext(Context):
                             router_name="workflow.spa_router",
                             function_name="request_spa_preprocessing",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data={

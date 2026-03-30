@@ -23,7 +23,7 @@ def test_atlas_context_mrc(mock_capture_post, tmp_path):
         default_destinations={
             tmp_path / "cm12345-6": f"{tmp_path}/destination/cm12345-6"
         },
-        instrument_name="",
+        instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
@@ -42,6 +42,7 @@ def test_atlas_context_mrc(mock_capture_post, tmp_path):
         router_name="session_control.spa_router",
         function_name="make_atlas_jpg",
         token="token",
+        instrument_name="m01",
         session_id=1,
         data={"path": f"{tmp_path}/destination/{atlas_mrc.relative_to(tmp_path)}"},
     )
@@ -56,7 +57,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         default_destinations={
             tmp_path / "cm12345-6": f"{tmp_path}/destination/cm12345-6"
         },
-        instrument_name="",
+        instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
@@ -87,6 +88,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         router_name="workflow.router",
         function_name="register_dc_group",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=1,
         data=dcg_data,
