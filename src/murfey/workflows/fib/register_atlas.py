@@ -33,9 +33,9 @@ class FIBAtlasMetadata(BaseModel):
     pos_x: float
     pos_y: float
     pos_z: float
-    rotation: float
-    tilt_alpha: float
-    tilt_beta: float
+    rotation: float  # Radians
+    tilt_alpha: float  # Radians
+    tilt_beta: float  # Radians
     # Image dimensions
     pixels_x: int
     pixels_y: int
@@ -132,8 +132,9 @@ def _register_fib_imaging_site(
     murfey_db: Session,
 ):
     """
-    Register FIB atlas in Murfey database or update existing entry with newer image
+    Register FIB atlas in Murfey database or update existing entry.
     """
+    # Create new entry if one doesn't already exist
     if not (
         fib_imaging_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
@@ -143,21 +144,23 @@ def _register_fib_imaging_site(
     ):
         fib_imaging_site = MurfeyDB.ImagingSite(
             session_id=session_id,
-            site_name=metadata.site_name,
-            data_type="atlas",
             image_path=str(metadata.file),
-            pos_x=metadata.pos_x,
-            pos_y=metadata.pos_y,
-            pos_z=metadata.pos_z,
-            rotation=float(np.rad2deg(metadata.rotation)),
-            tilt_alpha=float(np.rad2deg(metadata.tilt_alpha)),
-            tilt_beta=float(np.rad2deg(metadata.tilt_beta)),
-            len_x=metadata.len_x,
-            len_y=metadata.len_y,
-            image_pixels_x=metadata.pixels_x,
-            image_pixels_y=metadata.pixels_y,
-            image_pixel_size=metadata.pixel_size,
+            data_type="atlas",
         )
+    # Add/update entries
+    fib_imaging_site.site_name = metadata.site_name
+    fib_imaging_site.pos_x = metadata.pos_x
+    fib_imaging_site.pos_y = metadata.pos_y
+    fib_imaging_site.pos_z = metadata.pos_z
+    fib_imaging_site.rotation = float(np.rad2deg(metadata.rotation))
+    fib_imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
+    fib_imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
+    fib_imaging_site.len_x = metadata.len_x
+    fib_imaging_site.len_y = metadata.len_y
+    fib_imaging_site.image_pixels_x = metadata.pixels_x
+    fib_imaging_site.image_pixels_y = metadata.pixels_y
+    fib_imaging_site.image_pixel_size = metadata.pixel_size
+
     murfey_db.add(fib_imaging_site)
     murfey_db.commit()
 
