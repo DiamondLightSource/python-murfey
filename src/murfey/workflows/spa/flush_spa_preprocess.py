@@ -6,6 +6,17 @@ from PIL import Image
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import (
+        FoilHoleData as SmartEMFoilHoleData,
+        GridSquareData as SmartEMGridSquareData,
+    )
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 from murfey.server import _transport_object
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
@@ -127,6 +138,56 @@ def register_grid_square(
         )
     murfey_db.add(grid_square)
     murfey_db.commit()
+
+    if SMARTEM_ACTIVE:
+        try:
+            murfey_session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=murfey_session.instrument_name
+            )[murfey_session.instrument_name]
+            if machine_config.smartem_api_url:
+                dcg = murfey_db.exec(
+                    select(DataCollectionGroup)
+                    .where(DataCollectionGroup.session_id == session_id)
+                    .where(DataCollectionGroup.tag == grid_square_params.tag)
+                ).one_or_none()
+                if dcg and dcg.smartem_grid_uuid:
+                    smartem_client = SmartEMAPIClient(
+                        base_url=machine_config.smartem_api_url, logger=logger
+                    )
+                    gs_data = SmartEMGridSquareData(
+                        gridsquare_id=str(gsid),
+                        grid_uuid=dcg.smartem_grid_uuid,
+                        center_x=(
+                            int(grid_square_params.x_location)
+                            if grid_square_params.x_location is not None
+                            else None
+                        ),
+                        center_y=(
+                            int(grid_square_params.y_location)
+                            if grid_square_params.y_location is not None
+                            else None
+                        ),
+                        size_width=grid_square_params.width,
+                        size_height=grid_square_params.height,
+                        **(
+                            {"uuid": grid_square.smartem_uuid}
+                            if grid_square.smartem_uuid
+                            else {}
+                        ),
+                    )
+                    if grid_square.smartem_uuid:
+                        smartem_client.update_gridsquare(gs_data)
+                    else:
+                        response = smartem_client.create_grid_gridsquare(gs_data)
+                        grid_square.smartem_uuid = response.uuid
+                        murfey_db.add(grid_square)
+                        murfey_db.commit()
+        except Exception:
+            logger.warning("Failed to register grid square with smartem", exc_info=True)
+
     murfey_db.close()
 
 
@@ -221,6 +282,58 @@ def register_foil_hole(
     fh_id = foil_hole.id
     murfey_db.add(foil_hole)
     murfey_db.commit()
+
+    if SMARTEM_ACTIVE and gs.smartem_uuid:
+        try:
+            murfey_session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=murfey_session.instrument_name
+            )[murfey_session.instrument_name]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                fh_data = SmartEMFoilHoleData(
+                    id=str(foil_hole_params.name),
+                    gridsquare_uuid=gs.smartem_uuid,
+                    x_location=(
+                        int(foil_hole_params.x_location)
+                        if foil_hole_params.x_location is not None
+                        else None
+                    ),
+                    y_location=(
+                        int(foil_hole_params.y_location)
+                        if foil_hole_params.y_location is not None
+                        else None
+                    ),
+                    x_stage_position=foil_hole_params.x_stage_position,
+                    y_stage_position=foil_hole_params.y_stage_position,
+                    diameter=(
+                        int(foil_hole_params.diameter)
+                        if foil_hole_params.diameter is not None
+                        else None
+                    ),
+                    **(
+                        {"uuid": foil_hole.smartem_uuid}
+                        if foil_hole.smartem_uuid
+                        else {}
+                    ),
+                )
+                if foil_hole.smartem_uuid:
+                    smartem_client.update_foilhole(fh_data)
+                else:
+                    responses = smartem_client.create_gridsquare_foilholes(
+                        gs.smartem_uuid, [fh_data]
+                    )
+                    if responses:
+                        foil_hole.smartem_uuid = responses[0].uuid
+                        murfey_db.add(foil_hole)
+                        murfey_db.commit()
+        except Exception:
+            logger.warning("Failed to register foil hole with smartem", exc_info=True)
+
     murfey_db.close()
     return fh_id
 
