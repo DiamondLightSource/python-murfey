@@ -24,6 +24,20 @@ try:
 except ImportError:
     Image = None
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import (
+        AcquisitionData as SmartEMAcquisitionData,
+        AtlasData as SmartEMAtlasData,
+        GridData as SmartEMGridData,
+        MicrographData as SmartEMMicrographData,
+        MicrographManifest as SmartEMMicrographManifest,
+    )
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api.auth import (
@@ -78,6 +92,7 @@ from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
 logger = getLogger("murfey.server.api.workflow")
 
+
 router = APIRouter(
     prefix="/workflow",
     dependencies=[Depends(validate_instrument_token)],
@@ -92,6 +107,8 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
+    create_smartem_grid: bool = False
+    acquisition_uuid: Optional[str] = None
 
 
 @router.post(
@@ -110,6 +127,48 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
+    smartem_grid_uuid = None
+    if (
+        dcg_params.create_smartem_grid
+        and SMARTEM_ACTIVE
+        and dcg_params.acquisition_uuid
+    ):
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
+        if machine_config.smartem_api_url:
+            try:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                grid_data = SmartEMGridData(
+                    data_dir=Path(dcg_params.tag),
+                    atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
+                    acquisition_data=SmartEMAcquisitionData(
+                        uuid=dcg_params.acquisition_uuid,
+                        name=Path(dcg_params.tag).name,
+                    ),
+                )
+                smartem_grid_uuid = smartem_client.create_acquisition_grid(
+                    grid_data
+                ).uuid
+                atlas_name = (
+                    Path(dcg_params.atlas).stem
+                    if dcg_params.atlas
+                    else Path(dcg_params.tag).name
+                )
+                atlas_data = SmartEMAtlasData(
+                    id=atlas_name,
+                    acquisition_date=datetime.now(),
+                    storage_folder="",
+                    name=atlas_name,
+                    tiles=[],
+                    gridsquare_positions=None,
+                    grid_uuid=smartem_grid_uuid,
+                )
+                smartem_client.create_grid_atlas(atlas_data)
+            except Exception:
+                logger.warning("Failed to register SmartEM grid", exc_info=True)
     if (
         dcg_murfey := db.exec(
             select(DataCollectionGroup)
@@ -135,6 +194,8 @@ def register_dc_group(
             dcg_instance.atlas_pixel_size = (
                 dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
             )
+            if smartem_grid_uuid:
+                dcg_instance.smartem_grid_uuid = smartem_grid_uuid
 
             if _transport_object:
                 if dcg_instance.atlas_id is not None:
@@ -217,6 +278,11 @@ def register_dc_group(
                     "proposal_code": ispyb_proposal_code,
                     "proposal_number": ispyb_proposal_number,
                     "visit_number": ispyb_visit_number,
+                    **(
+                        {"smartem_grid_uuid": smartem_grid_uuid}
+                        if smartem_grid_uuid
+                        else {}
+                    ),
                 },
             )
     return dcg_params
@@ -491,6 +557,58 @@ async def request_spa_preprocessing(
         )
         db.add(movie)
         db.commit()
+
+        if (
+            SMARTEM_ACTIVE
+            and machine_config.smartem_api_url
+            and foil_hole_id is not None
+        ):
+            try:
+                fh_with_gs = db.exec(
+                    select(FoilHole, GridSquare)
+                    .where(FoilHole.id == foil_hole_id)
+                    .where(GridSquare.id == FoilHole.grid_square_id)
+                ).one_or_none()
+                if fh_with_gs is not None:
+                    fh, gs = fh_with_gs
+                    if fh.smartem_uuid:
+                        smartem_client = SmartEMAPIClient(
+                            base_url=machine_config.smartem_api_url, logger=logger
+                        )
+                        movie_path = Path(proc_file.path)
+                        micrograph_manifest = SmartEMMicrographManifest(
+                            unique_id=movie_path.stem,
+                            acquisition_datetime=datetime.now(),
+                            defocus=None,
+                            detector_name="",
+                            energy_filter=True,
+                            phase_plate=False,
+                            image_size_x=None,
+                            image_size_y=None,
+                            binning_x=1,
+                            binning_y=1,
+                        )
+                        micrograph_data = SmartEMMicrographData(
+                            id=movie_path.stem,
+                            gridsquare_id=str(gs.name),
+                            foilhole_uuid=fh.smartem_uuid,
+                            foilhole_id=str(fh.name),
+                            location_id=str(murfey_ids[0]),
+                            high_res_path=movie_path,
+                            manifest_file=movie_path,
+                            manifest=micrograph_manifest,
+                        )
+                        response = smartem_client.create_foilhole_micrograph(
+                            micrograph_data
+                        )
+                        movie.smartem_uuid = response.uuid
+                        db.add(movie)
+                        db.commit()
+            except Exception:
+                logger.warning(
+                    "Failed to register micrograph with smartem", exc_info=True
+                )
+
         db.close()
 
         if not mrc_out.parent.exists():
