@@ -303,7 +303,7 @@ class Analyser(Observer):
 
             # Files starting with "Position" belong to the standard tomography workflow
             # NOTE: not completely reliable, mdocs can be in tomography metadata as well
-            if (
+            if not self._serialem and (
                 split_file_stem[0] == "Position"
                 or "[" in file_path.name
                 or split_file_stem[-1] in ["Fractions", "fractions", "EER"]
