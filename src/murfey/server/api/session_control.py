@@ -360,6 +360,7 @@ def get_foil_hole(
 class AtlasRegistration(BaseModel):
     name: str
     acquisition_uuid: str
+    register_grid: bool = False
 
 
 @spa_router.post("/sessions/{session_id}/register_atlas")
@@ -396,8 +397,42 @@ def register_atlas(
                     grid_uuid=grid_uuid,
                 )
                 smartem_client.create_grid_atlas(atlas_data)
+                if atlas_registration_data.register_grid:
+                    smartem_client.grid_registered(grid_uuid)
     else:
         logger.info("smartem deactivated so did not register atlas")
+
+
+class SquareRegistration(BaseModel):
+    tag: str
+
+
+@spa_router.post("/sessions/{session_id}/register_square/{gsid}")
+def register_square(
+    session_id: MurfeySessionID,
+    gsid: int,
+    square_registration_data: SquareRegistration,
+    db=murfey_db,
+):
+    if SMARTEM_ACTIVE:
+        gs = db.exec(
+            select(GridSquare)
+            .where(GridSquare.name == gsid)
+            .where(GridSquare.tag == square_registration_data.tag)
+            .where(GridSquare.session_id == session_id)
+        ).one_or_none()
+        if gs and gs.smartem_uuid:
+            session = db.exec(select(Session).where(Session.id == session_id)).one()
+            machine_config = get_machine_config(session.instrument_name)[
+                session.instrument_name
+            ]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                smartem_client.gridsquare_registered(gs.smartem_uuid)
+    else:
+        logger.info("smartem deactivated so did not register square")
 
 
 @spa_router.post("/sessions/{session_id}/make_atlas_jpg")

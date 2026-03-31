@@ -947,6 +947,15 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - POST
+  - path: /session_control/spa/sessions/{session_id}/register_square/{gsid}
+    function: register_square
+    path_params:
+      - name: gsid
+        type: int
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /session_control/spa/sessions/{session_id}/make_atlas_jpg
     function: make_atlas_jpg
     path_params:

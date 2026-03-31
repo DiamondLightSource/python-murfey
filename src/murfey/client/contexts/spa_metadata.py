@@ -151,17 +151,19 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
-                            capture_post(
-                                base_url=str(environment.url.geturl()),
-                                router_name="session_control.spa_router",
-                                function_name="register_atlas",
-                                token=self._token,
-                                session_id=environment.murfey_session,
-                                data={
-                                    "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
-                                    "acquisition_uuid": environment.acquisition_uuid,
-                                },
-                            )
+                    if pos_data:
+                        capture_post(
+                            base_url=str(environment.url.geturl()),
+                            router_name="session_control.spa_router",
+                            function_name="register_atlas",
+                            token=self._token,
+                            session_id=environment.murfey_session,
+                            data={
+                                "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
+                                "acquisition_uuid": environment.acquisition_uuid,
+                                "register_grid": True,
+                            },
+                        )
 
         elif (
             transferred_file.suffix == ".dm"
@@ -260,4 +262,14 @@ class SPAMetadataContext(Context):
                         "tag": visitless_source,
                         "image": fh_data.image,
                     },
+                )
+            if fh_positions:
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_square",
+                    token=self._token,
+                    session_id=environment.murfey_session,
+                    gsid=gs_name,
+                    data={"tag": visitless_source},
                 )
