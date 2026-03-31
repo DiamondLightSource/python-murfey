@@ -134,6 +134,7 @@ def create_electron_snapshot_metadata(
     "test_params",
     (
         (
+            34683,  # Tag key
             "Electron Snapshot",
             "some_project",
             2000,  # Voltage
@@ -153,6 +154,7 @@ def create_electron_snapshot_metadata(
             1e-6,  # Y
         ),
         (
+            34682,  # Tag key
             "Electron Snapshot (2)",
             "another_project",
             2000,  # Voltage
@@ -176,6 +178,7 @@ def create_electron_snapshot_metadata(
 def test_parse_metadata(
     mocker: MockerFixture,
     test_params: tuple[
+        int,
         str,
         str,
         float,
@@ -198,6 +201,7 @@ def test_parse_metadata(
 ):
     # Unpack test params
     (
+        tag_key,
         image_name,
         project_name,
         voltage,
@@ -245,7 +249,9 @@ def test_parse_metadata(
         pixel_size_y,
     )
     mock_image = MagicMock()
-    mock_image.tag_v2 = {34683: xml_string}
+    tags = dict.fromkeys([*list(range(100)), *list(range(34600, 34700))], 0)
+    tags[tag_key] = xml_string
+    mock_image.tag_v2 = tags
     mocker.patch(
         "murfey.workflows.fib.register_atlas.PIL.Image.open",
         return_value=mock_image,

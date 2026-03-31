@@ -92,10 +92,26 @@ def _parse_metadata(file: Path, visit_name: str):
     Parses through the atlas image's tags to extract the relevant metadata
     """
 
-    # Metadata is stored in the TIFF file under tag number 34683
+    # Search for the XML metadata in the tags (34683 is the default key)
     img = PIL.Image.open(file)
     tags = dict(img.tag_v2)
-    xml_metadata = ET.fromstring(str(tags.get(34683)))
+    xml_metadata = None
+    if (
+        isinstance((tag_contents := tags.get(34683)), str)
+        and "xml version" in tag_contents
+    ):
+        xml_metadata = ET.fromstring(tag_contents)
+    else:
+        logger.warning(
+            "Could not find metadata under tag key 34683, iterating through tags"
+        )
+        for key, value in tags.items():
+            if key == 34683:  # Already inspected
+                continue
+            if isinstance(value, str) and "xml version" in value:
+                xml_metadata = ET.fromstring(value)
+    if xml_metadata is None:
+        raise ValueError(f"Could not find required metadata in file {file}")
 
     # Extract key values from metadata
     return FIBAtlasMetadata(
