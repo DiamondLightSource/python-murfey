@@ -60,6 +60,7 @@ class AtlasContext(Context):
                     data={
                         "name": transferred_file.stem,
                         "acquisition_uuid": environment.acquisition_uuid,
+                        "storage_folder": str(source),
                     },
                 )
 
@@ -134,6 +135,8 @@ class AtlasContext(Context):
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
+                    "create_smartem_grid": bool(environment.acquisition_uuid),
+                    "acquisition_uuid": environment.acquisition_uuid,
                 }
                 capture_post(
                     base_url=str(environment.url.geturl()),

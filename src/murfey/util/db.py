@@ -211,6 +211,7 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
+    smartem_grid_uuid: Optional[str] = None
     session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
@@ -500,6 +501,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     width: Optional[int] = None
     angle: Optional[float] = None
     quality_indicator: Optional[float] = None
+    smartem_uuid: Optional[str] = None
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="grid_squares"
     )
@@ -533,6 +535,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     pixel_location_y: Optional[int] = None
     diameter: Optional[int] = None
     quality_indicator: Optional[float] = None
+    smartem_uuid: Optional[str] = None
 
 
 class SearchMap(SQLModel, table=True):  # type: ignore
@@ -612,6 +615,7 @@ class Movie(SQLModel, table=True):  # type: ignore
     fluence: Optional[float] = None
     numberOfFrames: Optional[int] = None
     templateLabel: Optional[str] = None
+    smartem_uuid: Optional[str] = None
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
     data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")

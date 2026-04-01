@@ -32,6 +32,17 @@ from murfey.util.processing_params import default_spa_parameters
 
 logger = getLogger("murfey.workflows.spa.picking")
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.model.http_request import MicrographUpdateRequest
+    from smartem_backend.model.http_response import MicrographResponse
+    from smartem_backend.mq_publisher import publish_particle_picking_completed
+    from smartem_common.entity_status import MicrographStatus
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 
 def _register_picked_particles_use_diameter(message: dict, _db: Session):
     """Received picked particles from the autopick service"""
@@ -433,6 +444,38 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     movie.preprocessed = True
     murfey_db.add(movie)
     murfey_db.commit()
+    if SMARTEM_ACTIVE and movie.smartem_uuid:
+        try:
+            session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == message["session_id"])
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=session.instrument_name
+            )[session.instrument_name]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                update = MicrographUpdateRequest(
+                    status=MicrographStatus.PARTICLE_PICKING_COMPLETED
+                )
+                smartem_client._request(
+                    "put",
+                    f"micrographs/{movie.smartem_uuid}",
+                    update,
+                    MicrographResponse,
+                )
+                publish_particle_picking_completed(
+                    micrograph_uuid=movie.smartem_uuid,
+                    number_of_particles_picked=len(
+                        message.get("particle_diameters", [])
+                    ),
+                )
+        except Exception:
+            logger.warning(
+                "Failed to emit particle picking complete event to smartem",
+                exc_info=True,
+            )
     feedback_params = murfey_db.exec(
         select(ClassificationFeedbackParameters).where(
             ClassificationFeedbackParameters.pj_id

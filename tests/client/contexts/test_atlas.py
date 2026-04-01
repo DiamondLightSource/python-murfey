@@ -82,6 +82,8 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 2,
         "atlas_pixel_size": atlas_pixel_size * 7.8,
+        "create_smartem_grid": False,
+        "acquisition_uuid": None,
     }
     mock_capture_post.assert_called_once_with(
         base_url="http://localhost:8000",
