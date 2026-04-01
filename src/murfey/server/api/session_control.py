@@ -360,6 +360,7 @@ def get_foil_hole(
 class AtlasRegistration(BaseModel):
     name: str
     acquisition_uuid: str
+    storage_folder: str = ""
     register_grid: bool = False
 
 
@@ -390,7 +391,7 @@ def register_atlas(
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
                     acquisition_date=datetime.now(),
-                    storage_folder="",
+                    storage_folder=atlas_registration_data.storage_folder,
                     name=atlas_registration_data.name,
                     tiles=[],
                     gridsquare_positions=None,

@@ -59,6 +59,7 @@ class AtlasContext(Context):
                     data={
                         "name": transferred_file.stem,
                         "acquisition_uuid": environment.acquisition_uuid,
+                        "storage_folder": str(source),
                     },
                 )
 
