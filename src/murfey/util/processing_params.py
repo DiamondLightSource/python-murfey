@@ -58,7 +58,7 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
 
 class CLEMProcessingParameters(BaseModel):
     # Atlas vs GridSquare registration threshold
-    atlas_threshold: float = 0.0015  # in m
+    atlas_threshold: float = 0.002  # in m
 
     # Image alignment and merging-specific parameters
     crop_to_n_frames: Optional[int] = 50
