@@ -222,9 +222,9 @@ def _register_dcg_and_atlas(
     visit_number = visit_name.split("-")[-1]
 
     # Generate name/tag for data colleciton group based on series name
-    dcg_name = result.series_name.split("--")[0]
-    if result.series_name.split("--")[1].isdigit():
-        dcg_name += f"--{result.series_name.split('--')[1]}"
+    dcg_name = result.site_name.split("--")[0]
+    if result.site_name.split("--")[1].isdigit():
+        dcg_name += f"--{result.site_name.split('--')[1]}"
 
     # Determine values for atlas
     if result.is_atlas:
@@ -326,11 +326,11 @@ def _register_dcg_and_atlas(
         clem_img_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
             .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
+            .where(MurfeyDB.ImagingSite.site_name == result.site_name)
         ).one_or_none()
     ):
         clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id, site_name=result.series_name
+            session_id=session_id, site_name=result.site_name
         )
 
     clem_img_site.dcg_id = dcg_entry.id
@@ -350,9 +350,9 @@ def _register_grid_square(
         logger.error("Unable to find transport manager")
         return
     # Load all entries for the current data collection group
-    dcg_name = result.series_name.split("--")[0]
-    if result.series_name.split("--")[1].isdigit():
-        dcg_name += f"--{result.series_name.split('--')[1]}"
+    dcg_name = result.site_name.split("--")[0]
+    if result.site_name.split("--")[1].isdigit():
+        dcg_name += f"--{result.site_name.split('--')[1]}"
 
     # Check if an atlas has been registered
     if not (
