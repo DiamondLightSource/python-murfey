@@ -130,8 +130,12 @@ def _register_clem_imaging_site(
             thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
         )
         clem_img_site.thumbnail_pixel_size = result.pixel_size / scaling_factor
-        clem_img_site.thumbnail_pixels_x = int(round(result.pixels_x * scaling_factor))
-        clem_img_site.thumbnail_pixels_y = int(round(result.pixels_y * scaling_factor))
+        clem_img_site.thumbnail_pixels_x = (
+            int(round(result.pixels_x * scaling_factor)) or 1
+        )
+        clem_img_site.thumbnail_pixels_y = (
+            int(round(result.pixels_y * scaling_factor)) or 1
+        )
     murfey_db.add(clem_img_site)
     murfey_db.commit()
     murfey_db.close()
@@ -381,6 +385,7 @@ def _register_grid_square(
                         / atlas_width_real
                         * atlas_entry.thumbnail_pixels_x
                     )
+                    or 1
                 )
                 height_scaled = int(
                     round(
@@ -388,6 +393,7 @@ def _register_grid_square(
                         / atlas_height_real
                         * atlas_entry.thumbnail_pixels_y
                     )
+                    or 1
                 )
             else:
                 logger.warning(
