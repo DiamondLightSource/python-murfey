@@ -57,6 +57,27 @@ class CLEMPreprocessingResult(BaseModel):
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
+    def is_denoised(self) -> bool:
+        """
+        The "_Lng_LVCC" suffix appended to a CLEM dataset's position name indicates
+        that it's a denoised image set of the same position. These results should
+        override or supersede the original ones once they're available.
+        """
+        return "_Lng_LVCC" in self.series_name
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def site_name(self) -> str:
+        """
+        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
+        the series name.
+        """
+        return self.series_name.replace("_Lng_LVCC", "")
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
     def is_atlas(self) -> bool:
         """
         Incoming image sets with a width/height greater/equal to the pre-set threshold,
@@ -97,51 +118,63 @@ def _register_clem_imaging_site(
     result: CLEMPreprocessingResult,
     murfey_db: Session,
 ):
+    output_file = list(result.output_files.values())[0]
     if not (
         clem_img_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
             .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.site_name == result.series_name)
+            .where(MurfeyDB.ImagingSite.site_name == result.site_name)
         ).one_or_none()
     ):
         clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id, site_name=result.series_name
+            session_id=session_id,
+            site_name=result.site_name,
+            image_path=str(output_file.parent / "*tiff"),
+            data_type="atlas" if result.is_atlas else "grid_square",
+            # Shape and resolution information
+            image_pixels_x=result.pixels_x,
+            image_pixels_y=result.pixels_y,
+            image_pixel_size=result.pixel_size,
+            units=result.units,
+            # Extent of imaged area in real space
+            x0=result.extent[0],
+            x1=result.extent[1],
+            y0=result.extent[2],
+            y1=result.extent[3],
         )
 
-    # Add metadata for this series
-    output_file = list(result.output_files.values())[0]
-    clem_img_site.image_path = str(output_file.parent / "*tiff")
-    clem_img_site.data_type = "atlas" if result.is_atlas else "grid_square"
-    clem_img_site.number_of_members = result.number_of_members
-    for col_name, value in _get_color_flags(result.output_files.keys()).items():
-        setattr(clem_img_site, col_name, value)
-    clem_img_site.collection_mode = _determine_collection_mode(
-        result.output_files.keys()
-    )
-    clem_img_site.image_pixels_x = result.pixels_x
-    clem_img_site.image_pixels_y = result.pixels_y
-    clem_img_site.image_pixel_size = result.pixel_size
-    clem_img_site.units = result.units
-    clem_img_site.x0 = result.extent[0]
-    clem_img_site.x1 = result.extent[1]
-    clem_img_site.y0 = result.extent[2]
-    clem_img_site.y1 = result.extent[3]
-    # Register thumbnails if they are present
-    if result.thumbnails and result.thumbnail_size:
-        thumbnail = list(result.thumbnails.values())[0]
-        clem_img_site.thumbnail_path = str(thumbnail.parent / "*.png")
+        # Iteratively add colour channel information
+        clem_img_site.number_of_members = result.number_of_members
+        for col_name, value in _get_color_flags(result.output_files.keys()).items():
+            setattr(clem_img_site, col_name, value)
+        clem_img_site.collection_mode = _determine_collection_mode(
+            result.output_files.keys()
+        )
 
-        thumbnail_height, thumbnail_width = result.thumbnail_size
-        scaling_factor = min(
-            thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
-        )
-        clem_img_site.thumbnail_pixel_size = result.pixel_size / scaling_factor
-        clem_img_site.thumbnail_pixels_x = (
-            int(round(result.pixels_x * scaling_factor)) or 1
-        )
-        clem_img_site.thumbnail_pixels_y = (
-            int(round(result.pixels_y * scaling_factor)) or 1
-        )
+        # Register thumbnails if they are present
+        if result.thumbnails and result.thumbnail_size:
+            thumbnail = list(result.thumbnails.values())[0]
+            clem_img_site.thumbnail_path = str(thumbnail.parent / "*.png")
+
+            thumbnail_height, thumbnail_width = result.thumbnail_size
+            scaling_factor = min(
+                thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
+            )
+            clem_img_site.thumbnail_pixel_size = result.pixel_size / scaling_factor
+            clem_img_site.thumbnail_pixels_x = (
+                int(round(result.pixels_x * scaling_factor)) or 1
+            )
+            clem_img_site.thumbnail_pixels_y = (
+                int(round(result.pixels_y * scaling_factor)) or 1
+            )
+
+    # Overwrite file paths for existing entry if latest one is denoised
+    if result.is_denoised:
+        clem_img_site.image_path = str(output_file.parent / "*tiff")
+        if result.thumbnails and result.thumbnail_size:
+            thumbnail = list(result.thumbnails.values())[0]
+            clem_img_site.thumbnail_path = str(thumbnail.parent / "*.png")
+
     murfey_db.add(clem_img_site)
     murfey_db.commit()
     murfey_db.close()
