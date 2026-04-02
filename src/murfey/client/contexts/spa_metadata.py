@@ -158,6 +158,7 @@ class SPAMetadataContext(Context):
                             router_name="session_control.spa_router",
                             function_name="register_atlas",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             data={
                                 "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
@@ -272,6 +273,7 @@ class SPAMetadataContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_square",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gsid=gs_name,
                     data={"tag": visitless_source},
