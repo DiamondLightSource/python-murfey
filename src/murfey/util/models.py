@@ -129,10 +129,11 @@ class GridSquareParameters(BaseModel):
     tag: str
     image: str = ""
 
+    # Actual coordinates for image centre in real space
     x_location: Optional[float] = None
     y_location: Optional[float] = None
 
-    # Image coordinates when overlaid on atlas (in pixels0)
+    # Coordinates for image centre when overlaid on atlas (in pixels)
     x_location_scaled: Optional[int] = None
     y_location_scaled: Optional[int] = None
 

@@ -130,8 +130,12 @@ def _register_clem_imaging_site(
             thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
         )
         clem_img_site.thumbnail_pixel_size = result.pixel_size / scaling_factor
-        clem_img_site.thumbnail_pixels_x = int(result.pixels_x * scaling_factor)
-        clem_img_site.thumbnail_pixels_y = int(result.pixels_y * scaling_factor)
+        clem_img_site.thumbnail_pixels_x = (
+            int(round(result.pixels_x * scaling_factor)) or 1
+        )
+        clem_img_site.thumbnail_pixels_y = (
+            int(round(result.pixels_y * scaling_factor)) or 1
+        )
     murfey_db.add(clem_img_site)
     murfey_db.commit()
     murfey_db.close()
@@ -354,30 +358,42 @@ def _register_grid_square(
                 and clem_img_site.y0 is not None
                 and clem_img_site.y1 is not None
             ):
-                # Find pixel corresponding to image midpoint on atlas
-                x_mid_real = (
-                    0.5 * (clem_img_site.x0 + clem_img_site.x1) - atlas_entry.x0
-                )
+                # Find the real coordinates of the image midpoint
+                x_mid_real = 0.5 * (clem_img_site.x0 + clem_img_site.x1)
+                y_mid_real = 0.5 * (clem_img_site.y0 + clem_img_site.y1)
+
+                # Find pixel coordinates corresponding to image midpoint on atlas
                 x_mid_px = int(
-                    x_mid_real / atlas_width_real * atlas_entry.thumbnail_pixels_x
-                )
-                y_mid_real = (
-                    0.5 * (clem_img_site.y0 + clem_img_site.y1) - atlas_entry.y0
+                    round(
+                        (x_mid_real - atlas_entry.x0)
+                        / atlas_width_real
+                        * atlas_entry.thumbnail_pixels_x
+                    )
                 )
                 y_mid_px = int(
-                    y_mid_real / atlas_height_real * atlas_entry.thumbnail_pixels_y
+                    round(
+                        (y_mid_real - atlas_entry.y0)
+                        / atlas_height_real
+                        * atlas_entry.thumbnail_pixels_y
+                    )
                 )
 
                 # Find the size of the image, in pixels, when overlaid on the atlas
                 width_scaled = int(
-                    (clem_img_site.x1 - clem_img_site.x0)
-                    / atlas_width_real
-                    * atlas_entry.thumbnail_pixels_x
+                    round(
+                        (clem_img_site.x1 - clem_img_site.x0)
+                        / atlas_width_real
+                        * atlas_entry.thumbnail_pixels_x
+                    )
+                    or 1
                 )
                 height_scaled = int(
-                    (clem_img_site.y1 - clem_img_site.y0)
-                    / atlas_height_real
-                    * atlas_entry.thumbnail_pixels_y
+                    round(
+                        (clem_img_site.y1 - clem_img_site.y0)
+                        / atlas_height_real
+                        * atlas_entry.thumbnail_pixels_y
+                    )
+                    or 1
                 )
             else:
                 logger.warning(
