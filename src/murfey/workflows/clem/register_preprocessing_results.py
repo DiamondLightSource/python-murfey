@@ -11,11 +11,12 @@ import json
 import logging
 import traceback
 from collections.abc import Collection
+from functools import cached_property
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
@@ -53,16 +54,21 @@ class CLEMPreprocessingResult(BaseModel):
     resolution: float
     extent: list[float]  # [x0, x1, y0, y1]
 
-
-def _is_clem_atlas(result: CLEMPreprocessingResult):
-    # If an image has a width/height of at least 1.5 mm, it should qualify as an atlas
-    return (
-        max(
-            result.pixels_x * result.pixel_size,
-            result.pixels_y * result.pixel_size,
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def is_atlas(self) -> bool:
+        """
+        Incoming image sets with a width/height greater/equal to the pre-set threshold,
+        it should qualify as an atlas.
+        """
+        return (
+            max(
+                self.pixels_x * self.pixel_size,
+                self.pixels_y * self.pixel_size,
+            )
+            >= processing_params.atlas_threshold
         )
-        >= processing_params.atlas_threshold
-    )
 
 
 COLOR_FLAGS_MURFEY = {
@@ -105,7 +111,7 @@ def _register_clem_imaging_site(
     # Add metadata for this series
     output_file = list(result.output_files.values())[0]
     clem_img_site.image_path = str(output_file.parent / "*tiff")
-    clem_img_site.data_type = "atlas" if _is_clem_atlas(result) else "grid_square"
+    clem_img_site.data_type = "atlas" if result.is_atlas else "grid_square"
     clem_img_site.number_of_members = result.number_of_members
     for col_name, value in _get_color_flags(result.output_files.keys()).items():
         setattr(clem_img_site, col_name, value)
@@ -188,7 +194,7 @@ def _register_dcg_and_atlas(
         dcg_name += f"--{result.series_name.split('--')[1]}"
 
     # Determine values for atlas
-    if _is_clem_atlas(result):
+    if result.is_atlas:
         output_file = list(result.output_files.values())[0]
         # Register the thumbnail entries if they are provided
         if result.thumbnails and result.thumbnail_size is not None:
@@ -227,7 +233,7 @@ def _register_dcg_and_atlas(
         dcg_entry = dcg_search[0]
         # Update atlas if registering atlas dataset
         # and data collection group already exists
-        if _is_clem_atlas(result):
+        if result.is_atlas:
             atlas_message = {
                 "session_id": session_id,
                 "dcgid": dcg_entry.id,
