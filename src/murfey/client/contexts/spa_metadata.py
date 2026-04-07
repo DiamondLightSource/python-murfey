@@ -164,6 +164,7 @@ class SPAMetadataContext(Context):
                                 "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
                                 "acquisition_uuid": environment.acquisition_uuid,
                                 "register_grid": True,
+                                "tag": dcg_tag,
                             },
                         )
 

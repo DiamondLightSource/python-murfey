@@ -362,6 +362,7 @@ class AtlasRegistration(BaseModel):
     acquisition_uuid: str
     storage_folder: str = ""
     register_grid: bool = False
+    tag: str = ""
 
 
 @spa_router.post("/sessions/{session_id}/register_atlas")
@@ -379,14 +380,22 @@ def register_atlas(
             smartem_client = SmartEMAPIClient(
                 base_url=machine_config.smartem_api_url, logger=logger
             )
-            possible_grids = smartem_client.get_acquisition_grids(
-                atlas_registration_data.acquisition_uuid
-            )
             grid_uuid = None
-            for grid in possible_grids:
-                if grid.name == atlas_registration_data.name.replace("_atlas", ""):
-                    grid_uuid = grid.uuid
-                    break
+            if atlas_registration_data.tag:
+                dcg = murfey_db.exec(
+                    select(DataCollectionGroup)
+                    .where(DataCollectionGroup.session_id == session_id)
+                    .where(DataCollectionGroup.tag == atlas_registration_data.tag)
+                ).one_or_none()
+                grid_uuid = dcg.smartem_grid_uuid
+            else:
+                possible_grids = smartem_client.get_acquisition_grids(
+                    atlas_registration_data.acquisition_uuid
+                )
+                for grid in possible_grids:
+                    if grid.name == atlas_registration_data.name.replace("_atlas", ""):
+                        grid_uuid = grid.uuid
+                        break
             if grid_uuid is not None:
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
