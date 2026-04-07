@@ -60,7 +60,14 @@ class AtlasContext(Context):
                     data={
                         "name": transferred_file.stem,
                         "acquisition_uuid": environment.acquisition_uuid,
-                        "storage_folder": str(source),
+                        "storage_folder": str(
+                            _atlas_destination(
+                                environment,
+                                source,
+                                Path(self._machine_config.get("rsync_basepath", "")),
+                            )
+                            / "atlas"
+                        ),
                     },
                 )
 
