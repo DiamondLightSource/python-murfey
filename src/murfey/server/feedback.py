@@ -693,7 +693,7 @@ def _register_complete_2d_batch(message: dict, _db):
     ).one()
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
-    if feedback_params.hold_class2d or feedback_params.picker_ispyb_id is None:
+    if feedback_params.hold_class2d:
         feedback_params.rerun_class2d = True
         _db.add(feedback_params)
         _db.commit()
@@ -1007,7 +1007,7 @@ def _register_class_selection(message: dict, _db):
     ).one()
     _db.expunge(feedback_params)
 
-    if feedback_params.picker_ispyb_id is None:
+    """if feedback_params.picker_ispyb_id is None:
         selection_stash = db.SelectionStash(
             pj_id=pj_id,
             class_selection_score=message["class_selection_score"] or 0,
@@ -1015,7 +1015,7 @@ def _register_class_selection(message: dict, _db):
         _db.add(selection_stash)
         _db.commit()
         _db.close()
-        return
+        return"""
 
     feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False

@@ -6,7 +6,7 @@ from PIL import Image
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
@@ -82,16 +82,16 @@ def register_grid_square(
         )
         grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
         grid_square.image = grid_square_params.image or grid_square.image
-        if _transport_object:
-            _transport_object.do_update_grid_square(grid_square.id, grid_square_params)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_grid_square(grid_square.id, grid_square_params)
     except Exception:
-        if _transport_object:
+        if murfey.server._transport_object:
             dcg = murfey_db.exec(
                 select(DataCollectionGroup)
                 .where(DataCollectionGroup.session_id == session_id)
                 .where(DataCollectionGroup.tag == grid_square_params.tag)
             ).one()
-            gs_ispyb_response = _transport_object.do_insert_grid_square(
+            gs_ispyb_response = murfey.server._transport_object.do_insert_grid_square(
                 dcg.atlas_id, gsid, grid_square_params
             )
         else:
@@ -179,13 +179,13 @@ def register_foil_hole(
             foil_hole_params.thumbnail_size_y or foil_hole.thumbnail_size_y
         ) or jpeg_size[1]
         foil_hole.pixel_size = foil_hole_params.pixel_size or foil_hole.pixel_size
-        if _transport_object and gs.readout_area_x:
-            _transport_object.do_update_foil_hole(
+        if murfey.server._transport_object and gs.readout_area_x:
+            murfey.server._transport_object.do_update_foil_hole(
                 foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
     except Exception:
-        if _transport_object:
-            fh_ispyb_response = _transport_object.do_insert_foil_hole(
+        if murfey.server._transport_object:
+            fh_ispyb_response = murfey.server._transport_object.do_insert_foil_hole(
                 gs.id,
                 gs.thumbnail_size_x / gs.readout_area_x if gs.readout_area_x else None,
                 foil_hole_params,
@@ -440,11 +440,11 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
                 "foil_hole_id": foil_hole_id,
             },
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
-                _transport_object.feedback_queue
+                murfey.server._transport_object.feedback_queue
             )
-            _transport_object.send(
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
             murfey_db.delete(f)

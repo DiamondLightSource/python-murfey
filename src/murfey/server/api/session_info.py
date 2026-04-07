@@ -176,7 +176,6 @@ def create_session(
         instrument_name=instrument_name,
         visit_end_time=visit_end_time.end_time,
     )
-    print(db)
     db.add(s)
     db.commit()
     sid = s.id

@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.feedback import (
     _app_id,
     _flush_class2d,
@@ -83,13 +83,14 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
         particle_diameter = relion_params.particle_diameter
 
         if feedback_params.picker_ispyb_id is None:
-            if not _transport_object:
+            if not murfey.server._transport_object:
                 feedback_params.picker_ispyb_id = 1000
             else:
                 assert feedback_params.picker_murfey_id is not None
-                feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
+                """feedback_params.picker_ispyb_id = murfey.server._transport_object.do_buffer_lookup(
                     message["program_id"], feedback_params.picker_murfey_id
-                )
+                )"""
+
                 if feedback_params.picker_ispyb_id is not None:
                     _flush_class2d(message["session_id"], message["program_id"], _db)
             _db.add(feedback_params)
@@ -152,11 +153,11 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                     },
                     "recipes": ["em-spa-extract"],
                 }
-                if _transport_object:
+                if murfey.server._transport_object:
                     zocalo_message["parameters"]["feedback_queue"] = (
-                        _transport_object.feedback_queue
+                        murfey.server._transport_object.feedback_queue
                     )
-                    _transport_object.send(
+                    murfey.server._transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
         else:
@@ -192,11 +193,11 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                 },
                 "recipes": ["em-spa-extract"],
             }
-            if _transport_object:
+            if murfey.server._transport_object:
                 zocalo_message["parameters"]["feedback_queue"] = (
-                    _transport_object.feedback_queue
+                    murfey.server._transport_object.feedback_queue
                 )
-                _transport_object.send(
+                murfey.server._transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
 
@@ -252,11 +253,11 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         )
     ).one()
 
-    if feedback_params.picker_ispyb_id is None and _transport_object:
+    if feedback_params.picker_ispyb_id is None and murfey.server._transport_object:
         assert feedback_params.picker_murfey_id is not None
-        feedback_params.picker_ispyb_id = _transport_object.do_buffer_lookup(
+        """feedback_params.picker_ispyb_id = murfey.server._transport_object.do_buffer_lookup(
             message["program_id"], feedback_params.picker_murfey_id
-        )
+        )"""
         if feedback_params.picker_ispyb_id is not None:
             _flush_class2d(message["session_id"], message["program_id"], _db)
         _db.add(feedback_params)
@@ -302,11 +303,11 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         },
         "recipes": ["em-spa-extract"],
     }
-    if _transport_object:
+    if murfey.server._transport_object:
         zocalo_message["parameters"]["feedback_queue"] = (
-            _transport_object.feedback_queue
+            murfey.server._transport_object.feedback_queue
         )
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+        murfey.server._transport_object.send("processing_recipe", zocalo_message, new_connection=True)
     _db.close()
 
 
@@ -319,8 +320,8 @@ def _request_email(
     config = get_machine_config(instrument_name=session.instrument_name)[
         session.instrument_name
     ]
-    if _transport_object:
-        _transport_object.send(
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
             config.notifications_queue,
             {
                 "groupId": dcg_id,
@@ -427,6 +428,7 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
 
 
 def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
+    logger.debug("New picked particle!")
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
     ).one()
@@ -439,9 +441,15 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
             == _pj_id(message["program_id"], murfey_db)
         )
     ).one()
+    logger.debug(f"{feedback_params}")
+    print(feedback_params)
     if feedback_params.estimate_particle_diameter:
+        logger.debug("use diameter")
+        print("use diameter")
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
+        logger.debug("use box size")
+        print("use box size")
         _register_picked_particles_use_boxsize(message, murfey_db)
     prom.preprocessed_movies.labels(
         processing_job=_pj_id(message["program_id"], murfey_db)
