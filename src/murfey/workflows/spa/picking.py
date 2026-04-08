@@ -36,7 +36,6 @@ try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.model.http_request import MicrographUpdateRequest
     from smartem_backend.model.http_response import MicrographResponse
-    from smartem_backend.mq_publisher import publish_particle_picking_completed
     from smartem_common.entity_status import MicrographStatus
 
     SMARTEM_ACTIVE = True
@@ -464,12 +463,6 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
                     f"micrographs/{movie.smartem_uuid}",
                     update,
                     MicrographResponse,
-                )
-                publish_particle_picking_completed(
-                    micrograph_uuid=movie.smartem_uuid,
-                    number_of_particles_picked=len(
-                        message.get("particle_diameters", [])
-                    ),
                 )
         except Exception:
             logger.warning(

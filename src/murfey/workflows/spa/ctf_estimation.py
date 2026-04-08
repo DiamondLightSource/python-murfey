@@ -14,7 +14,6 @@ try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.model.http_request import MicrographUpdateRequest
     from smartem_backend.model.http_response import MicrographResponse
-    from smartem_backend.mq_publisher import publish_ctf_estimation_completed
     from smartem_common.entity_status import MicrographStatus
 
     SMARTEM_ACTIVE = True
@@ -46,10 +45,6 @@ def ctf_estimated(message: dict, murfey_db: Session) -> dict[str, bool]:
                     f"micrographs/{movie.smartem_uuid}",
                     update,
                     MicrographResponse,
-                )
-                publish_ctf_estimation_completed(
-                    micrograph_uuid=movie.smartem_uuid,
-                    ctf_max_res=message["ctf_max_resolution"],
                 )
         except Exception:
             logger.warning(
