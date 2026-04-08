@@ -439,7 +439,7 @@ def test_run_with_db(
         assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
-    # ISPyB's GrridSquare should have half the number of intiail entries
+    # ISPyB's GrridSquare should have half the number of initial entries
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(
