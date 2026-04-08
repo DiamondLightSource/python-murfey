@@ -250,6 +250,7 @@ def register_dc_group(
             .where(GridSquare.session_id == session_id)
         ).all():
             grid_square.tag = dcg_params.tag or original_tag
+            db.add(grid_square)
         db.commit()
     else:
         dcg_parameters = {
