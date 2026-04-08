@@ -232,6 +232,7 @@ def register_dc_group(
         )
     ).all():
         # Case where we switch from atlas to processing
+        original_tag = dcg_murfey[0].tag
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
         if _transport_object:
             _transport_object.send(
@@ -243,6 +244,12 @@ def register_dc_group(
                 },
             )
         db.add(dcg_murfey[0])
+        for grid_square in db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == original_tag)
+            .where(GridSquare.session_id == session_id)
+        ).all():
+            grid_square.tag = dcg_params.tag or original_tag
         db.commit()
     else:
         dcg_parameters = {
