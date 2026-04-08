@@ -115,6 +115,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "data_collection" = "murfey.workflows.register_data_collection:run"
 "data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "experiment_type_update" = "murfey.workflows.register_experiment_type_update:run"
+"fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"

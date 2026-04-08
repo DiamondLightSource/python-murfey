@@ -99,29 +99,27 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
     image_path: Optional[str] = Field(default=None)
     thumbnail_path: Optional[str] = Field(default=None)
 
-    # Link to Session table
-    session: Optional["Session"] = Relationship(
-        back_populates="imaging_sites"
-    )  # Many to one
-    session_id: Optional[int] = Field(
-        foreign_key="session.id", default=None, unique=False
-    )
-
     # Type of data (atlas/overview or grid square)
     data_type: Optional[str] = Field(default=None)  # "atlas" or "grid_square"
 
-    # Link to data collection group
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="imaging_sites"
-    )
-    dcg_id: Optional[int] = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
-    )
-    dcg_name: Optional[str] = Field(default=None)
+    # Stage position (image centre) and rotation
+    pos_x: Optional[float] = Field(default=None)
+    pos_y: Optional[float] = Field(default=None)
+    pos_z: Optional[float] = Field(default=None)
+    rotation: Optional[float] = Field(default=None)
+    tilt_alpha: Optional[float] = Field(default=None)
+    tilt_beta: Optional[float] = Field(default=None)
 
-    # Link to grid squares
-    grid_square: Optional["GridSquare"] = Relationship(back_populates="imaging_sites")
-    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
+    # Field and depth of view
+    len_x: Optional[float] = Field(default=None)
+    len_y: Optional[float] = Field(default=None)
+    len_z: Optional[float] = Field(default=None)
+
+    # Extent of the imaged area in real space
+    x0: Optional[float] = Field(default=None)
+    x1: Optional[float] = Field(default=None)
+    y0: Optional[float] = Field(default=None)
+    y1: Optional[float] = Field(default=None)
 
     # Shape and resolution information
     image_pixels_x: Optional[int] = Field(default=None)
@@ -130,13 +128,9 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
     thumbnail_pixels_x: Optional[int] = Field(default=None)
     thumbnail_pixels_y: Optional[int] = Field(default=None)
     thumbnail_pixel_size: Optional[float] = Field(default=None)
-    units: Optional[str] = Field(default=None)
 
-    # Extent of the imaged area in real space
-    x0: Optional[float] = Field(default=None)
-    x1: Optional[float] = Field(default=None)
-    y0: Optional[float] = Field(default=None)
-    y1: Optional[float] = Field(default=None)
+    # Spatial units
+    units: Optional[str] = Field(default=None)
 
     # Colour channel-related fields
     number_of_members: Optional[int] = Field(default=None)
@@ -149,6 +143,33 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
     has_yellow: Optional[bool] = Field(default=None)
     collection_mode: Optional[str] = Field(default=None)
     composite_created: bool = False  # Has a composite image been created?
+
+    # -------------
+    # Relationships
+    # -------------
+
+    # Session
+    session: Optional["Session"] = Relationship(
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    session_id: Optional[int] = Field(
+        foreign_key="session.id", default=None, unique=False
+    )
+
+    # DataCollectionGroup
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    dcg_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
+    )
+    dcg_name: Optional[str] = Field(default=None)
+
+    # GridSquare
+    grid_square: Optional["GridSquare"] = Relationship(
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
 
 
 """
