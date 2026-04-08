@@ -318,9 +318,6 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     auto_proc_programs: List["AutoProcProgram"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    selection_stash: List["SelectionStash"] = Relationship(
-        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
-    )
     particle_sizes: List["ParticleSizes"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -370,15 +367,6 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     group_tag: Optional[str]
     session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
     foil_hole: Optional["FoilHole"] = Relationship(back_populates="preprocess_stashes")
-
-
-class SelectionStash(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(default=None, primary_key=True)
-    class_selection_score: float
-    pj_id: int = Field(foreign_key="processingjob.processingJobId")
-    processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="selection_stash"
-    )
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
@@ -696,7 +684,6 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     initial_model: str
     next_job: int
     picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
-    picker_ispyb_id: Optional[int] = None
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="classification_feedback_parameters"
     )

@@ -353,7 +353,6 @@ def _release_2d_hold(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _2d_class_murfey_ids(
                     first_class2d.particles_file, message["program_id"], _db
                 ),
@@ -431,7 +430,6 @@ def _release_3d_hold(message: dict, _db):
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "do_initial_model": False if feedback_params.initial_model else True,
                 "initial_model_file": feedback_params.initial_model,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
@@ -517,7 +515,6 @@ def _release_refine_hold(message: dict, _db):
                 "symmetry": relion_params.symmetry,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "refined_class_uuid": _refine_murfey_id(
                     refine_dir=refine_params.refine_dir,
                     tag=refine_params.tag,
@@ -589,13 +586,6 @@ def _register_incomplete_2d_batch(message: dict, _db):
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
     other_options = dict(feedback_params)
-    if other_options["picker_ispyb_id"] is None:
-        logger.info("No ISPyB particle picker ID yet")
-        feedback_params.hold_class2d = False
-        _db.add(feedback_params)
-        _db.commit()
-        _db.expunge(feedback_params)
-        return
     _db.add(feedback_params)
     _db.commit()
     _db.expunge(feedback_params)
@@ -629,7 +619,6 @@ def _register_incomplete_2d_batch(message: dict, _db):
             "batch_is_complete": False,
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
-            "picker_id": other_options["picker_ispyb_id"],
             "nr_iter": default_spa_parameters.nr_iter_2d,
             "batch_size": default_spa_parameters.batch_size_2d,
             "nr_classes": default_spa_parameters.nr_classes_2d,
@@ -693,7 +682,7 @@ def _register_complete_2d_batch(message: dict, _db):
     ).one()
     _db.expunge(relion_params)
     _db.expunge(feedback_params)
-    if feedback_params.hold_class2d or feedback_params.picker_ispyb_id is None:
+    if feedback_params.hold_class2d:
         feedback_params.rerun_class2d = True
         _db.add(feedback_params)
         _db.commit()
@@ -791,7 +780,6 @@ def _register_complete_2d_batch(message: dict, _db):
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": 0,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
@@ -866,7 +854,6 @@ def _register_complete_2d_batch(message: dict, _db):
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score or 0,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
@@ -957,7 +944,6 @@ def _flush_class2d(
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score or 0,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "class_uuids": _2d_class_murfey_ids(
                     saved_message.particles_file, _app_id(pj_id, _db), _db
                 ),
@@ -1006,16 +992,6 @@ def _register_class_selection(message: dict, _db):
         )
     ).one()
     _db.expunge(feedback_params)
-
-    if feedback_params.picker_ispyb_id is None:
-        selection_stash = db.SelectionStash(
-            pj_id=pj_id,
-            class_selection_score=message["class_selection_score"] or 0,
-        )
-        _db.add(selection_stash)
-        _db.commit()
-        _db.close()
-        return
 
     feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False
@@ -1284,7 +1260,6 @@ def _register_3d_batch(message: dict, _db):
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": True,
-                "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
                 "class3d_grp_uuid": class3d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
@@ -1325,7 +1300,6 @@ def _register_3d_batch(message: dict, _db):
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": False,
                 "initial_model_file": other_options["initial_model"],
-                "picker_id": other_options["picker_ispyb_id"],
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
@@ -1534,7 +1508,6 @@ def _register_refinement(message: dict, _db):
             db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
-    other_options = dict(feedback_params)
 
     if feedback_params.hold_refine:
         # If waiting then save the message
@@ -1626,7 +1599,6 @@ def _register_refinement(message: dict, _db):
                 "symmetry": relion_options["symmetry"],
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
-                "picker_id": other_options["picker_ispyb_id"],
                 "refined_class_uuid": _refine_murfey_id(
                     refine_dir=refine_params.refine_dir,
                     tag=refine_params.tag,
@@ -1761,7 +1733,6 @@ def _register_bfactors(message: dict, _db):
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "node_creator_queue": machine_config.node_creator_queue,
-                "picker_id": feedback_params.picker_ispyb_id,
                 "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                 "refined_class_uuid": bfactor_params.refined_class_uuid,
                 "session_id": message["session_id"],
