@@ -24,7 +24,7 @@ class Lamella(NamedTuple):
     angle: float | None = None
 
 
-class MillingProgress(NamedTuple):
+class MillingImage(NamedTuple):
     file: Path
     timestamp: float
 
@@ -84,8 +84,8 @@ class FIBContext(Context):
         super().__init__("FIB", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
-        self._milling: dict[int, list[MillingProgress]] = {}
         self._lamellae: dict[int, Lamella] = {}
+        self._milling_images: dict[int, list[MillingImage]] = {}
 
     def post_transfer(
         self,
@@ -139,16 +139,16 @@ class FIBContext(Context):
                         f"File {transferred_file.name!r} not found on storage system"
                     )
                     return
-                if not self._milling.get(lamella_number):
-                    self._milling[lamella_number] = [
-                        MillingProgress(
+                if not self._milling_images.get(lamella_number):
+                    self._milling_images[lamella_number] = [
+                        MillingImage(
                             timestamp=timestamp,
                             file=destination_file,
                         )
                     ]
                 else:
-                    self._milling[lamella_number].append(
-                        MillingProgress(
+                    self._milling_images[lamella_number].append(
+                        MillingImage(
                             timestamp=timestamp,
                             file=destination_file,
                         )
@@ -156,7 +156,7 @@ class FIBContext(Context):
                 gif_list = [
                     l.file
                     for l in sorted(
-                        self._milling[lamella_number], key=lambda x: x.timestamp
+                        self._milling_images[lamella_number], key=lambda x: x.timestamp
                     )
                 ]
                 raw_directory = Path(
