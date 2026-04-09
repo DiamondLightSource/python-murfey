@@ -152,7 +152,7 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
-                    if pos_data:
+                    if gs_pix_positions:
                         capture_post(
                             base_url=str(environment.url.geturl()),
                             router_name="session_control.spa_router",

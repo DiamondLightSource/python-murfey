@@ -7,6 +7,7 @@ import xmltodict
 from murfey.client.context import Context, _atlas_destination, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.spa_metadata import get_grid_square_atlas_positions
 
 logger = logging.getLogger("murfey.client.contexts.atlas")
 
@@ -157,4 +158,53 @@ class AtlasContext(Context):
                 )
                 logger.info(
                     f"Registered data collection group for atlas {str(transferred_atlas_jpg)!r}"
+                )
+
+        elif environment and transferred_file.name == "Atlas.dm":
+            # Register all grid squares on this atlas
+            gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
+            for gs, pos_data in gs_pix_positions.items():
+                if pos_data:
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_grid_square",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gsid=int(gs),
+                        data={
+                            "tag": str(transferred_file.parent),
+                            "x_location": pos_data[0],
+                            "y_location": pos_data[1],
+                            "x_stage_position": pos_data[2],
+                            "y_stage_position": pos_data[3],
+                            "width": pos_data[4],
+                            "height": pos_data[5],
+                            "angle": pos_data[6],
+                        },
+                    )
+            if gs_pix_positions:
+                for p in transferred_file.parts:
+                    if p.startswith("Sample"):
+                        sample = int(p.replace("Sample", ""))
+                        break
+                else:
+                    logger.warning(
+                        f"Sample could not be identified for {transferred_file}"
+                    )
+                    return
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_atlas",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    data={
+                        "name": f"{environment.visit}-sample-{sample}",
+                        "acquisition_uuid": environment.acquisition_uuid,
+                        "register_grid": True,
+                        "tag": str(transferred_file.parent),
+                    },
                 )
