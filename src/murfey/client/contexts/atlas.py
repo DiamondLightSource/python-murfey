@@ -160,11 +160,7 @@ class AtlasContext(Context):
                     f"Registered data collection group for atlas {str(transferred_atlas_jpg)!r}"
                 )
 
-        elif (
-            environment
-            and "Atlas_" in transferred_file.stem
-            and transferred_file.suffix == ".dm"
-        ):
+        elif environment and transferred_file.name == "Atlas.dm":
             # Register all grid squares on this atlas
             gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
             for gs, pos_data in gs_pix_positions.items():
