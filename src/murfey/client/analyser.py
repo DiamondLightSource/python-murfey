@@ -422,7 +422,15 @@ class Analyser(Observer):
                             )
                     except Exception as e:
                         logger.error(f"Exception encountered: {e}")
-                    if "AtlasContext" not in str(self._context):
+                    if any(
+                        context in str(self._context)
+                        for context in (
+                            "SPAContext",
+                            "SPAMetadataContext",
+                            "TomographyContext",
+                            "TomographyMetadataContext",
+                        )
+                    ):
                         if not dc_metadata:
                             try:
                                 if self._context is not None:
