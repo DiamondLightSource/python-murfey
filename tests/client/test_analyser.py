@@ -297,8 +297,68 @@ def test_analyse_limited(
     assert mock_post_transfer.call_count == len(test_files)
 
 
-def test_analyse_spa():
-    pass
+def test_analyse_atlas(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "AtlasContext"
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "", force_mdoc_metadata=True)
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # Context should be set
+    assert analyser._context is not None and "AtlasContext" in str(analyser._context)
+
+    # "_find_context" should be called once
+    assert spy_find_context.call_count == 1
+
+    # "post_transfer" should be called on all files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+@pytest.mark.parametrize(
+    "context_to_test",
+    ("SPAContext", "SPAMetadataContext"),
+)
+def test_analyse_spa(
+    mocker: MockerFixture,
+    context_to_test: str,
+    tmp_path: Path,
+):
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == context_to_test
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+    spy_find_extension = mocker.spy(Analyser, "_find_extension")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "", force_mdoc_metadata=True)
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and context_to_test in str(analyser._context)
+    if context_to_test == "SPAContext":
+        assert spy_find_extension.call_count > 0
+        assert analyser._extension in (".eer", ".tiff")
+        mock_post_transfer.assert_called()
 
 
 def test_analyse_tomo():
