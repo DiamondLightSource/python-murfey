@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.client.analyser import Analyser
 from murfey.client.contexts.spa import SPAContext
@@ -143,16 +146,119 @@ def test_analyser_epu_determination(tmp_path):
     assert analyser._context._acquisition_software == "epu"
 
 
-def test_analyse_clem():
-    pass
+@pytest.mark.parametrize("test_file", contextless_files)
+def test_analyse_no_context(
+    test_file: str,
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    analyser._analyse(tmp_path / test_file)
+
+    # "_find_context" should be called
+    assert spy_find_context.call_count == 1
+
+    # "post_transfer" should not be called
+    mock_post_transfer.assert_not_called()
 
 
-def test_analyse_fib():
-    pass
+def test_analyse_clem(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Gather example files related to the CLEM workflow
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "CLEMContext" and not file.endswith(".lif")
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "CLEMContext" in str(analyser._context)
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
 
 
-def test_analyse_sxt():
-    pass
+@pytest.mark.parametrize(
+    "test_params",
+    # Test the "autotem" and "maps" workflows separately
+    [
+        [software, [file for file in file_list if software in file]]
+        for software in ("autotem", "maps")
+        for context, file_list in example_files.items()
+        if context == "FIBContext"
+    ],
+)
+def test_analyse_fib(
+    mocker: MockerFixture,
+    test_params: tuple[str, list[str]],
+    tmp_path: Path,
+):
+    # Unpack test params
+    software, test_files = test_params
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "FIBContext" in str(analyser._context)
+    assert analyser._context._acquisition_software == software
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+def test_analyse_sxt(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Load the example files corresponding to the SXT workflow
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "SXTContext"
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "SXTContext" in str(analyser._context)
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
 
 
 def test_analyse_spa():
