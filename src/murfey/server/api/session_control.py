@@ -411,7 +411,7 @@ def register_atlas(
                     smartem_client.grid_registered(grid_uuid)
     else:
         logger.info(
-            f"smartem deactivated so did not register atlas for {atlas_registration_data.acquisition_uuid}"
+            f"smartem deactivated so did not register atlas for {sanitise(str(atlas_registration_data.acquisition_uuid))}"
         )
 
 
