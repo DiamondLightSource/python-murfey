@@ -141,3 +141,23 @@ def test_analyser_epu_determination(tmp_path):
     analyser.queue.put(tomo_file)
     analyser.stop()
     assert analyser._context._acquisition_software == "epu"
+
+
+def test_analyse_clem():
+    pass
+
+
+def test_analyse_fib():
+    pass
+
+
+def test_analyse_sxt():
+    pass
+
+
+def test_analyse_spa():
+    pass
+
+
+def test_analyse_tomo():
+    pass
