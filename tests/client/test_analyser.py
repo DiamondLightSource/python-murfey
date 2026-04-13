@@ -261,6 +261,42 @@ def test_analyse_sxt(
     assert mock_post_transfer.call_count == len(test_files)
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    [
+        ["SPAMetadataContext", ["AtlasContext", "SPAContext"]],
+        ["TomographyMetadataContext", ["AtlasContext", "SPAContext"]],
+    ],
+)
+def test_analyse_limited(
+    mocker: MockerFixture, tmp_path: Path, test_params: tuple[str, list[str]]
+):
+    # Unpack test params
+    expected_context, other_contexts = test_params
+
+    # Load example files related to the CLEM
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context in (expected_context, *other_contexts)
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "", limited=True)
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert analyser._context is not None and expected_context in str(analyser._context)
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
 def test_analyse_spa():
     pass
 
