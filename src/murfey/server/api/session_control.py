@@ -382,7 +382,7 @@ def register_atlas(
             )
             grid_uuid = None
             if atlas_registration_data.tag:
-                dcg = murfey_db.exec(
+                dcg = db.exec(
                     select(DataCollectionGroup)
                     .where(DataCollectionGroup.session_id == session_id)
                     .where(DataCollectionGroup.tag == atlas_registration_data.tag)
