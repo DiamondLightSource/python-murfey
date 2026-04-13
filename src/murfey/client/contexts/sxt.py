@@ -127,6 +127,7 @@ class SXTContext(Context):
 
             recipes_to_assign_pjids = [
                 "sxt-aretomo",
+                "sxt-imod-patch",
             ]
             for recipe in recipes_to_assign_pjids:
                 capture_post(
