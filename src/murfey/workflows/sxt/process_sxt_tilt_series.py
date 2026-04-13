@@ -56,6 +56,7 @@ def process_sxt_tilt_series_workflow(
         murfey_db.add(tilt_series)
         murfey_db.commit()
 
+    # Find all processing jobs registered for this tilt series
     collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -64,8 +65,7 @@ def process_sxt_tilt_series_workflow(
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "sxt-tomo-align")
-    ).one()
+    ).all()
     instrument_name = (
         murfey_db.exec(select(Session).where(Session.id == session_id))
         .one()
@@ -92,25 +92,29 @@ def process_sxt_tilt_series_workflow(
         / f"{tilt_series.tag}_stack.mrc"
     )
     stack_file.parent.mkdir(parents=True, exist_ok=True)
-    zocalo_message = {
-        "recipes": ["sxt-tomo-align"],
-        "parameters": {
-            "txrm_file": tilt_series_info.txrm,
-            "dcid": collected_ids[1].id,
-            "appid": collected_ids[3].id,
-            "stack_file": str(stack_file),
-            "tilt_axis": 0,
-            "pixel_size": tilt_series_info.pixel_size,
-            "manual_tilt_offset": -tilt_series_info.tilt_offset,
-            "node_creator_queue": machine_config.node_creator_queue,
-        },
-    }
-    if _transport_object:
-        logger.info(
-            f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
-        )
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
-    else:
-        logger.info(
-            f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
-        )
+    for recipe_ids in collected_ids:
+        # Loop over all processing jobs, and send the alignment recipe for it
+        zocalo_message = {
+            "recipes": recipe_ids[2].recipe,
+            "parameters": {
+                "txrm_file": tilt_series_info.txrm,
+                "dcid": recipe_ids[1].id,
+                "appid": recipe_ids[3].id,
+                "stack_file": str(stack_file),
+                "tilt_axis": 0,
+                "pixel_size": tilt_series_info.pixel_size,
+                "manual_tilt_offset": -tilt_series_info.tilt_offset,
+                "node_creator_queue": machine_config.node_creator_queue,
+            },
+        }
+        if _transport_object:
+            logger.info(
+                f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
+            )
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        else:
+            logger.info(
+                f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
+            )

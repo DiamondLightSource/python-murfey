@@ -85,7 +85,8 @@ class SXTContext(Context):
             )
 
             recipes_to_assign_pjids = [
-                "sxt-tomo-align",
+                "sxt-aretomo",
+                "sxt-imod-patch",
             ]
             for recipe in recipes_to_assign_pjids:
                 capture_post(
