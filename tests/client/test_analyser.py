@@ -3,105 +3,78 @@ from __future__ import annotations
 import pytest
 
 from murfey.client.analyser import Analyser
-from murfey.client.contexts.atlas import AtlasContext
-from murfey.client.contexts.clem import CLEMContext
-from murfey.client.contexts.fib import FIBContext
 from murfey.client.contexts.spa import SPAContext
-from murfey.client.contexts.spa_metadata import SPAMetadataContext
-from murfey.client.contexts.sxt import SXTContext
 from murfey.client.contexts.tomo import TomographyContext
-from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
-example_files = [
-    # Tomography
-    ["visit/Position_1_001_0.0_20250715_012434_fractions.tiff", TomographyContext],
-    ["visit/Position_1_2_002_3.0_20250715_012434_Fractions.mrc", TomographyContext],
-    ["visit/Position_1_2_003_6.0_20250715_012434_EER.eer", TomographyContext],
-    ["visit/name1_004_9.0_20250715_012434_fractions.tiff", TomographyContext],
-    ["visit/Position_1_[30.0].tiff", TomographyContext],
-    ["visit/Position_1.mdoc", TomographyContext],
-    ["visit/name1_2.mdoc", TomographyContext],
-    # Tomography metadata
-    ["visit/Session.dm", TomographyMetadataContext],
-    ["visit/SearchMaps/SearchMap.xml", TomographyMetadataContext],
-    ["visit/Batch/BatchPositionsList.xml", TomographyMetadataContext],
-    ["visit/Thumbnails/file.mrc", TomographyMetadataContext],
-    # SPA
-    ["visit/FoilHole_01234_fractions.tiff", SPAContext],
-    ["visit/FoilHole_01234_EER.eer", SPAContext],
-    # SPA metadata
-    ["atlas/atlas.mrc", AtlasContext],
-    ["visit/EpuSession.dm", SPAMetadataContext],
-    ["visit/Metadata/GridSquare.dm", SPAMetadataContext],
-    # CLEM LIF file
-    ["visit/images/test_file.lif", CLEMContext],
-    # CLEM TIFF files
-    [
+example_files = {
+    "CLEMContext": [
+        # CLEM LIF file
+        "visit/images/test_file.lif",
+        # CLEM TIFF files
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12--Z02--C01.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12_Lng_LVCC--Z02--C01.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001--Z00--C00.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001_Lng_LVCC--Z00--C00.tif",
-        CLEMContext,
-    ],
-    # CLEM TIFF file accompanying metadata
-    [
+        # CLEM TIFF file accompanying metadata
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12_Lng_LVCC.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_histo.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_Lng_LVCC_histo.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001_Lng_LVCC.xlif",
-        CLEMContext,
     ],
-    # FIB Autotem files
-    ["visit/autotem/visit/ProjectData.dat", FIBContext],
-    ["visit/autotem/visit/Sites/Lamella/SetupImages/Preparation.tif", FIBContext],
-    [
+    "FIBContext": [
+        # FIB Autotem files
+        "visit/autotem/visit/ProjectData.dat",
+        "visit/autotem/visit/Sites/Lamella/SetupImages/Preparation.tif",
         "visit/autotem/visit/Sites/Lamella (2)//DCImages/DCM_2026-03-09-23-45-40.926/2026-03-09-23-48-43-Finer-Milling-dc_rescan-image-.png",
-        FIBContext,
-    ],
-    # FIB Maps files
-    ["visit/maps/visit/EMproject.emxml", FIBContext],
-    [
+        # FIB Maps files
+        "visit/maps/visit/EMproject.emxml",
         "visit/maps/visit/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
-        FIBContext,
-    ],
-    [
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
-        FIBContext,
     ],
-    # Soft x-ray tomography
-    ["visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm", SXTContext],
-    ["visit/X-ray_mosaic_ROI2.xrm", SXTContext],
-]
+    "SXTContext": [
+        "visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm",
+        "visit/X-ray_mosaic_ROI2.xrm",
+    ],
+    "AtlasContext": [
+        "atlas/atlas.mrc",
+    ],
+    "TomographyContext": [
+        "visit/Position_1_001_0.0_20250715_012434_fractions.tiff",
+        "visit/Position_1_2_002_3.0_20250715_012434_Fractions.mrc",
+        "visit/Position_1_2_003_6.0_20250715_012434_EER.eer",
+        "visit/name1_004_9.0_20250715_012434_fractions.tiff",
+        "visit/Position_1_[30.0].tiff",
+        "visit/Position_1.mdoc",
+        "visit/name1_2.mdoc",
+    ],
+    "TomographyMetadataContext": [
+        "visit/Session.dm",
+        "visit/SearchMaps/SearchMap.xml",
+        "visit/Batch/BatchPositionsList.xml",
+        "visit/Thumbnails/file.mrc",
+    ],
+    "SPAContext": [
+        "visit/FoilHole_01234_fractions.tiff",
+        "visit/FoilHole_01234_EER.eer",
+    ],
+    "SPAMetadataContext": [
+        "visit/EpuSession.dm",
+        "visit/Metadata/GridSquare.dm",
+    ],
+}
 
 
-@pytest.mark.parametrize("file_and_context", example_files)
+@pytest.mark.parametrize(
+    "file_and_context",
+    [
+        [file, context]
+        for context, file_list in example_files.items()
+        for file in file_list
+    ],
+)
 def test_find_context(file_and_context, tmp_path):
     # Unpack parametrised variables
     file_name, context = file_and_context
@@ -111,7 +84,7 @@ def test_find_context(file_and_context, tmp_path):
 
     # Check that the results are as expected
     assert analyser._find_context(tmp_path / file_name)
-    assert isinstance(analyser._context, context)
+    assert analyser._context is not None and context in str(analyser._context)
 
     # Checks for the specific workflow contexts
     if isinstance(analyser._context, TomographyContext):
