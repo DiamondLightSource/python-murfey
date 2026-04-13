@@ -350,7 +350,7 @@ class Analyser(Observer):
                 continue
             self._analyse(transferred_file)
             self.queue.task_done()
-        logger.debug("Analyer thread has stopped analysing incoming files")
+        logger.debug("Analyser thread has stopped analysing incoming files")
         self.notify(final=True)
 
     def _analyse(self, transferred_file: Path):
