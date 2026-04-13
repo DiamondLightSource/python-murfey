@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Any, List, NamedTuple
+from typing import Any, NamedTuple, OrderedDict
 
 import xmltodict
 
@@ -209,12 +209,6 @@ def ensure_dcg_exists(
     return dcg_tag
 
 
-class ProcessingParameter(NamedTuple):
-    name: str
-    label: str
-    default: Any = None
-
-
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
     glob = dir_for_transfer.glob("*")
     for f in glob:
@@ -225,9 +219,15 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
     return ""
 
 
+class ProcessingParameter(NamedTuple):
+    name: str
+    label: str
+    default: Any = None
+
+
 class Context:
-    user_params: List[ProcessingParameter] = []
-    metadata_params: List[ProcessingParameter] = []
+    user_params: list[ProcessingParameter] = []
+    metadata_params: list[ProcessingParameter] = []
 
     def __init__(self, name: str, acquisition_software: str, token: str):
         self._acquisition_software = acquisition_software
@@ -256,7 +256,7 @@ class Context:
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
-    ):
+    ) -> OrderedDict | None:
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )
