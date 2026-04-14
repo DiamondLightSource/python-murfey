@@ -7,7 +7,7 @@ from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
 def test_atlas_context_initialisation(tmp_path):
     context = AtlasContext("tomo", tmp_path, {}, "token")
-    assert context.name == "Atlas"
+    assert context.name == "AtlasContext"
     assert context._acquisition_software == "tomo"
     assert context._basepath == tmp_path
     assert context._machine_config == {}
