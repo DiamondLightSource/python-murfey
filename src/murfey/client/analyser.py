@@ -358,8 +358,7 @@ class Analyser(Observer):
             if (
                 "Metadata" in transferred_file.parts
                 or transferred_file.name == "EpuSession.dm"
-                and not self._context
-            ):
+            ) and not self._context:
                 if not (context := _get_context("SPAMetadataContext")):
                     return
                 self._context = context.load()(
@@ -372,8 +371,7 @@ class Analyser(Observer):
                 "Batch" in transferred_file.parts
                 or "SearchMaps" in transferred_file.parts
                 or transferred_file.name == "Session.dm"
-                and not self._context
-            ):
+            ) and not self._context:
                 if not (context := _get_context("TomographyMetadataContext")):
                     return
                 self._context = context.load()(
