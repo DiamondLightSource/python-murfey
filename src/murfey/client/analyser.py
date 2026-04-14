@@ -386,8 +386,7 @@ class Analyser(Observer):
                 if not self._find_context(transferred_file):
                     logger.debug(f"Couldn't find context for {str(transferred_file)!r}")
                     return None
-                else:
-                    logger.info(f"Context found successfully using {transferred_file}")
+                logger.info(f"Context found successfully using {transferred_file}")
 
             # Extra if-block for MyPy to verify that the context is set by this point
             if self._context is None:
