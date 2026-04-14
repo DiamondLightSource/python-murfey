@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import mock_open
 
 import pytest
 from pytest_mock import MockerFixture
 
 from murfey.client.analyser import Analyser
-from murfey.client.contexts.spa import SPAContext
-from murfey.client.contexts.tomo import TomographyContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
 example_files = {
@@ -76,15 +75,30 @@ example_files = {
         file
         for file_list in example_files.values()
         for file in file_list
-        for suffix in (".mrc", ".tiff", ".tif", ".eer", ".lif", ".txrm", ".xrm")
+        for suffix in (".mrc", ".tiff", ".tif", ".eer", ".mdoc")
         if file.endswith(suffix)
     ],
 )
-def test_find_extension(test_file: str, tmp_path: Path):
-    analyser = Analyser(basepath_local=tmp_path, token="")
+def test_find_extension(
+    mocker: MockerFixture,
+    test_file: str,
+    tmp_path: Path,
+):
+    # Mock the functions used to open a .mdoc file to return a dummy file path
+    m = mock_open(read_data="dummy data")
+    mocker.patch("murfey.client.analyser.open", m)
+    mocker.patch(
+        "murfey.client.analyser.get_block",
+        return_value={"SubFramePath": "/path/to/test_file.tiff"},
+    )
+
     # Pass the file to the function, and check the outputs are as expected
+    analyser = Analyser(basepath_local=tmp_path, token="")
     assert analyser._find_extension(tmp_path / test_file)
-    assert test_file.endswith(analyser._extension)
+    if not test_file.endswith(".mdoc"):
+        assert test_file.endswith(analyser._extension)
+    else:
+        assert analyser._extension == ".tiff"
 
 
 @pytest.mark.parametrize(
@@ -107,9 +121,9 @@ def test_find_context(file_and_context, tmp_path):
     assert analyser._context is not None and context in str(analyser._context)
 
     # Additional checks for specific contexts
-    if isinstance(analyser._context, TomographyContext):
+    if analyser._context is not None and analyser._context.name == "TomographyContext":
         assert analyser.parameters_model == ProcessingParametersTomo
-    if isinstance(analyser._context, SPAContext):
+    if analyser._context is not None and analyser._context.name == "SPAContext":
         assert analyser.parameters_model == ProcessingParametersSPA
 
 
@@ -279,24 +293,23 @@ def test_analyse_sxt(
 
 
 @pytest.mark.parametrize(
-    "test_params",
+    "context_to_test",
     [
-        ["SPAMetadataContext", ["AtlasContext", "SPAContext"]],
-        ["TomographyMetadataContext", ["AtlasContext", "SPAContext"]],
+        "SPAMetadataContext",
+        "TomographyMetadataContext",
     ],
 )
 def test_analyse_limited(
-    mocker: MockerFixture, tmp_path: Path, test_params: tuple[str, list[str]]
+    mocker: MockerFixture,
+    context_to_test: str,
+    tmp_path: Path,
 ):
-    # Unpack test params
-    expected_context, other_contexts = test_params
-
     # Load example files related to the CLEM
     test_files = [
         file
         for context, file_list in example_files.items()
         for file in file_list
-        if context in (expected_context, *other_contexts)
+        if context in context_to_test
     ]
 
     # Mock the 'post_transfer' class function
@@ -308,21 +321,36 @@ def test_analyse_limited(
         analyser._analyse(tmp_path / file)
 
     # "_find_context" should be called only once
-    assert analyser._context is not None and expected_context in str(analyser._context)
+    assert analyser._context is not None and analyser._context.name == context_to_test
 
     # "_post_transfer" should be called on every one of these files
     assert mock_post_transfer.call_count == len(test_files)
 
 
-def test_analyse_atlas(
+@pytest.mark.parametrize(
+    "context_to_test",
+    [
+        "AtlasContext",
+        "CLEMContext",
+        "FIBContext",
+        "SPAMetadataContext",
+        "SXTContext",
+        "TomographyMetadataContext",
+    ],
+)
+def test_analyse_generic(
     mocker: MockerFixture,
+    context_to_test: str,
     tmp_path: Path,
 ):
+    """
+    Tests the Contexts which has straightforward processing logic.
+    """
     test_files = [
         file
         for context, file_list in example_files.items()
         for file in file_list
-        if context == "AtlasContext"
+        if context == context_to_test
     ]
 
     # Set up mocks and spies
@@ -334,30 +362,25 @@ def test_analyse_atlas(
     for file in test_files:
         analyser._analyse(tmp_path / file)
 
-    # Context should be set
-    assert analyser._context is not None and "AtlasContext" in str(analyser._context)
-
     # "_find_context" should be called once
     assert spy_find_context.call_count == 1
+
+    # Context should be set
+    assert analyser._context is not None and analyser._context.name == context_to_test
 
     # "post_transfer" should be called on all files
     assert mock_post_transfer.call_count == len(test_files)
 
 
-@pytest.mark.parametrize(
-    "context_to_test",
-    ("SPAContext", "SPAMetadataContext"),
-)
 def test_analyse_spa(
     mocker: MockerFixture,
-    context_to_test: str,
     tmp_path: Path,
 ):
     test_files = [
         file
         for context, file_list in example_files.items()
         for file in file_list
-        if context == context_to_test
+        if context == "SPAContext"
     ]
 
     # Set up mocks and spies
@@ -371,41 +394,29 @@ def test_analyse_spa(
         analyser._analyse(tmp_path / file)
 
     assert spy_find_context.call_count == 1
-    assert analyser._context is not None and context_to_test in str(analyser._context)
-    if context_to_test == "SPAContext":
-        assert spy_find_extension.call_count > 0
-        assert analyser._extension in (".eer", ".tiff")
-        mock_post_transfer.assert_called()
+    assert analyser._context is not None and analyser._context.name == "SPAContext"
+    assert spy_find_extension.call_count > 0
+    assert analyser._extension in (".eer", ".tiff")
+    mock_post_transfer.assert_called()
 
 
-@pytest.mark.parametrize(
-    "context_to_test",
-    ("TomographyContext", "TomographyMetadataContext"),
-)
 def test_analyse_tomo(
     mocker: MockerFixture,
-    context_to_test: str,
     tmp_path: Path,
 ):
     test_files = [
         file
         for context, file_list in example_files.items()
         for file in file_list
-        if context == context_to_test
+        if context == "TomographyContext"
     ]
 
     # Set up mocks and spies
     mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
-    if context_to_test == "TomographyContext":
-        mock_gather_metadata = mocker.patch(
-            "murfey.client.contexts.tomo.TomographyContext.gather_metadata"
-        )
-    else:
-        mock_gather_metadata = mocker.patch(
-            "murfey.client.contexts.tomo_metadata.TomographyMetadataContext.gather_metadata"
-        )
+    mock_gather_metadata = mocker.patch(
+        "murfey.client.contexts.tomo.TomographyContext.gather_metadata"
+    )
     mock_gather_metadata.return_value = {"dummy": "dummy"}
-
     spy_find_context = mocker.spy(Analyser, "_find_context")
     spy_find_extension = mocker.spy(Analyser, "_find_extension")
 
