@@ -372,8 +372,10 @@ def test_analyse_generic(
     assert mock_post_transfer.call_count == len(test_files)
 
 
+@pytest.mark.parametrize("has_extension", [True, False])
 def test_analyse_spa(
     mocker: MockerFixture,
+    has_extension: bool,
     tmp_path: Path,
 ):
     test_files = [
@@ -384,24 +386,46 @@ def test_analyse_spa(
     ]
 
     # Set up mocks and spies
+    mock_metadata = {
+        "dummy": "dummy",
+    }
+    if has_extension:
+        mock_metadata["file_extension"] = ".tiff"
+
     mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    mock_gather_metadata = mocker.patch(
+        "murfey.client.contexts.spa.SPAContext.gather_metadata",
+        return_value=mock_metadata,
+    )
+    mock_notify = mocker.patch.object(Analyser, "notify")
     spy_find_context = mocker.spy(Analyser, "_find_context")
     spy_find_extension = mocker.spy(Analyser, "_find_extension")
 
     # Initialise the Analyser
-    analyser = Analyser(tmp_path, "", force_mdoc_metadata=True)
+    analyser = Analyser(tmp_path, "")
     for file in test_files:
         analyser._analyse(tmp_path / file)
 
     assert spy_find_context.call_count == 1
     assert analyser._context is not None and analyser._context.name == "SPAContext"
-    assert spy_find_extension.call_count > 0
-    assert analyser._extension in (".eer", ".tiff")
     mock_post_transfer.assert_called()
 
+    assert spy_find_extension.call_count > 0
+    assert analyser._extension == ".tiff"
+    mock_gather_metadata.assert_called()
+    mock_notify.assert_called_with(
+        {
+            "dummy": "dummy",
+            "file_extension": analyser._extension,
+            "acquisition_software": analyser._context._acquisition_software,
+        }
+    )
 
+
+@pytest.mark.parametrize("has_extension", [True, False])
 def test_analyse_tomo(
     mocker: MockerFixture,
+    has_extension: bool,
     tmp_path: Path,
 ):
     test_files = [
@@ -412,19 +436,39 @@ def test_analyse_tomo(
     ]
 
     # Set up mocks and spies
+    mock_metadata = {
+        "dummy": "dummy",
+    }
+    if has_extension:
+        mock_metadata["file_extension"] = ".tiff"
+
     mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
     mock_gather_metadata = mocker.patch(
-        "murfey.client.contexts.tomo.TomographyContext.gather_metadata"
+        "murfey.client.contexts.tomo.TomographyContext.gather_metadata",
+        return_value=mock_metadata,
     )
-    mock_gather_metadata.return_value = {"dummy": "dummy"}
+    mock_notify = mocker.patch.object(Analyser, "notify")
     spy_find_context = mocker.spy(Analyser, "_find_context")
     spy_find_extension = mocker.spy(Analyser, "_find_extension")
 
     # Initialise the Analyser
-    analyser = Analyser(tmp_path, "", force_mdoc_metadata=True)
+    analyser = Analyser(tmp_path, "")
     for file in test_files:
         analyser._analyse(tmp_path / file)
 
     assert spy_find_context.call_count == 1
-    assert spy_find_extension.call_count > 0
+    assert (
+        analyser._context is not None and analyser._context.name == "TomographyContext"
+    )
     mock_post_transfer.assert_called()
+
+    assert spy_find_extension.call_count > 0
+    assert analyser._extension == ".tiff"
+    mock_gather_metadata.assert_called()
+    mock_notify.assert_called_with(
+        {
+            "dummy": "dummy",
+            "file_extension": analyser._extension,
+            "acquisition_software": analyser._context._acquisition_software,
+        }
+    )
