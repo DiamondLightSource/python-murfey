@@ -71,6 +71,23 @@ example_files = {
 
 
 @pytest.mark.parametrize(
+    "test_file",
+    [
+        file
+        for file_list in example_files.values()
+        for file in file_list
+        for suffix in (".mrc", ".tiff", ".tif", ".eer", ".lif", ".txrm", ".xrm")
+        if file.endswith(suffix)
+    ],
+)
+def test_find_extension(test_file: str, tmp_path: Path):
+    analyser = Analyser(basepath_local=tmp_path, token="")
+    # Pass the file to the function, and check the outputs are as expected
+    assert analyser._find_extension(tmp_path / test_file)
+    assert test_file.endswith(analyser._extension)
+
+
+@pytest.mark.parametrize(
     "file_and_context",
     [
         [file, context]
@@ -82,14 +99,14 @@ def test_find_context(file_and_context, tmp_path):
     # Unpack parametrised variables
     file_name, context = file_and_context
 
-    # Pass the file to the Analyser; add environment as needed
+    # Set up the Analyser
     analyser = Analyser(basepath_local=tmp_path, token="")
 
-    # Check that the results are as expected
+    # Pass the file to the function, and check that outputs are as expected
     assert analyser._find_context(tmp_path / file_name)
     assert analyser._context is not None and context in str(analyser._context)
 
-    # Checks for the specific workflow contexts
+    # Additional checks for specific contexts
     if isinstance(analyser._context, TomographyContext):
         assert analyser.parameters_model == ProcessingParametersTomo
     if isinstance(analyser._context, SPAContext):
