@@ -397,7 +397,8 @@ class Analyser(Observer):
             # Trigger processing and metadata parsing according to the context
             match self._context.name:
                 case (
-                    "CLEMContext"
+                    "AtlasContext"
+                    | "CLEMContext"
                     | "FIBContext"
                     | "SPAMetadataContext"
                     | "SXTContext"
