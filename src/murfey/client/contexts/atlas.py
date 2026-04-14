@@ -19,7 +19,7 @@ class AtlasContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("Atlas", acquisition_software, token)
+        super().__init__("AtlasContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
 

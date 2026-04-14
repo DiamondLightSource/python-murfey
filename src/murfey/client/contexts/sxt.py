@@ -28,7 +28,7 @@ class SXTContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("SXT", acquisition_software, token)
+        super().__init__("SXTContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
 

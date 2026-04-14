@@ -82,7 +82,7 @@ class SPAContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("SPA", acquisition_software, token)
+        super().__init__("SPAContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
         self._processing_job_stash: dict = {}

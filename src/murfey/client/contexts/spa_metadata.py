@@ -81,7 +81,7 @@ class SPAMetadataContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("SPA_metadata", acquisition_software, token)
+        super().__init__("SPAMetadataContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
 

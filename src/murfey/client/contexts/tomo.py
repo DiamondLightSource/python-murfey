@@ -5,8 +5,6 @@ from pathlib import Path
 from threading import RLock
 from typing import Callable, Dict, List, OrderedDict
 
-import xmltodict
-
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter, ensure_dcg_exists
 from murfey.client.instance_environment import (
@@ -84,7 +82,7 @@ class TomographyContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("Tomography", acquisition_software, token)
+        super().__init__("TomographyContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
         self._tilt_series: Dict[str, List[Path]] = {}
@@ -550,7 +548,7 @@ class TomographyContext(Context):
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> OrderedDict:
-        if metadata_file.suffix not in (".mdoc", ".xml"):
+        if metadata_file.suffix != ".mdoc":
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
@@ -558,38 +556,6 @@ class TomographyContext(Context):
             if not metadata_file.is_file():
                 logger.debug(f"Metadata file {metadata_file} not found")
                 return OrderedDict({})
-            if metadata_file.suffix == ".xml":
-                with open(metadata_file, "r") as xml:
-                    try:
-                        for_parsing = xml.read()
-                    except Exception:
-                        logger.warning(
-                            f"Failed to parse file {metadata_file}", exc_info=True
-                        )
-                        return OrderedDict({})
-                    data = xmltodict.parse(for_parsing)
-                try:
-                    metadata: OrderedDict = OrderedDict({})
-                    metadata["experiment_type"] = "tomography"
-                    metadata["voltage"] = 300
-                    metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"][
-                        "Width"
-                    ]
-                    metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                        "Height"
-                    ]
-                    metadata["pixel_size_on_image"] = float(
-                        data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
-                    )
-                    metadata["motion_corr_binning"] = 1
-                    metadata["gain_ref"] = None
-                    metadata["dose_per_frame"] = (
-                        environment.dose_per_frame if environment else None
-                    )
-                    metadata["source"] = str(self._basepath)
-                except KeyError:
-                    return OrderedDict({})
-                return metadata
             with open(metadata_file, "r") as md:
                 mdoc_data = get_global_data(md)
                 num_blocks = get_num_blocks(md)

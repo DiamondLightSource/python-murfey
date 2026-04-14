@@ -26,7 +26,7 @@ class TomographyMetadataContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("Tomography_metadata", acquisition_software, token)
+        super().__init__("TomographyMetadataContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
 
