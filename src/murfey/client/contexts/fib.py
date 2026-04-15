@@ -189,7 +189,7 @@ class FIBContext(Context):
                 sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
                 for site in sites:
                     number = _number_from_name(site["Name"])
-                    milling_angle = site["Workflow"]["Recipe"][0]["Activites"][
+                    milling_angle = site["Workflow"]["Recipe"][0]["Activities"][
                         "MillingAngleActivity"
                     ].get("MillingAngle")
                     if self._lamellae.get(number) and milling_angle:
