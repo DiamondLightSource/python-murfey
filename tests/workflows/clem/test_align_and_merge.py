@@ -107,10 +107,6 @@ def test_run(
             "series_name": series_name_long,
             "images": [str(file) for file in image_stacks],
             "metadata": str(metadata),
-            "crop_to_n_frames": crop_to_n_frames,
-            "align_self": align_self,
-            "flatten": flatten,
-            "align_across": align_across,
             # Other recipe parameters
             "session_dir": str(processed_dir.parent),
             "session_id": session_id,
