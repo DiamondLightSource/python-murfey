@@ -1,122 +1,129 @@
 from __future__ import annotations
 
+from pathlib import Path
+from unittest.mock import mock_open
+
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.client.analyser import Analyser
-from murfey.client.contexts.atlas import AtlasContext
-from murfey.client.contexts.clem import CLEMContext
-from murfey.client.contexts.fib import FIBContext
-from murfey.client.contexts.spa import SPAContext
-from murfey.client.contexts.spa_metadata import SPAMetadataContext
-from murfey.client.contexts.sxt import SXTContext
-from murfey.client.contexts.tomo import TomographyContext
-from murfey.client.contexts.tomo_metadata import TomographyMetadataContext
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
 
-example_files = [
-    # Tomography
-    ["visit/Position_1_001_0.0_20250715_012434_fractions.tiff", TomographyContext],
-    ["visit/Position_1_2_002_3.0_20250715_012434_Fractions.mrc", TomographyContext],
-    ["visit/Position_1_2_003_6.0_20250715_012434_EER.eer", TomographyContext],
-    ["visit/name1_004_9.0_20250715_012434_fractions.tiff", TomographyContext],
-    ["visit/Position_1_[30.0].tiff", TomographyContext],
-    ["visit/Position_1.mdoc", TomographyContext],
-    ["visit/name1_2.mdoc", TomographyContext],
-    # Tomography metadata
-    ["visit/Session.dm", TomographyMetadataContext],
-    ["visit/SearchMaps/SearchMap.xml", TomographyMetadataContext],
-    ["visit/Batch/BatchPositionsList.xml", TomographyMetadataContext],
-    ["visit/Thumbnails/file.mrc", TomographyMetadataContext],
-    # SPA
-    ["visit/FoilHole_01234_fractions.tiff", SPAContext],
-    ["visit/FoilHole_01234_EER.eer", SPAContext],
-    # SPA metadata
-    ["atlas/atlas.mrc", AtlasContext],
-    ["visit/EpuSession.dm", SPAMetadataContext],
-    ["visit/Metadata/GridSquare.dm", SPAMetadataContext],
-    # CLEM LIF file
-    ["visit/images/test_file.lif", CLEMContext],
-    # CLEM TIFF files
-    [
+example_files = {
+    "CLEMContext": [
+        # CLEM LIF file
+        "visit/images/test_file.lif",
+        # CLEM TIFF files
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12--Z02--C01.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12_Lng_LVCC--Z02--C01.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001--Z00--C00.tif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Series001_Lng_LVCC--Z00--C00.tif",
-        CLEMContext,
-    ],
-    # CLEM TIFF file accompanying metadata
-    [
+        # CLEM TIFF file accompanying metadata
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Position 12_Lng_LVCC.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_histo.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Position 12/Metadata/Position 12_Lng_LVCC_histo.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001.xlif",
-        CLEMContext,
-    ],
-    [
         "visit/images/2024_03_14_12_34_56--Project001/grid1/Metadata/Series001_Lng_LVCC.xlif",
-        CLEMContext,
     ],
-    # FIB Autotem files
-    ["visit/autotem/visit/ProjectData.dat", FIBContext],
-    ["visit/autotem/visit/Sites/Lamella/SetupImages/Preparation.tif", FIBContext],
-    [
+    "FIBContext": [
+        # FIB Autotem files
+        "visit/autotem/visit/ProjectData.dat",
+        "visit/autotem/visit/Sites/Lamella/SetupImages/Preparation.tif",
         "visit/autotem/visit/Sites/Lamella (2)//DCImages/DCM_2026-03-09-23-45-40.926/2026-03-09-23-48-43-Finer-Milling-dc_rescan-image-.png",
-        FIBContext,
-    ],
-    # FIB Maps files
-    ["visit/maps/visit/EMproject.emxml", FIBContext],
-    [
+        # FIB Maps files
+        "visit/maps/visit/EMproject.emxml",
         "visit/maps/visit/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
-        FIBContext,
-    ],
-    [
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
-        FIBContext,
     ],
-    # Soft x-ray tomography
-    ["visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm", SXTContext],
-    ["visit/X-ray_mosaic_ROI2.xrm", SXTContext],
-]
+    "SXTContext": [
+        "visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm",
+        "visit/X-ray_mosaic_ROI2.xrm",
+    ],
+    "AtlasContext": [
+        "atlas/atlas.mrc",
+    ],
+    "TomographyContext": [
+        "visit/Position_1_001_0.0_20250715_012434_fractions.tiff",
+        "visit/Position_1_2_002_3.0_20250715_012434_Fractions.mrc",
+        "visit/Position_1_2_003_6.0_20250715_012434_EER.eer",
+        "visit/name1_004_9.0_20250715_012434_fractions.tiff",
+        "visit/Position_1_[30.0].tiff",
+        "visit/Position_1.mdoc",
+        "visit/name1_2.mdoc",
+    ],
+    "TomographyMetadataContext": [
+        "visit/Session.dm",
+        "visit/SearchMaps/SearchMap.xml",
+        "visit/Batch/BatchPositionsList.xml",
+        "visit/Thumbnails/file.mrc",
+    ],
+    "SPAContext": [
+        "visit/FoilHole_01234_fractions.tiff",
+        "visit/FoilHole_01234_EER.eer",
+    ],
+    "SPAMetadataContext": [
+        "visit/EpuSession.dm",
+        "visit/Metadata/GridSquare.dm",
+    ],
+}
 
 
-@pytest.mark.parametrize("file_and_context", example_files)
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        file
+        for file_list in example_files.values()
+        for file in file_list
+        for suffix in (".mrc", ".tiff", ".tif", ".eer", ".mdoc")
+        if file.endswith(suffix)
+    ],
+)
+def test_find_extension(
+    mocker: MockerFixture,
+    test_file: str,
+    tmp_path: Path,
+):
+    # Mock the functions used to open a .mdoc file to return a dummy file path
+    m = mock_open(read_data="dummy data")
+    mocker.patch("murfey.client.analyser.open", m)
+    mocker.patch(
+        "murfey.client.analyser.get_block",
+        return_value={"SubFramePath": "/path/to/test_file.tiff"},
+    )
+
+    # Pass the file to the function, and check the outputs are as expected
+    analyser = Analyser(basepath_local=tmp_path, token="")
+    assert analyser._find_extension(tmp_path / test_file)
+    if not test_file.endswith(".mdoc"):
+        assert test_file.endswith(analyser._extension)
+    else:
+        assert analyser._extension == ".tiff"
+
+
+@pytest.mark.parametrize(
+    "file_and_context",
+    [
+        [file, context]
+        for context, file_list in example_files.items()
+        for file in file_list
+    ],
+)
 def test_find_context(file_and_context, tmp_path):
     # Unpack parametrised variables
     file_name, context = file_and_context
 
-    # Pass the file to the Analyser; add environment as needed
+    # Set up the Analyser
     analyser = Analyser(basepath_local=tmp_path, token="")
 
-    # Check that the results are as expected
+    # Pass the file to the function, and check that outputs are as expected
     assert analyser._find_context(tmp_path / file_name)
-    assert isinstance(analyser._context, context)
+    assert analyser._context is not None and context in str(analyser._context)
 
-    # Checks for the specific workflow contexts
-    if isinstance(analyser._context, TomographyContext):
+    # Additional checks for specific contexts
+    if analyser._context is not None and analyser._context.name == "TomographyContext":
         assert analyser.parameters_model == ProcessingParametersTomo
-    if isinstance(analyser._context, SPAContext):
+    if analyser._context is not None and analyser._context.name == "SPAContext":
         assert analyser.parameters_model == ProcessingParametersSPA
 
 
@@ -168,3 +175,300 @@ def test_analyser_epu_determination(tmp_path):
     analyser.queue.put(tomo_file)
     analyser.stop()
     assert analyser._context._acquisition_software == "epu"
+
+
+@pytest.mark.parametrize("test_file", contextless_files)
+def test_analyse_no_context(
+    test_file: str,
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    analyser._analyse(tmp_path / test_file)
+
+    # "_find_context" should be called
+    assert spy_find_context.call_count == 1
+
+    # "post_transfer" should not be called
+    mock_post_transfer.assert_not_called()
+
+
+def test_analyse_clem(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Gather example files related to the CLEM workflow
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "CLEMContext" and not file.endswith(".lif")
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "CLEMContext" in str(analyser._context)
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    # Test the "autotem" and "maps" workflows separately
+    [
+        [software, [file for file in file_list if software in file]]
+        for software in ("autotem", "maps")
+        for context, file_list in example_files.items()
+        if context == "FIBContext"
+    ],
+)
+def test_analyse_fib(
+    mocker: MockerFixture,
+    test_params: tuple[str, list[str]],
+    tmp_path: Path,
+):
+    # Unpack test params
+    software, test_files = test_params
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "FIBContext" in str(analyser._context)
+    assert analyser._context._acquisition_software == software
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+def test_analyse_sxt(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Load the example files corresponding to the SXT workflow
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "SXTContext"
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "SXTContext" in str(analyser._context)
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+@pytest.mark.parametrize(
+    "context_to_test",
+    [
+        "SPAMetadataContext",
+        "TomographyMetadataContext",
+    ],
+)
+def test_analyse_limited(
+    mocker: MockerFixture,
+    context_to_test: str,
+    tmp_path: Path,
+):
+    # Load example files related to the CLEM
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context in context_to_test
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "", limited=True)
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert analyser._context is not None and analyser._context.name == context_to_test
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+@pytest.mark.parametrize(
+    "context_to_test",
+    [
+        "AtlasContext",
+        "CLEMContext",
+        "FIBContext",
+        "SPAMetadataContext",
+        "SXTContext",
+        "TomographyMetadataContext",
+    ],
+)
+def test_analyse_generic(
+    mocker: MockerFixture,
+    context_to_test: str,
+    tmp_path: Path,
+):
+    """
+    Tests the Contexts which has straightforward processing logic.
+    """
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == context_to_test
+    ]
+
+    # Set up mocks and spies
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "", force_mdoc_metadata=True)
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called once
+    assert spy_find_context.call_count == 1
+
+    # Context should be set
+    assert analyser._context is not None and analyser._context.name == context_to_test
+
+    # "post_transfer" should be called on all files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+@pytest.mark.parametrize("has_extension", [True, False])
+def test_analyse_spa(
+    mocker: MockerFixture,
+    has_extension: bool,
+    tmp_path: Path,
+):
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "SPAContext"
+    ]
+
+    # Set up mocks and spies
+    mock_metadata = {
+        "dummy": "dummy",
+    }
+    if has_extension:
+        mock_metadata["file_extension"] = ".tiff"
+
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    mock_gather_metadata = mocker.patch(
+        "murfey.client.contexts.spa.SPAContext.gather_metadata",
+        return_value=mock_metadata,
+    )
+    mock_notify = mocker.patch.object(Analyser, "notify")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+    spy_find_extension = mocker.spy(Analyser, "_find_extension")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and analyser._context.name == "SPAContext"
+    mock_post_transfer.assert_called()
+
+    assert spy_find_extension.call_count > 0
+    assert analyser._extension == ".tiff"
+    mock_gather_metadata.assert_called()
+    mock_notify.assert_called_with(
+        {
+            "dummy": "dummy",
+            "file_extension": analyser._extension,
+            "acquisition_software": analyser._context._acquisition_software,
+        }
+    )
+
+
+@pytest.mark.parametrize("has_extension", [True, False])
+def test_analyse_tomo(
+    mocker: MockerFixture,
+    has_extension: bool,
+    tmp_path: Path,
+):
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "TomographyContext"
+    ]
+
+    # Set up mocks and spies
+    mock_metadata = {
+        "dummy": "dummy",
+    }
+    if has_extension:
+        mock_metadata["file_extension"] = ".tiff"
+
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    mock_gather_metadata = mocker.patch(
+        "murfey.client.contexts.tomo.TomographyContext.gather_metadata",
+        return_value=mock_metadata,
+    )
+    mock_notify = mocker.patch.object(Analyser, "notify")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+    spy_find_extension = mocker.spy(Analyser, "_find_extension")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    assert spy_find_context.call_count == 1
+    assert (
+        analyser._context is not None and analyser._context.name == "TomographyContext"
+    )
+    mock_post_transfer.assert_called()
+
+    assert spy_find_extension.call_count > 0
+    assert analyser._extension == ".tiff"
+    mock_gather_metadata.assert_called()
+    mock_notify.assert_called_with(
+        {
+            "dummy": "dummy",
+            "file_extension": analyser._extension,
+            "acquisition_software": analyser._context._acquisition_software,
+        }
+    )

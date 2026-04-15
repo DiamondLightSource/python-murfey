@@ -4,10 +4,11 @@ import json
 import logging
 import traceback
 from ast import literal_eval
+from functools import cached_property
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
 from sqlmodel import Session, select
 
 from murfey.util.db import ImagingSite
@@ -24,6 +25,27 @@ class AlignAndMergeResult(BaseModel):
     output_file: Path
     thumbnail: Optional[Path] = None
     thumbnail_size: Optional[tuple[int, int]] = None
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def is_denoised(self) -> bool:
+        """
+        The "_Lng_LVCC" suffix appended to a CLEM dataset's position name indicates
+        that it's a denoised image set of the same position. These results should
+        override or supersede the original ones once they're available.
+        """
+        return "_Lng_LVCC" in self.series_name
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def site_name(self) -> str:
+        """
+        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
+        the series name.
+        """
+        return self.series_name.replace("_Lng_LVCC", "")
 
     @field_validator("image_stacks", mode="before")
     @classmethod
@@ -78,26 +100,36 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
 
     # Outer try-finally block for tidying up database-related section of function
     try:
-        # Register items in database if not already present
         try:
-            if not (
-                clem_img_series := murfey_db.exec(
-                    select(ImagingSite)
-                    .where(ImagingSite.session_id == session_id)
-                    .where(ImagingSite.site_name == result.series_name)
-                ).one_or_none()
-            ):
-                clem_img_series = ImagingSite(
-                    session_id=session_id, series_name=result.series_name
-                )
-            clem_img_series.composite_created = True
-            murfey_db.add(clem_img_series)
-            murfey_db.commit()
+            clem_img_site = murfey_db.exec(
+                select(ImagingSite)
+                .where(ImagingSite.session_id == session_id)
+                .where(ImagingSite.site_name == result.site_name)
+            ).one()
 
-            logger.info(
-                "Align-and-merge processing result registered for "
-                f"{result.series_name!r} series"
-            )
+            # Update the stored entry only if the incoming one matches it
+            if clem_img_site.image_path is not None and (
+                # Denoised dataset results should be registered regardless
+                result.is_denoised
+                or (
+                    # Raw dataset result should only be considered
+                    # If the current entry is also a raw dataset
+                    not result.is_denoised
+                    and "_Lng_LVCC" not in clem_img_site.image_path
+                )
+            ):
+                clem_img_site.composite_created = True
+                murfey_db.add(clem_img_site)
+                murfey_db.commit()
+
+                logger.info(
+                    "Align-and-merge processing result registered for "
+                    f"{result.series_name!r} series"
+                )
+            else:
+                logger.info(
+                    "Skipping database registration as incoming result doesn't match stored entry"
+                )
 
         except Exception:
             logger.error(

@@ -11,6 +11,7 @@ try:
     from smartem_common.schemas import (
         FoilHoleData as SmartEMFoilHoleData,
         GridSquareData as SmartEMGridSquareData,
+        GridSquareMetadata as SmartEMGridSquareMetadata,
     )
 
     SMARTEM_ACTIVE = True
@@ -154,6 +155,21 @@ def register_grid_square(
                     .where(DataCollectionGroup.tag == grid_square_params.tag)
                 ).one_or_none()
                 if dcg and dcg.smartem_grid_uuid:
+                    secured_grid_square_image_path_full_res: Path | None = None
+                    if grid_square_params.image:
+                        secured_grid_square_image_path_full_res = secure_path(
+                            Path(grid_square_params.image)
+                        )
+                        if secured_grid_square_image_path_full_res.with_suffix(
+                            ".tiff"
+                        ).is_file():
+                            secured_grid_square_image_path_full_res = (
+                                secured_grid_square_image_path_full_res.with_suffix(".tiff")
+                            )
+                        else:
+                            secured_grid_square_image_path_full_res = (
+                                secured_grid_square_image_path_full_res.with_suffix(".mrc")
+                            )
                     smartem_client = SmartEMAPIClient(
                         base_url=machine_config.smartem_api_url, logger=logger
                     )
@@ -176,6 +192,15 @@ def register_grid_square(
                             {"uuid": grid_square.smartem_uuid}
                             if grid_square.smartem_uuid
                             else {}
+                        ),
+                        metadata=SmartEMGridSquareMetadata(
+                            atlas_node_id=0,
+                            stage_position=None,
+                            state=None,
+                            rotation=None,
+                            image_path=secured_grid_square_image_path_full_res,
+                            selected=False,
+                            unusable=False,
                         ),
                     )
                     if grid_square.smartem_uuid:
@@ -297,6 +322,7 @@ def register_foil_hole(
                 )
                 fh_data = SmartEMFoilHoleData(
                     id=str(foil_hole_params.name),
+                    gridsquare_id=str(gs.name),
                     gridsquare_uuid=gs.smartem_uuid,
                     x_location=(
                         int(foil_hole_params.x_location)

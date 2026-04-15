@@ -658,10 +658,6 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     series_name=result.series_name,
                     images=image_combo,
                     metadata=result.metadata,
-                    crop_to_n_frames=processing_params.crop_to_n_frames,
-                    align_self=processing_params.align_self,
-                    flatten=processing_params.flatten,
-                    align_across=processing_params.align_across,
                     messenger=_transport_object,
                 )
             except Exception:
