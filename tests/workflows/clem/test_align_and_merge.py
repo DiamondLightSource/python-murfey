@@ -1,8 +1,8 @@
 from pathlib import Path
-from typing import Literal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
@@ -22,12 +22,6 @@ colors = [
     "red",
 ]
 feedback_queue = "murfey_feedback"
-
-# Align and merge settings
-crop_to_n_frames = 20
-align_self: Literal["enabled", ""] = "enabled"
-flatten: Literal["mean", "min", "max", ""] = "max"
-align_across: Literal["enabled", ""] = "enabled"
 
 
 @pytest.fixture
@@ -62,9 +56,8 @@ def metadata(processed_dir: Path):
     return metadata
 
 
-@patch("murfey.workflows.clem.align_and_merge.get_machine_config")
 def test_run(
-    mock_get_machine_config,
+    mocker: MockerFixture,
     image_stacks: list[Path],
     metadata: Path,
     processed_dir: Path,
@@ -81,6 +74,9 @@ def test_run(
     # Construct a mock MachineConfig object for use within the function
     mock_machine_config = MagicMock(spec=MachineConfig)
     mock_machine_config.processed_directory_name = processed_folder
+    mock_get_machine_config = mocker.patch(
+        "murfey.workflows.clem.align_and_merge.get_machine_config"
+    )
     mock_get_machine_config.return_value = {
         instrument_name: mock_machine_config,
     }
@@ -92,10 +88,6 @@ def test_run(
         series_name=series_name_long,
         images=image_stacks,
         metadata=metadata,
-        crop_to_n_frames=crop_to_n_frames,
-        align_self=align_self,
-        flatten=flatten,
-        align_across=align_across,
         messenger=mock_transport,
     )
 
