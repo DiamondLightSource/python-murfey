@@ -25,6 +25,7 @@ import numpy as np
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
+    NoResultFound,
     OperationalError,
     PendingRollbackError,
     SQLAlchemyError,
@@ -2186,6 +2187,12 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             murfey.server._transport_object.transport.nack(header, requeue=True)
     except OperationalError:
         logger.warning("Murfey database error encountered", exc_info=True)
+        time.sleep(1)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.transport.nack(header, requeue=True)
+    except NoResultFound:
+        # Missing rows might be due to a race condition and should be requeued
+        logger.warning("No matching database row was found", exc_info=True)
         time.sleep(1)
         if murfey.server._transport_object:
             murfey.server._transport_object.transport.nack(header, requeue=True)
