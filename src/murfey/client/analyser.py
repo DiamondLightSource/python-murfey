@@ -327,8 +327,8 @@ class Analyser(Observer):
     def _analyse_in_thread(self):
         """
         Class function that will be executed by the '_thread' attribute. It will
-        execute a while-loop in which is takes files of the queue and feeds them
-        into the '_analyse' class function until '_halt_thread' is set to True.
+        execute a while-loop where it takes files off the queue and feeds them to
+        the '_analyse' class function until '_halt_thread' is set to True.
         """
         logger.info("Analyser thread started")
         while not self._halt_thread:
