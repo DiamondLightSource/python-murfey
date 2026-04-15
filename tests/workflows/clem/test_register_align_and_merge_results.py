@@ -57,7 +57,7 @@ def test_run(
         murfey_db_session,
         MurfeyDB.ImagingSite,
         lookup_kwargs={
-            "id": murfey_session.id,
+            "session_id": murfey_session.id,
             "site_name": site_name,
             "image_path": str(image_path),
         },
