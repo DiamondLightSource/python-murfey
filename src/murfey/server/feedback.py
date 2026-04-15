@@ -45,8 +45,44 @@ from murfey.util.config import (
 )
 from murfey.util.processing_params import default_spa_parameters, motion_corrected_mrc
 from murfey.util.tomo import midpoint
+from gemmi import cif
+from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
 
 logger = logging.getLogger("murfey.server.feedback")
+
+
+def _current_pipeline_job_counter(visit_name: str) -> int:
+    """Return the next jobNNN Pipeliner will allocate for visit_name.
+
+    Reads the JOB_COUNTER value from default_pipeline.star so that
+    SPA feedback decisions are anchored to Pipeliner's actual state instead
+    of an independent integer counter that drifts.
+
+    Falls back to 7 (previous default) if the file is
+    missing — this preserves the previous behaviour for non Doppio runs
+    """
+    pipeline_file = Path(visit_name) / "default_pipeline.star"
+    if not pipeline_file.is_file():
+        return 7
+    try:
+        dp = cif.read_file(str(pipeline_file))
+        block = dp.find_block(GENERAL_BLOCK)
+        if block is None:
+            return 7
+        return int(block.find_value(JOB_COUNTER))
+    except Exception:
+        logger.warning(
+            "Failed to read JOB_COUNTER from %s — falling back to legacy job number",
+            pipeline_file,
+            exc_info=True,
+        )
+        return 7
+
+
+def _visit_name_for_session(session_id: int, _db) -> str:
+    """Return the visit (project directory) for a Murfey session id."""
+    session_row = _db.exec(select(db.Session).where(db.Session.id == session_id)).one()
+    return session_row.visit
 
 
 try:
@@ -373,9 +409,8 @@ def _release_2d_hold(message: dict, _db):
             "recipes": ["em-spa-class2d"],
         }
         if first_class2d.complete:
-            feedback_params.next_job += (
-                4 if default_spa_parameters.do_icebreaker_jobs else 3
-            )
+            visit_name = _visit_name_for_session(message["session_id"], _db)
+            feedback_params.next_job = _current_pipeline_job_counter(visit_name)
         feedback_params.rerun_class2d = False
         _db.add(feedback_params)
         if first_class2d.complete:
@@ -585,7 +620,9 @@ def _register_incomplete_2d_batch(message: dict, _db):
         _db.commit()
         _db.close()
         return
-    feedback_params.next_job = 10 if default_spa_parameters.do_icebreaker_jobs else 7
+    # Get next_job from the actual Pipeliner counter 
+    visit_name = _visit_name_for_session(message["session_id"], _db)
+    feedback_params.next_job = _current_pipeline_job_counter(visit_name)
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
     other_options = dict(feedback_params)
@@ -735,15 +772,8 @@ def _register_complete_2d_batch(message: dict, _db):
                 murfey_ids, class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
     elif not feedback_params.class_selection_score:
-        # For the first batch, start a container and set the database to wait
-        job_number_after_first_batch = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
-        if (
-            feedback_params.next_job is not None
-            and feedback_params.next_job < job_number_after_first_batch
-        ):
-            feedback_params.next_job = job_number_after_first_batch
+        visit_name = _visit_name_for_session(message["session_id"], _db)
+        feedback_params.next_job = _current_pipeline_job_counter(visit_name)
         if not feedback_params.star_combination_job:
             feedback_params.star_combination_job = feedback_params.next_job + (
                 3 if default_spa_parameters.do_icebreaker_jobs else 2
@@ -815,14 +845,14 @@ def _register_complete_2d_batch(message: dict, _db):
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_class2d = True
-        feedback_params.next_job += (
-            4 if default_spa_parameters.do_icebreaker_jobs else 3
-        )
+        # next_job is re-anchored from Pipeliner on the next entry to this
+        # function — no manual increment needed.
         _db.add(feedback_params)
         _db.commit()
         _db.close()
     else:
-        # Send all other messages on to a container
+        visit_name = _visit_name_for_session(message["session_id"], _db)
+        feedback_params.next_job = _current_pipeline_job_counter(visit_name)
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -889,9 +919,6 @@ def _register_complete_2d_batch(message: dict, _db):
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -936,10 +963,9 @@ def _flush_class2d(
         .where(db.Class2DParameters.pj_id == pj_id)
         .where(db.Class2DParameters.complete)
     ).all()
-    if not feedback_params.next_job:
-        feedback_params.next_job = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
+    # Check pipeliner counter
+    visit_name = _visit_name_for_session(session_id, _db)
+    feedback_params.next_job = _current_pipeline_job_counter(visit_name)
     if not feedback_params.star_combination_job:
         feedback_params.star_combination_job = feedback_params.next_job + (
             3 if default_spa_parameters.do_icebreaker_jobs else 2
@@ -1196,6 +1222,10 @@ def _register_3d_batch(message: dict, _db):
         .visit
     )
 
+    # Check Pipeliner's job counter 
+    feedback_params.next_job = _current_pipeline_job_counter(visit_name)
+    other_options["next_job"] = feedback_params.next_job
+
     provided_initial_model = _find_initial_model(visit_name, machine_config)
     if provided_initial_model and not feedback_params.initial_model:
         rescaled_initial_model_path = (
@@ -1218,7 +1248,6 @@ def _register_3d_batch(message: dict, _db):
         class3d_dir = (
             f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
-        feedback_params.next_job += 1
         _db.add(feedback_params)
         _db.commit()
 
@@ -1253,7 +1282,6 @@ def _register_3d_batch(message: dict, _db):
         _db.close()
     elif not feedback_params.initial_model:
         # For the first batch, start a container and set the database to wait
-        next_job = feedback_params.next_job
         class3d_dir = (
             f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
@@ -1273,8 +1301,6 @@ def _register_3d_batch(message: dict, _db):
         )
 
         feedback_params.hold_class3d = True
-        next_job += 2
-        feedback_params.next_job = next_job
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
@@ -1534,6 +1560,11 @@ def _register_refinement(message: dict, _db):
             db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
+
+    # Re-anchor next_job to Pipeliner's actual counter so the predicted
+    # Refine3D / MaskCreate / PostProcess slots line up with reality.
+    visit_name = _visit_name_for_session(message["session_id"], _db)
+    feedback_params.next_job = _current_pipeline_job_counter(visit_name)
     other_options = dict(feedback_params)
 
     if feedback_params.hold_refine:
@@ -1564,7 +1595,6 @@ def _register_refinement(message: dict, _db):
                 .where(db.RefineParameters.tag == "symmetry")
             ).one()
         except SQLAlchemyError:
-            next_job = feedback_params.next_job
             refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
@@ -1604,14 +1634,6 @@ def _register_refinement(message: dict, _db):
                 app_id=message["program_id"],
                 _db=_db,
             )
-
-            if relion_options["symmetry"] == "C1":
-                # Extra Refine, Mask, PostProcess beyond for determined symmetry
-                next_job += 8
-            else:
-                # Select and Extract particles, then Refine, Mask, PostProcess
-                next_job += 5
-            feedback_params.next_job = next_job
 
         zocalo_message: dict = {
             "parameters": {

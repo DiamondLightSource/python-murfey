@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -6,55 +8,89 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
-from gemmi import cif  
-from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
+from pipeliner.project_graph import ProjectGraph
 
 from murfey.util.config import MachineConfig, get_machine_config
 
-import os
+logger = logging.getLogger("murfey.util.processing_params")
 
-def get_current_job_number(visit_name: str, machine_config: MachineConfig) -> int:
-    if os.path.exists(visit_name):
-        default_pipeline_path = os.path.join(visit_name, "default_pipeline.star")
-    """elif machine_config.processed_directory_name:
-        core = Path(visit_name).parts[0]
-        extra_path = machine_config.processed_extra_directory
-        sub
-        default_pipeline_path = (core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path)"""
-    if os.path.exists(default_pipeline_path):
-        dp = cif.read_file(default_pipeline_path)  
-        dp_job_counter = dp.find_block(GENERAL_BLOCK).find_value(JOB_COUNTER)  
-        current_counter = int(dp_job_counter)
-        return current_counter
-    
-    return 2  # Default to job002 if the file doesn't exist or the value is not found
+
+_DEFAULT_MOTIONCORR_FALLBACK = "job002"
+
+
+@lru_cache(maxsize=16)
+def _job_dir_for_alias_cached(
+    visit_name: str, alias: str, mtime_ns: int
+) -> Optional[str]:
+    """Read default_pipeline.star and return the jobNNN for the given alias.
+
+    Returns None on any failure (missing file, graph read error, alias
+    not found). The mtime_ns argument is a cache key — when Pipeliner rewrites
+    default_pipeline.star its mtime changes and the next call falls through
+    to a fresh read.
+    """
+    project_dir = Path(visit_name)
+    pipeline_file = project_dir / "default_pipeline.star"
+    if not pipeline_file.is_file():
+        return None
+    try:
+        with ProjectGraph(pipeline_dir=project_dir, read_only=True) as graph:
+            for proc in graph.process_list:
+                proc_alias = getattr(proc, "alias", None)
+                if proc_alias and proc_alias.rstrip("/").endswith(alias):
+                    # proc.name is e.g. "MotionCorr/job003/"
+                    return Path(proc.name).name
+    except Exception:
+        logger.error(
+            "ProjectGraph read failed while looking up alias %r in %s",
+            alias,
+            pipeline_file,
+            exc_info=True,
+        )
+        return None
+    return None
+
+
+def _job_dir_for_alias(visit_name: str, alias: str) -> str:
+    """Return the Pipeliner jobNNN for alias in the given project.
+
+    visit_name must be an path to the project directory.
+    Falls back to the positional default job002 and logs a warning so
+    drift from the live pipeline is visible in the logs instead of silent.
+    """
+    project_dir = Path(visit_name).resolve()
+    pipeline_file = project_dir / "default_pipeline.star"
+    try:
+        mtime_ns = pipeline_file.stat().st_mtime_ns
+    except FileNotFoundError:
+        logger.warning(
+            "default_pipeline.star missing at %s — falling back to %s for alias %r",
+            pipeline_file,
+            _DEFAULT_MOTIONCORR_FALLBACK,
+            alias,
+        )
+        return _DEFAULT_MOTIONCORR_FALLBACK
+    job_dir = _job_dir_for_alias_cached(str(project_dir), alias, mtime_ns)
+    if job_dir is None:
+        logger.warning(
+            "Alias %r not found in %s — falling back to %s",
+            alias,
+            pipeline_file,
+            _DEFAULT_MOTIONCORR_FALLBACK,
+        )
+        return _DEFAULT_MOTIONCORR_FALLBACK
+    return job_dir
+
 
 def motion_corrected_mrc(
     input_movie: Path, visit_name: str, machine_config: MachineConfig
 ):
     movie = os.path.basename(input_movie)
-
-    """ if not os.path.exists(visit_name):
-    parts = [secure_filename(p) for p in input_movie.parts]
-    visit_idx = parts.index(visit_name)
-    core = Path("/") / Path(*parts[: visit_idx + 1])
-    ppath = Path("/") / Path(*parts)
-    if machine_config.process_multiple_datasets:
-        sub_dataset = ppath.relative_to(core).parts[0]
-    else:
-        sub_dataset = ""
-    extra_path = machine_config.processed_extra_directory
-    """
-
-    #job_number = get_current_job_number(visit_name, machine_config)
-
+    job_dir = _job_dir_for_alias(visit_name, "Live_motioncorr")
     mrc_out = (
         Path(visit_name)
         / "MotionCorr"
-        / f"job002"
+        / job_dir
         / "Movies"
         / str(movie + "_motion_corrected.mrc")
     )
