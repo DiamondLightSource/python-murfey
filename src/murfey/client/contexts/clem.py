@@ -87,7 +87,7 @@ class CLEMContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("CLEM", acquisition_software, token)
+        super().__init__("CLEMContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
         # CLEM contexts for "auto-save" acquisition mode

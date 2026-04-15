@@ -81,7 +81,7 @@ class FIBContext(Context):
         machine_config: dict,
         token: str,
     ):
-        super().__init__("FIB", acquisition_software, token)
+        super().__init__("FIBContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
         self._milling: dict[int, list[MillingProgress]] = {}
@@ -189,7 +189,7 @@ class FIBContext(Context):
                 sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
                 for site in sites:
                     number = _number_from_name(site["Name"])
-                    milling_angle = site["Workflow"]["Recipe"][0]["Activites"][
+                    milling_angle = site["Workflow"]["Recipe"][0]["Activities"][
                         "MillingAngleActivity"
                     ].get("MillingAngle")
                     if self._lamellae.get(number) and milling_angle:
