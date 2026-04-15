@@ -359,7 +359,7 @@ def get_foil_hole(
 
 class AtlasRegistration(BaseModel):
     name: str
-    acquisition_uuid: str
+    acquisition_uuid: str | None
     storage_folder: str = ""
     register_grid: bool = False
     tag: str = ""
@@ -371,7 +371,7 @@ def register_atlas(
     atlas_registration_data: AtlasRegistration,
     db=murfey_db,
 ):
-    if SMARTEM_ACTIVE:
+    if SMARTEM_ACTIVE and atlas_registration_data.acquisition_uuid is not None:
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         machine_config = get_machine_config(session.instrument_name)[
             session.instrument_name
@@ -382,7 +382,7 @@ def register_atlas(
             )
             grid_uuid = None
             if atlas_registration_data.tag:
-                dcg = murfey_db.exec(
+                dcg = db.exec(
                     select(DataCollectionGroup)
                     .where(DataCollectionGroup.session_id == session_id)
                     .where(DataCollectionGroup.tag == atlas_registration_data.tag)
@@ -410,7 +410,9 @@ def register_atlas(
                 if atlas_registration_data.register_grid:
                     smartem_client.grid_registered(grid_uuid)
     else:
-        logger.info("smartem deactivated so did not register atlas")
+        logger.info(
+            f"smartem deactivated so did not register atlas for {sanitise(str(atlas_registration_data.acquisition_uuid))}"
+        )
 
 
 class SquareRegistration(BaseModel):

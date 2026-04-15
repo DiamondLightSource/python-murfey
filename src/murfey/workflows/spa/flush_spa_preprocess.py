@@ -297,6 +297,7 @@ def register_foil_hole(
                 )
                 fh_data = SmartEMFoilHoleData(
                     id=str(foil_hole_params.name),
+                    gridsquare_id=str(gs.name),
                     gridsquare_uuid=gs.smartem_uuid,
                     x_location=(
                         int(foil_hole_params.x_location)
