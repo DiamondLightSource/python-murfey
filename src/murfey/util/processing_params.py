@@ -1,7 +1,6 @@
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional
 
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
@@ -59,12 +58,6 @@ def cryolo_model_path(visit: str, instrument_name: str) -> Path:
 class CLEMProcessingParameters(BaseModel):
     # Atlas vs GridSquare registration threshold
     atlas_threshold: float = 0.0015  # in m
-
-    # Image alignment and merging-specific parameters
-    crop_to_n_frames: Optional[int] = 50
-    align_self: Literal["enabled", ""] = "enabled"
-    flatten: Literal["mean", "min", "max", ""] = "mean"
-    align_across: Literal["enabled", ""] = "enabled"
 
 
 default_clem_processing_parameters = CLEMProcessingParameters()
