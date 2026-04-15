@@ -6,7 +6,7 @@ from cryoemservices.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 from murfey.util.config import get_machine_config
 
@@ -24,11 +24,6 @@ def run(
     series_name: str,
     images: list[Path],
     metadata: Path,
-    # Optional processing parameters
-    crop_to_n_frames: Optional[int] = None,
-    align_self: Literal["enabled", ""] = "",
-    flatten: Literal["mean", "min", "max", ""] = "mean",
-    align_across: Literal["enabled", ""] = "",
     # Optional session parameters
     messenger: Optional[TransportManager] = None,
 ):
@@ -65,10 +60,6 @@ def run(
                 "series_name": series_name,
                 "images": [str(file) for file in images],
                 "metadata": str(metadata),
-                "crop_to_n_frames": crop_to_n_frames,
-                "align_self": align_self,
-                "flatten": flatten,
-                "align_across": align_across,
                 # Other recipe parameters
                 "session_dir": str(session_dir),
                 "session_id": session_id,
