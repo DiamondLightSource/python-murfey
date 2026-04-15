@@ -84,6 +84,7 @@ class SPAMetadataContext(Context):
         super().__init__("SPAMetadataContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
+        self._registered_squares: set[int] = set()
 
     def post_transfer(
         self,
@@ -243,39 +244,44 @@ class SPAMetadataContext(Context):
                     },
                 )
 
-            for fh, fh_data in fh_positions.items():
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_foil_hole",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    session_id=environment.murfey_session,
-                    gs_name=gs_name,
-                    data={
-                        "name": fh,
-                        "x_location": fh_data.x_location,
-                        "y_location": fh_data.y_location,
-                        "x_stage_position": fh_data.x_stage_position,
-                        "y_stage_position": fh_data.y_stage_position,
-                        "readout_area_x": fh_data.readout_area_x,
-                        "readout_area_y": fh_data.readout_area_y,
-                        "thumbnail_size_x": fh_data.thumbnail_size_x,
-                        "thumbnail_size_y": fh_data.thumbnail_size_y,
-                        "pixel_size": fh_data.pixel_size,
-                        "diameter": fh_data.diameter,
-                        "tag": visitless_source,
-                        "image": fh_data.image,
-                    },
-                )
-            if fh_positions:
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_square",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    session_id=environment.murfey_session,
-                    gsid=gs_name,
-                    data={"tag": visitless_source},
-                )
+            if gs_name not in self._registered_squares:
+                for fh, fh_data in fh_positions.items():
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_foil_hole",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gs_name=gs_name,
+                        data={
+                            "name": fh,
+                            "x_location": fh_data.x_location,
+                            "y_location": fh_data.y_location,
+                            "x_stage_position": fh_data.x_stage_position,
+                            "y_stage_position": fh_data.y_stage_position,
+                            "readout_area_x": fh_data.readout_area_x,
+                            "readout_area_y": fh_data.readout_area_y,
+                            "thumbnail_size_x": fh_data.thumbnail_size_x,
+                            "thumbnail_size_y": fh_data.thumbnail_size_y,
+                            "pixel_size": fh_data.pixel_size,
+                            "diameter": fh_data.diameter,
+                            "tag": visitless_source,
+                            "image": fh_data.image,
+                        },
+                    )
+                if fh_positions:
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_square",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gsid=gs_name,
+                        data={
+                            "tag": visitless_source,
+                            "count": len(self._registered_squares) + 1,
+                        },
+                    )
+                    self._registered_squares.add(gs_name)

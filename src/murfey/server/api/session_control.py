@@ -417,6 +417,7 @@ def register_atlas(
 
 class SquareRegistration(BaseModel):
     tag: str
+    count: int | None = None
 
 
 @spa_router.post("/sessions/{session_id}/register_square/{gsid}")
@@ -442,7 +443,9 @@ def register_square(
                 smartem_client = SmartEMAPIClient(
                     base_url=machine_config.smartem_api_url, logger=logger
                 )
-                smartem_client.gridsquare_registered(gs.smartem_uuid)
+                smartem_client.gridsquare_registered(
+                    gs.smartem_uuid, count=square_registration_data.count
+                )
     else:
         logger.info("smartem deactivated so did not register square")
 
