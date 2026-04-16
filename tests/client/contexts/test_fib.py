@@ -173,8 +173,7 @@ def test_fib_autotem_context(
             rsync_basepath=Path(""),
         )
     assert mock_capture_post.call_count == len(fib_autotem_dc_images)
-    assert len(context._milling) == num_lamellae
-    assert len(context._lamellae) == num_lamellae
+    assert len(context._drift_correction_images) == num_lamellae
 
 
 def test_fib_maps_context(
